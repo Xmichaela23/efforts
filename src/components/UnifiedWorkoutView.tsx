@@ -540,7 +540,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b">
+      <div className="flex items-center justify-between p-2 border-b">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gray-100">
             <Calendar className="h-4 w-4" />
@@ -615,7 +615,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
         <div className="flex-1 overflow-auto">
           {/* Planned Tab */}
-          <TabsContent value="planned" className="flex-1 p-4">
+          <TabsContent value="planned" className="flex-1 p-2">
             <StructuredPlannedView 
               workout={isCompleted ? (hydratedPlanned || linkedPlanned || workout) : (hydratedPlanned || workout)}
               showHeader={true}
@@ -644,59 +644,50 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Summary Tab */}
-          <TabsContent value="summary" className="flex-1 p-4">
+          <TabsContent value="summary" className="flex-1 p-2">
             {isCompleted && (
-              <div className="mb-3 flex items-center gap-3">
-                {(!workout.planned_id && !linkedPlanned) ? (
-                  <Button variant="ghost" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={async()=>{
-                      try {
-                        const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
-                        console.log('🔍 Unattaching workout:', { workoutId: workout.id, plannedId: pid, linkedPlanned });
-                        if (!pid) return;
-                        // 1) Detach primary planned row (single-link)
-                        const { error: plannedError } = await supabase.from('planned_workouts').update({ workout_status: 'planned', completed_workout_id: null }).eq('id', pid);
-                        console.log('🔍 Planned workout update result:', plannedError);
-                        // 2) Clear workout link ONLY (preserve computed metrics)
-                        const { error: workoutError } = await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
-                        console.log('🔍 Workout update result:', workoutError);
-                        // Optional: recompute summary is not required; keep metrics as-is
-                        try { (workout as any).planned_id = null; } catch {}
-                        setLinkedPlanned(null);
-                        // Prevent immediate fallback re-link detection for a short window
-                        suppressRelinkUntil.current = Date.now() + 15000; // 15s
-                        console.log('🔍 Unattach complete, suppression until:', new Date(suppressRelinkUntil.current));
-                        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                      } catch {}
-                    }}
-                  >Unattach</Button>
-                )}
-                {/* Edit (opens Strength Logger) */}
-                {String((workout as any)?.type||'').toLowerCase()==='strength' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={()=> setEditingInline(true)}
-                  >Edit</Button>
-                )}
-                {onDelete && workout?.id && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700"
-                    onClick={() => {
-                      try {
-                        if (!confirm('Delete this workout?')) return;
-                        onDelete?.(String((workout as any).id));
-                      } catch {}
-                    }}
-                  >Delete</Button>
-                )}
+              <div className="mb-1 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {(!workout.planned_id && !linkedPlanned) ? (
+                    <Button variant="ghost" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async()=>{
+                        try {
+                          const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
+                          if (!pid) return;
+                          await supabase.from('planned_workouts').update({ workout_status: 'planned', completed_workout_id: null }).eq('id', pid);
+                          await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
+                          try { (workout as any).planned_id = null; } catch {}
+                          setLinkedPlanned(null);
+                          suppressRelinkUntil.current = Date.now() + 15000; // 15s
+                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                        } catch {}
+                      }}
+                    >Unattach</Button>
+                  )}
+                  {String((workout as any)?.type||'').toLowerCase()==='strength' && (
+                    <Button variant="ghost" size="sm" onClick={()=> setEditingInline(true)}>Edit</Button>
+                  )}
+                </div>
+                <div>
+                  {onDelete && workout?.id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => {
+                        try {
+                          if (!confirm('Delete this workout?')) return;
+                          onDelete?.(String((workout as any).id));
+                        } catch {}
+                      }}
+                    >Delete</Button>
+                  )}
+                </div>
                 {assocOpen && (
                   <AssociatePlannedDialog
                     workout={workout}
@@ -708,13 +699,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       try {
                         const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
                         setLinkedPlanned(data || null);
-                        // Immediately compute server summary so Summary tab reflects latest alignment
-                        try {
-                          await supabase.functions.invoke('compute-workout-summary', {
-                            body: { workout_id: String((workout as any)?.id) }
-                          });
-                          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                        } catch {}
+                        await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any)?.id) } });
+                        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                       } catch {}
                     }}
                   />
@@ -745,7 +731,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent value="completed" className="flex-1 -mt-8 !mt-0">
+          <TabsContent value="completed" className="flex-1 p-2">
             {isCompleted ? (
               <div className="h-full">
                 {/* Delete control removed per product decision */}
