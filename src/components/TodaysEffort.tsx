@@ -38,6 +38,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const { items: unifiedItems = [], loading: unifiedLoading } = useWeekUnified(activeDate, activeDate);
 
   // No persistence: we will use ephemeral geolocation below for today's weather
+  // Force-refresh unified feed if strength completed lacks exercises (dev pipeline guard)
+  useEffect(() => {
+    try {
+      const hasStrengthNoSE = Array.isArray(unifiedItems) && unifiedItems.some((it:any)=> (
+        String(it?.date).slice(0,10) === activeDate &&
+        String(it?.type||'').toLowerCase() === 'strength' &&
+        String(it?.status||'').toLowerCase() === 'completed' &&
+        !(Array.isArray(it?.executed?.strength_exercises) && it.executed.strength_exercises.length>0)
+      ));
+      if (hasStrengthNoSE) {
+        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      }
+    } catch {}
+  }, [unifiedItems, activeDate]);
 
   const { weather } = useWeather({
     lat: dayLoc?.lat,
