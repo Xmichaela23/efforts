@@ -654,6 +654,18 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return 'text-red-600';
   };
 
+  const getPercentageBg = (pct: number): string => {
+    if (pct >= 90 && pct <= 110) return 'bg-green-50';
+    if (pct >= 80 && pct <= 120) return 'bg-yellow-50';
+    return 'bg-red-50';
+  };
+
+  const getPercentageBorder = (pct: number): string => {
+    if (pct >= 90 && pct <= 110) return 'border-green-200';
+    if (pct >= 80 && pct <= 120) return 'border-yellow-200';
+    return 'border-red-200';
+  };
+
   const renderCompletedFor = (st: any): { paceText: string; hr: number | null; durationSec?: number } | string => {
     if (!comp || rows.length < 2) return '—' as any;
     const isRunOrWalk = /run|walk/i.test(comp.type || '') || /running|walking/i.test(comp.activity_type || '');
@@ -971,9 +983,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                 const label = plannedLabelStrict(st);
                 if (pct == null) return label;
                 return (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <span>{label}</span>
-                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${getPercentageColor(pct)}`}>{pct}%</span>
+                    <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${getPercentageColor(pct)} ${getPercentageBg(pct)} ${getPercentageBorder(pct)}`}>{pct}%</span>
                   </div>
                 );
               })()}
