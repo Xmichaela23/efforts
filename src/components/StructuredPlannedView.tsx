@@ -45,11 +45,13 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const lines: string[] = [];
   let totalSecsFromSteps = 0;
   // Strength: if server provided structured strength_exercises, render aggregated lines (avoid per-set repetition)
+  let preferStrengthLines = false;
   try {
     const parentDiscEarly = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
     if (parentDiscEarly === 'strength') {
       const exArr: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
       if (exArr.length) {
+        preferStrengthLines = true;
         for (const e of exArr) {
           const name = String(e?.name || '').replace(/_/g, ' ').trim();
           const setsNum = Math.max(1, Number(e?.sets) || (Array.isArray(e?.sets) ? e.sets.length : 0) || 1);
@@ -74,7 +76,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   // Prefer server-computed v3 steps when present
   try {
     const v3: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
-    if (v3.length) {
+    const parentDiscV3 = String((workout as any)?.type||'').toLowerCase();
+    if (v3.length && !(preferStrengthLines && parentDiscV3==='strength')) {
       const fmtDur = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
       const fmtDist = (m:number)=>{
         const x = Math.max(1, Math.round(Number(m)||0));
@@ -123,10 +126,10 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
         // Strength step formatting
         if (st?.strength && typeof st.strength==='object') {
-          const nm = String(st.strength.name||'Strength');
-          const sets = Number(st.strength.sets||0);
-          const reps = Number(st.strength.reps||0);
-          const wt = Number(st.strength.weight||0);
+      const nm = String(st.strength.name||'Strength');
+      const sets = Number(st.strength.sets||st.strength.setsCount||0);
+      const reps = Number(st.strength.reps||st.strength.repCount||0);
+      const wt = Number(st.strength.weight||st.strength.load||0);
           const unit = (String((workout as any)?.units||'').toLowerCase()==='metric') ? ' kg' : ' lb';
           const parts: string[] = [nm];
           if (sets>0 && reps>0) parts.push(`${sets}×${reps}`);
@@ -363,7 +366,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const baseKey = String(seg?.load?.baseline||'').replace(/^user\./i,'');
       const orm = pn[baseKey];
       const load = (typeof orm==='number'&&pct>0)? `${Math.max(5, Math.round((orm*(pct/100))/5)*5)} lb` : (pct?`${pct}%`:undefined);
-      lines.push(`${name} ${sets} × ${repsTxt}${load?` @ ${load}`:''}`);
+      lines.push(`${name} ${sets}×${repsTxt}${load?` @ ${load}`:''}`);
       continue;
     }
   }

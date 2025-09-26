@@ -800,12 +800,35 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
     
     setIsInitialized(true);
-    // Direct fetch as a safety net (does not overwrite if already filled)
+    // Direct fetch as a safety net (prefer unified get-week → computed steps)
     (async () => {
       try {
         const date = targetDate || getStrengthLoggerDateString();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        // 1) Unified server feed provides planned.steps even if DB row lacks computed
+        try {
+          const { data: unified } = await (supabase.functions.invoke as any)('get-week', { body: { from: date, to: date } });
+          const items: any[] = Array.isArray((unified as any)?.items) ? (unified as any).items : [];
+          const plannedStrength = items.find((it:any)=> !!it?.planned && String(it?.type||'').toLowerCase()==='strength');
+          if (plannedStrength && Array.isArray(plannedStrength?.planned?.steps)) {
+            const computedLike = { steps: plannedStrength.planned.steps, total_duration_seconds: plannedStrength.planned.total_duration_seconds };
+            const exs = parseFromComputed(computedLike);
+            if (exs.length) { setExercises(prev=> prev.length? prev: exs); return; }
+            // If steps did not map, try strength_exercises pass-through
+            const se: any[] = Array.isArray(plannedStrength?.planned?.strength_exercises) ? plannedStrength.planned.strength_exercises : [];
+            if (se.length) {
+              const pre: LoggedExercise[] = se.map((exercise: any, index: number) => ({
+                id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+                name: exercise.name || '',
+                expanded: true,
+                sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
+              }));
+              if (pre.length) { setExercises(prev => prev.length? prev: pre); return; }
+            }
+          }
+        } catch {}
+        // 2) Fallback: planned_workouts row (may have computed if hydrated elsewhere)
         const { data } = await supabase
           .from('planned_workouts')
           .select('computed, steps_preset, rendered_description, description, strength_exercises')
