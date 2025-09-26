@@ -233,7 +233,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       if (workout.type === 'strength') {
         // Strength: show exercise abbreviations with their set/rep/weight info
         // Read from strength_exercises field which contains the actual workout data
-        const exercises = Array.isArray(workout.strength_exercises) ? workout.strength_exercises : (Array.isArray((workout as any)?.computed?.strength_exercises) ? (workout as any).computed.strength_exercises : []);
+        const parseSets = (x:any)=> {
+          if (Array.isArray(x)) return x;
+          if (typeof x === 'string') { try { const p = JSON.parse(x); return Array.isArray(p) ? p : []; } catch { return []; } }
+          return [];
+        };
+        const normalizeExercises = (src:any): any[] => {
+          if (!src) return [];
+          if (Array.isArray(src)) return src.map((ex:any)=> ({ ...ex, sets: parseSets(ex?.sets) }));
+          if (typeof src === 'string') { try { const p = JSON.parse(src); return Array.isArray(p) ? p.map((ex:any)=> ({ ...ex, sets: parseSets(ex?.sets) })) : []; } catch { return []; } }
+          return [];
+        };
+        const exercises = (()=>{
+          const a = normalizeExercises(workout.strength_exercises);
+          if (a.length) return a;
+          const b = normalizeExercises((workout as any)?.computed?.strength_exercises);
+          return b;
+        })();
         
         if (exercises.length > 0) {
           // Create exercise summaries with abbreviations
@@ -675,7 +691,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           i += 1;
                         }
                         return (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>);
-                        if (!isStrength) {
+                        {
                           if (!expanded[String(workout.id)]) return null;
                           const type = String((workout as any)?.type||'').toLowerCase();
                           // Swim: use lightweight token summary to avoid heavy step expansion

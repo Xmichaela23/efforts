@@ -116,7 +116,8 @@ Deno.serve(async (req) => {
       }
       // Normalize status universally
       const cmp = w?.computed || null;
-      const hasExecuted = !!(cmp && ((Array.isArray(cmp?.intervals) && cmp.intervals.length>0) || cmp?.overall));
+      const hasStrengthEx = Array.isArray((w as any)?.strength_exercises) && (w as any).strength_exercises.length>0;
+      const hasExecuted = !!(cmp && ((Array.isArray(cmp?.intervals) && cmp.intervals.length>0) || cmp?.overall)) || hasStrengthEx;
       let status = String(w.status || w.legacy_status || '').toLowerCase();
       if (!status) status = hasExecuted ? 'completed' : (planned ? 'planned' : null);
       return { id: w.id, date, type, status, planned, executed, planned_id: w.planned_id || null };
