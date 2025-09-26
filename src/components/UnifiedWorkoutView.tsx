@@ -540,7 +540,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b">
+      <div className="flex items-center justify-between p-1 border-b">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gray-100">
             <Calendar className="h-4 w-4" />
@@ -615,7 +615,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
         <div className="flex-1 overflow-auto">
           {/* Planned Tab */}
-          <TabsContent value="planned" className="flex-1 p-2">
+          <TabsContent value="planned" className="flex-1 p-1">
             <StructuredPlannedView 
               workout={isCompleted ? (hydratedPlanned || linkedPlanned || workout) : (hydratedPlanned || workout)}
               showHeader={true}
@@ -644,9 +644,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Summary Tab */}
-          <TabsContent value="summary" className="flex-1 p-2">
+          <TabsContent value="summary" className="flex-1 p-1">
             {isCompleted && (
-              <div className="mb-1 flex items-center justify-between">
+              <div className="mb-0.5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {(!workout.planned_id && !linkedPlanned) ? (
                     <Button variant="ghost" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
@@ -731,7 +731,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent value="completed" className="flex-1 p-2">
+          <TabsContent value="completed" className="flex-1 p-1">
             {isCompleted ? (
               <div className="h-full">
                 {/* Delete control removed per product decision */}
