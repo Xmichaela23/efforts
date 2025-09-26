@@ -428,7 +428,8 @@ export default function WorkoutCalendar({
     const raw = Array.from(byId.values());
 
     // Return raw list; we intentionally show all entries (except exact duplicates)
-    return raw.map(ev => ({ date: ev.date, label: ev.label, href: ev.href, provider: ev.provider }));
+    // Preserve _src on events so UI can open the item directly
+    return raw.map(ev => ({ date: ev.date, label: ev.label, href: ev.href, provider: ev.provider, _src: ev._src }));
   }, [workouts, plannedWorkouts, plannedWeekRows, workoutsWeekRows, fromISO, toISO]);
 
   const handleDayClick = useCallback((day: Date) => {
@@ -581,9 +582,14 @@ export default function WorkoutCalendar({
               <div className="flex flex-col gap-1 items-start">
                 {items.length > 0 && (
                   items.map((evt, i) => (
-                    <span key={`${key}-${i}`} className="text-xs text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded w-full text-center truncate">
+                    <button
+                      key={`${key}-${i}`}
+                      type="button"
+                      onClick={(e)=>{ try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
+                      className="text-xs text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded w-full text-center truncate hover:bg-gray-200"
+                    >
                       {evt.label}
-                    </span>
+                    </button>
                   ))
                 )}
                 {items.length === 0 && loadingDebounced && (
