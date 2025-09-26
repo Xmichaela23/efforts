@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { supabase } from '@/lib/supabase';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
@@ -38,19 +39,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const { items: unifiedItems = [], loading: unifiedLoading } = useWeekUnified(activeDate, activeDate);
 
   // No persistence: we will use ephemeral geolocation below for today's weather
-  // Force-refresh unified feed if strength completed lacks exercises (dev pipeline guard)
+  // Hard fetch of sets for today's completed strength if missing (dev-time only)
   useEffect(() => {
-    try {
-      const hasStrengthNoSE = Array.isArray(unifiedItems) && unifiedItems.some((it:any)=> (
-        String(it?.date).slice(0,10) === activeDate &&
-        String(it?.type||'').toLowerCase() === 'strength' &&
-        String(it?.status||'').toLowerCase() === 'completed' &&
-        !(Array.isArray(it?.executed?.strength_exercises) && it.executed.strength_exercises.length>0)
-      ));
-      if (hasStrengthNoSE) {
-        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-      }
-    } catch {}
+    (async () => {
+      try {
+        const todayStrength = (Array.isArray(unifiedItems) ? unifiedItems : []).find((it:any)=> String(it?.date).slice(0,10)===activeDate && String(it?.type||'').toLowerCase()==='strength' && String(it?.status||'').toLowerCase()==='completed');
+        if (!todayStrength) return;
+        const hasSets = Array.isArray(todayStrength?.executed?.strength_exercises) && todayStrength.executed.strength_exercises.length>0;
+        if (hasSets) return;
+        const { data } = await supabase.from('workouts').select('id,strength_exercises,completed_exercises').eq('id', String(todayStrength.id)).maybeSingle();
+        if (data && (Array.isArray((data as any).strength_exercises) || Array.isArray((data as any).completed_exercises))) {
+          try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+        }
+      } catch {}
+    })();
   }, [unifiedItems, activeDate]);
 
   const { weather } = useWeather({
