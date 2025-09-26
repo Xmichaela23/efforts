@@ -8,26 +8,22 @@ import CompletedTab from './CompletedTab';
 
 interface WorkoutSummaryProps {
   workout: any;
+  completed?: any | null;
   onClose: () => void;
   onDelete?: (workoutId: string) => void;
 }
 
-export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSummaryProps) {
-  console.log('🚨 NEW CLEAN WORKOUT SUMMARY LOADED');
-  console.log('🔍 Workout intervals:', workout.intervals);
-  console.log('🔍 Full workout object:', JSON.stringify(workout, null, 2));
-  const { useImperial, workouts } = useAppContext();
+export default function WorkoutSummary({ workout, completed = null, onClose, onDelete }: WorkoutSummaryProps) {
+  const { useImperial } = useAppContext();
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [workoutStatus, setWorkoutStatus] = useState(workout?.status || workout?.workout_status || 'planned');
   const [activeTab, setActiveTab] = useState('summary');
   const completedStrengthForDay = React.useMemo(()=>{
-    if (!workout?.date || workout?.type !== 'strength') return null;
-    // Match on same date, prefer completed saved workout with strength_exercises
-    const match = workouts.find(w => (w as any).date === workout.date && (w as any).type === 'strength' && ((w as any).workout_status === 'completed' || (w as any).status === 'completed')) || null;
-    // Fallback to the currently selected workout if it's already completed (immediate UX after save)
-    if (!match && (workout as any)?.workout_status === 'completed') return workout as any;
-    return match;
-  }, [workouts, workout]);
+    if (workout?.type !== 'strength') return null;
+    if (completed && (completed as any)?.workout_status === 'completed') return completed as any;
+    if ((workout as any)?.workout_status === 'completed') return workout as any;
+    return null;
+  }, [completed, workout]);
 
   if (!workout) {
     return (

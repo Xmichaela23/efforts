@@ -102,17 +102,22 @@ serve(async (req) => {
     // Ensure token is fresh (refresh if expired or near-expiry)
     const accessToken = await ensureValidGarminAccessToken(supabase, userId, conn.access_token, conn.refresh_token, conn.expires_at)
 
-    // Fallback: if swim and no explicit pool fields on the planned row, default from user units
+    // Fallback defaults and baselines (units + FTP)
     try {
+      const { data: ub } = await supabase
+        .from('user_baselines')
+        .select('units, ftp')
+        .eq('user_id', userId)
+        .single()
+      // Expose FTP for power % → watts mapping
+      const ftpNum = Number((ub as any)?.ftp)
+      if (Number.isFinite(ftpNum) && ftpNum > 0) {
+        ;(workout as any).user_ftp = Math.round(ftpNum)
+      }
       const isSwim = String((workout as any)?.type || '').toLowerCase() === 'swim'
       const hasPool = isSwim && ((workout as any)?.pool_unit || (workout as any)?.pool_length_m)
       if (isSwim && !hasPool) {
-        const { data: ub } = await supabase
-          .from('user_baselines')
-          .select('units')
-          .eq('user_id', userId)
-          .single()
-        const pref = String(ub?.units || 'imperial').toLowerCase()
+        const pref = String((ub as any)?.units || 'imperial').toLowerCase()
         if (pref === 'imperial') {
           ;(workout as any).pool_unit = 'yd'
           ;(workout as any).pool_length_m = 22.86
@@ -322,10 +327,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   const byTypeIdx: { work: number[]; rest: number[]; warm: number[]; cool: number[] } = { work: [], rest: [], warm: [], cool: [] }
   try {
     computedSteps.forEach((x: any, i: number) => {
-      const t = String(x?.type || '').toLowerCase()
+      const t = String(x?.type || x?.kind || '').toLowerCase()
       if (t === 'warmup') byTypeIdx.warm.push(i)
       else if (t === 'cooldown') byTypeIdx.cool.push(i)
-      else if (t === 'interval_rest' || /rest/.test(t)) byTypeIdx.rest.push(i)
+      else if (t === 'interval_rest' || t === 'recovery' || /rest/.test(t)) byTypeIdx.rest.push(i)
       else byTypeIdx.work.push(i)
     })
   } catch {}
@@ -385,6 +390,12 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       }
       // CYCLING: apply POWER range from computed when available
       if (sport === 'CYCLING') {
+        // Do not attach power targets to REST/RECOVERY steps
+        if (upper === 'REST' || upper === 'RECOVERY') return
+        const userFTP: number | undefined = ((): number | undefined => {
+          const n = Number((workout as any)?.user_ftp)
+          return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined
+        })()
         const parseW = (v: any): number | undefined => {
           if (typeof v === 'number' && isFinite(v)) return v
           if (typeof v === 'string') {
@@ -393,18 +404,40 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           }
           return undefined
         }
-        let low = parseW((cs as any)?.power_range?.lower ?? (cs as any)?.target_low)
-        let high = parseW((cs as any)?.power_range?.upper ?? (cs as any)?.target_high)
+        const parsePct = (v: any): number | undefined => {
+          if (typeof v === 'number' && isFinite(v)) return v > 1 ? v/100 : v
+          if (typeof v === 'string') {
+            const m = v.match(/(-?\d+\.?\d*)\s*%?/)
+            if (m) { const n = Number(m[1]); if (isFinite(n)) return n > 1 ? n/100 : n }
+          }
+          return undefined
+        }
+        let low = parseW((cs as any)?.power_range?.lower ?? (cs as any)?.powerRange?.lower ?? (cs as any)?.target_low)
+        let high = parseW((cs as any)?.power_range?.upper ?? (cs as any)?.powerRange?.upper ?? (cs as any)?.target_high)
         if (typeof low === 'number' && typeof high === 'number') {
           step.targetType = 'POWER'
           step.targetValueLow = Math.round(low)
           step.targetValueHigh = Math.round(high)
         } else {
-          const center = parseW((cs as any)?.target_watts ?? (cs as any)?.target_value)
+          const center = parseW((cs as any)?.target_watts ?? (cs as any)?.targetWatts ?? (cs as any)?.target_value ?? (cs as any)?.powerTarget)
           if (typeof center === 'number' && isFinite(center)) {
             step.targetType = 'POWER'
             step.targetValueLow = Math.round(center * 0.95)
             step.targetValueHigh = Math.round(center * 1.05)
+          } else {
+            // Try % of FTP → watts
+            const pctLow = parsePct((cs as any)?.power_pct_range?.lower ?? (cs as any)?.powerPercentRange?.lower ?? (cs as any)?.pct_low ?? (cs as any)?.powerPctLow)
+            const pctHigh = parsePct((cs as any)?.power_pct_range?.upper ?? (cs as any)?.powerPercentRange?.upper ?? (cs as any)?.pct_high ?? (cs as any)?.powerPctHigh)
+            const pct = parsePct((cs as any)?.power_pct ?? (cs as any)?.powerPercent)
+            if (userFTP && typeof pctLow === 'number' && typeof pctHigh === 'number') {
+              step.targetType = 'POWER'
+              step.targetValueLow = Math.round(userFTP * pctLow)
+              step.targetValueHigh = Math.round(userFTP * pctHigh)
+            } else if (userFTP && typeof pct === 'number') {
+              step.targetType = 'POWER'
+              step.targetValueLow = Math.round(userFTP * pct * 0.95)
+              step.targetValueHigh = Math.round(userFTP * pct * 1.05)
+            }
           }
         }
       }
@@ -458,6 +491,16 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     } catch {}
   }
 
+  const clearTargets = (step: GarminStep) => {
+    try {
+      delete (step as any).targetType
+      delete (step as any).targetValue
+      delete (step as any).targetValueLow
+      delete (step as any).targetValueHigh
+      delete (step as any).targetValueType
+    } catch {}
+  }
+
   // Carry-forward last known SPEED range for RUNNING steps without explicit targets (non-rest)
   let lastSpeedLow: number | null = null
   let lastSpeedHigh: number | null = null
@@ -475,8 +518,14 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       const out: any[] = []
       const toSec = (v?: string): number => {
         if (!v || typeof v !== 'string') return 0
-        const m1 = v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60
-        const m2 = v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10)
+        const txt = v.trim()
+        // Support mm:ss or hh:mm:ss (e.g., "15:00", "1:05:00")
+        if (/^\d{1,2}:\d{2}(?::\d{2})?$/.test(txt)) {
+          return parseTimeToSeconds(txt)
+        }
+        // Also support tokens like "15 min", "15m", "90 s"
+        const m1 = txt.match(/(\d+)\s*min|^(\d+)\s*m$/i); if (m1) return parseInt((m1[1]||m1[2]) as string,10)*60
+        const m2 = txt.match(/(\d+)\s*s$/i); if (m2) return parseInt(m2[1],10)
         return 0
       }
       const toMeters = (val: number, unit?: string) => {
@@ -537,96 +586,104 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     } catch { return undefined }
   })()
 
-  // Prefer locally built intervals from computed.steps (ensures rich labels/equipment/rest)
+  // Prefer computed.steps first for highest fidelity; fallback to structured; then to stored intervals
   const intervals = (() => {
-    if (Array.isArray(intervalsFromStructured) && intervalsFromStructured.length) return intervalsFromStructured
     try {
       const comp: any = (workout as any)?.computed || {}
       const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : []
-      if (!steps.length) return Array.isArray((workout as any).intervals) ? (workout as any).intervals : []
-      // If computed exists but contains no actionable work reps, fall back to stored intervals (authoring)
-      const hasWorkReps = steps.some((st: any) => {
-        const t = String(st?.type || '').toLowerCase()
-        if (t === 'warmup' || t === 'cooldown') return false
-        if (t === 'interval_rest' || /rest/.test(t)) return false
-        return true
-      })
-      if (!hasWorkReps) {
-        const fromDb = Array.isArray((workout as any).intervals) ? (workout as any).intervals : []
-        if (fromDb.length) return fromDb
-      }
-      const out: any[] = []
-      const typeLower = String((workout as any).type || '').toLowerCase()
-      const isSwim = typeLower === 'swim'
-      const isRun = typeLower === 'run'
-      const pushWork = (lab: string, meters?: number, seconds?: number) => {
-        const base: any = {}
-        base.effortLabel = lab
-        if (typeof meters === 'number' && meters > 0) base.distanceMeters = Math.max(1, Math.round(meters))
-        else if (typeof seconds === 'number' && seconds > 0) base.duration = Math.max(1, Math.floor(seconds))
-        out.push(base)
-      }
-      const toMetersFromYd = (yd?: number) => (yd && yd > 0) ? Math.round(yd * 0.9144) : undefined
-      // Collect in natural order: warmups → main (work interleaved with rests) → cooldowns
-      const warmArr: any[] = []
-      const mainArr: any[] = []
-      const coolArr: any[] = []
-      for (const st of steps) {
-        const t = String(st?.type || '').toLowerCase()
-        const isRest = t === 'interval_rest' || /rest/.test(t)
-        if (isRest) {
-          const sec = Number((st as any)?.duration_s || (st as any)?.rest_s || 0)
-          mainArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor(sec || 1)) })
-          continue
-        }
-        let label = String((st as any)?.label || '').trim()
-        // Strip leading "Drill — " prefix if present
-        if (label) label = label.replace(/^Drill\s*[—-]\s*/i, '').trim()
-        if (!label && isSwim) {
-          const cue = String((st as any)?.cue || '').toLowerCase()
-          if (/drill:/.test(cue)) {
-            const nm = (cue.split(':')[1] || '').replace(/_/g,' ')
-            label = nm.charAt(0).toUpperCase() + nm.slice(1)
-          } else if (/pull/.test(cue)) label = 'Pull'
-          else if (/kick/.test(cue)) label = 'Kick'
-          else if (/aerobic/.test(cue)) label = 'Aerobic'
-        }
-        if (isSwim) {
-          const equip = String((st as any)?.equipment || '').trim()
-          const abbr = equip
-            .replace(/pull buoy/ig,'buoy')
-            .replace(/kickboard/ig,'board')
-            .replace(/\(optional\)/ig,'(opt)')
-          // Include per-rep yards explicitly so users see "1 × 100 yd"
-          const ydRaw = typeof (st as any)?.distance_yd === 'number' && (st as any).distance_yd > 0
-            ? Math.max(25, Math.round((st as any).distance_yd / 25) * 25)
-            : undefined
-          const yardText = ydRaw ? `1 × ${ydRaw} yd` : undefined
-          const baseLab = label || 'Interval'
-          label = [baseLab, yardText, abbr].filter(Boolean).join(' — ')
-        }
-        const meters = typeof (st as any)?.distance_m === 'number' && (st as any).distance_m > 0
-          ? Math.round((st as any).distance_m)
-          : toMetersFromYd((st as any)?.distance_yd)
-        const seconds = typeof (st as any)?.duration_s === 'number' && (st as any).duration_s > 0 ? Math.floor((st as any).duration_s) : undefined
-        // Route warmup/cooldown explicitly so Garmin ordering is correct
-        if (t === 'warmup') {
-          warmArr.push({ effortLabel: 'warm up', ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...((!isRun && typeof seconds==='number' && seconds>0) || (typeof meters!=='number' || !(meters>0)) ? { duration: seconds } : {}) })
-        } else if (t === 'cooldown') {
-          coolArr.push({ effortLabel: 'cool down', ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...((!isRun && typeof seconds==='number' && seconds>0) || (typeof meters!=='number' || !(meters>0)) ? { duration: seconds } : {}) })
-        } else {
-          mainArr.push({ effortLabel: (label || (isSwim ? 'interval' : 'interval')), ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...((!isRun && typeof seconds==='number' && seconds>0) || (typeof meters!=='number' || !(meters>0)) ? { duration: seconds } : {}) })
-          // Append rest immediately after work if rest_s present
-          if (typeof (st as any)?.rest_s === 'number' && (st as any).rest_s > 0) {
-            mainArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor((st as any).rest_s)) })
+      if (steps.length) {
+        // If computed exists but contains no actionable work reps, fall back next
+        const hasWorkReps = steps.some((st: any) => {
+          const t = String(st?.type || '').toLowerCase()
+          if (t === 'warmup' || t === 'cooldown') return false
+          if (t === 'interval_rest' || /rest/.test(t)) return false
+          return true
+        })
+        if (hasWorkReps) {
+          const out: any[] = []
+          const typeLower = String((workout as any).type || '').toLowerCase()
+          const isSwim = typeLower === 'swim'
+          const isRun = typeLower === 'run'
+          const toMetersFromYd = (yd?: number) => (yd && yd > 0) ? Math.round(yd * 0.9144) : undefined
+          const warmArr: any[] = []
+          const mainArr: any[] = []
+          const coolArr: any[] = []
+          const num = (v: any): number | undefined => {
+            if (typeof v === 'number' && isFinite(v) && v > 0) return v
+            const m = String(v ?? '').match(/(-?\d+\.?\d*)/)
+            if (m) return Number(m[1])
+            return undefined
           }
+          for (const st of steps) {
+            const t = String((st as any)?.type || (st as any)?.kind || '').toLowerCase()
+            const isRest = t === 'interval_rest' || t === 'recovery' || /rest/.test(t)
+            if (isRest) {
+              const sec = num((st as any)?.duration_s) ?? num((st as any)?.seconds) ?? num((st as any)?.rest_s) ?? num((st as any)?.restSeconds)
+              mainArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor(sec || 1)) })
+              continue
+            }
+            let label = String((st as any)?.label || '').trim()
+            if (label) label = label.replace(/^Drill\s*[—-]\s*/i, '').trim()
+            if (!label && isSwim) {
+              const cue = String((st as any)?.cue || '').toLowerCase()
+              if (/drill:/.test(cue)) {
+                const nm = (cue.split(':')[1] || '').replace(/_/g,' ')
+                label = nm.charAt(0).toUpperCase() + nm.slice(1)
+              } else if (/pull/.test(cue)) label = 'Pull'
+              else if (/kick/.test(cue)) label = 'Kick'
+              else if (/aerobic/.test(cue)) label = 'Aerobic'
+            }
+            const meters = ((): number | undefined => {
+              const m1 = num((st as any)?.distance_m)
+              const m2 = num((st as any)?.distanceMeters)
+              const yd = num((st as any)?.distance_yd)
+              if (typeof m1 === 'number') return Math.round(m1)
+              if (typeof m2 === 'number') return Math.round(m2)
+              if (typeof yd === 'number') return toMetersFromYd(yd)
+              return undefined
+            })()
+            const seconds = ((): number | undefined => {
+              const s1 = num((st as any)?.duration_s)
+              const s2 = num((st as any)?.seconds)
+              if (typeof s1 === 'number') return Math.floor(s1)
+              if (typeof s2 === 'number') return Math.floor(s2)
+              return undefined
+            })()
+            if (t === 'warmup') {
+              const warm: any = { effortLabel: 'warm up' }
+              if (typeof meters === 'number' && meters > 0) warm.distanceMeters = Math.round(meters)
+              // Add duration only when defined (>0). For RUN use duration only if distance missing.
+              if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {
+                warm.duration = Math.floor(seconds)
+              }
+              warmArr.push(warm)
+            } else if (t === 'cooldown') {
+              const cool: any = { effortLabel: 'cool down' }
+              if (typeof meters === 'number' && meters > 0) cool.distanceMeters = Math.round(meters)
+              if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {
+                cool.duration = Math.floor(seconds)
+              }
+              coolArr.push(cool)
+            } else {
+              const main: any = { effortLabel: (label || (isSwim ? 'interval' : 'interval')) }
+              if (typeof meters === 'number' && meters > 0) main.distanceMeters = Math.round(meters)
+              if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {
+                main.duration = Math.floor(seconds)
+              }
+              mainArr.push(main)
+              const restVal = num((st as any)?.rest_s) ?? num((st as any)?.restSeconds)
+              if (typeof restVal === 'number' && restVal > 0) {
+                mainArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor(restVal)) })
+              }
+            }
+          }
+          const ordered = [...warmArr, ...mainArr, ...coolArr]
+          if (ordered.length) return ordered
         }
       }
-      const ordered = [...warmArr, ...mainArr, ...coolArr]
-      return ordered.length ? ordered : (Array.isArray((workout as any).intervals) ? (workout as any).intervals : [])
-    } catch {
-      return Array.isArray((workout as any).intervals) ? (workout as any).intervals : []
-    }
+    } catch {}
+    if (Array.isArray(intervalsFromStructured) && intervalsFromStructured.length) return intervalsFromStructured
+    return Array.isArray((workout as any).intervals) ? (workout as any).intervals : []
   })()
 
   for (const interval of intervals) {
@@ -684,7 +741,8 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           // For RUNNING distance steps, suppress duration to avoid confusing time on device
           const sSeconds = (isRun && Number(seg?.distanceMeters) > 0) ? NaN : Number(seg?.duration)
           if (!(Number.isFinite(sMeters) && sMeters > 0) && !(Number.isFinite(sSeconds) && sSeconds > 0)) {
-            throw new Error('Invalid segment: must include distanceMeters>0 or duration>0')
+            // Skip malformed segment rather than failing entire export
+            continue
           }
           const step: GarminStep = {
             type: 'WorkoutStep',
@@ -708,24 +766,29 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           if (sport === 'LAP_SWIMMING' && step.intensity === 'REST') {
             step.durationType = 'FIXED_REST'
           }
-          applyTargets(step, seg, interval)
-          // Swim metadata: apply stroke/equipment/drill only for swim and non-rest steps
-          if (sport === 'LAP_SWIMMING' && !(step.intensity === 'REST' || step.intensity === 'RECOVERY')) {
-            const src = seg ?? {}
-            const labelTxt = String(src?.effortLabel || interval?.effortLabel || '')
-            const cueTxt = String((src as any)?.cue || '')
-            const equipTxt = String((src as any)?.equipment || '')
-            const strokeTxt = String((src as any)?.stroke || labelTxt)
-            const drill = detectDrillType(labelTxt, cueTxt)
-            const equip = mapSwimEquipment(equipTxt)
-            const stroke = mapSwimStroke(strokeTxt)
-            if (equip) step.equipmentType = equip
-            if (drill) step.drillType = drill
-            if (stroke) step.strokeType = stroke
+          const isRestIntensity = step.intensity === 'REST' || step.intensity === 'RECOVERY'
+          if (!isRestIntensity) {
+            applyTargets(step, seg, interval)
+            // Swim metadata: apply stroke/equipment/drill only for swim and non-rest steps
+            if (sport === 'LAP_SWIMMING') {
+              const src = seg ?? {}
+              const labelTxt = String(src?.effortLabel || interval?.effortLabel || '')
+              const cueTxt = String((src as any)?.cue || '')
+              const equipTxt = String((src as any)?.equipment || '')
+              const strokeTxt = String((src as any)?.stroke || labelTxt)
+              const drill = detectDrillType(labelTxt, cueTxt)
+              const equip = mapSwimEquipment(equipTxt)
+              const stroke = mapSwimStroke(strokeTxt)
+              if (equip) step.equipmentType = equip
+              if (drill) step.drillType = drill
+              if (stroke) step.strokeType = stroke
+            }
+            // Try to apply computed per-rep target if none attached
+            applyComputedTargetIfMissing(step, false)
+            normalizeTargetBounds(step)
+          } else {
+            clearTargets(step)
           }
-          // Try to apply computed per-rep target if none attached
-          applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
-          normalizeTargetBounds(step)
           // Update or carry-forward SPEED targets for RUNNING
           if (sport === 'RUNNING') {
             const isWorkStep = step.intensity === 'INTERVAL' || step.intensity === 'ACTIVE'
@@ -770,7 +833,8 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     const meters = Number(interval?.distanceMeters)
     const seconds = Number(interval?.duration)
     if (!(Number.isFinite(meters) && meters > 0) && !(Number.isFinite(seconds) && seconds > 0)) {
-      throw new Error('Invalid interval: must include distanceMeters>0 or duration>0')
+      // Skip malformed interval rather than failing entire export
+      continue
     }
     const step: GarminStep = {
       type: 'WorkoutStep',
@@ -793,23 +857,28 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     if (sport === 'LAP_SWIMMING' && step.intensity === 'REST') {
       step.durationType = 'FIXED_REST'
     }
-    applyTargets(step, interval)
-    // Swim metadata: apply stroke/equipment/drill only for swim and non-rest steps
-    if (sport === 'LAP_SWIMMING' && !(step.intensity === 'REST' || step.intensity === 'RECOVERY')) {
-      const src = interval ?? {}
-      const labelTxt = String(src?.effortLabel || '')
-      const cueTxt = String((src as any)?.cue || '')
-      const equipTxt = String((src as any)?.equipment || '')
-      const strokeTxt = String((src as any)?.stroke || labelTxt)
-      const drill = detectDrillType(labelTxt, cueTxt)
-      const equip = mapSwimEquipment(equipTxt)
-      const stroke = mapSwimStroke(strokeTxt)
-      if (equip) step.equipmentType = equip
-      if (drill) step.drillType = drill
-      if (stroke) step.strokeType = stroke
+    const isRestIntensity2 = step.intensity === 'REST' || step.intensity === 'RECOVERY'
+    if (!isRestIntensity2) {
+      applyTargets(step, interval)
+      // Swim metadata: apply stroke/equipment/drill only for swim and non-rest steps
+      if (sport === 'LAP_SWIMMING') {
+        const src = interval ?? {}
+        const labelTxt = String(src?.effortLabel || '')
+        const cueTxt = String((src as any)?.cue || '')
+        const equipTxt = String((src as any)?.equipment || '')
+        const strokeTxt = String((src as any)?.stroke || labelTxt)
+        const drill = detectDrillType(labelTxt, cueTxt)
+        const equip = mapSwimEquipment(equipTxt)
+        const stroke = mapSwimStroke(strokeTxt)
+        if (equip) step.equipmentType = equip
+        if (drill) step.drillType = drill
+        if (stroke) step.strokeType = stroke
+      }
+      applyComputedTargetIfMissing(step, false)
+      normalizeTargetBounds(step)
+    } else {
+      clearTargets(step)
     }
-    applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
-    normalizeTargetBounds(step)
     if (sport === 'RUNNING') {
       const isWorkStep = step.intensity === 'INTERVAL' || step.intensity === 'ACTIVE'
       if (isWorkStep) {
@@ -1117,8 +1186,8 @@ function estimateWorkoutSeconds(
   // advance to the next *work* rep in computed (skip rests)
   const nextWork = () => {
     while (idx < computedSteps.length) {
-      const t = String(computedSteps[idx]?.type || '').toLowerCase();
-      if (!(t === 'interval_rest' || /rest/.test(t))) break;
+      const t = String(computedSteps[idx]?.type || computedSteps[idx]?.kind || '').toLowerCase();
+      if (!(t === 'interval_rest' || t === 'recovery' || /rest/.test(t))) break;
       idx += 1;
     }
     return computedSteps[idx];
