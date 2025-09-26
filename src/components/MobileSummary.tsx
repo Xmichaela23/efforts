@@ -522,10 +522,21 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const plannedLabelStrict = (st:any): string => {
     // No labels like Warm-up/Cool-down; show a single target metric only
     if (isRideSport) {
-      const pr = (st as any)?.power_range;
-      const pw = Number((st as any)?.power_target_watts);
-      if (pr && typeof pr.lower === 'number' && typeof pr.upper === 'number' && pr.lower>0 && pr.upper>0) return `${Math.round((pr.lower+pr.upper)/2)} W`;
+      // Accept both snake_case and camelCase shapes
+      const pr = (st as any)?.power_range || (st as any)?.powerRange || (st as any)?.power?.range;
+      const prLower = Number(pr?.lower);
+      const prUpper = Number(pr?.upper);
+      if (Number.isFinite(prLower) && prLower>0 && Number.isFinite(prUpper) && prUpper>0) {
+        return `${Math.round(prLower)}–${Math.round(prUpper)} W`;
+      }
+      const pw = Number((st as any)?.power_target_watts ?? (st as any)?.powerTargetWatts ?? (st as any)?.target_watts ?? (st as any)?.watts);
       if (Number.isFinite(pw) && pw>0) return `${Math.round(pw)} W`;
+      // Fallback: show distance or time when no explicit power target provided
+      const meters = Number((st as any)?.distanceMeters ?? (st as any)?.distance_m ?? (st as any)?.m ?? (st as any)?.meters);
+      if (Number.isFinite(meters) && meters>0) return `${Math.round(meters)} m`;
+      const sec = [ (st as any)?.seconds, (st as any)?.duration, (st as any)?.duration_sec, (st as any)?.durationSeconds, (st as any)?.time_sec, (st as any)?.timeSeconds ]
+        .map((v:any)=>Number(v)).find((n:number)=>Number.isFinite(n) && n>0) as number | undefined;
+      if (Number.isFinite(sec) && (sec as number)>0) return fmtTime(sec as number);
       return '—';
     }
     // run/walk → single pace only
