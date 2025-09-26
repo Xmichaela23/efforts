@@ -111,15 +111,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     const items = Array.isArray(unifiedItems) ? unifiedItems : [];
     const completed = items
       .filter((it:any) => String(it?.status||'').toLowerCase()==='completed')
-      .map((it:any) => ({
-        id: it.id,
-        date: it.date,
-        type: it.type,
-        workout_status: 'completed',
-        computed: it.executed || null,
-        // expose strength_exercises from executed payload when present
-        strength_exercises: Array.isArray((it?.executed as any)?.strength_exercises) ? (it.executed as any).strength_exercises : ((it as any)?.strength_exercises || []),
-      }));
+      .map((it:any) => {
+        // Enrich with full workouts context when available (authoritative sets from logger)
+        const full = Array.isArray(workouts) ? (workouts as any[]).find((w:any)=> String(w?.id||'')===String(it.id)) : null;
+        const executedSE = Array.isArray((it?.executed as any)?.strength_exercises) ? (it.executed as any).strength_exercises : [];
+        const contextSE = Array.isArray((full as any)?.strength_exercises) ? (full as any).strength_exercises : [];
+        const chosenSE = executedSE && executedSE.length ? executedSE : contextSE;
+        const completedEx = Array.isArray((full as any)?.completed_exercises) ? (full as any).completed_exercises : undefined;
+        return {
+          id: it.id,
+          date: it.date,
+          type: it.type,
+          workout_status: 'completed',
+          computed: it.executed || null,
+          strength_exercises: chosenSE,
+          completed_exercises: completedEx,
+        };
+      });
     const planned = items
       .filter((it:any) => !!it?.planned && String(it?.status||'').toLowerCase()!=='completed')
       .map((it:any) => ({
