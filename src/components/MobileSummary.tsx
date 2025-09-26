@@ -883,7 +883,15 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                 if (!row) return <div>—</div>;
                 if (isRideSport) {
                   const pw = row?.executed?.avg_power_w as number | undefined;
-                  return <div>{typeof pw === 'number' ? `${Math.round(pw)} W` : '—'}</div>;
+                  if (typeof pw === 'number' && Number.isFinite(pw)) {
+                    return <div>{`${Math.round(pw)} W`}</div>;
+                  }
+                  const spd = row?.executed?.avg_speed_mps as number | undefined;
+                  if (typeof spd === 'number' && Number.isFinite(spd) && spd > 0.2) {
+                    const mph = spd * 2.236936;
+                    return <div>{`${mph.toFixed(1)} mph`}</div>;
+                  }
+                  return <div>—</div>;
                 }
                 const secPerMi = row?.executed?.avg_pace_s_per_mi as number | undefined;
                 return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
