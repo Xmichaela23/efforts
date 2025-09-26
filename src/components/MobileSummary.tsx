@@ -569,6 +569,91 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return '—';
   };
 
+  // --- Execution percentage helpers (strict, server-computed only) ---
+  const shouldShowPercentage = (st: any): boolean => {
+    const t = String((st?.type || st?.kind || '')).toLowerCase();
+    return !(t === 'interval_rest' || t === 'rest');
+  };
+
+  const calculateExecutionPercentage = (plannedStep: any, executedStep: any): number | null => {
+    try {
+      if (!executedStep) return null;
+
+      // Power-based intervals
+      const pr = (plannedStep as any)?.power_range || (plannedStep as any)?.powerRange || (plannedStep as any)?.power?.range;
+      const lo = Number(pr?.lower);
+      const hi = Number(pr?.upper);
+      const ew = Number((executedStep as any)?.avg_power_w ?? (executedStep as any)?.avg_watts ?? (executedStep as any)?.power);
+      if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi > 0 && Number.isFinite(ew) && ew > 0) {
+        const mid = (lo + hi) / 2;
+        if (mid > 0) return Math.round((ew / mid) * 100);
+      }
+
+      // Pace-based intervals (runs/swims)
+      const parsePaceTextToSecPerMeter = (txt?: string | null): number | null => {
+        if (!txt) return null;
+        const s = String(txt).trim().toLowerCase();
+        let m = s.match(/(\d{1,2}):(\d{2})\s*\/(mi|mile)/i);
+        if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec / 1609.34; }
+        m = s.match(/(\d{1,2}):(\d{2})\s*\/km/i);
+        if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec / 1000; }
+        m = s.match(/(\d{1,2}):(\d{2})\s*\/100m/i);
+        if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec / 100; }
+        m = s.match(/(\d{1,2}):(\d{2})\s*\/100yd/i);
+        if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec / (100 * 0.9144); }
+        m = s.match(/(\d{1,2}):(\d{2})\s*\/m/i);
+        if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec; }
+        return null;
+      };
+
+      const paceRange = Array.isArray((plannedStep as any)?.pace_range) ? (plannedStep as any).pace_range : null;
+      const paceMidSecPerMi = paceRange && paceRange.length===2
+        ? (()=>{ const a=Number(paceRange[0]); const b=Number(paceRange[1]); return (Number.isFinite(a)&&Number.isFinite(b)) ? Math.round((a+b)/2) : null; })()
+        : (Number((plannedStep as any)?.pace_sec_per_mi) || null);
+      let plannedSecPerMeter: number | null = null;
+      if (Number.isFinite(paceMidSecPerMi)) plannedSecPerMeter = (paceMidSecPerMi as number) / 1609.34;
+      if (plannedSecPerMeter == null) plannedSecPerMeter = parsePaceTextToSecPerMeter((plannedStep as any)?.paceTarget || (plannedStep as any)?.target_pace || (plannedStep as any)?.pace);
+
+      if (plannedSecPerMeter != null) {
+        // Executed pace: prefer executed.avg_pace_s_per_mi; else derive from distance/time
+        const execPaceMi = Number((executedStep as any)?.avg_pace_s_per_mi);
+        let execSecPerMeter: number | null = null;
+        if (Number.isFinite(execPaceMi) && execPaceMi > 0) execSecPerMeter = execPaceMi / 1609.34;
+        if (execSecPerMeter == null) {
+          const dM = Number((executedStep as any)?.distance_m);
+          const tS = Number((executedStep as any)?.duration_s);
+          if (Number.isFinite(dM) && dM > 0 && Number.isFinite(tS) && tS > 0) execSecPerMeter = tS / dM;
+        }
+        if (execSecPerMeter != null && execSecPerMeter > 0) {
+          // Faster pace => lower seconds per meter; adherence is target/actual * 100
+          return Math.round((plannedSecPerMeter / execSecPerMeter) * 100);
+        }
+      }
+
+      // Time-based efforts
+      const plannedSeconds = [ (plannedStep as any)?.seconds, (plannedStep as any)?.duration, (plannedStep as any)?.duration_sec, (plannedStep as any)?.durationSeconds, (plannedStep as any)?.time_sec, (plannedStep as any)?.timeSeconds ]
+        .map((v:any)=>Number(v)).find((n:number)=>Number.isFinite(n) && n>0) as number | undefined;
+      const execSeconds = Number((executedStep as any)?.duration_s);
+      if (Number.isFinite(plannedSeconds) && (plannedSeconds as number) > 0 && Number.isFinite(execSeconds) && execSeconds > 0) {
+        return Math.round((execSeconds / (plannedSeconds as number)) * 100);
+      }
+
+      // Distance-based efforts
+      const plannedMeters = Number((plannedStep as any)?.distanceMeters ?? (plannedStep as any)?.distance_m ?? (plannedStep as any)?.m ?? (plannedStep as any)?.meters);
+      const execMeters = Number((executedStep as any)?.distance_m);
+      if (Number.isFinite(plannedMeters) && plannedMeters > 0 && Number.isFinite(execMeters) && execMeters > 0) {
+        return Math.round((execMeters / plannedMeters) * 100);
+      }
+    } catch {}
+    return null;
+  };
+
+  const getPercentageColor = (pct: number): string => {
+    if (pct >= 90 && pct <= 110) return 'text-green-600';
+    if (pct >= 80 && pct <= 120) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
   const renderCompletedFor = (st: any): { paceText: string; hr: number | null; durationSec?: number } | string => {
     if (!comp || rows.length < 2) return '—' as any;
     const isRunOrWalk = /run|walk/i.test(comp.type || '') || /running|walking/i.test(comp.activity_type || '');
@@ -870,7 +955,29 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       <div className="mt-2 divide-y divide-gray-100">
         {steps.map((st, idx) => (
           <div key={idx} className="grid grid-cols-5 gap-4 py-2 text-sm">
-            <div className="text-gray-800">{plannedLabelStrict(st)}</div>
+            <div className="text-gray-800">
+              {(() => {
+                // Compute percentage badge inline with planned label
+                let row: any = null;
+                if (hasServerComputed) {
+                  const pid = String((st as any)?.id || '');
+                  row = pid ? intervalByPlannedId.get(pid) : null;
+                  if (!row) {
+                    const ix = Number((st as any)?.planned_index);
+                    if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null;
+                  }
+                }
+                const pct = (hasServerComputed && shouldShowPercentage(st)) ? calculateExecutionPercentage(st, row?.executed) : null;
+                const label = plannedLabelStrict(st);
+                if (pct == null) return label;
+                return (
+                  <div className="flex items-center gap-2">
+                    <span>{label}</span>
+                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${getPercentageColor(pct)}`}>{pct}%</span>
+                  </div>
+                );
+              })()}
+            </div>
             <div className="text-gray-900">
               {(() => {
                 if (!hasServerComputed) return <div>—</div>;
