@@ -276,6 +276,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           const b = normalizeExercises((workout as any)?.computed?.strength_exercises);
           return b;
         })();
+        try {
+          if (import.meta.env?.DEV) {
+            const lenExec = Array.isArray((workout as any)?.computed?.strength_exercises) ? (workout as any).computed.strength_exercises.length : 0;
+            const lenCtx = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises.length : 0;
+            const lenComp = Array.isArray((workout as any)?.completed_exercises) ? (workout as any).completed_exercises.length : 0;
+            // eslint-disable-next-line no-console
+            console.debug('[today:strength] sources', { id: String((workout as any)?.id||''), lenExec, lenCtx, lenComp, chosen: Array.isArray(exercises) ? exercises.length : 0 });
+          }
+        } catch {}
         
         if (exercises.length > 0) {
           // Create exercise summaries with abbreviations
