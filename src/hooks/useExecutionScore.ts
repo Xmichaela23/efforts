@@ -31,7 +31,11 @@ export const useExecutionScore = (
       .map((planned, index) => {
         const id = String(planned?.id || '');
         const idx = Number(planned?.planned_index ?? index);
-        const executed = (id && byPlannedId.get(id)) || (Number.isFinite(idx) ? byPlannedIndex.get(idx) : undefined);
+        let executed = (id && byPlannedId.get(id)) || (Number.isFinite(idx) ? byPlannedIndex.get(idx) : undefined);
+        // Fallback: positional match when server snapshot lacks planned_index mapping
+        if (!executed && Array.isArray(executedIntervals) && executedIntervals.length > index) {
+          executed = executedIntervals[index];
+        }
         return { planned, executed };
       })
       .filter(({ planned }) => {
@@ -50,18 +54,19 @@ export const useExecutionScore = (
 
     for (const { planned, executed } of pairs) {
       if (!executed) continue;
-      const percentage = calculateExecutionPercentage(planned, executed);
+      const ex = (executed as any)?.executed ?? executed;
+      const percentage = calculateExecutionPercentage(planned, ex);
       if (percentage === null) continue;
 
       let weight = 1;
       if (t === 'swim') {
-        weight = Number(executed.distance_m || planned.distance_m || planned.distanceMeters || 1) || 1;
+        weight = Number(ex?.distance_m || planned.distance_m || planned.distanceMeters || 1) || 1;
       } else if (t === 'strength') {
-        const reps = Number(executed.reps || planned.reps || 1) || 1;
-        const sets = Number(executed.sets || planned.sets || 1) || 1;
+        const reps = Number(ex?.reps || planned.reps || 1) || 1;
+        const sets = Number(ex?.sets || planned.sets || 1) || 1;
         weight = Math.max(1, reps * sets);
       } else {
-        weight = Number(executed.duration_s || planned.seconds || planned.duration || 60) || 60;
+        weight = Number(ex?.duration_s || planned.seconds || planned.duration || 60) || 60;
       }
 
       totalWeightedScore += percentage * weight;
