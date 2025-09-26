@@ -4,16 +4,11 @@ export interface StrengthSet { reps: number; weight: number; rir?: number; compl
 export interface StrengthExercise { name: string; sets?: number; reps?: number; weight?: number; setsArray?: StrengthSet[] }
 
 function normalizeName(raw: string): string {
-  const base = String(raw || '')
+  // Keep only minimal normalization to avoid merging distinct movements
+  return String(raw || '')
     .toLowerCase()
-    .replace(/\s*\(.*?\)\s*/g, '')
-    .replace(/\s*@.*$/, '')
-    .replace(/\s*[—-].*$/, '')
     .replace(/\s+/g, ' ')
     .trim();
-  // Alias groups: treat Pull-Ups and Chin-Ups as the same movement for comparison
-  if (/\b(pull|chin)[-\s]?ups?\b/.test(base)) return 'chin-ups';
-  return base;
 }
 
 function calcVolume(sets: StrengthSet[]): number {
@@ -41,7 +36,7 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
     const pVol = pSets * pReps * pW;
     const cSetsArrRaw = (c as any)?.setsArray as StrengthSet[] | undefined;
     const cSetsArr = Array.isArray(cSetsArrRaw)
-      ? cSetsArrRaw.filter((s:any)=> s && typeof s === 'object' && ('reps' in s || 'weight' in s))
+      ? cSetsArrRaw.filter((s:any)=> s && typeof s === 'object') // do not drop zero-weight/zero-rep sets
       : [];
     const cSets = Array.isArray(cSetsArr) ? cSetsArr.length : 0;
     const cRepsAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.reps||0)) : 0;

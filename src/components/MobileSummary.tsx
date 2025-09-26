@@ -266,8 +266,12 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   // Prefer server snapshot from completed.computed when available
   const serverPlannedLight: any[] = Array.isArray((completed as any)?.computed?.planned_steps_light) ? (completed as any).computed.planned_steps_light : [];
   const hasServerPlanned = serverPlannedLight.length > 0;
+  // For strength, allow completed-only render when no planned is available
   if (!planned && !hasServerPlanned) {
-    return (<div className="text-sm text-gray-600">No planned session to compare.</div>);
+    const typeMaybe = String((completed as any)?.type || '').toLowerCase();
+    if (typeMaybe !== 'strength') {
+      return (<div className="text-sm text-gray-600">No planned session to compare.</div>);
+    }
   }
 
   const [effectivePlanned, setEffectivePlanned] = useState<any>(planned);
@@ -282,7 +286,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     setEffectivePlanned(planned);
   }, [planned]);
 
-  const type = String((effectivePlanned as any)?.type || '').toLowerCase();
+  const type = String((effectivePlanned as any)?.type || (completed as any)?.type || '').toLowerCase();
   const isRidePlanned = /ride|bike|cycling/.test(type);
   const tokens: string[] = Array.isArray((effectivePlanned as any)?.steps_preset) ? ((effectivePlanned as any).steps_preset as any[]).map((t:any)=>String(t)) : [];
   const tokensJoined = tokens.join(' ').toLowerCase();
@@ -337,7 +341,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
   // Strength uses compare table
   if (type === 'strength') {
-    const plannedStrength = (planned.strength_exercises || []).map((ex: any)=>{
+    const plannedStrength = (planned?.strength_exercises || []).map((ex: any)=>{
       // Normalize planned fields even if a completed workout object is passed in
       const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
       const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
