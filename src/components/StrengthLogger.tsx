@@ -171,6 +171,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [selectedWarmupCategory, setSelectedWarmupCategory] = useState<string>('general');
   const [selectedWarmupVariant, setSelectedWarmupVariant] = useState<string>('A');
   
+  // Helper: detect common bodyweight movements (no default load)
+  const isBodyweightMove = (raw?: string): boolean => {
+    try {
+      const n = String(raw || '').toLowerCase().replace(/[\s-]/g,'');
+      return /dip|chinup|pullup|pushup|plank/.test(n);
+    } catch { return false; }
+  };
+  
   // Session persistence key based on target date - use consistent date format
   const getStrengthLoggerDateString = () => {
     const now = new Date();
@@ -769,7 +777,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         expanded: true,
         sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => ({
           reps: exercise.reps || 0,
-          weight: exercise.weight || 0,
+          weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
           barType: 'standard',
           rir: undefined,
           completed: false
@@ -848,7 +856,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
             name: exercise.name || '',
             expanded: true,
-            sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
+            sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0), barType: 'standard', rir: undefined, completed: false }))
           }));
           if (pre.length>0) setExercises(prev => prev.length? prev : pre);
           return;
