@@ -582,14 +582,16 @@ export default function WorkoutCalendar({
               <div className="flex flex-col gap-1 items-start">
                 {items.length > 0 && (
                   items.map((evt, i) => (
-                    <button
+                    <span
                       key={`${key}-${i}`}
-                      type="button"
-                      onClick={(e)=>{ try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
-                      className="text-xs text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded w-full text-center truncate hover:bg-gray-200"
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
+                      onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
+                      className="cursor-pointer text-xs text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded w-full text-center truncate hover:bg-gray-200"
                     >
                       {evt.label}
-                    </button>
+                    </span>
                   ))
                 )}
                 {items.length === 0 && loadingDebounced && (
