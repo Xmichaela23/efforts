@@ -54,21 +54,26 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         preferStrengthLines = true;
         for (const e of exArr) {
           const name = String(e?.name || '').replace(/_/g, ' ').trim();
-          const setsNum = Math.max(1, Number(e?.sets) || (Array.isArray(e?.sets) ? e.sets.length : 0) || 1);
-          const repsVal: any = (() => {
-            const r = (e as any)?.reps;
-            if (typeof r === 'string') return r.toUpperCase();
-            if (typeof r === 'number') return Math.max(1, Math.round(r));
-            // if sets array provided, try average reps
-            if (Array.isArray((e as any)?.sets) && (e as any).sets.length) {
-              try { const avg = Math.round(((e as any).sets as any[]).reduce((a: number, s: any) => a + (Number(s?.reps) || 0), 0) / (e as any).sets.length); return Math.max(1, avg); } catch {}
+          const setsField: any = (e as any).sets;
+          const baseWeight = (typeof (e as any)?.weight === 'number' && isFinite((e as any).weight)) ? Math.round((e as any).weight) : undefined;
+          const baseReps = ((): number | string | undefined => { const r=(e as any)?.reps; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
+          if (Array.isArray(setsField) && setsField.length) {
+            // Per-set objects
+            for (const s of setsField) {
+              const reps = (typeof s?.reps==='number' && s.reps>0) ? s.reps : (typeof baseReps==='number'?baseReps:0);
+              const wt = (typeof s?.weight==='number' && s.weight>0) ? Math.round(s.weight) : (baseWeight||0);
+              const wtTxt = wt>0 ? ` @ ${wt} lb` : '';
+              lines.push(`${name} 1×${reps||0}${wtTxt}`.trim());
             }
-            return undefined;
-          })();
-          const repTxt = (typeof repsVal === 'string') ? repsVal : (Number.isFinite(repsVal) ? String(repsVal) : '');
-          const wtNum = (typeof (e as any)?.weight === 'number' && isFinite((e as any).weight)) ? Math.round((e as any).weight) : undefined;
-          const wtTxt = typeof wtNum === 'number' && wtNum > 0 ? ` @ ${wtNum} lb` : '';
-          lines.push(`${name} ${setsNum}×${repTxt}${wtTxt}`.trim());
+          } else {
+            // Numeric sets: expand into that many steps
+            const setsNum = Math.max(1, Number(setsField)||1);
+            const repTxt = (typeof baseReps==='string') ? baseReps : String(baseReps||0);
+            const wtTxt = (typeof baseWeight==='number' && baseWeight>0) ? ` @ ${baseWeight} lb` : '';
+            for (let i=0;i<setsNum;i+=1) {
+              lines.push(`${name} 1×${repTxt}${wtTxt}`.trim());
+            }
+          }
         }
       }
     }
