@@ -958,11 +958,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       })()}
       <table className="w-full text-sm table-fixed">
         <colgroup>
+          <col className="w-[22%]" />
           <col className="w-[20%]" />
           <col className="w-[18%]" />
           <col className="w-[16%]" />
           <col className="w-[14%]" />
-          <col className="w-[16%]" />
         </colgroup>
         <thead>
           <tr className="border-b border-gray-200">
@@ -970,7 +970,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             <th className="px-2 py-3 text-left font-medium text-gray-600">{isRideSport ? 'Executed Watts' : (isSwimSport ? 'Executed /100 (pref)' : 'Executed Pace')}</th>
             <th className="px-2 py-3 text-left font-medium text-gray-600">Distance</th>
             <th className="px-2 py-3 text-left font-medium text-gray-600">Time</th>
-            <th className="px-2 py-3 text-left font-medium text-gray-600">BPM</th>
+            <th className="px-1 py-3 text-left font-medium text-gray-600">BPM</th>
           </tr>
         </thead>
         <tbody>
@@ -1035,10 +1035,14 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                 <td className="px-2 py-2 font-medium">{execCell}</td>
                 <td className="px-2 py-2">{distCell}</td>
                 <td className="px-2 py-2">{timeCell}</td>
-                <td className="px-1 py-2 text-right">
-                  <div className="text-xs">
-                    {hrVal != null ? `${hrVal}` : '—'}
-                    <div className="text-gray-500">bpm</div>
+                <td className="px-1 py-2 text-sm">
+                  <div className="text-right">
+                    {hrVal != null ? (
+                      <>
+                        <div className="font-medium">{hrVal}</div>
+                        <div className="text-xs text-gray-500">bpm</div>
+                      </>
+                    ) : '—'}
                   </div>
                 </td>
               </tr>
