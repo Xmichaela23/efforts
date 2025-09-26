@@ -218,7 +218,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (!pid) return;
         const { data: row } = await supabase
           .from('planned_workouts')
-          .select('id,type,computed,steps_preset,export_hints,tags')
+          .select('id,type,computed,steps_preset,export_hints,tags,workout_structure,rendered_description,description,name')
           .eq('id', pid)
           .maybeSingle();
         setHydratedPlanned(row as any);
