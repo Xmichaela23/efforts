@@ -47,8 +47,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         if (!todayStrength) return;
         const hasSets = Array.isArray(todayStrength?.executed?.strength_exercises) && todayStrength.executed.strength_exercises.length>0;
         if (hasSets) return;
-        const { data } = await supabase.from('workouts').select('id,strength_exercises,completed_exercises').eq('id', String(todayStrength.id)).maybeSingle();
-        if (data && (Array.isArray((data as any).strength_exercises) || Array.isArray((data as any).completed_exercises))) {
+        const { data } = await supabase.from('workouts').select('id,strength_exercises').eq('id', String(todayStrength.id)).maybeSingle();
+        if (data && Array.isArray((data as any).strength_exercises)) {
           try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
         }
       } catch {}
