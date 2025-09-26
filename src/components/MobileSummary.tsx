@@ -1010,19 +1010,19 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
       <table className="w-full text-sm table-fixed">
         <colgroup>
+          <col className="w-[36%]" />
           <col className="w-[22%]" />
-          <col className="w-[20%]" />
-          <col className="w-[18%]" />
           <col className="w-[16%]" />
           <col className="w-[14%]" />
+          <col className="w-[12%]" />
         </colgroup>
         <thead>
           <tr className="border-b border-gray-200">
-            <th className="px-2 py-3 text-left font-medium text-gray-600">Planned</th>
-            <th className="px-2 py-3 text-left font-medium text-gray-600">{isRideSport ? 'Executed Watts' : (isSwimSport ? 'Executed /100 (pref)' : 'Executed Pace')}</th>
-            <th className="px-2 py-3 text-left font-medium text-gray-600">Distance</th>
-            <th className="px-2 py-3 text-left font-medium text-gray-600">Time</th>
-            <th className="px-1 py-3 text-left font-medium text-gray-600">BPM</th>
+            <th className="px-2 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Planned</th>
+            <th className="px-2 py-3 text-left font-medium text-gray-600 whitespace-nowrap">{isRideSport ? 'Watts' : (isSwimSport ? '/100 (pref)' : 'Pace')}</th>
+            <th className="px-2 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Dist</th>
+            <th className="px-2 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Time</th>
+            <th className="px-1 py-3 text-left font-medium text-gray-600 whitespace-nowrap">BPM</th>
           </tr>
         </thead>
         <tbody>
