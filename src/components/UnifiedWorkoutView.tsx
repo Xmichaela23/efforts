@@ -415,6 +415,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // Generate a nice title from GPS location + activity type
   const generateWorkoutTitle = () => {
+    // Product decision: prefer the saved workout name if present
+    const explicitName = String((workout as any)?.name || '').trim();
+    if (explicitName) {
+      return explicitName;
+    }
     // Planned: standardize to "Type — Focus" for consistency across app
     if (workout.workout_status === 'planned') {
       const t = String(workout.type || '').toLowerCase();
@@ -548,13 +553,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 return 'Planned';
               })()}
             </p>
-            {isCompleted && workout?.planned_id && String((workout as any)?.type || '').toLowerCase() !== 'strength' && (
-              <div className="mt-1 inline-flex items-center gap-2 text-xs">
-                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 border border-green-200">
-                  Auto-linked to plan
-                </span>
-              </div>
-            )}
+            {/* Auto-linked badge removed per product decision */}
           </div>
         </div>
         {/* Close X removed per product decision; back handled by native nav */}
