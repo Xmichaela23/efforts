@@ -1005,15 +1005,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
   return (
     <div className="w-full">
-      {(() => {
-        const ver = completedComputed?.version || completedComputed?.computed_version || null;
-        const label = hasServerComputed ? `server-computed${ver ? ` (${ver})` : ''}` : (forceComputing ? 'computing…' : 'waiting for server');
-        return (
-          <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
-            <div>Source: {label}{computeError ? <span className="ml-2 text-red-600">{computeError}</span> : null}</div>
-          </div>
-        );
-      })()}
+      {/* Source line removed per UI request */}
 
       {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
       <table className="w-full text-sm table-fixed">

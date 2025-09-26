@@ -661,18 +661,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Summary Tab */}
           <TabsContent value="summary" className="flex-1 p-1">
-            {(() => {
-              if (overallScore == null) return null;
-              const color = overallScore>=90 && overallScore<=110 ? 'text-green-600' : overallScore>=80 && overallScore<=120 ? 'text-yellow-600' : 'text-red-600';
-              return (
-                <div className="px-4">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-500 truncate pr-2">{overallMethod}</span>
-                    <span className={`text-base font-semibold ${color}`}>{overallScore}%</span>
-                  </div>
-                </div>
-              );
-            })()}
             {/* Overall Execution card rendered inside MobileSummary to avoid duplication */}
             {isCompleted && (
               <div className="mb-0.5 flex items-center justify-between">
@@ -702,21 +690,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     <Button variant="ghost" size="sm" onClick={()=> setEditingInline(true)}>Edit</Button>
                   )}
                 </div>
-                <div>
-                  {onDelete && workout?.id && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700"
-                      onClick={() => {
-                        try {
-                          if (!confirm('Delete this workout?')) return;
-                          onDelete?.(String((workout as any).id));
-                        } catch {}
-                      }}
-                    >Delete</Button>
-                  )}
-                </div>
+                <div></div>
                 {assocOpen && (
                   <AssociatePlannedDialog
                     workout={workout}
@@ -736,6 +710,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 )}
               </div>
             )}
+            {(() => {
+              if (overallScore == null) return null;
+              const color = overallScore>=90 && overallScore<=110 ? 'text-green-600' : overallScore>=80 && overallScore<=120 ? 'text-yellow-600' : 'text-red-600';
+              return (
+                <div className="px-4">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-700 font-medium truncate pr-2">{overallMethod}</span>
+                    <span className={`text-base font-semibold ${color}`}>{overallScore}%</span>
+                  </div>
+                </div>
+              );
+            })()}
             {/* Inline Strength Logger editor */}
             {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
               <div className="mb-4 border border-gray-200 rounded-md">
@@ -757,6 +743,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
               completed={isCompleted ? workout : null} 
             />
+            {onDelete && workout?.id && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="fixed bottom-3 right-3 text-red-600 hover:text-red-700"
+                onClick={() => {
+                  try {
+                    if (!confirm('Delete this workout?')) return;
+                    onDelete?.(String((workout as any).id));
+                  } catch {}
+                }}
+              >Delete</Button>
+            )}
           </TabsContent>
 
           {/* Completed Tab */}
