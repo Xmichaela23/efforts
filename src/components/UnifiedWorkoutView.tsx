@@ -521,7 +521,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                          activityType === 'walk' ? 'Walking' :
                          activityType === 'swim' ? 'Swimming' :
                          activityType === 'strength' ? 'Strength Training' :
-                         activityType.charAt(0).toUpperCase() + activityType.slice(1);
+                         String(activityType).charAt(0).toUpperCase() + String(activityType).slice(1);
     
     // Create title: "Location + Friendly Sport" or sanitized name fallback
     if (location && location !== 'Unknown Location') {
@@ -648,7 +648,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           <TabsContent value="summary" className="flex-1 p-1">
             {(() => {
               const plannedRow: any = (hydratedPlanned || linkedPlanned || (isCompleted ? workout : null)) as any;
-              const plannedSteps: any[] = Array.isArray(plannedRow?.computed?.steps) ? plannedRow.computed.steps : [];
+              const computedSteps: any[] = Array.isArray(plannedRow?.computed?.steps) ? plannedRow.computed.steps : [];
+              // Fallback to server snapshot on completed row to match per-row table behavior
+              const lightSteps: any[] = Array.isArray((workout as any)?.computed?.planned_steps_light)
+                ? (workout as any).computed.planned_steps_light.map((s:any)=> ({ id: s.planned_step_id, planned_index: s.planned_index, distanceMeters: s.meters, seconds: s.seconds }))
+                : [];
+              const plannedSteps: any[] = computedSteps.length ? computedSteps : lightSteps;
               const executedIntervals: any[] = Array.isArray((workout as any)?.computed?.intervals) ? (workout as any).computed.intervals : [];
               const t = String((workout as any)?.type || plannedRow?.type || '').toLowerCase();
               const { score, methodLabel } = useExecutionScore(t, plannedSteps, executedIntervals);
