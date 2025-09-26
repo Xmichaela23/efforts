@@ -1015,34 +1015,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         );
       })()}
 
-      {(() => {
-        const plannedSteps = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
-        const executedIntervals = computedIntervals;
-        const workoutType = String((completed as any)?.type || (effectivePlanned as any)?.type || '').toLowerCase();
-        const score = calculateExecutionScore(workoutType, plannedSteps, executedIntervals);
-        if (!plannedSteps.length || !executedIntervals.length) return null;
-        return (
-          <div className="space-y-4">
-            {/* Execution card inside existing padding structure */}
-            <div className="px-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Overall Execution</span>
-                    <div className="text-xs text-gray-500 mt-0.5">{getExecutionMethodLabel(workoutType, plannedSteps)}</div>
-                  </div>
-                  <span className={`text-xl font-bold ${getPercentageColor(score || 0)}`}>{score ?? '—'}%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Source line */}
-            <div className="px-4">
-              <div className="text-xs text-gray-500 mb-4">Source: server-computed {completedComputed?.version ? `(v${completedComputed.version})` : ''}</div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
       <table className="w-full text-sm table-fixed">
         <colgroup>
           <col className="w-[22%]" />
