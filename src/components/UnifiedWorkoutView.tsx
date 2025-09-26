@@ -422,17 +422,34 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       if (stTitle) return stTitle;
       const t = String((plannedRow as any)?.type || '').toLowerCase();
       const typeLabel = t === 'run' ? 'Run' : t === 'ride' ? 'Ride' : t === 'swim' ? 'Swim' : t === 'strength' ? 'Strength' : 'Session';
-      const raw = String((plannedRow as any)?.name || (plannedRow as any)?.rendered_description || (plannedRow as any)?.description || '').toLowerCase();
+      const rawDesc = String((plannedRow as any)?.name || (plannedRow as any)?.rendered_description || (plannedRow as any)?.description || '').toLowerCase();
+      const tagsArr: any[] = Array.isArray((plannedRow as any)?.tags) ? (plannedRow as any).tags : [];
+      const tags = tagsArr.map((x:any)=> String(x).toLowerCase());
       const focus = (() => {
-        if (/interval/.test(raw)) return 'Intervals';
-        if (/tempo/.test(raw)) return 'Tempo';
-        if (/long\s*run|long\s*ride|long\s*\d+\s*min/.test(raw)) return 'Long';
-        if (/vo2/.test(raw)) return 'VO2';
-        if (/threshold|thr\b/.test(raw)) return 'Threshold';
-        if (/sweet\s*spot|ss\b/.test(raw)) return 'Sweet Spot';
-        if (/endurance/.test(raw)) return 'Endurance';
-        if (/technique/.test(raw)) return 'Technique';
+        if (t === 'ride') {
+          if (tags.includes('long_ride')) return 'Long Ride';
+          if (/vo2/.test(rawDesc)) return 'VO2';
+          if (/threshold|thr_/.test(rawDesc)) return 'Threshold';
+          if (/sweet\s*spot|\bss\b/.test(rawDesc)) return 'Sweet Spot';
+          if (/recovery/.test(rawDesc)) return 'Recovery';
+          if (/endurance|\bz2\b/.test(rawDesc)) return 'Endurance';
+          return 'Ride';
+        }
+        if (t === 'run') {
+          if (tags.includes('long_run')) return 'Long Run';
+          if (/tempo/.test(rawDesc)) return 'Tempo';
+          if (/(intervals?)/.test(rawDesc) || /(\d+)\s*[x×]\s*(\d+)/.test(rawDesc)) return 'Intervals';
+          return 'Run';
+        }
+        if (t === 'swim') {
+          if (tags.includes('opt_kind:technique') || /drills|technique/.test(rawDesc)) return 'Technique';
+          return 'Endurance';
+        }
         if (t === 'strength') return 'Strength';
+        // Generic fallbacks
+        if (/sweet\s*spot|\bss\b/.test(rawDesc)) return 'Sweet Spot';
+        if (/threshold|tempo|interval/.test(rawDesc)) return 'Quality';
+        if (/endurance|long/.test(rawDesc)) return 'Endurance';
         return 'Planned';
       })();
       return `${typeLabel} — ${focus}`;
