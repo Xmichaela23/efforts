@@ -24,6 +24,7 @@ import FitFileImporter from './FitFileImporter';
 import TrainingBaselines from './TrainingBaselines';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import PullToRefresh from './PullToRefresh';
+import { supabase } from '@/lib/supabase';
 
 interface AppLayoutProps {
   onLogout?: () => void;
@@ -362,10 +363,26 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setSelectedWorkout(null);
   };
 
-  const handleEditEffort = (workout: any) => {
-    if (workout.workout_status === 'completed') {
-      setSelectedWorkout(workout);
-    } else if (workout.workout_status === 'planned') {
+  const handleEditEffort = async (workout: any) => {
+    const status = String((workout as any)?.workout_status || '').toLowerCase();
+    if (status === 'completed') {
+      let row = workout;
+      try {
+        // If coming from calendar/range feed, fetch full workout by id for complete details
+        const minimal = !('sensor_data' in (workout as any)) && !('gps_track' in (workout as any)) && !('computed' in (workout as any));
+        const hasFewKeys = Object.keys(workout || {}).length < 8; // heuristic
+        if ((minimal || hasFewKeys) && (workout as any)?.id) {
+          const { data } = await supabase
+            .from('workouts')
+            .select('*')
+            .eq('id', String((workout as any).id))
+            .maybeSingle();
+          if (data) row = data as any;
+        }
+      } catch {}
+      setSelectedWorkout(row);
+      setActiveTab('completed');
+    } else if (status === 'planned') {
       // Planned workout: open in UnifiedWorkoutView on Planned sub-tab
       setShowAllPlans(false);
       setSelectedWorkout(workout);
