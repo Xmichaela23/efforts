@@ -713,10 +713,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               if (overallScore == null) return null;
               const color = overallScore>=90 && overallScore<=110 ? 'text-green-600' : overallScore>=80 && overallScore<=120 ? 'text-yellow-600' : 'text-red-600';
               return (
-                <div className="px-2 py-1">
-                  <div className="flex items-baseline gap-2 text-xs">
-                    <span className="text-gray-700 font-medium truncate">{overallMethod}</span>
+                <div className="px-1 py-0.5">
+                  <div className="flex flex-col items-center leading-tight">
                     <span className={`text-base font-semibold ${color}`}>{overallScore}%</span>
+                    <span className="text-[12px] text-gray-700 font-medium truncate">{overallMethod}</span>
                   </div>
                 </div>
               );
