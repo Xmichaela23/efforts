@@ -269,6 +269,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         const exercises = (()=>{
           const a = normalizeExercises(workout.strength_exercises);
           if (a.length) return a;
+          const c = normalizeExercises((workout as any)?.completed_exercises);
+          if (c.length) return c;
           const b = normalizeExercises((workout as any)?.computed?.strength_exercises);
           return b;
         })();
