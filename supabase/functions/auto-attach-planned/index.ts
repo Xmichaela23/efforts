@@ -66,19 +66,14 @@ Deno.serve(async (req) => {
 
     const { sport, subtype } = sportSubtype(w.provider_sport || w.type);
 
-    // Fetch planned candidates of same sport within a 1-day window to avoid UTC skew
+    // Fetch planned candidates of same sport on the exact YYYY-MM-DD only (timezone-agnostic)
     const day = String(w.date || '').slice(0,10);
-    const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const base = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T00:00:00`) : null;
-    const fromDay = base ? new Date(base.getFullYear(), base.getMonth(), base.getDate() - 1) : null;
-    const toDay = base ? new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1) : null;
     const { data: plannedList } = await supabase
       .from('planned_workouts')
       .select('id,user_id,type,date,name,computed,intervals,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment')
       .eq('user_id', w.user_id)
       .eq('type', sport)
-      .gte('date', fromDay ? toISO(fromDay) : day)
-      .lte('date', toDay ? toISO(toDay) : day)
+      .eq('date', day)
       .in('workout_status', ['planned','in_progress','completed']);
 
     const candidates = Array.isArray(plannedList) ? plannedList : [];
@@ -88,93 +83,19 @@ Deno.serve(async (req) => {
     const wSec = Number(w.moving_time ? (typeof w.moving_time==='number' ? w.moving_time : 0) : 0);
     const wMeters = Number(w.distance ? w.distance*1000 : 0);
 
-    // Score candidates
-    let best: any = null; let bestScore = -1e9; let bestDurPct: number | null = null; let bestDistPct: number | null = null;
+    // Strict match: date string + type only. If multiple, pick earliest created.
+    let best: any = null;
     for (const p of candidates) {
-      const hasSteps = (() => {
-        try {
-          const steps = Array.isArray((p as any)?.computed?.steps) ? (p as any).computed.steps : null;
-          const intervals = Array.isArray((p as any)?.intervals) ? (p as any).intervals : null;
-          return (Array.isArray(steps) && steps.length>0) || (Array.isArray(intervals) && intervals.length>0);
-        } catch { return false; }
-      })();
-      const stepCount = (() => { try { return Array.isArray((p as any)?.computed?.steps) ? (p as any).computed.steps.length : 0; } catch { return 0; } })();
-      // Ignore rows that look like WU/CD-only or otherwise underspecified
-      if (stepCount > 0 && stepCount < 3) {
-        continue;
+      const pdate = String((p as any).date || '').slice(0,10);
+      if (pdate === day && String((p as any).type||'').toLowerCase() === sport) {
+        if (!best) best = p;
       }
-      const totals = sumPlanned(p);
-      let score = 0;
-      // Optional deprioritization
-      const isOptional = (() => {
-        try {
-          const tags = Array.isArray((p as any)?.tags) ? (p as any).tags.map((x:any)=>String(x).toLowerCase()) : [];
-          return tags.includes('optional') || /\boptional\b/i.test(String((p as any)?.description||''));
-        } catch { return false; }
-      })();
-      // Time window: if both have timestamp, reward closeness within 2h
-      const ts = w.timestamp ? new Date(w.timestamp).getTime()/1000 : null;
-      const planTs = null; // no explicit time for now
-      if (ts && planTs) {
-        const dtMin = Math.abs(ts - planTs)/60;
-        if (dtMin <= 120) score += 2 - (dtMin/120);
-        else score -= dtMin/120;
-      }
-      // Prefer exact date match, then adjacent day
-      try {
-        const pdate = String((p as any).date || '').slice(0,10);
-        if (pdate && day) {
-          if (pdate === day) score += 1.0;
-          else {
-            const pd = new Date(`${pdate}T00:00:00`).getTime();
-            const wd = new Date(`${day}T00:00:00`).getTime();
-            const ddays = Math.abs(pd - wd) / 86400000;
-            if (ddays <= 1.0) score += 0.5;
-          }
-        }
-      } catch {}
-
-      // Prefer plans that are materialized (have steps) and exact-day matches
-      if (hasSteps) score += 1.0; else score -= 2.0; // strong penalty for non-materialized
-      // Prefer richer structured plans
-      score += Math.min(1.0, (stepCount||0) / 20);
-
-      // Duration closeness (primary)
-      let durPct: number | null = null;
-      if (totals.seconds && wSec>0) {
-        durPct = pctDiff(totals.seconds, wSec);
-        // Generous ramp: ≤50% still considered similar, ≤25% preferred
-        if (durPct <= 0.50) score += (durPct <= 0.25) ? (1.3 - (durPct/0.25)) : (0.5 - (durPct-0.25)/0.25);
-        else score -= durPct;
-      }
-      // Distance closeness (secondary; swim stricter)
-      const tolTgt = sport==='swim' ? 0.10 : 0.50; // up to 50% for non-swim
-      let distPct: number | null = null;
-      if (totals.meters && wMeters>0) {
-        distPct = pctDiff(totals.meters, wMeters);
-        if (distPct <= tolTgt) score += (distPct <= 0.15 ? (1.5 - (distPct/0.15)) : (0.4 - Math.max(0, (distPct-0.15))/0.35));
-        else score -= distPct;
-      }
-      // Small penalty if optional to prefer primary sessions when both match
-      if (isOptional) score -= 0.3;
-      if (score > bestScore) { bestScore = score; best = p; (best as any)._hasSteps = hasSteps; bestDurPct = durPct; bestDistPct = distPct; }
+    }
+    if (!best) {
+      return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_exact_date_type_match' }), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // Threshold to attach: accept if best is reasonably close on duration or distance
-    const softMatch = (bestDurPct != null && bestDurPct <= 0.50) || (bestDistPct != null && bestDistPct <= 0.50);
-    if (!best || (!softMatch && bestScore < 0.5)) {
-      return new Response(JSON.stringify({ success: true, attached: false, reason: 'score_too_low', bestScore }), { headers: { 'Content-Type': 'application/json' } });
-    }
-
-    // Do not attempt to materialize here; activation must guarantee steps
-    const nowHasSteps = (()=>{ try { return Array.isArray((best as any)?.computed?.steps) && (best as any).computed.steps.length>0; } catch { return false; } })();
-    const nowStepCount = (()=>{ try { return Array.isArray((best as any)?.computed?.steps) ? (best as any).computed.steps.length : 0; } catch { return 0; } })();
-    if (!nowHasSteps) {
-      return new Response(JSON.stringify({ success: false, attached: false, reason: 'planned_incomplete_missing_steps' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
-    }
-    if (nowStepCount < 3) {
-      return new Response(JSON.stringify({ success: false, attached: false, reason: 'planned_incomplete_too_few_steps' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
-    }
+    // Keep everything else the same for now; no step-count heuristics for this pass
 
     // Link (allow re-attach if previously completed to a deleted/old workout)
     const prevCompletedId = (best as any)?.completed_workout_id as string | null | undefined;
@@ -233,7 +154,7 @@ Deno.serve(async (req) => {
       await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
     } catch {}
 
-    return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, score: bestScore }), { headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id }), { headers: { 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }

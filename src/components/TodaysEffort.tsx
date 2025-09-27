@@ -32,8 +32,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [showFade, setShowFade] = useState(true);
 
-  // 🔧 FIXED: Use Pacific timezone for date calculations to avoid timezone issues
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+  // Use local timezone to derive YYYY-MM-DD as seen by the user
+  const today = new Date().toLocaleDateString('en-CA');
   const activeDate = selectedDate || today;
 
   // Unified single-source lookup for the active date
