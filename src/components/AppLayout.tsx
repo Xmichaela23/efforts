@@ -246,6 +246,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           friendly_name: workout.friendly_name,
           moving_time: workout.moving_time,
           elapsed_time: workout.elapsed_time,
+          avg_speed: workout.avg_speed,
+          avg_speed_mps: workout.avg_speed_mps,
 
           // EXISTING FIELDS - ensure proper data types
           avg_heart_rate: workout.metrics?.avg_heart_rate,
