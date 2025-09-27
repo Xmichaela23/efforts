@@ -825,11 +825,42 @@ const formatPace = (paceValue: any): string => {
     try {
       const src = (hydrated || workoutData) as any;
 
-      // 1) Server-computed moving seconds
+      // 0) Explicit seconds in metrics (provider timer seconds preferred for moving on swims)
+      try {
+        const tmr = Number(src?.metrics?.total_timer_time_seconds);
+        if (Number.isFinite(tmr) && tmr > 0) return Math.round(tmr);
+      } catch {}
+
+      // 1) Derive from distance and average speed/pace (clamp to elapsed)
+      try {
+        const distM = getDistanceMeters();
+        const avgSpeedKph = Number(src?.avg_speed); // stored as km/h
+        const avgPaceSecPerKm = Number(src?.avg_pace); // sec/km for run/walk
+        const elapsed = (()=>{ const s=getElapsedSeconds(); return Number.isFinite(s as any) && (s as number) > 0 ? (s as number) : null; })();
+        if (Number.isFinite(distM) && (distM as number) > 0) {
+          // Prefer speed when available
+          if (Number.isFinite(avgSpeedKph) && (avgSpeedKph as number) > 0) {
+            const mps = (avgSpeedKph as number) / 3.6;
+            if (mps > 0) {
+              let sec = Math.round((distM as number) / mps);
+              if (elapsed && sec > elapsed) sec = elapsed;
+              if (sec > 0) return sec;
+            }
+          }
+          // Fall back to pace if present (mainly run/walk)
+          if (Number.isFinite(avgPaceSecPerKm) && (avgPaceSecPerKm as number) > 0) {
+            let sec = Math.round((distM as number) / 1000 * (avgPaceSecPerKm as number));
+            if (elapsed && sec > elapsed) sec = elapsed;
+            if (sec > 0) return sec;
+          }
+        }
+      } catch {}
+
+      // 2) Server-computed moving seconds
       const computed = Number(src?.computed?.overall?.duration_s_moving);
       if (Number.isFinite(computed) && computed > 0) return Math.round(computed);
 
-      // 2) Sample-based explicit timer duration (device timer, not inferred)
+      // 3) Sample-based explicit timer duration (device timer, not inferred)
       const samples = Array.isArray(src?.sensor_data?.samples)
         ? src.sensor_data.samples
         : (Array.isArray(src?.sensor_data) ? src.sensor_data : []);
@@ -839,7 +870,7 @@ const formatPace = (paceValue: any): string => {
         if (Number.isFinite(timer) && timer > 0) return Math.round(timer);
       }
 
-      // 3) Provider moving-time fields
+      // 4) Provider moving-time fields (minutes)
       const candidates = [
         (src as any)?.metrics?.total_timer_time,
         (src as any)?.moving_time,

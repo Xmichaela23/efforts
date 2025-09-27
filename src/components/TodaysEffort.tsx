@@ -192,10 +192,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     // Display Moving Time (mm:ss) for non-strength; blank for strength
     const duration = (() => {
       if (workout.type === 'strength') return '';
-      // Prefer computed moving seconds
+      // 0) Prefer explicit timer seconds from metrics (provider)
+      const tmrS = Number((workout as any)?.metrics?.total_timer_time_seconds);
+      if (Number.isFinite(tmrS) && tmrS > 0) { const m=Math.floor(tmrS/60), s=tmrS%60; return `${m}:${String(s).padStart(2,'0')}`; }
+      // 1) Prefer computed moving seconds
       const compS = Number((workout as any)?.computed?.overall?.duration_s_moving);
       if (Number.isFinite(compS) && compS > 0) { const m=Math.floor(compS/60), s=compS%60; return `${m}:${String(s).padStart(2,'0')}`; }
-      // Fall back to sensor samples last timer seconds
+      // 2) Fall back to sensor samples last timer seconds
       try {
         const samples = Array.isArray((workout as any)?.sensor_data?.samples) ? (workout as any).sensor_data.samples : (Array.isArray((workout as any)?.sensor_data) ? (workout as any).sensor_data : []);
         if (samples && samples.length > 0) {
@@ -204,7 +207,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           if (Number.isFinite(sec) && sec>0) { const m=Math.floor(sec/60), s=sec%60; return `${m}:${String(s).padStart(2,'0')}`; }
         }
       } catch {}
-      // Fall back to minute fields → seconds
+      // 3) Fall back to minute fields → seconds
       const minutes = Number((workout as any)?.moving_time ?? (workout as any)?.elapsed_time ?? (workout as any)?.duration);
       if (Number.isFinite(minutes) && minutes>0) { const sec = Math.round(minutes*60); const m=Math.floor(sec/60), s=sec%60; return `${m}:${String(s).padStart(2,'0')}`; }
       return '';

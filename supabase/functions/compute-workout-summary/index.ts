@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
     // Load workout + planned link
     const { data: w } = await supabase
       .from('workouts')
-      .select('id,user_id,planned_id,computed,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time')
+      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time')
       .eq('id', workout_id)
       .maybeSingle();
     try { console.error('DATABASE QUERY COMPLETE, workout found:', !!w); } catch {}
@@ -458,6 +458,12 @@ Deno.serve(async (req) => {
     // Swim-specific moving seconds derivation helper
     function deriveSwimMovingSecondsFromContext(wAny:any, rowsIn:any[]): number | null {
       try {
+        // 0) Prefer explicit seconds in metrics JSON (provider timer seconds)
+        try {
+          const m = (()=>{ try { return typeof (wAny as any)?.metrics==='string' ? JSON.parse((wAny as any).metrics) : (wAny as any)?.metrics; } catch { return (wAny as any)?.metrics; } })();
+          const tmr = Number(m?.total_timer_time_seconds);
+          if (Number.isFinite(tmr) && tmr > 0) return Math.round(tmr);
+        } catch {}
         // 1) Prefer table scalar minutes
         const mvMin = Number((wAny as any)?.moving_time);
         if (Number.isFinite(mvMin) && mvMin > 0) return Math.round(mvMin * 60);
