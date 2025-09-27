@@ -632,9 +632,15 @@ async function mapGarminToWorkout(activity, userId) {
         // Second-precision time fields from provider summary
         const elapsedS = Number(computeInput?.summary?.durationInSeconds);
         const timerS = Number(computeInput?.summary?.timerDurationInSeconds);
+        const movingS = Number(computeInput?.summary?.movingDurationInSeconds);
         if (Number.isFinite(elapsedS) && elapsedS > 0) {
           out.total_elapsed_time_seconds = Math.round(elapsedS);
           out.total_elapsed_time = Math.floor(elapsedS / 60);
+        }
+        // Prefer explicit moving-duration seconds when present (more accurate than minutes scalar)
+        if (Number.isFinite(movingS) && movingS > 0) {
+          out.moving_time_seconds = Math.round(movingS);
+          out.moving_time = Math.floor(movingS / 60);
         }
         if (Number.isFinite(timerS) && timerS > 0) {
           out.total_timer_time_seconds = Math.round(timerS);

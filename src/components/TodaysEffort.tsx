@@ -5,7 +5,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
-import resolveMovingSeconds from '@/utils/resolveMovingSeconds';
+import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
@@ -127,7 +127,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           date: it.date,
           type: it.type,
           workout_status: 'completed',
-          computed: it.executed || null,
+          computed: (full && (full as any).computed) ? (full as any).computed : (it.executed || null),
           strength_exercises: chosenSE,
           completed_exercises: completedEx,
         };
