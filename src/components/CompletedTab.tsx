@@ -9,6 +9,7 @@ import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
+// keeping local logic for now; Today's view uses shared resolver
 
 // Custom styles for range sliders
 const sliderStyles = `

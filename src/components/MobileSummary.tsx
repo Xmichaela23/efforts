@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import StrengthCompareTable from './StrengthCompareTable';
+import resolveMovingSeconds from '@/utils/resolveMovingSeconds';
 
 type MobileSummaryProps = {
   planned: any | null;
@@ -233,7 +234,13 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
       return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${mph ? `${mph.toFixed(1)} mph` : '—'}`, hr: getAvgHR(completed) };
     }
     if (isSwim) {
-      const per100 = computeOverallSwimPer100Sec(completed);
+      // Prefer unified moving seconds via resolver for consistency
+      const durS = resolveMovingSeconds(completed);
+      const distKm = typeof completed?.distance === 'number' ? completed.distance : undefined;
+      const distM = distKm && distKm > 0 ? distKm * 1000 : undefined;
+      const per100 = (Number.isFinite(durS as any) && (durS as number) > 0 && Number.isFinite(distM as any) && (distM as number) > 0)
+        ? ((durS as number) / ((isYardPoolCompleted(completed) === true ? ((distM as number)/0.9144) : (distM as number)) / 100))
+        : computeOverallSwimPer100Sec(completed);
       const yardPool = isYardPoolCompleted(completed) === true;
       return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${per100 ? `${fmtTime(per100)} ${yardPool ? '/100yd' : '/100m'}` : '—'}`, hr: getAvgHR(completed) };
     }
@@ -251,7 +258,12 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
       return { text: `${fmtTime(plannedStep.duration)} @ ${mph ? `${mph.toFixed(1)} mph` : '—'}`, hr: getAvgHR(completed) };
     }
     if (isSwim) {
-      const per100 = computeOverallSwimPer100Sec(completed);
+      const durS = resolveMovingSeconds(completed);
+      const distKm = typeof completed?.distance === 'number' ? completed.distance : undefined;
+      const distM = distKm && distKm > 0 ? distKm * 1000 : undefined;
+      const per100 = (Number.isFinite(durS as any) && (durS as number) > 0 && Number.isFinite(distM as any) && (distM as number) > 0)
+        ? ((durS as number) / ((isYardPoolCompleted(completed) === true ? ((distM as number)/0.9144) : (distM as number)) / 100))
+        : computeOverallSwimPer100Sec(completed);
       const yardPool = isYardPoolCompleted(completed) === true;
       return { text: `${fmtTime(plannedStep.duration)} @ ${per100 ? `${fmtTime(per100)} ${yardPool ? '/100yd' : '/100m'}` : '—'}`, hr: getAvgHR(completed) };
     }
