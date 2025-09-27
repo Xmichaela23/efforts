@@ -5,6 +5,12 @@
 export function resolveMovingSeconds(workout: any): number | null {
   try {
     const src = workout as any;
+    // Ensure metrics is parsed if it arrives as a JSON string
+    const METRICS = (() => {
+      try {
+        return typeof src?.metrics === 'string' ? JSON.parse(src.metrics) : src?.metrics;
+      } catch { return src?.metrics; }
+    })();
 
     // 0) Unified server-computed moving seconds
     const computed = Number(src?.computed?.overall?.duration_s_moving ?? src?.computed?.overall?.duration_s);
@@ -12,9 +18,9 @@ export function resolveMovingSeconds(workout: any): number | null {
 
     // 1) Explicit seconds from provider metrics
     const secCandidates = [
-      Number(src?.metrics?.total_timer_time_seconds),
-      Number(src?.metrics?.moving_time_seconds),
-      Number(src?.metrics?.total_elapsed_time_seconds),
+      Number(METRICS?.total_timer_time_seconds),
+      Number(METRICS?.moving_time_seconds),
+      Number(METRICS?.total_elapsed_time_seconds),
     ];
     for (const v of secCandidates) {
       if (Number.isFinite(v) && v > 0) return Math.round(v);
@@ -22,13 +28,13 @@ export function resolveMovingSeconds(workout: any): number | null {
 
     // 2) Derive from distance and average speed/pace; clamp to elapsed seconds when known
     const getElapsedSeconds = (): number | null => {
-      const s1 = Number(src?.metrics?.total_elapsed_time_seconds);
+      const s1 = Number(METRICS?.total_elapsed_time_seconds);
       if (Number.isFinite(s1) && s1 > 0) return Math.round(s1);
       const mins = [
-        Number(src?.metrics?.total_elapsed_time),
+        Number(METRICS?.total_elapsed_time),
         Number(src?.total_elapsed_time),
         Number(src?.elapsed_time),
-        Number(src?.metrics?.elapsed_time),
+        Number(METRICS?.elapsed_time),
         Number(src?.duration)
       ].find((n) => Number.isFinite(n) && (n as number) > 0) as number | undefined;
       if (typeof mins === 'number') return Math.round(mins * 60);
@@ -40,7 +46,7 @@ export function resolveMovingSeconds(workout: any): number | null {
       const cm = Number(src?.computed?.overall?.distance_m);
       if (Number.isFinite(cm) && cm > 0) return Math.round(cm);
       // Then explicit meters
-      const dm = Number(src?.distance_meters ?? src?.metrics?.distance_meters);
+      const dm = Number(src?.distance_meters ?? METRICS?.distance_meters);
       if (Number.isFinite(dm) && dm > 0) return Math.round(dm);
       // Then distance in km → meters
       const dk = Number(src?.distance);
@@ -89,11 +95,11 @@ export function resolveMovingSeconds(workout: any): number | null {
 
     // 4) Minute fields → convert to seconds
     const minuteCandidates = [
-      Number(src?.metrics?.total_timer_time),
+      Number(METRICS?.total_timer_time),
       Number(src?.moving_time),
-      Number(src?.metrics?.moving_time),
+      Number(METRICS?.moving_time),
       Number(src?.elapsed_time),
-      Number(src?.metrics?.elapsed_time),
+      Number(METRICS?.elapsed_time),
     ];
     for (const m of minuteCandidates) {
       if (Number.isFinite(m) && m > 0) return Math.round(m * 60);
