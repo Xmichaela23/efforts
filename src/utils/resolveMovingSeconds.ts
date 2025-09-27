@@ -17,10 +17,12 @@ export function resolveMovingSeconds(workout: any): number | null {
     if (Number.isFinite(computed) && computed > 0) return Math.round(computed);
 
     // 1) Explicit seconds from provider metrics
+    // Strict moving-time seconds only (do NOT include total elapsed here)
     const secCandidates = [
-      Number(METRICS?.total_timer_time_seconds),
       Number(METRICS?.moving_time_seconds),
-      Number(METRICS?.total_elapsed_time_seconds),
+      Number(METRICS?.movingDurationInSeconds),
+      Number(METRICS?.total_timer_time_seconds),
+      Number(METRICS?.timerDurationInSeconds),
     ];
     for (const v of secCandidates) {
       if (Number.isFinite(v) && v > 0) return Math.round(v);
@@ -28,7 +30,7 @@ export function resolveMovingSeconds(workout: any): number | null {
 
     // 2) Derive from distance and average speed/pace; clamp to elapsed seconds when known
     const getElapsedSeconds = (): number | null => {
-      const s1 = Number(METRICS?.total_elapsed_time_seconds);
+      const s1 = Number(METRICS?.total_elapsed_time_seconds ?? METRICS?.durationInSeconds);
       if (Number.isFinite(s1) && s1 > 0) return Math.round(s1);
       const mins = [
         Number(METRICS?.total_elapsed_time),
@@ -93,7 +95,7 @@ export function resolveMovingSeconds(workout: any): number | null {
       }
     } catch {}
 
-    // 4) Minute fields → convert to seconds
+    // 4) Minute fields → convert to seconds (moving/elapsed/timer minutes)
     const minuteCandidates = [
       Number(METRICS?.total_timer_time),
       Number(src?.moving_time),
@@ -104,6 +106,15 @@ export function resolveMovingSeconds(workout: any): number | null {
     for (const m of minuteCandidates) {
       if (Number.isFinite(m) && m > 0) return Math.round(m * 60);
     }
+
+    // 5) Absolute last resort: overall elapsed seconds (never for swim)
+    try {
+      const sport = String(src?.type || '').toLowerCase();
+      if (sport !== 'swim') {
+        const elapsedFinal = Number(METRICS?.total_elapsed_time_seconds ?? METRICS?.durationInSeconds);
+        if (Number.isFinite(elapsedFinal) && elapsedFinal > 0) return Math.round(elapsedFinal);
+      }
+    } catch {}
 
     return null;
   } catch {
