@@ -628,17 +628,28 @@ async function mapGarminToWorkout(activity, userId) {
     // Embed training effect in computed.metrics-lite area for UI pickup
     metrics: (()=>{
       try {
-        // Prefer normalized keys first; fall back to legacy and provider-style names
+        const out: any = {};
+        // Second-precision time fields from provider summary
+        const elapsedS = Number(computeInput?.summary?.durationInSeconds);
+        const timerS = Number(computeInput?.summary?.timerDurationInSeconds);
+        if (Number.isFinite(elapsedS) && elapsedS > 0) {
+          out.total_elapsed_time_seconds = Math.round(elapsedS);
+          out.total_elapsed_time = Math.floor(elapsedS / 60);
+        }
+        if (Number.isFinite(timerS) && timerS > 0) {
+          out.total_timer_time_seconds = Math.round(timerS);
+          out.total_timer_time = Math.floor(timerS / 60);
+        }
+        // Training effect fields
         const aerobic = activity.aerobic_training_effect ?? activity.total_training_effect ?? activity.aerobicTrainingEffect ?? null;
         const anaerobic = activity.anaerobic_training_effect ?? activity.total_anaerobic_effect ?? activity.anaerobicTrainingEffect ?? null;
-        if (aerobic == null && anaerobic == null) return null;
-        // Write both normalized and legacy keys for backward compatibility
-        return JSON.stringify({
-          aerobic_training_effect: aerobic ?? null,
-          anaerobic_training_effect: anaerobic ?? null,
-          total_training_effect: aerobic ?? null,
-          total_anaerobic_effect: anaerobic ?? null
-        });
+        if (aerobic != null || anaerobic != null) {
+          out.aerobic_training_effect = aerobic ?? null;
+          out.anaerobic_training_effect = anaerobic ?? null;
+          out.total_training_effect = aerobic ?? null;
+          out.total_anaerobic_effect = anaerobic ?? null;
+        }
+        return Object.keys(out).length ? out : null;
       } catch  {
         return null;
       }

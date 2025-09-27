@@ -273,6 +273,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           max_temperature: workout.metrics?.max_temperature,
           total_timer_time: workout.metrics?.total_timer_time,
           total_elapsed_time: workout.metrics?.total_elapsed_time,
+          total_timer_time_seconds: workout.metrics?.total_timer_time_seconds,
+          total_elapsed_time_seconds: workout.metrics?.total_elapsed_time_seconds,
           total_work: workout.metrics?.total_work,
           total_descent: workout.metrics?.total_descent,
           avg_vam: workout.metrics?.avg_vam,
