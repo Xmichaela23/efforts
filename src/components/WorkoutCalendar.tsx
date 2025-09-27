@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
-import { useWorkoutsRange } from '@/hooks/useWorkoutsRange';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -189,8 +188,6 @@ export default function WorkoutCalendar({
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
   const { items: unifiedItems, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
-  // Backstop: legacy completed workouts (temporary until unified feed is fully reliable)
-  const { rows: legacyWorkouts = [], loading: legacyLoading } = useWorkoutsRange(fromISO, toISO);
   // Adapt unified items → planned + workouts shapes expected below
   const unifiedPlanned = unifiedItems.filter((it:any)=> !!it?.planned).map((it:any)=> ({
     id: it.id,
@@ -226,15 +223,7 @@ export default function WorkoutCalendar({
     // keep shape minimal; calendar only uses status, date, type, maybe planned_id
   }));
 
-  const legacyCompleted = Array.isArray(legacyWorkouts)
-    ? legacyWorkouts.filter((w:any)=> String(w?.workout_status||'').toLowerCase()==='completed').map((w:any)=> ({
-        id: w.id,
-        date: w.date,
-        type: w.type,
-        workout_status: 'completed',
-        distance: (typeof (w as any)?.distance === 'number' ? (w as any).distance : undefined),
-      }))
-    : [];
+  // No legacy backstop: unified feed is authoritative
 
   // Dev-only diagnostics to verify unified feed → calendar mapping
   if (import.meta.env?.DEV) {
@@ -246,7 +235,7 @@ export default function WorkoutCalendar({
         items: unifiedItems?.length || 0,
         plannedCount: unifiedPlanned?.length || 0,
         completedCount: unifiedWorkouts?.length || 0,
-        legacyCompleted: legacyCompleted?.length || 0,
+        legacyCompleted: 0,
         samplePlanned: unifiedPlanned?.[0] || null,
         sampleCompleted: unifiedWorkouts?.[0] || null,
       });
@@ -254,14 +243,14 @@ export default function WorkoutCalendar({
   }
 
   const plannedWeekRows = unifiedPlanned;
-  const workoutsWeekRows = [...unifiedWorkouts, ...legacyCompleted];
+  const workoutsWeekRows = [...unifiedWorkouts];
   const plannedLoading = unifiedLoading;
   const workoutsLoading = unifiedLoading;
 
   // Debounced loading indicator to avoid flicker on fast responses
   const [loadingDebounced, setLoadingDebounced] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
-  const hasItems = (Array.isArray(unifiedItems) && unifiedItems.length>0) || (Array.isArray(legacyCompleted) && legacyCompleted.length>0);
+  const hasItems = (Array.isArray(unifiedItems) && unifiedItems.length>0);
   const loadingWeekRaw = !initialLoadDone && (Boolean(unifiedLoading) && !hasItems);
   useEffect(() => {
     let t: any;

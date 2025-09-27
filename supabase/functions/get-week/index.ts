@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
     const payload = await req.json().catch(() => ({}));
     const fromISO = String(payload?.from || '').slice(0, 10);
     const toISO = String(payload?.to || '').slice(0, 10);
+    const debug: boolean = Boolean(payload?.debug);
     if (!isISO(fromISO) || !isISO(toISO)) {
       return new Response(JSON.stringify({ error: 'from/to must be YYYY-MM-DD' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -44,6 +45,184 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     const userId = userData.user.id as string;
+
+    // Helper: date-only utilities (avoid clashing with 'toISO' request var)
+    const toISODate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const addDays = (iso: string, n: number) => {
+      const parts = String(iso).split('-').map((x) => parseInt(x, 10));
+      const base = new Date(parts[0], (parts[1]||1)-1, parts[2]||1);
+      base.setDate(base.getDate() + n);
+      return toISODate(base);
+    };
+    const dayIndex: Record<string, number> = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
+    const dayNameFromISO = (iso: string): keyof typeof dayIndex => {
+      const parts = String(iso).split('-').map((x) => parseInt(x, 10));
+      const d = new Date(parts[0], (parts[1]||1)-1, parts[2]||1);
+      const js = d.getDay(); // 0=Sun..6=Sat
+      return (['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][js] as any) || 'Monday';
+    };
+    const weekNumberFor = (iso: string, startIso: string): number => {
+      const p = (s:string)=>{ const a=s.split('-').map((x)=>parseInt(x,10)); return new Date(a[0], (a[1]||1)-1, a[2]||1); };
+      const d = p(iso), s = p(startIso);
+      const diffDays = Math.floor((d.getTime() - s.getTime()) / 86400000);
+      return Math.floor(diffDays/7) + 1;
+    };
+
+    const debugNotes: any[] = [];
+    if (debug) {
+      debugNotes.push({ where:'init', fromISO, toISO });
+    }
+
+    // On-demand materialization (scoped strictly to [fromISO, toISO])
+    try {
+      // Load user's active plans with an explicit start date and non-empty sessions
+      const { data: plans, error: plansErr } = await supabase
+        .from('plans')
+        .select('id,user_id,status,config,duration_weeks,sessions_by_week')
+        .eq('user_id', userId)
+        .eq('status', 'active');
+      if (!plansErr && Array.isArray(plans) && plans.length) {
+        if (debug) debugNotes.push({ where:'plans', count: plans.length });
+        // Preload existing planned rows in range for quick membership checks
+        const { data: prePlanned } = await supabase
+          .from('planned_workouts')
+          .select('id,training_plan_id,date,type')
+          .eq('user_id', userId)
+          .gte('date', fromISO)
+          .lte('date', toISO);
+        const existsKey = new Set(
+          (Array.isArray(prePlanned)? prePlanned: []).map((r:any)=> `${String(r.training_plan_id)}|${String(r.date)}|${String(r.type).toLowerCase()}`)
+        );
+
+        // Iterate dates in window
+        const dates: string[] = [];
+        {
+          let cur = fromISO;
+          while (cur <= toISO) { dates.push(cur); cur = addDays(cur, 1); }
+        }
+
+        for (const plan of plans) {
+          try {
+            const cfg = (plan as any)?.config || {};
+            let startIso = String((cfg?.user_selected_start_date || cfg?.start_date || '').toString().slice(0,10));
+            const sessionsByWeek = (plan as any)?.sessions_by_week || {};
+            const durWeeks = Number((plan as any)?.duration_weeks || 0);
+            if (!isISO(startIso)) {
+              // Fallback: derive anchor from earliest existing planned row for this plan
+              try {
+                const { data: anchorRow } = await supabase
+                  .from('planned_workouts')
+                  .select('date,week_number,day_number')
+                  .eq('training_plan_id', plan.id)
+                  .order('date', { ascending: true })
+                  .limit(1)
+                  .maybeSingle();
+                if (anchorRow && anchorRow.date && Number(anchorRow.week_number) >= 1 && Number(anchorRow.day_number) >= 1) {
+                  const dn = Math.max(1, Math.min(7, Number(anchorRow.day_number)));
+                  const wn = Math.max(1, Number(anchorRow.week_number));
+                  // week1_start = anchor_date - (dn-1) - 7*(wn-1)
+                  let wk1 = String(anchorRow.date).slice(0,10);
+                  for (let i=0; i<(dn-1) + 7*(wn-1); i+=1) wk1 = addDays(wk1, -1);
+                  if (isISO(wk1)) startIso = wk1;
+                }
+              } catch {}
+            }
+            if (!isISO(startIso)) continue; // cannot map without anchor
+            if (debug) debugNotes.push({ where:'plan_anchor', plan_id: String(plan.id), startIso, durWeeks });
+            // For each date in range, see if plan covers it and ensure a row per authored session
+            for (const iso of dates) {
+              const wk = weekNumberFor(iso, startIso);
+              if (!(wk >= 1 && (durWeeks? wk <= durWeeks : true))) {
+                if (debug && debugNotes.length < 50) debugNotes.push({ where:'skip_range', iso, wk, reason:'out_of_plan_bounds' });
+                continue;
+              }
+              const dayName = String(dayNameFromISO(iso));
+              // Be tolerant of structure: array preferred; object -> flatten values; single -> box
+              let weekArrRaw: any = (sessionsByWeek as any)?.[String(wk)];
+              let weekArr: any[] = [];
+              if (Array.isArray(weekArrRaw)) weekArr = weekArrRaw;
+              else if (weekArrRaw && typeof weekArrRaw === 'object') {
+                const vals = Object.values(weekArrRaw);
+                weekArr = vals.flatMap((v:any)=> Array.isArray(v)? v : (v ? [v] : []));
+              } else if (weekArrRaw) {
+                weekArr = [weekArrRaw];
+              }
+              if (!weekArr.length) continue;
+              // Find all sessions authored for this day
+              const daySessions = weekArr.filter((s:any)=> String(s?.day) === dayName);
+              if (!daySessions.length) continue;
+              for (const s of daySessions) {
+                // Normalize type
+                const raw = String((s?.discipline || s?.type || 'run')).toLowerCase();
+                const normType = raw === 'brick' ? 'brick' : (raw==='bike' || raw==='cycling' ? 'ride' : (raw==='walk' ? 'walk' : (raw==='strength'||raw==='lift'||raw==='weights' ? 'strength' : (raw==='swim' ? 'swim' : 'run'))));
+                const key = `${String(plan.id)}|${iso}|${normType}`;
+                if (existsKey.has(key)) continue;
+                // Build minimal row preserving authored fields
+                const stepsPreset = Array.isArray(s?.steps_preset) ? s.steps_preset : undefined;
+                const workoutStructure = (s?.workout_structure && typeof s.workout_structure==='object') ? s.workout_structure : undefined;
+                const strength = Array.isArray(s?.strength_exercises) ? s.strength_exercises : undefined;
+                const tags = Array.isArray(s?.tags) ? s.tags : undefined;
+                const exportHints = (s?.export_hints && typeof s.export_hints==='object') ? s.export_hints : undefined;
+                const description = typeof s?.description==='string' ? s.description : (typeof s?.title==='string' ? s.title : undefined);
+                const insertRow: any = {
+                  user_id: userId,
+                  training_plan_id: plan.id,
+                  week_number: wk,
+                  day_number: dayIndex[dayName] || 1,
+                  date: iso,
+                  type: normType,
+                  workout_status: 'planned',
+                  source: 'training_plan',
+                };
+                if (stepsPreset) insertRow.steps_preset = stepsPreset;
+                if (workoutStructure) insertRow.workout_structure = workoutStructure;
+                if (strength) insertRow.strength_exercises = strength;
+                if (tags) insertRow.tags = tags;
+                if (exportHints) insertRow.export_hints = exportHints;
+                if (description) insertRow.description = description;
+                try {
+                  await supabase.from('planned_workouts')
+                    .insert(insertRow, { returning: 'minimal' })
+                    .throwOnError();
+                  existsKey.add(key);
+                  if (debug && debugNotes.length < 50) debugNotes.push({ where:'insert', iso, plan_id: String(plan.id), type: normType });
+                } catch {}
+              }
+            }
+          } catch {}
+        }
+
+        // Compute steps for any rows in range missing totals, using materialize-plan
+        try {
+          const { data: needCompute } = await supabase
+            .from('planned_workouts')
+            .select('id,computed,total_duration_seconds')
+            .eq('user_id', userId)
+            .gte('date', fromISO)
+            .lte('date', toISO);
+          const ids = (Array.isArray(needCompute)? needCompute: [])
+            .filter((r:any)=> {
+              const t = Number((r as any)?.total_duration_seconds);
+              if (Number.isFinite(t) && t>0) return false;
+              const hasComp = !!((r as any)?.computed && (Array.isArray((r as any).computed?.steps) || Number((r as any).computed?.total_duration_seconds)>0));
+              return !hasComp;
+            })
+            .map((r:any)=> String(r.id));
+          if (ids.length) {
+            const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/materialize-plan`;
+            const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+            for (const id of ids) {
+              try {
+                await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ planned_workout_id: id }) });
+              } catch {}
+            }
+            if (debug) debugNotes.push({ where:'materialize', count: ids.length });
+          }
+        } catch {}
+      }
+    } catch {
+      // Best-effort; do not block unified response
+    }
 
     // Fetch unified workouts (new columns present but may be null)
     // Select only columns that exist on workouts in this project
@@ -67,7 +246,10 @@ Deno.serve(async (req) => {
       .select('id,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds')
       .eq('user_id', userId)
       .gte('date', fromISO)
-      .lte('date', toISO);
+      .lte('date', toISO)
+      .order('date', { ascending: true })
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true });
     if (pErr) errors.push({ where: 'planned_workouts', message: pErr.message || String(pErr) });
     const plannedByKey = new Map<string, any>();
     for (const p of Array.isArray(plannedRows) ? plannedRows : []) {
@@ -205,8 +387,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (errors.length) {
-      return new Response(JSON.stringify({ items, warnings: errors }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const warningsOut = errors.concat(debugNotes);
+    if (warningsOut.length) {
+      return new Response(JSON.stringify({ items, warnings: warningsOut }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     return new Response(JSON.stringify({ items }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
