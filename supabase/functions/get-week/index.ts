@@ -9,6 +9,8 @@ const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  // Help intermediaries cache preflight per-origin semantics correctly
+  'Vary': 'Origin',
 };
 
 function isISO(dateStr?: string | null): boolean {
@@ -44,7 +46,8 @@ Deno.serve(async (req) => {
     const userId = userData.user.id as string;
 
     // Fetch unified workouts (new columns present but may be null)
-    const workoutSel = 'id,user_id,date,type,workout_status as legacy_status,planned_data,executed_data,status,planned_id,computed,strength_exercises,completed_exercises';
+    // Select only columns that exist on workouts in this project
+    const workoutSel = 'id,user_id,date,type,workout_status,planned_id,computed,strength_exercises';
     const { data: wkRaw, error: wkErr } = await supabase
       .from('workouts')
       .select(workoutSel)
@@ -61,7 +64,7 @@ Deno.serve(async (req) => {
     // 1) Preload planned rows for range keyed by (date|type)
     const { data: plannedRows, error: pErr } = await supabase
       .from('planned_workouts')
-      .select('id,date,type,workout_status,computed,steps_preset,strength_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds')
+      .select('id,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds')
       .eq('user_id', userId)
       .gte('date', fromISO)
       .lte('date', toISO);
@@ -97,17 +100,14 @@ Deno.serve(async (req) => {
           rendered_description: (p as any)?.rendered_description ?? null,
         };
       }
-      // executed (prioritize completed status)
-      let executed = w.executed_data || null;
-      const legacyCompleted = String(w?.legacy_status||'').toLowerCase()==='completed';
-      if (!executed || legacyCompleted) {
-        const cmp = w?.computed || null;
-        if (cmp && (legacyCompleted || Array.isArray(cmp?.intervals))) {
-          executed = {
-            intervals: Array.isArray(cmp?.intervals) ? cmp.intervals : null,
-            overall: cmp?.overall || null,
-          };
-        }
+      // executed snapshot from columns that exist
+      let executed: any = {};
+      const cmp0 = w?.computed || null;
+      if (cmp0 && (Array.isArray(cmp0?.intervals) || cmp0?.overall)) {
+        executed = {
+          intervals: Array.isArray(cmp0?.intervals) ? cmp0.intervals : null,
+          overall: cmp0?.overall || null,
+        } as any;
       }
       // Always pass through strength_exercises for strength sessions (normalize to array)
       if (!executed) executed = {};
@@ -115,29 +115,26 @@ Deno.serve(async (req) => {
         const rawSE = (w as any)?.strength_exercises;
         let se: any[] = [];
         if (Array.isArray(rawSE)) se = rawSE as any[];
-        else if (typeof rawSE === 'string') { try { const parsed = JSON.parse(rawSE); if (Array.isArray(parsed)) se = parsed; } catch {} }
-        if (se && se.length) executed.strength_exercises = se;
-        const rawCE = (w as any)?.completed_exercises;
-        let ce: any[] = [];
-        if (Array.isArray(rawCE)) ce = rawCE as any[];
-        else if (typeof rawCE === 'string') { try { const parsed = JSON.parse(rawCE); if (Array.isArray(parsed)) ce = parsed; } catch {} }
-        if ((!executed.strength_exercises || !executed.strength_exercises.length) && ce && ce.length) executed.strength_exercises = ce;
+        else if (typeof rawSE === 'string') {
+          try { const parsed = JSON.parse(rawSE); if (Array.isArray(parsed)) se = parsed; } catch {}
+        }
+        if (se && se.length) (executed as any).strength_exercises = se;
+
+        // no completed_exercises column in this schema
       } catch {}
-      // Normalize status universally
+      // Normalize status from fields that exist
       const cmp = w?.computed || null;
       const hasStrengthEx = Array.isArray((w as any)?.strength_exercises) && (w as any).strength_exercises.length>0;
       const hasExecuted = !!(cmp && ((Array.isArray(cmp?.intervals) && cmp.intervals.length>0) || cmp?.overall)) || hasStrengthEx;
-      let status = String(w.status || w.legacy_status || '').toLowerCase();
-      if (!status) status = hasExecuted ? 'completed' : (planned ? 'planned' : null);
+      const rawStatus = String((w as any)?.workout_status || '').toLowerCase();
+      let status = rawStatus || (hasExecuted ? 'completed' : (planned ? 'planned' : null));
       try {
         if (String(type)==='strength') {
           const exLen = Array.isArray((executed as any)?.strength_exercises) ? (executed as any).strength_exercises.length : 0;
           const seRaw = (w as any)?.strength_exercises;
-          const ceRaw = (w as any)?.completed_exercises;
           const seLen = Array.isArray(seRaw) ? seRaw.length : (typeof seRaw === 'string' ? 'str' : 0);
-          const ceLen = Array.isArray(ceRaw) ? ceRaw.length : (typeof ceRaw === 'string' ? 'str' : 0);
           // eslint-disable-next-line no-console
-          console.log('[get-week:strength]', { id: String(w.id), date, seLen, ceLen, exLen, status });
+          console.log('[get-week:strength]', { id: String(w.id), date, seLen, exLen, status });
         }
       } catch {}
       return { id: w.id, date, type, status, planned, executed, planned_id: w.planned_id || null };
@@ -151,6 +148,43 @@ Deno.serve(async (req) => {
     for (const p of Array.isArray(plannedRows) ? plannedRows : []) {
       const key = `${String(p.date)}|${String(p.type).toLowerCase()}`;
       if (!byKey.has(key)) {
+        // If this planned row is already linked to a completed workout, prefer emitting the completed item
+        const cw = (p as any)?.completed_workout_id ? String((p as any).completed_workout_id) : null;
+        if (cw) {
+          // Try to hydrate from prefetched workouts in-range; else emit minimal completed item
+          const w = (workouts as any[]).find((x:any)=> String(x.id)===cw);
+          if (w) {
+            const it = unify(w);
+            byKey.set(key, it);
+            items.push(it);
+            continue;
+          } else {
+            const minimalCompleted = {
+              id: cw,
+              date: String(p.date).slice(0,10),
+              type: String(p.type).toLowerCase(),
+              status: 'completed',
+              planned: {
+                id: p.id,
+                steps: Array.isArray(p?.computed?.steps) ? p.computed.steps : null,
+                total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
+                description: p?.description || p?.rendered_description || null,
+                tags: p?.tags || null,
+                steps_preset: (p as any)?.steps_preset ?? null,
+                strength_exercises: (p as any)?.strength_exercises ?? null,
+                export_hints: (p as any)?.export_hints ?? null,
+                workout_structure: (p as any)?.workout_structure ?? null,
+                friendly_summary: (p as any)?.friendly_summary ?? null,
+                rendered_description: (p as any)?.rendered_description ?? null,
+              },
+              executed: null,
+              planned_id: p.id,
+            } as any;
+            items.push(minimalCompleted);
+            byKey.set(key, minimalCompleted);
+            continue;
+          }
+        }
         const planned = {
           id: p.id,
           steps: Array.isArray(p?.computed?.steps) ? p.computed.steps : null,
@@ -164,8 +198,8 @@ Deno.serve(async (req) => {
           friendly_summary: (p as any)?.friendly_summary ?? null,
           rendered_description: (p as any)?.rendered_description ?? null,
         } as any;
-        const pStatus = String(p?.workout_status||'').toLowerCase();
-        const it = { id: String(p.id), date: String(p.date).slice(0,10), type: String(p.type).toLowerCase(), status: (pStatus||'planned'), planned, executed: null };
+        // Planned-only items must always be 'planned' since no workouts row exists for this date/type
+        const it = { id: String(p.id), date: String(p.date).slice(0,10), type: String(p.type).toLowerCase(), status: 'planned', planned, executed: null };
         items.push(it);
         byKey.set(key, it);
       }

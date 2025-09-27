@@ -405,7 +405,47 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         const elevationFt = elevation && elevation > 0 ? `${Math.round(elevation * 3.28084)} ft` : 'N/A';
 
         // For swims, only show distance and average pace
-        if (isSwim) return [distance, paceSpeed];
+        if (isSwim) {
+          // Prefer server overall; fall back to pool metadata or generic distance/duration
+          const preferYards = true; // app shows swim in yards
+          const comp = (workout as any)?.computed?.overall;
+          let distM: number | null = Number(comp?.distance_m);
+          let durS: number | null = Number(comp?.duration_s_moving ?? comp?.duration_s);
+          if (!(Number.isFinite(distM) && (distM as number) > 0)) {
+            // Try pool metadata
+            const poolLenM = Number((workout as any)?.pool_length_m ?? (workout as any)?.pool_length);
+            const nLengths = Number((workout as any)?.number_of_active_lengths);
+            if (Number.isFinite(poolLenM) && Number.isFinite(nLengths) && poolLenM > 0 && nLengths > 0) {
+              distM = poolLenM * nLengths;
+            } else {
+              // Try swim_data.lengths sum
+              try {
+                const lengths = Array.isArray((workout as any)?.swim_data?.lengths) ? (workout as any).swim_data.lengths : [];
+                const sum = lengths.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0);
+                if (sum > 0) distM = sum; // meters
+              } catch {}
+            }
+          }
+          if (!(Number.isFinite(durS) && (durS as number) > 0)) {
+            // Fallback to generic time fields
+            const cands = [ (workout as any)?.total_timer_time, (workout as any)?.moving_time, (workout as any)?.elapsed_time ];
+            for (const v of cands) { const n = Number(v); if (Number.isFinite(n) && n>0) { durS = n; break; } }
+          }
+          // As a last resort, distance from km field
+          if (!(Number.isFinite(distM) && (distM as number) > 0)) {
+            const km = computeDistanceKm(workout);
+            if (Number.isFinite(km) && (km as number) > 0) distM = (km as number) * 1000;
+          }
+          const yards = (Number.isFinite(distM) && (distM as number) > 0) ? Math.round((distM as number) / 0.9144) : null;
+          const distText = (yards != null) ? `${yards.toLocaleString()} yd` : 'N/A';
+          const durText = (Number.isFinite(durS) && (durS as number) > 0)
+            ? (()=>{ const s=Math.round(durS as number); const m=Math.floor(s/60); const ss=s%60; return `${m}:${String(ss).padStart(2,'0')}`; })()
+            : 'N/A';
+          const per100 = (Number.isFinite(durS) && (durS as number) > 0 && yards && yards > 0)
+            ? (()=>{ const per = (durS as number) / (yards/100); const m=Math.floor(per/60); const ss=Math.round(per%60); return `${m}:${String(ss).padStart(2,'0')}/100yd`; })()
+            : 'N/A';
+          return [distText, durText, per100];
+        }
         
         return [distance, paceSpeed, hrDisplay, elevationFt];
       }
