@@ -479,9 +479,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             }
           }
           if (!(Number.isFinite(durS) && (durS as number) > 0)) {
-            // Fallback to generic time fields
-            const cands = [ (workout as any)?.total_timer_time, (workout as any)?.moving_time, (workout as any)?.elapsed_time ];
-            for (const v of cands) { const n = Number(v); if (Number.isFinite(n) && n>0) { durS = n; break; } }
+            // Prefer explicit seconds when provided by provider metrics
+            const secCands = [
+              (workout as any)?.metrics?.total_timer_time_seconds,
+              (workout as any)?.metrics?.total_elapsed_time_seconds,
+            ];
+            for (const v of secCands) { const n = Number(v); if (Number.isFinite(n) && n>0) { durS = Math.round(n); break; } }
+          }
+          if (!(Number.isFinite(durS) && (durS as number) > 0)) {
+            // Fallback minute fields → convert to seconds (schema stores minutes here)
+            const minCands = [
+              (workout as any)?.total_timer_time,
+              (workout as any)?.moving_time,
+              (workout as any)?.elapsed_time,
+              (workout as any)?.metrics?.moving_time,
+              (workout as any)?.metrics?.elapsed_time,
+            ];
+            for (const v of minCands) { const n = Number(v); if (Number.isFinite(n) && n>0) { durS = Math.round(n * 60); break; } }
           }
           // As a last resort, distance from km field
           if (!(Number.isFinite(distM) && (distM as number) > 0)) {
