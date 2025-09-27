@@ -21,23 +21,29 @@ export function useWeekUnified(fromISO: string, toISO: string) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!mounted) return;
         setUserId(user ? user.id : null);
+        try { console.log('useWeekUnified:getUser', { hasUser: !!user?.id, userId: user?.id, fromISO, toISO }); } catch {}
       } catch {}
     })();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
       setUserId(session?.user?.id || null);
       queryClient.invalidateQueries({ queryKey: ['weekUnified'] });
+      try { console.log('useWeekUnified:onAuthStateChange', { uid: session?.user?.id || null }); } catch {}
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
   const queryKeyBase = ['weekUnified', 'me', userId, fromISO, toISO] as const;
 
+  try { console.log('useWeekUnified:hook', { userId, enabled: !!userId, fromISO, toISO }); } catch {}
+
   const query = useQuery({
     queryKey: queryKeyBase,
     enabled: !!userId,
     queryFn: async () => {
       if (!userId) return { items: [] } as any;
-      const { data, error } = await supabase.functions.invoke('get-week', { body: { from: fromISO, to: toISO } });
+      try { console.log('useWeekUnified:invoke', { fromISO, toISO, debug: true }); } catch {}
+      const { data, error } = await supabase.functions.invoke('get-week', { body: { from: fromISO, to: toISO, debug: true } });
+      try { console.log('useWeekUnified:response', { error: error?.message || null, items: Array.isArray((data as any)?.items) ? (data as any).items.length : 0, warnings: (data as any)?.warnings }); } catch {}
       if (error) throw error as any;
       const items: UnifiedItem[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
       return { items };
