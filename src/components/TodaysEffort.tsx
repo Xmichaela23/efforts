@@ -195,10 +195,41 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       // 0) Prefer explicit timer seconds from metrics (provider)
       const tmrS = Number((workout as any)?.metrics?.total_timer_time_seconds);
       if (Number.isFinite(tmrS) && tmrS > 0) { const m=Math.floor(tmrS/60), s=tmrS%60; return `${m}:${String(s).padStart(2,'0')}`; }
-      // 1) Prefer computed moving seconds
+      // 1) Physics-based fallback: distance ÷ avg speed (or distance × avg pace)
+      try {
+        let distM = Number((workout as any)?.computed?.overall?.distance_m);
+        if (!(Number.isFinite(distM) && distM > 0)) {
+          const dk = Number((workout as any)?.distance);
+          if (Number.isFinite(dk) && dk > 0) distM = Math.round(dk * 1000);
+          else {
+            const dm = Number((workout as any)?.distance_meters);
+            if (Number.isFinite(dm) && dm > 0) distM = dm;
+          }
+        }
+        const mps = (()=>{
+          const vMps = Number((workout as any)?.avg_speed_mps);
+          if (Number.isFinite(vMps) && vMps > 0) return vMps;
+          const vKph = Number((workout as any)?.avg_speed);
+          if (Number.isFinite(vKph) && vKph > 0) return vKph / 3.6;
+          return null;
+        })();
+        const elapsedS = ((): number | null => {
+          const e = Number((workout as any)?.metrics?.total_elapsed_time_seconds);
+          if (Number.isFinite(e) && e > 0) return Math.round(e);
+          const em = Number((workout as any)?.elapsed_time ?? (workout as any)?.duration);
+          if (Number.isFinite(em) && em > 0) return Math.round(em * 60);
+          return null;
+        })();
+        if (Number.isFinite(distM) && distM > 0 && Number.isFinite(mps as any) && (mps as number) > 0) {
+          let sec = Math.round(distM / (mps as number));
+          if (elapsedS && sec > elapsedS) sec = elapsedS;
+          if (sec > 0) { const m=Math.floor(sec/60), s=sec%60; return `${m}:${String(s).padStart(2,'0')}`; }
+        }
+      } catch {}
+      // 2) Prefer computed moving seconds
       const compS = Number((workout as any)?.computed?.overall?.duration_s_moving);
       if (Number.isFinite(compS) && compS > 0) { const m=Math.floor(compS/60), s=compS%60; return `${m}:${String(s).padStart(2,'0')}`; }
-      // 2) Fall back to sensor samples last timer seconds
+      // 3) Fall back to sensor samples last timer seconds
       try {
         const samples = Array.isArray((workout as any)?.sensor_data?.samples) ? (workout as any).sensor_data.samples : (Array.isArray((workout as any)?.sensor_data) ? (workout as any).sensor_data : []);
         if (samples && samples.length > 0) {
@@ -207,7 +238,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           if (Number.isFinite(sec) && sec>0) { const m=Math.floor(sec/60), s=sec%60; return `${m}:${String(s).padStart(2,'0')}`; }
         }
       } catch {}
-      // 3) Fall back to minute fields → seconds
+      // 4) Fall back to minute fields → seconds
       const minutes = Number((workout as any)?.moving_time ?? (workout as any)?.elapsed_time ?? (workout as any)?.duration);
       if (Number.isFinite(minutes) && minutes>0) { const sec = Math.round(minutes*60); const m=Math.floor(sec/60), s=sec%60; return `${m}:${String(s).padStart(2,'0')}`; }
       return '';
