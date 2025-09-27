@@ -138,7 +138,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             'avg_speed', 'avg_speed_mps', 'avg_pace',
             'moving_time', 'elapsed_time', 'total_timer_time', 'total_elapsed_time',
             'duration', 'pool_length', 'number_of_active_lengths',
-            'sensor_data', 'swim_data'
+            'sensor_data', 'swim_data', 'gps_track'
           ];
           for (const k of passthroughKeys) {
             if ((full as any)[k] != null && merged[k] == null) (merged as any)[k] = (full as any)[k];

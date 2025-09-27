@@ -1,4 +1,6 @@
 // @ts-nocheck
+// Function: auto-attach-planned
+// Behavior: Attach completed workouts to planned by exact YYYY-MM-DD date + type
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 function pctDiff(a: number, b: number): number { if (!(a>0) || !(b>0)) return Infinity; return Math.abs(a-b)/a; }
