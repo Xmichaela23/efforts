@@ -121,7 +121,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         const contextSE = Array.isArray((full as any)?.strength_exercises) ? (full as any).strength_exercises : [];
         const chosenSE = executedSE && executedSE.length ? executedSE : contextSE;
         const completedEx = Array.isArray((full as any)?.completed_exercises) ? (full as any).completed_exercises : undefined;
-        return {
+        // Shallow-merge key metrics so client resolvers can compute moving seconds uniformly
+        const merged: any = {
           id: it.id,
           date: it.date,
           type: it.type,
@@ -130,6 +131,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           strength_exercises: chosenSE,
           completed_exercises: completedEx,
         };
+        if (full && typeof full === 'object') {
+          const passthroughKeys = [
+            'metrics',
+            'distance', 'distance_meters', 'distance_km',
+            'avg_speed', 'avg_speed_mps', 'avg_pace',
+            'moving_time', 'elapsed_time', 'total_timer_time', 'total_elapsed_time',
+            'duration', 'pool_length', 'number_of_active_lengths'
+          ];
+          for (const k of passthroughKeys) {
+            if ((full as any)[k] != null && merged[k] == null) (merged as any)[k] = (full as any)[k];
+          }
+        }
+        return merged;
       });
     const planned = items
       .filter((it:any) => !!it?.planned && String(it?.status||'').toLowerCase()!=='completed')
