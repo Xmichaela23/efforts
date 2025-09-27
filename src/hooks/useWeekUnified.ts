@@ -18,6 +18,14 @@ export function useWeekUnified(fromISO: string, toISO: string) {
     let mounted = true;
     (async () => {
       try {
+        // Prefer getSession for immediate restoration from persisted auth
+        const { data: { session } } = await supabase.auth.getSession();
+        if (mounted && session?.user?.id) {
+          setUserId(session.user.id);
+          try { console.log('useWeekUnified:getSession', { hasSession: true, userId: session.user.id, fromISO, toISO }); } catch {}
+        }
+      } catch {}
+      try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!mounted) return;
         setUserId(user ? user.id : null);
