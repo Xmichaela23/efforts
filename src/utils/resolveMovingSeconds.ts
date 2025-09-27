@@ -12,6 +12,16 @@ export function resolveMovingSeconds(workout: any): number | null {
       } catch { return src?.metrics; }
     })();
 
+    // 0) Unified server-computed moving seconds (but skip if obviously rounded from minutes)
+    try {
+      const computed = Number(src?.computed?.overall?.duration_s_moving);
+      if (Number.isFinite(computed) && computed > 0) {
+        const movingTimeMinutes = Number(src?.moving_time);
+        const isRounded = Number.isFinite(movingTimeMinutes) && computed === Math.round(movingTimeMinutes * 60);
+        if (!isRounded) return Math.round(computed);
+      }
+    } catch {}
+
     // 1) Explicit seconds from provider metrics
     // Strict moving-time seconds only (do NOT include total elapsed here)
     const secCandidates = [
