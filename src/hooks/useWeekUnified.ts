@@ -64,14 +64,8 @@ export function useWeekUnified(fromISO: string, toISO: string) {
     refetchOnReconnect: false,
   });
 
-  // Debug current React Query state and nudge if idle while enabled
+  // Debug current React Query state (no automatic refetch to avoid loops)
   try { console.log('useWeekUnified:rq', { status: (query as any)?.status, fetchStatus: (query as any)?.fetchStatus, isFetching: (query as any)?.isFetching }); } catch {}
-  useEffect(() => {
-    try { console.log('useWeekUnified:refetchCheck', { enabled: !!userId, fetchStatus: (query as any)?.fetchStatus, status: (query as any)?.status }); } catch {}
-    if (userId && (query as any)?.fetchStatus === 'idle') {
-      try { query.refetch(); } catch {}
-    }
-  }, [userId, fromISO, toISO, (query as any)?.fetchStatus]);
 
   // In unified mode, rely on standard query invalidation from navigations;
   // avoid global event-based invalidation to prevent render loops on calendar.
