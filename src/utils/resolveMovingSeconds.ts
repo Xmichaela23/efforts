@@ -12,10 +12,6 @@ export function resolveMovingSeconds(workout: any): number | null {
       } catch { return src?.metrics; }
     })();
 
-    // 0) Unified server-computed moving seconds
-    const computed = Number(src?.computed?.overall?.duration_s_moving ?? src?.computed?.overall?.duration_s);
-    if (Number.isFinite(computed) && computed > 0) return Math.round(computed);
-
     // 1) Explicit seconds from provider metrics
     // Strict moving-time seconds only (do NOT include total elapsed here)
     const secCandidates = [
@@ -62,10 +58,8 @@ export function resolveMovingSeconds(workout: any): number | null {
       if (Number.isFinite(distM) && (distM as number) > 0) {
         // Prefer average speed (km/h or m/s)
         const mps = (() => {
-          const vMps = Number(src?.avg_speed_mps);
-          if (Number.isFinite(vMps) && vMps > 0) return vMps;
           const vKph = Number(src?.avg_speed);
-          if (Number.isFinite(vKph) && vKph > 0) return vKph / 3.6;
+          if (Number.isFinite(vKph) && vKph > 0) return vKph / 3.6; // km/h → m/s
           return null;
         })();
         if (Number.isFinite(mps as any) && (mps as number) > 0) {
