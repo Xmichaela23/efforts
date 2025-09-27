@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
           .select('id,training_plan_id,date,type')
           .eq('user_id', userId)
           .gte('date', fromISO)
-          .lte('date', toISO);
+          .lt('date', addDays(toISO, 1));
         const existsKey = new Set(
           (Array.isArray(prePlanned)? prePlanned: []).map((r:any)=> `${String(r.training_plan_id)}|${String(r.date)}|${String(r.type).toLowerCase()}`)
         );
@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
             .select('id,computed,total_duration_seconds')
             .eq('user_id', userId)
             .gte('date', fromISO)
-            .lte('date', toISO);
+            .lt('date', addDays(toISO, 1));
           const ids = (Array.isArray(needCompute)? needCompute: [])
             .filter((r:any)=> {
               const t = Number((r as any)?.total_duration_seconds);

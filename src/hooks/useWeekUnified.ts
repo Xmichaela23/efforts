@@ -22,36 +22,29 @@ export function useWeekUnified(fromISO: string, toISO: string) {
         const { data: { session } } = await supabase.auth.getSession();
         if (mounted && session?.user?.id) {
           setUserId(session.user.id);
-          try { console.log('useWeekUnified:getSession', { hasSession: true, userId: session.user.id, fromISO, toISO }); } catch {}
         }
       } catch {}
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!mounted) return;
         setUserId(user ? user.id : null);
-        try { console.log('useWeekUnified:getUser', { hasUser: !!user?.id, userId: user?.id, fromISO, toISO }); } catch {}
       } catch {}
     })();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
       setUserId(session?.user?.id || null);
       queryClient.invalidateQueries({ queryKey: ['weekUnified'] });
-      try { console.log('useWeekUnified:onAuthStateChange', { uid: session?.user?.id || null }); } catch {}
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
   const queryKeyBase = ['weekUnified', 'me', userId, fromISO, toISO] as const;
 
-  try { console.log('useWeekUnified:hook', { userId, enabled: !!userId, fromISO, toISO }); } catch {}
-
   const query = useQuery({
     queryKey: queryKeyBase,
     enabled: !!userId,
     queryFn: async () => {
       if (!userId) return { items: [] } as any;
-      try { console.log('useWeekUnified:invoke', { fromISO, toISO, debug: true }); } catch {}
-      const { data, error } = await supabase.functions.invoke('get-week', { body: { from: fromISO, to: toISO, debug: true } });
-      try { console.log('useWeekUnified:response', { error: error?.message || null, items: Array.isArray((data as any)?.items) ? (data as any).items.length : 0, warnings: (data as any)?.warnings }); } catch {}
+      const { data, error } = await supabase.functions.invoke('get-week', { body: { from: fromISO, to: toISO } });
       if (error) throw error as any;
       const items: UnifiedItem[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
       return { items };
@@ -63,9 +56,6 @@ export function useWeekUnified(fromISO: string, toISO: string) {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
-
-  // Debug current React Query state (no automatic refetch to avoid loops)
-  try { console.log('useWeekUnified:rq', { status: (query as any)?.status, fetchStatus: (query as any)?.fetchStatus, isFetching: (query as any)?.isFetching }); } catch {}
 
   // In unified mode, rely on standard query invalidation from navigations;
   // avoid global event-based invalidation to prevent render loops on calendar.

@@ -112,9 +112,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const dateWorkoutsMemo = useMemo(() => {
     const items = Array.isArray(unifiedItems) ? unifiedItems : [];
-    try {
-      console.log('Today: unifiedItems', { activeDate, count: items.length, sig: items.map((it:any)=> `${String(it.date)}|${String(it.type)}|${String(it.status)}`) });
-    } catch {}
     const completed = items
       .filter((it:any) => String(it?.status||'').toLowerCase()==='completed')
       .map((it:any) => {
