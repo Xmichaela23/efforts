@@ -241,15 +241,39 @@ Deno.serve(async (req) => {
 
     // Transitional fill: for rows missing planned_data/executed_data, derive from legacy tables
     // 1) Preload planned rows for range keyed by (date|type)
-    const { data: plannedRows, error: pErr } = await supabase
-      .from('planned_workouts')
-      .select('id,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds')
-      .eq('user_id', userId)
-      .gte('date', fromISO)
-      .lte('date', toISO)
-      .order('date', { ascending: true })
-      .order('created_at', { ascending: true })
-      .order('id', { ascending: true });
+    let plannedRows: any[] | null = null; let pErr: any = null;
+    try {
+      const { data, error } = await supabase
+        .from('planned_workouts')
+        .select('id,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at')
+        .eq('user_id', userId)
+        .gte('date', fromISO)
+        .lte('date', toISO)
+        .order('date', { ascending: true })
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true });
+      if (error) throw error;
+      plannedRows = Array.isArray(data) ? data : [];
+    } catch (e1) {
+      pErr = e1;
+      // Fallback for schemas without completed_workout_id or created_at
+      try {
+        const { data, error } = await supabase
+          .from('planned_workouts')
+          .select('id,date,type,workout_status,computed,steps_preset,strength_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds')
+          .eq('user_id', userId)
+          .gte('date', fromISO)
+          .lte('date', toISO)
+          .order('date', { ascending: true })
+          .order('id', { ascending: true });
+        if (error) throw error;
+        plannedRows = Array.isArray(data) ? data : [];
+        // Downgrade error to warning only
+      } catch (e2) {
+        pErr = e2;
+        plannedRows = [];
+      }
+    }
     if (pErr) errors.push({ where: 'planned_workouts', message: pErr.message || String(pErr) });
     const plannedByKey = new Map<string, any>();
     for (const p of Array.isArray(plannedRows) ? plannedRows : []) {
