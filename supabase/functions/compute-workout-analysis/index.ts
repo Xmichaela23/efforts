@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     // Load workout essentials
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length')
+      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, moving_time')
       .eq('id', workout_id)
       .maybeSingle();
     if (wErr) throw wErr;
@@ -346,11 +346,56 @@ Deno.serve(async (req) => {
       }
     } catch {}
 
-    // Write under workouts.computed.analysis without clobbering existing computed
+    // Derive canonical overall for swims and endurance
+    const overall = (() => {
+      const cPrev = parseJson(w.computed) || {};
+      const prevOverall = cPrev?.overall || {};
+      const type = String(w.type || '').toLowerCase();
+      // Endurance: prefer series totals when available
+      if (type !== 'strength') {
+        try {
+          const distSeries = hasRows ? Number(distance_m[distance_m.length-1]||0) : NaN;
+          const timeSeries = hasRows ? Number(time_s[time_s.length-1]||0) : NaN;
+          // Swims: ensure non-zero distance
+          if (type==='swim') {
+            let dist = Number.isFinite(distSeries) && distSeries>0 ? distSeries : null;
+            if (!dist) {
+              // lengths.sum
+              const swim = parseJson((w as any).swim_data) || null;
+              const lengths: any[] = Array.isArray(swim?.lengths) ? swim.lengths : [];
+              if (lengths.length) {
+                const sum = lengths.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0);
+                if (sum>0) dist = Math.round(sum);
+              }
+              if (!dist) {
+                const nLen = Number((w as any)?.number_of_active_lengths);
+                const poolM = Number((w as any)?.pool_length);
+                if (Number.isFinite(nLen) && nLen>0 && Number.isFinite(poolM) && poolM>0) dist = Math.round(nLen*poolM);
+              }
+            }
+            const dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries)
+              : (Number((w as any)?.moving_time)||null);
+            return {
+              ...(prevOverall||{}),
+              distance_m: dist || prevOverall?.distance_m || 0,
+              duration_s_moving: dur || prevOverall?.duration_s_moving || null,
+            };
+          }
+          // Non-swim
+          const dist = Number.isFinite(distSeries) && distSeries>0 ? Math.round(distSeries)
+            : (Number((w as any)?.distance)*1000 || prevOverall?.distance_m || null);
+          const dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries)
+            : (Number((w as any)?.moving_time)|| prevOverall?.duration_s_moving || null);
+          return { ...(prevOverall||{}), distance_m: dist, duration_s_moving: dur };
+        } catch { return prevOverall || {}; }
+      }
+      return prevOverall || {};
+    })();
+
+    // Write under workouts.computed with updated overall and analysis
     const computed = (() => {
       const c = parseJson(w.computed) || {};
-      // Preserve any pre-existing non-analysis keys; replace analysis fully with the new one
-      return { ...c, analysis };
+      return { ...c, overall, analysis };
     })();
 
     const { error: upErr } = await supabase

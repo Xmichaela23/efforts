@@ -699,7 +699,7 @@ const formatPace = (paceValue: any): string => {
       },
       {
         label: 'Duration', 
-        value: formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration)
+        value: (()=>{ const s = getElapsedSeconds(); return Number.isFinite(s as any) && (s as number) > 0 ? formatDuration(s as number) : 'N/A'; })()
       },
       {
         label: 'Heart Rate',
@@ -856,11 +856,44 @@ const formatPace = (paceValue: any): string => {
     }
   };
 
+  // ----- Elapsed time resolver (exact seconds when available) -----
+  const getElapsedSeconds = (): number | null => {
+    try {
+      const src = (hydrated || workoutData) as any;
+      // 1) Samples last clock/elapsed duration
+      const samples = Array.isArray(src?.sensor_data?.samples)
+        ? src.sensor_data.samples
+        : (Array.isArray(src?.sensor_data) ? src.sensor_data : []);
+      if (Array.isArray(samples) && samples.length > 0) {
+        const last: any = samples[samples.length - 1];
+        const clock = Number(last?.clockDurationInSeconds ?? last?.elapsedDurationInSeconds ?? last?.sumDurationInSeconds);
+        if (Number.isFinite(clock) && clock > 0) return Math.round(clock);
+      }
+      // 2) Metrics explicit seconds if present
+      const metricsSec = Number(src?.metrics?.total_elapsed_time_seconds);
+      if (Number.isFinite(metricsSec) && metricsSec > 0) return Math.round(metricsSec);
+      // 3) Minute fields → seconds
+      const minCands = [
+        Number(src?.metrics?.total_elapsed_time),
+        Number(src?.total_elapsed_time),
+        Number(src?.elapsed_time),
+        Number(src?.metrics?.elapsed_time),
+        Number(src?.duration)
+      ];
+      const minutes = minCands.find((v)=> Number.isFinite(v) && v > 0) as number | undefined;
+      if (typeof minutes === 'number') return Math.round(minutes * 60);
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const getDistanceMeters = (): number | null => {
-    // Swims: only trust server-computed distance
+    // Swims: only trust server-computed distance (prefer hydrated row if present)
     if (workoutType === 'swim') {
       try {
-        const cm = Number((workoutData as any)?.computed?.overall?.distance_m);
+        const src = (hydrated || workoutData) as any;
+        const cm = Number(src?.computed?.overall?.distance_m);
         return Number.isFinite(cm) && cm > 0 ? Math.round(cm) : null;
       } catch { return null; }
     }
@@ -957,6 +990,14 @@ const formatPace = (paceValue: any): string => {
   const formatPoolLengthLabel = (): string => {
     const L = inferPoolLengthMeters();
     if (!L) return 'N/A';
+    // Honor user unit preference: display yd when imperial
+    try {
+      // useAppContext may already be in scope; if not, this block is harmless
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
+      if (typeof useImperial === 'boolean' && useImperial === true) {
+        return `${Math.round(L / 0.9144)} yd`;
+      }
+    } catch {}
     const yardPool = isYardPool();
     if (yardPool === true) return `${Math.round(L / 0.9144)} yd`;
     const candidates = [25, 50, 33.33];
@@ -1604,16 +1645,9 @@ const formatMovingTime = () => {
 
          {/* Duration (Elapsed) */}
          <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {(() => {
-               const s = (workoutData as any)?.metrics?.total_elapsed_time
-                     ?? (workoutData as any)?.total_elapsed_time
-                     ?? (workoutData as any)?.elapsed_time
-                     ?? (workoutData as any)?.metrics?.elapsed_time
-                     ?? (typeof (workoutData as any)?.duration === 'number' ? (workoutData as any).duration * 60 : null);
-               return Number.isFinite(Number(s)) && Number(s) > 0 ? formatDuration(Number(s)) : 'N/A';
-             })()}
-           </div>
+          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            {(() => { const s = getElapsedSeconds(); return Number.isFinite(s as any) && (s as number) > 0 ? formatDuration(s as number) : 'N/A'; })()}
+          </div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Duration</div></div>
          </div>
 

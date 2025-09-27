@@ -35,6 +35,65 @@ const roundInt = (v)=>{
   const n = Number(v);
   return Number.isFinite(n) ? Math.round(n) : null;
 };
+// --- Swim moving-time derivation helper (used when provider omits moving/timer) ---
+function deriveSwimMovingSeconds(activityLike: any): number | null {
+  try {
+    const s = activityLike?.summary || {};
+    // 1) Provider explicit moving/timer
+    const ms = Number(s.movingDurationInSeconds ?? s.timerDurationInSeconds);
+    if (Number.isFinite(ms) && ms > 0) return Math.round(ms);
+
+    // 2) From lengths (authoritative for pool)
+    try {
+      const swim = activityLike?.swim_data ?? {};
+      const lens = Array.isArray(swim?.lengths) ? swim.lengths : [];
+      if (lens.length) {
+        const durs:number[] = lens.map((l:any)=> Number(l?.duration_s ?? NaN)).filter((n)=> Number.isFinite(n) && n > 0);
+        if (durs.length) {
+          const min = durs.reduce((m,n)=> Math.min(m,n), Number.POSITIVE_INFINITY);
+          const max = durs.reduce((m,n)=> Math.max(m,n), 0);
+          // If all lengths have essentially the same duration (likely reconstructed), treat as unreliable
+          const essentiallyUniform = durs.length >= 3 && (max - min) <= 1;
+          if (!essentiallyUniform) {
+            let sum = durs.reduce((a,b)=> a + b, 0);
+            const durS = Number(s.durationInSeconds ?? activityLike?.duration_seconds);
+            if (Number.isFinite(durS) && durS > 0 && sum > durS) sum = durS; // never exceed total elapsed
+            if (sum > 0) return Math.round(sum);
+          }
+        }
+      }
+    } catch {}
+
+    // 3) Distance ÷ avg speed, or distance × avg pace
+    const distM = Number(s.totalDistanceInMeters ?? s.distanceInMeters ?? activityLike?.distance_meters);
+    const avgMps = Number(s.averageSpeedInMetersPerSecond ?? activityLike?.avg_speed_mps);
+    const durS_forClamp = Number(s.durationInSeconds ?? activityLike?.duration_seconds);
+    if (Number.isFinite(distM) && distM > 0 && Number.isFinite(avgMps) && avgMps > 0) {
+      let est = distM / avgMps;
+      if (Number.isFinite(durS_forClamp) && durS_forClamp > 0) est = Math.min(est, durS_forClamp);
+      return Math.round(est);
+    }
+    const avgMinPerKm = Number(s.averagePaceInMinutesPerKilometer);
+    if (Number.isFinite(distM) && distM > 0 && Number.isFinite(avgMinPerKm) && avgMinPerKm > 0) {
+      let est = (distM / 1000) * avgMinPerKm * 60;
+      if (Number.isFinite(durS_forClamp) && durS_forClamp > 0) est = Math.min(est, durS_forClamp);
+      return Math.round(est);
+    }
+
+    // 4) Pool-only heuristic (~15% rest)
+    const hasPoolHints = Number.isFinite(Number(s.poolLengthInMeters))
+      || Number.isFinite(Number(s.numberOfActiveLengths))
+      || Number.isFinite(Number(activityLike?.pool_length));
+    const durS = Number(s.durationInSeconds ?? activityLike?.duration_seconds);
+    if (hasPoolHints && Number.isFinite(durS) && durS > 0) return Math.round(durS * 0.85);
+
+    // 5) Last resort: overall duration
+    if (Number.isFinite(durS) && durS > 0) return Math.round(durS);
+    return null;
+  } catch  {
+    return null;
+  }
+}
 // --- Garmin local date + UTC timestamp resolver ---
 function garminLocalDateAndTimestamp(a) {
   const sIn = Number(a?.summary?.startTimeInSeconds ?? a?.start_time_in_seconds);
@@ -69,7 +128,7 @@ function mapStravaToWorkout(activity, userId) {
   try {
     computedSummary = computeComputedFromActivity(activity);
   } catch  {}
-  const computedJson = computedSummary ? JSON.stringify(computedSummary) : null;
+  const computedJsonObj = computedSummary || null;
   const derivedAvgCadence = (()=>{
     try {
       const v = computedSummary?.overall?.avg_cadence_spm;
@@ -113,17 +172,17 @@ function mapStravaToWorkout(activity, userId) {
     start_position_lat: Array.isArray(activity.start_latlng) ? activity.start_latlng[0] ?? null : null,
     start_position_long: Array.isArray(activity.start_latlng) ? activity.start_latlng[1] ?? null : null,
     // Optional JSON fields if provided by caller (e.g., enriched client or webhook)
-    gps_track: activity.gps_track ? JSON.stringify(activity.gps_track) : null,
-    sensor_data: activity.sensor_data ? JSON.stringify(activity.sensor_data) : null,
-    swim_data: activity.swim_data ? JSON.stringify(activity.swim_data) : null,
-    laps: activity.laps ? JSON.stringify(activity.laps) : null,
+    gps_track: activity.gps_track ?? null,
+    sensor_data: activity.sensor_data ?? null,
+    swim_data: activity.swim_data ?? null,
+    laps: activity.laps ?? null,
     // Polyline if available
     gps_trackpoints: activity.map?.polyline || activity.map?.summary_polyline || null,
     // Cadence rollups (prefer Strava fields, else derived)
     avg_cadence: Number.isFinite(activity.average_cadence) ? Math.round(activity.average_cadence) : derivedAvgCadence,
     max_cadence: Number.isFinite(activity.max_cadence) ? Math.round(activity.max_cadence) : derivedMaxCadence,
     // Server-computed summary for UI (includes GAP/cadence when available)
-    computed: computedJson,
+    computed: computedJsonObj,
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString()
   };
@@ -422,9 +481,10 @@ async function mapGarminToWorkout(activity, userId) {
     refined_type: computeInput?.refined_type || null,
     date: date,
     timestamp: timestamp,
-    duration: activity.duration_seconds != null ? Math.max(0, Math.round(activity.duration_seconds / 60)) : null,
-    moving_time: activity.duration_seconds != null ? Math.max(0, Math.round(activity.duration_seconds / 60)) : null,
-    elapsed_time: activity.duration_seconds != null ? Math.max(0, Math.round(activity.duration_seconds / 60)) : null,
+    // Use provider seconds precisely: elapsed vs moving
+    duration: (()=>{ const s = Number(computeInput?.summary?.durationInSeconds); return Number.isFinite(s) && s>0 ? Math.floor(s/60) : null; })(),
+    moving_time: (()=>{ const ms = Number(computeInput?.summary?.movingDurationInSeconds ?? computeInput?.summary?.timerDurationInSeconds); if (Number.isFinite(ms) && ms>0) return Math.floor(ms/60); if (type==='swim') { const d = deriveSwimMovingSeconds(computeInput); return Number.isFinite(d as any) && (d as number) > 0 ? Math.floor((d as number)/60) : null; } return null; })(),
+    elapsed_time: (()=>{ const s = Number(computeInput?.summary?.durationInSeconds); return Number.isFinite(s) && s>0 ? Math.floor(s/60) : null; })(),
     distance: activity.distance_meters != null ? Number((activity.distance_meters / 1000).toFixed(3)) : null,
     workout_status: 'completed',
     source: 'garmin',
@@ -461,7 +521,7 @@ async function mapGarminToWorkout(activity, userId) {
       const v = enriched ?? actMaxCad;
       return roundInt(v);
     })(),
-    strokes: Number.isFinite(activity.strokes) ? activity.strokes : Number.isFinite(computeInput?.summary?.totalNumberOfStrokes) ? Number(computeInput.summary.totalNumberOfStrokes) : null,
+    strokes: (Number.isFinite(activity.strokes) ? activity.strokes : Number.isFinite(computeInput?.summary?.totalNumberOfStrokes) ? Number(computeInput.summary.totalNumberOfStrokes) : null) ?? null,
     pool_length: (()=>{
       const explicit = Number(activity.pool_length);
       if (Number.isFinite(explicit) && explicit > 0) return explicit;
@@ -506,9 +566,28 @@ async function mapGarminToWorkout(activity, userId) {
       }
     })(),
     // Server-computed summary for UI (intervals + overall)
-    computed: (()=>{
+    computed: ((): string | null => {
       try {
-        const c = computeComputedFromActivity(computeInput);
+        const c: any = computeComputedFromActivity(computeInput) || {};
+        // Guarantee overall for swims from ingest-time totals (distance_meters, duration_seconds)
+        if (type === 'swim') {
+          const distIn = Number(activity.distance_meters ?? computeInput?.summary?.totalDistanceInMeters ?? computeInput?.summary?.distanceInMeters);
+          const nLen = Number(activity.number_of_active_lengths ?? computeInput?.summary?.numberOfActiveLengths);
+          const poolM = Number(activity.pool_length ?? computeInput?.pool_length ?? computeInput?.pool_length_m);
+          // Moving seconds preferred — use derived helper first
+          const derived = deriveSwimMovingSeconds(computeInput);
+          const durIn = Number.isFinite(derived as any) && (derived as number) > 0
+                        ? (derived as number)
+                        : Number(computeInput?.summary?.movingDurationInSeconds ?? computeInput?.summary?.timerDurationInSeconds ?? activity.duration_seconds ?? computeInput?.summary?.durationInSeconds);
+          const distM = Number.isFinite(distIn) && distIn > 0 ? Math.round(distIn)
+                        : (Number.isFinite(nLen) && nLen > 0 && Number.isFinite(poolM) && poolM > 0 ? Math.round(nLen * poolM) : null);
+          const durS = Number.isFinite(durIn) && durIn > 0 ? Math.floor(durIn) : null;
+          c.overall = {
+            ...(c.overall || {}),
+            distance_m: (c.overall?.distance_m ?? distM ?? 0),
+            duration_s_moving: (c.overall?.duration_s_moving ?? durS ?? null)
+          };
+        }
         // If lengths exist, add splits_100 from lengths
         try {
           const lengths = computeInput?.swim_data?.lengths || [];
@@ -541,7 +620,7 @@ async function mapGarminToWorkout(activity, userId) {
             }
           }
         } catch  {}
-        return c ? JSON.stringify(c) : null;
+        return JSON.stringify(c);
       } catch  {
         return null;
       }
@@ -629,12 +708,53 @@ Deno.serve(async (req)=>{
         }
       });
     }
+    // Ensure scalar swim fields persisted even if provider details path is used
+    try {
+      const { data: justUpserted } = await supabase
+        .from('workouts')
+        .select('id,distance,moving_time,pool_length,number_of_active_lengths')
+        .eq('user_id', row.user_id)
+        .eq(onConflict.includes('garmin') ? 'garmin_activity_id' : 'strava_activity_id', onConflict.includes('garmin') ? row.garmin_activity_id : row.strava_activity_id)
+        .maybeSingle();
+      const wid = justUpserted?.id;
+      if (wid) {
+        const scalarUpdates: any = {};
+        const distKm = typeof row.distance === 'number' && row.distance > 0 ? row.distance : (Number(activity.distance_meters) > 0 ? Number((Number(activity.distance_meters) / 1000).toFixed(3)) : null);
+        const sum = (activity && activity.summary) ? activity.summary : {};
+        let moveMin = typeof row.moving_time === 'number' && row.moving_time > 0
+          ? row.moving_time
+          : (Number(sum?.movingDurationInSeconds ?? sum?.timerDurationInSeconds) > 0
+              ? Math.floor(Number(sum.movingDurationInSeconds ?? sum.timerDurationInSeconds) / 60)
+              : null);
+        // Swim-specific derivation when provider didn't include moving/timer
+        try {
+          const typeKey = String(activity?.activity_type || '').toLowerCase();
+          const isSwim = typeKey.includes('swim');
+          if ((moveMin == null || moveMin <= 0) && isSwim) {
+            const derivedS = deriveSwimMovingSeconds({ ...activity, summary: sum });
+            if (Number.isFinite(derivedS as any) && (derivedS as number) > 0) moveMin = Math.floor((derivedS as number) / 60);
+          }
+        } catch {}
+        const durMin = typeof row.duration === 'number' && row.duration > 0 ? row.duration : (Number(sum?.durationInSeconds) > 0 ? Math.floor(Number(sum.durationInSeconds) / 60) : null);
+        const poolLen = typeof row.pool_length === 'number' && row.pool_length > 0 ? row.pool_length : (Number(activity.pool_length) > 0 ? Number(activity.pool_length) : null);
+        const nLen = typeof row.number_of_active_lengths === 'number' && row.number_of_active_lengths > 0 ? row.number_of_active_lengths : (Number(activity.number_of_active_lengths) > 0 ? Number(activity.number_of_active_lengths) : null);
+        if (distKm != null) scalarUpdates.distance = distKm;
+        if (moveMin != null) scalarUpdates.moving_time = moveMin;
+        if (durMin != null) scalarUpdates.duration = durMin;
+        if (poolLen != null) scalarUpdates.pool_length = poolLen;
+        if (nLen != null) scalarUpdates.number_of_active_lengths = nLen;
+        if (Object.keys(scalarUpdates).length) {
+          await supabase.from('workouts').update(scalarUpdates).eq('id', wid);
+        }
+      }
+    } catch {}
+
     // Fire-and-forget: auto-attach to planned and compute summaries/analysis for zero-touch UX
     try {
       const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/auto-attach-planned`;
       const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-      const { data: justUpserted } = await supabase.from('workouts').select('id').eq('user_id', row.user_id).eq(onConflict.includes('garmin') ? 'garmin_activity_id' : 'strava_activity_id', onConflict.includes('garmin') ? row.garmin_activity_id : row.strava_activity_id).maybeSingle();
-      const wid = justUpserted?.id;
+      const { data: justUpserted2 } = await supabase.from('workouts').select('id').eq('user_id', row.user_id).eq(onConflict.includes('garmin') ? 'garmin_activity_id' : 'strava_activity_id', onConflict.includes('garmin') ? row.garmin_activity_id : row.strava_activity_id).maybeSingle();
+      const wid = justUpserted2?.id;
       if (wid) {
         await fetch(fnUrl, {
           method: 'POST',

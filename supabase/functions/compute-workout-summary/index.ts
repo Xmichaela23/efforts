@@ -242,57 +242,71 @@ const COMPUTED_VERSION_INT = 1003;
 
 // ---------- GAP (Minetti model with elevation smoothing) ----------
 function gapSecPerMi(rows:any[], sIdx:number, eIdx:number) {
-  if (!rows || eIdx <= sIdx) return null;
-  let adjMeters = 0; let timeSec = 0;
-  const alpha = 0.1; // EMA smoothing (~10-15s at ~1 Hz)
-  function minettiCost(g:number){
-    const x = Math.max(-0.30, Math.min(0.30, g));
-    return (((155.4*x - 30.4)*x - 43.3)*x + 46.3)*x*x + 19.5*x + 3.6;
-  }
-  let ema:number|null = null;
-  for (let i=sIdx+1;i<=eIdx;i+=1) {
-    const a = rows[i-1], b = rows[i];
-    const dt = Math.min(60, Math.max(0, (b.t||0)-(a.t||0)));
-    if (!dt) continue; timeSec += dt;
-    // distance for segment
-    const dMeters = (() => {
-      const hasD = (typeof a.d === 'number') && (typeof b.d === 'number');
-      if (hasD) {
-        const dm = Math.max(0, (b.d as number) - (a.d as number));
-        if (dm > 0) return dm;
-      }
-      const v = (typeof b.v === 'number' && b.v > 0) ? b.v : ((typeof a.v === 'number' && a.v > 0) ? a.v : 0);
-      return v > 0 ? v * dt : 0;
-    })();
-    if (dMeters <= 0) continue;
-    // smoothed elevation delta
-    const elevRaw = (typeof b.elev === 'number') ? b.elev : (typeof a.elev === 'number' ? a.elev : null);
-    if (elevRaw != null) ema = (ema == null) ? elevRaw : (alpha * elevRaw + (1 - alpha) * ema);
-    const prevEma = ema;
-    // lookahead one more point when possible to get better delev; else use current diff
-    let delev = 0;
-    if (i+1 <= eIdx) {
-      const nb = rows[i+1];
-      const nextElevRaw = (typeof nb.elev === 'number') ? nb.elev : elevRaw;
-      const nextEma = (nextElevRaw != null) ? (alpha * nextElevRaw + (1 - alpha) * (ema ?? nextElevRaw)) : (ema ?? 0);
-      delev = nextEma - (prevEma ?? nextEma);
-      ema = nextEma;
-    } else {
-      delev = 0;
+  try {
+    if (!Array.isArray(rows)) return null;
+    const n = rows.length;
+    if (n < 2) return null;
+    let s = Math.max(0, Math.min(n - 2, Math.floor(sIdx)));
+    let e = Math.max(s + 1, Math.min(n - 1, Math.floor(eIdx)));
+    if (e <= s) return null;
+    let adjMeters = 0; let timeSec = 0;
+    const alpha = 0.1; // EMA smoothing (~10-15s at ~1 Hz)
+    function minettiCost(g:number){
+      const x = Math.max(-0.30, Math.min(0.30, g));
+      return (((155.4*x - 30.4)*x - 43.3)*x + 46.3)*x*x + 19.5*x + 3.6;
     }
-    const g = dMeters > 0 ? Math.max(-0.30, Math.min(0.30, delev / dMeters)) : 0;
-    const ratio = minettiCost(g) / 3.6; // cost relative to flat
-    // safety clamp to avoid extreme adjustments
-    const safeRatio = Math.max(0.7, Math.min(2.5, ratio));
-    adjMeters += dMeters * safeRatio;
+    let ema:number|null = null;
+    for (let i=s+1;i<=e;i+=1) {
+      const a:any = rows[i-1] || {};
+      const b:any = rows[i] || {};
+      const at = Number(a?.t ?? 0);
+      const bt = Number(b?.t ?? 0);
+      const dt = Math.min(60, Math.max(0, bt - at));
+      if (!dt) continue; timeSec += dt;
+      // distance for segment
+      const dMeters = (() => {
+        const hasD = (typeof a?.d === 'number') && (typeof b?.d === 'number');
+        if (hasD) {
+          const dm = Math.max(0, (Number(b.d) - Number(a.d)));
+          if (dm > 0) return dm;
+        }
+        const v = (typeof b?.v === 'number' && b.v > 0) ? b.v : ((typeof a?.v === 'number' && a.v > 0) ? a.v : 0);
+        return v > 0 ? v * dt : 0;
+      })();
+      if (dMeters <= 0) continue;
+      // smoothed elevation delta
+      const elevRawB = (typeof b?.elev === 'number') ? b.elev : (typeof a?.elev === 'number' ? a.elev : null);
+      if (elevRawB != null) ema = (ema == null) ? elevRawB : (alpha * elevRawB + (1 - alpha) * ema);
+      const prevEma = ema;
+      // lookahead one more point when possible
+      let delev = 0;
+      if (i+1 <= e) {
+        const nb:any = rows[i+1] || {};
+        const nextElevRaw = (typeof nb?.elev === 'number') ? nb.elev : elevRawB;
+        const nextEma = (nextElevRaw != null) ? (alpha * nextElevRaw + (1 - alpha) * (ema ?? nextElevRaw)) : (ema ?? 0);
+        delev = nextEma - (prevEma ?? nextEma);
+        ema = nextEma;
+      } else {
+        delev = 0;
+      }
+      const g = dMeters > 0 ? Math.max(-0.30, Math.min(0.30, delev / dMeters)) : 0;
+      const ratio = minettiCost(g) / 3.6; // cost relative to flat
+      const safeRatio = Math.max(0.7, Math.min(2.5, ratio));
+      adjMeters += dMeters * safeRatio;
+    }
+    return paceSecPerMiFromMetersSeconds(adjMeters, timeSec);
+  } catch (err:any) {
+    try { console.error('Exact error location: gapSecPerMi', { error: err?.message }); } catch {}
+    return null;
   }
-  return paceSecPerMiFromMetersSeconds(adjMeters, timeSec);
 }
 
 // ---------- main handler ----------
 Deno.serve(async (req) => {
+  try { console.error('FUNCTION ENTRY'); } catch {}
   // CORS preflight
   if (req.method === 'OPTIONS') {
+    try { console.error('OPTIONS REQUEST'); } catch {}
     return new Response('ok', {
       headers: {
         'Access-Control-Allow-Origin': '*',
@@ -304,19 +318,23 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { 'Access-Control-Allow-Origin': '*' } });
 
   try {
+    try { console.error('POST REQUEST RECEIVED'); } catch {}
     const { workout_id } = await req.json();
+    try { console.error('PARSED JSON, workout_id:', workout_id); } catch {}
     if (!workout_id) {
       return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
     }
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    try { console.error('SUPABASE CLIENT CREATED'); } catch {}
 
     // Load workout + planned link
     const { data: w } = await supabase
       .from('workouts')
-      .select('id,user_id,planned_id,computed,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment')
+      .select('id,user_id,planned_id,computed,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time')
       .eq('id', workout_id)
       .maybeSingle();
+    try { console.error('DATABASE QUERY COMPLETE, workout found:', !!w); } catch {}
 
     if (!w) {
       return new Response(JSON.stringify({ error:'workout not found' }), { status:404, headers:{'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*'}});
@@ -334,11 +352,238 @@ Deno.serve(async (req) => {
         .maybeSingle();
       planned = p || null;
     }
+    // ---- MAIN PROCESSING BLOCK ----
+    try {
+    // Parse and validate sensor data input (pre-normalize diagnostics)
+    const sensorRaw = (() => {
+      try { return typeof w.sensor_data === 'string' ? JSON.parse(w.sensor_data) : w.sensor_data; } catch { return w.sensor_data; }
+    })();
+    const samplesIn = Array.isArray(sensorRaw?.samples) ? sensorRaw.samples : Array.isArray(sensorRaw) ? sensorRaw : [];
+    try {
+      console.error('[pre-normalize]', {
+        sensorType: typeof sensorRaw,
+        hasSamplesProp: !!(sensorRaw && typeof sensorRaw === 'object' && 'samples' in sensorRaw),
+        isArray: Array.isArray(samplesIn),
+        length: Array.isArray(samplesIn) ? samplesIn.length : 0,
+        first: Array.isArray(samplesIn) ? samplesIn[0] : null
+      });
+    } catch {}
+    const samples = Array.isArray(samplesIn) ? samplesIn.filter(Boolean) : [];
 
-    // Parse sensor_data
-    const sensor = (() => { try { return typeof w.sensor_data === 'string' ? JSON.parse(w.sensor_data) : w.sensor_data; } catch { return w.sensor_data; } })();
-    const samples = Array.isArray(sensor?.samples) ? sensor.samples : Array.isArray(sensor) ? sensor : [];
-    let rows = normalizeSamples(samples);
+    // Helper used by normalize fallback (defined early to avoid hoist issues)
+    function computeFromSummaryDataEarly(wAny:any): { meters:number; secs:number } {
+      let meters = 0, secs = 0;
+      try {
+        const sport0 = String((wAny as any)?.type || '').toLowerCase();
+        const km = Number((wAny as any)?.distance); if (Number.isFinite(km) && km > 0) meters = Math.round(km * 1000);
+        const mv = Number((wAny as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) secs = Math.round(mv * 60);
+        if (sport0 === 'swim') {
+          if (!(meters > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) meters = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0)); } catch {} }
+          if (!(secs > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) secs = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.duration_s)||0), 0)); } catch {} }
+          if (!(meters > 0)) { const n = Number((wAny as any)?.number_of_active_lengths); const L = Number((wAny as any)?.pool_length); if (Number.isFinite(n)&&n>0&&Number.isFinite(L)&&L>0) meters = Math.round(n * L); }
+        }
+      } catch {}
+      return { meters, secs };
+    }
+
+    // Safe normalization with fallback
+    let rows: any[] = [];
+    try {
+      rows = normalizeSamples(samples);
+    } catch (e:any) {
+      try {
+        console.error('[normalizeSamples:error]', {
+          msg: e?.message,
+          stack: e?.stack?.split('\n')[0],
+          inputLength: Array.isArray(samples) ? samples.length : 0,
+          first: Array.isArray(samples) ? samples[0] : null
+        });
+      } catch {}
+      const { meters, secs } = computeFromSummaryDataEarly(w);
+      const computed = {
+        version: COMPUTED_VERSION,
+        intervals: [],
+        overall: {
+          duration_s_moving: secs > 0 ? secs : null,
+          distance_m: meters > 0 ? meters : 0,
+          avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(meters, secs),
+          gap_pace_s_per_mi: null
+        }
+      } as any;
+      await writeComputed(computed);
+      return new Response(JSON.stringify({ success:true, mode:'normalize-error-fallback' }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+    }
+    // Global sanitation: remove malformed entries and enforce numeric time
+    try {
+      const out: Array<{ t:number; d:number; v?:number; elev?:number; hr?:number; cad?:number; p?:number }> = [];
+      let lastT = 0;
+      let lastD = 0;
+      for (let i = 0; i < rows.length; i += 1) {
+        const r:any = rows[i] || {};
+        let t = Number(r?.t);
+        if (!Number.isFinite(t)) continue;
+        if (out.length && t < lastT) t = lastT + 1;
+        let d = Number(r?.d);
+        if (!Number.isFinite(d)) d = lastD;
+        out.push({ t, d, v: (typeof r?.v === 'number' ? r.v : undefined), elev: (typeof r?.elev === 'number' ? r.elev : undefined), hr: (typeof r?.hr === 'number' ? r.hr : undefined), cad: (typeof r?.cad === 'number' ? r.cad : undefined), p: (typeof r?.p === 'number' ? r.p : undefined) });
+        lastT = t; lastD = d;
+      }
+      rows = out;
+    } catch (err:any) {
+      try { console.error('Exact error location: sanitize loop', { error: err?.message, rowsType: typeof rows }); } catch {}
+      const { meters, secs } = computeFromSummaryDataEarly(w);
+      const computed = { version: COMPUTED_VERSION, intervals: [], overall: { duration_s_moving: secs||null, distance_m: meters||0, avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(meters, secs), gap_pace_s_per_mi: null } } as any;
+      await writeComputed(computed);
+      return new Response(JSON.stringify({ success:true, mode:'sanitize-error-fallback' }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+    }
+
+    // Helper: derive overall strictly from summary/scalars (no series)
+    function computeFromSummaryData(wAny:any): { meters:number; secs:number } {
+      let meters = 0, secs = 0;
+      try {
+        const sport0 = String((wAny as any)?.type || '').toLowerCase();
+        // Prefer authoritative scalars
+        const km = Number((wAny as any)?.distance); if (Number.isFinite(km) && km > 0) meters = Math.round(km * 1000);
+        const mv = Number((wAny as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) secs = Math.round(mv * 60);
+        // Swim-specific secondary sources
+        if (sport0 === 'swim') {
+          if (!(meters > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) meters = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0)); } catch {} }
+          if (!(secs > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) secs = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.duration_s)||0), 0)); } catch {} }
+          if (!(meters > 0)) { const n = Number((wAny as any)?.number_of_active_lengths); const L = Number((wAny as any)?.pool_length); if (Number.isFinite(n)&&n>0&&Number.isFinite(L)&&L>0) meters = Math.round(n * L); }
+        }
+      } catch {}
+      return { meters, secs };
+    }
+
+    // Swim-specific moving seconds derivation helper
+    function deriveSwimMovingSecondsFromContext(wAny:any, rowsIn:any[]): number | null {
+      try {
+        // 1) Prefer table scalar minutes
+        const mvMin = Number((wAny as any)?.moving_time);
+        if (Number.isFinite(mvMin) && mvMin > 0) return Math.round(mvMin * 60);
+        // 2) Sum lengths durations when present
+        try {
+          const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data;
+          const lens = Array.isArray(swim?.lengths) ? swim.lengths : [];
+          if (lens.length) {
+            const sum = lens.reduce((s:number,l:any)=> s + (Number(l?.duration_s)||0), 0);
+            if (sum > 0) return Math.round(sum);
+          }
+        } catch {}
+        // 3) From distance and avg speed/pace found in series when available
+        if (Array.isArray(rowsIn) && rowsIn.length >= 2) {
+          const meters = Math.max(0, (rowsIn[rowsIn.length-1].d||0) - (rowsIn[0].d||0));
+          const secs   = Math.max(1, (rowsIn[rowsIn.length-1].t||0) - (rowsIn[0].t||0));
+          if (meters > 0 && secs > 0) {
+            // clamp to elapsed if known
+            const durMin = Number((wAny as any)?.duration);
+            const elapsed = Number.isFinite(durMin) && durMin>0 ? durMin*60 : null;
+            const secClamped = (elapsed && secs > elapsed) ? elapsed : secs;
+            return Math.round(secClamped);
+          }
+        }
+        // 4) Distance ÷ avg speed or distance × avg pace from computed/metrics if present
+        try {
+          const c = (wAny as any)?.computed; const cj = typeof c==='string' ? JSON.parse(c) : c || {};
+          const distM = Number(cj?.overall?.distance_m);
+          const avgMps = Number((wAny as any)?.avg_speed_mps);
+          const avgMinPerKm = Number((wAny as any)?.avg_pace_min_per_km);
+          if (Number.isFinite(distM) && distM>0 && Number.isFinite(avgMps) && avgMps>0) return Math.round(distM / avgMps);
+          if (Number.isFinite(distM) && distM>0 && Number.isFinite(avgMinPerKm) && avgMinPerKm>0) return Math.round((distM/1000) * avgMinPerKm * 60);
+        } catch {}
+        // 5) Pool-only heuristic ~85% of elapsed
+        const poolM = Number((wAny as any)?.pool_length);
+        const nLen = Number((wAny as any)?.number_of_active_lengths);
+        const hasPoolHints = (Number.isFinite(poolM) && poolM>0) || (Number.isFinite(nLen) && nLen>0);
+        const durMin = Number((wAny as any)?.duration);
+        if (hasPoolHints && Number.isFinite(durMin) && durMin>0) return Math.round(durMin * 60 * 0.85);
+        // 6) Fallback null
+        return null;
+      } catch { return null; }
+    }
+
+    // Validation check before any pairwise access
+    const hasValidT = Array.isArray(rows) && rows.every((r:any)=> r && typeof r.t === 'number');
+    try {
+      console.log('DEBUG: normalizeSamples output:', {
+        rowsType: typeof rows,
+        isArray: Array.isArray(rows),
+        length: Array.isArray(rows) ? rows.length : 0,
+        firstElement: Array.isArray(rows) ? rows[0] : null,
+        firstElementType: Array.isArray(rows) ? typeof rows[0] : 'n/a',
+        hasUndefinedElements: Array.isArray(rows) ? rows.some((r:any)=> r === undefined) : null,
+        hasNullElements: Array.isArray(rows) ? rows.some((r:any)=> r === null) : null,
+        elementTypes: Array.isArray(rows) ? rows.slice(0,5).map((r:any)=> typeof r) : [],
+        tProperties: Array.isArray(rows) ? rows.slice(0,5).map((r:any)=> ({ hasT: !!(r && typeof r.t !== 'undefined'), tValue: r?.t, tType: typeof r?.t })) : []
+      });
+    } catch {}
+    if (!Array.isArray(rows) || rows.length === 0 || !hasValidT) {
+      // Do not short-circuit; proceed with an empty, safe rows array for downstream logic and rely on scalars later
+      rows = [] as any[];
+    }
+    // Helper: robust writer that tolerates schemas without computed_version/computed_at
+    async function writeComputed(computedPayload: any): Promise<void> {
+      const stamp = new Date().toISOString();
+      // First try with version + timestamp (preferred)
+      const { error: upErr1 } = await supabase
+        .from('workouts')
+        .update({ computed: computedPayload, computed_version: COMPUTED_VERSION_INT, computed_at: stamp })
+        .eq('id', workout_id);
+      if (!upErr1) return;
+      // Fallback: write computed only (for schemas missing these columns)
+      const { error: upErr2 } = await supabase
+        .from('workouts')
+        .update({ computed: computedPayload })
+        .eq('id', workout_id);
+      if (upErr2) throw upErr2;
+    }
+
+
+    // If there are fewer than 2 samples (common for pool swims), write a minimal computed using authoritative scalars
+    if (rows.length < 2) {
+      let overallMeters = 0;
+      let overallSec = 0;
+      try {
+        const sport0 = String((w as any)?.type || '').toLowerCase();
+        if (sport0 === 'swim') {
+          const kmPri = Number((w as any)?.distance);
+          const mvPri = Number((w as any)?.moving_time);
+          if (Number.isFinite(kmPri) && kmPri > 0) overallMeters = Math.round(kmPri * 1000);
+          if (Number.isFinite(mvPri) && mvPri > 0) overallSec = Math.round(mvPri * 60);
+          if (!(overallMeters > 0)) {
+            const swim = (()=>{ try { return typeof (w as any)?.swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any)?.swim_data; } catch { return null; } })();
+            const lengths = Array.isArray(swim?.lengths) ? swim.lengths : [];
+            if (lengths.length) overallMeters = Math.round(lengths.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0));
+          }
+          if (!(overallSec > 0)) {
+            const swim = (()=>{ try { return typeof (w as any)?.swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any)?.swim_data; } catch { return null; } })();
+            const lengths = Array.isArray(swim?.lengths) ? swim.lengths : [];
+            if (lengths.length) overallSec = Math.round(lengths.reduce((s:number,l:any)=> s + (Number(l?.duration_s)||0), 0));
+          }
+          if (!(overallMeters > 0)) {
+            const nLen = Number((w as any)?.number_of_active_lengths);
+            const poolM = Number((w as any)?.pool_length);
+            if (Number.isFinite(nLen) && nLen > 0 && Number.isFinite(poolM) && poolM > 0) overallMeters = Math.round(nLen * poolM);
+          }
+        } else {
+          const km = Number((w as any)?.distance); if (Number.isFinite(km) && km > 0) overallMeters = Math.round(km * 1000);
+          const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) overallSec = Math.round(mv * 60);
+        }
+      } catch {}
+
+      const computed = {
+        version: COMPUTED_VERSION,
+        intervals: [],
+        overall: {
+          duration_s_moving: overallSec > 0 ? overallSec : null,
+          distance_m: overallMeters > 0 ? overallMeters : 0,
+          avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
+          gap_pace_s_per_mi: null
+        }
+      } as any;
+      await writeComputed(computed);
+      return new Response(JSON.stringify({ success: true, mode: 'no-samples' }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+    }
 
     // normalize laps JSON to Lap[]
     type Lap = { start_ts:number; end_ts:number; time_s:number; dist_m:number };
@@ -369,14 +614,22 @@ Deno.serve(async (req) => {
 
     // Movement gate: skip initial non-movement, but ONLY when no planned link
     if (!w.planned_id) {
-      let startIdx = 0;
-      while (startIdx + 1 < rows.length) {
-        const a = rows[startIdx], b = rows[startIdx+1];
-        const dt = (b.t - a.t); const dd = (b.d - a.d);
-        if ((a.v && a.v >= 0.5) || (dd >= 10) || (dt >= 5)) break;
-        startIdx += 1;
+      try {
+        let startIdx = 0;
+        while (startIdx + 1 < rows.length) {
+          const a = rows[startIdx] || {} as any;
+          const b = rows[startIdx+1] || {} as any;
+          const at = Number(a?.t ?? 0);
+          const bt = Number(b?.t ?? 0);
+          const dd = Number((b?.d ?? 0) - (a?.d ?? 0));
+          const av = Number(a?.v ?? 0);
+          if ((av >= 0.5) || (dd >= 10) || ((bt - at) >= 5)) break;
+          startIdx += 1;
+        }
+        if (startIdx > 0) rows = rows.slice(startIdx);
+      } catch (err:any) {
+        try { console.error('Exact error location: movement gate', { error: err?.message, rowsLength: Array.isArray(rows)?rows.length:0 }); } catch {}
       }
-      if (startIdx > 0) rows = rows.slice(startIdx);
     }
 
     // Planned steps (prefer computed.steps)
@@ -577,28 +830,91 @@ Deno.serve(async (req) => {
         const totalSecs   = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
         const wantDistanceSplits = (sport === 'run' || sport === 'swim');
         if (wantDistanceSplits && totalMeters >= 600) {
-          const splitM = 1000; // 1 km
-          let startIdx = 0; let nextTarget = (rows[0].d || 0) + splitM;
-          for (let i = 1; i < rows.length; i++) {
-            if ((rows[i].d || 0) >= nextTarget) {
-              const endIdx = i;
-              if (endIdx > startIdx) outIntervals.push(execFromIdx(rows, startIdx, endIdx, 'split', 'split_km'));
-              startIdx = endIdx + 1; nextTarget += splitM;
+          try {
+            const splitM = 1000; // 1 km
+            let startIdx = 0; let nextTarget = (rows[0].d || 0) + splitM;
+            for (let i = 1; i < rows.length; i++) {
+              if ((rows[i].d || 0) >= nextTarget) {
+                const endIdx = i;
+                if (endIdx > startIdx) outIntervals.push(execFromIdx(rows, startIdx, endIdx, 'split', 'split_km'));
+                startIdx = endIdx + 1; nextTarget += splitM;
+              }
             }
+            if (startIdx < rows.length - 1) outIntervals.push(execFromIdx(rows, startIdx, rows.length - 1, 'split', 'split_km_tail'));
+          } catch (err:any) {
+            try { console.error('Exact error location: split_km loop', { error: err?.message, rowsLength: rows.length }); } catch {}
           }
-          if (startIdx < rows.length - 1) outIntervals.push(execFromIdx(rows, startIdx, rows.length - 1, 'split', 'split_km_tail'));
         } else {
-          const step = 60; const t0 = rows[0].t || 0; let startIdx = 0;
-          for (let t = t0 + step; t <= t0 + totalSecs + 1; t += step) {
-            let endIdx = startIdx; while (endIdx + 1 < rows.length && (rows[endIdx+1].t || 0) < t) endIdx++;
-            if (endIdx > startIdx) { outIntervals.push(execFromIdx(rows, startIdx, endIdx, 'split', 'split_60s')); startIdx = endIdx + 1; }
+          try {
+            const step = 60; const t0 = rows.length ? (rows[0].t || 0) : 0; let startIdx = 0;
+            for (let t = t0 + step; t <= t0 + totalSecs + 1; t += step) {
+              let endIdx = startIdx; while (endIdx + 1 < rows.length && (rows[endIdx+1].t || 0) < t) endIdx++;
+              if (endIdx > startIdx) { outIntervals.push(execFromIdx(rows, startIdx, endIdx, 'split', 'split_60s')); startIdx = endIdx + 1; }
+            }
+            if (startIdx < rows.length - 1) outIntervals.push(execFromIdx(rows, startIdx, rows.length - 1, 'split', 'split_60s_tail'));
+          } catch (err:any) {
+            try { console.error('Exact error location: split_60s loop', { error: err?.message, rowsLength: rows.length }); } catch {}
           }
-          if (startIdx < rows.length - 1) outIntervals.push(execFromIdx(rows, startIdx, rows.length - 1, 'split', 'split_60s_tail'));
         }
       }
 
-      const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
-      const overallSec    = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+      let overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
+      let overallSec    = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+
+    // For swims, use authoritative scalars first; then fill only if still missing
+    try {
+      const sportForOverall = String((w as any)?.type || '').toLowerCase();
+      if (sportForOverall === 'swim') {
+        const kmPri = Number((w as any)?.distance);
+        const mvPri = Number((w as any)?.moving_time);
+        if (Number.isFinite(kmPri) && kmPri > 0) overallMeters = Math.round(kmPri * 1000);
+        if (Number.isFinite(mvPri) && mvPri > 0) overallSec = Math.round(mvPri * 60);
+        if (!(overallMeters > 0)) {
+          // 1) Sum lengths from swim_data
+          try {
+            const swim = typeof (w as any)?.swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any)?.swim_data;
+            const lengths = Array.isArray(swim?.lengths) ? swim.lengths : [];
+            if (lengths.length) {
+              const sum = lengths.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0);
+              if (sum > 0) overallMeters = Math.round(sum);
+            }
+          } catch {}
+          // 2) number_of_active_lengths × pool_length
+          if (!(overallMeters > 0)) {
+            const nLen = Number((w as any)?.number_of_active_lengths);
+            const poolM = Number((w as any)?.pool_length);
+            if (Number.isFinite(nLen) && nLen > 0 && Number.isFinite(poolM) && poolM > 0) {
+              overallMeters = Math.round(nLen * poolM);
+            }
+          }
+          // 3) distance (km)
+          if (!(overallMeters > 0)) {
+            const km = Number((w as any)?.distance);
+            if (Number.isFinite(km) && km > 0) overallMeters = Math.round(km * 1000);
+          }
+        }
+        if (!(overallSec > 0)) {
+          // Prefer series or lengths sum; else moving_time minutes
+          try {
+            const swim = typeof (w as any)?.swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any)?.swim_data;
+            const lengths = Array.isArray(swim?.lengths) ? swim.lengths : [];
+            if (lengths.length) {
+              const dur = lengths.reduce((s:number,l:any)=> s + (Number(l?.duration_s)||0), 0);
+              if (dur > 0) overallSec = Math.round(dur);
+            }
+          } catch {}
+          if (!(overallSec > 0)) {
+            const mvMin = Number((w as any)?.moving_time);
+            if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+            // Heuristic as last resort for pool swims
+            if (!(overallSec > 0)) {
+              const derived = deriveSwimMovingSecondsFromContext(w, rows);
+              if (Number.isFinite(derived as any) && (derived as number) > 0) overallSec = Number(derived);
+            }
+          }
+        }
+      }
+    } catch {}
 
       const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
       const computed = {
@@ -617,16 +933,7 @@ Deno.serve(async (req) => {
         }
       };
 
-      {
-        const { data: up, error: upErr } = await supabase
-          .from('workouts')
-          .update({ computed, computed_version: COMPUTED_VERSION_INT, computed_at: new Date().toISOString() })
-          .eq('id', workout_id)
-          .select('id')
-          .single();
-        if (upErr) throw upErr;
-        if (!up) throw new Error('compute-workout-summary: update returned no row');
-      }
+      await writeComputed(computed);
 
       // eslint-disable-next-line no-console
       try { console.log(`[compute-summary:${COMPUTED_VERSION}] wid=${w.id} mode=${laps.length ? 'laps-no-plan' : 'splits-no-plan'} intervals=${outIntervals.length}`); } catch {}
@@ -635,8 +942,57 @@ Deno.serve(async (req) => {
 
     const snapped = trySnapToLaps(plannedSteps, laps);
     if (snapped && snapped.length) {
-      const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
-      const overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+      let overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
+      let overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+      // For swims, use authoritative scalars first; then fill only if still missing
+      try {
+        const sportForOverall = String((w as any)?.type || '').toLowerCase();
+        if (sportForOverall === 'swim') {
+          const kmPri = Number((w as any)?.distance);
+          const mvPri = Number((w as any)?.moving_time);
+          if (Number.isFinite(kmPri) && kmPri > 0) overallMeters = Math.round(kmPri * 1000);
+          if (Number.isFinite(mvPri) && mvPri > 0) overallSec = Math.round(mvPri * 60);
+          if (!(overallMeters > 0)) {
+            try {
+              const swim = typeof (w as any)?.swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any)?.swim_data;
+              const lengths = Array.isArray(swim?.lengths) ? swim.lengths : [];
+              if (lengths.length) {
+                const sum = lengths.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0);
+                if (sum > 0) overallMeters = Math.round(sum);
+              }
+            } catch {}
+            if (!(overallMeters > 0)) {
+              const nLen = Number((w as any)?.number_of_active_lengths);
+              const poolM = Number((w as any)?.pool_length);
+              if (Number.isFinite(nLen) && nLen > 0 && Number.isFinite(poolM) && poolM > 0) {
+                overallMeters = Math.round(nLen * poolM);
+              }
+            }
+            if (!(overallMeters > 0)) {
+              const km = Number((w as any)?.distance);
+              if (Number.isFinite(km) && km > 0) overallMeters = Math.round(km * 1000);
+            }
+          }
+          if (!(overallSec > 0)) {
+            try {
+              const swim = typeof (w as any)?.swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any)?.swim_data;
+              const lengths = Array.isArray(swim?.lengths) ? swim.lengths : [];
+              if (lengths.length) {
+                const dur = lengths.reduce((s:number,l:any)=> s + (Number(l?.duration_s)||0), 0);
+                if (dur > 0) overallSec = Math.round(dur);
+              }
+            } catch {}
+            if (!(overallSec > 0)) {
+              const mvMin = Number((w as any)?.moving_time);
+              if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+              if (!(overallSec > 0)) {
+                const derived = deriveSwimMovingSecondsFromContext(w, rows);
+                if (Number.isFinite(derived as any) && (derived as number) > 0) overallSec = Number(derived);
+              }
+            }
+          }
+        }
+      } catch {}
       const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
       const computed = {
         version: COMPUTED_VERSION,
@@ -648,16 +1004,7 @@ Deno.serve(async (req) => {
           gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
         }
       };
-      {
-        const { data: up, error: upErr } = await supabase
-          .from('workouts')
-          .update({ computed, computed_version: COMPUTED_VERSION_INT, computed_at: new Date().toISOString() })
-          .eq('id', workout_id)
-          .select('id')
-          .single();
-        if (upErr) throw upErr;
-        if (!up) throw new Error('compute-workout-summary: update returned no row');
-      }
+      await writeComputed(computed);
       return new Response(JSON.stringify({ success:true, computed, mode:'snap-to-laps' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
@@ -784,7 +1131,7 @@ Deno.serve(async (req) => {
       }
       // force last to end of file
       const last = infos[infos.length-1];
-      if (last) last.endIdx = rows.length - 1;
+      if (last) last.endIdx = Math.max(last.endIdx ?? 0, rows.length - 1);
     }
 
     // Materialize intervals
@@ -854,8 +1201,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      const startD = rows[sIdx]?.d || 0; const startT = rows[sIdx]?.t || 0;
-      const endD = rows[eIdx]?.d || startD; const endT = rows[eIdx]?.t || startT + 1;
+      const startD = Number(rows[sIdx]?.d || 0); const startT = Number(rows[sIdx]?.t || 0);
+      const endD = Number(rows[eIdx]?.d ?? startD); const endT = Number(rows[eIdx]?.t ?? (startT + 1));
       let segMetersMeasured = Math.max(0, endD - startD);
       let segSecRaw = Math.max(0, endT - startT);
 
@@ -890,7 +1237,7 @@ Deno.serve(async (req) => {
       const segGap = segSec != null ? gapSecPerMi(rows, sIdx, eIdx) : null;
 
       // HR smoothing 60–210 bpm; if warmup, drop first 5s of segment
-      let hrVals: number[] = []; const t0 = rows[sIdx]?.t || 0;
+      let hrVals: number[] = []; const t0 = Number(rows[sIdx]?.t || 0);
       for (let j=sIdx;j<=eIdx;j+=1) {
         const h = rows[j].hr; if (info.role==='warmup' && (rows[j].t - t0) < 5) continue;
         if (typeof h === 'number' && h >= 60 && h <= 210) hrVals.push(h);
@@ -941,8 +1288,57 @@ Deno.serve(async (req) => {
     }
 
     // Overall rollups (optional)
-    const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
-    const overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+    let overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
+    let overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+    // For swims, use authoritative scalars first; then fill only if still missing
+    try {
+      const sportForOverall = String((w as any)?.type || '').toLowerCase();
+      if (sportForOverall === 'swim') {
+        const kmPri = Number((w as any)?.distance);
+        const mvPri = Number((w as any)?.moving_time);
+        if (Number.isFinite(kmPri) && kmPri > 0) overallMeters = Math.round(kmPri * 1000);
+        if (Number.isFinite(mvPri) && mvPri > 0) overallSec = Math.round(mvPri * 60);
+        if (!(overallMeters > 0)) {
+          try {
+            const swim = typeof (w as any)?.swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any)?.swim_data;
+            const lengths = Array.isArray(swim?.lengths) ? swim.lengths : [];
+            if (lengths.length) {
+              const sum = lengths.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0);
+              if (sum > 0) overallMeters = Math.round(sum);
+            }
+          } catch {}
+          if (!(overallMeters > 0)) {
+            const nLen = Number((w as any)?.number_of_active_lengths);
+            const poolM = Number((w as any)?.pool_length);
+            if (Number.isFinite(nLen) && nLen > 0 && Number.isFinite(poolM) && poolM > 0) {
+              overallMeters = Math.round(nLen * poolM);
+            }
+          }
+          if (!(overallMeters > 0)) {
+            const km = Number((w as any)?.distance);
+            if (Number.isFinite(km) && km > 0) overallMeters = Math.round(km * 1000);
+          }
+        }
+        if (!(overallSec > 0)) {
+          try {
+            const swim = typeof (w as any)?.swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any)?.swim_data;
+            const lengths = Array.isArray(swim?.lengths) ? swim.lengths : [];
+            if (lengths.length) {
+              const dur = lengths.reduce((s:number,l:any)=> s + (Number(l?.duration_s)||0), 0);
+              if (dur > 0) overallSec = Math.round(dur);
+            }
+          } catch {}
+          if (!(overallSec > 0)) {
+            const mvMin = Number((w as any)?.moving_time);
+            if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+            if (!(overallSec > 0)) {
+              const derived = deriveSwimMovingSecondsFromContext(w, rows);
+              if (Number.isFinite(derived as any) && (derived as number) > 0) overallSec = Number(derived);
+            }
+          }
+        }
+      }
+    } catch {}
 
     const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
     const computed = {
@@ -958,30 +1354,65 @@ Deno.serve(async (req) => {
     };
 
     // Write to workouts
-    {
-      const { data: up, error: upErr } = await supabase
-        .from('workouts')
-        .update({ computed, computed_version: COMPUTED_VERSION_INT, computed_at: new Date().toISOString() })
-        .eq('id', workout_id)
-        .select('id')
-        .single();
-      if (upErr) throw upErr;
-      if (!up) throw new Error('compute-workout-summary: update returned no row');
-    }
+    await writeComputed(computed);
 
     return new Response(JSON.stringify({ success:true, computed }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
 
+    } catch (e:any) {
+      try {
+        console.error('MAIN PROCESSING ERROR:', { error: e?.message, stack: e?.stack, line: e?.stack?.split('\n')[1] || null });
+      } catch {}
+      // Minimal fallback from authoritative scalars to avoid crashing
+      try {
+        let meters = 0, secs = 0;
+        const type0 = String((w as any)?.type || '').toLowerCase();
+        const km = Number((w as any)?.distance); if (Number.isFinite(km) && km > 0) meters = Math.round(km * 1000);
+        const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) secs = Math.round(mv * 60);
+        if (type0 === 'swim') {
+          if (!(meters>0)) { try { const swim = typeof (w as any)?.swim_data==='string'? JSON.parse((w as any).swim_data):(w as any)?.swim_data; const lens = Array.isArray(swim?.lengths)?swim.lengths:[]; if (lens.length) meters = Math.round(lens.reduce((s:number,l:any)=> s+(Number(l?.distance_m)||0),0)); } catch {} }
+          if (!(secs>0)) { try { const swim = typeof (w as any)?.swim_data==='string'? JSON.parse((w as any).swim_data):(w as any)?.swim_data; const lens = Array.isArray(swim?.lengths)?swim.lengths:[]; if (lens.length) secs = Math.round(lens.reduce((s:number,l:any)=> s+(Number(l?.duration_s)||0),0)); } catch {} }
+          if (!(meters>0)) { const n=Number((w as any)?.number_of_active_lengths); const L=Number((w as any)?.pool_length); if (Number.isFinite(n)&&n>0&&Number.isFinite(L)&&L>0) meters=Math.round(n*L); }
+        }
+        const computed = { version: COMPUTED_VERSION, intervals: [], overall: { duration_s_moving: secs||null, distance_m: meters||0, avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(meters, secs), gap_pace_s_per_mi: null } } as any;
+        await writeComputed(computed);
+        return new Response(JSON.stringify({ success:true, mode:'main-error-fallback' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
+      } catch (e2:any) {
+        try { console.error('MAIN PROCESSING FALLBACK ERROR:', { error: e2?.message }); } catch {}
+        throw e; // let outer catch handle as last resort
+      }
+    }
+
   } catch (e:any) {
-    // eslint-disable-next-line no-console
+    // Last-resort: write minimal computed from authoritative scalars so UI does not break
     try {
-      const msg = (e && (e.message || e.msg)) ? (e.message || e.msg) : undefined;
-      const code = (e && (e.code || e.status || e.name)) ? (e.code || e.status || e.name) : undefined;
-      const details = (() => { try { return JSON.stringify(e); } catch { return String(e); } })();
-      console.error('[compute-summary:error]', { code, msg, details });
-    } catch {}
-    const payload:any = { error: (e && (e.message || e.msg)) || String(e) };
-    if (e && (e.code || e.status)) payload.code = e.code || e.status;
-    try { if (typeof e === 'object') payload.details = e; } catch {}
-    return new Response(JSON.stringify(payload), { status: 500, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
+      const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+      const { data: w } = await supabase
+        .from('workouts')
+        .select('id,type,swim_data,pool_length,number_of_active_lengths,distance,moving_time')
+        .eq('id', (await req.json().catch(()=>({workout_id:null}))).workout_id)
+        .maybeSingle();
+      let meters = 0, secs = 0;
+      const type = String((w as any)?.type||'').toLowerCase();
+      if (type === 'swim') {
+        const km = Number((w as any)?.distance); if (Number.isFinite(km) && km>0) meters = Math.round(km*1000);
+        const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv>0) secs = Math.round(mv*60);
+        if (!(meters>0)) { try { const swim = typeof (w as any)?.swim_data==='string'? JSON.parse((w as any).swim_data):(w as any)?.swim_data; const lens = Array.isArray(swim?.lengths)?swim.lengths:[]; if (lens.length) meters = Math.round(lens.reduce((s:number,l:any)=> s+(Number(l?.distance_m)||0),0)); } catch {} }
+        if (!(secs>0)) { try { const swim = typeof (w as any)?.swim_data==='string'? JSON.parse((w as any).swim_data):(w as any)?.swim_data; const lens = Array.isArray(swim?.lengths)?swim.lengths:[]; if (lens.length) secs = Math.round(lens.reduce((s:number,l:any)=> s+(Number(l?.duration_s)||0),0)); } catch {} }
+        if (!(meters>0)) { const n = Number((w as any)?.number_of_active_lengths); const L = Number((w as any)?.pool_length); if (Number.isFinite(n)&&n>0&&Number.isFinite(L)&&L>0) meters = Math.round(n*L); }
+      } else {
+        const km = Number((w as any)?.distance); if (Number.isFinite(km) && km>0) meters = Math.round(km*1000);
+        const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv>0) secs = Math.round(mv*60);
+      }
+      const computed = { version: COMPUTED_VERSION, intervals: [], overall: { duration_s_moving: secs>0?secs:null, distance_m: meters>0?meters:0, avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(meters, secs), gap_pace_s_per_mi: null } } as any;
+      const stamp = new Date().toISOString();
+      await supabase.from('workouts').update({ computed, computed_version: COMPUTED_VERSION_INT, computed_at: stamp }).eq('id', (w as any)?.id);
+      console.error('[compute-summary:error]', { code: e?.code||e?.name||'Error', msg: e?.message||String(e) });
+      return new Response(JSON.stringify({ success:true, mode:'fallback', note:'wrote minimal overall due to error' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
+    } catch {
+      // eslint-disable-next-line no-console
+      try { console.error('[compute-summary:error]', { code: e?.code||e?.name||'Error', msg: e?.message||String(e) }); } catch {}
+      const payload:any = { error: (e && (e.message || e.msg)) || String(e) };
+      return new Response(JSON.stringify(payload), { status: 500, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
+    }
   }
 });

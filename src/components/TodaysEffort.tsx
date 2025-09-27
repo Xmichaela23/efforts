@@ -189,8 +189,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // Format rich workout display - different for planned vs completed
   const formatRichWorkoutDisplay = (workout: any) => {
     const discipline = getDisplaySport(workout);
-    // Remove duration display for strength in Today's Efforts per product request
-    const duration = (workout.type === 'strength') ? '' : (workout.duration ? formatDuration(workout.duration) : '');
+    // Display Moving Time (mm:ss) for non-strength; blank for strength
+    const duration = (() => {
+      if (workout.type === 'strength') return '';
+      // Prefer computed moving seconds
+      const compS = Number((workout as any)?.computed?.overall?.duration_s_moving);
+      if (Number.isFinite(compS) && compS > 0) { const m=Math.floor(compS/60), s=compS%60; return `${m}:${String(s).padStart(2,'0')}`; }
+      // Fall back to sensor samples last timer seconds
+      try {
+        const samples = Array.isArray((workout as any)?.sensor_data?.samples) ? (workout as any).sensor_data.samples : (Array.isArray((workout as any)?.sensor_data) ? (workout as any).sensor_data : []);
+        if (samples && samples.length > 0) {
+          const last:any = samples[samples.length-1];
+          const sec = Number(last?.timerDurationInSeconds ?? last?.clockDurationInSeconds);
+          if (Number.isFinite(sec) && sec>0) { const m=Math.floor(sec/60), s=sec%60; return `${m}:${String(s).padStart(2,'0')}`; }
+        }
+      } catch {}
+      // Fall back to minute fields → seconds
+      const minutes = Number((workout as any)?.moving_time ?? (workout as any)?.elapsed_time ?? (workout as any)?.duration);
+      if (Number.isFinite(minutes) && minutes>0) { const sec = Math.round(minutes*60); const m=Math.floor(sec/60), s=sec%60; return `${m}:${String(s).padStart(2,'0')}`; }
+      return '';
+    })();
     const isCompleted = workout.workout_status === 'completed';
     
     // Get metrics/description based on workout status
@@ -407,7 +425,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         // For swims, only show distance and average pace
         if (isSwim) {
           // Prefer server overall; fall back to pool metadata or generic distance/duration
-          const preferYards = true; // app shows swim in yards
+          const preferYards = !!useImperial; // user preference from baselines
           const comp = (workout as any)?.computed?.overall;
           let distM: number | null = Number(comp?.distance_m);
           let durS: number | null = Number(comp?.duration_s_moving ?? comp?.duration_s);
@@ -437,12 +455,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             if (Number.isFinite(km) && (km as number) > 0) distM = (km as number) * 1000;
           }
           const yards = (Number.isFinite(distM) && (distM as number) > 0) ? Math.round((distM as number) / 0.9144) : null;
-          const distText = (yards != null) ? `${yards.toLocaleString()} yd` : 'N/A';
+          const meters = (Number.isFinite(distM) && (distM as number) > 0) ? Math.round(distM as number) : null;
+          const distText = preferYards
+            ? (yards != null ? `${yards.toLocaleString()} yd` : 'N/A')
+            : (meters != null ? `${meters.toLocaleString()} m` : 'N/A');
           const durText = (Number.isFinite(durS) && (durS as number) > 0)
             ? (()=>{ const s=Math.round(durS as number); const m=Math.floor(s/60); const ss=s%60; return `${m}:${String(ss).padStart(2,'0')}`; })()
             : 'N/A';
-          const per100 = (Number.isFinite(durS) && (durS as number) > 0 && yards && yards > 0)
-            ? (()=>{ const per = (durS as number) / (yards/100); const m=Math.floor(per/60); const ss=Math.round(per%60); return `${m}:${String(ss).padStart(2,'0')}/100yd`; })()
+          const per100 = (Number.isFinite(durS) && (durS as number) > 0 && ((preferYards && yards && yards>0) || (!preferYards && meters && meters>0)))
+            ? (()=>{ const denom = preferYards ? (yards as number)/100 : (meters as number)/100; const per = (durS as number) / denom; const m_=Math.floor(per/60); const ss=Math.round(per%60); return `${m_}:${String(ss).padStart(2,'0')}/${preferYards ? '100yd' : '100m'}`; })()
             : 'N/A';
           return [distText, durText, per100];
         }
