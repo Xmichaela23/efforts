@@ -38,9 +38,9 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       const body = {
         id,
         include_gps: opts?.include_gps !== false,
-        include_sensors: opts?.include_sensors !== false,
+        include_sensors: opts?.include_sensors === true ? true : false,
         include_swim: opts?.include_swim !== false,
-        resolution: opts?.resolution || 'high',
+        resolution: opts?.resolution || 'low',
         normalize: opts?.normalize !== false,
         version: opts?.version || 'v1',
       } as any;

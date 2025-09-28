@@ -623,7 +623,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         <div className="flex items-center gap-2">
           {isCompleted && (
             (!workout.planned_id && !linkedPlanned) ? (
-              <Button variant="ghost" size="sm" onClick={()=>setAssocOpen(true)}>Attach</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={()=>setAssocOpen(true)}
+              >Attach</Button>
             ) : (
               <Button
                 variant="ghost"
@@ -632,13 +636,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   try {
                     const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
                     if (!pid) return;
+                    // disable re-link noise then detach
+                    suppressRelinkUntil.current = Date.now() + 15000; // 15s
                     await supabase.from('planned_workouts').update({ workout_status: 'planned', completed_workout_id: null }).eq('id', pid);
                     await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
                     try { (workout as any).planned_id = null; } catch {}
                     setLinkedPlanned(null);
-                    suppressRelinkUntil.current = Date.now() + 15000; // 15s
                     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                     try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                    setActiveTab('completed');
                   } catch {}
                 }}
               >Unattach</Button>
