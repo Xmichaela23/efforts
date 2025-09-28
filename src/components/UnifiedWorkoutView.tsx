@@ -42,7 +42,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // plannedWorkouts context removed; rely on server unified data/routes
   const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
-  const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'completed' : 'planned'));
+  const hasLink = Boolean((workout as any)?.planned_id);
+  const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? (hasLink ? 'summary' : 'completed') : 'planned'));
   const [editingInline, setEditingInline] = useState(false);
   const [assocOpen, setAssocOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
@@ -306,9 +307,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {
-    const desired = initialTab || (isCompleted ? 'completed' : 'planned');
+    const linked = Boolean((workout as any)?.planned_id) || Boolean(linkedPlanned?.id);
+    const desired = initialTab || (isCompleted ? (linked ? 'summary' : 'completed') : 'planned');
     setActiveTab(desired);
-  }, [initialTab, isCompleted, workout?.id]);
+  }, [initialTab, isCompleted, (workout as any)?.planned_id, linkedPlanned?.id, workout?.id]);
 
   // Helper to parse steps_preset that may be stored as JSON string
   const readStepsPreset = (src: any): string[] | undefined => {

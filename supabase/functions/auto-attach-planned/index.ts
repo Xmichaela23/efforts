@@ -85,19 +85,25 @@ Deno.serve(async (req) => {
     const wSec = Number(w.moving_time ? (typeof w.moving_time==='number' ? w.moving_time : 0) : 0);
     const wMeters = Number(w.distance ? w.distance*1000 : 0);
 
-    // Strict match: date string + type only. If multiple, pick earliest created.
-    let best: any = null;
+    // High-confidence selection rule: same day+type AND duration within 50%–120%
+    // Compute planned seconds for each candidate and pick closest by percent diff
+    let best: any = null; let bestPct: number = Number.POSITIVE_INFINITY; let bestSec: number | null = null;
     for (const p of candidates) {
       const pdate = String((p as any).date || '').slice(0,10);
-      if (pdate === day && String((p as any).type||'').toLowerCase() === sport) {
-        if (!best) best = p;
-      }
+      if (pdate !== day || String((p as any).type||'').toLowerCase() !== sport) continue;
+      const totals = sumPlanned(p);
+      const pSec = Number(totals.seconds);
+      if (!Number.isFinite(pSec) || pSec <= 0 || !Number.isFinite(wSec) || wSec <= 0) continue;
+      const pct = Math.abs(wSec - pSec) / Math.max(1, pSec);
+      if (pct < bestPct) { bestPct = pct; best = p; bestSec = pSec; }
     }
     if (!best) {
-      return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_exact_date_type_match' }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_exact_date_type_match_or_no_planned_seconds' }), { headers: { 'Content-Type': 'application/json' } });
     }
-
-    // Keep everything else the same for now; no step-count heuristics for this pass
+    const ratio = (bestSec && wSec>0) ? (wSec / bestSec) : null;
+    if (!(ratio!=null && ratio >= 0.5 && ratio <= 1.2)) {
+      return new Response(JSON.stringify({ success: true, attached: false, reason: 'duration_out_of_range', ratio }), { headers: { 'Content-Type': 'application/json' } });
+    }
 
     // Link (allow re-attach if previously completed to a deleted/old workout)
     const prevCompletedId = (best as any)?.completed_workout_id as string | null | undefined;
@@ -156,7 +162,7 @@ Deno.serve(async (req) => {
       await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
     } catch {}
 
-    return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id }), { headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, ratio }), { headers: { 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }

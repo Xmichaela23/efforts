@@ -714,160 +714,18 @@ export const useWorkouts = () => {
     }
   };
 
-  // Auto‑attach helper: link a completed workout to a planned_workouts row
+  // Auto‑attach now delegates to server and relies on unified invalidation
   const autoAttachPlannedSession = async (completed: Workout) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Fetch candidate planned rows by discipline within ±2 days
-      const date = completed.date;
-      const around = (iso: string, delta: number) => {
-        const d = new Date(iso + 'T00:00:00');
-        d.setDate(d.getDate()+delta);
-        return d.toISOString().slice(0,10);
-      };
-      const from = around(date, -2);
-      const to = around(date, 2);
-
-      console.log('🔍 Auto-attach debugging for workout:', {
-        completedDate: date,
-        completedType: completed.type,
-        completedTypeLower: String(completed.type || '').toLowerCase(),
-        searchFrom: from,
-        searchTo: to,
-        workoutId: (completed as any).id,
-        workoutName: (completed as any).name
-      });
-
-      const { data: planned } = await supabase
-        .from('planned_workouts')
-        .select('id,user_id,type,date,name,workout_status')
-        .eq('user_id', user.id)
-        .eq('type', String(completed.type || '').toLowerCase())
-        .in('workout_status', ['planned','in_progress','completed'])
-        .gte('date', from)
-        .lte('date', to);
-
-      console.log('🔍 Auto-attach found planned workouts:', planned);
-
-      const candidates = Array.isArray(planned) ? planned : [];
-      if (!candidates.length) {
-        console.log('❌ No planned workouts found for auto-attach. Check if planned workout exists for:', {
-          type: completed.type,
-          date: completed.date,
-          searchRange: `${from} to ${to}`
-        });
-        
-        return;
-      }
-
-      // Keep all candidates; server truth for existing links lives on workouts.planned_id
-      const filteredCandidates = candidates;
-
-      if (!filteredCandidates.length) {
-        console.log('❌ No valid candidates after filtering. Original candidates:', candidates.length, 'Filtered:', 0);
-        return;
-      }
-
-      // Same‑day candidates
-      const sameDay = filteredCandidates.filter((c:any)=> c.date === date);
-      const derivePlannedStats = (r:any) => {
-        // Derive seconds and km from computed.steps or intervals or duration
-        let secs = 0; let km = 0;
-        try {
-          const comp = (r as any)?.computed;
-          if (comp && Array.isArray(comp.steps)) {
-            for (const st of comp.steps) {
-              if (typeof st.duration === 'number') secs += st.duration;
-              if (typeof st.distanceMeters === 'number') km += st.distanceMeters / 1000;
-            }
-            if (!secs && typeof comp.total_duration_seconds === 'number') secs = comp.total_duration_seconds;
-          }
-        } catch {}
-        try {
-          const ints = Array.isArray((r as any)?.intervals) ? (r as any).intervals : [];
-          for (const it of ints) {
-            if (typeof it.duration === 'number') secs += it.duration;
-            if (typeof it.distanceMeters === 'number') km += it.distanceMeters / 1000;
-          }
-        } catch {}
-        if (!secs && typeof r.duration === 'number') secs = r.duration * 60;
-        return { secs, km };
-      };
-
-      const pickByHeuristics = (arr:any[]): any | null => {
-        if (arr.length === 1) return arr[0];
-        // Duration/Distance heuristics
-        const dur = (completed.total_timer_time ?? completed.moving_time ?? (completed.duration ? completed.duration*60 : null));
-        const distKm = typeof completed.distance === 'number' ? completed.distance : null;
-        let best: any = null; let bestScore = Number.NEGATIVE_INFINITY;
-        for (const r of arr) {
-          let score = 0;
-          const stats = derivePlannedStats(r);
-          if (dur && stats.secs) {
-            const diff = Math.abs(dur - stats.secs) / Math.max(60, stats.secs);
-            if (diff <= 0.15) score += 2; else score -= diff;
-          }
-          const tok = String((r as any)?.rendered_description || (r as any)?.description || '').toLowerCase();
-          const name = String((r as any)?.name || '').toLowerCase();
-          const lbl = name + ' ' + tok;
-          // Simple focus tokens
-          const focus = ['vo2','tempo','interval','endurance','threshold','sweet spot','technique'];
-          for (const f of focus) if ((completed.name||'').toLowerCase().includes(f) && lbl.includes(f)) score += 1;
-          const plannedKm = (typeof (r as any)?.targets_summary?.distance_km === 'number') ? (r as any).targets_summary.distance_km : (stats.km || null);
-          if (distKm && plannedKm) {
-            const diffD = Math.abs(distKm - plannedKm) / Math.max(0.5, plannedKm);
-            if (diffD <= 0.10) score += 1.5; else score -= diffD;
-          }
-          if (score > bestScore) { bestScore = score; best = r; }
-        }
-        // Only accept if score is positive
-        return bestScore > 0 ? best : null;
-      };
-
-      let target = pickByHeuristics(sameDay);
-      if (!target) {
-        // No same-day clear match → single candidate in ±2 days
-        const single = filteredCandidates.length === 1 ? filteredCandidates[0] : null;
-        if (single) target = single; else target = pickByHeuristics(filteredCandidates);
-      }
-      if (!target) {
-        console.log('❌ No target selected for auto-attach. Same day candidates:', sameDay.length, 'All candidates:', filteredCandidates.length);
-        return;
-      }
-      
-      console.log('✅ Auto-attach target selected:', {
-        id: target.id,
-        name: target.name,
-        type: target.type,
-        date: target.date,
-        status: target.workout_status
-      });
-
-      // Mark the authored planned row as completed (no date move) and link both ways
-      // Mark planned as completed (no reverse id column used)
-      await supabase
-        .from('planned_workouts')
-        .update({ workout_status: 'completed' })
-        .eq('id', target.id);
+      const wid = (completed as any)?.id as string | undefined;
+      if (!wid) return;
       try {
-        await supabase
-          .from('workouts')
-          .update({ planned_id: target.id })
-          .eq('id', (completed as any).id)
-          .eq('user_id', user.id);
+        await supabase.functions.invoke('auto-attach-planned', { body: { workout_id: wid } });
       } catch {}
-      // Server attach flow now computes summary; no client invocation needed
-      // Optionally tag completed workout with friendly name
-      if (completed.name && completed.name !== target.name) {
-        await supabase.from('workouts').update({ description: completed.description || '', name: target.name }).eq('id', completed.id).eq('user_id', user.id);
-      }
-      // Refresh front-end state
-      fetchWorkouts();
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
     } catch (e) {
-      console.log('Auto attach error:', e);
+      console.log('Auto attach (server) error:', e);
     }
   };
 
