@@ -255,7 +255,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           avg_power: workout.metrics?.avg_power,
           max_power: workout.metrics?.max_power,
           normalized_power: workout.metrics?.normalized_power,
-          avg_speed: workout.metrics?.avg_speed,
+          avg_speed: workout.avg_speed ?? workout.metrics?.avg_speed,
+          // (duplicate) remove second avg_speed key
           max_speed: workout.metrics?.max_speed,
           avg_cadence: workout.metrics?.avg_cadence,
           max_cadence: workout.metrics?.max_cadence,
