@@ -443,8 +443,13 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   }, [ (effectivePlanned as any)?.rendered_description, isRidePlanned, ftp ]);
   // Prefer structured steps when present; otherwise prefill from description so the ledger is always populated
   // Display steps come from full planned steps when available, else light, else description-derived
+  // For long runs, a single description line is valid → accept desc-derived even if length === 1
   // Always render at least one row so simple Plan vs Actual is visible immediately
-  const steps: any[] = (plannedStepsFull.length >= 3 ? plannedStepsFull : (plannedStepsLight.length >= 3 ? plannedStepsLight : descPaceSteps));
+  const steps: any[] = (
+    plannedStepsFull.length >= 3
+      ? plannedStepsFull
+      : (plannedStepsLight.length >= 3 ? plannedStepsLight : (descPaceSteps.length ? descPaceSteps : []))
+  );
   if (!steps.length) {
     steps.push({ kind: 'steady', id: 'overall', planned_index: 0, seconds: (planned as any)?.computed?.total_duration_seconds || undefined });
   }
