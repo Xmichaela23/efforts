@@ -16,6 +16,8 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   const queryClient = useQueryClient();
   const { workouts } = useAppContext();
 
+  const isUuid = (v?: string | null) => !!v && /[0-9a-fA-F-]{36}/.test(v);
+
   // Try to find an already-hydrated workout in context (fallback path)
   const fromContext = useMemo(() => {
     try {
@@ -31,10 +33,10 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
 
   const query = useQuery({
     queryKey: ['workout-detail', id, opts],
-    enabled: !!id && !fromContext,
+    enabled: !!id && isUuid(id) && !fromContext,
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('not authenticated');
+      // Allow function to authorize with service role when available; fall back to anon
       const body = {
         id,
         include_gps: opts?.include_gps !== false,
