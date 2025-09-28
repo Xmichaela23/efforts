@@ -154,18 +154,14 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         completedId = inserted.id as string;
       }
 
-      // Flip planned to completed and link via single-link model
-      await supabase.from('planned_workouts')
-        .update({ workout_status: 'completed' })
-        .eq('id', planned.id)
-        .eq('user_id', user.id);
-      await supabase.from('workouts')
-        .update({ planned_id: planned.id })
-        .eq('id', completedId)
-        .eq('user_id', user.id);
+      // Server attach path (materialize → attach → compute) for determinism
+      try {
+        const { error } = await supabase.functions.invoke('auto-attach-planned', { body: { workout_id: completedId } });
+        if (error) throw error as any;
+      } catch {}
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
       onAssociated?.(planned.id);
-      // Also update the resolved view users by emitting invalidate
       onClose();
     } catch (e: any) {
       setError(e?.message || 'Failed to associate');
