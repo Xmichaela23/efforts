@@ -553,20 +553,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     }
   };
 
-  // --- Overall execution score inputs (computed once per render) ---
-  const plannedRowForScore: any = (hydratedPlanned || linkedPlanned || (isCompleted ? workout : null)) as any;
-  const computedStepsForScore: any[] = Array.isArray(plannedRowForScore?.computed?.steps) ? plannedRowForScore.computed.steps : [];
-  const lightStepsForScore: any[] = Array.isArray((workout as any)?.computed?.planned_steps_light)
-    ? (workout as any).computed.planned_steps_light.map((s:any)=> ({ id: s.planned_step_id, planned_index: s.planned_index, distanceMeters: s.meters, seconds: s.seconds }))
-    : [];
-  const plannedStepsForScore: any[] = computedStepsForScore.length ? computedStepsForScore : lightStepsForScore;
-  const executedIntervalsForScore: any[] = Array.isArray((workout as any)?.computed?.intervals) ? (workout as any).computed.intervals : [];
+  // --- Overall execution score (only when linked to a plan) ---
+  const isLinked = Boolean((workout as any)?.planned_id) || Boolean(linkedPlanned?.id);
+  const plannedRowForScore: any = isLinked ? (hydratedPlanned || linkedPlanned) : null;
+  const plannedStepsForScore: any[] = Array.isArray(plannedRowForScore?.computed?.steps) ? plannedRowForScore.computed.steps : [];
+  const executedIntervalsForScore: any[] = isLinked && Array.isArray((workout as any)?.computed?.intervals) ? (workout as any).computed.intervals : [];
   const workoutTypeForScore = String((workout as any)?.type || plannedRowForScore?.type || '').toLowerCase();
-  const { score: overallScore, methodLabel: overallMethod } = useExecutionScore(
-    workoutTypeForScore,
-    plannedStepsForScore,
-    executedIntervalsForScore
-  );
+  const { score: overallScore, methodLabel: overallMethod } = isLinked
+    ? useExecutionScore(workoutTypeForScore, plannedStepsForScore, executedIntervalsForScore)
+    : { score: null as any, methodLabel: '' as any };
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -746,10 +741,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 />
               </div>
             )}
-            <MobileSummary 
-              planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
-              completed={isCompleted ? workout : null} 
-            />
+            {isCompleted && !isLinked ? (
+              <div className="px-3 py-2 text-sm text-gray-600">Attach this workout to a planned session to see planned vs actual.</div>
+            ) : (
+              <MobileSummary 
+                planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
+                completed={isCompleted ? workout : null} 
+              />
+            )}
             {onDelete && workout?.id && (
               <Button
                 variant="ghost"
