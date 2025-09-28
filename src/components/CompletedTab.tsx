@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 
 import { useAppContext } from '@/contexts/AppContext';
 import { useWorkouts } from '@/hooks/useWorkouts';
-import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
@@ -142,6 +141,60 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
       setIsLoading(true);
     }
   }, [workoutData]);
+
+  // Memoized derived data keyed by workout id (prevents duplicate heavy work)
+  const workoutIdKey = String((hydrated as any)?.id || (workoutData as any)?.id || '');
+  const memo = useMemo(() => {
+    const src = (hydrated || workoutData) as any;
+    // Build GPS-derived track once
+    const gpsRaw = src?.gps_track;
+    const gps = Array.isArray(gpsRaw)
+      ? gpsRaw
+      : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
+    const track: [number,number][] = gps
+      .map((p:any)=>{
+        const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
+        const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
+        if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
+        return null;
+      })
+      .filter(Boolean) as [number,number][];
+
+    // Build normalized samples from computed.analysis.series if present
+    const series = src?.computed?.analysis?.series || null;
+    const time_s: number[] = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
+    const distance_m: number[] = Array.isArray(series?.distance_m) ? series.distance_m : [];
+    const elev: (number|null)[] = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
+    const pace: (number|null)[] = Array.isArray(series?.pace_s_per_km) ? series.pace_s_per_km : [];
+    const hr: (number|null)[] = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
+    const len = Math.min(distance_m.length, time_s.length || distance_m.length);
+    const samples = (()=>{
+      const out:any[] = [];
+      let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
+      const a = 0.2;
+      for (let i=0;i<len;i++){
+        const t = Number(time_s?.[i] ?? i) || 0;
+        const d = Number(distance_m?.[i] ?? 0) || 0;
+        const e = typeof elev?.[i] === 'number' ? Number(elev[i]) : null;
+        if (e != null) ema = (ema==null ? e : a*e + (1-a)*ema);
+        const es = (ema != null) ? ema : (e != null ? e : (lastE != null ? lastE : 0));
+        let grade: number | null = null, vam: number | null = null;
+        if (lastE != null && lastD != null && lastT != null){
+          const dd = Math.max(1, d - lastD);
+          const dh = es - lastE;
+          const dt = Math.max(1, t - lastT);
+          grade = dh / dd;
+          vam = (dh/dt) * 3600;
+        }
+        out.push({ t_s: t, d_m: d, elev_m_sm: es, pace_s_per_km: Number.isFinite(pace?.[i]) ? Number(pace[i]) : null, hr_bpm: Number.isFinite(hr?.[i]) ? Number(hr[i]) : null, grade, vam_m_per_h: vam });
+        lastE = es; lastD = d; lastT = t;
+      }
+      return out;
+    })();
+
+    return { track, samples } as const;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workoutIdKey, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);
   // Initialize pool length state from explicit, inferred, or default
   useEffect(() => {
     if (workoutType !== 'swim') return;
@@ -2292,8 +2345,8 @@ const formatMovingTime = () => {
         return (
           <div className="mt-1 mx-[-16px]">
             <EffortsViewerMapbox
-              samples={samples as any}
-              trackLngLat={track}
+              samples={(memo?.samples || samples) as any}
+              trackLngLat={(memo?.track || track) as any}
               useMiles={!!useImperial}
               useFeet={!!useImperial}
               compact={compact}
