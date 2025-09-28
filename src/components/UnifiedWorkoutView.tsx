@@ -553,15 +553,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     }
   };
 
-  // --- Overall execution score (only when linked to a plan) ---
+  // --- Overall execution score (always call hook; provide empty inputs when unlinked) ---
   const isLinked = Boolean((workout as any)?.planned_id) || Boolean(linkedPlanned?.id);
-  const plannedRowForScore: any = isLinked ? (hydratedPlanned || linkedPlanned) : null;
-  const plannedStepsForScore: any[] = Array.isArray(plannedRowForScore?.computed?.steps) ? plannedRowForScore.computed.steps : [];
-  const executedIntervalsForScore: any[] = isLinked && Array.isArray((workout as any)?.computed?.intervals) ? (workout as any).computed.intervals : [];
+  const plannedRowForScore: any = (hydratedPlanned || linkedPlanned) as any;
+  const plannedStepsForScore: any[] = Array.isArray(plannedRowForScore?.computed?.steps) && isLinked ? plannedRowForScore.computed.steps : [];
+  const executedIntervalsForScore: any[] = Array.isArray((workout as any)?.computed?.intervals) && isLinked ? (workout as any).computed.intervals : [];
   const workoutTypeForScore = String((workout as any)?.type || plannedRowForScore?.type || '').toLowerCase();
-  const { score: overallScore, methodLabel: overallMethod } = isLinked
-    ? useExecutionScore(workoutTypeForScore, plannedStepsForScore, executedIntervalsForScore)
-    : { score: null as any, methodLabel: '' as any };
+  const { score: overallScoreRaw, methodLabel: overallMethod } = useExecutionScore(
+    workoutTypeForScore,
+    plannedStepsForScore,
+    executedIntervalsForScore
+  );
+  const overallScore = isLinked ? overallScoreRaw : null;
 
   return (
     <div className="w-full h-full flex flex-col">
