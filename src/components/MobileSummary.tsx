@@ -1056,7 +1056,24 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             const plannedLabel = plannedLabelStrict(st);
 
             const execCell = (() => {
-              if (!hasServerComputed || !row) return '—';
+              // Simple aggregate fallback when mapping isn't ready
+              if (!hasServerComputed) {
+                if (idx !== 0) return '—';
+                if (isRideSport) {
+                  const overall = (completed as any)?.computed?.overall || {};
+                  const pw = (completed as any)?.avg_power
+                    ?? (completed as any)?.metrics?.avg_power
+                    ?? overall.avg_power_w
+                    ?? overall.avg_power;
+                  if (typeof pw === 'number' && Number.isFinite(pw)) return `${Math.round(pw)} W`;
+                } else {
+                  const overall = (completed as any)?.computed?.overall || {};
+                  const secPerMi = overall.avg_pace_s_per_mi as number | undefined;
+                  if (typeof secPerMi === 'number' && secPerMi > 0) return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
+                }
+                return '—';
+              }
+              if (!row) return '—';
               if (isRideSport) {
                 const pw = row?.executed?.avg_power_w as number | undefined;
                 if (typeof pw === 'number' && Number.isFinite(pw)) return `${Math.round(pw)} W`;
@@ -1071,7 +1088,19 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             })();
 
             const distCell = (() => {
-              if (!hasServerComputed || !row) return '—';
+              if (!hasServerComputed) {
+                if (idx !== 0) return '—';
+                const overall = (completed as any)?.computed?.overall || {};
+                const distM = (completed as any)?.metrics?.distance_meters
+                  ?? overall.distance_m
+                  ?? ((typeof (completed as any)?.distance === 'number') ? (completed as any).distance * 1000 : undefined);
+                if (typeof distM === 'number' && distM > 0) {
+                  if (isSwimSport) return useImperial ? `${Math.round(distM/0.9144)} yd` : `${Math.round(distM)} m`;
+                  const mi = distM / 1609.34; return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
+                }
+                return '—';
+              }
+              if (!row) return '—';
               const distM = row?.executed?.distance_m as number | undefined;
               if (typeof distM === 'number' && distM > 0) {
                 if (isSwimSport) return useImperial ? `${Math.round(distM/0.9144)} yd` : `${Math.round(distM)} m`;
@@ -1081,12 +1110,29 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             })();
 
             const timeCell = (() => {
-              if (!hasServerComputed || !row) return '—';
+              if (!hasServerComputed) {
+                if (idx !== 0) return '—';
+                const overall = (completed as any)?.computed?.overall || {};
+                const dur = (completed as any)?.metrics?.moving_time
+                  ?? (completed as any)?.moving_time
+                  ?? overall.duration_s_moving
+                  ?? overall.duration_s;
+                return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
+              }
+              if (!row) return '—';
               const dur = row?.executed?.duration_s; return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
             })();
 
             const hrVal = (() => {
-              if (!hasServerComputed || !row) return null as number | null;
+              if (!hasServerComputed) {
+                if (idx !== 0) return null as number | null;
+                const overall = (completed as any)?.computed?.overall || {};
+                const hr = (completed as any)?.avg_heart_rate
+                  ?? (completed as any)?.metrics?.avg_heart_rate
+                  ?? overall.avg_hr;
+                return (typeof hr === 'number' && hr > 0) ? Math.round(hr) : null;
+              }
+              if (!row) return null as number | null;
               const hr = row?.executed?.avg_hr; return (typeof hr === 'number' && hr > 0) ? Math.round(hr) : null;
             })();
 
