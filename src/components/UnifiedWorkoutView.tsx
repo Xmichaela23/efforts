@@ -13,6 +13,7 @@ import StructuredPlannedView from './StructuredPlannedView';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { supabase } from '@/lib/supabase';
 import { useExecutionScore } from '@/hooks/useExecutionScore';
+import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 
 interface UnifiedWorkoutViewProps {
   workout: any;
@@ -54,6 +55,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // Unified week data for the workout's date (single-day window)
   const dateIso = String((workout as any)?.date || '').slice(0,10);
   const { items: unifiedItems = [] } = useWeekUnified(dateIso, dateIso);
+
+  // Phase 1: On-demand completed detail hydration (gps/sensors) with fallback to context object
+  const wid = String((workout as any)?.id || '');
+  const { workout: hydratedCompleted, loading: detailLoading } = useWorkoutDetail(isCompleted ? wid : undefined, {
+    include_gps: true,
+    include_sensors: true,
+    include_swim: true,
+    resolution: 'high',
+    normalize: true,
+    version: 'v1'
+  });
+  const completedData: any = isCompleted ? (hydratedCompleted || workout) : workout;
 
   // Resolve linked planned row for completed workouts
   useEffect(() => {
@@ -760,7 +773,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   <div className="p-4">
                     <CompletedTab 
                       workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
-                      workoutData={workout}
+                      workoutData={completedData}
                     />
                   </div>
                 ) : workout.type === 'strength' ? (

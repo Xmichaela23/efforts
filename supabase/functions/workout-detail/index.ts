@@ -1,0 +1,124 @@
+// @ts-nocheck
+// Function: workout-detail
+// Behavior: Return canonical completed workout details by id with optional heavy fields
+
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+
+type DetailOptions = {
+  include_gps?: boolean;
+  include_sensors?: boolean;
+  include_swim?: boolean;
+  resolution?: 'low' | 'high';
+  normalize?: boolean;
+  version?: string; // response schema version; default v1
+};
+
+const corsHeaders: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Vary': 'Origin',
+};
+
+function isUuid(v?: string | null): boolean { return !!v && /[0-9a-fA-F-]{36}/.test(v); }
+
+function normalizeBasic(w: any) {
+  const type = String(w?.type || '').toLowerCase();
+  return {
+    normalization_version: 'v1',
+    id: String(w?.id || ''),
+    user_id: String(w?.user_id || ''),
+    date: String(w?.date || '').slice(0,10),
+    type,
+    workout_status: String(w?.workout_status || 'completed'),
+    planned_id: w?.planned_id || null,
+    // Basic metrics (pass-through; units as stored)
+    distance: w?.distance ?? w?.distance_km ?? null,
+    distance_meters: w?.distance_meters ?? (typeof w?.distance === 'number' ? w.distance * 1000 : null),
+    moving_time: w?.moving_time ?? w?.metrics?.moving_time ?? null,
+    elapsed_time: w?.elapsed_time ?? w?.metrics?.elapsed_time ?? null,
+    avg_heart_rate: w?.avg_heart_rate ?? w?.metrics?.avg_heart_rate ?? null,
+    max_heart_rate: w?.max_heart_rate ?? w?.metrics?.max_heart_rate ?? null,
+    avg_power: w?.avg_power ?? w?.metrics?.avg_power ?? null,
+    max_power: w?.max_power ?? w?.metrics?.max_power ?? null,
+    avg_cadence: w?.avg_cadence ?? w?.metrics?.avg_cadence ?? null,
+    max_cadence: w?.max_cadence ?? w?.metrics?.max_cadence ?? null,
+    avg_speed_mps: w?.avg_speed_mps ?? null,
+    avg_speed: w?.avg_speed ?? w?.metrics?.avg_speed ?? null,
+    elevation_gain: w?.elevation_gain ?? w?.metrics?.elevation_gain ?? null,
+    elevation_loss: w?.elevation_loss ?? w?.metrics?.elevation_loss ?? null,
+    // Computed snapshot passthrough
+    computed: w?.computed || null,
+  };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+  }
+  try {
+    const body = await req.json().catch(()=>({}));
+    const id = String(body?.id || '').trim();
+    const opts: DetailOptions = {
+      include_gps: body?.include_gps !== false,
+      include_sensors: body?.include_sensors !== false,
+      include_swim: body?.include_swim !== false,
+      resolution: (body?.resolution === 'low' ? 'low' : 'high'),
+      normalize: body?.normalize !== false,
+      version: String(body?.version || 'v1'),
+    };
+    if (!isUuid(id)) {
+      return new Response(JSON.stringify({ error: 'id must be a UUID' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const authH = req.headers.get('Authorization') || '';
+    const token = authH.startsWith('Bearer ') ? authH.slice(7) : null;
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token || undefined as any);
+    if (userErr || !userData?.user?.id) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const userId = userData.user.id as string;
+
+    // Select minimal set plus optional blobs
+    const baseSel = 'id,user_id,date,type,workout_status,planned_id,name,metrics,computed,avg_heart_rate,max_heart_rate,avg_power,max_power,avg_cadence,max_cadence,avg_speed,avg_speed_mps,distance,distance_meters,elapsed_time,moving_time,elevation_gain,elevation_loss,start_position_lat,start_position_long,timestamp';
+    const gpsSel = opts.include_gps ? ',gps_track' : '';
+    const sensSel = opts.include_sensors ? ',sensor_data' : '';
+    const swimSel = opts.include_swim ? ',swim_data,number_of_active_lengths,pool_length_m,pool_unit' : '';
+    const select = baseSel + gpsSel + sensSel + swimSel;
+
+    const { data: row, error } = await supabase
+      .from('workouts')
+      .select(select)
+      .eq('id', id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) {
+      return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Normalize light fields only (Phase 1: no heavy processing/downsampling)
+    const detail = normalizeBasic(row);
+
+    // Attach blobs as-is
+    if (opts.include_gps) (detail as any).gps_track = row.gps_track || null;
+    if (opts.include_sensors) (detail as any).sensor_data = row.sensor_data || null;
+    if (opts.include_swim) {
+      (detail as any).swim_data = row.swim_data || null;
+      (detail as any).number_of_active_lengths = row.number_of_active_lengths ?? null;
+      (detail as any).pool_length_m = row.pool_length_m ?? null;
+      (detail as any).pool_unit = row.pool_unit ?? null;
+    }
+
+    return new Response(JSON.stringify({ workout: detail }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  } catch (e) {
+    const msg = (e && (e.message || e.msg)) ? (e.message || e.msg) : String(e);
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+});
+
+
