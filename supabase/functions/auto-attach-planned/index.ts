@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       .eq('date', day)
       .in('workout_status', ['planned','in_progress','completed']);
 
-    const candidates = Array.isArray(plannedList) ? plannedList : [];
+    let candidates = Array.isArray(plannedList) ? plannedList : [];
     if (!candidates.length) return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { 'Content-Type': 'application/json' } });
 
     // Compute workout stats (moving time and meters)
@@ -88,11 +88,35 @@ Deno.serve(async (req) => {
     // High-confidence selection rule: same day+type AND duration within 50%–120%
     // Compute planned seconds for each candidate and pick closest by percent diff
     let best: any = null; let bestPct: number = Number.POSITIVE_INFINITY; let bestSec: number | null = null;
+    const ensureSeconds = async (p:any) => {
+      const totals = sumPlanned(p);
+      let pSec = Number(totals.seconds);
+      if (!(Number.isFinite(pSec) && pSec>0)) {
+        try {
+          const baseUrl = Deno.env.get('SUPABASE_URL');
+          const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+          await fetch(`${baseUrl}/functions/v1/materialize-plan`, {
+            method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}`, 'apikey': key },
+            body: JSON.stringify({ planned_workout_id: p.id })
+          });
+          // Re-read this row to pick up computed totals
+          const { data: pRow } = await supabase
+            .from('planned_workouts')
+            .select('id,computed,total_duration_seconds,date,type')
+            .eq('id', p.id)
+            .maybeSingle();
+          if (pRow) Object.assign(p, pRow);
+          const totals2 = sumPlanned(p);
+          pSec = Number(totals2.seconds);
+        } catch {}
+      }
+      return Number.isFinite(pSec) && pSec>0 ? pSec : null;
+    };
+
     for (const p of candidates) {
       const pdate = String((p as any).date || '').slice(0,10);
       if (pdate !== day || String((p as any).type||'').toLowerCase() !== sport) continue;
-      const totals = sumPlanned(p);
-      const pSec = Number(totals.seconds);
+      const pSec = await ensureSeconds(p);
       if (!Number.isFinite(pSec) || pSec <= 0 || !Number.isFinite(wSec) || wSec <= 0) continue;
       const pct = Math.abs(wSec - pSec) / Math.max(1, pSec);
       if (pct < bestPct) { bestPct = pct; best = p; bestSec = pSec; }

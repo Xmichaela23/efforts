@@ -133,7 +133,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           } catch {}
           return;
         }
-        // First try in-place expansion from steps_preset (works for single workouts outside plan weeks)
+        // Server-first: if steps missing but tokens/structure exist, materialize on server
+        try {
+          const pid = String((linkedPlanned as any)?.id || '');
+          const hasTokens = Array.isArray((linkedPlanned as any)?.steps_preset) && (linkedPlanned as any).steps_preset.length>0;
+          const hasStruct = !!((linkedPlanned as any)?.workout_structure && typeof (linkedPlanned as any).workout_structure==='object');
+          if (pid && (hasTokens || hasStruct)) {
+            await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
+            const { data: refreshed } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
+            if (refreshed && Array.isArray((refreshed as any)?.computed?.steps) && (refreshed as any).computed.steps.length>0) {
+              setLinkedPlanned(refreshed);
+              return;
+            }
+          }
+        } catch {}
+
+        // Fallback: client expansion from steps tokens (last resort)
         try {
           const readStepsPresetLocal = (src: any): string[] | undefined => {
             try {

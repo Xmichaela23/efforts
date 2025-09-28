@@ -1,4 +1,6 @@
 // @ts-nocheck
+// Function: sweep-week
+// Behavior: Pre-materialize planned rows, auto-attach completed workouts, and compute summaries for a week window
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 function toISO(d: Date) {
@@ -72,6 +74,26 @@ Deno.serve(async (req) => {
     const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
     const attachUrl = `${baseUrl}/functions/v1/auto-attach-planned`;
     const computeUrl = `${baseUrl}/functions/v1/compute-workout-summary`;
+
+    // Pre-materialize planned rows in window to stabilize attach
+    try {
+      const { data: plannedWin } = await supabase
+        .from('planned_workouts')
+        .select('id,computed,total_duration_seconds')
+        .gte('date', fromISO)
+        .lte('date', toISOEnd)
+        .limit(2000);
+      const baseUrl = Deno.env.get('SUPABASE_URL');
+      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+      const needMat = (Array.isArray(plannedWin)?plannedWin:[]).filter((r:any)=>{
+        const hasSteps = Array.isArray((r as any)?.computed?.steps) && (r as any).computed.steps.length>0;
+        const total = Number((r as any)?.total_duration_seconds || (r as any)?.computed?.total_duration_seconds);
+        return !(hasSteps && Number.isFinite(total) && total>0);
+      }).map((r:any)=> String(r.id));
+      for (const id of needMat.slice(0, 200)) {
+        try { await fetch(`${baseUrl}/functions/v1/materialize-plan`, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ planned_workout_id: id }) }); } catch {}
+      }
+    } catch {}
 
     const MAX = 4; let attached = 0; let computed = 0;
     for (let i=0;i<allIds.length;i+=MAX) {
