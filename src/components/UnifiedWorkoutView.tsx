@@ -564,7 +564,53 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     plannedStepsForScore,
     executedIntervalsForScore
   );
-  const overallScore = isLinked ? overallScoreRaw : null;
+  // Fallback overall score when mapping is missing: compare simple plan target vs actual
+  const computeSimpleScore = (): number | null => {
+    if (!isLinked) return null;
+    const noMapping = plannedStepsForScore.length === 0 || executedIntervalsForScore.length === 0;
+    if (!noMapping) return null;
+    const sport = workoutTypeForScore;
+    try {
+      if (sport === 'ride' || sport === 'bike') {
+        const planText = String((plannedRowForScore as any)?.rendered_description || (plannedRowForScore as any)?.description || '').toLowerCase();
+        const targetRange = planText.match(/(\d+)\s*[–-]\s*(\d+)\s*w/);
+        const targetSingle = planText.match(/@\s*(\d+)\s*w/) || planText.match(/\b(\d+)\s*w\b/);
+        let target = null as number | null;
+        if (targetRange) {
+          const lo = parseInt(targetRange[1], 10); const hi = parseInt(targetRange[2], 10);
+          if (Number.isFinite(lo) && Number.isFinite(hi) && hi>0) target = Math.round((lo+hi)/2);
+        } else if (targetSingle) {
+          const v = parseInt(targetSingle[1], 10); if (Number.isFinite(v) && v>0) target = v;
+        }
+        const overall = (completedData as any)?.computed?.overall || {};
+        const actual = (completedData as any)?.avg_power
+          ?? (completedData as any)?.metrics?.avg_power
+          ?? overall.avg_power_w
+          ?? overall.avg_power
+          ?? null;
+        if (target && typeof actual === 'number' && actual>0) {
+          return Math.max(0, Math.round((actual / target) * 100));
+        }
+      }
+      if (sport === 'run' || sport === 'walk') {
+        // Compare pace: planned token like 8:30/mi in plan text
+        const planText = String((plannedRowForScore as any)?.rendered_description || (plannedRowForScore as any)?.description || '').toLowerCase();
+        const m = planText.match(/(\d+):(\d{2})\s*\/mi/);
+        const overall = (completedData as any)?.computed?.overall || {};
+        const secPerMi = overall.avg_pace_s_per_mi as number | undefined;
+        if (m && secPerMi && secPerMi>0) {
+          const target = parseInt(m[1],10)*60 + parseInt(m[2],10);
+          if (target>0) {
+            // Lower is better for pace → adherence = target/actual
+            return Math.max(0, Math.round((target / secPerMi) * 100));
+          }
+        }
+      }
+    } catch {}
+    return null;
+  };
+  const simpleScore = computeSimpleScore();
+  const overallScore = isLinked ? (simpleScore != null ? simpleScore : overallScoreRaw) : null;
 
   return (
     <div className="w-full h-full flex flex-col">

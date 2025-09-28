@@ -448,6 +448,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   if (!steps.length) {
     steps.push({ kind: 'steady', id: 'overall', planned_index: 0, seconds: (planned as any)?.computed?.total_duration_seconds || undefined });
   }
+  // If executed mapping isn't ready, collapse to a single row to avoid showing planned-only dashes
+  const stepsDisplay = useMemo(() => (hasServerComputed ? steps : [steps[0]]), [hasServerComputed, steps]);
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const comp = hydratedCompleted || completed;
@@ -1046,7 +1048,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
           </tr>
         </thead>
         <tbody>
-          {steps.map((st, idx) => {
+          {stepsDisplay.map((st, idx) => {
             let row: any = null;
             if (hasServerComputed) {
               const pid = String((st as any)?.id || '');
