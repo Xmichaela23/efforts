@@ -588,6 +588,20 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     } catch {}
     const txt = String((st as any)?.pace || '').trim();
     if (/\d+:\d{2}\s*\/(mi|km)/i.test(txt)) return txt;
+    // Fallback: parse a single target pace from the planned description (e.g., "70:00 @ 10:30/mi")
+    try {
+      const desc = String((effectivePlanned as any)?.rendered_description || (effectivePlanned as any)?.description || '').toLowerCase();
+      const m = desc.match(/(\d{1,2}):(\d{2})\s*\/mi/);
+      if (m) {
+        const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+        return fmtPace(sec);
+      }
+      const mkm = desc.match(/(\d{1,2}):(\d{2})\s*\/km/);
+      if (mkm) {
+        const secKm = parseInt(mkm[1],10)*60 + parseInt(mkm[2],10);
+        return fmtPace(Math.round(secKm * 1.60934));
+      }
+    } catch {}
     return '—';
   };
 
