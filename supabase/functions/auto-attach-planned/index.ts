@@ -40,10 +40,16 @@ function sumPlanned(planned: any): { seconds: number | null; meters: number | nu
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  const cors = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  } as Record<string,string>;
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
   try {
     const { workout_id } = await req.json();
-    if (!workout_id) return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (!workout_id) return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -53,7 +59,7 @@ Deno.serve(async (req) => {
       .select('id,user_id,type,provider_sport,date,timestamp,distance,moving_time,avg_heart_rate,tss,intensity_factor,metrics')
       .eq('id', workout_id)
       .maybeSingle();
-    if (!w) return new Response(JSON.stringify({ error: 'workout not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    if (!w) return new Response(JSON.stringify({ error: 'workout not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
 
     // Already linked → recompute summary and return
     // @ts-ignore
@@ -63,7 +69,7 @@ Deno.serve(async (req) => {
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
         await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
       } catch {}
-      return new Response(JSON.stringify({ success: true, attached: false, recomputed: true, reason: 'already_linked' }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ success: true, attached: false, recomputed: true, reason: 'already_linked' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
     const { sport, subtype } = sportSubtype(w.provider_sport || w.type);
@@ -79,7 +85,7 @@ Deno.serve(async (req) => {
       .in('workout_status', ['planned','in_progress','completed']);
 
     let candidates = Array.isArray(plannedList) ? plannedList : [];
-    if (!candidates.length) return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { 'Content-Type': 'application/json' } });
+    if (!candidates.length) return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
 
     // Compute workout stats (moving time and meters)
     const wSec = Number(w.moving_time ? (typeof w.moving_time==='number' ? w.moving_time : 0) : 0);
@@ -122,11 +128,11 @@ Deno.serve(async (req) => {
       if (pct < bestPct) { bestPct = pct; best = p; bestSec = pSec; }
     }
     if (!best) {
-      return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_exact_date_type_match_or_no_planned_seconds' }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_exact_date_type_match_or_no_planned_seconds' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
     const ratio = (bestSec && wSec>0) ? (wSec / bestSec) : null;
     if (!(ratio!=null && ratio >= 0.5 && ratio <= 1.2)) {
-      return new Response(JSON.stringify({ success: true, attached: false, reason: 'duration_out_of_range', ratio }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ success: true, attached: false, reason: 'duration_out_of_range', ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
     // Link (allow re-attach if previously completed to a deleted/old workout)
@@ -186,9 +192,9 @@ Deno.serve(async (req) => {
       await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
     } catch {}
 
-    return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, ratio }), { headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 });
 
