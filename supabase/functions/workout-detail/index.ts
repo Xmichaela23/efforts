@@ -89,7 +89,8 @@ Deno.serve(async (req) => {
     const baseSel = 'id,user_id,date,type,workout_status,planned_id,name,metrics,computed,avg_heart_rate,max_heart_rate,avg_power,max_power,avg_cadence,max_cadence,avg_speed,avg_speed_mps,distance,distance_meters,elapsed_time,moving_time,elevation_gain,elevation_loss,start_position_lat,start_position_long,timestamp';
     const gpsSel = opts.include_gps ? ',gps_track' : '';
     const sensSel = opts.include_sensors ? ',sensor_data' : '';
-    const swimSel = opts.include_swim ? ',swim_data,number_of_active_lengths,pool_length_m,pool_unit' : '';
+    // workouts table stores pool_length (meters or yards depending on source), not pool_length_m/pool_unit
+    const swimSel = opts.include_swim ? ',swim_data,number_of_active_lengths,pool_length' : '';
     const select = baseSel + gpsSel + sensSel + swimSel;
 
     let query = supabase.from('workouts').select(select).eq('id', id) as any;
@@ -109,8 +110,7 @@ Deno.serve(async (req) => {
     if (opts.include_swim) {
       (detail as any).swim_data = row.swim_data || null;
       (detail as any).number_of_active_lengths = row.number_of_active_lengths ?? null;
-      (detail as any).pool_length_m = row.pool_length_m ?? null;
-      (detail as any).pool_unit = row.pool_unit ?? null;
+      (detail as any).pool_length = row.pool_length ?? null;
     }
 
     return new Response(JSON.stringify({ workout: detail }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
