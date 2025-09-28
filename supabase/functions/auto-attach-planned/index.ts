@@ -185,6 +185,17 @@ Deno.serve(async (req) => {
         .eq('user_id', w.user_id);
     }
 
+    // Ensure planned is materialized now that it's linked (guarantees steps for Summary)
+    try {
+      const baseUrl = Deno.env.get('SUPABASE_URL');
+      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+      await fetch(`${baseUrl}/functions/v1/materialize-plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key },
+        body: JSON.stringify({ planned_workout_id: best.id })
+      });
+    } catch {}
+
     // Compute server summary
     try {
       const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
