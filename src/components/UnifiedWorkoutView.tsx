@@ -816,7 +816,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             ) : (
               <MobileSummary 
                 planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
-                completed={isCompleted ? workout : null} 
+                completed={isCompleted ? completedData : null}
               />
             )}
             {onDelete && workout?.id && (

@@ -1,5 +1,8 @@
 // @ts-nocheck
-// Minimal server-side materializer for new plans only (dev scope)
+// Function: materialize-plan
+// Behavior: Expand planned_workouts into computed.steps (stable ids) + total duration.
+// Supports run/ride/swim/strength tokens, workout_structure fallback, long_run_* tokens,
+// and description-based single-step fallback. CORS enabled. Returns count materialized.
 // - Reads planned_workouts rows by training_plan_id or single planned_workout id
 // - Expands steps_preset tokens into computed.steps with stable ids
 // - Resolves run paces (fiveK/easy) and bike power (FTP %) using user_baselines.performance_numbers
@@ -54,8 +57,8 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
   if (/cooldown/.test(lower) && /min/.test(lower)) {
     const sec = minutesTokenToSeconds(lower) ?? 600; out.push({ id: uid(), kind:'cooldown', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }
-  // long run time based
-  if (/longrun_\d+min/.test(lower)) {
+  // long run time based (support longrun_Xmin and long_run_Xmin)
+  if (/long[_-]?run_\d+min/.test(lower)) {
     const m = lower.match(/longrun_(\d+)min/); const sec = m ? parseInt(m[1],10)*60 : 3600; out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }
   // easy run: run_easy_Xmin
@@ -238,6 +241,31 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           const dM = toMeters(seg?.distance); if (dM>0) steps.push({ id: uid(), kind: 'work', distance_m: dM });
           continue;
         }
+      }
+    }
+  } catch {}
+  // Final fallback: parse rendered_description/description for a single steady step
+  try {
+    if (steps.length === 0) {
+      const desc = String(row?.rendered_description || row?.description || '').toLowerCase();
+      // Duration: prefer an explicit "total duration" marker
+      let dMatch = desc.match(/total\s*duration\s*:\s*(\d{1,3}):(\d{2})/);
+      if (!dMatch) dMatch = desc.match(/\b(\d{1,3}):(\d{2})\b/);
+      const durSec = dMatch ? (parseInt(dMatch[1],10)*60 + parseInt(dMatch[2],10)) : 0;
+      // Pace text like 10:30/mi or 5:00/km
+      let pMatch = desc.match(/(\d{1,2}):(\d{2})\s*\/mi/);
+      let paceSecPerMi: number | null = null;
+      if (pMatch) {
+        paceSecPerMi = parseInt(pMatch[1],10)*60 + parseInt(pMatch[2],10);
+      } else {
+        pMatch = desc.match(/(\d{1,2}):(\d{2})\s*\/km/);
+        if (pMatch) {
+          const spk = parseInt(pMatch[1],10)*60 + parseInt(pMatch[2],10);
+          paceSecPerMi = Math.round(spk * 1.60934);
+        }
+      }
+      if (durSec > 0 || (paceSecPerMi!=null)) {
+        steps.push({ id: uid(), kind: 'work', duration_s: durSec>0?durSec:1800, pace_sec_per_mi: paceSecPerMi || undefined });
       }
     }
   } catch {}
