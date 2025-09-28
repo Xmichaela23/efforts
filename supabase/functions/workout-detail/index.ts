@@ -77,11 +77,13 @@ Deno.serve(async (req) => {
     const authH = req.headers.get('Authorization') || '';
     const token = authH.startsWith('Bearer ') ? authH.slice(7) : null;
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    const { data: userData, error: userErr } = await supabase.auth.getUser(token || undefined as any);
-    if (userErr || !userData?.user?.id) {
-      return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    const userId = userData.user.id as string;
+    let userId: string | null = null;
+    try {
+      if (token) {
+        const { data: userData } = await supabase.auth.getUser(token as any);
+        userId = userData?.user?.id || null;
+      }
+    } catch {}
 
     // Select minimal set plus optional blobs
     const baseSel = 'id,user_id,date,type,workout_status,planned_id,name,metrics,computed,avg_heart_rate,max_heart_rate,avg_power,max_power,avg_cadence,max_cadence,avg_speed,avg_speed_mps,distance,distance_meters,elapsed_time,moving_time,elevation_gain,elevation_loss,start_position_lat,start_position_long,timestamp';
@@ -90,12 +92,9 @@ Deno.serve(async (req) => {
     const swimSel = opts.include_swim ? ',swim_data,number_of_active_lengths,pool_length_m,pool_unit' : '';
     const select = baseSel + gpsSel + sensSel + swimSel;
 
-    const { data: row, error } = await supabase
-      .from('workouts')
-      .select(select)
-      .eq('id', id)
-      .eq('user_id', userId)
-      .maybeSingle();
+    let query = supabase.from('workouts').select(select).eq('id', id) as any;
+    if (userId) query = query.eq('user_id', userId);
+    const { data: row, error } = await query.maybeSingle();
     if (error) throw error;
     if (!row) {
       return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

@@ -202,12 +202,21 @@ export const useWorkouts = () => {
 
       if (!user) { setWorkouts([]); setLoading(false); return; }
 
-      // Step 1: Fetch manual/planned workouts from workouts table (bounded window to avoid timeouts)
+      // Step 1: Fetch manual/planned workouts from workouts table (bounded window, lightweight columns only)
       const todayIso = new Date().toISOString().slice(0, 10);
       const lookbackIso = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 45 days (reduce payload)
       const { data: manualWorkouts, error: manualError } = await supabase
         .from("workouts")
-        .select("*")
+        .select([
+          'id','user_id','name','type','provider_sport','date','workout_status','duration',
+          // summary metrics only (no blobs)
+          'distance','avg_heart_rate','max_heart_rate','avg_power','max_power','normalized_power',
+          'avg_speed','max_speed','avg_cadence','max_cadence','elevation_gain','elevation_loss','calories',
+          'moving_time','elapsed_time','timestamp','start_position_lat','start_position_long',
+          // computed snapshot and metrics (small JSON); exclude gps_track/sensor_data/swim_data
+          'computed','metrics',
+          'created_at','updated_at'
+        ].join(','))
         .eq("user_id", user.id)
         .gte("date", lookbackIso)
         .lte("date", todayIso)
