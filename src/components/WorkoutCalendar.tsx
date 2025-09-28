@@ -296,22 +296,14 @@ export default function WorkoutCalendar({
     // Build lookup of days/types that actually have a completed workout row this week
     // We only treat a planned row as completed if there is a matching completed workout
     const wkDb = Array.isArray(workoutsWeekRows) ? workoutsWeekRows : [];
-    // Identify planned rows explicitly linked to a completed workout (authoritative association)
+    // Identify workouts that point to a planned_id (single source of truth)
     const plannedArr = Array.isArray(planned) ? (planned as any[]) : [];
-    const linkedCompletedIds = new Set(
-      plannedArr
-        .map((p: any) => p?.completed_workout_id)
-        .filter((id: any) => id != null)
-        .map((id: any) => String(id))
-    );
-    // Also consider workouts that point to a planned_id as linked completions
     const workoutIdByPlannedId = new Map<string, string>();
     for (const w of wkDb) {
       try {
         if (String(w?.workout_status||'').toLowerCase()==='completed' && (w as any)?.planned_id) {
           const pid = String((w as any).planned_id);
           workoutIdByPlannedId.set(pid, String((w as any).id));
-          linkedCompletedIds.add(String((w as any).id));
         }
       } catch {}
     }
@@ -334,10 +326,10 @@ export default function WorkoutCalendar({
       }
       return m;
     })();
-    // Planned rows considered completed if linked via either side OR marked completed
+    // Planned rows considered completed only when a workout references them via planned_id
     const completedPlannedKeys = new Set(
       plannedArr
-        .filter((p: any) => p?.completed_workout_id || workoutIdByPlannedId.has(String(p?.id)) || String(p?.workout_status || '').toLowerCase() === 'completed')
+        .filter((p: any) => workoutIdByPlannedId.has(String(p?.id)))
         .map((p: any) => `${String(p.date)}|${String(p.type || '').toLowerCase()}`)
     );
 
@@ -346,7 +338,7 @@ export default function WorkoutCalendar({
     // Normalize planned statuses:
     // - If a planned row links to a completed workout (either side), force completed ✓
     const mappedPlanned = (planned as any[]).map((p:any)=>{
-      if (p?.completed_workout_id || workoutIdByPlannedId.has(String(p?.id))) {
+      if (workoutIdByPlannedId.has(String(p?.id))) {
         return { ...p, workout_status: 'completed' };
       }
       return p;
@@ -364,11 +356,7 @@ export default function WorkoutCalendar({
       // If this is a planned row that has a completed workout linked via either side, suppress it (completed wins)
       const isPlannedRow = String((w as any).source || '').toLowerCase() === 'training_plan' || String((w as any).provider||'').toLowerCase()==='workouts';
       if (isPlannedRow) {
-        if ((w as any)?.completed_workout_id) return false;
         if (workoutIdByPlannedId.has(String((w as any).id))) return false;
-        // Heuristic: if a completed workout exists on the same date and type, suppress the planned row
-        const keyDT = `${String((w as any).date)}|${String((w as any).type||'').toLowerCase()}`;
-        if (completedWorkoutKeys.has(keyDT)) return false;
       }
       return true;
     });
