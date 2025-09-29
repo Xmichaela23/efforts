@@ -566,47 +566,57 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       if (Number.isFinite(sec) && (sec as number)>0) return fmtTime(sec as number);
       return '—';
     }
-    // run/walk → single pace only
+    // run/walk → show "duration @ pace" when possible
+    let paceText: string | null = null;
     // Prefer explicit textual target first (e.g., "6:30/mi", "4:10/km")
     const directTxt = (st as any)?.paceTarget || (st as any)?.target_pace || (st as any)?.pace;
     if (typeof directTxt === 'string' && /\d+:\d{2}\s*\/(mi|km)/i.test(directTxt)) {
-      return String(directTxt).trim();
+      paceText = String(directTxt).trim();
     }
     const p = Number((st as any)?.pace_sec_per_mi);
-    if (Number.isFinite(p) && p>0) return fmtPace(p);
+    if (!paceText && Number.isFinite(p) && p>0) paceText = fmtPace(p);
     const prng = Array.isArray((st as any)?.pace_range) ? (st as any).pace_range : null;
-    if (prng && prng.length===2) {
+    if (!paceText && prng && prng.length===2) {
       const lo = Number(prng[0]); const hi = Number(prng[1]);
       if (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) {
         const mid = Math.round((lo + hi) / 2);
-        return fmtPace(mid);
+        paceText = fmtPace(mid);
       }
     }
-    // derive from distance + duration if present
+    // derive pace from distance + duration if present
     try {
-      const meters = Number((st as any)?.distanceMeters ?? (st as any)?.distance_m ?? (st as any)?.m ?? (st as any)?.meters);
+      if (!paceText) {
+        const meters = Number((st as any)?.distanceMeters ?? (st as any)?.distance_m ?? (st as any)?.m ?? (st as any)?.meters);
+        const sec = [ (st as any)?.seconds, (st as any)?.duration, (st as any)?.duration_sec, (st as any)?.durationSeconds, (st as any)?.time_sec, (st as any)?.timeSeconds ]
+          .map((v:any)=>Number(v)).find((n:number)=>Number.isFinite(n) && n>0) as number | undefined;
+        if (Number.isFinite(meters) && meters>0 && Number.isFinite(sec) && (sec as number)>0) {
+          const miles = meters/1609.34; if (miles>0) paceText = fmtPace((sec as number)/miles);
+        }
+      }
+    } catch {}
+    if (!paceText) {
+      const txt = String((st as any)?.pace || '').trim();
+      if (/\d+:\d{2}\s*\/(mi|km)/i.test(txt)) paceText = txt;
+    }
+    // Planned duration
+    let plannedSec: number | null = null;
+    try {
       const sec = [ (st as any)?.seconds, (st as any)?.duration, (st as any)?.duration_sec, (st as any)?.durationSeconds, (st as any)?.time_sec, (st as any)?.timeSeconds ]
         .map((v:any)=>Number(v)).find((n:number)=>Number.isFinite(n) && n>0) as number | undefined;
-      if (Number.isFinite(meters) && meters>0 && Number.isFinite(sec) && (sec as number)>0) {
-        const miles = meters/1609.34; if (miles>0) return fmtPace((sec as number)/miles);
+      if (Number.isFinite(sec)) plannedSec = Number(sec);
+      if (plannedSec == null) {
+        const desc = String((effectivePlanned as any)?.rendered_description || (effectivePlanned as any)?.description || '').toLowerCase();
+        // Prefer explicit label like "Total duration: 70:00" else any mm:ss before @
+        let m = desc.match(/total\s*duration\s*:\s*(\d{1,3}):(\d{2})/);
+        if (!m) m = desc.match(/\b(\d{1,3}):(\d{2})\b\s*@/);
+        if (!m) m = desc.match(/\b(\d{1,3}):(\d{2})\b/);
+        if (m) plannedSec = parseInt(m[1],10)*60 + parseInt(m[2],10);
       }
     } catch {}
-    const txt = String((st as any)?.pace || '').trim();
-    if (/\d+:\d{2}\s*\/(mi|km)/i.test(txt)) return txt;
-    // Fallback: parse a single target pace from the planned description (e.g., "70:00 @ 10:30/mi")
-    try {
-      const desc = String((effectivePlanned as any)?.rendered_description || (effectivePlanned as any)?.description || '').toLowerCase();
-      const m = desc.match(/(\d{1,2}):(\d{2})\s*\/mi/);
-      if (m) {
-        const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-        return fmtPace(sec);
-      }
-      const mkm = desc.match(/(\d{1,2}):(\d{2})\s*\/km/);
-      if (mkm) {
-        const secKm = parseInt(mkm[1],10)*60 + parseInt(mkm[2],10);
-        return fmtPace(Math.round(secKm * 1.60934));
-      }
-    } catch {}
+
+    if (paceText && plannedSec && plannedSec>0) return `${fmtTime(plannedSec)} @ ${paceText}`;
+    if (paceText) return paceText;
+    if (plannedSec && plannedSec>0) return fmtTime(plannedSec);
     return '—';
   };
 

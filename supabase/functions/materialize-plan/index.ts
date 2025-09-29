@@ -244,6 +244,17 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       }
     }
   } catch {}
+  // Final fallback (no parsing of description): if this is a run and row.duration is set,
+  // create a single steady step using user's easy pace baseline
+  try {
+    if (steps.length === 0 && String(row?.type||'').toLowerCase()==='run') {
+      const min = Number(row?.duration);
+      if (Number.isFinite(min) && min>0) {
+        const easy = secPerMiFromBaseline(baselines, 'easy');
+        steps.push({ id: uid(), kind: 'work', duration_s: Math.round(min*60), pace_sec_per_mi: easy||undefined });
+      }
+    }
+  } catch {}
   // Final fallback: parse rendered_description/description for a single steady step
   try {
     if (steps.length === 0) {

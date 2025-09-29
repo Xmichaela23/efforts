@@ -651,7 +651,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     return null;
   };
   const simpleScore = computeSimpleScore();
-  const overallScore = isLinked ? (simpleScore != null ? simpleScore : overallScoreRaw) : null;
+  const overallScore = (simpleScore != null ? simpleScore : (isLinked ? overallScoreRaw : null));
 
   return (
     <div className="w-full h-full flex flex-col">
