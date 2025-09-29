@@ -1,4 +1,8 @@
 // @ts-nocheck
+// Function: compute-workout-summary
+// Behavior: Normalize samples and compute executed intervals and overall metrics
+//           (pace, GAP, HR, cadence, power) and persist to workouts.computed.
+//           Also normalizes pace units and tags records with normalization_version='v1'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 // ---------- small helpers ----------
@@ -16,14 +20,14 @@ function avg(nums: number[]) {
   return nums.reduce((a, b)=>a + b, 0) / nums.length;
 }
 
-function paceSecPerMiFromMetersSeconds(meters: number, sec: number) {
+  function paceSecPerMiFromMetersSeconds(meters: number, sec: number) {
   if (!(meters > 0) || !(sec > 0)) return null;
   const miles = meters / 1609.34;
   return miles > 0 ? sec / miles : null;
 }
 
 // ---------- robust sample normalization ----------
-function normalizeSamples(samples: any[]) {
+  function normalizeSamples(samples: any[]) {
   const out: Array<{ ts:number; t:number; v?:number; d?:number; hr?:number; elev?:number; cad?:number; p?:number }> = [];
   for (let i=0;i<samples.length;i+=1) {
     const s = samples[i] || {};
@@ -131,6 +135,38 @@ function normalizeSamples(samples: any[]) {
     last = cur;
   }
   return out;
+}
+
+// ---------- normalization helpers ----------
+function normalizePaceSeconds(val: any): number | null {
+  const n = Number(val);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  // Some sources encode deciseconds (e.g., 6260 for 10:26/mi)
+  if (n > 1200) return Math.round(n / 10);
+  return Math.round(n);
+}
+
+function normalizeComputedPaces(c: any): any {
+  try {
+    const out = JSON.parse(JSON.stringify(c || {}));
+    if (out?.overall) {
+      const v = normalizePaceSeconds(out.overall.avg_pace_s_per_mi);
+      if (v != null) out.overall.avg_pace_s_per_mi = v;
+      const g = normalizePaceSeconds(out.overall.gap_pace_s_per_mi);
+      if (g != null) out.overall.gap_pace_s_per_mi = g;
+    }
+    if (Array.isArray(out?.intervals)) {
+      for (const it of out.intervals) {
+        if (it?.executed) {
+          const v = normalizePaceSeconds(it.executed.avg_pace_s_per_mi);
+          if (v != null) it.executed.avg_pace_s_per_mi = v;
+          const g = normalizePaceSeconds(it.executed.gap_pace_s_per_mi);
+          if (g != null) it.executed.gap_pace_s_per_mi = g;
+        }
+      }
+    }
+    return out;
+  } catch { return c; }
 }
 
 // ---------- planned field readers (v3 + token parsing) ----------
@@ -530,16 +566,17 @@ Deno.serve(async (req) => {
     // Helper: robust writer that tolerates schemas without computed_version/computed_at
     async function writeComputed(computedPayload: any): Promise<void> {
       const stamp = new Date().toISOString();
+      const normalized = normalizeComputedPaces(computedPayload);
       // First try with version + timestamp (preferred)
       const { error: upErr1 } = await supabase
         .from('workouts')
-        .update({ computed: computedPayload, computed_version: COMPUTED_VERSION_INT, computed_at: stamp })
+        .update({ computed: normalized, computed_version: COMPUTED_VERSION_INT, computed_at: stamp, normalization_version: 'v1' })
         .eq('id', workout_id);
       if (!upErr1) return;
       // Fallback: write computed only (for schemas missing these columns)
       const { error: upErr2 } = await supabase
         .from('workouts')
-        .update({ computed: computedPayload })
+        .update({ computed: normalized })
         .eq('id', workout_id);
       if (upErr2) throw upErr2;
     }

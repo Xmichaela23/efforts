@@ -640,7 +640,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         if (mid > 0) return Math.round((ew / mid) * 100);
       }
 
-      // Pace-based intervals (runs/swims)
+      // Pace-based intervals (runs/swims) with decisecond normalization
       const parsePaceTextToSecPerMeter = (txt?: string | null): number | null => {
         if (!txt) return null;
         const s = String(txt).trim().toLowerCase();
@@ -666,8 +666,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       if (plannedSecPerMeter == null) plannedSecPerMeter = parsePaceTextToSecPerMeter((plannedStep as any)?.paceTarget || (plannedStep as any)?.target_pace || (plannedStep as any)?.pace);
 
       if (plannedSecPerMeter != null) {
-        // Executed pace: prefer executed.avg_pace_s_per_mi; else derive from distance/time
-        const execPaceMi = Number((executedStep as any)?.avg_pace_s_per_mi);
+        // Executed pace: prefer executed.avg_pace_s_per_mi; normalize deciseconds; else derive from distance/time
+        let execPaceMi = Number((executedStep as any)?.avg_pace_s_per_mi);
+        if (Number.isFinite(execPaceMi) && execPaceMi > 1200) execPaceMi = execPaceMi / 10;
         let execSecPerMeter: number | null = null;
         if (Number.isFinite(execPaceMi) && execPaceMi > 0) execSecPerMeter = execPaceMi / 1609.34;
         if (execSecPerMeter == null) {

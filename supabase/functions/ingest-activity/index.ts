@@ -183,6 +183,7 @@ function mapStravaToWorkout(activity, userId) {
     max_cadence: Number.isFinite(activity.max_cadence) ? Math.round(activity.max_cadence) : derivedMaxCadence,
     // Server-computed summary for UI (includes GAP/cadence when available)
     computed: computedJsonObj,
+    normalization_version: 'v1',
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString()
   };
@@ -569,6 +570,22 @@ async function mapGarminToWorkout(activity, userId) {
     computed: ((): string | null => {
       try {
         const c: any = computeComputedFromActivity(computeInput) || {};
+        // Normalize paces to seconds (fix possible decisecond inputs)
+        try {
+          const fix = (n:any)=>{ const v=Number(n); if(!Number.isFinite(v)||v<=0) return null; return v>1200?Math.round(v/10):Math.round(v); };
+          if (c?.overall) {
+            if (c.overall.avg_pace_s_per_mi!=null) c.overall.avg_pace_s_per_mi = fix(c.overall.avg_pace_s_per_mi);
+            if (c.overall.gap_pace_s_per_mi!=null) c.overall.gap_pace_s_per_mi = fix(c.overall.gap_pace_s_per_mi);
+          }
+          if (Array.isArray(c?.intervals)) {
+            for (const it of c.intervals) {
+              if (it?.executed) {
+                if (it.executed.avg_pace_s_per_mi!=null) it.executed.avg_pace_s_per_mi = fix(it.executed.avg_pace_s_per_mi);
+                if (it.executed.gap_pace_s_per_mi!=null) it.executed.gap_pace_s_per_mi = fix(it.executed.gap_pace_s_per_mi);
+              }
+            }
+          }
+        } catch {}
         // Guarantee overall for swims from ingest-time totals (distance_meters, duration_seconds)
         if (type === 'swim') {
           const distIn = Number(activity.distance_meters ?? computeInput?.summary?.totalDistanceInMeters ?? computeInput?.summary?.distanceInMeters);

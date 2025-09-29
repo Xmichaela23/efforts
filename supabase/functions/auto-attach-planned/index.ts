@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     // Load workout
     const { data: w } = await supabase
       .from('workouts')
-      .select('id,user_id,type,provider_sport,date,timestamp,distance,moving_time,avg_heart_rate,tss,intensity_factor,metrics')
+      .select('id,user_id,type,provider_sport,date,timestamp,distance,moving_time,avg_heart_rate,tss,intensity_factor,metrics,normalization_version,computed')
       .eq('id', workout_id)
       .maybeSingle();
     if (!w) return new Response(JSON.stringify({ error: 'workout not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -71,6 +71,31 @@ Deno.serve(async (req) => {
       } catch {}
       return new Response(JSON.stringify({ success: true, attached: false, recomputed: true, reason: 'already_linked' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
+
+    // Normalize legacy computed paces before proceeding (organic cleanup path)
+    try {
+      if (String(w.normalization_version||'') !== 'v1') {
+        const comp = (typeof (w as any).computed === 'string') ? JSON.parse((w as any).computed) : (w as any).computed || {};
+        const fix = (n:any)=>{ const v=Number(n); if(!Number.isFinite(v)||v<=0) return null; return v>1200?Math.round(v/10):Math.round(v); };
+        let changed = false;
+        if (comp?.overall) {
+          const v = fix(comp.overall.avg_pace_s_per_mi); if (v!=null && comp.overall.avg_pace_s_per_mi!==v) { comp.overall.avg_pace_s_per_mi=v; changed=true; }
+          const g = fix(comp.overall.gap_pace_s_per_mi); if (g!=null && comp.overall.gap_pace_s_per_mi!==g) { comp.overall.gap_pace_s_per_mi=g; changed=true; }
+        }
+        if (Array.isArray(comp?.intervals)) {
+          for (const it of comp.intervals) {
+            if (it?.executed) {
+              const v = fix(it.executed.avg_pace_s_per_mi); if (v!=null && it.executed.avg_pace_s_per_mi!==v) { it.executed.avg_pace_s_per_mi=v; changed=true; }
+              const g = fix(it.executed.gap_pace_s_per_mi); if (g!=null && it.executed.gap_pace_s_per_mi!==g) { it.executed.gap_pace_s_per_mi=g; changed=true; }
+            }
+          }
+        }
+        if (changed) {
+          await supabase.from('workouts').update({ computed: comp, normalization_version: 'v1' }).eq('id', w.id);
+          (w as any).computed = comp; (w as any).normalization_version = 'v1';
+        }
+      }
+    } catch {}
 
     const { sport, subtype } = sportSubtype(w.provider_sport || w.type);
 
