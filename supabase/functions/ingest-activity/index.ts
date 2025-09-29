@@ -167,6 +167,13 @@ function mapStravaToWorkout(activity, userId) {
     max_pace: activity.max_speed && activity.max_speed > 0 ? Math.round(1000 / activity.max_speed) : null,
     elevation_gain: Number.isFinite(activity.total_elevation_gain) ? Math.round(activity.total_elevation_gain) : null,
     calories: Number.isFinite(activity.calories) ? Math.round(activity.calories) : null,
+    steps: ((): number | null => {
+      try {
+        const v = activity.steps ?? activity.step_count ?? activity.total_steps ?? null;
+        const n = Number(v);
+        return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+      } catch { return null; }
+    })(),
     provider_sport: activity.sport_type || activity.type || null,
     // Location
     start_position_lat: Array.isArray(activity.start_latlng) ? activity.start_latlng[0] ?? null : null,

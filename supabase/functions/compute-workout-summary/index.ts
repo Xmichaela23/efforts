@@ -967,7 +967,33 @@ Deno.serve(async (req) => {
           duration_s_moving: overallSec,
           distance_m: Math.round(overallMeters),
           avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
-          gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
+          gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null,
+          // Rollups
+          avg_cadence_spm: ((): number | null => {
+            try {
+              const cads:number[] = [];
+              for (let i=0;i<rows.length;i+=1) {
+                const c = rows[i].cad; if (typeof c === 'number' && Number.isFinite(c)) cads.push(c);
+              }
+              return cads.length ? Math.round(cads.reduce((a,b)=>a+b,0)/cads.length) : null;
+            } catch { return null; }
+          })(),
+          max_cadence_spm: ((): number | null => {
+            try {
+              let mx = -Infinity; for (let i=0;i<rows.length;i+=1) { const c = rows[i].cad; if (typeof c === 'number' && Number.isFinite(c) && c > mx) mx = c; }
+              return Number.isFinite(mx) ? Math.round(mx) : null;
+            } catch { return null; }
+          })(),
+          avg_vam: ((): number | null => {
+            try {
+              const elevGainM = Number((w as any)?.elevation_gain);
+              const durMin = Number((w as any)?.moving_time);
+              if (Number.isFinite(elevGainM) && elevGainM > 0 && Number.isFinite(durMin) && durMin > 0) {
+                const hours = (durMin * 60) / 3600; return Math.round(elevGainM / hours);
+              }
+              return null;
+            } catch { return null; }
+          })()
         },
         quality: {
           mode: laps.length ? 'lap' : 'split',

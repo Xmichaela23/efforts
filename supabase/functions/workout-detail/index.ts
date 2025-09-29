@@ -25,7 +25,7 @@ function isUuid(v?: string | null): boolean { return !!v && /[0-9a-fA-F-]{36}/.t
 function normalizeBasic(w: any) {
   const type = String(w?.type || '').toLowerCase();
   return {
-    normalization_version: 'v1',
+    normalization_version: String(w?.normalization_version || ''),
     id: String(w?.id || ''),
     user_id: String(w?.user_id || ''),
     date: String(w?.date || '').slice(0,10),
@@ -45,6 +45,9 @@ function normalizeBasic(w: any) {
     max_cadence: w?.max_cadence ?? w?.metrics?.max_cadence ?? null,
     avg_speed_mps: w?.avg_speed_mps ?? null,
     avg_speed: w?.avg_speed ?? w?.metrics?.avg_speed ?? null,
+    duration: w?.duration ?? null,
+    calories: w?.calories ?? null,
+    steps: w?.steps ?? null,
     elevation_gain: w?.elevation_gain ?? w?.metrics?.elevation_gain ?? null,
     elevation_loss: w?.elevation_loss ?? w?.metrics?.elevation_loss ?? null,
     // Computed snapshot passthrough
@@ -89,7 +92,7 @@ Deno.serve(async (req) => {
     const baseSel = [
       'id','user_id','date','type','workout_status','planned_id','name','metrics','computed',
       'avg_heart_rate','max_heart_rate','avg_power','max_power','avg_cadence','max_cadence',
-      'avg_speed','distance','elapsed_time','moving_time','elevation_gain','elevation_loss',
+      'avg_speed','distance','duration','elapsed_time','moving_time','calories','steps','elevation_gain','elevation_loss',
       'start_position_lat','start_position_long','timestamp'
     ].join(',');
     const gpsSel = opts.include_gps ? ',gps_track' : '';
@@ -109,11 +112,19 @@ Deno.serve(async (req) => {
     // Normalize light fields only (Phase 1: no heavy processing/downsampling)
     const detail = normalizeBasic(row);
 
-    // Attach blobs as-is
-    if (opts.include_gps) (detail as any).gps_track = row.gps_track || null;
-    if (opts.include_sensors) (detail as any).sensor_data = row.sensor_data || null;
+    // No derived fallbacks here; detail is a thin wrapper around stored data.
+
+    // Parse/attach structured fields
+    try { (detail as any).computed = (()=>{ try { return typeof row.computed === 'string' ? JSON.parse(row.computed) : (row.computed || null); } catch { return row.computed || null; } })(); } catch {}
+    try { (detail as any).metrics  = (()=>{ try { return typeof row.metrics  === 'string' ? JSON.parse(row.metrics)  : (row.metrics  || null); } catch { return row.metrics  || null; } })(); } catch {}
+    if (opts.include_gps) {
+      try { (detail as any).gps_track = typeof row.gps_track === 'string' ? JSON.parse(row.gps_track) : (row.gps_track || null); } catch { (detail as any).gps_track = row.gps_track || null; }
+    }
+    if (opts.include_sensors) {
+      try { (detail as any).sensor_data = typeof row.sensor_data === 'string' ? JSON.parse(row.sensor_data) : (row.sensor_data || null); } catch { (detail as any).sensor_data = row.sensor_data || null; }
+    }
     if (opts.include_swim) {
-      (detail as any).swim_data = row.swim_data || null;
+      try { (detail as any).swim_data = typeof row.swim_data === 'string' ? JSON.parse(row.swim_data) : (row.swim_data || null); } catch { (detail as any).swim_data = row.swim_data || null; }
       (detail as any).number_of_active_lengths = row.number_of_active_lengths ?? null;
       (detail as any).pool_length = row.pool_length ?? null;
     }
