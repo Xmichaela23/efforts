@@ -609,8 +609,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         // Compare pace: planned token like 8:30/mi in plan text
         const planText = String((plannedRowForScore as any)?.rendered_description || (plannedRowForScore as any)?.description || '').toLowerCase();
         const m = planText.match(/(\d+):(\d{2})\s*\/mi/);
+        // Actual pace seconds per mile
+        let secPerMi: number | null = null;
         const overall = (completedData as any)?.computed?.overall || {};
-        const secPerMi = overall.avg_pace_s_per_mi as number | undefined;
+        if (Number.isFinite(overall.avg_pace_s_per_mi)) secPerMi = Number(overall.avg_pace_s_per_mi);
+        if (secPerMi == null) {
+          const metricsPaceKm = (completedData as any)?.metrics?.avg_pace as number | undefined; // sec/km
+          if (Number.isFinite(metricsPaceKm)) secPerMi = Math.round((metricsPaceKm as number) * 1.60934);
+        }
+        if (secPerMi == null) {
+          const moving = Number((completedData as any)?.moving_time ?? (completedData as any)?.metrics?.moving_time);
+          const distKm = Number((completedData as any)?.distance ?? (completedData as any)?.metrics?.distance_km);
+          if (moving>0 && distKm>0) secPerMi = Math.round((moving / (distKm * 0.621371)));
+        }
         if (m && secPerMi && secPerMi>0) {
           const target = parseInt(m[1],10)*60 + parseInt(m[2],10);
           if (target>0) {
