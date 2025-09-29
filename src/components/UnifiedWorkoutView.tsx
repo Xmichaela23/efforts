@@ -612,7 +612,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         // Actual pace seconds per mile
         let secPerMi: number | null = null;
         const overall = (completedData as any)?.computed?.overall || {};
-        if (Number.isFinite(overall.avg_pace_s_per_mi)) secPerMi = Number(overall.avg_pace_s_per_mi);
+        if (Number.isFinite(overall.avg_pace_s_per_mi)) {
+          let v = Number(overall.avg_pace_s_per_mi);
+          // Normalize if stored in deciseconds (e.g., 6260 for 10:26)
+          if (v > 1000) v = Math.round(v / 10);
+          secPerMi = v;
+        }
         // Prefer distance/time calculation using meters to avoid unit confusion
         if (secPerMi == null) {
           const meters = Number((completedData as any)?.metrics?.distance_meters ?? overall.distance_m);
