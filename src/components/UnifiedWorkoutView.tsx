@@ -613,14 +613,23 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         let secPerMi: number | null = null;
         const overall = (completedData as any)?.computed?.overall || {};
         if (Number.isFinite(overall.avg_pace_s_per_mi)) secPerMi = Number(overall.avg_pace_s_per_mi);
+        // Prefer distance/time calculation using meters to avoid unit confusion
+        if (secPerMi == null) {
+          const meters = Number((completedData as any)?.metrics?.distance_meters ?? overall.distance_m);
+          const moving = Number((completedData as any)?.moving_time ?? (completedData as any)?.metrics?.moving_time ?? overall.duration_s_moving ?? overall.duration_s);
+          if (Number.isFinite(meters) && meters>0 && Number.isFinite(moving) && moving>0) {
+            const miles = meters / 1609.34;
+            if (miles>0.05) secPerMi = Math.round(moving / miles);
+          }
+        }
         if (secPerMi == null) {
           const metricsPaceKm = (completedData as any)?.metrics?.avg_pace as number | undefined; // sec/km
           if (Number.isFinite(metricsPaceKm)) secPerMi = Math.round((metricsPaceKm as number) * 1.60934);
         }
         if (secPerMi == null) {
           const moving = Number((completedData as any)?.moving_time ?? (completedData as any)?.metrics?.moving_time);
-          const distKm = Number((completedData as any)?.distance ?? (completedData as any)?.metrics?.distance_km);
-          if (moving>0 && distKm>0) secPerMi = Math.round((moving / (distKm * 0.621371)));
+          const distKmAssumed = Number((completedData as any)?.distance ?? (completedData as any)?.metrics?.distance_km);
+          if (moving>0 && distKmAssumed>0) secPerMi = Math.round((moving / (distKmAssumed * 0.621371)));
         }
         if (m && secPerMi && secPerMi>0) {
           const target = parseInt(m[1],10)*60 + parseInt(m[2],10);
