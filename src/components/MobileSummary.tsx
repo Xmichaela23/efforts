@@ -1059,6 +1059,123 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     <div className="w-full">
       {/* Source line removed per UI request */}
 
+      {(() => {
+        // Component adherence strip (pace / duration / distance)
+        try {
+          const isRunOrWalk = /run|walk/i.test(sportType);
+          if (!isRunOrWalk) return null;
+
+          // Planned totals
+          const plannedSecondsTotal = (() => {
+            // prefer computed.total_duration_seconds
+            const t = Number((effectivePlanned as any)?.computed?.total_duration_seconds);
+            if (Number.isFinite(t) && t > 0) return t;
+            // fallback: sum step durations
+            const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+            const s = arr.reduce((sum:number, st:any)=> sum + (Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0), 0);
+            return s > 0 ? s : null;
+          })();
+
+          const plannedPaceSecPerMi = (() => {
+            const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+            // look for explicit pace_range midpoint or pace_sec_per_mi from any work step
+            for (const st of arr) {
+              const kind = String(st?.kind || st?.type || '').toLowerCase();
+              if (kind === 'recovery' || kind === 'rest') continue;
+              if (Array.isArray(st?.pace_range) && st.pace_range.length === 2) {
+                const a = Number(st.pace_range[0]); const b = Number(st.pace_range[1]);
+                if (Number.isFinite(a) && Number.isFinite(b) && a>0 && b>0) return Math.round((a + b) / 2);
+              }
+              const p = Number(st?.pace_sec_per_mi);
+              if (Number.isFinite(p) && p > 0) return p;
+            }
+            return null;
+          })();
+
+          const plannedDistanceMeters = (() => {
+            const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+            let m = 0; for (const st of arr) { const dm = Number(st?.distanceMeters || st?.distance_m || st?.m || 0); if (Number.isFinite(dm) && dm>0) m += dm; }
+            if (m > 0) return m;
+            if (plannedSecondsTotal && plannedPaceSecPerMi) {
+              // derive from duration and target pace
+              const miles = plannedSecondsTotal / plannedPaceSecPerMi; return Math.round(miles * 1609.34);
+            }
+            return null;
+          })();
+
+          // Executed totals
+          const compOverall = (hydratedCompleted || completed)?.computed?.overall || {};
+          const executedSeconds = (() => {
+            const s = Number(compOverall?.duration_s_moving ?? compOverall?.duration_s);
+            if (Number.isFinite(s) && s>0) return s;
+            const fromResolver = resolveMovingSeconds(hydratedCompleted || completed);
+            return Number.isFinite(fromResolver as any) && (fromResolver as number) > 0 ? (fromResolver as number) : null;
+          })();
+          const executedMeters = (() => {
+            const m = Number(compOverall?.distance_m);
+            if (Number.isFinite(m) && m>0) return m;
+            const km = Number((hydratedCompleted || completed)?.distance);
+            return Number.isFinite(km) && km>0 ? Math.round(km * 1000) : null;
+          })();
+          const executedSecPerMi = (() => {
+            const v = Number(compOverall?.avg_pace_s_per_mi);
+            if (Number.isFinite(v) && v>0) return v;
+            if (executedSeconds && executedMeters) {
+              const miles = executedMeters / 1609.34; if (miles>0.01) return Math.round(executedSeconds / miles);
+            }
+            return null;
+          })();
+
+          // Build components
+          const pacePct = (plannedPaceSecPerMi && executedSecPerMi) ? Math.round((plannedPaceSecPerMi / executedSecPerMi) * 100) : null;
+          const paceDeltaSec = (plannedPaceSecPerMi && executedSecPerMi) ? (plannedPaceSecPerMi - executedSecPerMi) : null; // + is faster
+          const durationPct = (plannedSecondsTotal && executedSeconds) ? Math.round((executedSeconds / plannedSecondsTotal) * 100) : null;
+          const durationDelta = (plannedSecondsTotal && executedSeconds) ? (executedSeconds - plannedSecondsTotal) : null; // + means longer
+          const distPct = (plannedDistanceMeters && executedMeters) ? Math.round((executedMeters / plannedDistanceMeters) * 100) : null;
+          const distDeltaMi = (plannedDistanceMeters && executedMeters) ? ((executedMeters - plannedDistanceMeters) / 1609.34) : null; // + means longer
+
+          // If nothing to show, skip
+          const anyVal = (pacePct!=null) || (durationPct!=null) || (distPct!=null);
+          if (!anyVal) return null;
+
+          const chip = (label:string, pct:number|null, text:string) => {
+            if (pct==null) return null;
+            const color = getPercentageColor(pct);
+            return (
+              <div className="flex flex-col items-center px-2">
+                <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
+                <div className="text-[11px] text-gray-700">{label}</div>
+                <div className="text-[11px] text-gray-600">{text}</div>
+              </div>
+            );
+          };
+
+          const fmtDeltaTime = (s:number) => {
+            const sign = s>=0 ? '+' : '−'; const v = Math.abs(Math.round(s));
+            const m = Math.floor(v/60); const ss = v%60; return `${sign}${m}:${String(ss).padStart(2,'0')}`;
+          };
+          const fmtDeltaPace = (s:number) => {
+            const faster = s>0; const v = Math.abs(s); const m = Math.floor(v/60); const ss = Math.round(v%60);
+            return `${m?`${m}m `:''}${ss}s/mi ${faster? 'faster' : 'slower'}`.trim();
+          };
+          const fmtDeltaMi = (mi:number) => {
+            const sign = mi>=0 ? '+' : '−'; const v = Math.abs(mi);
+            const val = v < 0.95 ? v.toFixed(1) : v.toFixed(0);
+            return `${sign}${val} mi`;
+          };
+
+          return (
+            <div className="w-full pt-1 pb-2">
+              <div className="flex items-center justify-around text-center">
+                {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—')}
+                {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—')}
+                {chip('Distance', distPct, distDeltaMi!=null ? fmtDeltaMi(distDeltaMi) : '—')}
+              </div>
+            </div>
+          );
+        } catch { return null; }
+      })()}
+
       {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
       <table className="w-full text-sm table-fixed">
         <colgroup>
