@@ -94,7 +94,7 @@ export const useExecutionScore = (
           return hasVariedDurations ? 'Duration-weighted power adherence' : 'Average power adherence';
         case 'run':
         case 'walk':
-          return hasVariedDurations ? 'Duration-weighted pace adherence' : 'Average pace adherence';
+          return 'Pace/duration adherence';
         case 'swim':
           return 'Distance-weighted pace adherence';
         case 'strength':

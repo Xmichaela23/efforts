@@ -280,6 +280,38 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       }
     }
   } catch {}
+  // Parse textual target ranges from description and attach as structured fields when missing
+  try {
+    const desc = String(row?.rendered_description || row?.description || '').toLowerCase();
+    const parsePaceRange = (s:string): [number,number] | null => {
+      // 10:00-10:30/mi or 5:00-5:15/km
+      let m = s.match(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
+      if (!m) return null;
+      const a = parseInt(m[1],10)*60 + parseInt(m[2],10);
+      const b = parseInt(m[3],10)*60 + parseInt(m[4],10);
+      const unit = m[5].toLowerCase();
+      if (unit === 'mi') return [Math.min(a,b), Math.max(a,b)];
+      const aMi = Math.round(a * 1.60934); const bMi = Math.round(b * 1.60934);
+      return [Math.min(aMi,bMi), Math.max(aMi,bMi)];
+    };
+    const parsePowerRange = (s:string): {lower:number, upper:number} | null => {
+      const m = s.match(/(\d{2,4})\s*[–-]\s*(\d{2,4})\s*w/i);
+      if (!m) return null;
+      const lo = parseInt(m[1],10); const hi = parseInt(m[2],10);
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo<=0 || hi<=0) return null;
+      return { lower: Math.min(lo,hi), upper: Math.max(lo,hi) };
+    };
+    const pr = parsePaceRange(desc);
+    const pow = parsePowerRange(desc);
+    if (pr || pow) {
+      for (const st of steps) {
+        const kind = String((st as any)?.kind || '').toLowerCase();
+        if (kind === 'recovery' || kind === 'rest') continue;
+        if (pr && !(Array.isArray((st as any)?.pace_range))) (st as any).pace_range = pr;
+        if (pow && !((st as any)?.power_range && typeof (st as any).power_range.lower==='number')) (st as any).power_range = pow;
+      }
+    }
+  } catch {}
   const total_s = steps.reduce((s,st)=> s + (Number(st.duration_s)||0), 0);
   return { steps, total_s };
 }
@@ -298,6 +330,10 @@ function toV3Step(st: any): any {
   if (typeof st?.duration_s === 'number') out.seconds = Math.max(1, Math.round(st.duration_s));
   if (typeof st?.distance_m === 'number') out.distanceMeters = Math.max(1, Math.round(st.distance_m));
   if (typeof st?.pace_sec_per_mi === 'number') out.paceTarget = `${mmss(st.pace_sec_per_mi)}/mi`;
+  if (Array.isArray(st?.pace_range) && st.pace_range.length===2) {
+    const a = Number(st.pace_range[0]); const b = Number(st.pace_range[1]);
+    if (Number.isFinite(a) && Number.isFinite(b) && a>0 && b>0) out.pace_range = [Math.round(a), Math.round(b)];
+  }
   if (st?.power_range && typeof st.power_range.lower === 'number' && typeof st.power_range.upper === 'number') {
     const lo = Math.round(st.power_range.lower);
     const up = Math.round(st.power_range.upper);
