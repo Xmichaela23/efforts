@@ -100,6 +100,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
         if (typeof secs==='number' && secs>0) totalSecsFromSteps += Math.max(1, Math.round(secs));
         const distM = typeof st?.distanceMeters==='number' ? st.distanceMeters : undefined;
+        const distYdRaw = ((): number | undefined => {
+          const d1 = (st as any)?.distance_yd; const d2 = (st as any)?.distanceYd; const d3 = (st as any)?.distance_yds;
+          const n = Number(d1 ?? d2 ?? d3);
+          return Number.isFinite(n) && n>0 ? Math.round(n) : undefined;
+        })();
         if (isSwim && typeof distM==='number' && distM>0 && typeof secPer100FromPN==='number') {
           const sec = (poolUnit==='yd') ? ((distM/0.9144)/100)*secPer100FromPN : ((distM/100)*secPer100FromPN);
           estTotal += sec;
@@ -132,7 +137,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
         // Swim: prefer explicit count × distance with label/equipment
         if (isSwim) {
-          const distTxt = (typeof distM==='number' && distM>0) ? fmtDist(distM) : undefined;
+          const distTxt = (typeof distM==='number' && distM>0)
+            ? fmtDist(distM)
+            : (typeof distYdRaw==='number' ? `${distYdRaw} yd` : undefined);
           const baseLabel = (typeof st?.label==='string' && st.label.trim()) ? st.label.trim().replace(/^drill\s*/i,'Drill ') : (kind || '').trim();
           const seg = [distTxt ? `1 × ${distTxt}` : (typeof secs==='number' && secs>0 ? `1 × ${fmtDur(secs)}` : undefined), baseLabel || undefined].filter(Boolean).join(' — ')
           lines.push([seg, equip].filter(Boolean).join(''))
@@ -142,6 +149,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const pieces: string[] = [];
         if (kind) pieces.push(kind);
         if (typeof distM==='number' && distM>0) pieces.push(fmtDist(distM));
+        else if (typeof distYdRaw==='number') pieces.push(`${distYdRaw} yd`);
         else if (typeof secs==='number' && secs>0) pieces.push(fmtDur(secs));
         if (pTxt) pieces.push(`@ ${pTxt}`);
         else if (powRange) pieces.push(`@ ${powRange}`);
