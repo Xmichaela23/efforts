@@ -1,4 +1,8 @@
 // @ts-nocheck
+// Function: activate-plan
+// Behavior: Activates a plan for a user by inserting planned_workouts
+//           (persists steps_preset, strength_exercises, description, tags)
+//           and then calls materialize-plan to compute computed.steps.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 type SessionsByWeek = Record<string, Array<any>>
@@ -159,6 +163,7 @@ function deriveStrengthExercises(tokens: string[], baselines: any): any[] {
   } catch { return [] }
 }
 
+// Function: activate-plan
 Deno.serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -293,8 +298,14 @@ Deno.serve(async (req) => {
           workout_structure: (s as any)?.workout_structure && typeof (s as any).workout_structure === 'object' ? (s as any).workout_structure : null,
         }
         if (mapped === 'strength') {
-          const ex = deriveStrengthExercises(stepsTokens, baselines)
-          if (ex && ex.length) baseRow.strength_exercises = ex
+          // Prefer authored strength_exercises when provided; else derive from tokens
+          const authored = Array.isArray((s as any)?.strength_exercises) ? (s as any).strength_exercises : []
+          if (authored.length) {
+            baseRow.strength_exercises = authored
+          } else {
+            const ex = deriveStrengthExercises(stepsTokens, baselines)
+            if (ex && ex.length) baseRow.strength_exercises = ex
+          }
         }
         rows.push(baseRow)
       }

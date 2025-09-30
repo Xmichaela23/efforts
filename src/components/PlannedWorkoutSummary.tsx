@@ -320,7 +320,8 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           }
           const workAnno = workPace ? ` (${workPace})` : (workPower?` (${workPower})`:'' );
           const restAnno = hasRec ? (restPace ? ` ${restLabel} (${restPace})` : (restPower?` ${restLabel} (${restPower})` : ` ${restLabel}`)) : '';
-          out.push(`${count} × ${workLabel}${workAnno}${restAnno}`);
+          const countDisplay = Math.max(1, Number(count)||0);
+          out.push(`${countDisplay} × ${workLabel}${workAnno}${restAnno}`);
           if (j <= i) { i += 1; continue; }
           i = j; continue;
         }
