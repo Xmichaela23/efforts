@@ -51,10 +51,20 @@ function getTitle(workout: any): string {
   return nm || 'Session';
 }
 
+function parseComputed(workout: any): any | null {
+  try {
+    const c = (workout as any)?.computed;
+    if (!c) return null;
+    if (typeof c === 'string') return JSON.parse(c);
+    return c;
+  } catch { return (workout as any)?.computed || null; }
+}
+
 function computeMinutes(workout: any, baselines?: Baselines, exportHints?: ExportHints): number | null {
   // Prefer recompute from computed.steps (client authoritative), then fall back
   try {
-    const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+    const compA = parseComputed(workout);
+    const steps: any[] = Array.isArray(compA?.steps) ? compA.steps : [];
     if (steps.length > 0) {
       const secPerMeterFromPace = (pace?: string): number | null => {
         try {
@@ -85,7 +95,8 @@ function computeMinutes(workout: any, baselines?: Baselines, exportHints?: Expor
     }
   } catch {}
   try {
-    const ts = Number((workout as any)?.computed?.total_duration_seconds) || Number((workout as any)?.total_duration_seconds);
+    const compB = parseComputed(workout);
+    const ts = Number(compB?.total_duration_seconds) || Number((workout as any)?.total_duration_seconds);
     if (Number.isFinite(ts) && ts > 0) return Math.max(1, Math.round(ts / 60));
   } catch {}
   try {
@@ -118,7 +129,8 @@ function computeSwimYards(workout: any): number | null {
   } catch {}
   // Fallback to computed distances
   try {
-    const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+    const compC = parseComputed(workout);
+    const steps: any[] = Array.isArray(compC?.steps) ? compC.steps : [];
     if (steps.length) {
       const meters = steps.reduce((a: number, st: any) => a + (Number(st?.distanceMeters) || 0), 0);
       const yd = Math.round(meters / 0.9144);
@@ -234,7 +246,8 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
     if (!isStrength) return [];
     try {
       // Prefer computed strength steps (server-prescribed)
-      const cSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+      const compD = parseComputed(workout);
+      const cSteps: any[] = Array.isArray(compD?.steps) ? compD.steps : [];
       const comp = cSteps.filter(st => String((st as any)?.kind||'').toLowerCase()==='strength').map((st:any)=> st?.strength).filter(Boolean) as any[];
       const asLines = (arr:any[]) => arr.map((s:any)=>{
         const name = String(s?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
