@@ -39,6 +39,27 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'): number | nul
   return parsePaceToSecPerMi(raw);
 }
 
+// Strength helpers: map exercise name to baseline key and compute prescribed weight
+function oneRmFromBaselines(b: any, exerciseName: string): number | null {
+  try {
+    const n = String(exerciseName || '').toLowerCase();
+    if (n.includes('bench')) return Number.isFinite(b?.bench) ? b.bench : null;
+    if (n.includes('deadlift')) return Number.isFinite(b?.deadlift) ? b.deadlift : null;
+    if (n.includes('squat')) return Number.isFinite(b?.squat) ? b.squat : null;
+    if (n.includes('overhead') || n.includes('ohp') || (n.includes('press') && !n.includes('bench'))) {
+      const v = b?.overheadPress1RM ?? b?.ohp ?? b?.overhead_press;
+      return Number.isFinite(v) ? v : null;
+    }
+    // Unknown or bodyweight: no 1RM baseline
+    return null;
+  } catch { return null; }
+}
+function pctWeight(oneRm: number | null, pct?: number): number | undefined {
+  if (oneRm == null) return undefined;
+  if (!(typeof pct === 'number' && isFinite(pct) && pct > 0)) return undefined;
+  return Math.max(1, Math.round(oneRm * pct));
+}
+
 function parseIntSafe(s?: string | number | null): number | null { const n = typeof s === 'number' ? s : parseInt(String(s||''), 10); return Number.isFinite(n) ? n : null; }
 
 function uid(): string { try { return crypto.randomUUID(); } catch { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; } }
@@ -173,13 +194,19 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           const name = String(ex?.name||'exercise');
           const reps = (typeof ex?.reps==='number'? ex.reps : undefined);
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
-          const weight = (typeof ex?.weight==='number'? ex.weight : undefined);
-          steps.push({ id: uid(), kind:'strength', duration_s: 60, strength: { name, sets, reps, weight } });
+          const explicitWeight = (typeof ex?.weight==='number'? ex.weight : undefined);
+          const percent = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+          const oneRm = oneRmFromBaselines(baselines as any, name);
+          const prescribed = explicitWeight ?? pctWeight(oneRm, percent);
+          const strength = { name, sets, reps, weight: prescribed, percent_1rm: percent } as any;
+          steps.push({ id: uid(), kind:'strength', strength });
         }
         continue;
       }
       // placeholder if no details
-      const sec = 45*60; steps.push({ id: uid(), kind:'work', duration_s: sec }); continue;
+      // No fixed duration requirement for strength; include a generic strength block
+      steps.push({ id: uid(), kind:'strength', strength: { name: 'strength block' } });
+      continue;
     }
     steps.push(...added);
   }

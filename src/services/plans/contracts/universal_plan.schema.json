@@ -159,8 +159,20 @@
             "properties": {
               "name": { "type": "string" },
               "sets": { "type": "integer", "minimum": 1 },
-              "reps": { "type": "integer", "minimum": 1 },
-              "weight": { "type": "number", "minimum": 0 }
+              "reps": {
+                "oneOf": [
+                  { "type": "integer", "minimum": 1 },
+                  { "type": "string", "enum": ["AMRAP","amrap"] },
+                  { "type": "null" }
+                ]
+              },
+              "weight": {
+                "oneOf": [
+                  { "type": "number", "minimum": 0 },
+                  { "type": "string" },
+                  { "type": "null" }
+                ]
+              }
             }
           }
         }
