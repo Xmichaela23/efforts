@@ -299,7 +299,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Lateral Lunges (alternating)', time_sec: 60 },
       { move: 'Leg Swings (front/back, each side 30s)', time_sec: 60 },
       { move: 'Arm Crosses + Overheads', time_sec: 60 },
-      { move: 'World's Greatest Stretch (alternating)', time_sec: 60 },
+      { move: "World's Greatest Stretch (alternating)", time_sec: 60 },
       { move: 'Knee Hugs (walk-in-place)', time_sec: 60 },
       { move: 'Calf Raises (tempo)', time_sec: 60 },
       { move: 'Hip Airplanes (hands on hips)', time_sec: 60 },
@@ -372,7 +372,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     ]},
     'addon_mobility_10.v2': { name: 'Mobility — 10 min (v2)', duration_min: 10, sequence: [
       { move: 'Plank to Down Dog', time_sec: 60 },
-      { move: 'World's Greatest Stretch (alternating)', time_sec: 60 },
+      { move: "World's Greatest Stretch (alternating)", time_sec: 60 },
       { move: 'Half-Kneeling Hip Flexor Stretch (each side 30s)', time_sec: 60 },
       { move: 'Hamstring Stretch (supine)', time_sec: 60 },
       { move: '90/90 Hip Switches (controlled)', time_sec: 60 },
@@ -448,7 +448,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     'Hanging Knee Raise', 'Hanging Leg Raise', 'Toes-to-Bar', 'Hanging Windshield Wipers',
     'Stability Ball Rollout', 'Stir the Pot', 'TRX Fallout', 'Ab Wheel Rollout',
     'Russian Twist', 'Cable Woodchopper', 'Landmine Twist', 'Pallof Press',
-    'Farmer's Carry', 'Suitcase Carry', 'Overhead Carry',
+    "Farmer's Carry", 'Suitcase Carry', 'Overhead Carry',
     'Superman Hold', 'Back Extension', 'Hip Extension', 'Glute Bridge March', 'Reverse Hyperextension',
     'Cable Crunch', 'Ab Machine Crunch', "Captain's Chair Knee Raise", 'Roman Chair Sit-Up', 'GHD Sit-Up'
   ];
