@@ -54,10 +54,11 @@ function oneRmFromBaselines(b: any, exerciseName: string): number | null {
     return null;
   } catch { return null; }
 }
+function round5(n: number): number { return Math.max(5, Math.round(n / 5) * 5); }
 function pctWeight(oneRm: number | null, pct?: number): number | undefined {
   if (oneRm == null) return undefined;
   if (!(typeof pct === 'number' && isFinite(pct) && pct > 0)) return undefined;
-  return Math.max(1, Math.round(oneRm * pct));
+  return round5(oneRm * pct);
 }
 
 function parseWeightInput(input: any, oneRm: number | null): { weight?: number; percent_1rm?: number } {
@@ -66,6 +67,7 @@ function parseWeightInput(input: any, oneRm: number | null): { weight?: number; 
     const s = String(input || '').trim().toLowerCase();
     if (!s) return {};
     if (/(^|\b)(bw|body\s*weight|bodyweight)(\b|$)/.test(s)) return { weight: 0 };
+    if (/amrap/.test(s)) return {}; // reps-only hint, not a weight
     // Match "70% 1RM" or "70%" or "0.7" style
     let m = s.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
     if (m) {
@@ -87,6 +89,112 @@ function parseWeightInput(input: any, oneRm: number | null): { weight?: number; 
     }
   } catch {}
   return {};
+}
+
+// Accessory mapping → primary 1RM with ratio
+function getAccessoryRatio(movement: string): number {
+  const m = String(movement || '').toLowerCase();
+  // Primary lifts default to 1.0
+  if (/bench|squat|deadlift|dead_lift|ohp|overhead/.test(m)) return 1.0;
+  // Upper body pull (bench reference)
+  if (m.includes('barbell_row') || m.includes('bent_over_row') || m.includes('pendlay_row') || m.includes('barbell row') || m.includes('bent over row') || m.includes('pendlay')) return 0.90;
+  if (m.includes('t_bar_row') || /\bt[-_ ]?bar[-_ ]?row\b/.test(m)) return 0.80;
+  if (m.includes('chest_supported_row') || m.includes('chest supported row')) return 0.85;
+  if (m.includes('cable_row') || m.includes('cable row')) return 0.70;
+  if (m.includes('lat_pulldown') || m.includes('pulldown') || m.includes('lat pulldown')) return 0.65;
+  if (m.includes('inverted_row') || m.includes('inverted row')) return 0.65;
+  if (m.includes('face_pull') || m.includes('face pull')) return 0.35;
+  if (m.includes('reverse_fly') || m.includes('reverse_flye') || m.includes('reverse fly')) return 0.30;
+  if (m.includes('chinup') || m.includes('chin_up') || m.includes('pullup') || m.includes('pull_up') || m.includes('chin-up') || m.includes('pull-up')) return 0.65;
+  // Upper body push (bench reference)
+  if (m.includes('dip')) return 0.90;
+  if (m.includes('incline_bench') || m.includes('incline bench')) return 0.85;
+  if (m.includes('close_grip_bench') || m.includes('close grip bench')) return 0.90;
+  if (m.includes('db_bench_press') || m.includes('dumbbell_bench')) return 0.75;
+  if (m.includes('db_incline_press') || m.includes('dumbbell_incline')) return 0.70;
+  if (m.includes('db_fly') || m.includes('db_flye') || m.includes('dumbbell_fly')) return 0.45;
+  if (m.includes('cable_fly') || m.includes('cable_flye')) return 0.40;
+  if (m.includes('diamond_pushup') || m.includes('close_grip_pushup')) return 0.0;
+  if (m.includes('pike_pushup')) return 0.0;
+  if (m.includes('pushup') || m.includes('push_up')) return 0.0;
+  // Shoulders (overhead reference)
+  if (m.includes('lateral_raise')) return 0.35;
+  if (m.includes('front_raise')) return 0.40;
+  if (m.includes('rear_delt_fly') || m.includes('rear_delt_flye')) return 0.30;
+  if (m.includes('db_shoulder_press') || m.includes('dumbbell_shoulder')) return 0.65;
+  if (m.includes('overhead_tricep_extension') || m.includes('tricep_extension')) return 0.40;
+  if (m.includes('push_press')) return 1.10;
+  // Hip dominant (deadlift reference)
+  if (m.includes('hip_thrust') || m.includes('hip thrust')) return 0.80;
+  if (m.includes('romanian_deadlift') || m.includes('rdl')) return 0.70;
+  if (m.includes('good_morning') || m.includes('good morning')) return 0.45;
+  if (m.includes('single_leg_rdl') || m.includes('single leg rdl')) return 0.25;
+  if (m.includes('glute_bridge') || m.includes('glute bridge')) return 0.60;
+  if (m.includes('leg_curl') || m.includes('leg curl')) return 0.60;
+  if (m.includes('sumo_deadlift') || m.includes('sumo')) return 0.95;
+  if (m.includes('nordic_curl')) return 0.0;
+  // Knee dominant (squat reference)
+  if (m.includes('bulgarian_split_squat')) return 0.30;
+  if (m.includes('walking_lunge') || m.includes('lunge')) return 0.35;
+  if (m.includes('reverse_lunge')) return 0.35;
+  if (m.includes('lateral_lunge')) return 0.30;
+  if (m.includes('goblet_squat')) return 0.40;
+  if (m.includes('step_up') || m.includes('step up')) return 0.25;
+  if (m.includes('leg_press')) return 1.20;
+  if (m.includes('leg_extension')) return 0.55;
+  if (m.includes('front_squat')) return 0.85;
+  if (m.includes('overhead_squat')) return 0.60;
+  if (m.includes('jump_squat') || m.includes('box_jump')) return 0.0;
+  if (m.includes('wall_sit')) return 0.0;
+  if (m.includes('pistol_squat') || m.includes('pistol')) return 0.0;
+  // Core & BW
+  if (m.includes('plank') || m.includes('side_plank')) return 0.0;
+  if (m.includes('ab_rollout') || m.includes('rollout')) return 0.0;
+  if (m.includes('hanging_leg_raise')) return 0.0;
+  if (m.includes('russian_twist')) return 0.0;
+  if (m.includes('dead_bug')) return 0.0;
+  if (m.includes('bird_dog')) return 0.0;
+  if (m.includes('pallof_press')) return 0.0;
+  if (m.includes('burpee')) return 0.0;
+  if (m.includes('mountain_climber')) return 0.0;
+  return 1.0;
+}
+
+function pickPrimary1RMAndBase(name: string, baselines: any): { base: number | null; ref: 'bench'|'squat'|'deadlift'|'overhead'|null; ratio: number; unilateral: boolean } {
+  const n = String(name || '').toLowerCase();
+  const bench = Number.isFinite(baselines?.bench) ? baselines.bench as number : null;
+  const squat = Number.isFinite(baselines?.squat) ? baselines.squat as number : null;
+  const deadlift = Number.isFinite(baselines?.deadlift) ? baselines.deadlift as number : null;
+  const overhead = Number.isFinite(baselines?.overheadPress1RM ?? baselines?.ohp ?? baselines?.overhead) ? (baselines?.overheadPress1RM ?? baselines?.ohp ?? baselines?.overhead) as number : null;
+  const unilateral = /(single|bulgarian|split|one arm|one leg|unilateral|pistol)/i.test(n);
+
+  // Direct primary lifts
+  if (n.includes('bench')) return { base: bench, ref: 'bench', ratio: 1.0, unilateral };
+  if (n.includes('squat')) return { base: squat, ref: 'squat', ratio: 1.0, unilateral };
+  if (n.includes('deadlift') || n.includes('dead_lift')) return { base: deadlift, ref: 'deadlift', ratio: 1.0, unilateral };
+  if (n.includes('overhead') || n.includes('ohp') || (n.includes('press') && !n.includes('bench'))) return { base: overhead, ref: 'overhead', ratio: 1.0, unilateral };
+
+  // Accessory aliases
+  const ratio = getAccessoryRatio(n);
+  if (n.includes('row')) return { base: bench, ref: 'bench', ratio, unilateral };
+  if (n.includes('dip')) return { base: bench, ref: 'bench', ratio, unilateral };
+  if (n.includes('hip thrust')) return { base: deadlift, ref: 'deadlift', ratio, unilateral };
+  if (n.includes('lunge') || n.includes('split squat') || n.includes('goblet') || n.includes('step up')) return { base: squat, ref: 'squat', ratio, unilateral };
+  if (n.includes('rdl') || n.includes('romanian')) return { base: deadlift, ref: 'deadlift', ratio, unilateral };
+
+  // Unknown
+  return { base: null, ref: null, ratio: 1.0, unilateral };
+}
+
+function repScaleFor(reps?: number | string): number {
+  if (typeof reps === 'string' && /amrap/i.test(reps)) return 1.00;
+  const r = Number(reps);
+  if (!Number.isFinite(r)) return 1.0;
+  if (r <= 6) return 1.05;
+  if (r <= 9) return 1.00;
+  if (r <= 12) return 0.95;
+  if (r <= 15) return 0.90;
+  return 0.85;
 }
 
 function parseIntSafe(s?: string | number | null): number | null { const n = typeof s === 'number' ? s : parseInt(String(s||''), 10); return Number.isFinite(n) ? n : null; }
@@ -176,6 +284,42 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   const discipline = String(row?.type||'').toLowerCase();
   const steps: any[] = [];
+
+  // Early path: Strength without tokens → expand from strength_exercises so computed is written
+  if (discipline === 'strength' && tokens.length === 0) {
+    try {
+      const rawStrength: any = (row as any)?.strength_exercises;
+      const exs: any[] = Array.isArray(rawStrength)
+        ? rawStrength
+        : (typeof rawStrength === 'string' ? (()=>{ try { return JSON.parse(rawStrength); } catch { return []; } })() : []);
+      if (Array.isArray(exs) && exs.length > 0) {
+        for (const ex of exs) {
+          const name = String(ex?.name||'exercise');
+          const reps = (typeof ex?.reps==='number'? ex.reps : undefined);
+          const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
+          // Resolve base 1RM and accessory ratio
+          const pick = pickPrimary1RMAndBase(name, baselines as any);
+          const base1RM = pick.base;
+          const ratio = pick.ratio;
+          const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+          const parsed = parseWeightInput((ex as any)?.weight, base1RM);
+          let prescribed: number | undefined = undefined;
+          if (parsed.weight != null) prescribed = parsed.weight;
+          else if (base1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
+            const scaled = base1RM * ratio * percentRaw * repScaleFor(reps);
+            prescribed = round5(scaled);
+          }
+          const percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
+          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from: pick.ref || undefined } as any;
+          steps.push({ id: uid(), kind:'strength', strength });
+        }
+        return { steps, total_s: 0 };
+      }
+    } catch {}
+    // No details present: still emit a generic block so computed exists
+    steps.push({ id: uid(), kind:'strength', strength: { name: 'strength block' } });
+    return { steps, total_s: 0 };
+  }
   for (const tok of tokens) {
     let added: any[] = [];
     if (discipline==='run' || discipline==='walk') added = expandRunToken(tok, baselines);

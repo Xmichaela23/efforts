@@ -32,7 +32,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   if (!hasStructured && !hasComputedV3) {
     return (
       <div className="p-3">
-        <div className="text-sm text-gray-700">No structured or computed steps available yet.</div>
+        <div className="text-sm text-gray-700">Waiting for server compute…</div>
       </div>
     );
   }
@@ -59,42 +59,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const poolLenM: number | null = (typeof (workout as any)?.pool_length_m === 'number') ? (workout as any).pool_length_m : null;
   const lines: string[] = [];
   let totalSecsFromSteps = 0;
-  // Strength: if server provided structured strength_exercises, render aggregated lines (avoid per-set repetition)
+  // Strength: no client fallback — render only server-computed steps
   let preferStrengthLines = false;
-  try {
-    const parentDiscEarly = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
-    if (parentDiscEarly === 'strength') {
-      const exArr: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
-      if (exArr.length) {
-        preferStrengthLines = true;
-        for (const e of exArr) {
-          const name = String(e?.name || '').replace(/_/g, ' ').trim();
-          const norm = name.toLowerCase().replace(/[\s-]/g,'');
-          const isBw = /^(?:.*(?:dip|chinup|pullup|pushup|plank).*)$/.test(norm);
-          const setsField: any = (e as any).sets;
-          const baseWeight = (typeof (e as any)?.weight === 'number' && isFinite((e as any).weight)) ? Math.round((e as any).weight) : undefined;
-          const baseReps = ((): number | string | undefined => { const r=(e as any)?.reps; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
-          if (Array.isArray(setsField) && setsField.length) {
-            // Per-set objects
-            for (const s of setsField) {
-              const reps = (typeof s?.reps==='number' && s.reps>0) ? s.reps : (typeof baseReps==='number'?baseReps:0);
-              const wt = (typeof s?.weight==='number' && s.weight>0) ? Math.round(s.weight) : (baseWeight||0);
-              const wtTxt = (wt>0 && !isBw) ? ` @ ${wt} lb` : '';
-              lines.push(`${name} 1×${reps||0}${wtTxt}`.trim());
-            }
-          } else {
-            // Numeric sets: expand into that many steps
-            const setsNum = Math.max(1, Number(setsField)||1);
-            const repTxt = (typeof baseReps==='string') ? baseReps : String(baseReps||0);
-            const wtTxt = (typeof baseWeight==='number' && baseWeight>0 && !isBw) ? ` @ ${baseWeight} lb` : '';
-            for (let i=0;i<setsNum;i+=1) {
-              lines.push(`${name} 1×${repTxt}${wtTxt}`.trim());
-            }
-          }
-        }
-      }
-    }
-  } catch {}
   // Prefer server-computed v3 steps when present
   try {
     const v3: any[] = Array.isArray(computedAny?.steps) ? computedAny.steps : [];
