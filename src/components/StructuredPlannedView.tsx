@@ -67,13 +67,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     const parentDiscV3 = String((workout as any)?.type||'').toLowerCase();
     if (v3.length) {
       const fmtDur = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+      // Decide display unit for swim even if pool_unit is missing: fall back to tokens (…yd)
+      const tokensArr: string[] = Array.isArray((workout as any)?.steps_preset) ? ((workout as any).steps_preset as string[]).map(String) : [];
+      const tokensJoined = tokensArr.join(' ').toLowerCase();
+      const tokensPreferYd = /\byd\b/.test(tokensJoined);
+      const isSwimType = String((workout as any)?.type||'').toLowerCase()==='swim';
+      const displayYards = isSwimType && (poolUnit==='yd' || tokensPreferYd);
       const fmtDist = (m:number)=>{
         const x = Math.max(1, Math.round(Number(m)||0));
-        // Swim distances respect pool unit; others keep meters for clarity
-        if (String((workout as any)?.type||'').toLowerCase()==='swim' && (poolUnit==='yd')) {
-          const yd = Math.round(x / 0.9144);
-          return `${yd} yd`;
-        }
+        if (displayYards) { const yd = Math.round(x / 0.9144); return `${yd} yd`; }
         return `${x} m`;
       };
       const niceKind = (k:string)=>{
