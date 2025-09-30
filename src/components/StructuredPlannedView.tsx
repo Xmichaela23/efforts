@@ -84,7 +84,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   try {
     const v3: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
     const parentDiscV3 = String((workout as any)?.type||'').toLowerCase();
-    if (v3.length && !(preferStrengthLines && parentDiscV3==='strength')) {
+    if (v3.length) {
       const fmtDur = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
       const fmtDist = (m:number)=>{
         const x = Math.max(1, Math.round(Number(m)||0));
@@ -133,15 +133,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
         // Strength step formatting
         if (st?.strength && typeof st.strength==='object') {
-      const nm = String(st.strength.name||'Strength');
-      const sets = Number(st.strength.sets||st.strength.setsCount||0);
-      const reps = Number(st.strength.reps||st.strength.repCount||0);
+          const nm = String(st.strength.name||'Strength');
+          const sets = Number(st.strength.sets||st.strength.setsCount||0);
+          const reps = ((): number|string|undefined=>{ const r=st.strength.reps||st.strength.repCount; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
           const wt = Number(st.strength.weight||st.strength.load||0);
           const unit = (String((workout as any)?.units||'').toLowerCase()==='metric') ? ' kg' : ' lb';
           const normNm = nm.toLowerCase().replace(/[\s-]/g,'');
           const isBw = /^(?:.*(?:dip|chinup|pullup|pushup|plank).*)$/.test(normNm);
           const parts: string[] = [nm];
-          if (sets>0 && reps>0) parts.push(`${sets}×${reps}`);
+          if (sets>0 && reps!=null) parts.push(`${sets}×${reps}`);
           if (wt>0 && !isBw) parts.push(`@ ${Math.round(wt)}${unit}`);
           lines.push(parts.join(' '));
           return;
