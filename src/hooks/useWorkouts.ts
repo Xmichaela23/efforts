@@ -584,40 +584,13 @@ export const useWorkouts = () => {
                   }));
                 }
               } catch (error) {
-                console.log(`⚠️ Error parsing strength_exercises for "${w.name}":`, error);
+                if (import.meta?.env?.DEV) {
+                  console.debug(`strength_exercises parse failed for "${w.name}"`, error);
+                }
               }
             }
             
-            // Fallback: parse from description field if strength_exercises is empty
-            if (w.description) {
-              if (import.meta.env?.DEV) console.log(`🔍 Falling back to description parsing for "${w.name}":`, w.description);
-              
-              // Create a custom structure that will work with StrengthCompletedView
-              // Transform the description into proper exercise format with sets array
-              const exercises = w.description.split(',').map((exerciseStr, index) => {
-                const [name, setsInfo] = exerciseStr.trim().split(':');
-                const [sets, reps] = setsInfo?.split('/') || ['5', '5'];
-                
-                return {
-                  id: `temp-${index}`,
-                  name: name.trim(),
-                  sets: Array.from({ length: parseInt(sets) || 5 }, (_, i) => ({
-                    reps: parseInt(reps) || 5,
-                    weight: 0,
-                    rir: undefined,
-                    completed: true
-                  })),
-                  reps: parseInt(reps) || 5,
-                  weight: 0,
-                  notes: exerciseStr.trim(),
-                  weightMode: 'same' as const
-                };
-              });
-              
-              return exercises;
-            } else {
-              console.log(`⚠️ Strength workout "${w.name}" has no strength_exercises or description field`);
-            }
+            // Remove description-based fallback and noisy console; rely on server-computed or explicit strength_exercises only
           }
           
           return [];

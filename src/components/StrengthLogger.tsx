@@ -346,7 +346,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     ]}, */
     'addon_mobility_5.v1': { name: 'Mobility — 5 min (v1)', duration_min: 5, sequence: [
       { move: 'Cat–Cow', time_sec: 60 },
-      { move: 'Child's Pose', time_sec: 60 },
+      { move: "Child's Pose", time_sec: 60 },
       { move: 'Thread the Needle (Left)', time_sec: 60 },
       { move: 'Thread the Needle (Right)', time_sec: 60 },
       { move: 'Seated Forward Fold', time_sec: 60 },
@@ -360,7 +360,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     ]},
     /* 'addon_mobility_10.v1': { name: 'Mobility — 10 min (v1)', duration_min: 10, sequence: [
       { move: 'Cat–Cow', time_sec: 60 },
-      { move: 'Child's Pose', time_sec: 60 },
+      { move: "Child's Pose", time_sec: 60 },
       { move: 'Thread the Needle (Left)', time_sec: 60 },
       { move: 'Thread the Needle (Right)', time_sec: 60 },
       { move: 'Seated Forward Fold', time_sec: 60 },
@@ -377,7 +377,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Hamstring Stretch (supine)', time_sec: 60 },
       { move: '90/90 Hip Switches (controlled)', time_sec: 60 },
       { move: 'Cat–Cow', time_sec: 60 },
-      { move: 'Child's Pose', time_sec: 60 },
+      { move: "Child's Pose", time_sec: 60 },
       { move: 'Seated Forward Fold', time_sec: 60 },
       { move: 'Figure-4 Glute Stretch (each side 30s)', time_sec: 60 },
       { move: 'Seated Spinal Twist (each side 30s)', time_sec: 60 },
