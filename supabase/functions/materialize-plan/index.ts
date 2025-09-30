@@ -284,6 +284,19 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   const discipline = String(row?.type||'').toLowerCase();
   const steps: any[] = [];
+  // Infer session-level swim equipment from tags (e.g., req:board, req:fins, req:buoy, req:snorkel)
+  const inferEquipFromTags = (): string | null => {
+    try {
+      const tags: string[] = Array.isArray((row as any)?.tags) ? (row as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
+      if (!tags.length) return null;
+      if (tags.some(t=>/req:board|\bboard\b/.test(t))) return 'board';
+      if (tags.some(t=>/req:fins|\bfins\b/.test(t))) return 'fins';
+      if (tags.some(t=>/req:buoy|\bbuoy\b/.test(t))) return 'buoy';
+      if (tags.some(t=>/req:snorkel|\bsnorkel\b/.test(t))) return 'snorkel';
+      return null;
+    } catch { return null }
+  };
+  const sessionEquip = inferEquipFromTags();
 
   // Early path: Strength without tokens → expand from strength_exercises so computed is written
   if (discipline === 'strength' && tokens.length === 0) {
@@ -376,7 +389,7 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       // Drill (name first): swim_drill_<name>_4x50yd(_r15)?(_equipment)?
       m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
-        const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
+        const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||sessionEquip||null;
         const distM = unit==='yd'? ydToM(dist) : dist;
         for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
@@ -384,7 +397,7 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       // Drill (count first): swim_drills_6x50yd_fingertipdrag (optional _r15, optional equipment)
       m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
-        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name=m[4].replace(/_/g,' '); const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
+        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name=m[4].replace(/_/g,' '); const rest=parseInt(m[5]||'0',10); const equip=m[6]||sessionEquip||null;
         const distM = unit==='yd'? ydToM(dist) : dist;
         for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
@@ -405,7 +418,7 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       }
       // Pull/Kick sets
       m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
-      if (m) { const kind=m[1]; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const eq=m[6]|| (kind==='pull'?'buoy': (kind==='kick'?'board':null)); const distM=unit==='yd'? ydToM(dist):dist; for(let i=0;i<reps;i++){ steps.push({ id: uid(), kind:'work', distance_m: distM, label:kind, equipment:eq||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); } continue; }
+      if (m) { const kind=m[1]; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const eq=m[6]|| sessionEquip || (kind==='pull'?'buoy': (kind==='kick'?'board':null)); const distM=unit==='yd'? ydToM(dist):dist; for(let i=0;i<reps;i++){ steps.push({ id: uid(), kind:'work', distance_m: distM, label:kind, equipment:eq||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); } continue; }
       // Fallback distance/time
       if (/\d+yd/.test(s)) { const mm=s.match(/(\d+)yd/); const yd=mm?parseInt(mm[1],10):0; const mtr=ydToM(yd); steps.push({ id: uid(), kind:'work', distance_m: mtr }); continue; }
       if (/\d+min/.test(s)) { const sec=minutesTokenToSeconds(s) ?? 600; steps.push({ id: uid(), kind:'work', duration_s: sec }); continue; }

@@ -105,9 +105,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           const n = Number(d1 ?? d2 ?? d3);
           return Number.isFinite(n) && n>0 ? Math.round(n) : undefined;
         })();
-        if (isSwim && typeof distM==='number' && distM>0 && typeof secPer100FromPN==='number') {
-          const sec = (poolUnit==='yd') ? ((distM/0.9144)/100)*secPer100FromPN : ((distM/100)*secPer100FromPN);
-          estTotal += sec;
+        if (isSwim && typeof secPer100FromPN==='number') {
+          if (typeof distM==='number' && distM>0) {
+            const sec = (poolUnit==='yd') ? ((distM/0.9144)/100)*secPer100FromPN : ((distM/100)*secPer100FromPN);
+            estTotal += sec;
+          } else if (typeof distYdRaw==='number' && distYdRaw>0) {
+            // Compute directly from authored yards when distanceMeters is absent
+            const sec = (distYdRaw/100)*secPer100FromPN;
+            estTotal += sec;
+          }
         }
         const pTxt = typeof st?.paceTarget==='string' ? st.paceTarget : undefined;
         const powRange = (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
