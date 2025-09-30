@@ -60,6 +60,35 @@ function pctWeight(oneRm: number | null, pct?: number): number | undefined {
   return Math.max(1, Math.round(oneRm * pct));
 }
 
+function parseWeightInput(input: any, oneRm: number | null): { weight?: number; percent_1rm?: number } {
+  try {
+    if (typeof input === 'number' && isFinite(input) && input >= 0) return { weight: Math.round(input) };
+    const s = String(input || '').trim().toLowerCase();
+    if (!s) return {};
+    if (/(^|\b)(bw|body\s*weight|bodyweight)(\b|$)/.test(s)) return { weight: 0 };
+    // Match "70% 1RM" or "70%" or "0.7" style
+    let m = s.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
+    if (m) {
+      const pct = parseFloat(m[1]) / 100;
+      const w = pctWeight(oneRm, pct);
+      return { weight: w, percent_1rm: pct };
+    }
+    m = s.match(/([0-9]+(?:\.[0-9]+)?)\s*1\s*rm/);
+    if (m) {
+      const pct = parseFloat(m[1]) / 100;
+      const w = pctWeight(oneRm, pct);
+      return { weight: w, percent_1rm: pct };
+    }
+    // Plain number inside string
+    m = s.match(/([0-9]+(?:\.[0-9]+)?)/);
+    if (m) {
+      const n = Math.round(parseFloat(m[1]));
+      if (isFinite(n)) return { weight: n };
+    }
+  } catch {}
+  return {};
+}
+
 function parseIntSafe(s?: string | number | null): number | null { const n = typeof s === 'number' ? s : parseInt(String(s||''), 10); return Number.isFinite(n) ? n : null; }
 
 function uid(): string { try { return crypto.randomUUID(); } catch { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; } }
@@ -194,11 +223,13 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           const name = String(ex?.name||'exercise');
           const reps = (typeof ex?.reps==='number'? ex.reps : undefined);
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
-          const explicitWeight = (typeof ex?.weight==='number'? ex.weight : undefined);
-          const percent = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
           const oneRm = oneRmFromBaselines(baselines as any, name);
-          const prescribed = explicitWeight ?? pctWeight(oneRm, percent);
-          const strength = { name, sets, reps, weight: prescribed, percent_1rm: percent } as any;
+          const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+          const parsed = parseWeightInput((ex as any)?.weight, oneRm);
+          const fromPct = pctWeight(oneRm, percentRaw);
+          const prescribed = (parsed.weight != null ? parsed.weight : (fromPct != null ? fromPct : undefined));
+          const percent_1rm = (percentRaw != null ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
+          const strength = { name, sets, reps, weight: prescribed, percent_1rm } as any;
           steps.push({ id: uid(), kind:'strength', strength });
         }
         continue;
@@ -423,7 +454,7 @@ Deno.serve(async (req) => {
           // Assign stable planned_index per step
           const withIndex = steps.map((st:any, idx:number)=> ({ ...st, planned_index: idx }));
           const v3 = withIndex.map(toV3Step);
-          const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: total_s }, duration: Math.max(1, Math.round(total_s/60)) };
+          const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: total_s }, total_duration_seconds: total_s, duration: Math.max(1, Math.round(total_s/60)) };
           await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
           count += 1;
         }

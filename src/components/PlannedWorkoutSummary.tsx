@@ -89,8 +89,8 @@ function computeMinutes(workout: any, baselines?: Baselines, exportHints?: Expor
     if (Number.isFinite(ts) && ts > 0) return Math.max(1, Math.round(ts / 60));
   } catch {}
   try {
-    // Final fallback: derive from tokens/structure when present
-    const minutes = resolvePlannedDurationMinutes(workout as any, baselines as any, exportHints);
+    // Final fallback: derive from stored totals only (no guessing)
+    const minutes = resolvePlannedDurationMinutes(workout as any);
     if (typeof minutes === 'number' && Number.isFinite(minutes) && minutes > 0) return Math.round(minutes);
   } catch {}
   return null;
@@ -99,6 +99,24 @@ function computeMinutes(workout: any, baselines?: Baselines, exportHints?: Expor
 function computeSwimYards(workout: any): number | null {
   const type = String((workout as any)?.type || '').toLowerCase();
   if (type !== 'swim') return null;
+  // Prefer tokens (authoring unit is yd) to avoid yd→m→yd drift
+  try {
+    const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset : [];
+    if (toks.length) {
+      const toYd = (n: number, unit: string) => unit.toLowerCase() === 'm' ? Math.round(n / 0.9144) : n;
+      let sum = 0;
+      toks.forEach((t) => {
+        const s = String(t).toLowerCase();
+        let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10), m[2]); return; }
+        m = s.match(/swim_drill_[a-z0-9_]+_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
+        m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
+        m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[2], 10) * parseInt(m[3], 10), m[4]); return; }
+        m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
+      });
+      return sum > 0 ? sum : null;
+    }
+  } catch {}
+  // Fallback to computed distances
   try {
     const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
     if (steps.length) {
@@ -107,21 +125,7 @@ function computeSwimYards(workout: any): number | null {
       if (yd > 0) return yd;
     }
   } catch {}
-  try {
-    const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset : [];
-    if (!toks.length) return null;
-    const toYd = (n: number, unit: string) => unit.toLowerCase() === 'm' ? Math.round(n / 0.9144) : n;
-    let sum = 0;
-    toks.forEach((t) => {
-      const s = String(t).toLowerCase();
-      let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10), m[2]); return; }
-      m = s.match(/swim_drill_[a-z0-9_]+_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
-      m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
-      m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[2], 10) * parseInt(m[3], 10), m[4]); return; }
-      m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
-    });
-    return sum > 0 ? sum : null;
-  } catch { return null; }
+  return null;
 }
 
 function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | undefined {
@@ -229,14 +233,31 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   const strengthItems: string[] = (() => {
     if (!isStrength) return [];
     try {
+      // Prefer computed strength steps (server-prescribed)
+      const cSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+      const comp = cSteps.filter(st => String((st as any)?.kind||'').toLowerCase()==='strength').map((st:any)=> st?.strength).filter(Boolean) as any[];
+      const asLines = (arr:any[]) => arr.map((s:any)=>{
+        const name = String(s?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+        const sets = Math.max(1, Number(s?.sets)||1);
+        const repsVal:any = (():any=>{ const r=s?.reps; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
+        const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
+        const wt = (():string|undefined=>{ const w=s?.weight; if (typeof w==='number') return w===0?'BW':`${Math.round(w)} lb`; return undefined; })();
+        return `${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}`;
+      });
+      if (comp.length) return asLines(comp);
+      // Fallback: authored exercises
       const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
       if (!ex.length) return [];
-      return ex.map((e:any) => {
+      return ex.map((e:any)=>{
+        const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
         const sets = Math.max(1, Number(e?.sets)||1);
         const repsVal:any = (():any=>{ const r=e?.reps||e?.rep; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
         const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
-        const wt = (typeof e?.weight==='number' && isFinite(e.weight)) ? `${Math.round(e.weight)} lb` : undefined;
-        const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+        const wt = (():string|undefined=>{
+          if (typeof e?.weight==='number') return e.weight===0?'BW':`${Math.round(e.weight)} lb`;
+          if (typeof e?.weight==='string' && e.weight.trim()) return e.weight.trim();
+          return undefined;
+        })();
         return `${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}`;
       });
     } catch { return []; }
