@@ -146,6 +146,8 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
     // Strip new authoring metadata before schema validate; will reattach after
     if (typeof out.baselines_required !== 'undefined') delete out.baselines_required;
     if (typeof out.units !== 'undefined') delete out.units;
+    // Strip normalization tag; not part of universal schema
+    if (typeof out.normalization_version !== 'undefined') delete out.normalization_version;
     if (typeof out.adaptive_scaling !== 'undefined') delete out.adaptive_scaling;
     if (typeof out.progression_rules !== 'undefined') delete out.progression_rules;
     if (typeof out.volume_distribution !== 'undefined') delete out.volume_distribution;
