@@ -216,8 +216,11 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       steps.push({ id: uid(), kind:'work', duration_s: 300 });
       continue;
     } else if (discipline==='strength') {
-      // Expand strength_exercises into steps if provided
-      const exs: any[] = Array.isArray((row as any)?.strength_exercises) ? (row as any).strength_exercises : [];
+      // Expand strength_exercises into steps if provided (supports stringified JSON)
+      const rawStrength: any = (row as any)?.strength_exercises;
+      const exs: any[] = Array.isArray(rawStrength)
+        ? rawStrength
+        : (typeof rawStrength === 'string' ? (()=>{ try { return JSON.parse(rawStrength); } catch { return []; } })() : []);
       if (exs.length) {
         for (const ex of exs) {
           const name = String(ex?.name||'exercise');
