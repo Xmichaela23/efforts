@@ -320,6 +320,43 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
     steps.push({ id: uid(), kind:'strength', strength: { name: 'strength block' } });
     return { steps, total_s: 0 };
   }
+
+  // Strength WITH tokens: expand authored strength_exercises ONCE (not per-token)
+  // Tokens are used for UI copy; the load prescription comes from strength_exercises.
+  // Avoid the per-token duplication by handling this branch before iterating tokens.
+  if (discipline === 'strength' && tokens.length > 0) {
+    try {
+      const rawStrength: any = (row as any)?.strength_exercises;
+      const exs: any[] = Array.isArray(rawStrength)
+        ? rawStrength
+        : (typeof rawStrength === 'string' ? (()=>{ try { return JSON.parse(rawStrength); } catch { return []; } })() : []);
+      if (exs.length) {
+        for (const ex of exs) {
+          const name = String(ex?.name||'exercise');
+          const reps = (typeof ex?.reps==='number'? ex.reps : (typeof ex?.reps==='string'? ex.reps : undefined));
+          const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
+          const pick = pickPrimary1RMAndBase(name, baselines as any);
+          const base1RM = pick.base;
+          const ratio = pick.ratio;
+          const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+          const parsed = parseWeightInput((ex as any)?.weight, base1RM);
+          let prescribed: number | undefined = undefined;
+          if (parsed.weight != null) prescribed = parsed.weight;
+          else if (base1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
+            const scaled = base1RM * ratio * (percentRaw as number) * repScaleFor(typeof reps==='number'? reps : undefined);
+            prescribed = round5(scaled);
+          }
+          const percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
+          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from: pick.ref || undefined } as any;
+          steps.push({ id: uid(), kind:'strength', strength });
+        }
+        return { steps, total_s: 0 };
+      }
+    } catch {}
+    // Fallback placeholder if no details present
+    steps.push({ id: uid(), kind:'strength', strength: { name: 'strength block' } });
+    return { steps, total_s: 0 };
+  }
   for (const tok of tokens) {
     let added: any[] = [];
     if (discipline==='run' || discipline==='walk') added = expandRunToken(tok, baselines);
@@ -351,6 +388,13 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         for(let i=0;i<reps;i++){ steps.push({ id: uid(), kind:'work', distance_m: distM, label:'aerobic' }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
       }
+      // Threshold sets: swim_threshold_8x100yd(_r10)?
+      m = s.match(/swim_threshold_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/);
+      if (m) {
+        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const rest=parseInt(m[4]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
+        for(let i=0;i<reps;i++){ steps.push({ id: uid(), kind:'work', distance_m: distM, label:'threshold' }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        continue;
+      }
       // Pull/Kick sets
       m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) { const kind=m[1]; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const eq=m[6]|| (kind==='pull'?'buoy': (kind==='kick'?'board':null)); const distM=unit==='yd'? ydToM(dist):dist; for(let i=0;i<reps;i++){ steps.push({ id: uid(), kind:'work', distance_m: distM, label:kind, equipment:eq||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); } continue; }
@@ -358,32 +402,6 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       if (/\d+yd/.test(s)) { const mm=s.match(/(\d+)yd/); const yd=mm?parseInt(mm[1],10):0; const mtr=ydToM(yd); steps.push({ id: uid(), kind:'work', distance_m: mtr }); continue; }
       if (/\d+min/.test(s)) { const sec=minutesTokenToSeconds(s) ?? 600; steps.push({ id: uid(), kind:'work', duration_s: sec }); continue; }
       steps.push({ id: uid(), kind:'work', duration_s: 300 });
-      continue;
-    } else if (discipline==='strength') {
-      // Expand strength_exercises into steps if provided (supports stringified JSON)
-      const rawStrength: any = (row as any)?.strength_exercises;
-      const exs: any[] = Array.isArray(rawStrength)
-        ? rawStrength
-        : (typeof rawStrength === 'string' ? (()=>{ try { return JSON.parse(rawStrength); } catch { return []; } })() : []);
-      if (exs.length) {
-        for (const ex of exs) {
-          const name = String(ex?.name||'exercise');
-          const reps = (typeof ex?.reps==='number'? ex.reps : undefined);
-          const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
-          const oneRm = oneRmFromBaselines(baselines as any, name);
-          const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
-          const parsed = parseWeightInput((ex as any)?.weight, oneRm);
-          const fromPct = pctWeight(oneRm, percentRaw);
-          const prescribed = (parsed.weight != null ? parsed.weight : (fromPct != null ? fromPct : undefined));
-          const percent_1rm = (percentRaw != null ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
-          const strength = { name, sets, reps, weight: prescribed, percent_1rm } as any;
-          steps.push({ id: uid(), kind:'strength', strength });
-        }
-        continue;
-      }
-      // placeholder if no details
-      // No fixed duration requirement for strength; include a generic strength block
-      steps.push({ id: uid(), kind:'strength', strength: { name: 'strength block' } });
       continue;
     }
     steps.push(...added);

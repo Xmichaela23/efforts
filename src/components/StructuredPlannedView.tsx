@@ -148,7 +148,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           pieces.push(st.label);
         }
         const ln = pieces.join(' ') + equip;
-        lines.push(ln || 'step');
+        if (ln && ln.trim().length > 0) {
+          lines.push(ln);
+        }
       });
       if (isSwim) {
         // prefer baseline-estimated duration when available, else timed steps sum
