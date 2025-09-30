@@ -280,6 +280,47 @@ Deno.serve(async (req) => {
       plannedByKey.set(`${String(p.date)}|${String(p.type).toLowerCase()}`, p);
     }
 
+    // Derive brick group info in-memory (no schema change):
+    // Pair same-day sessions tagged with 'brick' across endurance types.
+    const brickMetaByPlannedId = new Map<string, { group_id: string; order: number }>();
+    try {
+      const byDate: Record<string, any[]> = {};
+      for (const p of Array.isArray(plannedRows) ? plannedRows : []) {
+        const tags: string[] = Array.isArray((p as any)?.tags) ? (p as any).tags : [];
+        const isBrick = tags.some((t) => String(t).toLowerCase() === 'brick');
+        const t = String((p as any)?.type || '').toLowerCase();
+        const isEndurance = t === 'run' || t === 'ride' || t === 'walk';
+        if (isBrick && isEndurance) {
+          const date = String((p as any)?.date).slice(0, 10);
+          if (!byDate[date]) byDate[date] = [];
+          byDate[date].push(p);
+        }
+      }
+      Object.entries(byDate).forEach(([date, arr]) => {
+        // Stable order: created_at then id then type (bike first if available)
+        const sorted = [...arr].sort((a: any, b: any) => {
+          const ca = String(a.created_at || '');
+          const cb = String(b.created_at || '');
+          if (ca !== cb) return ca.localeCompare(cb);
+          // Prefer bike before run when equal
+          const ta = String(a.type || '').toLowerCase();
+          const tb = String(b.type || '').toLowerCase();
+          if (ta !== tb) return ta === 'ride' ? -1 : 1;
+          return String(a.id).localeCompare(String(b.id));
+        });
+        // Pair in twos
+        for (let i = 0, pair = 1; i < sorted.length; i += 2, pair += 1) {
+          const p1 = sorted[i];
+          const p2 = sorted[i + 1];
+          if (!p1 || !p2) break; // odd count → ignore last
+          const gid = `${date}|brick|${pair}`;
+          // Assign order by sorted index
+          brickMetaByPlannedId.set(String(p1.id), { group_id: gid, order: 1 });
+          brickMetaByPlannedId.set(String(p2.id), { group_id: gid, order: 2 });
+        }
+      });
+    } catch {}
+
     const unify = (w:any) => {
       const date = String(w.date).slice(0,10);
       const type = String(w.type).toLowerCase();
@@ -304,6 +345,8 @@ Deno.serve(async (req) => {
           workout_structure: (p as any)?.workout_structure ?? null,
           friendly_summary: (p as any)?.friendly_summary ?? null,
           rendered_description: (p as any)?.rendered_description ?? null,
+          brick_group_id: (brickMetaByPlannedId.get(String(p.id))||null)?.group_id || null,
+          brick_order: (brickMetaByPlannedId.get(String(p.id))||null)?.order || null,
         };
       }
       // executed snapshot from columns that exist
@@ -403,6 +446,8 @@ Deno.serve(async (req) => {
           workout_structure: (p as any)?.workout_structure ?? null,
           friendly_summary: (p as any)?.friendly_summary ?? null,
           rendered_description: (p as any)?.rendered_description ?? null,
+          brick_group_id: (brickMetaByPlannedId.get(String(p.id))||null)?.group_id || null,
+          brick_order: (brickMetaByPlannedId.get(String(p.id))||null)?.order || null,
         } as any;
         // Planned-only items must always be 'planned' since no workouts row exists for this date/type
         const it = { id: String(p.id), date: String(p.date).slice(0,10), type: String(p.type).toLowerCase(), status: 'planned', planned, executed: null };
