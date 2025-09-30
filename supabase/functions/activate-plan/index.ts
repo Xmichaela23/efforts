@@ -212,6 +212,14 @@ Deno.serve(async (req) => {
       baselines = (ub?.performance_numbers || {}) as any
     } catch {}
 
+    // Determine swim defaults from plan config
+    const swimUnit: 'yd'|'m' = ((): 'yd'|'m' => {
+      const u = String(plan?.config?.swim_unit || plan?.config?.swimUnit || '').toLowerCase();
+      if (u === 'm' || u === 'meter' || u === 'metres' || u === 'metre') return 'm';
+      return 'yd';
+    })();
+    const defaultPoolLenM = swimUnit === 'yd' ? 22.86 : 25.0;
+
     for (const wk of Object.keys(sessionsByWeek)) {
       const weekNum = parseInt(wk, 10)
       const sessions = Array.isArray(sessionsByWeek[wk]) ? sessionsByWeek[wk] : []
@@ -296,6 +304,18 @@ Deno.serve(async (req) => {
           tags: Array.isArray(s?.tags) ? s.tags : (Array.isArray(s?.optional) && s.optional ? ['optional'] : []),
           // Include authored structured workout when present so server materializer can expand it
           workout_structure: (s as any)?.workout_structure && typeof (s as any).workout_structure === 'object' ? (s as any).workout_structure : null,
+        }
+        // Persist authored swim unit on each swim row so rendering/materialization honors yards vs meters
+        if (mapped === 'swim') {
+          // If tokens explicitly indicate 50 m pool, prefer that length
+          const joined = stepsTokens.join(' ').toLowerCase();
+          let poolLen = defaultPoolLenM;
+          let unit: 'yd'|'m' = swimUnit;
+          if (/\b50m\b/.test(joined)) { unit = 'm'; poolLen = 50.0; }
+          if (/\b25m\b/.test(joined)) { unit = 'm'; poolLen = 25.0; }
+          if (/\b25\s*yd\b/.test(joined)) { unit = 'yd'; poolLen = 22.86; }
+          baseRow.pool_unit = unit;
+          baseRow.pool_length_m = poolLen;
         }
         if (mapped === 'strength') {
           // Prefer authored strength_exercises when provided; else derive from tokens

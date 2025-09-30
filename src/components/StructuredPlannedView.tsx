@@ -422,29 +422,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     }
   };
 
-  // Persist default pool setting based on user preference when missing
-  useEffect(() => {
-    (async () => {
-      try {
-        const isSwim = String((workout as any)?.type || '').toLowerCase() === 'swim';
-        if (!isSwim) return;
-        const missing = (poolUnit == null && poolLenM == null);
-        if (!missing) return;
-        const baselines = await loadUserBaselines?.();
-        const units = String(baselines?.units || 'imperial').toLowerCase();
-        const def = units === 'metric' ? { pool_unit: 'm', pool_length_m: 25.0 } : { pool_unit: 'yd', pool_length_m: 22.86 };
-        setSavingPool(true);
-        await supabase
-          .from('planned_workouts')
-          .update(def as any)
-          .eq('id', (workout as any)?.id);
-        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-        setAutoDefaulted(true);
-      } catch {}
-      finally { setSavingPool(false); }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [(workout as any)?.id]);
+  // Removed: client-side defaulting of pool settings to avoid flicker; rely on activation.
 
   const setPool = async (unit: 'yd' | 'm' | null, lengthM: number | null) => {
     try {
