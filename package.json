@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "bake": "node scripts/bake-one.mjs",
-    "bake:all": "node scripts/bake-all.mjs"
+    "bake:all": "node scripts/bake-all.mjs",
+    "plan:validate": "node scripts/validate-plan.mjs",
+    "plan:minify": "node scripts/plan-minify.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -94,7 +96,5 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1"
-    "plan:validate": "node scripts/validate-plan.mjs",
-    "plan:minify": "node scripts/plan-minify.mjs"
   }
 }
