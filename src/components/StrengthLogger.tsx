@@ -684,7 +684,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (plannedStrength && Array.isArray(plannedStrength?.planned?.steps)) {
             const computedLike = { steps: plannedStrength.planned.steps, total_duration_seconds: plannedStrength.planned.total_duration_seconds };
             const exs = parseFromComputed(computedLike);
-            if (exs.length) { setExercises(prev=> prev.length? prev: exs); return; }
+            if (exs.length) { setExercises(exs); return; }
           }
         } catch {}
         // DB planned_workouts row
@@ -700,7 +700,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (!data) return;
         if ((data as any)?.computed && Array.isArray((data as any).computed?.steps)) {
           const exs = parseFromComputed((data as any).computed);
-          if (exs.length) { setExercises(prev=> prev.length? prev: exs); return; }
+          if (exs.length) { setExercises(exs); return; }
         }
       } catch {}
     })();
