@@ -11,8 +11,23 @@ type StructuredPlannedViewProps = {
 };
 
 const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, showHeader = true, onEdit, onComplete }) => {
-  const hasStructured = !!((workout as any)?.workout_structure && typeof (workout as any).workout_structure === 'object');
-  const hasComputedV3 = Array.isArray((workout as any)?.computed?.steps) && (workout as any).computed.steps.length > 0;
+  // Normalize possibly stringified JSON blobs from planned_workouts
+  const computedAny: any = (() => {
+    try {
+      const c = (workout as any)?.computed;
+      if (typeof c === 'string') return JSON.parse(c);
+      return c || null;
+    } catch { return (workout as any)?.computed || null; }
+  })();
+  const structureAny: any = (() => {
+    try {
+      const ws = (workout as any)?.workout_structure;
+      if (typeof ws === 'string') return JSON.parse(ws);
+      return ws || null;
+    } catch { return (workout as any)?.workout_structure || null; }
+  })();
+  const hasStructured = !!(structureAny && typeof structureAny === 'object');
+  const hasComputedV3 = Array.isArray(computedAny?.steps) && computedAny.steps.length > 0;
 
   if (!hasStructured && !hasComputedV3) {
     return (
@@ -23,7 +38,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   }
 
   // Structured-only renderer
-  const ws: any = (workout as any).workout_structure || {};
+  const ws: any = structureAny || {};
   const { loadUserBaselines } = useAppContext?.() || ({} as any);
   const [ctxPN, setCtxPN] = useState<any | null>(null);
   const [savingPool, setSavingPool] = useState<boolean>(false);
@@ -82,7 +97,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   } catch {}
   // Prefer server-computed v3 steps when present
   try {
-    const v3: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+    const v3: any[] = Array.isArray(computedAny?.steps) ? computedAny.steps : [];
     const parentDiscV3 = String((workout as any)?.type||'').toLowerCase();
     if (v3.length) {
       const fmtDur = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
