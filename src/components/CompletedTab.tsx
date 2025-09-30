@@ -1075,22 +1075,32 @@ const formatPace = (paceValue: any): string => {
   const formatPoolLengthLabel = (): string => {
     const L = inferPoolLengthMeters();
     if (!L) return 'N/A';
-    // Honor user unit preference: display yd when imperial
-    try {
-      // useAppContext may already be in scope; if not, this block is harmless
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
-      if (typeof useImperial === 'boolean' && useImperial === true) {
-        return `${Math.round(L / 0.9144)} yd`;
+    // Snap to canonical pool lengths, displaying true reference labels
+    // Yard candidates (meters): 25 yd = 22.86, 50 yd = 45.72
+    const yardCandidates = [
+      { m: 22.86, label: '25 yd' },
+      { m: 45.72, label: '50 yd' }
+    ];
+    // Metric candidates (meters): 25 m, 33.33 m, 50 m
+    const metricCandidates = [
+      { m: 25.0, label: '25 m' },
+      { m: 33.33, label: '33.33 m' },
+      { m: 50.0, label: '50 m' }
+    ];
+    const pickNearest = (cands: Array<{ m: number; label: string }>): string => {
+      let best = cands[0];
+      let bestDelta = Math.abs(L - best.m);
+      for (let i = 1; i < cands.length; i += 1) {
+        const d = Math.abs(L - cands[i].m);
+        if (d < bestDelta) { best = cands[i]; bestDelta = d; }
       }
-    } catch {}
+      return best.label;
+    };
     const yardPool = isYardPool();
-    if (yardPool === true) return `${Math.round(L / 0.9144)} yd`;
-    const candidates = [25, 50, 33.33];
-    let best = L; let label = `${Math.round(L)} m`;
-    for (const c of candidates) {
-      if (Math.abs(L - c) < Math.abs(best - (typeof best === 'number' ? best : c))) { best = c; label = `${c} m`; }
-    }
-    return label;
+    if (yardPool === true) return pickNearest(yardCandidates);
+    if (yardPool === false) return pickNearest(metricCandidates);
+    // Unknown: choose the nearest across both sets
+    return pickNearest([...yardCandidates, ...metricCandidates]);
   };
 
   const formatMetersCompact = (m: number | null | undefined): string => {
