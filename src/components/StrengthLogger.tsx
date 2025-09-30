@@ -299,7 +299,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Lateral Lunges (alternating)', time_sec: 60 },
       { move: 'Leg Swings (front/back, each side 30s)', time_sec: 60 },
       { move: 'Arm Crosses + Overheads', time_sec: 60 },
-      { move: 'World’s Greatest Stretch (alternating)', time_sec: 60 },
+      { move: 'World's Greatest Stretch (alternating)', time_sec: 60 },
       { move: 'Knee Hugs (walk-in-place)', time_sec: 60 },
       { move: 'Calf Raises (tempo)', time_sec: 60 },
       { move: 'Hip Airplanes (hands on hips)', time_sec: 60 },
@@ -346,7 +346,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     ]}, */
     'addon_mobility_5.v1': { name: 'Mobility — 5 min (v1)', duration_min: 5, sequence: [
       { move: 'Cat–Cow', time_sec: 60 },
-      { move: 'Child’s Pose', time_sec: 60 },
+      { move: 'Child's Pose', time_sec: 60 },
       { move: 'Thread the Needle (Left)', time_sec: 60 },
       { move: 'Thread the Needle (Right)', time_sec: 60 },
       { move: 'Seated Forward Fold', time_sec: 60 },
@@ -360,7 +360,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     ]},
     /* 'addon_mobility_10.v1': { name: 'Mobility — 10 min (v1)', duration_min: 10, sequence: [
       { move: 'Cat–Cow', time_sec: 60 },
-      { move: 'Child’s Pose', time_sec: 60 },
+      { move: 'Child's Pose', time_sec: 60 },
       { move: 'Thread the Needle (Left)', time_sec: 60 },
       { move: 'Thread the Needle (Right)', time_sec: 60 },
       { move: 'Seated Forward Fold', time_sec: 60 },
@@ -372,12 +372,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     ]},
     'addon_mobility_10.v2': { name: 'Mobility — 10 min (v2)', duration_min: 10, sequence: [
       { move: 'Plank to Down Dog', time_sec: 60 },
-      { move: 'World’s Greatest Stretch (alternating)', time_sec: 60 },
+      { move: 'World's Greatest Stretch (alternating)', time_sec: 60 },
       { move: 'Half-Kneeling Hip Flexor Stretch (each side 30s)', time_sec: 60 },
       { move: 'Hamstring Stretch (supine)', time_sec: 60 },
       { move: '90/90 Hip Switches (controlled)', time_sec: 60 },
       { move: 'Cat–Cow', time_sec: 60 },
-      { move: 'Child’s Pose', time_sec: 60 },
+      { move: 'Child's Pose', time_sec: 60 },
       { move: 'Seated Forward Fold', time_sec: 60 },
       { move: 'Figure-4 Glute Stretch (each side 30s)', time_sec: 60 },
       { move: 'Seated Spinal Twist (each side 30s)', time_sec: 60 },
@@ -448,9 +448,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     'Hanging Knee Raise', 'Hanging Leg Raise', 'Toes-to-Bar', 'Hanging Windshield Wipers',
     'Stability Ball Rollout', 'Stir the Pot', 'TRX Fallout', 'Ab Wheel Rollout',
     'Russian Twist', 'Cable Woodchopper', 'Landmine Twist', 'Pallof Press',
-    'Farmer’s Carry', 'Suitcase Carry', 'Overhead Carry',
+    'Farmer's Carry', 'Suitcase Carry', 'Overhead Carry',
     'Superman Hold', 'Back Extension', 'Hip Extension', 'Glute Bridge March', 'Reverse Hyperextension',
-    'Cable Crunch', 'Ab Machine Crunch', "Captain’s Chair Knee Raise", 'Roman Chair Sit-Up', 'GHD Sit-Up'
+    'Cable Crunch', 'Ab Machine Crunch', "Captain's Chair Knee Raise", 'Roman Chair Sit-Up', 'GHD Sit-Up'
   ];
 
 
@@ -624,43 +624,99 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (!steps.length) return [];
       const byName: Record<string, LoggedExercise> = {};
       const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
-      const isWarm = (n:string)=>/warm[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*up/i.test(n);
-      const isCool = (n:string)=>/cool[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*down/i.test(n);
-      const isBodyweight = (n:string)=>/(pull\-?ups|chin\-?ups|push\-?ups|dips|plank|sit\-?ups|burpees|hollow|superman)/i.test(n);
-      const isAccessoryCore = (n:string)=>/(rollout|plank|carry|crunch|twist|woodchopper|stir\s*the\s*pot|pallof|hanging|toe\s*\-?s*to|flutter\s*kicks|scissor\s*kicks|superman|back\s*extension|hip\s*extension|glute\s*bridge|reverse\s*hyper|ab\s*wheel|side\s*plank|copenhagen)/i.test(n);
-      const pctOf = (name: string, pct?: number): number => {
-        if (!pct || !performanceNumbers) return 0;
-        const t = name.toLowerCase();
-        const one = t.includes('deadlift') ? performanceNumbers?.deadlift
-                  : t.includes('bench') ? performanceNumbers?.bench
-                  : t.includes('overhead') || t.includes('ohp') ? (performanceNumbers?.overhead || performanceNumbers?.overheadPress1RM)
-                  : t.includes('squat') ? performanceNumbers?.squat
-                  : undefined;
-        if (typeof one !== 'number') return 0;
-        return round5(one * (pct/100));
-      };
       for (const st of steps) {
-        const isStrength = String(st?.type||'').toLowerCase()==='strength_work' || !!st?.exercise;
-        if (!isStrength) continue;
-        const name = (st.exercise || st.exercise_name || st.name || '').toString().trim();
+        const s = st?.strength || {};
+        const name = String(s?.name || '').trim();
         if (!name) continue;
-        // Skip warm-up / cool-down entries in strength logger
-        if (isWarm(name) || isCool(name)) continue;
-        if (isAccessoryCore(name)) continue; // do not auto-prefill accessory/core work
-        const reps = Number(st.reps) || 0;
-        let pct: number | undefined;
-        const inten = String(st.intensity||st.target||'');
-        const m = inten.match(/(\d{1,3})\s*%/);
-        if (m) pct = parseInt(m[1],10);
-        const weight = isBodyweight(name) ? 0 : (pct ? pctOf(name, pct) : (Number(st.weight)||0));
+        const repsRaw: any = s?.reps;
+        const reps = typeof repsRaw === 'number' ? Math.max(0, Math.round(repsRaw)) : 0;
+        const isAmrap = typeof repsRaw === 'string' && /amrap/i.test(repsRaw);
+        const weightNum = typeof s?.weight === 'number' ? round5(s.weight) : 0;
+        const sets = Number(s?.sets) || 0;
         if (!byName[name]) {
-          byName[name] = { id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`, name, expanded: true, sets: [] } as LoggedExercise;
+          byName[name] = {
+            id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            name,
+            expanded: true,
+            sets: [] as LoggedSet[],
+            timer: 90,
+            unit: 'lb',
+            notes: '',
+            rir: null,
+          } as LoggedExercise;
         }
-        byName[name].sets.push({ reps, weight: weight||0, barType: 'standard', rir: undefined, completed: false });
+        const targetSets = Math.max(1, sets);
+        for (let i=0;i<targetSets;i+=1) {
+          byName[name].sets.push({
+            reps: isAmrap ? 0 : reps,
+            weight: weightNum,
+            rir: null,
+            done: false,
+            amrap: isAmrap === true,
+          } as any);
+        }
       }
-      const all = Object.values(byName);
-      return all; // warm/cool removed from logger
+      return Object.values(byName);
     } catch { return []; }
+  };
+
+  useEffect(() => {
+    try {
+      // prefer scheduledWorkout.computed
+      const comp = (scheduledWorkout as any)?.computed;
+      if (comp && Array.isArray(comp?.steps)) {
+        const exs = parseFromComputed(comp);
+        if (exs.length) { setExercises(exs); setIsInitialized(true); return; }
+      }
+    } catch {}
+
+    setIsInitialized(true);
+    (async () => {
+      try {
+        const date = targetDate || getStrengthLoggerDateString();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        // Unified feed → computed-like
+        try {
+          const { data: unified } = await (supabase.functions.invoke as any)('get-week', { body: { from: date, to: date } });
+          const items: any[] = Array.isArray((unified as any)?.items) ? (unified as any).items : [];
+          const plannedStrength = items.find((it:any)=> !!it?.planned && String(it?.type||'').toLowerCase()==='strength');
+          if (plannedStrength && Array.isArray(plannedStrength?.planned?.steps)) {
+            const computedLike = { steps: plannedStrength.planned.steps, total_duration_seconds: plannedStrength.planned.total_duration_seconds };
+            const exs = parseFromComputed(computedLike);
+            if (exs.length) { setExercises(prev=> prev.length? prev: exs); return; }
+          }
+        } catch {}
+        // DB planned_workouts row
+        const { data } = await supabase
+          .from('planned_workouts')
+          .select('computed')
+          .eq('user_id', user.id)
+          .eq('date', date)
+          .eq('type', 'strength')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!data) return;
+        if ((data as any)?.computed && Array.isArray((data as any).computed?.steps)) {
+          const exs = parseFromComputed((data as any).computed);
+          if (exs.length) { setExercises(prev=> prev.length? prev: exs); return; }
+        }
+      } catch {}
+    })();
+  }, [scheduledWorkout, targetDate]);
+
+  const prefillFromPlanned = (row: any) => {
+    try {
+      try { clearSessionProgress(); } catch {}
+      setLockManualPrefill(false);
+      setLockManualPrefill(true);
+      if (row?.computed?.steps && Array.isArray(row.computed.steps)) {
+        const exs = parseFromComputed(row.computed);
+        if (exs.length) { setExercises(exs); return; }
+      }
+      // No computed available → do nothing (no fallback)
+    } catch {}
   };
 
   // Utility to ensure warm-up → main → cooldown ordering anytime we mutate exercises
@@ -1089,72 +1145,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const we = addDaysYmd(weekStart, 6);
     return iso >= ws && iso <= we;
   };
-
-  const prefillFromPlanned = (row: any) => {
-    try {
-      console.log('🔧 prefillFromPlanned called with row:', row);
-      // Clear any saved session so planned prefill isn't overridden by restore
-      try { clearSessionProgress(); } catch {}
-      setLockManualPrefill(false);
-      setLockManualPrefill(true);
-      
-      if (row?.computed?.steps && Array.isArray(row.computed.steps)){
-        console.log('📊 Found computed steps, parsing...', row.computed.steps);
-        const exs = parseFromComputed(row.computed);
-        console.log('📊 Parsed exercises from computed:', exs);
-        if (exs.length) { 
-          setExercises(exs); 
-          console.log('✅ Set exercises from computed steps');
-          return; 
-        }
-      }
-      
-      const se = Array.isArray(row?.strength_exercises)? row.strength_exercises : [];
-      console.log('📊 Found strength_exercises:', se);
-      if (se.length){
-        const mapped: LoggedExercise[] = se.map((exercise: any, index: number) => ({
-          id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-          name: exercise.name || '',
-          expanded: true,
-          sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
-        }));
-        console.log('📊 Mapped strength exercises:', mapped);
-        setExercises(mapped);
-        console.log('✅ Set exercises from strength_exercises');
-        return;
-      } else {
-        console.log('⚠️ No strength_exercises found in row');
-      }
-
-      // Fallback: parse from steps_preset / descriptions if available
-      try {
-        const stepsArr: string[] = Array.isArray((row as any).steps_preset) ? (row as any).steps_preset : [];
-        const viaTokens = parseStepsPreset(stepsArr);
-        const src = (row as any).rendered_description || (row as any).description || '';
-        const parsed = viaTokens.length>0 ? viaTokens : parseStrengthDescription(src);
-        const orOpts = extractOrOptions(src);
-        if (parsed.length > 0) {
-          console.log('📝 Parsed exercises from planned description/steps');
-          setExercises(parsed);
-          if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
-          return;
-        }
-      } catch {}
-    } catch (error) {
-      console.error('❌ Error in prefillFromPlanned:', error);
-    }
-  };
-
-  // Cleanup when component unmounts
-  useEffect(() => {
-    return () => {
-      console.log('🧹 StrengthLogger cleanup - saving session progress');
-      // Save current progress before unmounting
-      if (exercises.length > 0) {
-        saveSessionProgress(exercises, attachedAddons, notesText, notesRpe);
-      }
-    };
-  }, []); // Empty dependency array - only run on mount/unmount
 
   const togglePlateCalc = (exerciseId: string, setIndex: number) => {
     const key = `${exerciseId}-${setIndex}`;
