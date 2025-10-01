@@ -142,6 +142,11 @@ function derivePlannedCellLabel(w: any): string | null {
       return `SM ${durStr}`.trim();
     }
 
+    // MOBILITY / PT
+    if (type === 'mobility') {
+      return `MBL`.trim();
+    }
+
     // STRENGTH (apply mixed rule priority: Compounds > Accessory > Core)
     if (type === 'strength') {
       // Prefer minutes from steps token strength_main_XXmin over row.duration (which may reflect multi-session day totals)

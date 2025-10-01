@@ -97,16 +97,19 @@ export default function PTPlanBuilderPage() {
       }));
       await addPlannedWorkout({
         name: planName || 'PT/Mobility Session',
-        type: 'strength',
+        type: 'mobility',
         date,
         duration: 0,
         description: 'PT/Mobility session',
-        strength_exercises: items.map((it) => ({ name: it.name, sets: it.sets || 0, reps: it.reps || 0, weight: it.weight || 0 })),
+        intervals: [],
+        strength_exercises: [],
+        mobility_exercises,
         workout_status: 'planned',
         source: 'manual',
       } as any);
     }
     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
     alert(`Added ${dates.length} planned sessions`);
     history.back();
   };
