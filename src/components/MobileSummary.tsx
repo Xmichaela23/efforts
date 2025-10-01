@@ -1076,32 +1076,25 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             return s > 0 ? s : null;
           })();
 
+          // Planned and executed session-averaged pace (strict, totals-based)
           const plannedPaceSecPerMi = (() => {
-            const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
-            // look for explicit pace_range midpoint or pace_sec_per_mi from any work step
-            for (const st of arr) {
-              const kind = String(st?.kind || st?.type || '').toLowerCase();
-              if (kind === 'recovery' || kind === 'rest') continue;
-              if (Array.isArray(st?.pace_range) && st.pace_range.length === 2) {
-                const a = Number(st.pace_range[0]); const b = Number(st.pace_range[1]);
-                if (Number.isFinite(a) && Number.isFinite(b) && a>0 && b>0) return Math.round((a + b) / 2);
-              }
-              const p = Number(st?.pace_sec_per_mi);
-              if (Number.isFinite(p) && p > 0) return p;
-              // New: parse textual pace targets like "10:30/mi" or "4:20/km"
-              try {
-                const txt = String(st?.paceTarget || st?.target_pace || st?.pace || '').trim();
-                if (txt) {
-                  let m = txt.match(/(\d{1,2}):(\d{2})\s*\/(mi|mile)/i);
-                  if (m) {
-                    const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); if (sec>0) return sec;
-                  }
-                  m = txt.match(/(\d{1,2}):(\d{2})\s*\/km/i);
-                  if (m) {
-                    const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); if (sec>0) return Math.round(sec * 1.60934);
-                  }
-                }
-              } catch {}
+            const secondsTotal = (() => {
+              const t = Number((effectivePlanned as any)?.computed?.total_duration_seconds);
+              if (Number.isFinite(t) && t>0) return t;
+              const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              if (!arr.length) return null;
+              const s = arr.reduce((sum:number, st:any)=> sum + (Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0), 0);
+              return s>0 ? s : null;
+            })();
+            const metersTotal = (() => {
+              const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              if (!arr.length) return null;
+              let m = 0; for (const st of arr) { const dm = Number(st?.distanceMeters || st?.distance_m || st?.m || 0); if (Number.isFinite(dm) && dm>0) m += dm; }
+              return m>0 ? m : null;
+            })();
+            if (Number.isFinite(secondsTotal as any) && Number.isFinite(metersTotal as any) && (metersTotal as number) > 0) {
+              const miles = (metersTotal as number) / 1609.34;
+              if (miles > 0.01) return Math.round((secondsTotal as number) / miles);
             }
             return null;
           })();
@@ -1133,7 +1126,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           })();
           const executedSecPerMi = (() => {
             const v = Number(compOverall?.avg_pace_s_per_mi);
-            if (Number.isFinite(v) && v>0) return v;
+            if (Number.isFinite(v) && v>0) return v>1200 ? Math.round(v/10) : v;
             if (executedSeconds && executedMeters) {
               const miles = executedMeters / 1609.34; if (miles>0.01) return Math.round(executedSeconds / miles);
             }
