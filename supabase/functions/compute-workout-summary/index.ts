@@ -354,15 +354,15 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { 'Access-Control-Allow-Origin': '*' } });
 
   try {
-    try { console.error('POST REQUEST RECEIVED'); } catch {}
+    try { console.error('[compute] POST RECEIVED'); } catch {}
     const { workout_id } = await req.json();
-    try { console.error('PARSED JSON, workout_id:', workout_id); } catch {}
+    try { console.error('[compute] INPUT workout_id:', workout_id); } catch {}
     if (!workout_id) {
       return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
     }
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
-    try { console.error('SUPABASE CLIENT CREATED'); } catch {}
+    try { console.error('[compute] SUPABASE CLIENT CREATED'); } catch {}
 
     // Load workout + planned link
     const { data: w } = await supabase
@@ -370,7 +370,7 @@ Deno.serve(async (req) => {
       .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time')
       .eq('id', workout_id)
       .maybeSingle();
-    try { console.error('DATABASE QUERY COMPLETE, workout found:', !!w); } catch {}
+    try { console.error('[compute] WORKOUT LOAD ok:', !!w, 'planned_id:', (w as any)?.planned_id, 'type:', (w as any)?.type); } catch {}
 
     if (!w) {
       return new Response(JSON.stringify({ error:'workout not found' }), { status:404, headers:{'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*'}});
@@ -446,6 +446,7 @@ Deno.serve(async (req) => {
           gap_pace_s_per_mi: null
         }
       } as any;
+      try { console.error('[compute] writing computed fallback (normalize error)'); } catch {}
       await writeComputed(computed);
       return new Response(JSON.stringify({ success:true, mode:'normalize-error-fallback' }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
@@ -624,6 +625,7 @@ Deno.serve(async (req) => {
           gap_pace_s_per_mi: null
         }
       } as any;
+      try { console.error('[compute] writing computed (no samples)'); } catch {}
       await writeComputed(computed);
       return new Response(JSON.stringify({ success: true, mode: 'no-samples' }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
@@ -1005,7 +1007,7 @@ Deno.serve(async (req) => {
       await writeComputed(computed);
 
       // eslint-disable-next-line no-console
-      try { console.log(`[compute-summary:${COMPUTED_VERSION}] wid=${w.id} mode=${laps.length ? 'laps-no-plan' : 'splits-no-plan'} intervals=${outIntervals.length}`); } catch {}
+      try { console.error(`[compute] mode=${laps.length ? 'laps-no-plan' : 'splits-no-plan'} intervals=${outIntervals.length}`); } catch {}
       return new Response(JSON.stringify({ success:true, computed, mode: laps.length ? 'laps-no-plan' : 'splits-no-plan' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
@@ -1073,6 +1075,7 @@ Deno.serve(async (req) => {
           gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
         }
       };
+      try { console.error('[compute] mode=snap-to-laps intervals:', snapped.length); } catch {}
       await writeComputed(computed);
       return new Response(JSON.stringify({ success:true, computed, mode:'snap-to-laps' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }

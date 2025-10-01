@@ -325,6 +325,29 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     setActiveTab(desired);
   }, [initialTab, isCompleted, (workout as any)?.planned_id, linkedPlanned?.id, workout?.id]);
 
+  // Strict server coordination on Summary open: ensure attach+compute without client fallbacks
+  useEffect(() => {
+    (async () => {
+      try {
+        if (activeTab !== 'summary') return;
+        if (!isCompleted) return;
+        const wid = String((workout as any)?.id || '');
+        if (!wid) return;
+        // Prevent duplicate runs across re-renders
+        const key = `summary-strict-${wid}`;
+        if (recomputeGuardRef.current.has(key)) return;
+        recomputeGuardRef.current.add(key);
+
+        const linkId = String((workout as any)?.planned_id || linkedPlanned?.id || hydratedPlanned?.id || '');
+        if (!linkId) {
+          try { await supabase.functions.invoke('auto-attach-planned', { body: { workout_id: wid } } as any); } catch {}
+        }
+        try { await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } } as any); } catch {}
+        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+      } catch {}
+    })();
+  }, [activeTab, isCompleted, (workout as any)?.id, (workout as any)?.planned_id, linkedPlanned?.id, hydratedPlanned?.id]);
+
   // Helper to parse steps_preset that may be stored as JSON string
   const readStepsPreset = (src: any): string[] | undefined => {
     try {

@@ -48,7 +48,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
   try {
-    const { workout_id } = await req.json();
+    const payload = await req.json();
+    const workout_id = payload?.workout_id;
+    const explicitPlannedId = payload?.planned_id || payload?.plannedId || null;
     if (!workout_id) return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -99,6 +101,64 @@ Deno.serve(async (req) => {
 
     const { sport, subtype } = sportSubtype(w.provider_sport || w.type);
 
+    // ===== EXPLICIT ATTACH PATH (user-chosen planned) =====
+    if (explicitPlannedId) {
+      // Validate same user and fetch planned row
+      const { data: plannedRow } = await supabase
+        .from('planned_workouts')
+        .select('id,user_id,type,date,computed,export_hints,pool_length_m,pool_unit,pool_label,environment,workout_status,completed_workout_id')
+        .eq('id', String(explicitPlannedId))
+        .maybeSingle();
+      if (!plannedRow || String(plannedRow.user_id) !== String(w.user_id)) {
+        return new Response(JSON.stringify({ success: false, attached: false, reason: 'planned_not_found_or_wrong_user' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+      // Materialize steps if missing to ensure mapping later
+      try {
+        const hasSteps = Array.isArray((plannedRow as any)?.computed?.steps) && (plannedRow as any).computed.steps.length>0;
+        if (!hasSteps) {
+          const baseUrl = Deno.env.get('SUPABASE_URL');
+          const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+          await fetch(`${baseUrl}/functions/v1/materialize-plan`, {
+            method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}`, 'apikey': key },
+            body: JSON.stringify({ planned_workout_id: String(plannedRow.id) })
+          });
+        }
+      } catch {}
+      // Update planned row linkage (allow re-association)
+      try { await supabase.from('planned_workouts').update({ workout_status: 'completed', completed_workout_id: w.id }).eq('id', String(plannedRow.id)).eq('user_id', w.user_id); } catch {}
+      // Update workout linkage (+ pool context for swims)
+      try {
+        const updates: any = { planned_id: String(plannedRow.id) };
+        if (String((plannedRow as any)?.type||'').toLowerCase()==='swim') {
+          const env = (plannedRow as any)?.environment as string | undefined;
+          const poolLenM = (plannedRow as any)?.pool_length_m as number | undefined;
+          const poolUnit = (plannedRow as any)?.pool_unit as string | undefined;
+          const poolLabel = (plannedRow as any)?.pool_label as string | undefined;
+          if (env === 'open_water') {
+            updates.environment = 'open_water';
+          } else {
+            updates.environment = 'pool';
+            if (Number.isFinite(poolLenM as any)) updates.pool_length_m = poolLenM;
+            if (poolUnit) updates.pool_unit = poolUnit;
+            updates.pool_length_source = 'user_plan';
+            updates.pool_confidence = 'high';
+            updates.pool_conflict = false;
+            if (Number.isFinite(poolLenM as any)) updates.plan_pool_length_m = poolLenM;
+            if (poolUnit) updates.plan_pool_unit = poolUnit;
+            if (poolLabel) updates.plan_pool_label = poolLabel;
+          }
+        }
+        await supabase.from('workouts').update(updates).eq('id', w.id).eq('user_id', w.user_id);
+      } catch {}
+      // Compute summary now
+      try {
+        const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+      } catch {}
+      return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
     // Fetch planned candidates of same sport on the exact YYYY-MM-DD only (timezone-agnostic)
     const day = String(w.date || '').slice(0,10);
     const { data: plannedList } = await supabase
@@ -116,7 +176,7 @@ Deno.serve(async (req) => {
     const wSec = Number(w.moving_time ? (typeof w.moving_time==='number' ? w.moving_time : 0) : 0);
     const wMeters = Number(w.distance ? w.distance*1000 : 0);
 
-    // High-confidence selection rule: same day+type AND duration within 50%–120%
+    // High-confidence selection rule: same day+type AND duration within 85%–115%
     // Compute planned seconds for each candidate and pick closest by percent diff
     let best: any = null; let bestPct: number = Number.POSITIVE_INFINITY; let bestSec: number | null = null;
     const ensureSeconds = async (p:any) => {
@@ -156,7 +216,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_exact_date_type_match_or_no_planned_seconds' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
     const ratio = (bestSec && wSec>0) ? (wSec / bestSec) : null;
-    if (!(ratio!=null && ratio >= 0.5 && ratio <= 1.2)) {
+    if (!(ratio!=null && ratio >= 0.85 && ratio <= 1.15)) {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'duration_out_of_range', ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 

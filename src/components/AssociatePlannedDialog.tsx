@@ -154,11 +154,17 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         completedId = inserted.id as string;
       }
 
-      // Server attach path (materialize → attach → compute) for determinism
+      // Server attach path (explicit planned) → materialize → attach → compute
       try {
-        const { error } = await supabase.functions.invoke('auto-attach-planned', { body: { workout_id: completedId } });
+        const { data, error } = await supabase.functions.invoke('auto-attach-planned', { body: { workout_id: completedId, planned_id: String(planned?.id || '') } as any });
+        console.log('[associate] auto-attach-planned response:', data, error);
         if (error) throw error as any;
-      } catch {}
+        if (!(data as any)?.success) {
+          console.error('[associate] auto-attach-planned returned non-success:', data);
+        }
+      } catch (e) {
+        console.error('[associate] auto-attach-planned failed:', e);
+      }
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
       onAssociated?.(planned.id);
