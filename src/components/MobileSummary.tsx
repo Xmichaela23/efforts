@@ -273,7 +273,7 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
   return { text: '—', hr: getAvgHR(completed) };
 };
 
-export default function MobileSummary({ planned, completed }: MobileSummaryProps) {
+export default function MobileSummary({ planned, completed, hideTopAdherence }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
   const { useImperial } = useAppContext();
   // Prefer server snapshot from completed.computed when available
   const serverPlannedLight: any[] = Array.isArray((completed as any)?.computed?.planned_steps_light) ? (completed as any).computed.planned_steps_light : [];
@@ -1059,7 +1059,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     <div className="w-full">
       {/* Source line removed per UI request */}
 
-      {(() => {
+      {!hideTopAdherence && (() => {
         // Component adherence strip (pace / duration / distance)
         try {
           const isRunOrWalk = /run|walk/i.test(sportType);

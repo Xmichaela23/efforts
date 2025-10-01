@@ -890,19 +890,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
                 return (
                   <div className="px-2 pt-1 pb-0">
-                    <div className="flex items-baseline justify-center gap-6">
-                      {pacePct != null && (
-                        <div className="flex items-baseline gap-1">
-                          <span className={`text-base font-semibold ${getColor(pacePct)}`}>{pacePct}%</span>
-                          <span className="text-[12px] text-gray-700 font-medium">Pace</span>
-                        </div>
-                      )}
-                      {durPct != null && (
-                        <div className="flex items-baseline gap-1">
-                          <span className={`text-base font-semibold ${getColor(durPct)}`}>{durPct}%</span>
-                          <span className="text-[12px] text-gray-700 font-medium">Duration</span>
-                        </div>
-                      )}
+                    <div className="flex items-center justify-center gap-8">
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-base font-semibold ${pacePct!=null?getColor(pacePct):'text-gray-400'}`}>{pacePct!=null?`${pacePct}%`:'—'}</span>
+                        <span className="text-[12px] text-gray-700 font-medium">Pace</span>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-base font-semibold ${durPct!=null?getColor(durPct):'text-gray-400'}`}>{durPct!=null?`${durPct}%`:'—'}</span>
+                        <span className="text-[12px] text-gray-700 font-medium">Duration</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -931,6 +927,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               <MobileSummary 
                 planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
                 completed={isCompleted ? completedData : null}
+                hideTopAdherence
               />
             )}
             {onDelete && workout?.id && (
