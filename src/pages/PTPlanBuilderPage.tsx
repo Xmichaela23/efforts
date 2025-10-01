@@ -14,27 +14,36 @@ type ParsedItem = {
 function parseLine(line: string): ParsedItem | null {
   const raw = String(line || '').trim();
   if (!raw) return null;
-  const out: ParsedItem = { name: raw, perSide: /per\s*side/i.test(raw) };
+  // Strip leading bullets/dashes
+  const cleaned = raw.replace(/^[-•\s]+/, '').trim();
+  const out: ParsedItem = { name: cleaned, perSide: /per\s*side/i.test(cleaned) };
   // cues
-  const cueMatch = raw.match(/(?:cue|focus)\s*:\s*(.+)$/i);
+  const cueMatch = cleaned.match(/(?:cue|focus)\s*:\s*(.+)$/i);
   if (cueMatch) out.cues = cueMatch[1].trim();
   // sets x reps like 3x8 or 3 x 8
-  const sr = raw.match(/(\d+)\s*x\s*(\d+)/i);
+  let sr = cleaned.match(/(\d+)\s*x\s*(\d+)/i);
   if (sr) { out.sets = parseInt(sr[1], 10); out.reps = parseInt(sr[2], 10); }
+  // "3 sets of 8" pattern
+  if (!sr) {
+    const so = cleaned.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
+    if (so) { out.sets = parseInt(so[1], 10); out.reps = parseInt(so[2], 10); }
+  }
   // weight like 20 lb|lbs|kg
-  const w = raw.match(/(\d+(?:\.\d+)?)\s*(lb|lbs|kg)\b/i);
+  const w = cleaned.match(/(\d+(?:\.\d+)?)\s*(lb|lbs|kg)\b/i);
   if (w) {
     out.weight = parseFloat(w[1]);
     out.unit = /kg/i.test(w[2]) ? 'kg' : 'lb';
   }
   // Clean name (remove parsed tokens)
-  let name = raw
+  let name = cleaned
     .replace(/\(.+?\)/g, '')
     .replace(/,?\s*cue\s*:.*/i, '')
     .replace(/,?\s*focus\s*:.*/i, '')
     .replace(/\b\d+\s*x\s*\d+\b/i, '')
+    .replace(/\b\d+\s*sets?\s*of\s*\d+\b/i, '')
     .replace(/\b\d+(?:\.\d+)?\s*(?:lb|lbs|kg)\b/i, '')
     .replace(/\bper\s*side\b/i, '')
+    .replace(/\bswitches?\b/i, '')
     .replace(/[,;]/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
@@ -76,7 +85,7 @@ export default function PTPlanBuilderPage() {
     return text.split(/\n+/).map(parseLine).filter(Boolean) as ParsedItem[];
   }, [text]);
 
-  const save = async () => {
+  const addPlan = async () => {
     if (!text.trim() || items.length === 0) { alert('Please enter at least one exercise.'); return; }
     const dates = expandRecurrence(startDate, Math.max(1, weeks), 3);
     for (const date of dates) {
@@ -98,8 +107,12 @@ export default function PTPlanBuilderPage() {
       } as any);
     }
     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-    alert(`Saved ${dates.length} planned sessions`);
+    alert(`Added ${dates.length} planned sessions`);
     history.back();
+  };
+
+  const saveTemplate = async () => {
+    alert('Saving to templates will be added in the Plans section. For now, use Add plan to place sessions on your calendar.');
   };
 
   return (
@@ -140,7 +153,8 @@ export default function PTPlanBuilderPage() {
       </div>
       <div className="flex gap-4 items-center">
         <button className="text-sm text-gray-600 hover:text-gray-900" onClick={()=>history.back()}>Cancel</button>
-        <button className="text-sm text-blue-600 hover:text-blue-700" onClick={save}>Save to Templates</button>
+        <button className="text-sm text-blue-600 hover:text-blue-700" onClick={addPlan}>Add plan</button>
+        <button className="text-sm text-gray-600 hover:text-gray-900" onClick={saveTemplate}>Save to Templates</button>
       </div>
     </div>
   );
