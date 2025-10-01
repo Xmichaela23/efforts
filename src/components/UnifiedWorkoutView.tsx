@@ -748,9 +748,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     if (!pid) return;
                     // disable re-link noise then detach
                     suppressRelinkUntil.current = Date.now() + 15000; // 15s
-                    await supabase.from('planned_workouts').update({ workout_status: 'planned', completed_workout_id: null }).eq('id', pid);
-                    await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
-                    try { (workout as any).planned_id = null; } catch {}
+                    // Soft-unattach only switches UI state; preserve DB linkage unless user confirms destructive unattach
+                    try {
+                      await supabase.from('planned_workouts').update({ workout_status: 'planned' } as any).eq('id', pid);
+                    } catch {}
                     setLinkedPlanned(null);
                     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                     try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
