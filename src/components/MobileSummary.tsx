@@ -1088,6 +1088,20 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               }
               const p = Number(st?.pace_sec_per_mi);
               if (Number.isFinite(p) && p > 0) return p;
+              // New: parse textual pace targets like "10:30/mi" or "4:20/km"
+              try {
+                const txt = String(st?.paceTarget || st?.target_pace || st?.pace || '').trim();
+                if (txt) {
+                  let m = txt.match(/(\d{1,2}):(\d{2})\s*\/(mi|mile)/i);
+                  if (m) {
+                    const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); if (sec>0) return sec;
+                  }
+                  m = txt.match(/(\d{1,2}):(\d{2})\s*\/km/i);
+                  if (m) {
+                    const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); if (sec>0) return Math.round(sec * 1.60934);
+                  }
+                }
+              } catch {}
             }
             return null;
           })();
