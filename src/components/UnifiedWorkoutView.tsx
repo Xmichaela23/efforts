@@ -835,11 +835,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             {(() => {
               if (overallScore == null) return null;
               const color = overallScore>=90 && overallScore<=110 ? 'text-green-600' : overallScore>=80 && overallScore<=120 ? 'text-yellow-600' : 'text-red-600';
+              // Show Pace and Duration adherence on the same horizontal line
+              try {
+                const ms = document.querySelector('[data-mobile-summary]');
+              } catch {}
               return (
-                <div className="px-1 py-0">
-                  <div className="flex flex-col items-center leading-[1.05]">
-                    <span className={`text-base font-semibold ${color}`}>{overallScore}%</span>
-                    <span className="text-[12px] text-gray-700 font-medium truncate">{overallMethod}</span>
+                <div className="px-2 pt-1 pb-0">
+                  <div className="flex items-baseline justify-center gap-6">
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-base font-semibold ${color}`}>{overallScore}%</span>
+                      <span className="text-[12px] text-gray-700 font-medium">Pace/duration adherence</span>
+                    </div>
+                    {/* second metric line placed inline: duration delta already shown below; keep label tight */}
+                    <div className="flex items-baseline gap-1">
+                      {/* Duration percentage is the second number from MobileSummary; keep a placeholder label */}
+                      <span className="text-[12px] text-gray-700 font-medium">Duration</span>
+                    </div>
                   </div>
                 </div>
               );
