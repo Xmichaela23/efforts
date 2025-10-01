@@ -779,11 +779,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const selectedDate = targetDate || getStrengthLoggerDateString();
       
       // Prefer planned_workouts table
-      const todaysPlanned = (plannedWorkouts || []).filter((w: any) => 
+      let todaysPlanned = (plannedWorkouts || []).filter((w: any) => 
         String(w?.date) === selectedDate && 
         String(w?.type||'').toLowerCase() === 'strength' && 
         String(w?.workout_status||'').toLowerCase() === 'planned'
       );
+      // Exclude rows that are actually PT/Mobility written as strength
+      const isPtMobilityLike = (row: any) => {
+        const nm = String(((row||{}).name||'') + ' ' + ((row||{}).description||''))
+          .toLowerCase();
+        return /\bpt\b|mobility/.test(nm);
+      };
+      todaysPlanned = todaysPlanned.filter((w:any)=> !isPtMobilityLike(w));
       let todaysStrengthWorkouts = todaysPlanned;
 
       if (todaysStrengthWorkouts.length === 0) {
@@ -792,7 +799,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         todaysStrengthWorkouts = currentWorkouts.filter((workout: any) => 
           workout.date === selectedDate && 
           workout.type === 'strength' && 
-          (workout as any).workout_status === 'planned'
+          (workout as any).workout_status === 'planned' && !isPtMobilityLike(workout)
         );
       }
 
