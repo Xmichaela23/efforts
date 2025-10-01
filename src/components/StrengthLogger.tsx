@@ -736,7 +736,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     })();
   }, []);
 
+  // Guard to ensure initialization runs only once per open
+  const didInitRef = useRef(false);
+
   useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
     console.log('🔄 StrengthLogger initializing...');
     
     // Try to restore session progress first
@@ -877,7 +882,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (plannedStrength && Array.isArray(plannedStrength?.planned?.steps)) {
             const computedLike = { steps: plannedStrength.planned.steps, total_duration_seconds: plannedStrength.planned.total_duration_seconds };
             const exs = parseFromComputed(computedLike);
-            if (exs.length) { setExercises(prev=> prev.length? prev: exs); return; }
+            const isPlaceholder = (arr: LoggedExercise[]) => {
+              if (!Array.isArray(arr) || arr.length !== 1) return false;
+              const e = arr[0] as any;
+              const blankName = !String(e?.name||'').trim();
+              const sets = Array.isArray(e?.sets) ? e.sets : [];
+              const blankSets = sets.length === 0 || sets.every((s:any)=> (Number(s?.reps)||0)===0 && (Number(s?.weight)||0)===0 && !s?.completed);
+              return blankName && blankSets;
+            };
+            if (exs.length) { setExercises(prev=> isPlaceholder(prev) ? exs : (prev.length? prev: exs)); return; }
             // If steps did not map, try strength_exercises pass-through
             const se: any[] = Array.isArray(plannedStrength?.planned?.strength_exercises) ? plannedStrength.planned.strength_exercises : [];
             if (se.length) {
@@ -887,7 +900,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 expanded: true,
                 sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
               }));
-              if (pre.length) { setExercises(prev => prev.length? prev: pre); return; }
+              if (pre.length) { setExercises(prev => (isPlaceholder(prev) ? pre : (prev.length? prev: pre))); return; }
             }
           }
         } catch {}
@@ -904,7 +917,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (!data) return;
         if ((data as any)?.computed && Array.isArray((data as any).computed?.steps)) {
           const exs = parseFromComputed((data as any).computed);
-          if (exs.length) { setExercises(prev=> prev.length? prev: exs); return; }
+          const isPlaceholder = (arr: LoggedExercise[]) => {
+            if (!Array.isArray(arr) || arr.length !== 1) return false;
+            const e = arr[0] as any;
+            const blankName = !String(e?.name||'').trim();
+            const sets = Array.isArray(e?.sets) ? e.sets : [];
+            const blankSets = sets.length === 0 || sets.every((s:any)=> (Number(s?.reps)||0)===0 && (Number(s?.weight)||0)===0 && !s?.completed);
+            return blankName && blankSets;
+          };
+          if (exs.length) { setExercises(prev=> isPlaceholder(prev) ? exs : (prev.length? prev: exs)); return; }
         }
         if (Array.isArray((data as any).strength_exercises) && (data as any).strength_exercises.length>0) {
           const pre: LoggedExercise[] = (data as any).strength_exercises.map((exercise: any, index: number) => ({
@@ -913,19 +934,35 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             expanded: true,
             sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0), barType: 'standard', rir: undefined, completed: false }))
           }));
-          if (pre.length>0) setExercises(prev => prev.length? prev : pre);
+          const isPlaceholder = (arr: LoggedExercise[]) => {
+            if (!Array.isArray(arr) || arr.length !== 1) return false;
+            const e = arr[0] as any;
+            const blankName = !String(e?.name||'').trim();
+            const sets = Array.isArray(e?.sets) ? e.sets : [];
+            const blankSets = sets.length === 0 || sets.every((s:any)=> (Number(s?.reps)||0)===0 && (Number(s?.weight)||0)===0 && !s?.completed);
+            return blankName && blankSets;
+          };
+          if (pre.length>0) setExercises(prev => (isPlaceholder(prev) ? pre : (prev.length? prev : pre)));
           return;
         }
         const steps: string[] = Array.isArray((data as any).steps_preset) ? (data as any).steps_preset : [];
         const viaTok = parseStepsPreset(steps);
         const src2 = (data as any).rendered_description || (data as any).description || '';
         const parsed2 = viaTok.length>0 ? viaTok : parseStrengthDescription(src2);
-        if (parsed2.length>0) setExercises(prev => prev.length? prev : parsed2);
+        const isPlaceholder = (arr: LoggedExercise[]) => {
+          if (!Array.isArray(arr) || arr.length !== 1) return false;
+          const e = arr[0] as any;
+          const blankName = !String(e?.name||'').trim();
+          const sets = Array.isArray(e?.sets) ? e.sets : [];
+          const blankSets = sets.length === 0 || sets.every((s:any)=> (Number(s?.reps)||0)===0 && (Number(s?.weight)||0)===0 && !s?.completed);
+          return blankName && blankSets;
+        };
+        if (parsed2.length>0) setExercises(prev => (isPlaceholder(prev) ? parsed2 : (prev.length? prev : parsed2)));
         const or2 = extractOrOptions(src2);
         if (or2 && or2.length>1) setPendingOrOptions(prev => prev || or2);
       } catch {}
     })();
-  }, [scheduledWorkout, workouts, targetDate, performanceNumbers]);
+  }, [scheduledWorkout, targetDate]);
 
   // Handle manual prefill lock - separate effect to avoid infinite loops
   useEffect(() => {
