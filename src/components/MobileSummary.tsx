@@ -1089,8 +1089,38 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const metersTotal = (() => {
               const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
               if (!arr.length) return null;
-              let m = 0; for (const st of arr) { const dm = Number(st?.distanceMeters || st?.distance_m || st?.m || 0); if (Number.isFinite(dm) && dm>0) m += dm; }
-              return m>0 ? m : null;
+              let meters = 0;
+              for (const st of arr) {
+                const dm = Number(st?.distanceMeters || st?.distance_m || st?.m || 0);
+                if (Number.isFinite(dm) && dm > 0) {
+                  meters += dm;
+                  continue;
+                }
+                // Derive distance for time-only steps when a planned pace exists
+                const dur = Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0);
+                if (!Number.isFinite(dur) || dur <= 0) continue;
+                let paceSecPerMi: number | null = null;
+                if (Number.isFinite(st?.pace_sec_per_mi as any) && (st as any).pace_sec_per_mi > 0) {
+                  paceSecPerMi = Number((st as any).pace_sec_per_mi);
+                } else {
+                  try {
+                    const txt = String(st?.paceTarget || st?.target_pace || st?.pace || '').trim();
+                    if (txt) {
+                      let m = txt.match(/(\d{1,2}):(\d{2})\s*\/(mi|mile)/i);
+                      if (m) paceSecPerMi = parseInt(m[1],10)*60 + parseInt(m[2],10);
+                      if (!paceSecPerMi) {
+                        m = txt.match(/(\d{1,2}):(\d{2})\s*\/km/i);
+                        if (m) paceSecPerMi = Math.round((parseInt(m[1],10)*60 + parseInt(m[2],10)) * 1.60934);
+                      }
+                    }
+                  } catch {}
+                }
+                if (Number.isFinite(paceSecPerMi as any) && (paceSecPerMi as number) > 0) {
+                  const miles = dur / (paceSecPerMi as number);
+                  if (miles > 0) meters += miles * 1609.34;
+                }
+              }
+              return meters > 0 ? Math.round(meters) : null;
             })();
             if (Number.isFinite(secondsTotal as any) && Number.isFinite(metersTotal as any) && (metersTotal as number) > 0) {
               const miles = (metersTotal as number) / 1609.34;
