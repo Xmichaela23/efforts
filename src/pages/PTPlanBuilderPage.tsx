@@ -66,10 +66,10 @@ function expandRecurrence(start: string, weeks: number, daysPerWeek: number = 3)
 
 export default function PTPlanBuilderPage() {
   const today = new Date().toISOString().slice(0, 10);
-  const [planName, setPlanName] = useState('Updated PT Items');
+  const [planName, setPlanName] = useState('');
   const [startDate, setStartDate] = useState(today);
   const [weeks, setWeeks] = useState(4);
-  const [text, setText] = useState('bridge marching, 3x8, cue: slow\nbird dog rows, 20 lb, 2x8 per side, cue: kick back straight\nsingle leg RDL rows, 25 lb, 2x12 per side, cue: weight same side as working leg');
+  const [text, setText] = useState('');
   const { addPlannedWorkout } = usePlannedWorkouts() as any;
 
   const items = useMemo(() => {
@@ -77,6 +77,7 @@ export default function PTPlanBuilderPage() {
   }, [text]);
 
   const save = async () => {
+    if (!text.trim() || items.length === 0) { alert('Please enter at least one exercise.'); return; }
     const dates = expandRecurrence(startDate, Math.max(1, weeks), 3);
     for (const date of dates) {
       const mobility_exercises = items.map((it, idx) => ({
@@ -86,7 +87,7 @@ export default function PTPlanBuilderPage() {
         notes: it.cues || '',
       }));
       await addPlannedWorkout({
-        name: planName,
+        name: planName || 'PT/Mobility Session',
         type: 'strength',
         date,
         duration: 0,
@@ -124,7 +125,7 @@ export default function PTPlanBuilderPage() {
       </div>
       <div className="space-y-2">
         <label className="text-sm">Exercises (one per line)</label>
-        <textarea rows={6} className="border rounded px-2 py-2 w-full" value={text} onChange={(e)=>setText(e.target.value)} />
+        <textarea rows={6} className="border rounded px-2 py-2 w-full" value={text} onChange={(e)=>setText(e.target.value)} placeholder={"Example:\nbridge marching, 3x8, cue: slow\nbird dog rows, 20 lb, 2x8 per side, cue: kick back straight\nsingle leg RDL rows, 25 lb, 2x12 per side, cue: weight same side as working leg"} />
       </div>
       <div className="space-y-2">
         <label className="text-sm">Preview</label>
@@ -137,9 +138,9 @@ export default function PTPlanBuilderPage() {
           ))}
         </div>
       </div>
-      <div className="flex gap-2">
-        <button className="px-3 py-2 border rounded" onClick={()=>history.back()}>Cancel</button>
-        <button className="px-3 py-2 border rounded bg-black text-white" onClick={save}>Save to Calendar</button>
+      <div className="flex gap-4 items-center">
+        <button className="text-sm text-gray-600 hover:text-gray-900" onClick={()=>history.back()}>Cancel</button>
+        <button className="text-sm text-blue-600 hover:text-blue-700" onClick={save}>Save to Templates</button>
       </div>
     </div>
   );
