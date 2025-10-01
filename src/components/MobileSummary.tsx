@@ -1209,23 +1209,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             const plannedLabel = plannedLabelStrict(st);
 
             const execCell = (() => {
-              // Simple aggregate fallback when mapping isn't ready or row not found
-              if (!hasServerComputed || !row) {
-                if (idx !== 0) return '—';
-                if (isRideSport) {
-                  const overall = (completed as any)?.computed?.overall || {};
-                  const pw = (completed as any)?.avg_power
-                    ?? (completed as any)?.metrics?.avg_power
-                    ?? overall.avg_power_w
-                    ?? overall.avg_power;
-                  if (typeof pw === 'number' && Number.isFinite(pw)) return `${Math.round(pw)} W`;
-                } else {
-                  const overall = (completed as any)?.computed?.overall || {};
-                  const secPerMi = overall.avg_pace_s_per_mi as number | undefined;
-                  if (typeof secPerMi === 'number' && secPerMi > 0) return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
-                }
-                return '—';
-              }
+              // Strict: only show when server mapping provides a matched executed interval
+              if (!hasServerComputed || !row) return '—';
               if (isRideSport) {
                 const pw = row?.executed?.avg_power_w as number | undefined;
                 if (typeof pw === 'number' && Number.isFinite(pw)) return `${Math.round(pw)} W`;
@@ -1261,27 +1246,12 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             })();
 
             const timeCell = (() => {
-              if (!hasServerComputed || !row) {
-                if (idx !== 0) return '—';
-                const overall = (completed as any)?.computed?.overall || {};
-                const dur = (completed as any)?.metrics?.moving_time
-                  ?? (completed as any)?.moving_time
-                  ?? overall.duration_s_moving
-                  ?? overall.duration_s;
-                return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
-              }
+              if (!hasServerComputed || !row) return '—';
               const dur = row?.executed?.duration_s; return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
             })();
 
             const hrVal = (() => {
-              if (!hasServerComputed || !row) {
-                if (idx !== 0) return null as number | null;
-                const overall = (completed as any)?.computed?.overall || {};
-                const hr = (completed as any)?.avg_heart_rate
-                  ?? (completed as any)?.metrics?.avg_heart_rate
-                  ?? overall.avg_hr;
-                return (typeof hr === 'number' && hr > 0) ? Math.round(hr) : null;
-              }
+              if (!hasServerComputed || !row) return null as number | null;
               const hr = row?.executed?.avg_hr; return (typeof hr === 'number' && hr > 0) ? Math.round(hr) : null;
             })();
 
