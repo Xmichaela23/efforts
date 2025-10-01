@@ -73,18 +73,17 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
     
     let workoutToLoad = scheduledWorkout;
 
-    // If no scheduled workout provided, check for today's planned workout
+    // If no scheduled workout provided, check for today's planned workout (type: mobility)
     if (!workoutToLoad) {
       console.log('🔍 No scheduled workout, checking for today\'s planned workout...');
       const todayDate = getTodayDateString();
       
-      const currentWorkouts = workouts || [];
-      // For now, look for strength workouts with mobility exercises
-      const todaysMobilityWorkouts = currentWorkouts.filter(workout => 
-        workout.date === todayDate && 
-        workout.type === 'strength' && 
-        (workout as any).workout_status === 'planned' &&
-        (workout as any).mobility_exercises
+      const currentPlanned = (workouts || []) as any[];
+      // Look for planned mobility sessions
+      const todaysMobilityWorkouts = currentPlanned.filter((w:any) => 
+        String(w?.date) === todayDate && 
+        String(w?.type||'').toLowerCase() === 'mobility' && 
+        String((w as any)?.workout_status||'').toLowerCase() === 'planned'
       );
 
       console.log('📊 Found planned mobility workouts for today:', todaysMobilityWorkouts);
