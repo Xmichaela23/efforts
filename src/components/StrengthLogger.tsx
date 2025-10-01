@@ -773,8 +773,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       console.log('🔍 No scheduled workout, checking for selected date\'s planned workout...');
       const selectedDate = targetDate || getStrengthLoggerDateString();
       
-      // Prefer planned_workouts table (refresh once for good measure)
-      try { (refreshPlanned as any)?.(); } catch {}
+      // Prefer planned_workouts table
       const todaysPlanned = (plannedWorkouts || []).filter((w: any) => 
         String(w?.date) === selectedDate && 
         String(w?.type||'').toLowerCase() === 'strength' && 
@@ -784,11 +783,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
       if (todaysStrengthWorkouts.length === 0) {
         // Fallback to any planned in workouts hub if present
-        const currentWorkouts = workouts || [];
-        todaysStrengthWorkouts = currentWorkouts.filter(workout => 
+        const currentWorkouts = (workouts as any[]) || [];
+        todaysStrengthWorkouts = currentWorkouts.filter((workout: any) => 
           workout.date === selectedDate && 
           workout.type === 'strength' && 
-          workout.workout_status === 'planned'
+          (workout as any).workout_status === 'planned'
         );
       }
 
@@ -926,7 +925,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (or2 && or2.length>1) setPendingOrOptions(prev => prev || or2);
       } catch {}
     })();
-  }, [scheduledWorkout, workouts, plannedWorkouts, targetDate, performanceNumbers]);
+  }, [scheduledWorkout, workouts, targetDate, performanceNumbers]);
 
   // Handle manual prefill lock - separate effect to avoid infinite loops
   useEffect(() => {
@@ -1089,7 +1088,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (isInitialized) {
       saveSessionProgress(exercises, [...attachedAddons, newAddon], notesText, notesRpe);
     }
-    setShowWorkoutsMenu(false);
   };
 
   const attachChosenWarmup = () => {
@@ -1105,7 +1103,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         saveSessionProgress(exercises, [...attachedAddons, newAddon], notesText, notesRpe);
       }
       setShowWarmupChooser(false);
-      setShowWorkoutsMenu(false);
     } catch {}
   };
 
