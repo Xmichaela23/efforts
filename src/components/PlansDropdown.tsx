@@ -134,14 +134,14 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           <span>Select a plan (catalog)</span>
         </DropdownMenuItem>
 
-        {/* Builder: PT/Mobility → creates planned strength sessions with exercises */}
+        {/* Builder: Mobility → creates planned mobility sessions with exercises */}
         <DropdownMenuSeparator className="my-2" />
         <DropdownMenuItem
           onClick={() => { navigate('/plans/pt'); }}
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >
-          <span>Build a plan (PT/Mobility)</span>
+          <span>Build a plan (Mobility)</span>
           <span className="text-xs text-blue-600 font-semibold">NEW</span>
         </DropdownMenuItem>
 

@@ -73,7 +73,7 @@ function expandRecurrence(start: string, weeks: number, daysPerWeek: number = 3)
   return dates;
 }
 
-export default function PTPlanBuilderPage() {
+export default function MobilityPlanBuilderPage() {
   const today = new Date().toISOString().slice(0, 10);
   const [planName, setPlanName] = useState('');
   const [startDate, setStartDate] = useState(today);
@@ -120,7 +120,7 @@ export default function PTPlanBuilderPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-4">
-      <h1 className="text-xl font-semibold">Build PT/Mobility Plan</h1>
+      <h1 className="text-xl font-semibold">Build Mobility Plan</h1>
       <div className="space-y-2">
         <label className="text-sm">Plan Name</label>
         <input className="border rounded px-2 py-2 w-full" value={planName} onChange={(e)=>setPlanName(e.target.value)} />
