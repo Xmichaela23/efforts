@@ -1059,7 +1059,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     <div className="w-full">
       {/* Source line removed per UI request */}
 
-      {!hideTopAdherence && (() => {
+      {(() => {
         // Component adherence strip (pace / duration / distance)
         try {
           const isRunOrWalk = /run|walk/i.test(sportType);
@@ -1166,12 +1166,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
           return (
             <div className="w-full pt-1 pb-2">
-              <div className="flex items-center justify-center gap-4 text-center">
+              <div className="flex items-center justify-center gap-6 text-center">
                 <div className="flex items-end gap-3">
                   {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—')}
                   {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—')}
                 </div>
-                {chip('Distance', distPct, distDeltaMi!=null ? fmtDeltaMi(distDeltaMi) : '—')}
               </div>
             </div>
           );
