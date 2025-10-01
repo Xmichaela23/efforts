@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
     try {
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('id,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at')
+        .select('id,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at')
         .eq('user_id', userId)
         .gte('date', fromISO)
         .lte('date', toISO)
@@ -260,7 +260,7 @@ Deno.serve(async (req) => {
       try {
         const { data, error } = await supabase
           .from('planned_workouts')
-          .select('id,date,type,workout_status,computed,steps_preset,strength_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds')
+          .select('id,date,type,workout_status,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds')
           .eq('user_id', userId)
           .gte('date', fromISO)
           .lte('date', toISO)
@@ -341,6 +341,7 @@ Deno.serve(async (req) => {
           tags: p?.tags || null,
           steps_preset: (p as any)?.steps_preset ?? null,
           strength_exercises: (p as any)?.strength_exercises ?? null,
+          mobility_exercises: (p as any)?.mobility_exercises ?? null,
           export_hints: (p as any)?.export_hints ?? null,
           workout_structure: (p as any)?.workout_structure ?? null,
           friendly_summary: (p as any)?.friendly_summary ?? null,
@@ -442,6 +443,7 @@ Deno.serve(async (req) => {
           tags: p?.tags || null,
           steps_preset: (p as any)?.steps_preset ?? null,
           strength_exercises: (p as any)?.strength_exercises ?? null,
+          mobility_exercises: (p as any)?.mobility_exercises ?? null,
           export_hints: (p as any)?.export_hints ?? null,
           workout_structure: (p as any)?.workout_structure ?? null,
           friendly_summary: (p as any)?.friendly_summary ?? null,

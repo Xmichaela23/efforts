@@ -33,7 +33,7 @@ export const usePlannedWorkouts = () => {
 
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,rendered_description,units,source,workout_structure,workout_title,friendly_summary,total_duration_seconds,strength_exercises,pool_unit,pool_length_m')
+        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,rendered_description,units,source,workout_structure,workout_title,friendly_summary,total_duration_seconds,strength_exercises,mobility_exercises,pool_unit,pool_length_m')
         .eq('user_id', user.id)
         .gte('date', pastIso)
         .lte('date', futureIso)
@@ -122,6 +122,7 @@ export const usePlannedWorkouts = () => {
           duration: workout.duration,
           intervals: [],
           strength_exercises: parseMaybeJson((workout as any).strength_exercises) || [],
+          mobility_exercises: parseMaybeJson((workout as any).mobility_exercises) || [],
           workout_status: workout.workout_status,
           source: workout.source,
           training_plan_id: workout.training_plan_id,
@@ -206,6 +207,7 @@ export const usePlannedWorkouts = () => {
         description: workoutData.description || '',
         intervals: workoutData.intervals || [],
         strength_exercises: workoutData.strength_exercises || [],
+        mobility_exercises: (workoutData as any).mobility_exercises || [],
         workout_status: workoutData.workout_status || 'planned',
         source: workoutData.source || 'manual',
         training_plan_id: workoutData.training_plan_id,
@@ -239,6 +241,7 @@ export const usePlannedWorkouts = () => {
         duration: data.duration,
         intervals: data.intervals || [],
         strength_exercises: data.strength_exercises || [],
+        mobility_exercises: (data as any).mobility_exercises || [],
         workout_status: data.workout_status,
         source: data.source,
         training_plan_id: data.training_plan_id,
@@ -287,6 +290,7 @@ export const usePlannedWorkouts = () => {
         duration: data.duration,
         intervals: data.intervals || [],
         strength_exercises: data.strength_exercises || [],
+        mobility_exercises: (data as any).mobility_exercises || [],
         workout_status: data.workout_status,
         source: data.source,
         training_plan_id: data.training_plan_id,
