@@ -725,18 +725,45 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
                         const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
                         const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
-                        const paceStrWithRange = (paceTarget?: string, kind?: string) => {
+                        const paceStrWithRange = (paceTarget?: string, kind?: string, step?: any) => {
                           try {
+                            // Prefer numeric range if provided on step
+                            const pr: any = step?.pace_range;
+                            const kmToMi = (sec:number)=> Math.round(sec * 1.60934);
+                            const calcFromCenter = (centerSecPerMi:number)=>{
+                              const tol = (String(kind||'').toLowerCase()==='recovery' || String(kind||'').toLowerCase()==='warmup' || String(kind||'').toLowerCase()==='cooldown') ? tolEasy : tolQual;
+                              const lo = Math.round(centerSecPerMi*(1 - tol));
+                              const hi = Math.round(centerSecPerMi*(1 + tol));
+                              return { lo, hi, unit: 'mi' } as const;
+                            };
+                            if (Array.isArray(pr) && pr.length===2) {
+                              const a = Number(pr[0]); const b = Number(pr[1]);
+                              if (Number.isFinite(a) && Number.isFinite(b) && a>0 && b>0) {
+                                const lo = Math.min(a,b), hi = Math.max(a,b);
+                                const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+                                return `${mmss(lo)}–${mmss(hi)}/mi`;
+                              }
+                            } else if (pr && typeof pr==='object' && typeof pr.lower==='number' && typeof pr.upper==='number') {
+                              const lo = Math.min(pr.lower, pr.upper), hi = Math.max(pr.lower, pr.upper);
+                              const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+                              return `${mmss(lo)}–${mmss(hi)}/mi`;
+                            }
+                            // Else derive from center pace if provided numerically
+                            if (typeof step?.pace_sec_per_mi === 'number' && step.pace_sec_per_mi>0) {
+                              const { lo, hi } = calcFromCenter(step.pace_sec_per_mi);
+                              const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+                              return `${mmss(lo)}–${mmss(hi)}/mi`;
+                            }
+                            // Finally, parse textual paceTarget
                             if (!paceTarget) return undefined;
                             const m = String(paceTarget).match(/(\d+):(\d{2})\/(mi|km)/i);
                             if (!m) return undefined;
-                            const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+                            const baseSec = parseInt(m[1],10)*60 + parseInt(m[2],10);
                             const unit = m[3].toLowerCase();
-                            const tol = (String(kind||'').toLowerCase()==='recovery' || String(kind||'').toLowerCase()==='warmup' || String(kind||'').toLowerCase()==='cooldown') ? tolEasy : tolQual;
-                            const lo = Math.round(sec*(1 - tol));
-                            const hi = Math.round(sec*(1 + tol));
+                            const center = unit==='km' ? kmToMi(baseSec) : baseSec;
+                            const { lo, hi } = calcFromCenter(center);
                             const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
-                            return `${mmss(lo)}–${mmss(hi)}/${unit}`;
+                            return `${mmss(lo)}–${mmss(hi)}/mi`;
                           } catch { return undefined; }
                         };
                         const powerStr = (st:any) => (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
@@ -748,33 +775,33 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           const st:any = steps[i];
                           const kind = String(st?.kind||'').toLowerCase();
                           if (kind==='warmup' && typeof st?.seconds==='number') {
-                            const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'warmup');
+                            const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'warmup', st);
                             lines.push(`WU ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
                             i += 1; continue;
                           }
                           if (kind==='cooldown' && typeof st?.seconds==='number') {
-                            const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'cooldown');
+                            const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'cooldown', st);
                             lines.push(`CD ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
                             i += 1; continue;
                           }
                           if (isWork(st)) {
                             const workLabel = (()=>{ if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) return `${Math.round(st.distanceMeters)} m`; if (typeof st?.seconds==='number' && st.seconds>0) return fmtTime(st.seconds); return 'interval'; })();
-                            const workPace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined, st?.kind);
+                            const workPace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined, st?.kind, st);
                             const workPower = powerStr(st);
                             const next = steps[i+1];
                             const hasRec = next && isRec(next);
                             const restLabel = hasRec ? (()=>{ if (typeof next?.seconds==='number' && next.seconds>0) return fmtTime(next.seconds); if (typeof next?.distanceMeters==='number' && next.distanceMeters>0) return `${Math.round(next.distanceMeters)} m`; return 'rest'; })() : undefined;
-                            const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery') : undefined;
+                            const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery', next) : undefined;
                             const restPower = hasRec ? powerStr(next) : undefined;
                             let count = 0; let j = i;
                             while (j < steps.length) {
                               const a = steps[j]; const b = steps[j+1];
                               if (!isWork(a)) break;
                               const aLabel = (typeof a?.distanceMeters==='number' && a.distanceMeters>0) ? `${Math.round(a.distanceMeters)} m` : (typeof a?.seconds==='number' ? fmtTime(a.seconds) : 'interval');
-                              const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind);
+                              const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind, a);
                               const aPow = powerStr(a);
                               const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? `${Math.round(b.distanceMeters)} m` : 'rest')) : undefined;
-                              const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery') : undefined;
+                              const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery', b) : undefined;
                               const bPow = (b && isRec(b)) ? powerStr(b) : undefined;
                               const sameWork = (aLabel===workLabel) && (aPace===workPace) && (aPow===workPower);
                               const sameRest = (!hasRec && !b) || (!!hasRec && !!b && isRec(b) && bLabel===restLabel && bPace===restPace && bPow===restPower);

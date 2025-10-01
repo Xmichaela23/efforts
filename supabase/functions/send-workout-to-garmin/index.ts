@@ -1,3 +1,5 @@
+// Edge function: send-workout-to-garmin
+// Exports a planned workout to Garmin Connect
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -359,17 +361,44 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       // Only apply when step has no explicit target
       const hasTarget = step.targetType || step.targetValue != null || step.targetValueLow != null
       if (hasTarget) return
-      // RUNNING pace from computed pace_range / pace_sec_per_mi
-      if (sport === 'RUNNING' && (typeof cs?.pace_sec_per_mi === 'number' || cs?.pace_range)) {
-        const secPerMi: number | undefined = typeof cs.pace_sec_per_mi === 'number' ? cs.pace_sec_per_mi : undefined
-        const range = cs?.pace_range as { lower?: number; upper?: number } | undefined
+      // RUNNING pace from computed pace_range / pace_sec_per_mi / paceTarget
+      if (sport === 'RUNNING' && (typeof cs?.pace_sec_per_mi === 'number' || cs?.pace_range || typeof cs?.paceTarget === 'string')) {
+        // Normalize various shapes into seconds-per-mile range or center
+        let secPerMi: number | undefined = typeof cs.pace_sec_per_mi === 'number' ? cs.pace_sec_per_mi : undefined
+        // pace_range could be an array [low, high] or object {lower, upper} (seconds per mile)
+        let rangeLow: number | undefined
+        let rangeHigh: number | undefined
+        const pr: any = (cs as any)?.pace_range
+        if (Array.isArray(pr) && pr.length === 2) {
+          const a = Number(pr[0]); const b = Number(pr[1])
+          if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
+            rangeLow = Math.min(a, b)
+            rangeHigh = Math.max(a, b)
+          }
+        } else if (pr && typeof pr === 'object' && (typeof pr.lower === 'number' || typeof pr.upper === 'number')) {
+          const a = Number(pr.lower); const b = Number(pr.upper)
+          if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
+            rangeLow = Math.min(a, b)
+            rangeHigh = Math.max(a, b)
+          }
+        }
+        // If still nothing, try parsing paceTarget text to center seconds/mi
+        if (secPerMi == null && (rangeLow == null || rangeHigh == null)) {
+          const txt: string = String((cs as any)?.paceTarget || '')
+          const m = txt.match(/(\d{1,2}):(\d{2})\s*\/\s*(mi|mile|km)/i)
+          if (m) {
+            const sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
+            const unit = m[3].toLowerCase()
+            secPerMi = unit === 'km' ? Math.round(sec * 1.60934) : sec
+          }
+        }
         // Convert pace (sec/mi) to speed (m/s)
         const toSpeed = (sec: number) => 1609.34 / sec
         // Garmin run targets should use SPEED (m/s); Connect displays as Pace
         step.targetType = 'SPEED'
-        if (range && typeof range.lower === 'number' && typeof range.upper === 'number') {
-          step.targetValueLow = toSpeed(range.upper) // slower pace → lower speed
-          step.targetValueHigh = toSpeed(range.lower) // faster pace → higher speed
+        if (typeof rangeLow === 'number' && typeof rangeHigh === 'number') {
+          step.targetValueLow = toSpeed(rangeHigh) // slower pace → lower speed
+          step.targetValueHigh = toSpeed(rangeLow) // faster pace → higher speed
           delete (step as any).targetValue
         } else if (typeof secPerMi === 'number') {
           // Prefer a range: widen around the single pace based on intensity/duration

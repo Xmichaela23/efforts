@@ -86,7 +86,30 @@ function computeMinutes(workout: any, baselines?: Baselines, exportHints?: Expor
         // Distance-based step with pace target → estimate
         const meters = Number(st?.distanceMeters);
         if (Number.isFinite(meters) && meters > 0) {
-          const spm = secPerMeterFromPace(typeof st?.paceTarget === 'string' ? st.paceTarget : undefined);
+          // Prefer numeric planned pace when available
+          const pr: any = (st as any)?.pace_range;
+          let secPerMeter: number | null = null;
+          if (Array.isArray(pr) && pr.length === 2) {
+            const a = Number(pr[0]); const b = Number(pr[1]);
+            if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
+              const mid = (a + b) / 2;
+              secPerMeter = mid / 1609.34;
+            }
+          } else if (pr && typeof pr === 'object' && typeof pr.lower === 'number' && typeof pr.upper === 'number') {
+            const a = Number(pr.lower); const b = Number(pr.upper);
+            if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
+              const mid = (a + b) / 2;
+              secPerMeter = mid / 1609.34;
+            }
+          }
+          if (secPerMeter == null && typeof (st as any)?.pace_sec_per_mi === 'number') {
+            const sec = Number((st as any).pace_sec_per_mi);
+            if (Number.isFinite(sec) && sec > 0) secPerMeter = sec / 1609.34;
+          }
+          if (secPerMeter == null) {
+            secPerMeter = secPerMeterFromPace(typeof st?.paceTarget === 'string' ? st.paceTarget : undefined);
+          }
+          const spm = secPerMeter;
           if (spm != null) return acc + meters * spm;
         }
         return acc;
