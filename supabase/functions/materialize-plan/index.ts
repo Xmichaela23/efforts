@@ -285,18 +285,24 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
   const discipline = String(row?.type||'').toLowerCase();
   const steps: any[] = [];
   // Infer session-level swim equipment from tags (e.g., req:board, req:fins, req:buoy, req:snorkel)
-  const inferEquipFromTags = (): string | null => {
+  const inferEquipFromTagsOrDesc = (): string | null => {
     try {
       const tags: string[] = Array.isArray((row as any)?.tags) ? (row as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
+      const desc: string = String((row as any)?.description || '').toLowerCase();
       if (!tags.length) return null;
       if (tags.some(t=>/req:board|\bboard\b/.test(t))) return 'board';
       if (tags.some(t=>/req:fins|\bfins\b/.test(t))) return 'fins';
       if (tags.some(t=>/req:buoy|\bbuoy\b/.test(t))) return 'buoy';
       if (tags.some(t=>/req:snorkel|\bsnorkel\b/.test(t))) return 'snorkel';
+      // Fallback: infer from description keywords
+      if (/\bwith\s+board\b|\bkick\s+board\b/.test(desc)) return 'board';
+      if (/\bfins\b/.test(desc)) return 'fins';
+      if (/\bpull\s+buoy\b|\bbuoy\b/.test(desc)) return 'buoy';
+      if (/\bsnorkel\b/.test(desc)) return 'snorkel';
       return null;
     } catch { return null }
   };
-  const sessionEquip = inferEquipFromTags();
+  const sessionEquip = inferEquipFromTagsOrDesc();
 
   // Early path: Strength without tokens → expand from strength_exercises so computed is written
   if (discipline === 'strength' && tokens.length === 0) {

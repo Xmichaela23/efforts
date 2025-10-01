@@ -87,6 +87,17 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         return '';
       };
       const isSwim = String((workout as any)?.type||'').toLowerCase()==='swim'
+      // Session-level accessory hint from tags
+      const sessionEquipFromTags = (()=>{
+        try {
+          const tags: string[] = Array.isArray((workout as any)?.tags) ? (workout as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
+          if (tags.some(t=>/req:board|\bboard\b/.test(t))) return 'board';
+          if (tags.some(t=>/req:fins|\bfins\b/.test(t))) return 'fins';
+          if (tags.some(t=>/req:buoy|\bbuoy\b/.test(t))) return 'buoy';
+          if (tags.some(t=>/req:snorkel|\bsnorkel\b/.test(t))) return 'snorkel';
+        } catch {}
+        return null;
+      })();
       // Estimate total duration using baselines for distance steps (swim only)
       let estTotal = 0;
       const secPer100FromPN = (() => {
@@ -120,10 +131,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const pow = typeof st?.powerTarget==='string' ? st.powerTarget : undefined;
         const kind = niceKind(st?.kind);
         let equip = '';
-        if (typeof st?.equipment==='string') {
-          const e = String(st.equipment).trim();
-          if (e && e.toLowerCase()!=='none') equip = ` with ${e}`;
-        }
+        const eqTxt = ((): string | null => {
+          if (typeof st?.equipment==='string') {
+            const e = String(st.equipment).trim().toLowerCase();
+            if (e && e!=='none') return e;
+          }
+          if (sessionEquipFromTags) return sessionEquipFromTags;
+          return null;
+        })();
+        if (eqTxt) equip = ` with ${eqTxt}`;
 
         // Strength step formatting
         if (st?.strength && typeof st.strength==='object') {
