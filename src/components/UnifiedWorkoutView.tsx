@@ -871,11 +871,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 const executedPaceSecPerMi: number | null = (() => {
                   let v = Number(overall?.avg_pace_s_per_mi);
                   if (Number.isFinite(v) && v>0) return v>1200? Math.round(v/10) : v;
-                  const m = Number(overall?.distance_m);
-                  const s = Number(overall?.duration_s_moving ?? overall?.duration_s);
-                  if (Number.isFinite(m) && m>0 && Number.isFinite(s) && s>0) {
-                    const miles = m/1609.34; if (miles>0.01) return Math.round(s / miles);
-                  }
                   return null;
                 })();
 
