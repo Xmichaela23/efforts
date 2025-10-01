@@ -17,6 +17,7 @@ import PlanSelect from "./pages/PlanSelect";
 import PlansAdminImport from "./pages/PlansAdminImport";
 import PlansCatalogPage from "./pages/PlansCatalog.tsx";
 import MobilityPlanBuilderPage from "./pages/PTPlanBuilderPage";
+import PlansBuild from "./pages/PlansBuild";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
 <Route path="/plans/select" element={<PlanSelect />} />
 <Route path="/plans/admin" element={<PlansAdminImport />} />
 <Route path="/plans/catalog" element={<PlansCatalogPage />} />
+<Route path="/plans/build" element={<PlansBuild />} />
 <Route path="/plans/pt" element={<MobilityPlanBuilderPage />} />
 <Route path="*" element={<NotFound />} />
 </Routes>
