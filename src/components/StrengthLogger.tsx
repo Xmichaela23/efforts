@@ -680,7 +680,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         try {
           const { data: unified } = await (supabase.functions.invoke as any)('get-week', { body: { from: date, to: date } });
           const items: any[] = Array.isArray((unified as any)?.items) ? (unified as any).items : [];
-          const plannedStrength = items.find((it:any)=> !!it?.planned && String(it?.type||'').toLowerCase()==='strength');
+          const isMobilityLike = (p:any)=>{
+            try { const d = String((p?.planned?.description || p?.planned?.rendered_description || '')||'').toLowerCase(); return /\bmobility\b|\bpt\b/.test(d); } catch { return false; }
+          };
+          const plannedStrength = items.filter((it:any)=> !!it?.planned && String(it?.type||'').toLowerCase()==='strength')
+            .filter((it:any)=> !isMobilityLike(it))
+            [0];
           if (plannedStrength && Array.isArray(plannedStrength?.planned?.steps)) {
             const computedLike = { steps: plannedStrength.planned.steps, total_duration_seconds: plannedStrength.planned.total_duration_seconds };
             const exs = parseFromComputed(computedLike);
@@ -922,6 +927,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           .limit(1)
           .maybeSingle();
         if (!data) return;
+        // Skip if description indicates mobility
+        try { const desc = String((data as any)?.description || (data as any)?.rendered_description || '').toLowerCase(); if (/\bmobility\b|\bpt\b/.test(desc)) return; } catch {}
         if ((data as any)?.computed && Array.isArray((data as any).computed?.steps)) {
           const exs = parseFromComputed((data as any).computed);
           const isPlaceholder = (arr: LoggedExercise[]) => {

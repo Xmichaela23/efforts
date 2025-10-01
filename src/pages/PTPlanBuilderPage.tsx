@@ -53,24 +53,21 @@ function parseLine(line: string): ParsedItem | null {
 }
 
 function expandRecurrence(start: string, weeks: number, daysPerWeek: number = 3): string[] {
-  // Mon/Wed/Fri pattern from start date
-  const startDate = new Date(start + 'T12:00:00');
+  // Anchor to Monday of the week containing start date, schedule Mon/Wed/Fri each week
+  const s = new Date(start + 'T12:00:00');
   const toIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-  const pattern = [0, 2, 4]; // offset days within a Mon-start week; we’ll just step 2 days
-  const dates: string[] = [];
-  let cur = new Date(startDate);
-  for (let w = 0; w < weeks; w++) {
-    let count = 0;
-    let day = new Date(cur);
-    while (count < daysPerWeek) {
-      dates.push(toIso(day));
-      day = addDays(day, 2);
-      count += 1;
+  const day = s.getDay(); // 0=Sun..6=Sat
+  const monday = addDays(s, (day === 0 ? -6 : (1 - day))); // move to Monday of this week
+  const offsets = [0, 2, 4]; // Mon/Wed/Fri
+  const out: string[] = [];
+  for (let w = 0; w < Math.max(1, weeks); w++) {
+    for (let i = 0; i < Math.min(daysPerWeek, offsets.length); i++) {
+      const d = addDays(monday, w * 7 + offsets[i]);
+      if (d >= s) out.push(toIso(d)); // do not schedule before start date
     }
-    cur = addDays(cur, 7);
   }
-  return dates;
+  return out;
 }
 
 export default function MobilityPlanBuilderPage() {
@@ -96,11 +93,11 @@ export default function MobilityPlanBuilderPage() {
         notes: it.cues || '',
       }));
       await addPlannedWorkout({
-        name: planName || 'PT/Mobility Session',
+        name: planName || 'Mobility Session',
         type: 'mobility',
         date,
         duration: 0,
-        description: 'PT/Mobility session',
+        description: 'Mobility session',
         intervals: [],
         strength_exercises: [],
         mobility_exercises,
