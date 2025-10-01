@@ -237,7 +237,16 @@ export function generateDetailedWorkoutTemplate(
           range = powerRangeStr(st?.power_low ?? st?.target_low, st?.power_high ?? st?.target_high);
         } else if (typeof st?.pace_sec_per_mi === 'number') {
           target = `@ ${formatPace(st.pace_sec_per_mi)}`;
-          if (st?.pace_range) range = `Range: ${formatPace(st.pace_range.lower)} – ${formatPace(st.pace_range.upper)}`;
+          const pr: any = (st as any)?.pace_range;
+          if (Array.isArray(pr) && pr.length === 2) {
+            const lo = Math.min(Number(pr[0]), Number(pr[1]));
+            const hi = Math.max(Number(pr[0]), Number(pr[1]));
+            if (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) {
+              range = `Range: ${formatPace(lo)} – ${formatPace(hi)}`;
+            }
+          } else if (pr && typeof pr === 'object' && typeof pr.lower === 'number' && typeof pr.upper === 'number') {
+            range = `Range: ${formatPace(pr.lower)} – ${formatPace(pr.upper)}`;
+          }
         }
         if (isWU) {
           stepsOut.push({ type: 'warmup', description: 'Warm-Up', duration, target, range });
