@@ -1177,7 +1177,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       })()}
 
       {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
-      <table className="w-full text-sm table-fixed">
+      <table className="w-full text-[13px] table-fixed">
         <colgroup>
           <col className="w-[36%]" />
           <col className="w-[22%]" />
@@ -1187,11 +1187,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         </colgroup>
         <thead>
           <tr className="border-b border-gray-200">
-            <th className="px-2 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Planned</th>
-            <th className="px-2 py-3 text-left font-medium text-gray-600 whitespace-nowrap">{isRideSport ? 'Watts' : (isSwimSport ? '/100 (pref)' : 'Pace')}</th>
-            <th className="px-2 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Dist</th>
-            <th className="px-2 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Time</th>
-            <th className="px-1 py-3 text-left font-medium text-gray-600 whitespace-nowrap">BPM</th>
+            <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Planned</th>
+            <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">{isRideSport ? 'Watts' : (isSwimSport ? '/100 (pref)' : 'Pace')}</th>
+            <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Dist</th>
+            <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Time</th>
+            <th className="px-1 py-2 text-left font-medium text-gray-600 whitespace-nowrap">BPM</th>
           </tr>
         </thead>
         <tbody>
@@ -1257,23 +1257,23 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
             return (
               <tr key={idx} className="border-b border-gray-100">
-                <td className="px-2 py-2">
-                  <div className="flex items-center justify-between w-full min-h-[2.5rem]">
-                    <span className="text-sm font-medium truncate pr-2">{plannedLabel}</span>
+                <td className="px-2 py-1.5">
+                  <div className="flex items-center justify-between w-full min-h-[2.1rem]">
+                    <span className="text-[13px] font-medium truncate pr-2">{plannedLabel}</span>
                     {pct != null && (
-                      <span className={`text-xs font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
+                      <span className={`text-[11px] font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
                     )}
                   </div>
                 </td>
-                <td className="px-2 py-2 font-medium">{execCell}</td>
-                <td className="px-2 py-2">{distCell}</td>
-                <td className="px-2 py-2">{timeCell}</td>
-                <td className="px-1 py-2 text-sm">
+                <td className="px-2 py-1.5 font-medium">{execCell}</td>
+                <td className="px-2 py-1.5">{distCell}</td>
+                <td className="px-2 py-1.5">{timeCell}</td>
+                <td className="px-1 py-1.5 text-[13px]">
                   <div className="text-right">
                     {hrVal != null ? (
                       <>
                         <div className="font-medium">{hrVal}</div>
-                        <div className="text-xs text-gray-500">bpm</div>
+                        <div className="text-[10px] text-gray-500">bpm</div>
                       </>
                     ) : '—'}
                   </div>
