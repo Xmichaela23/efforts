@@ -833,27 +833,80 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           <TabsContent value="summary" className="flex-1 p-0">
             {/* Attach/Unattach moved to header to reduce padding */}
             {(() => {
-              if (overallScore == null) return null;
-              const color = overallScore>=90 && overallScore<=110 ? 'text-green-600' : overallScore>=80 && overallScore<=120 ? 'text-yellow-600' : 'text-red-600';
-              // Show Pace and Duration adherence on the same horizontal line
+              // Compute session-level Pace and Duration adherence, side-by-side
               try {
-                const ms = document.querySelector('[data-mobile-summary]');
-              } catch {}
-              return (
-                <div className="px-2 pt-1 pb-0">
-                  <div className="flex items-baseline justify-center gap-6">
-                    <div className="flex items-baseline gap-1">
-                      <span className={`text-base font-semibold ${color}`}>{overallScore}%</span>
-                      <span className="text-[12px] text-gray-700 font-medium">Pace/duration adherence</span>
-                    </div>
-                    {/* second metric line placed inline: duration delta already shown below; keep label tight */}
-                    <div className="flex items-baseline gap-1">
-                      {/* Duration percentage is the second number from MobileSummary; keep a placeholder label */}
-                      <span className="text-[12px] text-gray-700 font-medium">Duration</span>
+                const plannedRow: any = (hydratedPlanned || linkedPlanned) as any;
+                const overall = (completedData as any)?.computed?.overall || {};
+                const getColor = (pct:number) => (pct>=90&&pct<=110? 'text-green-600' : (pct>=80&&pct<=120? 'text-yellow-600' : 'text-red-600'));
+
+                // Planned totals
+                const plannedSecondsTotal: number | null = (() => {
+                  const t = Number(plannedRow?.computed?.total_duration_seconds);
+                  if (Number.isFinite(t) && t>0) return t;
+                  const steps: any[] = Array.isArray(plannedRow?.computed?.steps) ? plannedRow.computed.steps : [];
+                  if (!steps.length) return null;
+                  const s = steps.reduce((a:number, st:any)=> a + (Number(st?.seconds||st?.duration||st?.duration_sec||st?.durationSeconds||0) || 0), 0);
+                  return s>0 ? s : null;
+                })();
+                const plannedPaceSecPerMi: number | null = (() => {
+                  const steps: any[] = Array.isArray(plannedRow?.computed?.steps) ? plannedRow.computed.steps : [];
+                  for (const st of steps) {
+                    const kind = String(st?.kind || st?.type || '').toLowerCase();
+                    if (kind==='recovery' || kind==='rest') continue;
+                    if (Array.isArray(st?.pace_range) && st.pace_range.length===2) {
+                      const a=Number(st.pace_range[0]); const b=Number(st.pace_range[1]);
+                      if (Number.isFinite(a)&&Number.isFinite(b)&&a>0&&b>0) return Math.round((a+b)/2);
+                    }
+                    const p=Number(st?.pace_sec_per_mi);
+                    if (Number.isFinite(p) && p>0) return p;
+                  }
+                  return null;
+                })();
+
+                // Executed totals
+                const executedSeconds: number | null = (() => {
+                  const s = Number(overall?.duration_s_moving ?? overall?.duration_s);
+                  return (Number.isFinite(s) && s>0) ? s : null;
+                })();
+                const executedPaceSecPerMi: number | null = (() => {
+                  let v = Number(overall?.avg_pace_s_per_mi);
+                  if (Number.isFinite(v) && v>0) return v>1200? Math.round(v/10) : v;
+                  const m = Number(overall?.distance_m);
+                  const s = Number(overall?.duration_s_moving ?? overall?.duration_s);
+                  if (Number.isFinite(m) && m>0 && Number.isFinite(s) && s>0) {
+                    const miles = m/1609.34; if (miles>0.01) return Math.round(s / miles);
+                  }
+                  return null;
+                })();
+
+                const pacePct: number | null = (plannedPaceSecPerMi && executedPaceSecPerMi)
+                  ? Math.round((plannedPaceSecPerMi as number) / (executedPaceSecPerMi as number) * 100)
+                  : null;
+                const durPct: number | null = (plannedSecondsTotal && executedSeconds)
+                  ? Math.round((executedSeconds as number) / (plannedSecondsTotal as number) * 100)
+                  : null;
+
+                if (pacePct == null && durPct == null) return null;
+
+                return (
+                  <div className="px-2 pt-1 pb-0">
+                    <div className="flex items-baseline justify-center gap-6">
+                      {pacePct != null && (
+                        <div className="flex items-baseline gap-1">
+                          <span className={`text-base font-semibold ${getColor(pacePct)}`}>{pacePct}%</span>
+                          <span className="text-[12px] text-gray-700 font-medium">Pace</span>
+                        </div>
+                      )}
+                      {durPct != null && (
+                        <div className="flex items-baseline gap-1">
+                          <span className={`text-base font-semibold ${getColor(durPct)}`}>{durPct}%</span>
+                          <span className="text-[12px] text-gray-700 font-medium">Duration</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              );
+                );
+              } catch { return null; }
             })()}
             {/* Inline Strength Logger editor */}
             {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
