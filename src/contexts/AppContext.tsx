@@ -839,6 +839,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (ex && ex.length) row.strength_exercises = ex;
             }
 
+            // Mobility: pass through authored mobility_exercises if present
+            if (Array.isArray((s as any)?.mobility_exercises)) {
+              // Normalize minimal shape { name, duration, description }
+              try {
+                const srcArr: any[] = (s as any).mobility_exercises as any[];
+                row.mobility_exercises = srcArr.map((m:any)=>({
+                  name: String(m?.name||'').trim(),
+                  duration: m?.duration ?? (typeof m?.plannedDuration==='string'?m.plannedDuration: undefined) ?? '2-3 minutes',
+                  description: m?.description ?? String(m?.notes||'') || ''
+                }));
+              } catch { row.mobility_exercises = (s as any).mobility_exercises; }
+            }
+
             rows.push(row);
           });
         });
