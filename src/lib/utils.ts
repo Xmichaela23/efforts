@@ -79,6 +79,7 @@ export function typeAbbrev(typeLike: string | undefined): string {
   if (t.includes('ride') || t.includes('bike') || t === 'cycling') return 'BK';
   if (t.includes('swim')) return 'SW';
   if (t.includes('strength')) return 'ST';
+  if (t.includes('mobility')) return 'MBL';
   if (t.includes('walk')) return 'WK';
   return 'WO';
 }

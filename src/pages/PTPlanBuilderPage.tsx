@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { useAppContext } from '@/contexts/AppContext';
 
 type ParsedItem = {
   name: string;
@@ -83,70 +84,52 @@ export default function MobilityPlanBuilderPage() {
   const [selectedDays, setSelectedDays] = useState<string[]>(['Mon','Wed','Fri']);
   const { addPlannedWorkout } = usePlannedWorkouts() as any;
   const navigate = useNavigate();
+  const { addPlan } = useAppContext();
 
   const items = useMemo(() => {
     return text.split(/\n+/).map(parseLine).filter(Boolean) as ParsedItem[];
   }, [text]);
 
-  const addPlan = async () => {
+  const addPlanAction = async () => {
     if (!text.trim() || items.length === 0) { alert('Please enter at least one exercise.'); return; }
     if (!selectedDays.length) { alert('Please select at least one day of the week.'); return; }
     const dates = expandRecurrence(startDate, Math.max(1, weeks), selectedDays);
-
-    // 1) Create a lightweight plan container so entries appear under Plans
-    let planId: string | null = null;
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not signed in');
-      const payload: any = {
-        name: planName || 'Mobility Plan',
-        status: 'active',
-        duration_weeks: Math.max(1, weeks),
-        current_week: 1,
-        user_id: user.id,
-        config: { user_selected_start_date: startDate, source: 'mobility_builder', source_dsl: text }
-      };
-      const { data: planRow, error: pErr } = await supabase.from('plans').insert([payload]).select().single();
-      if (pErr) throw pErr;
-      planId = String(planRow.id);
-    } catch (e: any) {
-      console.warn('Plan insert failed; continuing with planned rows only:', e?.message || e);
-    }
-
-    // Helpers for week/day numbers
-    const toParts = (iso: string) => iso.split('-').map((x)=>parseInt(x,10));
-    const startParts = toParts(startDate);
-    const startObj = new Date(startParts[0], (startParts[1]||1)-1, startParts[2]||1, 12, 0, 0);
-    const dow = startObj.getDay();
-    const monday = new Date(startObj.getFullYear(), startObj.getMonth(), startObj.getDate() - (dow===0?6:(dow-1)));
-    const dayNum = (iso: string) => { const d = new Date(iso+'T12:00:00'); const js=d.getDay(); return js===0?7:js; };
-    const weekNum = (iso: string) => { const d = new Date(iso+'T12:00:00'); const diff = Math.floor((d.getTime()-monday.getTime())/86400000); return Math.floor(diff/7)+1; };
-
-    for (const date of dates) {
-      const mobility_exercises = items.map((it, idx) => ({
-        id: `mob-${Date.now()}-${idx}`,
-        name: it.name,
-        plannedDuration: it.reps && it.sets ? `${it.sets}x${it.reps}${it.perSide ? ' per side' : ''}` : (it.reps ? `${it.reps} reps` : '2-3 minutes'),
-        notes: it.cues || '',
-      }));
-      await addPlannedWorkout({
-        name: planName || 'Mobility Session',
+    // Build sessions_by_week in the same shape as unified plans
+    const weekdayShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const weekOf = (iso:string) => {
+      const d = new Date(iso+'T12:00:00');
+      const js = d.getDay(); // 0..6
+      const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - (js===0?6:(js-1)));
+      const diff = Math.floor((d.getTime()-monday.getTime())/86400000);
+      return { week: Math.floor(diff/7)+1, day: weekdayShort[js] };
+    };
+    const sessionsByWeek: Record<string, any[]> = {};
+    dates.forEach((iso)=>{
+      const js = new Date(iso+'T12:00:00').getDay();
+      const day = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][js];
+      const w = weekOf(iso).week; // relative to start-of-week of that date; exact number not critical for builder
+      const normalized = items.map((it)=>({
+        name: 'Mobility Session',
         type: 'mobility',
-        date,
-        duration: 0,
         description: 'Mobility session',
-        intervals: [],
-        strength_exercises: [],
-        mobility_exercises,
-        workout_status: 'planned',
-        source: 'manual',
-        ...(planId ? { training_plan_id: planId, week_number: weekNum(date), day_number: dayNum(date) } : {}),
-      } as any);
-    }
-    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-    try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-    alert(`Added ${dates.length} planned sessions`);
-    navigate('.')
+        mobility_exercises: items.map(ii=>({ name: ii.name, duration: (ii.sets && ii.reps) ? `${ii.sets}x${ii.reps}${ii.perSide?' per side':''}` : (ii.reps? `${ii.reps} reps`:'2-3 minutes'), description: ii.cues || '' }))
+      }));
+      const arr = sessionsByWeek[String(w)] || [];
+      arr.push({ day, type: 'mobility', name: 'Mobility Session', description: 'Mobility session', mobility_exercises: normalized[0]?.mobility_exercises || [] });
+      sessionsByWeek[String(w)] = arr;
+    });
+
+    const payload = {
+      name: planName || 'Mobility Plan',
+      duration_weeks: Math.max(1, weeks),
+      start_date: startDate,
+      sessions_by_week: sessionsByWeek,
+      status: 'active',
+      config: { user_selected_start_date: startDate, source: 'mobility_builder', source_dsl: text }
+    } as any;
+    await addPlan(payload);
+    alert(`Mobility plan created with ${dates.length} sessions`);
+    navigate('/');
   };
 
   const saveTemplate = async () => {
@@ -203,7 +186,7 @@ export default function MobilityPlanBuilderPage() {
       </div>
       <div className="flex gap-4 items-center">
         <button className="text-sm text-gray-600 hover:text-gray-900" onClick={()=>history.back()}>Cancel</button>
-        <button className="text-sm text-blue-600 hover:text-blue-700" onClick={addPlan}>Add plan</button>
+        <button className="text-sm text-blue-600 hover:text-blue-700" onClick={addPlanAction}>Add plan</button>
         <button className="text-sm text-gray-600 hover:text-gray-900" onClick={saveTemplate}>Save to Templates</button>
       </div>
     </div>
