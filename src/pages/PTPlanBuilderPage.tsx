@@ -52,19 +52,21 @@ function parseLine(line: string): ParsedItem | null {
   return out;
 }
 
-function expandRecurrence(start: string, weeks: number, daysPerWeek: number = 3): string[] {
-  // Anchor to Monday of the week containing start date, schedule Mon/Wed/Fri each week
+function expandRecurrence(start: string, weeks: number, dayNames: string[]): string[] {
+  // Anchor to Monday and schedule selected weekdays for N weeks
   const s = new Date(start + 'T12:00:00');
   const toIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
   const day = s.getDay(); // 0=Sun..6=Sat
-  const monday = addDays(s, (day === 0 ? -6 : (1 - day))); // move to Monday of this week
-  const offsets = [0, 2, 4]; // Mon/Wed/Fri
+  const monday = addDays(s, (day === 0 ? -6 : (1 - day))); // start of week (Mon)
+  const order = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const offsetByName: Record<string, number> = { Mon:0, Tue:1, Wed:2, Thu:3, Fri:4, Sat:5, Sun:6 };
+  const offsets = Array.from(new Set(dayNames.map(n=>offsetByName[n]).filter(n=>typeof n==='number'))).sort((a,b)=>a-b);
   const out: string[] = [];
   for (let w = 0; w < Math.max(1, weeks); w++) {
-    for (let i = 0; i < Math.min(daysPerWeek, offsets.length); i++) {
-      const d = addDays(monday, w * 7 + offsets[i]);
-      if (d >= s) out.push(toIso(d)); // do not schedule before start date
+    for (const off of offsets) {
+      const d = addDays(monday, w * 7 + off);
+      if (d >= s) out.push(toIso(d));
     }
   }
   return out;
@@ -76,6 +78,7 @@ export default function MobilityPlanBuilderPage() {
   const [startDate, setStartDate] = useState(today);
   const [weeks, setWeeks] = useState(4);
   const [text, setText] = useState('');
+  const [selectedDays, setSelectedDays] = useState<string[]>(['Mon','Wed','Fri']);
   const { addPlannedWorkout } = usePlannedWorkouts() as any;
 
   const items = useMemo(() => {
@@ -84,7 +87,8 @@ export default function MobilityPlanBuilderPage() {
 
   const addPlan = async () => {
     if (!text.trim() || items.length === 0) { alert('Please enter at least one exercise.'); return; }
-    const dates = expandRecurrence(startDate, Math.max(1, weeks), 3);
+    if (!selectedDays.length) { alert('Please select at least one day of the week.'); return; }
+    const dates = expandRecurrence(startDate, Math.max(1, weeks), selectedDays);
     for (const date of dates) {
       const mobility_exercises = items.map((it, idx) => ({
         id: `mob-${Date.now()}-${idx}`,
@@ -132,8 +136,17 @@ export default function MobilityPlanBuilderPage() {
           <input type="number" min={1} max={12} className="border rounded px-2 py-2 w-full" value={weeks} onChange={(e)=>setWeeks(parseInt(e.target.value||'1',10))} />
         </div>
         <div className="space-y-2">
-          <label className="text-sm">Cadence</label>
-          <input disabled className="border rounded px-2 py-2 w-full bg-gray-50" value="3x/week" />
+          <label className="text-sm">Days of Week</label>
+          <div className="flex flex-wrap gap-2">
+            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
+              <button
+                key={d}
+                type="button"
+                onClick={()=> setSelectedDays(prev => prev.includes(d) ? prev.filter(x=>x!==d) : [...prev, d])}
+                className={`px-2 py-1 rounded border text-sm ${selectedDays.includes(d) ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-300'}`}
+              >{d}</button>
+            ))}
+          </div>
         </div>
       </div>
       <div className="space-y-2">
