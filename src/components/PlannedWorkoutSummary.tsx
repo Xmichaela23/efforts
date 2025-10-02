@@ -265,6 +265,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   const title = getTitle(workout);
   const lines = suppressNotes ? (buildStructuredSubtitleOnly(workout, baselines) || '') : (buildWeeklySubtitle(workout, baselines) || '');
   const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
+  const isMobility = String((workout as any)?.type||'').toLowerCase()==='mobility';
   const strengthItems: string[] = (() => {
     if (!isStrength) return [];
     try {
@@ -389,6 +390,20 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
       return out;
     } catch { return []; }
   })();
+  const mobilityLines: string[] = (() => {
+    if (!isMobility) return [];
+    try {
+      const raw = (workout as any)?.mobility_exercises;
+      const arr: any[] = Array.isArray(raw) ? raw : (typeof raw==='string'? (JSON.parse(raw)||[]): []);
+      if (!Array.isArray(arr) || arr.length===0) return [];
+      return arr.map((m:any)=>{
+        const name = String(m?.name||'').trim();
+        const dur = String(m?.duration||'').trim();
+        const desc = String(m?.description||'').trim();
+        return [name, dur, desc].filter(Boolean).join(' — ');
+      });
+    } catch { return []; }
+  })();
   const stacked = String(lines).split(/\s•\s/g).filter(Boolean);
   return (
     <div className="flex items-start justify-between gap-3">
@@ -426,6 +441,11 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         {!hideLines && isStrength && strengthItems.length>0 && (
           <ul className="list-disc pl-5 mt-1 text-sm text-gray-700">
             {strengthItems.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
+          </ul>
+        )}
+        {!hideLines && isMobility && mobilityLines.length>0 && (
+          <ul className="list-disc pl-5 mt-1 text-sm text-gray-700">
+            {mobilityLines.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}
       </div>
