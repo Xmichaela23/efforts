@@ -72,6 +72,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
   // Pass a planned strength workout directly into the Strength Logger
   const [loggerScheduledWorkout, setLoggerScheduledWorkout] = useState<any | null>(null);
+  // Pass a planned mobility workout directly into the Mobility Logger
+  const [loggerMobilityScheduledWorkout, setLoggerMobilityScheduledWorkout] = useState<any | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const providerFetchedRef = useRef<boolean>(false);
@@ -127,6 +129,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     };
     window.addEventListener('open:strengthLogger', handler as any);
     return () => window.removeEventListener('open:strengthLogger', handler as any);
+  }, []);
+
+  // Open Mobility Logger on demand from child views (Planned tab button)
+  useEffect(() => {
+    const handler = (ev: any) => {
+      try {
+        const planned = ev?.detail?.planned;
+        if (!planned) return;
+        setShowAllPlans(false);
+        setSelectedWorkout(null);
+        setLoggerMobilityScheduledWorkout(planned);
+        if (planned?.date) setSelectedDate(String(planned.date));
+        setShowMobilityLogger(true);
+      } catch {}
+    };
+    window.addEventListener('open:mobilityLogger', handler as any);
+    return () => window.removeEventListener('open:mobilityLogger', handler as any);
   }, []);
 
   // Load provider data once per session when Completed tab is first opened
@@ -734,6 +753,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   setSelectedWorkout(workout);
                   setActiveTab('completed');
                 }}
+                scheduledWorkout={loggerMobilityScheduledWorkout || undefined}
               />
             </div>
           ) : showBuilder ? (

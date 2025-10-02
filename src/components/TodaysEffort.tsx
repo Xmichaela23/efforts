@@ -160,6 +160,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         // Pass-through fields needed by renderers
         steps_preset: (it as any)?.planned?.steps_preset ?? null,
         strength_exercises: (it as any)?.planned?.strength_exercises ?? null,
+        mobility_exercises: (it as any)?.planned?.mobility_exercises ?? null,
         export_hints: (it as any)?.planned?.export_hints ?? null,
         workout_structure: (it as any)?.planned?.workout_structure ?? null,
         friendly_summary: (it as any)?.planned?.friendly_summary ?? null,
