@@ -96,18 +96,21 @@ export default function MobilityPlanBuilderPage() {
     const dates = expandRecurrence(startDate, Math.max(1, weeks), selectedDays);
     // Build sessions_by_week in the same shape as unified plans
     const weekdayShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const weekOf = (iso:string) => {
+    const weekdayFull = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const startPartsArr = startDate.split('-').map(x=>parseInt(x,10));
+    const startObj2 = new Date(startPartsArr[0], (startPartsArr[1]||1)-1, (startPartsArr[2]||1), 12, 0, 0);
+    const jsStart = startObj2.getDay();
+    const startMonday = new Date(startObj2.getFullYear(), startObj2.getMonth(), startObj2.getDate() - (jsStart===0?6:(jsStart-1)));
+    const fullDayName = (iso:string) => weekdayFull[new Date(iso+'T12:00:00').getDay()];
+    const weekIndexFromStart = (iso:string) => {
       const d = new Date(iso+'T12:00:00');
-      const js = d.getDay(); // 0..6
-      const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - (js===0?6:(js-1)));
-      const diff = Math.floor((d.getTime()-monday.getTime())/86400000);
-      return { week: Math.floor(diff/7)+1, day: weekdayShort[js] };
+      const diffDays = Math.floor((d.getTime() - startMonday.getTime())/86400000);
+      return Math.floor(diffDays/7) + 1; // Week 1 anchored to start week
     };
     const sessionsByWeek: Record<string, any[]> = {};
     dates.forEach((iso)=>{
-      const js = new Date(iso+'T12:00:00').getDay();
-      const day = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][js];
-      const w = weekOf(iso).week; // relative to start-of-week of that date; exact number not critical for builder
+      const dayFull = fullDayName(iso);
+      const w = weekIndexFromStart(iso);
       const normalized = items.map((it)=>({
         name: 'Mobility Session',
         type: 'mobility',
@@ -115,7 +118,7 @@ export default function MobilityPlanBuilderPage() {
         mobility_exercises: items.map(ii=>({ name: ii.name, duration: (ii.sets && ii.reps) ? `${ii.sets}x${ii.reps}${ii.perSide?' per side':''}` : (ii.reps? `${ii.reps} reps`:'2-3 minutes'), description: ii.cues || '' }))
       }));
       const arr = sessionsByWeek[String(w)] || [];
-      arr.push({ day, type: 'mobility', name: 'Mobility Session', description: 'Mobility session', mobility_exercises: normalized[0]?.mobility_exercises || [] });
+      arr.push({ day: dayFull, type: 'mobility', name: 'Mobility Session', description: 'Mobility session', mobility_exercises: normalized[0]?.mobility_exercises || [] });
       sessionsByWeek[String(w)] = arr;
     });
 
