@@ -155,6 +155,8 @@ Deno.serve(async (req) => {
                 // Normalize type (include mobility). If unknown, skip instead of defaulting to run.
                 const raw = String((s?.discipline || s?.type || '')).toLowerCase();
                 let normType: string | null = null;
+                const hasMob = Array.isArray((s as any)?.mobility_exercises) && (s as any).mobility_exercises.length > 0;
+                if (hasMob) normType = 'mobility';
                 if (raw === 'brick') normType = 'brick';
                 else if (raw === 'bike' || raw === 'cycling' || raw === 'ride') normType = 'ride';
                 else if (raw === 'walk') normType = 'walk';
