@@ -96,14 +96,28 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
       }
     }
 
-    if (workoutToLoad && (workoutToLoad as any).mobility_exercises && (workoutToLoad as any).mobility_exercises.length > 0) {
+    const mobAny: any[] = (()=>{
+      try {
+        const direct = (workoutToLoad as any)?.mobility_exercises;
+        if (Array.isArray(direct)) return direct as any[];
+        if (typeof direct === 'string') { const p = JSON.parse(direct); if (Array.isArray(p)) return p as any[]; }
+      } catch {}
+      try {
+        const nested = (workoutToLoad as any)?.planned?.mobility_exercises;
+        if (Array.isArray(nested)) return nested as any[];
+        if (typeof nested === 'string') { const p = JSON.parse(nested); if (Array.isArray(p)) return p as any[]; }
+      } catch {}
+      return [] as any[];
+    })();
+
+    if (workoutToLoad && Array.isArray(mobAny) && mobAny.length > 0) {
       console.log('📝 Pre-populating with planned mobility workout exercises');
       // Pre-populate with scheduled workout data
-      const prePopulatedExercises: LoggedMobilityExercise[] = (workoutToLoad as any).mobility_exercises.map((exercise: any, index: number) => ({
+      const prePopulatedExercises: LoggedMobilityExercise[] = mobAny.map((exercise: any, index: number) => ({
         id: `mob-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
         name: exercise.name || '',
-        plannedDuration: exercise.duration || '2-3 minutes',
-        notes: exercise.description || '',
+        plannedDuration: exercise.duration || exercise.plannedDuration || '2-3 minutes',
+        notes: exercise.description || exercise.notes || '',
         completed: false,
         expanded: true
       }));
