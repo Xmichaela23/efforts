@@ -818,7 +818,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   if (type==='strength') {
                     window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned } }));
                   } else {
-                    window.dispatchEvent(new CustomEvent('open:mobilityLogger', { detail: { planned } }));
+                    // Map mobility → strength logger template with parsed sets×reps when possible
+                    const raw = (planned?.mobility_exercises ?? (planned?.planned?.mobility_exercises)) as any;
+                    const arr: any[] = Array.isArray(raw) ? raw : [];
+                    const parsed = arr.map((m:any)=>{
+                      const name = String(m?.name||'').trim() || 'Mobility';
+                      const dur = String(m?.duration || m?.plannedDuration || '').toLowerCase();
+                      let sets = 1; let reps = 0;
+                      const mr = dur.match(/(\d+)\s*x\s*(\d+)/i) || dur.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
+                      if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||0; }
+                      return { name, sets, reps, weight: 0 };
+                    });
+                    const plannedForStrength = { ...planned, type: 'strength', strength_exercises: parsed } as any;
+                    window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: plannedForStrength } }));
                   }
                 } catch {}
               };
