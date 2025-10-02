@@ -65,7 +65,7 @@ export interface StrengthExercise {
 export interface Workout {
   id: string;
   name: string;
-  type: "run" | "ride" | "swim" | "strength" | "walk";
+  type: "run" | "ride" | "swim" | "strength" | "walk" | "mobility";
   duration: number;
   date: string;
   description?: string;
@@ -73,6 +73,7 @@ export interface Workout {
   completedManually?: boolean;
   intervals?: RunInterval[] | RideInterval[] | SwimInterval[];
   strength_exercises?: StrengthExercise[];
+  mobility_exercises?: Array<any>;
   workout_status?: "planned" | "completed" | "skipped" | "in_progress";
   // Linkage to authored planned workout (if associated)
   planned_id?: string | null;
@@ -1145,6 +1146,7 @@ export const useWorkouts = () => {
         workout_status: workoutData.workout_status ?? "planned",
         intervals: workoutData.intervals ? JSON.stringify(workoutData.intervals) : JSON.stringify([]),
         strength_exercises: workoutData.strength_exercises ? JSON.stringify(workoutData.strength_exercises) : JSON.stringify([]),
+        mobility_exercises: (workoutData as any).mobility_exercises ? JSON.stringify((workoutData as any).mobility_exercises) : JSON.stringify([]),
         user_id: user.id,
         avg_heart_rate: workoutData.avg_heart_rate,
         max_heart_rate: workoutData.max_heart_rate,
@@ -1243,6 +1245,7 @@ export const useWorkouts = () => {
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
+        mobility_exercises: ((): any[] => { try { return data.mobility_exercises ? JSON.parse(data.mobility_exercises) : []; } catch { return Array.isArray((data as any).mobility_exercises) ? (data as any).mobility_exercises : []; } })(),
         avg_heart_rate: data.avg_heart_rate,
         max_heart_rate: data.max_heart_rate,
         avg_power: data.avg_power,
@@ -1390,7 +1393,7 @@ export const useWorkouts = () => {
       if (updates.workout_status !== undefined) updateObject.workout_status = updates.workout_status;
       if (updates.intervals !== undefined) updateObject.intervals = JSON.stringify(updates.intervals);
       if (updates.strength_exercises !== undefined) updateObject.strength_exercises = JSON.stringify(updates.strength_exercises);
-      if ((updates as any).swim_data !== undefined) updateObject.swim_data = JSON.stringify((updates as any).swim_data);
+      if ((updates as any).mobility_exercises !== undefined) updateObject.mobility_exercises = JSON.stringify((updates as any).mobility_exercises);
       if (updates.avg_heart_rate !== undefined) updateObject.avg_heart_rate = updates.avg_heart_rate;
       if (updates.max_heart_rate !== undefined) updateObject.max_heart_rate = updates.max_heart_rate;
       if (updates.avg_power !== undefined) updateObject.avg_power = updates.avg_power;
@@ -1467,6 +1470,7 @@ export const useWorkouts = () => {
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
+        mobility_exercises: ((): any[] => { try { return data.mobility_exercises ? JSON.parse(data.mobility_exercises) : []; } catch { return Array.isArray((data as any).mobility_exercises) ? (data as any).mobility_exercises : []; } })(),
         avg_heart_rate: data.avg_heart_rate,
         max_heart_rate: data.max_heart_rate,
         avg_power: data.avg_power,

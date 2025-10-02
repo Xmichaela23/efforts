@@ -211,11 +211,11 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
 
-    // Prepare the workout data - using 'strength' type for now until we add 'mobility'
+    // Prepare the workout data - using 'mobility' type and persisting mobility_exercises
     const completedWorkout = {
       id: scheduledWorkout?.id || Date.now().toString(),
       name: scheduledWorkout?.name || `Mobility - ${new Date().toLocaleDateString()}`,
-      type: 'strength' as const, // Temporary until we add 'mobility' type
+      type: 'mobility' as const,
       date: scheduledWorkout?.date || new Date().toISOString().split('T')[0],
       description: validExercises
         .map(ex => `${ex.name}: ${ex.completed ? 'Completed' : 'Not completed'}`)

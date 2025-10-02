@@ -31,12 +31,16 @@ function addDaysISO(iso: string, n: number): string {
 
 const DAY_INDEX: Record<string, number> = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 }
 
-function mapType(raw: string): 'run'|'ride'|'swim'|'strength' {
+// Map authoring type → planned_workouts.type. Returns null for unknown/blank so callers can skip
+function mapType(raw: string, hasMobilityExercises: boolean): 'run'|'ride'|'swim'|'strength'|'mobility'|null {
   const t = String(raw||'').toLowerCase()
+  if (hasMobilityExercises) return 'mobility'
+  if (t === 'mobility' || t === 'pt') return 'mobility'
   if (t === 'ride' || t === 'bike' || t === 'cycling') return 'ride'
   if (t === 'swim') return 'swim'
   if (t === 'strength' || t === 'lift' || t === 'weights') return 'strength'
-  return 'run'
+  if (t === 'run' || t === 'walk') return 'run'
+  return null
 }
 
 function titleFor(type: string, tokens: string[]): string {
@@ -57,6 +61,7 @@ function titleFor(type: string, tokens: string[]): string {
     if (/longrun_/.test(joined)) return 'Run — Long'
     return 'Run'
   }
+  if (t === 'mobility') return 'Mobility'
   return 'Session'
 }
 
@@ -233,7 +238,10 @@ Deno.serve(async (req) => {
         if (rawDiscipline === 'rest' || rawDiscipline === 'off' || rawDiscipline === 'recovery') {
           continue
         }
-        const mapped = mapType(s.discipline || s.type)
+        const hasMobility = Array.isArray((s as any)?.mobility_exercises) && (s as any).mobility_exercises.length > 0
+        const mapped = mapType((s as any)?.discipline || (s as any)?.type, hasMobility)
+        // Skip unknown/blank types instead of defaulting to run
+        if (!mapped) continue
         const stepsTokens: string[] = Array.isArray(s?.steps_preset) ? s.steps_preset.map((t:any)=> String(t)) : []
         const name = s.name || titleFor(mapped, stepsTokens)
         const durationVal = (typeof s?.duration === 'number' && isFinite(s.duration)) ? s.duration : 0
@@ -304,6 +312,15 @@ Deno.serve(async (req) => {
           tags: Array.isArray(s?.tags) ? s.tags : (Array.isArray(s?.optional) && s.optional ? ['optional'] : []),
           // Include authored structured workout when present so server materializer can expand it
           workout_structure: (s as any)?.workout_structure && typeof (s as any).workout_structure === 'object' ? (s as any).workout_structure : null,
+        }
+        if (mapped === 'mobility') {
+          // Pass through authored mobility exercises as-is (display-time structure)
+          const mob = (s as any)?.mobility_exercises
+          if (Array.isArray(mob) && mob.length) {
+            baseRow.mobility_exercises = mob
+          }
+          // Ensure a stable display name for mobility when not authored
+          if (!baseRow.name || String(baseRow.name).trim()==='') baseRow.name = 'Mobility'
         }
         // Persist authored swim unit on each swim row so rendering/materialization honors yards vs meters
         if (mapped === 'swim') {

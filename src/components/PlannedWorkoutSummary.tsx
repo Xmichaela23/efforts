@@ -48,6 +48,7 @@ function getTitle(workout: any): string {
     return nm || 'Swim — Endurance';
   }
   if (t === 'strength') return nm || 'Strength';
+  if (t === 'mobility') return nm || 'Mobility';
   return nm || 'Session';
 }
 
