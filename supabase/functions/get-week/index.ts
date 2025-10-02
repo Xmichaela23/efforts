@@ -152,15 +152,23 @@ Deno.serve(async (req) => {
               const daySessions = weekArr.filter((s:any)=> String(s?.day) === dayName);
               if (!daySessions.length) continue;
               for (const s of daySessions) {
-                // Normalize type
+                // Normalize type (include mobility)
                 const raw = String((s?.discipline || s?.type || 'run')).toLowerCase();
-                const normType = raw === 'brick' ? 'brick' : (raw==='bike' || raw==='cycling' ? 'ride' : (raw==='walk' ? 'walk' : (raw==='strength'||raw==='lift'||raw==='weights' ? 'strength' : (raw==='swim' ? 'swim' : 'run'))));
+                const normType = raw === 'brick'
+                  ? 'brick'
+                  : (raw==='bike' || raw==='cycling') ? 'ride'
+                  : (raw==='walk') ? 'walk'
+                  : (raw==='strength' || raw==='lift' || raw==='weights') ? 'strength'
+                  : (raw==='swim') ? 'swim'
+                  : (raw==='mobility') ? 'mobility'
+                  : 'run';
                 const key = `${String(plan.id)}|${iso}|${normType}`;
                 if (existsKey.has(key)) continue;
                 // Build minimal row preserving authored fields
                 const stepsPreset = Array.isArray(s?.steps_preset) ? s.steps_preset : undefined;
                 const workoutStructure = (s?.workout_structure && typeof s.workout_structure==='object') ? s.workout_structure : undefined;
                 const strength = Array.isArray(s?.strength_exercises) ? s.strength_exercises : undefined;
+                const mobility = Array.isArray(s?.mobility_exercises) ? s.mobility_exercises : undefined;
                 const tags = Array.isArray(s?.tags) ? s.tags : undefined;
                 const exportHints = (s?.export_hints && typeof s.export_hints==='object') ? s.export_hints : undefined;
                 const description = typeof s?.description==='string' ? s.description : (typeof s?.title==='string' ? s.title : undefined);
@@ -177,6 +185,7 @@ Deno.serve(async (req) => {
                 if (stepsPreset) insertRow.steps_preset = stepsPreset;
                 if (workoutStructure) insertRow.workout_structure = workoutStructure;
                 if (strength) insertRow.strength_exercises = strength;
+                if (mobility) insertRow.mobility_exercises = mobility;
                 if (tags) insertRow.tags = tags;
                 if (exportHints) insertRow.export_hints = exportHints;
                 if (description) insertRow.description = description;
