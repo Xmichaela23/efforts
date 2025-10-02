@@ -644,7 +644,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           
           sessions.forEach((s: any) => {
             const dow = dayIndex[s.day] || 1;
-            const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
+            // Anchor week to Monday of startDate to honor authored weekdays
+            const startParts = String(startDate).split('-').map((x)=>parseInt(x,10));
+            const startObj = new Date(startParts[0], (startParts[1]||1)-1, (startParts[2]||1));
+            const startJs = startObj.getDay(); // 0=Sun..6=Sat
+            const startMonday = new Date(startObj.getFullYear(), startObj.getMonth(), startObj.getDate() - (startJs===0?6:(startJs-1)));
+            const y = startMonday.getFullYear(); const m = String(startMonday.getMonth()+1).padStart(2,'0'); const d0 = String(startMonday.getDate()).padStart(2,'0');
+            const startMondayIso = `${y}-${m}-${d0}`;
+            const date = addDays(startMondayIso, (weekNum - 1) * 7 + (dow - 1));
             if (weekNum === 1 && date < startDate) return; // skip pre-start in week 1
 
             // Normalize type to satisfy DB check constraints
