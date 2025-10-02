@@ -29,10 +29,32 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const hasStructured = !!(structureAny && typeof structureAny === 'object');
   const hasComputedV3 = Array.isArray(computedAny?.steps) && computedAny.steps.length > 0;
 
-  if (!hasStructured && !hasComputedV3) {
+  const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
+  const mobilityList: Array<{ name: string; duration?: string; description?: string }> = (() => {
+    try {
+      const raw = (workout as any)?.mobility_exercises;
+      if (Array.isArray(raw)) return raw as any[];
+      if (typeof raw === 'string') { const p = JSON.parse(raw); if (Array.isArray(p)) return p as any[]; }
+    } catch {}
+    return [];
+  })();
+
+  if (!hasStructured && !hasComputedV3 && parentDisc==='mobility') {
     return (
       <div className="p-3">
-        <div className="text-sm text-gray-700">Waiting for server compute…</div>
+        {mobilityList.length ? (
+          <ul className="list-disc pl-5 space-y-1">
+            {mobilityList.map((m, i)=> (
+              <li key={i} className="text-sm text-gray-800">
+                <span className="font-medium">{m.name}</span>
+                {m.duration ? <span className="text-gray-600"> — {m.duration}</span> : null}
+                {m.description ? <span className="text-gray-600"> — {m.description}</span> : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-sm text-gray-700">Mobility session</div>
+        )}
       </div>
     );
   }
@@ -267,7 +289,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   };
   const type = String(ws?.type||'').toLowerCase();
   const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
-  const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
+  // parentDisc computed above for mobility rendering
   const isStrengthContext = (type === 'strength_session') || (parentDisc === 'strength');
 
   // Legacy swim fallback removed: rely on computed.v3 exclusively

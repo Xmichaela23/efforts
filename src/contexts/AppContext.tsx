@@ -654,6 +654,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             else if (rawType === 'bike' || rawType === 'ride') mappedType = 'ride';
             else if (rawType === 'swim') mappedType = 'swim';
             else if (rawType === 'strength') mappedType = 'strength';
+            else if (rawType === 'mobility') mappedType = 'mobility';
             else if (rawType === 'brick') mappedType = 'run'; // represent brick on calendar as run
 
             const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
@@ -685,6 +686,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 if (/longrun_/.test(tokensJoined)) return 'Run — Long';
                 return 'Run';
               }
+              if (mappedType === 'mobility') return 'Mobility';
               return 'Session';
             })();
 
