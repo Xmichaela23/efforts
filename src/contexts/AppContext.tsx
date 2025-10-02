@@ -847,7 +847,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 row.mobility_exercises = srcArr.map((m:any)=>({
                   name: String(m?.name||'').trim(),
                   duration: m?.duration ?? (typeof m?.plannedDuration==='string'?m.plannedDuration: undefined) ?? '2-3 minutes',
-                  description: m?.description ?? String(m?.notes||'') || ''
+                  description: (m?.description ?? (m?.notes != null ? String(m.notes) : ''))
                 }));
               } catch { row.mobility_exercises = (s as any).mobility_exercises; }
             }
