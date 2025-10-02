@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { supabase } from '@/lib/supabase';
+import { useNavigate } from 'react-router-dom';
 
 type ParsedItem = {
   name: string;
@@ -80,6 +82,7 @@ export default function MobilityPlanBuilderPage() {
   const [text, setText] = useState('');
   const [selectedDays, setSelectedDays] = useState<string[]>(['Mon','Wed','Fri']);
   const { addPlannedWorkout } = usePlannedWorkouts() as any;
+  const navigate = useNavigate();
 
   const items = useMemo(() => {
     return text.split(/\n+/).map(parseLine).filter(Boolean) as ParsedItem[];
@@ -89,6 +92,36 @@ export default function MobilityPlanBuilderPage() {
     if (!text.trim() || items.length === 0) { alert('Please enter at least one exercise.'); return; }
     if (!selectedDays.length) { alert('Please select at least one day of the week.'); return; }
     const dates = expandRecurrence(startDate, Math.max(1, weeks), selectedDays);
+
+    // 1) Create a lightweight plan container so entries appear under Plans
+    let planId: string | null = null;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+      const payload: any = {
+        name: planName || 'Mobility Plan',
+        status: 'active',
+        duration_weeks: Math.max(1, weeks),
+        current_week: 1,
+        user_id: user.id,
+        config: { user_selected_start_date: startDate, source: 'mobility_builder', source_dsl: text }
+      };
+      const { data: planRow, error: pErr } = await supabase.from('plans').insert([payload]).select().single();
+      if (pErr) throw pErr;
+      planId = String(planRow.id);
+    } catch (e: any) {
+      console.warn('Plan insert failed; continuing with planned rows only:', e?.message || e);
+    }
+
+    // Helpers for week/day numbers
+    const toParts = (iso: string) => iso.split('-').map((x)=>parseInt(x,10));
+    const startParts = toParts(startDate);
+    const startObj = new Date(startParts[0], (startParts[1]||1)-1, startParts[2]||1, 12, 0, 0);
+    const dow = startObj.getDay();
+    const monday = new Date(startObj.getFullYear(), startObj.getMonth(), startObj.getDate() - (dow===0?6:(dow-1)));
+    const dayNum = (iso: string) => { const d = new Date(iso+'T12:00:00'); const js=d.getDay(); return js===0?7:js; };
+    const weekNum = (iso: string) => { const d = new Date(iso+'T12:00:00'); const diff = Math.floor((d.getTime()-monday.getTime())/86400000); return Math.floor(diff/7)+1; };
+
     for (const date of dates) {
       const mobility_exercises = items.map((it, idx) => ({
         id: `mob-${Date.now()}-${idx}`,
@@ -107,12 +140,13 @@ export default function MobilityPlanBuilderPage() {
         mobility_exercises,
         workout_status: 'planned',
         source: 'manual',
+        ...(planId ? { training_plan_id: planId, week_number: weekNum(date), day_number: dayNum(date) } : {}),
       } as any);
     }
     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
     try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
     alert(`Added ${dates.length} planned sessions`);
-    history.back();
+    navigate('.')
   };
 
   const saveTemplate = async () => {
@@ -121,7 +155,10 @@ export default function MobilityPlanBuilderPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-4">
-      <h1 className="text-xl font-semibold">Build Mobility Plan</h1>
+      <div className="flex items-center justify-between">
+        <div className="text-xl font-semibold">Build Mobility Plan</div>
+        <button className="text-sm text-gray-600 hover:text-gray-900" onClick={()=>navigate('/')}>Dashboard</button>
+      </div>
       <div className="space-y-2">
         <label className="text-sm">Plan Name</label>
         <input className="border rounded px-2 py-2 w-full" value={planName} onChange={(e)=>setPlanName(e.target.value)} />
