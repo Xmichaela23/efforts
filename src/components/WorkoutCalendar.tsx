@@ -214,6 +214,7 @@ export default function WorkoutCalendar({
     workout_structure: (it as any)?.planned?.workout_structure ?? null,
     friendly_summary: (it as any)?.planned?.friendly_summary ?? null,
     rendered_description: (it as any)?.planned?.rendered_description ?? null,
+    training_plan_id: (it as any)?.planned?.training_plan_id ?? null,
   }));
   const unifiedWorkouts = unifiedItems.map((it:any)=> ({
     id: it.id,
