@@ -152,16 +152,21 @@ Deno.serve(async (req) => {
               const daySessions = weekArr.filter((s:any)=> String(s?.day) === dayName);
               if (!daySessions.length) continue;
               for (const s of daySessions) {
-                // Normalize type (include mobility)
-                const raw = String((s?.discipline || s?.type || 'run')).toLowerCase();
-                const normType = raw === 'brick'
-                  ? 'brick'
-                  : (raw==='bike' || raw==='cycling') ? 'ride'
-                  : (raw==='walk') ? 'walk'
-                  : (raw==='strength' || raw==='lift' || raw==='weights') ? 'strength'
-                  : (raw==='swim') ? 'swim'
-                  : (raw==='mobility') ? 'mobility'
-                  : 'run';
+                // Normalize type (include mobility). If unknown, skip instead of defaulting to run.
+                const raw = String((s?.discipline || s?.type || '')).toLowerCase();
+                let normType: string | null = null;
+                if (raw === 'brick') normType = 'brick';
+                else if (raw === 'bike' || raw === 'cycling' || raw === 'ride') normType = 'ride';
+                else if (raw === 'walk') normType = 'walk';
+                else if (raw === 'strength' || raw === 'lift' || raw === 'weights') normType = 'strength';
+                else if (raw === 'swim') normType = 'swim';
+                else if (raw === 'run') normType = 'run';
+                else if (raw === 'mobility') normType = 'mobility';
+                // Skip unknown/blank types entirely to avoid phantom RN rows
+                if (!normType) {
+                  if (debug && debugNotes.length < 50) debugNotes.push({ where:'skip_unknown_type', iso, raw });
+                  continue;
+                }
                 const key = `${String(plan.id)}|${iso}|${normType}`;
                 if (existsKey.has(key)) continue;
                 // Build minimal row preserving authored fields
