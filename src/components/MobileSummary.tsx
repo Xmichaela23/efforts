@@ -1329,8 +1329,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const plannedWatts = (() => {
               const ftpNum = Number(ftp);
               const steps = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              const isWorkStep = (st:any) => {
+                const k = String(st?.type || st?.kind || st?.name || '').toLowerCase();
+                return !(k.includes('warm') || k.includes('cool') || k.includes('rest') || k.includes('recovery') || k.includes('jog'));
+              };
               let sum = 0; let w = 0;
               for (const st of steps) {
+                if (!isWorkStep(st)) continue;
                 const dur = Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0);
                 let center: number | null = null;
                 const pr = (st as any)?.power_range;
@@ -1355,17 +1360,34 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
             // Executed watts
             const executedWatts = (() => {
-              const v = Number((hydratedCompleted || completed)?.avg_power ?? (hydratedCompleted || completed)?.metrics?.avg_power ?? (hydratedCompleted || completed)?.average_watts);
-              if (Number.isFinite(v) && v>0) return Math.round(v);
-              // Fallback: duration-weighted from executed intervals if present
-              const intervals = Array.isArray((hydratedCompleted || completed)?.computed?.intervals) ? (hydratedCompleted || completed).computed.intervals : [];
+              // Prefer duration-weighted executed watts only across executed intervals that correspond to planned work steps with power targets
+              const steps = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              const intervals: any[] = Array.isArray((hydratedCompleted || completed)?.computed?.intervals) ? (hydratedCompleted || completed).computed.intervals : [];
+              const isWorkStep = (st:any) => { const k = String(st?.type || st?.kind || st?.name || '').toLowerCase(); return !(k.includes('warm') || k.includes('cool') || k.includes('rest') || k.includes('recovery') || k.includes('jog')); };
+              const hasPowerTarget = (st:any) => {
+                const pr = (st as any)?.power_range; const lo=Number(pr?.lower), hi=Number(pr?.upper);
+                const pw = Number((st as any)?.power_target_watts ?? (st as any)?.target_watts ?? (st as any)?.watts);
+                return (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) || (Number.isFinite(pw) && pw>0);
+              };
               let sum = 0; let w = 0;
-              for (const it of intervals) {
-                const pw = Number(it?.executed?.avg_power_w ?? it?.executed?.avg_watts);
-                const dur = Number(it?.executed?.duration_s);
+              for (let idx=0; idx<steps.length; idx+=1) {
+                const st = steps[idx];
+                if (!isWorkStep(st) || !hasPowerTarget(st)) continue;
+                const pid = String((st as any)?.id || '');
+                let row: any = null;
+                if (pid) row = intervals.find((it:any)=> String((it as any)?.planned_step_id || '') === pid) || null;
+                if (!row) {
+                  const ix = Number((st as any)?.planned_index ?? idx);
+                  if (Number.isFinite(ix)) row = intervals.find((it:any)=> Number((it as any)?.planned_index) === ix) || null;
+                }
+                const pw = Number(row?.executed?.avg_power_w ?? row?.executed?.avg_watts);
+                const dur = Number(row?.executed?.duration_s);
                 if (Number.isFinite(pw) && pw>0 && Number.isFinite(dur) && dur>0) { sum += pw*dur; w += dur; }
               }
-              return w>0 ? Math.round(sum/w) : null;
+              if (w>0) return Math.round(sum/w);
+              // Fallback to overall average if interval mapping is missing
+              const v = Number((hydratedCompleted || completed)?.avg_power ?? (hydratedCompleted || completed)?.metrics?.avg_power ?? (hydratedCompleted || completed)?.average_watts);
+              return (Number.isFinite(v) && v>0) ? Math.round(v) : null;
             })();
 
             const compOverall = (hydratedCompleted || completed)?.computed?.overall || {};
