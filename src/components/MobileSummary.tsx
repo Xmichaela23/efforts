@@ -211,7 +211,7 @@ function computeOverallSwimPer100Sec(completed: any): number | null {
 }
 
 const completedValueForStep = (completed: any, plannedStep: any): CompletedDisplay => {
-  if (!completed) return '—';
+  if (!completed) return { text: '—', hr: null } as CompletedDisplay;
   // Attempt per-step slice from samples; fallback to overall
   const isRunOrWalk = /run|walk/i.test(completed.type || '') || /running|walking/i.test(completed.activity_type || '');
   const isRide = /ride|bike|cycling/i.test(completed.type || '') || /cycling|bike/i.test(completed.activity_type || '');
@@ -1063,7 +1063,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
         // Component adherence strip (pace / duration / distance)
         try {
           const isRunOrWalk = /run|walk/i.test(sportType);
-          if (!isRunOrWalk) return null;
+          const isRide = /ride|bike|cycling/i.test(sportType);
+          const isSwim = /swim/i.test(sportType);
+
+          // ------------ RUN/WALK (existing behavior) ------------
+          if (!isRide && !isSwim && isRunOrWalk) {
 
           // Planned totals
           const plannedSecondsTotal = (() => {
@@ -1211,6 +1215,201 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               </div>
             </div>
           );
+          }
+
+          // ------------ SWIM (session-average per-100 pace + duration) ------------
+          if (isSwim) {
+            // Planned totals
+            const plannedSecondsTotal = (() => {
+              const t = Number((effectivePlanned as any)?.computed?.total_duration_seconds);
+              if (Number.isFinite(t) && t > 0) return t;
+              const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              const s = arr.reduce((sum:number, st:any)=> sum + (Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0), 0);
+              return s > 0 ? s : null;
+            })();
+
+            const swimUnit = String((effectivePlanned as any)?.swim_unit || 'yd').toLowerCase();
+
+            // Planned per-100 seconds (prefer baselines, else duration‑weighted from steps, else derive from distance+time)
+            const plannedPer100 = (() => {
+              const fromBaseline = Number((effectivePlanned as any)?.baselines_template?.swim_pace_per_100_sec ?? (effectivePlanned as any)?.baselines?.swim_pace_per_100_sec);
+              if (Number.isFinite(fromBaseline) && (fromBaseline as number) > 0) return Math.round(fromBaseline as number);
+              const steps = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              let sum = 0; let w = 0;
+              for (const st of steps) {
+                const dur = Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0);
+                let p100: number | null = null;
+                if (typeof (st as any)?.swim_pace_sec_per_100 === 'number') p100 = Number((st as any).swim_pace_sec_per_100);
+                const rng = (st as any)?.swim_pace_range_per_100;
+                if (p100 == null && rng && typeof rng.lower === 'number' && typeof rng.upper === 'number') {
+                  p100 = Math.round(((rng.lower as number) + (rng.upper as number)) / 2);
+                }
+                if (Number.isFinite(p100 as any) && (p100 as number) > 0 && Number.isFinite(dur) && dur > 0) { sum += (p100 as number) * dur; w += dur; }
+              }
+              if (w > 0) return Math.round(sum / w);
+              // Derive from planned distance and time
+              const distM = (() => {
+                const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+                let m = 0; for (const st of arr) { const dm = Number(st?.distanceMeters || st?.distance_m || st?.m || 0); if (Number.isFinite(dm) && dm>0) m += dm; }
+                return m > 0 ? m : null;
+              })();
+              if (plannedSecondsTotal && distM) {
+                const denom = swimUnit === 'yd' ? ((distM as number)/0.9144)/100 : ((distM as number)/100);
+                if (denom > 0) return Math.round((plannedSecondsTotal as number) / denom);
+              }
+              return null;
+            })();
+
+            // Executed totals
+            const compOverall = (hydratedCompleted || completed)?.computed?.overall || {};
+            const executedSeconds = (() => {
+              const s = Number(compOverall?.duration_s_moving ?? compOverall?.duration_s);
+              if (Number.isFinite(s) && s>0) return s;
+              const fromResolver = resolveMovingSeconds(hydratedCompleted || completed);
+              return Number.isFinite(fromResolver as any) && (fromResolver as number) > 0 ? (fromResolver as number) : null;
+            })();
+            const executedMeters = (() => {
+              const m = Number(compOverall?.distance_m);
+              if (Number.isFinite(m) && m>0) return m;
+              const km = Number((hydratedCompleted || completed)?.distance);
+              return Number.isFinite(km) && km>0 ? Math.round(km * 1000) : null;
+            })();
+            const executedPer100 = (() => {
+              if (Number.isFinite(executedSeconds as any) && (executedSeconds as number) > 0 && Number.isFinite(executedMeters as any) && (executedMeters as number) > 0) {
+                const denom = swimUnit === 'yd' ? (((executedMeters as number)/0.9144)/100) : (((executedMeters as number)/100));
+                if (denom > 0) return Math.round((executedSeconds as number) / denom);
+              }
+              return null;
+            })();
+
+            const pacePct = (plannedPer100 && executedPer100) ? Math.round((plannedPer100 / executedPer100) * 100) : null;
+            const paceDeltaSec = (plannedPer100 && executedPer100) ? (plannedPer100 - executedPer100) : null; // + is faster
+            const durationPct = (plannedSecondsTotal && executedSeconds) ? Math.round((executedSeconds as number / (plannedSecondsTotal as number)) * 100) : null;
+            const durationDelta = (plannedSecondsTotal && executedSeconds) ? ((executedSeconds as number) - (plannedSecondsTotal as number)) : null;
+
+            const chip = (label:string, pct:number|null, text:string) => {
+              if (pct==null) return null;
+              const color = getPercentageColor(pct);
+              return (
+                <div className="flex flex-col items-center px-2">
+                  <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
+                  <div className="text-[11px] text-gray-700">{label}</div>
+                  <div className="text-[11px] text-gray-600">{text}</div>
+                </div>
+              );
+            };
+            const fmtDeltaTime = (s:number) => { const sign = s>=0 ? '+' : '−'; const v = Math.abs(Math.round(s)); const m=Math.floor(v/60); const ss=v%60; return `${sign}${m}:${String(ss).padStart(2,'0')}`; };
+            const fmtDeltaPer100 = (s:number) => { const faster = s>0; const v = Math.abs(s); const m=Math.floor(v/60); const ss=Math.round(v%60); return `${m?`${m}m `:''}${ss}s/${swimUnit==='yd'?'100yd':'100m'} ${faster? 'faster' : 'slower'}`.trim(); };
+
+            const anyVal = (pacePct!=null) || (durationPct!=null);
+            if (!anyVal) return null;
+            return (
+              <div className="w-full pt-1 pb-2">
+                <div className="flex items-center justify-center gap-6 text-center">
+                  <div className="flex items-end gap-3">
+                    {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPer100(paceDeltaSec) : '—')}
+                    {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—')}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // ------------ BIKE/RIDE (session-average power vs planned + duration) ------------
+          if (isRide) {
+            const plannedSecondsTotal = (() => {
+              const t = Number((effectivePlanned as any)?.computed?.total_duration_seconds);
+              if (Number.isFinite(t) && t > 0) return t;
+              const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              const s = arr.reduce((sum:number, st:any)=> sum + (Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0), 0);
+              return s > 0 ? s : null;
+            })();
+
+            // Duration-weighted planned watts from steps; fall back to description-derived with FTP
+            const plannedWatts = (() => {
+              const ftpNum = Number(ftp);
+              const steps = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              let sum = 0; let w = 0;
+              for (const st of steps) {
+                const dur = Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0);
+                let center: number | null = null;
+                const pr = (st as any)?.power_range;
+                const lo = Number(pr?.lower); const hi = Number(pr?.upper);
+                if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi > 0) {
+                  if (lo < 3 && hi < 3 && Number.isFinite(ftpNum) && ftpNum > 0) center = Math.round(ftpNum * ((lo + hi) / 2));
+                  else center = Math.round((lo + hi) / 2);
+                }
+                const pw = Number((st as any)?.power_target_watts ?? (st as any)?.target_watts ?? (st as any)?.watts);
+                if (center == null && Number.isFinite(pw) && pw > 0) center = Math.round(pw);
+                if (center != null && Number.isFinite(dur) && dur > 0) { sum += (center as number) * dur; w += dur; }
+              }
+              if (w > 0) return Math.round(sum / w);
+              // Fallback to description-derived targets
+              try {
+                const arr = Array.isArray(descPaceSteps) ? descPaceSteps : [];
+                const vals = arr.map((x:any)=> Number(x?.power_target_watts)).filter((n:number)=> Number.isFinite(n) && n>0);
+                if (vals.length) return Math.round(vals.reduce((a:number,b:number)=>a+b,0) / vals.length);
+              } catch {}
+              return null;
+            })();
+
+            // Executed watts
+            const executedWatts = (() => {
+              const v = Number((hydratedCompleted || completed)?.avg_power ?? (hydratedCompleted || completed)?.metrics?.avg_power ?? (hydratedCompleted || completed)?.average_watts);
+              if (Number.isFinite(v) && v>0) return Math.round(v);
+              // Fallback: duration-weighted from executed intervals if present
+              const intervals = Array.isArray((hydratedCompleted || completed)?.computed?.intervals) ? (hydratedCompleted || completed).computed.intervals : [];
+              let sum = 0; let w = 0;
+              for (const it of intervals) {
+                const pw = Number(it?.executed?.avg_power_w ?? it?.executed?.avg_watts);
+                const dur = Number(it?.executed?.duration_s);
+                if (Number.isFinite(pw) && pw>0 && Number.isFinite(dur) && dur>0) { sum += pw*dur; w += dur; }
+              }
+              return w>0 ? Math.round(sum/w) : null;
+            })();
+
+            const compOverall = (hydratedCompleted || completed)?.computed?.overall || {};
+            const executedSeconds = (() => {
+              const s = Number(compOverall?.duration_s_moving ?? compOverall?.duration_s);
+              if (Number.isFinite(s) && s>0) return s;
+              const fromResolver = resolveMovingSeconds(hydratedCompleted || completed);
+              return Number.isFinite(fromResolver as any) && (fromResolver as number) > 0 ? (fromResolver as number) : null;
+            })();
+
+            const powerPct = (plannedWatts && executedWatts) ? Math.round((executedWatts / plannedWatts) * 100) : null;
+            const powerDelta = (plannedWatts && executedWatts) ? (executedWatts - plannedWatts) : null; // + means higher
+            const durationPct = (plannedSecondsTotal && executedSeconds) ? Math.round((executedSeconds as number / (plannedSecondsTotal as number)) * 100) : null;
+            const durationDelta = (plannedSecondsTotal && executedSeconds) ? ((executedSeconds as number) - (plannedSecondsTotal as number)) : null;
+
+            const chip = (label:string, pct:number|null, text:string) => {
+              if (pct==null) return null;
+              const color = getPercentageColor(pct);
+              return (
+                <div className="flex flex-col items-center px-2">
+                  <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
+                  <div className="text-[11px] text-gray-700">{label}</div>
+                  <div className="text-[11px] text-gray-600">{text}</div>
+                </div>
+              );
+            };
+            const fmtDeltaTime = (s:number) => { const sign = s>=0 ? '+' : '−'; const v = Math.abs(Math.round(s)); const m=Math.floor(v/60); const ss=v%60; return `${sign}${m}:${String(ss).padStart(2,'0')}`; };
+            const fmtDeltaWatts = (w:number) => { const sign = w>=0 ? '+' : '−'; return `${sign}${Math.abs(Math.round(w))} W`; };
+
+            const anyVal = (powerPct!=null) || (durationPct!=null);
+            if (!anyVal) return null;
+            return (
+              <div className="w-full pt-1 pb-2">
+                <div className="flex items-center justify-center gap-6 text-center">
+                  <div className="flex items-end gap-3">
+                    {chip('Watts', powerPct, powerDelta!=null ? fmtDeltaWatts(powerDelta) : '—')}
+                    {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—')}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          return null;
         } catch { return null; }
       })()}
 
