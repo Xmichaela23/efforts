@@ -1471,6 +1471,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
+  // Interpret logger mode (mobility uses strength template but should not auto‑load planned strength)
+  const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+
   // Don't render until properly initialized
   if (!isInitialized) {
     return (
