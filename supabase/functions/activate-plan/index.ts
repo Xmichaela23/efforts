@@ -29,6 +29,20 @@ function addDaysISO(iso: string, n: number): string {
   return toISO(base)
 }
 
+// Normalize any ISO date to the Monday of its week (Mon=anchor)
+function mondayOf(iso: string): string {
+  try {
+    const parts = String(iso).split('-').map((x)=>parseInt(x,10))
+    const d = new Date(parts[0], (parts[1]||1)-1, parts[2]||1)
+    const js = d.getDay() // 0=Sun..6=Sat
+    const diff = (js === 0 ? -6 : (1 - js)) // shift to Monday
+    d.setDate(d.getDate() + diff)
+    return toISO(d)
+  } catch {
+    return iso
+  }
+}
+
 const DAY_INDEX: Record<string, number> = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 }
 
 // Map authoring type → planned_workouts.type. Returns null for unknown/blank so callers can skip
@@ -204,10 +218,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, inserted: 0, reason: 'no_sessions' }), { headers: { ...corsHeaders, 'Content-Type':'application/json' } })
     }
 
-    // Determine start date
+    // Determine start date (user-selected) and normalize anchor to Monday-of-week
     let startDate: string = startDateOverride
       || (plan.config?.user_selected_start_date ? String(plan.config.user_selected_start_date).slice(0,10) : '')
     if (!startDate) startDate = computeNextMonday()
+    const anchorMonday: string = mondayOf(startDate)
 
     const rows: any[] = []
     // Load baselines for strength exercise loads
@@ -230,7 +245,9 @@ Deno.serve(async (req) => {
       const sessions = Array.isArray(sessionsByWeek[wk]) ? sessionsByWeek[wk] : []
       for (const s of sessions) {
         const dow = DAY_INDEX[String(s.day)] || 1
-        const date = addDaysISO(startDate, (weekNum - 1) * 7 + (dow - 1))
+        // Anchor all scheduling to the Monday of the selected start week,
+        // then offset by (week-1)*7 + (dow-1). Skip first-week days before user-selected start.
+        const date = addDaysISO(anchorMonday, (weekNum - 1) * 7 + (dow - 1))
         if (weekNum === 1 && date < startDate) continue
 
         const rawDiscipline = String(s.discipline || s.type || '').toLowerCase()

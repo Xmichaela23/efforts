@@ -1328,7 +1328,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             // Duration-weighted planned watts from steps; fall back to description-derived with FTP
             const plannedWatts = (() => {
               const ftpNum = Number(ftp);
-              const steps = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              const steps = Array.isArray(plannedStepsFull) && plannedStepsFull.length ? plannedStepsFull : (Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : []);
               const isWorkStep = (st:any) => {
                 const k = String(st?.type || st?.kind || st?.name || '').toLowerCase();
                 return !(k.includes('warm') || k.includes('cool') || k.includes('rest') || k.includes('recovery') || k.includes('jog'));
@@ -1361,8 +1361,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             // Executed watts
             const executedWatts = (() => {
               // Prefer duration-weighted executed watts only across executed intervals that correspond to planned work steps with power targets
-              const steps = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
-              const intervals: any[] = Array.isArray((hydratedCompleted || completed)?.computed?.intervals) ? (hydratedCompleted || completed).computed.intervals : [];
+              const steps = Array.isArray(plannedStepsFull) && plannedStepsFull.length ? plannedStepsFull : (Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : []);
               const isWorkStep = (st:any) => { const k = String(st?.type || st?.kind || st?.name || '').toLowerCase(); return !(k.includes('warm') || k.includes('cool') || k.includes('rest') || k.includes('recovery') || k.includes('jog')); };
               const hasPowerTarget = (st:any) => {
                 const pr = (st as any)?.power_range; const lo=Number(pr?.lower), hi=Number(pr?.upper);
@@ -1374,15 +1373,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                 const st = steps[idx];
                 if (!isWorkStep(st) || !hasPowerTarget(st)) continue;
                 const pid = String((st as any)?.id || '');
-                let row: any = null;
-                if (pid) row = intervals.find((it:any)=> String((it as any)?.planned_step_id || '') === pid) || null;
-                if (!row) {
-                  const ix = Number((st as any)?.planned_index ?? idx);
-                  if (Number.isFinite(ix)) row = intervals.find((it:any)=> Number((it as any)?.planned_index) === ix) || null;
-                }
+                let row: any = pid ? intervalByPlannedId.get(pid) : null;
+                if (!row) { const ix = Number((st as any)?.planned_index ?? idx); if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null; }
                 const pw = Number(row?.executed?.avg_power_w ?? row?.executed?.avg_watts);
                 const dur = Number(row?.executed?.duration_s);
                 if (Number.isFinite(pw) && pw>0 && Number.isFinite(dur) && dur>0) { sum += pw*dur; w += dur; }
+              }
+              // Fallback: if we didn't match via ids/indexes but intervals exist, use intervals with kind 'work'
+              if (!(w>0)) {
+                const intervals: any[] = Array.isArray((hydratedCompleted || completed)?.computed?.intervals) ? (hydratedCompleted || completed).computed.intervals : [];
+                for (const it of intervals) {
+                  const k = String((it as any)?.kind || '').toLowerCase();
+                  if (k !== 'work') continue;
+                  const pw = Number((it as any)?.executed?.avg_power_w ?? (it as any)?.executed?.avg_watts);
+                  const dur = Number((it as any)?.executed?.duration_s);
+                  if (Number.isFinite(pw) && pw>0 && Number.isFinite(dur) && dur>0) { sum += pw*dur; w += dur; }
+                }
               }
               if (w>0) return Math.round(sum/w);
               // Fallback to overall average if interval mapping is missing
