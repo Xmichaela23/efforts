@@ -112,40 +112,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const dateWorkoutsMemo = useMemo(() => {
     const items = Array.isArray(unifiedItems) ? unifiedItems : [];
+    // Completed → only use unified.executed as the source of truth
     const completed = items
       .filter((it:any) => String(it?.status||'').toLowerCase()==='completed')
-      .map((it:any) => {
-        // Enrich with full workouts context when available (authoritative sets from logger)
-        const full = Array.isArray(workouts) ? (workouts as any[]).find((w:any)=> String(w?.id||'')===String(it.id)) : null;
-        const executedSE = Array.isArray((it?.executed as any)?.strength_exercises) ? (it.executed as any).strength_exercises : [];
-        const contextSE = Array.isArray((full as any)?.strength_exercises) ? (full as any).strength_exercises : [];
-        const chosenSE = executedSE && executedSE.length ? executedSE : contextSE;
-        const completedEx = Array.isArray((full as any)?.completed_exercises) ? (full as any).completed_exercises : undefined;
-        // Shallow-merge key metrics so client resolvers can compute moving seconds uniformly
-        const merged: any = {
-          id: it.id,
-          date: it.date,
-          type: it.type,
-          workout_status: 'completed',
-          computed: (full && (full as any).computed) ? (full as any).computed : (it.executed || null),
-          strength_exercises: chosenSE,
-          completed_exercises: completedEx,
-        };
-        if (full && typeof full === 'object') {
-          const passthroughKeys = [
-            'metrics',
-            'distance', 'distance_meters', 'distance_km',
-            'avg_speed', 'avg_speed_mps', 'avg_pace',
-            'moving_time', 'elapsed_time', 'total_timer_time', 'total_elapsed_time',
-            'duration', 'pool_length', 'number_of_active_lengths',
-            'sensor_data', 'swim_data', 'gps_track'
-          ];
-          for (const k of passthroughKeys) {
-            if ((full as any)[k] != null && merged[k] == null) (merged as any)[k] = (full as any)[k];
-          }
-        }
-        return merged;
-      });
+      .map((it:any) => ({
+        id: it.id,
+        date: it.date,
+        type: it.type,
+        workout_status: 'completed',
+        // For display/renderers, surface executed as computed-like
+        computed: it.executed || null,
+        // Surface discipline-specific executed payloads for simple summaries
+        strength_exercises: Array.isArray((it?.executed as any)?.strength_exercises) ? (it.executed as any).strength_exercises : undefined,
+        mobility_exercises: Array.isArray((it?.executed as any)?.mobility_exercises) ? (it.executed as any).mobility_exercises : undefined,
+      }));
+    // Planned → only use unified.planned
     const planned = items
       .filter((it:any) => !!it?.planned && String(it?.status||'').toLowerCase()!=='completed')
       .map((it:any) => ({
@@ -157,7 +138,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         rendered_description: it.planned?.rendered_description || it.planned?.description || null,
         computed: (Array.isArray(it.planned?.steps) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null),
         tags: it.planned?.tags || [],
-        // Pass-through fields needed by renderers
         steps_preset: (it as any)?.planned?.steps_preset ?? null,
         strength_exercises: (it as any)?.planned?.strength_exercises ?? null,
         mobility_exercises: (it as any)?.planned?.mobility_exercises ?? null,
@@ -165,12 +145,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         workout_structure: (it as any)?.planned?.workout_structure ?? null,
         friendly_summary: (it as any)?.planned?.friendly_summary ?? null,
       }));
-    // Build set of types that already have a completed workout for the date
     const typeKey = (w:any)=> `${String(w.type||'').toLowerCase()}|${w.date}`;
     const completedTypes = new Set(completed.map(typeKey));
     const plannedKept = planned.filter((w:any)=> !completedTypes.has(typeKey(w)));
     return [...completed, ...plannedKept];
-  }, [unifiedItems, activeDate, workouts]);
+  }, [unifiedItems, activeDate]);
 
   // FIXED: React to selectedDate prop changes properly
   useEffect(() => {
