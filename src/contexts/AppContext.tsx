@@ -526,9 +526,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const startDate: string = planData.start_date || (data as any)?.start_date || computeNextMonday();
 
         // Server-only activation (single source of truth for planned rows/materialization)
-        await supabase.functions.invoke('activate-plan', {
+        const act = await supabase.functions.invoke('activate-plan', {
           body: { plan_id: String((data as any)?.id || (insertPayload as any)?.id), start_date: startDate }
         });
+        try { console.log('[activate-plan] request start_date:', startDate, 'response:', (act as any)?.data); } catch {}
 
         // Warm unified caches for week 1
         try {

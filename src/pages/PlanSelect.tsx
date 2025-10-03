@@ -959,7 +959,8 @@ export default function PlanSelect() {
       try {
         const { supabase } = await import('@/lib/supabase');
         const chosenStart = (startDate && startDate.trim().length>0) ? startDate : (payload?.config?.user_selected_start_date || '');
-        await supabase.functions.invoke('activate-plan', { body: { plan_id: String(planRow.id), start_date: chosenStart } });
+        const resp = await supabase.functions.invoke('activate-plan', { body: { plan_id: String(planRow.id), start_date: chosenStart } });
+        try { console.log('[PlanSelect] activate-plan start_date:', chosenStart, 'resp:', (resp as any)?.data); } catch {}
       } catch {}
 
       try { await refreshPlans?.(); } catch {}

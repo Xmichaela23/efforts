@@ -228,6 +228,7 @@ Deno.serve(async (req) => {
     const anchorMonday: string = mondayOf(startDate)
 
     const rows: any[] = []
+    try { console.log('[activate-plan] using start_date:', startDate, 'anchorMonday:', anchorMonday, 'planId:', planId) } catch {}
     // Load baselines for strength exercise loads
     let baselines: any = {}
     try {
