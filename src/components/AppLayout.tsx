@@ -486,7 +486,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               let sets = 1; let reps = 8;
               const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
               if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||8; }
-              return { name, sets, reps, weight: 0, notes };
+              // Preserve authored load if present
+              let w = 0;
+              if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
+                w = m.weight;
+              } else if (typeof m?.weight === 'string') {
+                const pw = parseFloat(m.weight);
+                if (Number.isFinite(pw)) w = pw;
+              }
+              return { name, sets, reps, weight: w, notes };
             });
             setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: mob?.planned?.name || 'Mobility Session', date: today, strength_exercises: parsed } as any);
           } else {
