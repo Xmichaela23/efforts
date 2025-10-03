@@ -515,6 +515,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
+    } else if (type === 'log-mobility') {
+      // Open strength logger in mobility mode with a minimal payload
+      try {
+        const base: any = { logger_mode: 'mobility', type: 'strength', name: 'Mobility Session', date: selectedDate };
+        setLoggerScheduledWorkout(base);
+      } catch {}
+      setShowStrengthLogger(true);
     } else {
       setShowBuilder(true);
     }

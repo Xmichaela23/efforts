@@ -671,6 +671,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch {}
 
     setIsInitialized(true);
+    const _mode0 = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+    if (_mode0 === 'mobility') {
+      // In mobility mode, do not auto-fetch strength planned content here
+      return;
+    }
     (async () => {
       try {
         const date = targetDate || getStrengthLoggerDateString();
@@ -881,6 +886,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     
     setIsInitialized(true);
     // Direct fetch as a safety net (prefer unified get-week → computed steps)
+    const _mode1 = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+    if (_mode1 === 'mobility') {
+      // In mobility mode, avoid safety-net fetches that might overwrite mobility content
+      return;
+    }
     (async () => {
       try {
         const date = targetDate || getStrengthLoggerDateString();
