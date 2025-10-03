@@ -1490,7 +1490,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       <div className="bg-white pb-2 mb-2">
         <div className="flex items-center justify-between w-full">
           <h1 className="text-xl font-medium text-gray-700">
-            {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
+            {(() => {
+              const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+              if (mode === 'mobility') return 'Log Mobility';
+              return scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength';
+            })()}
           </h1>
           <div className="flex items-center gap-2">
             <div className="relative">
