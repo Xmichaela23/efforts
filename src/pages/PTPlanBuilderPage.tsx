@@ -56,20 +56,20 @@ function parseLine(line: string): ParsedItem | null {
 }
 
 function expandRecurrence(start: string, weeks: number, dayNames: string[]): string[] {
-  // Anchor to Monday and schedule selected weekdays for N weeks
-  const s = new Date(start + 'T12:00:00');
+  // Anchor to Monday and schedule selected weekdays for N weeks (user local time)
+  const s = new Date(start + 'T12:00:00'); // normalize to local midday to avoid DST/offset issues
   const toIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const addDaysLocalNoon = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, 12, 0, 0);
   const day = s.getDay(); // 0=Sun..6=Sat
-  const monday = addDays(s, (day === 0 ? -6 : (1 - day))); // start of week (Mon)
-  const order = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const monday = addDaysLocalNoon(s, (day === 0 ? -6 : (1 - day))); // start of week (Mon) at local noon
   const offsetByName: Record<string, number> = { Mon:0, Tue:1, Wed:2, Thu:3, Fri:4, Sat:5, Sun:6 };
   const offsets = Array.from(new Set(dayNames.map(n=>offsetByName[n]).filter(n=>typeof n==='number'))).sort((a,b)=>a-b);
   const out: string[] = [];
   for (let w = 0; w < Math.max(1, weeks); w++) {
     for (const off of offsets) {
-      const d = addDays(monday, w * 7 + off);
-      if (d >= s) out.push(toIso(d));
+      const d = addDaysLocalNoon(monday, w * 7 + off);
+      // Compare by date-only semantics in local time
+      if (toIso(d) >= toIso(s)) out.push(toIso(d));
     }
   }
   return out;
