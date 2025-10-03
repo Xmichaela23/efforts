@@ -394,56 +394,47 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         }
         return [ { icon: Dumbbell, value: 'No exercises' } ];
       } else {
-        // Endurance: distance, pace/speed, heart rate, elevation
-        // 🔧 FIXED: Use consistent distance formatting like CompletedTab
-        let distance = 'N/A';
-        const km = computeDistanceKm(workout);
-        if (km && !isNaN(km)) {
-          if (useImperial) distance = `${(km * 0.621371).toFixed(1)} mi`;
-          else distance = `${km.toFixed(1)} km`;
-        }
-        
+        // Endurance: distance, pace/speed, heart rate, elevation (unified executed.overall only)
         const isRun = workout.type === 'run' || workout.type === 'walk';
         const isSwim = workout.type === 'swim';
-        
-                      // Handle pace/speed using transformed data from useWorkouts
-              let paceSpeed = 'N/A';
-              // useWorkouts.ts transforms: duration_seconds → duration (minutes), distance_meters → distance (km)
-              const distanceKm = computeDistanceKm(workout) ?? Number(workout.distance);
-              const durationMinutes = Number(workout.duration);
-              const avgSpeedMps = Number(workout.avg_speed_mps);
-              
-              if (isSwim) {
+        const isRide = workout.type === 'ride' || workout.type === 'bike';
+        const overall = (workout as any)?.computed?.overall || {};
+        const distM = Number(overall?.distance_m ?? overall?.distanceMeters);
+        const durS = Number(overall?.duration_s_moving ?? overall?.moving_seconds ?? overall?.duration_s);
+        const avgSpeedMpsOverall = Number(overall?.avg_speed_mps ?? overall?.avg_speed);
+        // Distance text
+        let distance = 'N/A';
+        if (Number.isFinite(distM) && distM > 0) {
+          if (useImperial) distance = `${(distM/1609.34).toFixed(1)} mi`;
+          else distance = `${(distM/1000).toFixed(1)} km`;
+        }
+        // Pace/Speed
+        let paceSpeed = 'N/A';
+        if (isSwim) {
                 // Single source of truth: use server-computed overall stats only
-                const comp = (workout as any)?.computed?.overall;
-                const distM = Number(comp?.distance_m);
-                const durS = Number(comp?.duration_s_moving);
-                if (Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
+          if (Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
                   const preferYards = !!useImperial;
-                  const per100 = preferYards
-                    ? durS / ((distM / 0.9144) / 100)
-                    : durS / (distM / 100);
+            const per100 = preferYards ? (durS / ((distM / 0.9144) / 100)) : (durS / (distM / 100));
                   const mm = Math.floor(per100 / 60);
                   const ss = Math.round(per100 % 60);
                   paceSpeed = `${mm}:${String(ss).padStart(2,'0')} ${preferYards ? '/100yd' : '/100m'}`;
                 }
-              } else if (isRun && distanceKm && durationMinutes && distanceKm > 0 && durationMinutes > 0) {
-                // Calculate pace from transformed distance/duration
-                const distanceMiles = distanceKm * 0.621371; // Convert km to miles
-                const paceMinPerMile = durationMinutes / distanceMiles;
-                const minutes = Math.floor(paceMinPerMile);
-                const seconds = Math.round((paceMinPerMile - minutes) * 60);
-                paceSpeed = `${minutes}:${seconds.toString().padStart(2,'0')}/mi`;
-              } else if (avgSpeedMps && avgSpeedMps > 0) {
-                // Convert m/s to mph: multiply by 2.237
-                const speedMph = avgSpeedMps * 2.237;
-                paceSpeed = `${Math.round(speedMph * 10) / 10} mph`;
-              }
-        
-        const heartRate = workout.avg_heart_rate || workout.metrics?.avg_heart_rate;
-        const hrDisplay = heartRate && heartRate > 0 ? `${Math.round(heartRate)} bpm` : 'N/A';
-        const elevation = workout.elevation_gain || workout.metrics?.elevation_gain;
-        const elevationFt = elevation && elevation > 0 ? `${Math.round(elevation * 3.28084)} ft` : 'N/A';
+        } else if (isRun && Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
+          // Pace min/mi from overall
+          const miles = distM / 1609.34;
+          const paceMinPerMile = (durS / 60) / miles;
+          const minutes = Math.floor(paceMinPerMile);
+          const seconds = Math.round((paceMinPerMile - minutes) * 60);
+          paceSpeed = `${minutes}:${String(seconds).padStart(2,'0')}/mi`;
+        } else if (isRide && (Number.isFinite(avgSpeedMpsOverall) && avgSpeedMpsOverall > 0)) {
+          const speedMph = avgSpeedMpsOverall * 2.237;
+          paceSpeed = `${Math.round(speedMph * 10) / 10} mph`;
+        }
+
+        const heartRate = Number(overall?.avg_hr ?? workout.avg_heart_rate ?? workout.metrics?.avg_heart_rate);
+        const hrDisplay = (Number.isFinite(heartRate) && heartRate > 0) ? `${Math.round(heartRate)} bpm` : 'N/A';
+        const elevationM = Number(overall?.elevation_gain_m ?? workout.elevation_gain ?? workout.metrics?.elevation_gain);
+        const elevationFt = (Number.isFinite(elevationM) && elevationM > 0) ? `${Math.round(elevationM * 3.28084)} ft` : 'N/A';
 
         // For swims, only show distance and average pace
         if (isSwim) {
