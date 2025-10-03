@@ -818,26 +818,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   const basePlanned = rowAny?.planned && typeof rowAny.planned === 'object' ? { ...rowAny.planned } : { ...rowAny };
                   // Always include date/type/name for the logger header and fallbacks
                   basePlanned.date = rowAny?.date || basePlanned.date;
-                  basePlanned.type = (type==='mobility') ? 'strength' : (basePlanned.type || type || 'strength');
+                  basePlanned.type = basePlanned.type || type;
                   basePlanned.name = basePlanned.name || (type==='mobility' ? 'Mobility Session' : 'Strength');
 
                   if (type==='strength') {
                     window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: basePlanned } }));
                   } else {
-                    // Map mobility → strength format (sets×reps)
-                    const raw = (rowAny?.planned?.mobility_exercises ?? rowAny?.mobility_exercises) as any;
-                    const arr: any[] = Array.isArray(raw) ? raw : [];
-                    const parsed = arr.map((m:any)=>{
-                      const name = String(m?.name||'').trim() || 'Mobility';
-                      const notes = String(m?.description || m?.notes || '').trim();
-                      const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
-                      let sets = 1; let reps = 0;
-                      const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
-                      if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||0; }
-                      return { name, sets, reps, weight: 0, notes };
-                    });
-                    const plannedForStrength = { ...basePlanned, type: 'strength', strength_exercises: parsed } as any;
-                    window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: plannedForStrength } }));
+                    // Mobility → open MobilityLogger directly with authored mobility_exercises
+                    window.dispatchEvent(new CustomEvent('open:mobilityLogger', { detail: { planned: basePlanned } }));
                   }
                 } catch {}
               };

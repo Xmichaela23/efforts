@@ -122,6 +122,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         // Ensure logger opens targeted to that planned row/date
         setShowAllPlans(false);
         setSelectedWorkout(null);
+        // Mutual exclusion: close mobility logger if open
+        setShowMobilityLogger(false);
         setLoggerScheduledWorkout(planned);
         if (planned?.date) setSelectedDate(String(planned.date));
         setShowStrengthLogger(true);
@@ -139,6 +141,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         if (!planned) return;
         setShowAllPlans(false);
         setSelectedWorkout(null);
+        // Mutual exclusion: close strength logger if open
+        setShowStrengthLogger(false);
         setLoggerMobilityScheduledWorkout(planned);
         if (planned?.date) setSelectedDate(String(planned.date));
         setShowMobilityLogger(true);
