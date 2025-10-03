@@ -147,6 +147,8 @@ function computeSwimYards(workout: any): number | null {
         m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
         m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[2], 10) * parseInt(m[3], 10), m[4]); return; }
         m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
+        m = s.match(/swim_threshold_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1],10) * parseInt(m[2],10), m[3]); return; }
+        m = s.match(/swim_interval_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1],10) * parseInt(m[2],10), m[3]); return; }
       });
       return sum > 0 ? sum : null;
     }
@@ -187,6 +189,10 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | unde
             if (m) { const reps = parseInt(m[2], 10); const dist = parseInt(m[3], 10); const r = m[5] ? ` @ :${parseInt(m[5], 10)}r` : ''; (m[1] === 'pull' ? pulls : kicks).push(`${reps}x${dist}${r}`); return; }
             m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
             if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const r = m[4] ? ` @ :${parseInt(m[4], 10)}r` : ''; aerobics.push(`${reps}x${dist}${r}`); return; }
+            m = s.match(/swim_threshold_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+            if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const r = m[4] ? ` @ :${parseInt(m[4], 10)}r` : ''; aerobics.push(`threshold ${reps}x${dist}${r}`); return; }
+            m = s.match(/swim_interval_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+            if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const r = m[4] ? ` @ :${parseInt(m[4], 10)}r` : ''; aerobics.push(`interval ${reps}x${dist}${r}`); return; }
           });
           if (wu) parts.push(wu);
           if (drills.length) parts.push(`Drills: ${Array.from(new Set(drills)).join(', ')}`);

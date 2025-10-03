@@ -395,7 +395,7 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       // Drill (name first): swim_drill_<name>_4x50yd(_r15)?(_equipment)?
       m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
-        const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||sessionEquip||null;
+        const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
         const distM = unit==='yd'? ydToM(dist) : dist;
         for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
@@ -403,7 +403,7 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       // Drill (count first): swim_drills_6x50yd_fingertipdrag (optional _r15, optional equipment)
       m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
-        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name=m[4].replace(/_/g,' '); const rest=parseInt(m[5]||'0',10); const equip=m[6]||sessionEquip||null;
+        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name=m[4].replace(/_/g,' '); const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
         const distM = unit==='yd'? ydToM(dist) : dist;
         for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
