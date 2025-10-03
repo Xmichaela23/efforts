@@ -1385,8 +1385,35 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     console.log('  - Current local time:', new Date().toString());
     console.log('  - Current PST time:', new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
 
-    // Prepare the workout data
-    const completedWorkout = {
+    // Prepare the workout data (mobility-mode saves as mobility for classification)
+    const modeSave = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+    const isMobilityMode = modeSave === 'mobility';
+    const mobilityFromSets = () => {
+      try {
+        return validExercises.map((ex:any)=>{
+          const rep = Array.isArray(ex.sets) && ex.sets.length>0 ? (ex.sets[0].reps || 0) : 0;
+          const dur = ex.sets && ex.sets.length ? `${ex.sets.length}x${rep}` : undefined;
+          const w0 = Array.isArray(ex.sets) && ex.sets.length>0 ? Number(ex.sets[0].weight||0) : 0;
+          const payload:any = { name: ex.name, duration: dur, description: '' } as any;
+          if (Number.isFinite(w0) && w0>0) { payload.weight = w0; payload.unit = 'lb'; }
+          return payload;
+        });
+      } catch { return []; }
+    };
+    const completedWorkout = isMobilityMode ? {
+      id: scheduledWorkout?.id || Date.now().toString(),
+      name: scheduledWorkout?.name || `Mobility - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
+      type: 'mobility' as const,
+      date: workoutDate,
+      description: 'Mobility session',
+      duration: durationMinutes,
+      mobility_exercises: mobilityFromSets(),
+      workout_status: 'completed' as const,
+      completedManually: true,
+      notes: extra?.notes,
+      rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
+      addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence }))
+    } : {
       id: scheduledWorkout?.id || Date.now().toString(),
       name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
       type: 'strength' as const,
@@ -1405,11 +1432,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
     console.log('🔍 Saving completed workout:', completedWorkout);
 
-    // If sourced from a planned row and date differs, move then complete
+    // If sourced from a planned row, attach and mark completed
     (async ()=>{
       try{
-        if (sourcePlannedId && sourcePlannedDate && sourcePlannedDate !== workoutDate){
-          await supabase.from('planned_workouts').update({ date: workoutDate, workout_status: 'completed' }).eq('id', sourcePlannedId);
+        if (sourcePlannedId){
+          try { await supabase.from('workouts').update({ planned_id: sourcePlannedId }).eq('id', (saved as any)?.id || completedWorkout.id); } catch {}
+          let updateObj: any = { workout_status: 'completed' };
+          try {
+            const { data: probe } = await supabase.from('planned_workouts').select('id,completed_workout_id').eq('id', sourcePlannedId).maybeSingle();
+            if (probe && Object.prototype.hasOwnProperty.call(probe, 'completed_workout_id')) {
+              updateObj.completed_workout_id = (saved as any)?.id || completedWorkout.id;
+            }
+          } catch {}
+          await supabase.from('planned_workouts').update(updateObj).eq('id', sourcePlannedId);
+          if (sourcePlannedDate && sourcePlannedDate !== workoutDate){
+            try { await supabase.from('planned_workouts').update({ date: workoutDate }).eq('id', sourcePlannedId); } catch {}
+          }
         }
       } catch {}
     })();
