@@ -296,6 +296,47 @@ Deno.serve(async (req) => {
       plannedByKey.set(`${String(p.date)}|${String(p.type).toLowerCase()}`, p);
     }
 
+    // Opportunistic re-materialize: swim rows where tokens include warmup/cooldown but computed steps are missing them
+    try {
+      const needsWuCd: string[] = [];
+      for (const p of Array.isArray(plannedRows) ? plannedRows : []) {
+        try {
+          const t = String((p as any)?.type || '').toLowerCase();
+          if (t !== 'swim') continue;
+          const tokens: string[] = Array.isArray((p as any)?.steps_preset) ? (p as any).steps_preset.map((x:any)=>String(x).toLowerCase()) : [];
+          if (!tokens.length) continue;
+          const hasWU = tokens.some((s)=> /swim_warmup_\d+(yd|m)(?:_[a-z0-9_]+)?/i.test(s));
+          const hasCD = tokens.some((s)=> /swim_cooldown_\d+(yd|m)(?:_[a-z0-9_]+)?/i.test(s));
+          if (!hasWU && !hasCD) continue;
+          const steps: any[] = Array.isArray((p as any)?.computed?.steps) ? (p as any).computed.steps : [];
+          const hasWUComputed = steps.some((st:any)=> String((st?.kind||'')).toLowerCase()==='warmup');
+          const hasCDComputed = steps.some((st:any)=> String((st?.kind||'')).toLowerCase()==='cooldown');
+          if ((hasWU && !hasWUComputed) || (hasCD && !hasCDComputed)) needsWuCd.push(String((p as any).id));
+        } catch {}
+      }
+      if (needsWuCd.length) {
+        const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/materialize-plan`;
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        for (const id of needsWuCd) {
+          try { await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ planned_workout_id: id }) }); } catch {}
+        }
+        if (debug) errors.push({ where:'materialize_wu_cd', count: needsWuCd.length });
+        // Reload planned rows that were adjusted (best-effort, limited scope) so UI sees cooldown immediately
+        try {
+          const { data } = await supabase
+            .from('planned_workouts')
+            .select('id,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at')
+            .eq('user_id', userId)
+            .gte('date', fromISO)
+            .lte('date', toISO)
+            .order('date', { ascending: true })
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true });
+          plannedRows = Array.isArray(data) ? data : plannedRows;
+        } catch {}
+      }
+    } catch {}
+
     // Derive brick group info in-memory (no schema change):
     // Pair same-day sessions tagged with 'brick' across endurance types.
     const brickMetaByPlannedId = new Map<string, { group_id: string; order: number }>();

@@ -10,7 +10,6 @@ import WorkoutDetail from './WorkoutDetail';
 import GarminAutoSync from './GarminAutoSync';
 import TodaysEffort from './TodaysEffort';
 import StrengthLogger from './StrengthLogger';
-import MobilityLogger from './MobilityLogger';
 import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
 import WorkoutSummary from './WorkoutSummary';
@@ -51,7 +50,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
-  const [showMobilityLogger, setShowMobilityLogger] = useState(false);
+  // MobilityLogger removed; mobility now uses StrengthLogger in mobility mode
   const initialRouteState: any = (location && location.state) || {};
   const [showAllPlans, setShowAllPlans] = useState<boolean>(!!initialRouteState.openPlans);
   const [focusPlanId, setFocusPlanId] = useState<string | undefined>(initialRouteState.focusPlanId);
@@ -72,8 +71,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
   // Pass a planned strength workout directly into the Strength Logger
   const [loggerScheduledWorkout, setLoggerScheduledWorkout] = useState<any | null>(null);
-  // Pass a planned mobility workout directly into the Mobility Logger
-  const [loggerMobilityScheduledWorkout, setLoggerMobilityScheduledWorkout] = useState<any | null>(null);
+  
 
   const containerRef = useRef<HTMLDivElement>(null);
   const providerFetchedRef = useRef<boolean>(false);
@@ -122,8 +120,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         // Ensure logger opens targeted to that planned row/date
         setShowAllPlans(false);
         setSelectedWorkout(null);
-        // Mutual exclusion: close mobility logger if open
-        setShowMobilityLogger(false);
+        // Mutual exclusion handled by single logger state
         setLoggerScheduledWorkout(planned);
         if (planned?.date) setSelectedDate(String(planned.date));
         setShowStrengthLogger(true);
@@ -141,8 +138,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         if (!planned) return;
         setShowAllPlans(false);
         setSelectedWorkout(null);
-        // Mutual exclusion: ensure mobility modal is closed
-        setShowMobilityLogger(false);
+        // Single logger path
         // Convert mobility_exercises → strength_exercises and open StrengthLogger
         const raw: any[] = Array.isArray((planned as any)?.mobility_exercises) ? (planned as any).mobility_exercises : [];
         const parsed = raw.map((m: any) => {
@@ -472,10 +468,34 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
     } else if (type === 'log-mobility') {
-      // Route to strength template in mobility mode
-      setShowMobilityLogger(false);
-      setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: 'Mobility Session', date: selectedDate } as any);
-      setShowStrengthLogger(true);
+      // Route to strength template in mobility mode with today's planned mobility if present
+      (async () => {
+        try {
+          const today = selectedDate;
+          const { data } = await supabase.functions.invoke('get-week', { body: { from: today, to: today } } as any) as any;
+          const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
+          const mob = items.find((it:any)=> String(it?.date)===today && String(it?.type||'').toLowerCase()==='mobility' && !!it?.planned);
+          if (mob && Array.isArray(mob?.planned?.mobility_exercises)) {
+            const raw = mob.planned.mobility_exercises as any[];
+            const parsed = raw.map((m: any) => {
+              const name = String(m?.name || '').trim() || 'Mobility';
+              const notes = String(m?.description || m?.notes || '').trim();
+              const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
+              let sets = 1; let reps = 8;
+              const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
+              if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||8; }
+              return { name, sets, reps, weight: 0, notes };
+            });
+            setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: mob?.planned?.name || 'Mobility Session', date: today, strength_exercises: parsed } as any);
+          } else {
+            setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: 'Mobility Session', date: today } as any);
+          }
+        } catch {
+          setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: 'Mobility Session', date: selectedDate } as any);
+        } finally {
+          setShowStrengthLogger(true);
+        }
+      })();
     } else {
       setShowBuilder(true);
     }
@@ -763,18 +783,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 targetDate={(loggerScheduledWorkout as any)?.date || selectedDate}
               />
             </div>
-          ) : showMobilityLogger ? (
-            <div className="pt-4">
-              <MobilityLogger 
-                onClose={handleBackToDashboard} 
-                onWorkoutSaved={(workout) => {
-                  setShowMobilityLogger(false);
-                  setSelectedWorkout(workout);
-                  setActiveTab('completed');
-                }}
-                scheduledWorkout={loggerMobilityScheduledWorkout || undefined}
-              />
-            </div>
           ) : showBuilder ? (
             <div className="pt-4">
               <WorkoutBuilder
@@ -833,7 +841,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       </main>
 
       {/* Bottom Navigation Tab Bar - Instagram style */}
-      {!(selectedWorkout || showStrengthLogger || showMobilityLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || workoutBeingEdited) && (
+      {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || workoutBeingEdited) && (
         <div className="mobile-tabbar px-3 pt-0.5 flex items-center">
           <div className="w-full">
             <div className="flex justify-around items-center">
