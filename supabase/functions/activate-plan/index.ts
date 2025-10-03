@@ -219,9 +219,12 @@ Deno.serve(async (req) => {
     }
 
     // Determine start date (user-selected) and normalize anchor to Monday-of-week
+    // Preference order: explicit request start_date → plan.config.user_selected_start_date → plan.start_date → TODAY (this week)
+    const todayISO = (() => { const d=new Date(); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; })();
     let startDate: string = startDateOverride
       || (plan.config?.user_selected_start_date ? String(plan.config.user_selected_start_date).slice(0,10) : '')
-    if (!startDate) startDate = computeNextMonday()
+      || (plan as any)?.start_date
+      || todayISO
     const anchorMonday: string = mondayOf(startDate)
 
     const rows: any[] = []

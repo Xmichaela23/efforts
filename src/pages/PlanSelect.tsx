@@ -955,8 +955,12 @@ export default function PlanSelect() {
       const planErr = (planInsert as any).error;
       if (planErr) throw planErr;
 
-      // Activate plan server-side: insert planned rows and materialize steps
-      try { const { supabase } = await import('@/lib/supabase'); await supabase.functions.invoke('activate-plan', { body: { plan_id: String(planRow.id) } }); } catch {}
+      // Activate plan server-side with explicit start_date: insert planned rows and materialize steps
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const chosenStart = (startDate && startDate.trim().length>0) ? startDate : (payload?.config?.user_selected_start_date || '');
+        await supabase.functions.invoke('activate-plan', { body: { plan_id: String(planRow.id), start_date: chosenStart } });
+      } catch {}
 
       try { await refreshPlans?.(); } catch {}
       navigate('/', { state: { openPlans: true, focusPlanId: planRow.id, focusWeek: 1 } });
