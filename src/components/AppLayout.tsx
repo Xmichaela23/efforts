@@ -148,7 +148,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           let sets = 1; let reps = 8;
           const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
           if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||8; }
-          return { name, sets, reps, weight: 0, notes };
+          // Use preserved load if present
+          const w = (typeof m?.weight === 'number' && Number.isFinite(m.weight)) ? m.weight : 0;
+          return { name, sets, reps, weight: w, notes };
         });
         const plannedForStrength = { ...planned, type: 'strength', strength_exercises: parsed, logger_mode: 'mobility' } as any;
         setLoggerScheduledWorkout(plannedForStrength);
