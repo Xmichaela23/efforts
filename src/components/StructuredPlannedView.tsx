@@ -219,26 +219,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     }
   } catch {}
 
-  // Swim planned detail resilience: if cooldown is authored in tokens but missing in computed steps, render it
-  try {
-    const isSwim = String((workout as any)?.type||'').toLowerCase()==='swim';
-    if (isSwim) {
-      const hasCooldownLine = lines.some((ln)=> /cool-?down/i.test(String(ln)) );
-      const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
-      if (!hasCooldownLine && toks.length) {
-        const t = toks.find((x)=> /swim_cooldown_\d+(yd|m)/i.test(String(x)) );
-        if (t) {
-          const m = String(t).toLowerCase().match(/swim_cooldown_(\d+)(yd|m)/i);
-          if (m) {
-            const dist = parseInt(m[1],10);
-            const unit = (m[2]||'yd').toLowerCase();
-            const yd = unit==='m' ? Math.round(dist/0.9144) : dist;
-            lines.push(`1 × ${yd} yd — Cooldown`);
-          }
-        }
-      }
-    }
-  } catch {}
+  // No UI fabrication: rely on server-computed steps only
 
   // No client-side materialization; rely on server activation
   const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };

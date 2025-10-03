@@ -390,7 +390,8 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       };
       let m: RegExpMatchArray | null = null;
       // Warmup/Cooldown distance tokens: swim_warmup_300yd_easy / swim_cooldown_200yd
-      m = s.match(/swim_(warmup|cooldown)_(\d+)(yd|m)/);
+      // Allow optional suffix after unit (e.g., _easy)
+      m = s.match(/swim_(warmup|cooldown)_(\d+)(yd|m)(?:_[a-z0-9_]+)?/);
       if (m) { pushWUCD(parseInt(m[2],10), m[3], m[1]==='warmup'); continue; }
       // Drill (name first): swim_drill_<name>_4x50yd(_r15)?(_equipment)?
       m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
