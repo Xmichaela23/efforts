@@ -140,7 +140,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         setSelectedWorkout(null);
         // Single logger path
         // Convert mobility_exercises → strength_exercises and open StrengthLogger
-        const raw: any[] = Array.isArray((planned as any)?.mobility_exercises) ? (planned as any).mobility_exercises : [];
+        const raw: any[] = (() => {
+          const val: any = (planned as any)?.mobility_exercises;
+          if (Array.isArray(val)) return val as any[];
+          if (typeof val === 'string') { try { const p = JSON.parse(val); if (Array.isArray(p)) return p as any[]; } catch {} }
+          return [] as any[];
+        })();
         const parsed = raw.map((m: any) => {
           const name = String(m?.name || '').trim() || 'Mobility';
           const notes = String(m?.description || m?.notes || '').trim();
@@ -148,8 +153,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           let sets = 1; let reps = 8;
           const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
           if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||8; }
-          // Use preserved load if present
-          const w = (typeof m?.weight === 'number' && Number.isFinite(m.weight)) ? m.weight : 0;
+          // Use preserved load if present, else parse from free text
+          let w = 0;
+          if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
+            w = m.weight;
+          } else if (typeof m?.weight === 'string') {
+            const pw = parseFloat(m.weight);
+            if (Number.isFinite(pw)) w = pw;
+          } else {
+            const blob = `${String(m?.name||'')} ${String(m?.description||'')} ${String(m?.notes||'')} ${String(m?.duration||'')}`;
+            const mw = blob.match(/(\d+(?:\.\d+)?)\s*(lb|lbs|kg)\b/i);
+            if (mw) { const pw = parseFloat(mw[1]); if (Number.isFinite(pw)) w = pw; }
+          }
           return { name, sets, reps, weight: w, notes };
         });
         const plannedForStrength = { ...planned, type: 'strength', strength_exercises: parsed, logger_mode: 'mobility' } as any;
