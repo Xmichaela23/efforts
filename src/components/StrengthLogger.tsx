@@ -755,8 +755,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     console.log('🔄 StrengthLogger initializing...');
     
     // Try to restore session progress first
+    const modeAtOpen = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
     const savedSession = restoreSessionProgress();
-    if (savedSession) {
+    if (savedSession && modeAtOpen !== 'mobility') {
       console.log('🔄 Restoring saved session progress...');
       setExercises(savedSession.exercises);
       setAttachedAddons(savedSession.addons);
