@@ -824,7 +824,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   if (type==='strength') {
                     window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: basePlanned } }));
                   } else {
-                    // Mobility → open MobilityLogger directly with authored mobility_exercises
+                    // Mobility → use strength logger template but under mobility mode via AppLayout handler
                     window.dispatchEvent(new CustomEvent('open:mobilityLogger', { detail: { planned: basePlanned } }));
                   }
                 } catch {}

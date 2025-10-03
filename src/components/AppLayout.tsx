@@ -141,11 +141,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         if (!planned) return;
         setShowAllPlans(false);
         setSelectedWorkout(null);
-        // Mutual exclusion: close strength logger if open
-        setShowStrengthLogger(false);
-        setLoggerMobilityScheduledWorkout(planned);
+        // Mutual exclusion: close mobility logger if open
+        setShowMobilityLogger(false);
+        // Convert mobility_exercises → strength_exercises for template prefill
+        const raw: any[] = Array.isArray((planned as any)?.mobility_exercises) ? (planned as any).mobility_exercises : [];
+        const parsed = raw.map((m: any) => {
+          const name = String(m?.name || '').trim() || 'Mobility';
+          const notes = String(m?.description || m?.notes || '').trim();
+          const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
+          let sets = 1; let reps = 8;
+          const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
+          if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||8; }
+          return { name, sets, reps, weight: 0, notes };
+        });
+        const plannedForStrength = { ...planned, type: 'strength', strength_exercises: parsed, logger_mode: 'mobility' } as any;
+        setLoggerScheduledWorkout(plannedForStrength);
         if (planned?.date) setSelectedDate(String(planned.date));
-        setShowMobilityLogger(true);
+        setShowStrengthLogger(true);
       } catch {}
     };
     window.addEventListener('open:mobilityLogger', handler as any);

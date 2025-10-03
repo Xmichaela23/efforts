@@ -150,7 +150,21 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           }
           return null;
         })();
-        if (eqTxt) equip = ` with ${eqTxt}`;
+        // Drills should not display board/buoy equipment; only explicit fin/snorkel/paddles are shown
+        if (eqTxt) {
+          const isDrillStep = String(st?.kind||'').toLowerCase()==='drill' || /^drill\b/i.test(String(st?.label||''));
+          const allowedForDrill = /\b(fins|snorkel|paddles)\b/;
+          const disallowedForDrill = /\b(board|kickboard|buoy|pull\s*buoy)\b/;
+          if (isDrillStep) {
+            if (allowedForDrill.test(eqTxt) && !disallowedForDrill.test(eqTxt)) {
+              equip = ` with ${eqTxt}`;
+            } else {
+              equip = '';
+            }
+          } else {
+            equip = ` with ${eqTxt}`;
+          }
+        }
 
         // Strength step formatting
         if (st?.strength && typeof st.strength==='object') {
@@ -202,6 +216,27 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       // Mark that we handled with computed to avoid legacy fallbacks
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const handledByComputedFlag = true;
+    }
+  } catch {}
+
+  // Swim planned detail resilience: if cooldown is authored in tokens but missing in computed steps, render it
+  try {
+    const isSwim = String((workout as any)?.type||'').toLowerCase()==='swim';
+    if (isSwim) {
+      const hasCooldownLine = lines.some((ln)=> /cool-?down/i.test(String(ln)) );
+      const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
+      if (!hasCooldownLine && toks.length) {
+        const t = toks.find((x)=> /swim_cooldown_\d+(yd|m)/i.test(String(x)) );
+        if (t) {
+          const m = String(t).toLowerCase().match(/swim_cooldown_(\d+)(yd|m)/i);
+          if (m) {
+            const dist = parseInt(m[1],10);
+            const unit = (m[2]||'yd').toLowerCase();
+            const yd = unit==='m' ? Math.round(dist/0.9144) : dist;
+            lines.push(`1 × ${yd} yd — Cooldown`);
+          }
+        }
+      }
     }
   } catch {}
 
