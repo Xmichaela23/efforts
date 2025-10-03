@@ -541,12 +541,47 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
     } else if (type === 'log-mobility') {
-      // Open strength logger in mobility mode with a minimal payload
-      try {
-        const base: any = { logger_mode: 'mobility', type: 'strength', name: 'Mobility Session', date: selectedDate };
-        setLoggerScheduledWorkout(base);
-      } catch {}
-      setShowStrengthLogger(true);
+      // Mirror planned path: fetch today's planned mobility (if any) and convert → strength exercises
+      (async () => {
+        try {
+          const today = selectedDate;
+          const { data } = await supabase.functions.invoke('get-week', { body: { from: today, to: today } } as any) as any;
+          const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
+          const mob = items.find((it:any)=> String(it?.date)===today && String(it?.type||'').toLowerCase()==='mobility' && !!it?.planned);
+          if (mob && mob?.planned?.mobility_exercises) {
+            const rawVal: any = mob.planned.mobility_exercises;
+            const raw: any[] = Array.isArray(rawVal) ? rawVal as any[] : (typeof rawVal === 'string' ? (()=>{ try { const p = JSON.parse(rawVal); return Array.isArray(p)? p: []; } catch { return []; } })() : []);
+            const parsed = raw.map((m: any) => {
+              const name = String(m?.name || '').trim() || 'Mobility';
+              const notes = String(m?.description || m?.notes || '').trim();
+              const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
+              let sets = 1; let reps = 8;
+              const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
+              if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||8; }
+              // Preserve load or parse from any free text as fallback
+              let w = 0;
+              if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
+                w = m.weight;
+              } else if (typeof m?.weight === 'string') {
+                const pw = parseFloat(m.weight);
+                if (Number.isFinite(pw)) w = pw;
+              } else {
+                const blob = `${String(m?.name||'')} ${String(m?.description||'')} ${String(m?.notes||'')} ${String(m?.duration||'')}`;
+                const mw = blob.match(/(\d+(?:\.\d+)?)\s*(lb|lbs|kg)\b/i);
+                if (mw) { const pw = parseFloat(mw[1]); if (Number.isFinite(pw)) w = pw; }
+              }
+              return { name, sets, reps, weight: w, notes };
+            });
+            setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: mob?.planned?.name || 'Mobility Session', date: today, strength_exercises: parsed } as any);
+          } else {
+            setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: 'Mobility Session', date: today } as any);
+          }
+        } catch {
+          setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: 'Mobility Session', date: selectedDate } as any);
+        } finally {
+          setShowStrengthLogger(true);
+        }
+      })();
     } else {
       setShowBuilder(true);
     }

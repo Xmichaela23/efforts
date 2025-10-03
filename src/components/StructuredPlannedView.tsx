@@ -48,6 +48,14 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
               <li key={i} className="text-sm text-gray-800">
                 <span className="font-medium">{m.name}</span>
                 {m.duration ? <span className="text-gray-600"> — {m.duration}</span> : null}
+                {(() => {
+                  const w: any = (m as any)?.weight;
+                  if (w == null) return null;
+                  const num = typeof w === 'number' ? w : (typeof w === 'string' ? parseFloat(w) : NaN);
+                  if (!Number.isFinite(num) || num <= 0) return null;
+                  const unit = String((m as any)?.unit || 'lb');
+                  return <span className="text-gray-600"> — @ {Math.round(num)} {unit}</span>;
+                })()}
                 {m.description ? <span className="text-gray-600"> — {m.description}</span> : null}
               </li>
             ))}
