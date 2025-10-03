@@ -358,6 +358,41 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         return [
           { icon: Dumbbell, value: 'No exercises' }
         ];
+      } else if (workout.type === 'mobility') {
+        // Mobility: show simple set summaries from executed.mobility_exercises (unified source)
+        const parseList = (src:any): any[] => {
+          if (Array.isArray(src)) return src;
+          if (typeof src === 'string') { try { const p = JSON.parse(src); return Array.isArray(p) ? p : []; } catch { return []; } }
+          return [];
+        };
+        const items = parseList((workout as any)?.mobility_exercises) || parseList((workout as any)?.computed?.mobility_exercises);
+        if (items.length > 0) {
+          const codeFromName = (nm:string): string => {
+            const name = String(nm||'').trim();
+            const lower = name.toLowerCase();
+            // Use simple initials for multi-word names; else first 3 letters
+            const words = name.split(/\s+/).filter(Boolean);
+            if (words.length >= 2) return words.map(w=>w[0]).join('').toUpperCase().slice(0,4);
+            return name.slice(0,3).toUpperCase();
+          };
+          const chips = items.map((it:any)=>{
+            const name = String(it?.name||'').trim();
+            const dur = String(it?.duration||'');
+            const m = dur.match(/(\d+)\s*[x×]\s*(\d+)/i);
+            const sets = m ? parseInt(m[1],10) : undefined;
+            const reps = m ? parseInt(m[2],10) : undefined;
+            let w = it?.weight; let wNum = (typeof w==='number') ? w : (typeof w==='string' ? parseFloat(w): 0);
+            if (!Number.isFinite(wNum)) wNum = 0;
+            const parts: string[] = [];
+            parts.push(codeFromName(name));
+            if (typeof sets==='number' && typeof reps==='number') parts.push(`${sets}×${reps}`);
+            if (wNum>0) parts.push(`@ ${Math.round(wNum)} lb`);
+            const val = parts.join(' ');
+            return { icon: Dumbbell, value: val || codeFromName(name) };
+          });
+          return chips;
+        }
+        return [ { icon: Dumbbell, value: 'No exercises' } ];
       } else {
         // Endurance: distance, pace/speed, heart rate, elevation
         // 🔧 FIXED: Use consistent distance formatting like CompletedTab
