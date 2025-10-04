@@ -1992,22 +1992,7 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-      {/* Avg Cadence / Stroke rate */}
-          <div className="px-2 py-1">
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {(() => {
-                const v = (
-                  workoutData.avg_cadence ??
-                  workoutData.metrics?.avg_cadence ??
-                  workoutData.avg_bike_cadence
-                );
-                return v != null ? safeNumber(v) : 'N/A';
-              })()}
-            </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Avg {workoutData.swim_data ? 'stroke rate' : 'Cadence'}</div>
-            </div>
-          </div>
+          {/* Avg Cadence tile removed – shown in top metrics grid only */}
 
           {/* Elevation Gain (replace VAM) */}
           <div className="px-2 py-1">
@@ -2560,41 +2545,7 @@ const formatMovingTime = () => {
         }
         return null;
       })()}
-      {/* Zones histograms (minimal stacked bars) */}
-      {((hydrated||workoutData)?.computed?.analysis?.zones) && (
-        <div className="mx-[-16px] px-3 py-3 space-y-3">
-          {Array.isArray((hydrated||workoutData).computed.analysis.zones?.hr?.bins) && (hydrated||workoutData).computed.analysis.zones.hr.bins.length > 0 && (()=>{
-            const hrBins = (hydrated||workoutData).computed.analysis.zones.hr.bins as any[];
-            const total = hrBins.reduce((a:number,b:any)=>a + (Number(b.t_s)||0), 0) || 1;
-            return (
-              <div>
-                <div className="text-sm mb-1">HR zones</div>
-                <div className="flex h-2 overflow-hidden" style={{ borderRadius: 2 }}>
-                  {hrBins.map((b:any, i:number) => (
-                    <div key={`hrz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
-                  ))}
-                </div>
-                <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.hr.schema}</div>
-              </div>
-            );
-          })()}
-          {Array.isArray((hydrated||workoutData).computed.analysis.zones?.pace?.bins) && (hydrated||workoutData).computed.analysis.zones.pace.bins.length > 0 && (()=>{
-            const pBins = (hydrated||workoutData).computed.analysis.zones.pace.bins as any[];
-            const total = pBins.reduce((a:number,b:any)=>a + (Number(b.t_s)||0), 0) || 1;
-            return (
-              <div>
-                <div className="text-sm mb-1">Pace bands</div>
-                <div className="flex h-2 overflow-hidden" style={{ borderRadius: 2 }}>
-                  {pBins.map((b:any, i:number) => (
-                    <div key={`pcz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
-                  ))}
-                </div>
-                <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.pace.schema}</div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
+      {/* (Removed old mini zones histograms to avoid duplicate zones under splits) */}
       {((hydrated||workoutData)?.computed?.analysis?.bests) && (
         <div className="mx-[-16px] px-3 py-2 space-y-1">
           <div className="text-sm mb-1">Bests</div>
