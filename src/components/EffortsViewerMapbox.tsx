@@ -1030,7 +1030,7 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Chart */}
-      <div style={{ position: "relative", marginTop: 4, marginBottom: 12, overflow: "hidden", zIndex: 0 }}>
+      <div style={{ marginTop: 4 }}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}   // responsive: all drawn in SVG units

@@ -2298,7 +2298,7 @@ const formatMovingTime = () => {
         const zonesHr = (hydrated||workoutData)?.computed?.analysis?.zones?.hr;
         if (!(zonesHr?.bins?.length)) return null;
         return (
-          <div className="mt-4 mb-6 mx-[-16px] px-3 py-3 space-y-4">
+          <div className="mt-6 mx-[-16px] px-3 py-3 space-y-4">
             {zonesHr?.bins?.length ? (
               <div className="my-4">
                 <HRZoneChart zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)} title="Heart Rate Zones" />
@@ -2309,7 +2309,7 @@ const formatMovingTime = () => {
       })()}
 
       {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
-        <div className="mt-4 mx-[-16px] px-3 py-3">
+        <div className="mt-6 mx-[-16px] px-3 py-3">
           {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
             <div className="mb-2">
               <div className="text-sm mb-1">Splits · km</div>
