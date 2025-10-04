@@ -8,6 +8,7 @@ import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
+import { useWorkoutData } from '@/hooks/useWorkoutData';
 // keeping local logic for now; Today's view uses shared resolver
 
 // Custom styles for range sliders
@@ -2152,13 +2153,14 @@ const formatMovingTime = () => {
         <div className="mx-[-16px] px-3 py-2 mb-2">
           {(() => {
             const useMi = !!useImperial;
-            const distKm = (computeDistanceKm(hydrated||workoutData) ?? Number((hydrated||workoutData)?.distance)) || 0;
-            const movingSec = (hydrated||workoutData)?.moving_time ?? (hydrated||workoutData)?.metrics?.moving_time ?? (hydrated||workoutData)?.computed?.overall?.duration_s_moving ?? null;
+            const data = useWorkoutData(hydrated||workoutData);
+            const distKm = data.distance_km ?? 0;
+            const movingSec = data.duration_s;
             const avgSpeedKmh = Number((hydrated||workoutData)?.avg_speed) || null;
             const avgPaceSpKm = (hydrated||workoutData)?.metrics?.avg_pace ?? (hydrated||workoutData)?.avg_pace ?? null;
-            const avgHr = (hydrated||workoutData)?.avg_heart_rate ?? null;
-            const avgPwr = (hydrated||workoutData)?.avg_power ?? null;
-            const gain = (hydrated||workoutData)?.elevation_gain ?? null;
+            const avgHr = data.avg_hr;
+            const avgPwr = data.avg_power;
+            const gain = data.elevation_gain_m;
             const calcVam = (() => {
               try {
                 const dist = (computeDistanceKm(hydrated||workoutData) ?? Number((hydrated||workoutData)?.distance) ?? 0) * 1000;
