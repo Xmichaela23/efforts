@@ -401,7 +401,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         const overall = (workout as any)?.computed?.overall || {};
         const distM = Number(overall?.distance_m ?? overall?.distanceMeters);
         const durS = Number(overall?.duration_s_moving ?? overall?.moving_seconds ?? overall?.duration_s);
-        const avgSpeedMpsOverall = Number(overall?.avg_speed_mps ?? overall?.avg_speed);
+        // Prefer canonical m/s; if missing, derive from distance_m / duration_s_moving
+        let avgSpeedMpsOverall = Number(overall?.avg_speed_mps);
+        if (!(Number.isFinite(avgSpeedMpsOverall) && avgSpeedMpsOverall > 0) && Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
+          avgSpeedMpsOverall = distM / durS;
+        }
         const avgPowerW = Number(overall?.avg_power_w ?? (workout as any)?.avg_power);
         // Distance text
         let distance = 'N/A';
