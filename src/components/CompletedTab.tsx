@@ -742,9 +742,9 @@ const formatPace = (paceValue: any): string => {
           unit: 'cal'
         },
         {
-          label: 'Elevation',
-          value: formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain),
-          unit: useImperial ? 'ft' : 'ft'
+          label: 'Elevation Gain',
+          value: (() => { const v = (workoutData as any)?.elevation_gain; return v != null ? formatElevation(v) : 'N/A'; })(),
+          unit: useImperial ? 'ft' : 'm'
         }
       ];
     }
@@ -768,9 +768,9 @@ const formatPace = (paceValue: any): string => {
         unit: 'bpm'
       },
       {
-        label: 'Elevation',
-        value: formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain),
-        unit: useImperial ? 'ft' : 'ft'
+        label: 'Elevation Gain',
+        value: (() => { const v = (workoutData as any)?.elevation_gain; return v != null ? formatElevation(v) : 'N/A'; })(),
+        unit: useImperial ? 'ft' : 'm'
       },
       {
         label: 'Calories',
@@ -2045,20 +2045,18 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          {/* VAM - only show if gain > ~150 ft/50 m */}
-          {(() => {
-            const gain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain || 0;
-            return gain > 150 ? (
-              <div className="px-2 py-1">
-                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                  {calculateVAM()}
-                </div>
-                <div className="text-xs text-[#666666] font-normal">
-                  <div className="font-medium">VAM</div>
-                </div>
-              </div>
-            ) : null;
-          })()}
+          {/* Elevation Gain (replace VAM) */}
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {(() => {
+                const val = (workoutData as any)?.elevation_gain;
+                return val != null ? formatElevation(val) : 'N/A';
+              })()}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Elevation Gain</div>
+            </div>
+          </div>
 
           {/* Calories */}
           <div className="px-2 py-1">
@@ -2154,10 +2152,10 @@ const formatMovingTime = () => {
           {!isPoolSwim && (
             <div className="px-2 py-1">
               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                {formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain)} ft
+                {(() => { const v = (workoutData as any)?.elevation_gain; return v != null ? formatElevation(v) : 'N/A'; })()} {useImperial ? 'ft' : 'm'}
               </div>
               <div className="text-xs text-[#666666] font-normal">
-                <div className="font-medium">Climbed</div>
+                <div className="font-medium">Elevation Gain</div>
               </div>
             </div>
           )}
@@ -2220,10 +2218,13 @@ const formatMovingTime = () => {
           {!isPoolSwim && (
             <div className="px-2 py-1">
               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                {calculateVAM()}
+                {(() => {
+                  const val = (workoutData as any)?.elevation_gain;
+                  return val != null ? formatElevation(val) : 'N/A';
+                })()}
               </div>
               <div className="text-xs text-[#666666] font-normal">
-                <div className="font-medium">VAM</div>
+                <div className="font-medium">Elevation Gain</div>
               </div>
             </div>
           )}
