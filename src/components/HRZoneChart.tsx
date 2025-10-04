@@ -264,8 +264,8 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
           {/* Bar Chart */}
           <div>
             <h3 className="text-sm font-medium mb-3">Time Distribution</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={zoneData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={zoneData} margin={{ top: 8, right: 8, left: 8, bottom: 16 }}>
                 <XAxis dataKey="zone" />
                 <YAxis />
                 <Tooltip 
@@ -280,7 +280,7 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
           {/* Pie Chart */}
           <div>
             <h3 className="text-sm font-medium mb-3">Zone Distribution</h3>
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie
                   data={zoneData}
@@ -288,7 +288,7 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
                   nameKey="zone"
                   cx="50%"
                   cy="50%"
-                  outerRadius={80}
+                  outerRadius={72}
                   label={({ percentage }) => pctFmt(percentage)}
                 >
                   {zoneData.map((entry, index) => (
