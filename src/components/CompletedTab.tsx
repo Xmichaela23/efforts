@@ -510,7 +510,7 @@ const formatMaxSpeed = (speedValue: any): string => {
     }
   } else {
     // For cycling: Look for fastest speed (highest km/h)
-    const maxSpeedKmh = Number(workoutData.max_speed);
+    const maxSpeedKmh = Number(((hydrated as any)?.max_speed ?? (workoutData as any)?.max_speed));
     const avgSpeedKmh = Number(workoutData.avg_speed);
     
     if (import.meta.env?.DEV) console.log('🔍 formatSpeed (CYCLE) - looking for fastest speed:', {

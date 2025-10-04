@@ -48,8 +48,15 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       } as any;
       const { data, error } = await (supabase.functions.invoke as any)('workout-detail', { body });
       if (error) throw error;
-      const workout = (data as any)?.workout || null;
-      return workout;
+      const remote = (data as any)?.workout || null;
+      // Merge with base row from context to preserve scalar columns (single source of truth)
+      try {
+        const base = Array.isArray(workouts) ? (workouts as any[]).find((x:any)=> String(x?.id||'') === String(id)) : null;
+        if (base && remote) return { ...base, ...remote };
+        return remote;
+      } catch {
+        return remote;
+      }
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
