@@ -1365,6 +1365,13 @@ export const useWorkouts = () => {
       } catch (e) {
         console.log('ℹ️ Auto-attach skipped:', e);
       }
+
+      // Compute summary (fire-and-forget) so computed.overall is available to unified/Today
+      try {
+        (supabase.functions.invoke as any)?.('compute-workout-summary', { body: { workout_id: data.id } } as any)
+          .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
+          .catch(() => {});
+      } catch {}
       return newWorkout;
     } catch (err) {
       console.error("Error in addWorkout:", err);
@@ -1470,7 +1477,7 @@ export const useWorkouts = () => {
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
-        mobility_exercises: ((): any[] => { try { return data.mobility_exercises ? JSON.parse(data.mobility_exercises) : []; } catch { return Array.isArray((data as any).mobility_exercises) ? (data as any).mobility_exercises : []; } })(),
+        mobility_exercises: (() => { try { return data.mobility_exercises ? JSON.parse(data.mobility_exercises) : []; } catch { return Array.isArray((data as any).mobility_exercises) ? (data as any).mobility_exercises : []; } })(),
         avg_heart_rate: data.avg_heart_rate,
         max_heart_rate: data.max_heart_rate,
         avg_power: data.avg_power,
@@ -1569,6 +1576,13 @@ export const useWorkouts = () => {
       };
 
       setWorkouts((prev) => prev.map((w) => (w.id === id ? updated : w)));
+
+      // Compute summary (fire-and-forget) to refresh metrics post-update
+      try {
+        (supabase.functions.invoke as any)?.('compute-workout-summary', { body: { workout_id: id } } as any)
+          .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
+          .catch(() => {});
+      } catch {}
       return updated;
     } catch (err) {
       console.error("Error in updateWorkout:", err);

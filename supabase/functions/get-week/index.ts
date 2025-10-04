@@ -242,6 +242,7 @@ Deno.serve(async (req) => {
 
     // Fetch unified workouts (new columns present but may be null)
     // Select only columns that exist on workouts in this project
+    // Revert to stable, minimal selection used previously
     const workoutSel = 'id,user_id,date,type,workout_status,planned_id,computed,strength_exercises,mobility_exercises';
     const { data: wkRaw, error: wkErr } = await supabase
       .from('workouts')
@@ -416,34 +417,25 @@ Deno.serve(async (req) => {
           overall: cmp0?.overall || null,
         } as any;
       }
-      // Always pass through strength_exercises for strength sessions (normalize to array)
+      // Pass through sets for strength and mobility (normalize to arrays) – previous display behavior
       if (!executed) executed = {};
       try {
-        // Strength sets → executed
         const rawSE = (w as any)?.strength_exercises;
         let se: any[] = [];
         if (Array.isArray(rawSE)) se = rawSE as any[];
-        else if (typeof rawSE === 'string') {
-          try { const parsed = JSON.parse(rawSE); if (Array.isArray(parsed)) se = parsed; } catch {}
-        }
+        else if (typeof rawSE === 'string') { try { const parsed = JSON.parse(rawSE); if (Array.isArray(parsed)) se = parsed; } catch {} }
         if (se && se.length) (executed as any).strength_exercises = se;
-
-        // Mobility sets → executed
         const rawME = (w as any)?.mobility_exercises;
         let me: any[] = [];
         if (Array.isArray(rawME)) me = rawME as any[];
-        else if (typeof rawME === 'string') {
-          try { const parsed = JSON.parse(rawME); if (Array.isArray(parsed)) me = parsed; } catch {}
-        }
+        else if (typeof rawME === 'string') { try { const parsed = JSON.parse(rawME); if (Array.isArray(parsed)) me = parsed; } catch {} }
         if (me && me.length) (executed as any).mobility_exercises = me;
-
-        // no completed_exercises column in this schema
       } catch {}
-      // Normalize status from fields that exist
       const cmp = w?.computed || null;
+
+      // Normalize status from available hints
       const hasStrengthEx = Array.isArray((w as any)?.strength_exercises) && (w as any).strength_exercises.length>0;
-      const hasMobilityEx = Array.isArray((w as any)?.mobility_exercises) && (w as any).mobility_exercises.length>0;
-      const hasExecuted = !!(cmp && ((Array.isArray(cmp?.intervals) && cmp.intervals.length>0) || cmp?.overall)) || hasStrengthEx || hasMobilityEx;
+      const hasExecuted = !!(cmp && ((Array.isArray(cmp?.intervals) && cmp.intervals.length>0) || cmp?.overall)) || hasStrengthEx;
       const rawStatus = String((w as any)?.workout_status || '').toLowerCase();
       let status = rawStatus || (hasExecuted ? 'completed' : (planned ? 'planned' : null));
       try {
