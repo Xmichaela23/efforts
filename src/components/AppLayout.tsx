@@ -303,7 +303,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           avg_power: workout.metrics?.avg_power,
           max_power: workout.metrics?.max_power,
           normalized_power: workout.metrics?.normalized_power,
-          max_speed: workout.metrics?.max_speed,
+          max_speed: workout.max_speed,
           avg_cadence: workout.metrics?.avg_cadence,
           max_cadence: workout.metrics?.max_cadence,
           calories: workout.metrics?.calories,
