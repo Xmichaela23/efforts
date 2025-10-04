@@ -729,124 +729,36 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       {(() => { 
                         if (!expanded[String(workout.id)]) return null;
                         const type = String((workout as any)?.type||'').toLowerCase();
-                          // Swim: use lightweight token summary to avoid heavy step expansion
-                          if (type==='swim') {
-                            try {
-                              const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
-                              if (!toks.length) return null;
-                              const preferYards = true; // authored units default to yards for this plan
-                              const yd = (n:number, unit:string)=> unit.toLowerCase()==='yd'? n : Math.round(n/0.9144);
-                              const lines: string[] = [];
-                              const pushWUCD = (m:RegExpMatchArray, warm:boolean)=>{
-                                const n = parseInt(m[1],10); const unit = String(m[2]||'yd'); const dist = preferYards? `${yd(n,unit)} yd` : `${n} ${unit}`;
-                                lines.push(`${warm?'Warm‑up':'Cool‑down'} ${dist}`);
-                              };
-                              const add = (label:string, reps:number, dist:number, unit:string)=>{
-                                const distance = preferYards? `${yd(dist,unit)} yd` : `${dist} ${unit}`;
-                                lines.push(`${label} ${reps}×${distance}`);
-                              };
-                              toks.forEach((t)=>{
-                                const s = String(t).toLowerCase();
-                                let m = s.match(/swim_warmup_(\d+)(yd|m)/i); if (m) { pushWUCD(m, true); return; }
-                                m = s.match(/swim_cooldown_(\d+)(yd|m)/i); if (m) { pushWUCD(m, false); return; }
-                                m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)/i); if (m) { add(m[1].replace(/_/g,' '), parseInt(m[2],10), parseInt(m[3],10), m[4]); return; }
-                                m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i); if (m) { add(m[4].replace(/_/g,' '), parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
-                                m = s.match(/swim_pull_(\d+)x(\d+)(yd|m)/i); if (m) { add('Pull', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
-                                m = s.match(/swim_kick_(\d+)x(\d+)(yd|m)/i); if (m) { add('Kick', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
-                                m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m) { add('Aerobic', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
-                              });
-                              return lines.length? (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>) : null;
-                            } catch {}
-                          }
-                          // For non-swim planned workouts, avoid duplicating details already rendered by PlannedWorkoutSummary
-                          if (type!=='swim') { return null; }
-                          // Endurance details from computed steps with ranges (guarded)
-                          const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
-                          if (steps.length > 1000) {
-                            return (<div className="text-xs text-gray-700">Details are long; showing summary only.</div>);
-                          }
-                          if (!steps.length) return null;
-                          const hints = (workout as any)?.export_hints || {};
-                          const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
-                          const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
-                          const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
-                          const paceStrWithRange = (paceTarget?: string, kind?: string) => {
-                            try {
-                              if (!paceTarget) return undefined;
-                              const m = String(paceTarget).match(/(\d+):(\d{2})\/(mi|km)/i);
-                              if (!m) return undefined;
-                              const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-                              const unit = m[3].toLowerCase();
-                              const tol = (String(kind||'').toLowerCase()==='recovery' || String(kind||'').toLowerCase()==='warmup' || String(kind||'').toLowerCase()==='cooldown') ? tolEasy : tolQual;
-                              const lo = Math.round(sec*(1 - tol));
-                              const hi = Math.round(sec*(1 + tol));
-                              const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
-                              return `${mmss(lo)}–${mmss(hi)}/${unit}`;
-                            } catch { return undefined; }
-                          };
-                          const powerStr = (st:any) => (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
-                          const lines: string[] = [];
-                          let i = 0;
-                          const isWork = (x:any)=> String((x?.kind||'')).toLowerCase()==='work' || String((x?.kind||'')).toLowerCase()==='steady' || String((x?.kind||''))==='interval_work';
-                          const isRec = (x:any)=> String((x?.kind||'')).toLowerCase()==='recovery' || /rest/i.test(String(x?.label||''));
-                          while (i < steps.length) {
-                            const st:any = steps[i];
-                            const kind = String(st?.kind||'').toLowerCase();
-                            if (kind==='warmup' && typeof st?.seconds==='number') {
-                              const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'warmup');
-                              lines.push(`1 × Warm‑up ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
-                              i += 1; continue;
-                            }
-                            if (kind==='cooldown' && typeof st?.seconds==='number') {
-                              const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'cooldown');
-                              lines.push(`1 × Cool‑down ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
-                              i += 1; continue;
-                            }
-                            if (isWork(st)) {
-                              const workLabel = (()=>{
-                                if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) return `${Math.round(st.distanceMeters)} m`;
-                                if (typeof st?.seconds==='number' && st.seconds>0) return fmtTime(st.seconds);
-                                return 'interval';
-                              })();
-                              const workPace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined, st?.kind);
-                              const workPower = powerStr(st);
-                              const next = steps[i+1];
-                              const hasRec = next && isRec(next);
-                              const restLabel = hasRec ? (()=>{
-                                if (typeof next?.seconds==='number' && next.seconds>0) return fmtTime(next.seconds);
-                                if (typeof next?.distanceMeters==='number' && next.distanceMeters>0) return `${Math.round(next.distanceMeters)} m`;
-                                return 'rest';
-                              })() : undefined;
-                              const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery') : undefined;
-                              const restPower = hasRec ? powerStr(next) : undefined;
-                              let count = 0; let j = i;
-                              while (j < steps.length) {
-                                const a = steps[j]; const b = steps[j+1];
-                                if (!isWork(a)) break;
-                                const aLabel = (typeof a?.distanceMeters==='number' && a.distanceMeters>0) ? `${Math.round(a.distanceMeters)} m` : (typeof a?.seconds==='number' ? fmtTime(a.seconds) : 'interval');
-                                const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind);
-                                const aPow = powerStr(a);
-                                const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? `${Math.round(b.distanceMeters)} m` : 'rest')) : undefined;
-                                const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery') : undefined;
-                                const bPow = (b && isRec(b)) ? powerStr(b) : undefined;
-                                const sameWork = (aLabel===workLabel) && (aPace===workPace) && (aPow===workPower);
-                                const sameRest = (!hasRec && !b) || (!!hasRec && !!b && isRec(b) && bLabel===restLabel && bPace===restPace && bPow===restPower);
-                                if (!sameWork || !sameRest) break;
-                                count += 1; j += hasRec ? 2 : 1;
-                              }
-                              const workAnno = workPace ? ` (${workPace})` : (workPower?` (${workPower})`:'' );
-                              const restAnno = hasRec ? (restPace ? ` ${restLabel} (${restPace})` : (restPower?` ${restLabel} (${restPower})` : ` ${restLabel}`)) : '';
-                              lines.push(`${count} × ${workLabel}${workAnno}${restAnno}`);
-                              if (j <= i) { i += 1; continue; }
-                              i = j; continue;
-                            }
-                            if (typeof st?.seconds==='number') { lines.push(`1 × ${fmtTime(st.seconds)}`); i+=1; continue; }
-                            if (typeof st?.distanceMeters==='number') { lines.push(`1 × ${Math.round(st.distanceMeters)} m`); i+=1; continue; }
-                            i += 1;
-                          }
-                          return (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>);
+                        // Swim: use lightweight token summary to avoid heavy step expansion
+                        if (type==='swim') {
+                          try {
+                            const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
+                            if (!toks.length) return null;
+                            const preferYards = true; // authored units default to yards for this plan
+                            const yd = (n:number, unit:string)=> unit.toLowerCase()==='yd'? n : Math.round(n/0.9144);
+                            const lines: string[] = [];
+                            const pushWUCD = (m:RegExpMatchArray, warm:boolean)=>{
+                              const n = parseInt(m[1],10); const unit = String(m[2]||'yd'); const dist = preferYards? `${yd(n,unit)} yd` : `${n} ${unit}`;
+                              lines.push(`${warm?'Warm‑up':'Cool‑down'} ${dist}`);
+                            };
+                            const add = (label:string, reps:number, dist:number, unit:string)=>{
+                              const distance = preferYards? `${yd(dist,unit)} yd` : `${dist} ${unit}`;
+                              lines.push(`${label} ${reps}×${distance}`);
+                            };
+                            toks.forEach((t)=>{
+                              const s = String(t).toLowerCase();
+                              let m = s.match(/swim_warmup_(\d+)(yd|m)/i); if (m) { pushWUCD(m, true); return; }
+                              m = s.match(/swim_cooldown_(\d+)(yd|m)/i); if (m) { pushWUCD(m, false); return; }
+                              m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)/i); if (m) { add(m[1].replace(/_/g,' '), parseInt(m[2],10), parseInt(m[3],10), m[4]); return; }
+                              m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i); if (m) { add(m[4].replace(/_/g,' '), parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
+                              m = s.match(/swim_pull_(\d+)x(\d+)(yd|m)/i); if (m) { add('Pull', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
+                              m = s.match(/swim_kick_(\d+)x(\d+)(yd|m)/i); if (m) { add('Kick', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
+                              m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m) { add('Aerobic', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
+                            });
+                            return lines.length? (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>) : null;
+                          } catch {}
                         }
-                        // Avoid duplicate rendering: rely on PlannedWorkoutSummary to render strength details when expanded
+                        // Non-swim: avoid duplicate details; PlannedWorkoutSummary already renders content
                         return null;
                       })()}
                     </div>
