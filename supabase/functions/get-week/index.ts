@@ -243,7 +243,18 @@ Deno.serve(async (req) => {
     // Fetch unified workouts (new columns present but may be null)
     // Select only columns that exist on workouts in this project
     // Revert to stable, minimal selection used previously
-    const workoutSel = 'id,user_id,date,type,workout_status,planned_id,computed,strength_exercises,mobility_exercises';
+    // Include minimal raw columns that can hydrate executed.overall when missing
+    const workoutSel = [
+      'id','user_id','date','type','workout_status','planned_id','computed',
+      // fallbacks to enrich executed.overall
+      'distance','avg_heart_rate','elevation_gain','moving_time','elapsed_time','avg_speed',
+      // power-related columns
+      'avg_power','normalized_power','functional_threshold_power',
+      // opaque metrics JSON for providers
+      'metrics',
+      // sets for strength/mobility
+      'strength_exercises','mobility_exercises'
+    ].join(',');
     const { data: wkRaw, error: wkErr } = await supabase
       .from('workouts')
       .select(workoutSel)
@@ -417,6 +428,27 @@ Deno.serve(async (req) => {
           overall: cmp0?.overall || null,
         } as any;
       }
+      // Enrich executed.overall using a single, predictable source:
+      // 1) workouts.computed.overall as-is when present
+      // 2) otherwise, map from top-level workout columns only (no nested provider metrics)
+      try {
+        if (!executed) executed = {};
+        const overall: any = executed.overall || {};
+        const num = (x: any) => (typeof x === 'number' && isFinite(x) ? x : undefined);
+        if (overall.distance_m == null) overall.distance_m = undefined; // do not guess units
+        if (overall.duration_s_moving == null && overall.duration_s == null) {
+          overall.duration_s_moving = num((w as any)?.moving_time) ?? num((w as any)?.elapsed_time);
+        }
+        if (overall.avg_speed_mps == null) {
+          overall.avg_speed_mps = num((w as any)?.avg_speed);
+        }
+        if (overall.avg_power_w == null) overall.avg_power_w = num((w as any)?.avg_power);
+        if (overall.normalized_power_w == null) overall.normalized_power_w = num((w as any)?.normalized_power);
+        if (overall.functional_threshold_power_w == null) overall.functional_threshold_power_w = num((w as any)?.functional_threshold_power);
+        if (overall.avg_hr == null) overall.avg_hr = num((w as any)?.avg_heart_rate);
+        if (overall.elevation_gain_m == null) overall.elevation_gain_m = num((w as any)?.elevation_gain);
+        executed.overall = overall;
+      } catch {}
       // Pass through sets for strength and mobility (normalize to arrays) – previous display behavior
       if (!executed) executed = {};
       try {
@@ -520,6 +552,27 @@ Deno.serve(async (req) => {
         byKey.set(key, it);
       }
     }
+
+    // Stable sort within each date by brick group/order so bricks show Bike→Run consistently
+    try {
+      const withIndex = (items as any[]).map((it: any, idx: number) => ({ ...it, __i: idx }));
+      withIndex.sort((a: any, b: any) => {
+        const ad = String(a?.date || '');
+        const bd = String(b?.date || '');
+        if (ad !== bd) return ad.localeCompare(bd);
+        const ag = String(a?.planned?.brick_group_id || '');
+        const bg = String(b?.planned?.brick_group_id || '');
+        if (ag && bg && ag === bg) {
+          const ao = Number(a?.planned?.brick_order || 0);
+          const bo = Number(b?.planned?.brick_order || 0);
+          if (Number.isFinite(ao) && Number.isFinite(bo) && ao !== bo) return ao - bo;
+        }
+        // Stable fallback: preserve original order
+        return (a.__i || 0) - (b.__i || 0);
+      });
+      (items as any[]).length = 0;
+      for (const it of withIndex) { delete (it as any).__i; (items as any[]).push(it); }
+    } catch {}
 
     const warningsOut = errors.concat(debugNotes);
     if (warningsOut.length) {
