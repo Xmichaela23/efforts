@@ -746,8 +746,8 @@ const formatPace = (paceValue: any): string => {
       }
     ];
 
-    // Add discipline-specific metrics
-    if (isRun) {
+    // Discipline-specific display removed; keep metrics data-driven. For legacy blocks, avoid duplicate cadence.
+    if (false && isRun) {
       return [
         ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
         {
@@ -775,7 +775,7 @@ const formatPace = (paceValue: any): string => {
         },
         ...baseMetrics.slice(3) // Elevation, Calories
       ];
-    } else if (isBike) {
+    } else if (false && isBike) {
       return [
         ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
         {
@@ -808,7 +808,7 @@ const formatPace = (paceValue: any): string => {
         },
         ...baseMetrics.slice(3) // Elevation, Calories
       ];
-    } else if (isSwim) {
+    } else if (false && isSwim) {
       // For pool swims, hide elevation; always show calories
       const caloriesMetric = baseMetrics[4];
       return [
