@@ -1,3 +1,4 @@
+// Supabase Edge Function: compute-workout-analysis
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -117,9 +118,9 @@ Deno.serve(async (req) => {
       gps = parseJson(ga.gps_track) || [];
     }
 
-    // Build minimal provider-agnostic run analysis (series + 1km/1mi splits)
-    function normalizeSamples(samplesIn: any[]): Array<{ t:number; d:number; elev?:number; hr?:number; cad?:number }> {
-      const out: Array<{ t:number; d:number; elev?:number; hr?:number; cad?:number }> = [];
+  // Build minimal provider-agnostic analysis rows (time, dist, elev, hr, cadences, power, speed)
+  function normalizeSamples(samplesIn: any[]): Array<{ t:number; d:number; elev?:number; hr?:number; cad_spm?:number; cad_rpm?:number; power_w?:number; v_mps?:number }> {
+    const out: Array<{ t:number; d:number; elev?:number; hr?:number; cad_spm?:number; cad_rpm?:number; power_w?:number; v_mps?:number }> = [];
       for (let i=0;i<samplesIn.length;i+=1) {
         const s = samplesIn[i] || {} as any;
         const t = Number(
@@ -130,8 +131,15 @@ Deno.serve(async (req) => {
         );
         const elev = (typeof s.elevationInMeters === 'number' && s.elevationInMeters) || (typeof s.altitudeInMeters === 'number' && s.altitudeInMeters) || (typeof s.altitude === 'number' && s.altitude) || undefined;
         const hr = (typeof s.heartRate === 'number' && s.heartRate) || (typeof s.heart_rate === 'number' && s.heart_rate) || (typeof s.heartRateInBeatsPerMinute === 'number' && s.heartRateInBeatsPerMinute) || undefined;
-        const cad = (typeof s.stepsPerMinute === 'number' && s.stepsPerMinute) || (typeof s.runCadence === 'number' && s.runCadence) || undefined;
-        out.push({ t: Number.isFinite(t)?t:i, d: Number.isFinite(d)?d:NaN, elev, hr, cad });
+      const cad_spm = (typeof s.stepsPerMinute === 'number' && s.stepsPerMinute) || (typeof s.runCadence === 'number' && s.runCadence) || undefined;
+      // Bike cadence commonly lives in bikeCadenceInRPM/bikeCadence/cadence
+      const cad_rpm = (typeof s.bikeCadenceInRPM === 'number' && s.bikeCadenceInRPM)
+        || (typeof s.bikeCadence === 'number' && s.bikeCadence)
+        || (typeof s.cadence === 'number' && s.cadence)
+        || undefined;
+      const power_w = (typeof s.power === 'number' && s.power) || (typeof s.watts === 'number' && s.watts) || undefined;
+      const v_mps = (typeof s.speedMetersPerSecond === 'number' && s.speedMetersPerSecond) || (typeof s.v === 'number' && s.v) || undefined;
+      out.push({ t: Number.isFinite(t)?t:i, d: Number.isFinite(d)?d:NaN, elev, hr, cad_spm, cad_rpm, power_w, v_mps });
       }
       out.sort((a,b)=>(a.t||0)-(b.t||0));
       if (!out.length) return out;
@@ -200,9 +208,13 @@ Deno.serve(async (req) => {
     const time_s: number[] = [];
     const distance_m: number[] = [];
     const elevation_m: (number|null)[] = [];
-    const pace_s_per_km: (number|null)[] = [];
+  const pace_s_per_km: (number|null)[] = [];
     const hr_bpm: (number|null)[] = [];
-    const cadence_spm: (number|null)[] = [];
+  const cadence_spm: (number|null)[] = [];
+  const cadence_rpm: (number|null)[] = [];
+  const power_watts: (number|null)[] = [];
+  const speed_mps: (number|null)[] = [];
+  const grade_percent: (number|null)[] = [];
     if (hasRows) {
       for (let i=0;i<rows.length;i+=1) {
         const r = rows[i];
@@ -210,18 +222,28 @@ Deno.serve(async (req) => {
         distance_m.push(Math.max(0, (r.d||0) - d0));
         elevation_m.push(typeof r.elev === 'number' ? r.elev : null);
         hr_bpm.push(typeof r.hr === 'number' ? r.hr : null);
-        cadence_spm.push(typeof r.cad === 'number' ? r.cad : null);
+      cadence_spm.push(typeof r.cad_spm === 'number' ? r.cad_spm : null);
+      cadence_rpm.push(typeof r.cad_rpm === 'number' ? r.cad_rpm : null);
+      power_watts.push(typeof r.power_w === 'number' ? r.power_w : null);
         if (i>0) {
           const dt = Math.max(0, (rows[i].t||0) - (rows[i-1].t||0));
           const dd = Math.max(0, (rows[i].d||0) - (rows[i-1].d||0));
           const MIN_DD = 2.5; // meters
           if (dt > 0 && dd > MIN_DD) {
             pace_s_per_km.push(dt / (dd / 1000));
+          speed_mps.push(dd / dt);
+          const de = (typeof rows[i].elev === 'number' ? rows[i].elev : (typeof elevation_m[i] === 'number' ? (elevation_m[i] as number) : null))
+                   - (typeof rows[i-1].elev === 'number' ? rows[i-1].elev : (typeof elevation_m[i-1] === 'number' ? (elevation_m[i-1] as number) : null));
+          grade_percent.push(typeof de === 'number' && dd > 0 ? (de / dd) * 100 : (grade_percent[grade_percent.length-1] ?? null));
           } else {
             pace_s_per_km.push(pace_s_per_km[pace_s_per_km.length-1] ?? null);
+          speed_mps.push(r.v_mps ?? speed_mps[speed_mps.length-1] ?? null);
+          grade_percent.push(grade_percent[grade_percent.length-1] ?? null);
           }
         } else {
           pace_s_per_km.push(null);
+        speed_mps.push(r.v_mps ?? null);
+        grade_percent.push(null);
         }
       }
     }
@@ -252,21 +274,50 @@ Deno.serve(async (req) => {
 
     // Light smoothing for elevation and pace to reduce noise/spikes
     const elevation_sm = hasRows ? smoothEMA(elevation_m, 0.25) : [];
-    const pace_sm = hasRows ? smoothEMA(pace_s_per_km, 0.25) : [];
+  const pace_sm = hasRows ? smoothEMA(pace_s_per_km, 0.25) : [];
+  const speed_sm = hasRows ? smoothEMA(speed_mps, 0.18) : [];
+  const grade_sm = hasRows ? smoothEMA(grade_percent, 0.25) : [];
 
-    const analysis: any = {
+  const analysis: any = {
       version: ANALYSIS_VERSION,
       computedAt: new Date().toISOString(),
       input,
-      series: hasRows ? { time_s, distance_m, elevation_m: elevation_sm, pace_s_per_km: pace_sm, hr_bpm, cadence_spm } : { sampling: { strategy: 'empty', targetPoints: 0 } },
+    series: hasRows ? { time_s, distance_m, elevation_m: elevation_sm, pace_s_per_km: pace_sm, speed_mps: speed_sm, hr_bpm, cadence_spm, cadence_rpm, power_watts, grade_percent: grade_sm } : { sampling: { strategy: 'empty', targetPoints: 0 } },
       events: {
         laps: Array.isArray(laps) ? laps.slice(0, 50) : [],
         splits: { km: computeSplits(1000), mi: computeSplits(1609.34) }
       },
-      zones: {},
+    zones: {},
       bests: {},
       ui: { footnote: `Computed at ${ANALYSIS_VERSION}`, renderHints: { preferPace: sport === 'run' } }
     };
+
+  // Zones histograms (auto-range, time-weighted)
+  try {
+    const binsFor = (values: (number|null)[], times: number[], n: number) => {
+      const vals: number[] = [];
+      for (let i=0;i<values.length;i++) if (typeof values[i] === 'number' && Number.isFinite(values[i] as number)) vals.push(values[i] as number);
+      if (vals.length < 10) return null;
+      const min = Math.min(...vals), max = Math.max(...vals);
+      if (!(max>min)) return null;
+      const step = (max - min) / n;
+      const bins = new Array(n).fill(0);
+      for (let i=1;i<times.length && i<values.length;i++) {
+        const v = values[i];
+        if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+        const dt = Math.max(0, times[i] - times[i-1]);
+        let idx = Math.floor((v - min) / step);
+        if (idx >= n) idx = n - 1;
+        if (idx < 0) idx = 0;
+        bins[idx] += dt;
+      }
+      return { bins: bins.map((t_s:number, i:number)=>({ i, t_s, min: Math.round(min + i*step), max: Math.round(min + (i+1)*step) })), schema: 'auto-range' };
+    };
+    const hrZones = binsFor(hr_bpm, time_s, 5);
+    if (hrZones) analysis.zones.hr = hrZones as any;
+    const pwrZones = binsFor(power_watts, time_s, 6);
+    if (pwrZones) analysis.zones.power = pwrZones as any;
+  } catch {}
 
     // --- Swim 100m splits: prefer series-derived buckets; fall back to lengths ---
     try {

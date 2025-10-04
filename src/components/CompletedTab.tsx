@@ -35,11 +35,10 @@ const sliderStyles = `
 `;
 
 interface CompletedTabProps {
- workoutType: 'ride' | 'run' | 'swim' | 'strength' | 'walk';
- workoutData: any;
+  workoutData: any;
 }
 
-const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData }) => {
+const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const { useImperial } = useAppContext();
   const compact = useCompact();
   
@@ -160,17 +159,18 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   }, [workoutIdKey, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);
   // Initialize pool length state from explicit, inferred, or default
   useEffect(() => {
-    if (workoutType !== 'swim') return;
-    try {
-      const explicit = Number((workoutData as any)?.pool_length);
-      if (Number.isFinite(explicit) && explicit > 0) { setPoolLengthMeters(explicit); return; }
-      const defStr = typeof window !== 'undefined' ? window.localStorage.getItem('pool_length_default_m') : null;
-      const def = defStr ? Number(defStr) : NaN;
-      if (Number.isFinite(def) && def > 0) { setPoolLengthMeters(def); return; }
-      // Fallback to inference later via helpers (keep null so helpers compute)
-      setPoolLengthMeters(null);
-    } catch { setPoolLengthMeters(null); }
-  }, [workoutType, workoutData?.id]);
+    if (workoutData && workoutData.swim_data) {
+      try {
+        const explicit = Number((workoutData as any)?.pool_length);
+        if (Number.isFinite(explicit) && explicit > 0) { setPoolLengthMeters(explicit); return; }
+        const defStr = typeof window !== 'undefined' ? window.localStorage.getItem('pool_length_default_m') : null;
+        const def = defStr ? Number(defStr) : NaN;
+        if (Number.isFinite(def) && def > 0) { setPoolLengthMeters(def); return; }
+        // Fallback to inference later via helpers (keep null so helpers compute)
+        setPoolLengthMeters(null);
+      } catch { setPoolLengthMeters(null); }
+    }
+  }, [workoutData?.swim_data]);
 
   // If this workout is linked to a planned row, fetch its tokens/label for display
   useEffect(() => {
@@ -246,7 +246,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
                 const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
-                if (workoutType === 'swim') {
+                if (workoutData.swim_data) {
                   const meters = Math.round(km * 1000);
                   if (!meters) return 'N/A';
                   return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
@@ -266,7 +266,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
                workoutData.avg_speed ? `${(workoutData.avg_speed * 3.6).toFixed(1)} km/h` : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">{workoutType === 'run' || workoutType === 'walk' ? 'Avg Pace' : 'Avg Speed'}</div>
+              <div className="font-medium">{workoutData.swim_data ? 'Avg Pace' : 'Avg Speed'}</div>
             </div>
           </div>
         </div>
@@ -299,7 +299,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   }
 
   // 🔒 EXISTING GARMIN LOGIC - allow swims without GPS
-  if (workoutType !== 'swim' && (!workoutData.gps_track || workoutData.gps_track.length === 0)) {
+  if (workoutData.swim_data && (!workoutData.gps_track || workoutData.gps_track.length === 0)) {
    return (
      <div className="flex items-center justify-center h-64">
        <div className="text-center">
@@ -363,7 +363,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   } catch {}
   // Swim: derive from lengths if present
   try {
-    if (workoutType === 'swim') {
+    if (workoutData.swim_data) {
       const lengths = Array.isArray((w as any)?.swim_data?.lengths) ? (w as any).swim_data.lengths : [];
       if (lengths.length > 0) {
         let meters = 0;
@@ -440,12 +440,12 @@ const formatMaxSpeed = (speedValue: any): string => {
   // For running/walking, we want the fastest pace (lowest time per km)
   // For cycling, we want the fastest speed (highest km/h)
   
-  if (workoutType === 'run' || workoutType === 'walk') {
-    // For running/walking: Look for best pace (fastest pace = lowest time per km)
+  if (workoutData.swim_data) {
+    // For swimming: Look for best pace (fastest pace = lowest time per km)
     const maxPaceSecondsPerKm = Number(workoutData.max_pace);
     const avgPaceSecondsPerKm = Number(workoutData.avg_pace);
     
-    if (import.meta.env?.DEV) console.log('🔍 formatSpeed (RUN/WALK) - looking for best pace:', {
+    if (import.meta.env?.DEV) console.log('🔍 formatSpeed (SWIM) - looking for best pace:', {
       max_pace: workoutData.max_pace,
       avg_pace: workoutData.avg_pace,
       maxPaceSecondsPerKm,
@@ -659,9 +659,9 @@ const formatPace = (paceValue: any): string => {
 
    // 🏠 PRIMARY METRICS - Dynamic based on workout type
   const getPrimaryMetrics = () => {
-    const isRun = workoutType === 'run';
-    const isBike = workoutType === 'ride';
-    const isSwim = workoutType === 'swim';
+    const isRun = workoutData.swim_data;
+    const isBike = workoutData.ride_data;
+    const isSwim = workoutData.swim_data;
     // Detect pool vs open-water swims
     const hasLengths = Number((workoutData as any)?.number_of_active_lengths) > 0
       || (Array.isArray((workoutData as any)?.swim_data?.lengths) && (workoutData as any).swim_data.lengths.length > 0);
@@ -670,7 +670,7 @@ const formatPace = (paceValue: any): string => {
     const poolHint = /lap|pool/.test(providerStr);
     const hasGps = Array.isArray((workoutData as any)?.gps_track) && (workoutData as any).gps_track.length > 10;
     const isPoolSwim = isSwim && (hasLengths || poolHint || (!openWaterHint && !hasGps));
-    const isWalk = workoutType === 'walk';
+    const isWalk = workoutData.walk_data;
     
     // Walking gets simplified metrics: time, distance, heart rate, calories, elevation
     if (isWalk) {
@@ -938,7 +938,7 @@ const formatPace = (paceValue: any): string => {
 
   const getDistanceMeters = (): number | null => {
     // Swims: only trust server-computed distance (prefer hydrated row if present)
-    if (workoutType === 'swim') {
+    if (workoutData.swim_data) {
       try {
         const src = (hydrated || workoutData) as any;
         const cm = Number(src?.computed?.overall?.distance_m);
@@ -1230,10 +1230,10 @@ const formatPace = (paceValue: any): string => {
 
  // 🏠 ADVANCED METRICS - Dynamic based on workout type
  const getAdvancedMetrics = () => {
-   const isRun = workoutType === 'run';
-   const isBike = workoutType === 'ride';
-   const isSwim = workoutType === 'swim';
-   const isWalk = workoutType === 'walk';
+   const isRun = workoutData.swim_data;
+   const isBike = workoutData.ride_data;
+   const isSwim = workoutData.swim_data;
+   const isWalk = workoutData.walk_data;
    
    // Walking gets minimal advanced metrics
    if (isWalk) {
@@ -1424,7 +1424,7 @@ const formatPace = (paceValue: any): string => {
 
   // Enhanced VAM calculation for running with insights
  const calculateRunningVAM = () => {
-   if (workoutType !== 'run') return null;
+   if (!workoutData.swim_data) return null;
    
    const elevationGain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain;
    const duration = workoutData.duration;
@@ -1467,9 +1467,9 @@ const formatPace = (paceValue: any): string => {
 
  // Calculate Grade Adjusted Pace (GAP) using proper Strava formula
  const calculateGradeAdjustedPace = () => {
-   if (import.meta.env?.DEV) console.log('🔍 GAP calculation - workoutType:', workoutType);
-   if (workoutType !== 'run' && workoutType !== 'walk') {
-     if (import.meta.env?.DEV) console.log('❌ GAP calculation skipped - not a run/walk:', workoutType);
+   if (import.meta.env?.DEV) console.log('🔍 GAP calculation');
+   if (!workoutData.swim_data && !workoutData.walk_data) {
+     if (import.meta.env?.DEV) console.log('❌ GAP calculation skipped - not a run/walk:', workoutData.swim_data);
      return null;
    }
    
@@ -1671,7 +1671,7 @@ const formatMovingTime = () => {
     })()}
 
      {/* 🏠 ALL METRICS - 3-column grid with tighter spacing */}
-     {workoutType === 'swim' ? (
+     {workoutData.swim_data ? (
        <div className="grid grid-cols-3 gap-1">
          {/* Distance */}
          <div className="px-2 py-1">
@@ -1758,7 +1758,7 @@ const formatMovingTime = () => {
      ) : (
        <div className="grid grid-cols-3 gap-1">
        {/* General metrics - Only for non-cycling workouts */}
-       {workoutType !== 'ride' && (
+       {workoutData.ride_data && workoutData.walk_data && (
          <>
           {/* Distance */}
            <div className="px-2 py-1">
@@ -1766,7 +1766,7 @@ const formatMovingTime = () => {
                {(() => {
                  const src = (hydrated || workoutData);
                  const km = (computeDistanceKm(src) ?? Number(src?.distance)) || 0;
-                if (workoutType === 'swim') {
+                if (workoutData.swim_data) {
                   const meters = Math.round(km * 1000);
                   if (!meters) return 'N/A';
                   return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
@@ -1783,7 +1783,7 @@ const formatMovingTime = () => {
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
              {(() => {
-               if (workoutType === 'swim') {
+               if (workoutData.swim_data) {
                  // Duration (elapsed) must use explicit elapsed fields; do not use moving-time resolver
                  const s = (workoutData as any)?.metrics?.total_elapsed_time
                        ?? (workoutData as any)?.total_elapsed_time
@@ -1811,7 +1811,7 @@ const formatMovingTime = () => {
            </div>
            
            {/* Avg Pace/Speed */}
-          {workoutType === 'run' || workoutType === 'walk' ? (
+          {workoutData.swim_data ? (
              <div className="px-2 py-1">
                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
                  {formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
@@ -1820,7 +1820,7 @@ const formatMovingTime = () => {
                  <div className="font-medium">Avg Pace</div>
                </div>
              </div>
-           ) : workoutType === 'swim' ? (
+           ) : workoutData.ride_data ? (
              <div className="px-2 py-1">
                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
                 {(() => { const s = computeSwimAvgPaceSecPer100(); if (!s) return 'N/A'; const disp = useImperial ? Math.round(s*0.9144) : s; return formatSwimPace(disp); })()}
@@ -1841,7 +1841,7 @@ const formatMovingTime = () => {
            )}
 
           {/* Swim-only cards: Lengths, Pool */}
-          {workoutType === 'swim' && (
+          {workoutData.swim_data && (
             <>
               <div className="px-2 py-1">
                 <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -1863,7 +1863,7 @@ const formatMovingTime = () => {
        )}
 
        {/* Row 2: GAP, Max Speed, Avg Cadence */}
-      {workoutType === 'run' && (
+      {workoutData.swim_data && (
         <div className="px-2 py-1">
           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
             {(() => {
@@ -1882,10 +1882,10 @@ const formatMovingTime = () => {
         </div>
       )}
 
-      {workoutType !== 'ride' && workoutType !== 'swim' && (
+      {workoutData.ride_data && workoutData.walk_data && (
       <div className="px-2 py-1">
         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-          {(workoutType === 'run' || workoutType === 'walk')
+          {(workoutData.swim_data || workoutData.walk_data)
             ? (() => {
                 // Preferred: stored max_pace (sec/km). Fallback: derive from samples.
                 const stored = workoutData.metrics?.max_pace ?? workoutData.max_pace;
@@ -1911,18 +1911,18 @@ const formatMovingTime = () => {
                 }
                 if (!Number.isFinite(secPerKm) || (secPerKm as number) <= 0) return 'N/A';
                 const secPerMile = (secPerKm as number) * 1.60934;
-                if (workoutType === 'walk' && secPerMile < 360) return 'N/A';
+                if (workoutData.walk_data && secPerMile < 360) return 'N/A';
                 return formatPace(secPerKm);
               })()
             : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A')}
         </div>
         <div className="text-xs text-[#666666] font-normal">
-          <div className="font-medium">{(workoutType === 'run' || workoutType === 'walk') ? 'Max Pace' : 'Max Speed'}</div>
+          <div className="font-medium">{(workoutData.swim_data || workoutData.walk_data) ? 'Max Pace' : 'Max Speed'}</div>
         </div>
       </div>
       )}
       
-      {workoutType === 'ride' ? (
+      {workoutData.ride_data ? (
         <>
           {/* Avg Speed (top-left) */}
           <div className="px-2 py-1">
@@ -1997,7 +1997,7 @@ const formatMovingTime = () => {
               })()}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Avg {workoutType === 'swim' ? 'stroke rate' : 'Cadence'}</div>
+              <div className="font-medium">Avg {workoutData.swim_data ? 'stroke rate' : 'Cadence'}</div>
             </div>
           </div>
 
@@ -2087,14 +2087,14 @@ const formatMovingTime = () => {
             })()}
           </div>
           <div className="text-xs text-[#666666] font-normal">
-            <div className="font-medium">Avg {workoutType === 'swim' ? 'stroke rate' : 'Cadence'}</div>
+            <div className="font-medium">Avg {workoutData.swim_data ? 'stroke rate' : 'Cadence'}</div>
           </div>
         </div>
       )}
       
       {/* Row 3: Elevation, Calories, Max HR - Only for non-cycling workouts; hide Elevation for pool swims */}
       {(() => {
-        const isSwim = workoutType === 'swim';
+        const isSwim = workoutData.swim_data;
         const hasLengths = Number((workoutData as any)?.number_of_active_lengths) > 0
           || (Array.isArray((workoutData as any)?.swim_data?.lengths) && (workoutData as any).swim_data.lengths.length > 0);
         const providerStr = String((workoutData as any)?.provider_sport || (workoutData as any)?.activity_type || (workoutData as any)?.name || '').toLowerCase();
@@ -2102,7 +2102,7 @@ const formatMovingTime = () => {
         const poolHint = /lap|pool/.test(providerStr);
         const hasGps = Array.isArray((workoutData as any)?.gps_track) && (workoutData as any).gps_track.length > 10;
         const isPoolSwim = isSwim && (hasLengths || poolHint || (!openWaterHint && !hasGps));
-        return workoutType !== 'ride' ? (
+        return workoutData.ride_data ? (
         <>
           {/* Hide climb for pool swim */}
           {!isPoolSwim && (
@@ -2125,7 +2125,7 @@ const formatMovingTime = () => {
             </div>
           </div>
      
-          {(workoutType === 'run' || workoutType === 'walk') && (
+          {(workoutData.swim_data || workoutData.walk_data) && (
             <div className="px-2 py-1">
               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
                 {formatStrideLength(deriveStrideLengthMeters())}
@@ -2146,7 +2146,7 @@ const formatMovingTime = () => {
           </div>
 
           {/* Row 4: Cadence card (hidden for swim); VAM hidden for pool swims */}
-          {workoutType !== 'swim' && (
+          {workoutData.swim_data && (
             <div className="px-2 py-1">
               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
                 {(() => {
@@ -2204,7 +2204,7 @@ const formatMovingTime = () => {
      <div className="w-full">
        {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
        {(() => {
-         const isSwim = workoutType === 'swim';
+         const isSwim = workoutData.swim_data;
          const hasLengths = Number((workoutData as any)?.number_of_active_lengths) > 0
            || (Array.isArray((workoutData as any)?.swim_data?.lengths) && (workoutData as any).swim_data.lengths.length > 0);
          const providerStr = String((workoutData as any)?.provider_sport || (workoutData as any)?.activity_type || (workoutData as any)?.name || '').toLowerCase();
@@ -2352,39 +2352,45 @@ const formatMovingTime = () => {
               </div>
             </div>
           )}
-          {/* Heart Rate Zone Chart - replaces legacy splits */}
-          {workoutType === 'run' && (() => {
-            // Try multiple data sources
-            let samples = [];
-            if (Array.isArray((hydrated||workoutData)?.sensor_data?.samples)) {
-              samples = (hydrated||workoutData).sensor_data.samples;
-            } else if (Array.isArray((hydrated||workoutData)?.sensor_data)) {
-              samples = (hydrated||workoutData).sensor_data;
-            } else if (Array.isArray((hydrated||workoutData)?.time_series_data)) {
-              samples = (hydrated||workoutData).time_series_data;
+          {/* Heart Rate Zone Chart - data-driven */}
+          {(() => {
+            const zones = (hydrated||workoutData)?.computed?.analysis?.zones?.hr;
+            if (zones?.bins && Array.isArray(zones.bins) && zones.bins.length > 0) {
+              const zDur = zones.bins.map((b:any)=> Number(b.t_s)||0);
+              return (
+                <div className="mb-4">
+                  <HRZoneChart
+                    zoneDurationsSeconds={zDur}
+                    title="Heart Rate Zones"
+                  />
+                </div>
+              );
             }
-            
-            return samples.length > 0 && (
-              <div className="mb-4">
-                <HRZoneChart
-                  samples={samples.map((s: any, i: number) => ({
-                    t: i,
-                    hr: s.hr_bpm || s.heartRate || s.heart_rate || s.hr || s.bpm || s.heart_rate_bpm || null
-                  }))}
-                  age={30}
-                  sex="male"
-                  zonePreset="run"
-                  title="Heart Rate Zones"
-                />
-              </div>
-            );
+            return null;
+          })()}
+          {/* Power Zones - if present */}
+          {(() => {
+            const pwr = (hydrated||workoutData)?.computed?.analysis?.zones?.power;
+            if (pwr?.bins && Array.isArray(pwr.bins) && pwr.bins.length > 0) {
+              // Reuse HRZoneChart for a quick stacked bar using durations
+              const zDur = pwr.bins.map((b:any)=> Number(b.t_s)||0);
+              return (
+                <div className="mb-4">
+                  <HRZoneChart
+                    zoneDurationsSeconds={zDur}
+                    title="Power Zones"
+                  />
+                </div>
+              );
+            }
+            return null;
           })()}
         </div>
       )}
 
       {/* Swim splits list with HR – hide unless valid splits exist with variance */}
       {(() => {
-        if (workoutType !== 'swim') return null;
+        if (!workoutData.swim_data) return null;
         const comp = (hydrated || workoutData) as any;
         const comp100 = comp?.computed?.analysis?.events?.splits_100;
         const rowsPref = Array.isArray(comp100?.rows) ? comp100.rows as Array<{ n:number; duration_s:number }> : [];
@@ -2456,7 +2462,7 @@ const formatMovingTime = () => {
       })()}
 
       {/* SEPARATE Power/Cadence Chart - at the bottom */}
-      {(workoutType === 'run' || workoutType === 'ride') && (() => {
+      {(workoutData.swim_data || workoutData.ride_data) && (() => {
         // Try multiple data sources for sensor data
         let samples = [];
         if (Array.isArray((hydrated||workoutData)?.sensor_data?.samples)) {
@@ -2493,7 +2499,7 @@ const formatMovingTime = () => {
           };
 
           const cadenceData = samples
-            .map(s => pickCadenceSample(s, workoutType === 'ride' ? 'ride' : 'run'))
+            .map(s => pickCadenceSample(s, workoutData.swim_data ? 'swim' : 'run'))
             .filter(v => v != null);
           
           // Old Power/Cadence chart removed (now integrated into main viewer tabs)

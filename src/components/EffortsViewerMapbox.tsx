@@ -12,9 +12,13 @@ type Sample = {
   d_m: number;              // cumulative meters
   elev_m_sm: number | null; // smoothed elevation (m)
   pace_s_per_km: number | null;
+  speed_mps?: number | null;
   hr_bpm: number | null;
   vam_m_per_h: number | null;
   grade: number | null;
+  cad_spm?: number | null;
+  cad_rpm?: number | null;
+  power_w?: number | null;
 };
 type Split = {
   startIdx: number; endIdx: number;
@@ -23,7 +27,7 @@ type Split = {
   avgHr_bpm: number | null;
   gain_m: number; avgGrade: number | null;
 };
-type MetricTab = "pace" | "bpm" | "cad" | "pwr" | "elev";
+type MetricTab = "pace" | "spd" | "bpm" | "cad" | "pwr" | "elev";
 
 /** ---------- Small utils/formatters ---------- */
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -351,6 +355,10 @@ function EffortsViewerMapbox({
     const elevation_m: (number|null)[] = Array.isArray(s.elevation_m) ? s.elevation_m : [];
     const pace_s_per_km: (number|null)[] = Array.isArray(s.pace_s_per_km) ? s.pace_s_per_km : [];
     const hr_bpm: (number|null)[] = Array.isArray(s.hr_bpm) ? s.hr_bpm : [];
+    const speed_mps: (number|null)[] = Array.isArray(s.speed_mps) ? s.speed_mps : [];
+    const cad_spm: (number|null)[] = Array.isArray(s.cadence_spm) ? s.cadence_spm : [];
+    const cad_rpm: (number|null)[] = Array.isArray(s.cadence_rpm) ? s.cadence_rpm : [];
+    const power_w: (number|null)[] = Array.isArray(s.power_watts) ? s.power_watts : [];
     const len = Math.min(distance_m.length, time_s.length || distance_m.length);
     // Downsample indices to ~2000 pts while preserving 1 km/1 mi split boundaries
     const splitMeters = useMiles ? 1609.34 : 1000;
@@ -403,9 +411,13 @@ function EffortsViewerMapbox({
         d_m: d,
         elev_m_sm: es,
         pace_s_per_km: paceEma ?? null,
+        speed_mps: Number.isFinite(speed_mps?.[i] as any) ? Number(speed_mps[i]) : null,
         hr_bpm: Number.isFinite(hr_bpm?.[i]) ? Number(hr_bpm[i]) : null,
         grade,
-        vam_m_per_h: vam
+        vam_m_per_h: vam,
+        cad_spm: Number.isFinite(cad_spm?.[i] as any) ? Number(cad_spm[i]) : null,
+        cad_rpm: Number.isFinite(cad_rpm?.[i] as any) ? Number(cad_rpm[i]) : null,
+        power_w: Number.isFinite(power_w?.[i] as any) ? Number(power_w[i]) : null
       });
       lastE = es; lastD = d; lastT = t;
     }
@@ -440,7 +452,15 @@ function EffortsViewerMapbox({
     return out;
   }, [samples, useMiles]);
 
-  const [tab, setTab] = useState<MetricTab>("pace");
+  // Default tab: prefer SPEED when speed_mps exists; else PACE when pace exists; else BPM
+  const defaultTab: MetricTab = useMemo(() => {
+    const hasSpeed = normalizedSamples.some(s => Number.isFinite(s.speed_mps as any));
+    const hasPace  = normalizedSamples.some(s => Number.isFinite(s.pace_s_per_km as any));
+    if (hasSpeed) return "spd";
+    if (hasPace) return "pace";
+    return "bpm";
+  }, [normalizedSamples]);
+  const [tab, setTab] = useState<MetricTab>(defaultTab);
   const [showVam, setShowVam] = useState(false);
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
@@ -620,6 +640,12 @@ function EffortsViewerMapbox({
       if (!finite.length || (Math.max(...finite) - Math.min(...finite) === 0)) return new Array(elev.length).fill(0);
       return elev;
     }
+    // Speed (m/s → present directly)
+    if (tab === "spd") {
+      const spd = normalizedSamples.map(s => Number.isFinite(s.speed_mps as any) ? (s.speed_mps as number) : NaN);
+      const wins = winsorize(spd as number[], 5, 99);
+      return smoothWithOutlierHandling(wins, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
+    }
     // Pace - enhanced smoothing with outlier handling
       if (tab === "pace") {
       const raw = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
@@ -655,9 +681,13 @@ function EffortsViewerMapbox({
       const winsorized = winsorize(hr, 5, 95);
       return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
-    // Cadence (derive from normalizedSamples or sensor_data)
+    // Cadence (derive from normalizedSamples)
     if (tab === "cad") {
-      const cad = cadSeries && cadSeries.length ? cadSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN);
+      const cad = normalizedSamples.map(s => {
+        if (Number.isFinite(s.cad_rpm as any)) return Number(s.cad_rpm);
+        if (Number.isFinite(s.cad_spm as any)) return Number(s.cad_spm);
+        return NaN;
+      });
       if (isOutdoorGlobal) {
         // Remove impossible cadence outliers (< 40 or > 220) and smooth lightly
         const clamped = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
@@ -1048,7 +1078,16 @@ function EffortsViewerMapbox({
       {/* Metric buttons */}
       <div style={{ marginTop: 8, padding: "0 6px" }}>
         <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
-          {( ["pace", "bpm", "cad", "pwr", "elev"] as MetricTab[]).map((t) => (
+          {( (
+            [
+              normalizedSamples.some(s=>Number.isFinite(s.speed_mps as any)) ? "spd" : null,
+              normalizedSamples.some(s=>Number.isFinite(s.pace_s_per_km as any)) ? "pace" : null,
+              "bpm",
+              normalizedSamples.some(s=>Number.isFinite(s.cad_rpm as any) || Number.isFinite(s.cad_spm as any)) ? "cad" : null,
+              normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
+              "elev"
+            ].filter(Boolean) as MetricTab[]
+          ) ).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -1057,7 +1096,7 @@ function EffortsViewerMapbox({
                 padding: "6px 2px", borderBottom: tab === t ? "2px solid #0ea5e9" : "2px solid transparent", letterSpacing: 0.5
               }}
             >
-              {t.toUpperCase()}
+              {t === 'spd' ? 'SPEED' : t.toUpperCase()}
             </button>
           ))}
         </div>
