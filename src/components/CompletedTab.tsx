@@ -2354,8 +2354,6 @@ const formatMovingTime = () => {
           </div>
         );
       })()}
-      </div>
-
      {/* SEPARATE Power/Cadence Chart - at the bottom */}
       {(workoutData.swim_data || workoutData.ride_data) && (() => {
         // Try multiple data sources for sensor data
