@@ -2035,23 +2035,7 @@ const formatMovingTime = () => {
             </div>
           </div>
         </>
-      ) : (
-        <div className="px-2 py-1">
-          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-            {(() => {
-              const v = (
-                workoutData.avg_cadence ??
-                workoutData.metrics?.avg_cadence ??
-                workoutData.avg_running_cadence
-              );
-              return v != null ? safeNumber(v) : 'N/A';
-            })()}
-          </div>
-          <div className="text-xs text-[#666666] font-normal">
-            <div className="font-medium">Avg {workoutData.swim_data ? 'stroke rate' : 'Cadence'}</div>
-          </div>
-        </div>
-      )}
+      ) : null}
       
       {/* Row 3: Elevation, Calories, Max HR - Only for non-cycling workouts; hide Elevation for pool swims */}
       {(() => {
@@ -2314,7 +2298,7 @@ const formatMovingTime = () => {
         const zonesHr = (hydrated||workoutData)?.computed?.analysis?.zones?.hr;
         if (!(zonesHr?.bins?.length)) return null;
         return (
-          <div className="mt-4 mx-[-16px] px-3 py-3">
+          <div className="mt-4 mb-6 mx-[-16px] px-3 py-3 space-y-4">
             {zonesHr?.bins?.length ? (
               <div className="my-4">
                 <HRZoneChart zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)} title="Heart Rate Zones" />

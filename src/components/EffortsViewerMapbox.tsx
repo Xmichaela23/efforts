@@ -456,6 +456,7 @@ function EffortsViewerMapbox({
   const defaultTab: MetricTab = useMemo(() => {
     const hasSpeed = normalizedSamples.some(s => Number.isFinite(s.speed_mps as any));
     const hasPace  = normalizedSamples.some(s => Number.isFinite(s.pace_s_per_km as any));
+    if (import.meta.env?.DEV) console.log('[viewer] tabs presence', { hasSpeed, hasPace, firstSpeed: normalizedSamples.find(s=>Number.isFinite(s.speed_mps as any))?.speed_mps, firstPace: normalizedSamples.find(s=>Number.isFinite(s.pace_s_per_km as any))?.pace_s_per_km });
     if (hasSpeed) return "spd";
     if (hasPace) return "pace";
     return "bpm";
@@ -643,6 +644,7 @@ function EffortsViewerMapbox({
     // Speed (m/s → present directly)
     if (tab === "spd") {
       const spd = normalizedSamples.map(s => Number.isFinite(s.speed_mps as any) ? (s.speed_mps as number) : NaN);
+      if (import.meta.env?.DEV) console.log('[viewer] plotting SPEED points', spd.filter(Number.isFinite).length);
       const wins = winsorize(spd as number[], 5, 99);
       return smoothWithOutlierHandling(wins, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
