@@ -52,17 +52,47 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     queryKey: ['workout-detail', id, optsKey],
     enabled: !!id && isUuid(id) && !fromContext,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      // Allow function to authorize with service role when available; fall back to anon
+      // Build normalized options once
       const normalized = JSON.parse(optsKey || '{}');
-      const body = {
-        id,
-        ...normalized,
-      } as any;
-      const { data, error } = await (supabase.functions.invoke as any)('workout-detail', { body });
-      if (error) throw error;
-      const remote = (data as any)?.workout || null;
-      // Merge with base row from context to preserve scalar columns (single source of truth)
+
+      const fetchDetail = async () => {
+        const body = { id, ...normalized } as any;
+        const { data, error } = await (supabase.functions.invoke as any)('workout-detail', { body });
+        if (error) throw error;
+        return (data as any)?.workout || null;
+      };
+
+      const hasSeries = (w: any) => {
+        try {
+          const s = w?.computed?.analysis?.series || null;
+          const n = Array.isArray(s?.distance_m) ? s.distance_m.length : 0;
+          const nt = Array.isArray(s?.time_s) ? s.time_s.length : (Array.isArray(s?.time) ? s.time.length : 0);
+          return n > 1 && nt > 1;
+        } catch { return false; }
+      };
+
+      let remote = await fetchDetail();
+
+      if (!remote) throw new Error('Workout not found');
+
+      // If analysis missing → compute once and wait
+      if (!hasSeries(remote)) {
+        try {
+          await (supabase.functions.invoke as any)('compute-workout-analysis', { body: { workout_id: id } });
+        } catch {}
+        for (let i = 0; i < 6; i++) {
+          await new Promise((r) => setTimeout(r, 700));
+          try {
+            const next = await fetchDetail();
+            if (next) {
+              remote = next;
+              if (hasSeries(remote)) break;
+            }
+          } catch {}
+        }
+      }
+
+      // Merge with base row from context to preserve scalars
       try {
         const base = Array.isArray(workouts) ? (workouts as any[]).find((x:any)=> String(x?.id||'') === String(id)) : null;
         if (base && remote) return { ...base, ...remote };
