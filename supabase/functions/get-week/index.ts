@@ -439,13 +439,13 @@ Deno.serve(async (req) => {
         if (overall.duration_s_moving == null && overall.duration_s == null) {
           overall.duration_s_moving = num((w as any)?.moving_time) ?? num((w as any)?.elapsed_time);
         }
-        if (overall.avg_speed_mps == null) {
-          overall.avg_speed_mps = num((w as any)?.avg_speed);
-        }
+        // Accept canonical m/s if provided by importer
+        if (overall.avg_speed_mps == null) overall.avg_speed_mps = num((w as any)?.avg_speed_mps);
         if (overall.avg_power_w == null) overall.avg_power_w = num((w as any)?.avg_power);
         if (overall.normalized_power_w == null) overall.normalized_power_w = num((w as any)?.normalized_power);
         if (overall.functional_threshold_power_w == null) overall.functional_threshold_power_w = num((w as any)?.functional_threshold_power);
         if (overall.avg_hr == null) overall.avg_hr = num((w as any)?.avg_heart_rate);
+        // Elevation gain is stored in meters in our importer
         if (overall.elevation_gain_m == null) overall.elevation_gain_m = num((w as any)?.elevation_gain);
         executed.overall = overall;
       } catch {}

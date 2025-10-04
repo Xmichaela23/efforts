@@ -402,14 +402,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         const distM = Number(overall?.distance_m ?? overall?.distanceMeters);
         const durS = Number(overall?.duration_s_moving ?? overall?.moving_seconds ?? overall?.duration_s);
         const avgSpeedMpsOverall = Number(overall?.avg_speed_mps ?? overall?.avg_speed);
-        const avgPowerW = Number(overall?.avg_power_w ?? (workout as any)?.avg_power ?? (workout as any)?.metrics?.avg_power);
-        const ftpW = ((): number | null => {
-          const fromOverall = Number(overall?.functional_threshold_power_w);
-          if (Number.isFinite(fromOverall) && fromOverall > 0) return fromOverall;
-          const fromBaselines = Number((baselines as any)?.performanceNumbers?.ftp);
-          if (Number.isFinite(fromBaselines) && fromBaselines > 0) return fromBaselines;
-          return null;
-        })();
+        const avgPowerW = Number(overall?.avg_power_w ?? (workout as any)?.avg_power);
         // Distance text
         let distance = 'N/A';
         if (Number.isFinite(distM) && distM > 0) {
@@ -445,16 +438,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         const elevationFt = (Number.isFinite(elevationM) && elevationM > 0) ? `${Math.round(elevationM * 3.28084)} ft` : 'N/A';
 
         // Power text for rides (Avg W and %FTP when FTP is known)
-        const powerText = (() => {
-          if (!isRide) return undefined;
-          if (!(Number.isFinite(avgPowerW) && avgPowerW > 0)) return undefined;
-          const watts = `${Math.round(avgPowerW)} W`;
-          if (ftpW && ftpW > 0) {
-            const pct = Math.round((avgPowerW / ftpW) * 100);
-            return `${watts} • ${pct}% FTP`;
-          }
-          return watts;
-        })();
+        const powerText = (isRide && Number.isFinite(avgPowerW) && avgPowerW > 0) ? `${Math.round(avgPowerW)} W` : undefined;
 
         // For swims, only show distance and average pace
         if (isSwim) {
@@ -499,7 +483,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           return [distText, durText, per100];
         }
         
-        return [distance, paceSpeed, hrDisplay, elevationFt];
+        return [distance, paceSpeed, powerText, hrDisplay, elevationFt].filter(Boolean) as any;
       }
     };
     
