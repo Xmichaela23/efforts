@@ -245,13 +245,24 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
-                const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
+                const kmFrom = (() => {
+                  try {
+                    const computedMeters = (workoutData as any)?.computed?.overall?.distance_m;
+                    if (typeof computedMeters === 'number' && computedMeters > 0) return computedMeters / 1000;
+                  } catch {}
+                  const meters = (workoutData as any)?.distance_meters ?? (workoutData as any)?.metrics?.distance_meters ?? (workoutData as any)?.strava_data?.original_activity?.distance;
+                  if (typeof meters === 'number' && meters > 0) return meters / 1000;
+                  const d = Number((workoutData as any)?.distance);
+                  return Number.isFinite(d) ? (d > 2000 ? d / 1000 : d) : 0;
+                })();
+                const km = kmFrom || 0;
                 if (workoutData.swim_data) {
                   const meters = Math.round(km * 1000);
                   if (!meters) return 'N/A';
                   return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
                 }
-                return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
+                const fmt = (n:number) => useImperial ? (n * 0.621371).toFixed(1) : n.toFixed(1);
+                return km ? `${fmt(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
               })()}
             </div>
             <div className="text-xs text-[#666666] font-normal">
@@ -1173,7 +1184,7 @@ const formatPace = (paceValue: any): string => {
           outSummary.push(`Main: ${main.length}x${Math.round(mainD)}m - ${avgPer100?formatSwimPace(avgPer100):'—' } avg (${plusMinus} consistency)`);
           let i=1; for (const l of main) {
             const p100 = l.t/(l.d/100);
-            outPerf.push({ label: `${Math.round(mainD)}m #${i++}`, distance_m: l.d, pace_per100_s: p100, swolf: null });
+            outPerf.push({ label: `${Math.round(mainD)}m #${i++}`, distance_m: l.d, pace_per100_s: p100 });
           }
         }
         // Warmup = first lap if longer/slow; Cooldown = last lap if short
@@ -1656,10 +1667,7 @@ const formatMovingTime = () => {
               {detected.performance.map((s, i)=> (
                 <div key={`perf-${i}`} className="flex items-center justify-between">
                   <div>{s.label}</div>
-                  <div className="font-mono">
-                    {s.pace_per100_s != null ? `${formatSwimPace(s.pace_per100_s)}` : '—'}
-                    {s.swolf != null ? `  (SWOLF ${s.swolf})` : ''}
-                  </div>
+                  <div className="font-mono">{s.pace_per100_s != null ? `${formatSwimPace(s.pace_per100_s)}` : '—'}</div>
                 </div>
               ))}
             </div>
@@ -2317,7 +2325,7 @@ const formatMovingTime = () => {
            }
          } catch {}
         return (
-          <div className="mt-1 mx-[-16px]">
+          <div className="mt-2 mb-4 mx-[-16px]">
             {/* Reserve space to prevent layout shift */}
             <div style={{ height: 320 }}>
               <EffortsViewerMapbox
@@ -2334,7 +2342,7 @@ const formatMovingTime = () => {
       })()}
 
       {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
-        <div className="mx-[-16px] px-3 py-2">
+        <div className="mt-4 mx-[-16px] px-3 py-3">
           {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
             <div className="mb-2">
               <div className="text-sm mb-1">Splits · km</div>
@@ -2358,7 +2366,7 @@ const formatMovingTime = () => {
             if (zones?.bins && Array.isArray(zones.bins) && zones.bins.length > 0) {
               const zDur = zones.bins.map((b:any)=> Number(b.t_s)||0);
               return (
-                <div className="mb-4">
+                <div className="my-4">
                   <HRZoneChart
                     zoneDurationsSeconds={zDur}
                     title="Heart Rate Zones"
@@ -2375,7 +2383,7 @@ const formatMovingTime = () => {
               // Reuse HRZoneChart for a quick stacked bar using durations
               const zDur = pwr.bins.map((b:any)=> Number(b.t_s)||0);
               return (
-                <div className="mb-4">
+                <div className="my-4">
                   <HRZoneChart
                     zoneDurationsSeconds={zDur}
                     title="Power Zones"
@@ -2488,18 +2496,17 @@ const formatMovingTime = () => {
             return Math.round(n);
           };
 
-          const pickCadenceSample = (s: any, sport: 'run'|'ride'|'walk') => {
-            if (sport === 'ride') {
-              return s.bikeCadence ?? s.cadence ?? null;   // rpm
-            }
-            // run/walk
-            return normalizeRunCadence(
-              s.runCadence ?? s.cadence ?? s.strideRate ?? s.stride_cadence
-            );
+          const pickCadenceSample = (s: any) => {
+            // Prefer rpm if present
+            const rpm = s.bikeCadence ?? s.cadence ?? null;
+            if (Number.isFinite(rpm)) return Number(rpm); // rpm
+            // Else derive spm
+            const rc = s.runCadence ?? s.cadence ?? s.strideRate ?? s.stride_cadence;
+            return normalizeRunCadence(rc);
           };
 
           const cadenceData = samples
-            .map(s => pickCadenceSample(s, workoutData.swim_data ? 'swim' : 'run'))
+            .map(s => pickCadenceSample(s))
             .filter(v => v != null);
           
           // Old Power/Cadence chart removed (now integrated into main viewer tabs)
@@ -2570,7 +2577,7 @@ const formatMovingTime = () => {
 };
 
 // --- Training Effect helpers ---
-const getTrainingEffect = () => {
+const getTrainingEffect = (workoutData: any) => {
   const aerobic = (workoutData as any)?.metrics?.total_training_effect ?? (workoutData as any)?.total_training_effect ?? null;
   const anaerobic = (workoutData as any)?.metrics?.total_anaerobic_effect ?? (workoutData as any)?.total_anaerobic_effect ?? null;
   return {
@@ -2580,7 +2587,7 @@ const getTrainingEffect = () => {
 };
 
 // --- Running dynamics rollups (avg from samples when available) ---
-const getRunDynamics = () => {
+const getRunDynamics = (hydrated: any) => {
   const samples = Array.isArray((hydrated as any)?.sensor_data?.samples)
     ? (hydrated as any).sensor_data.samples
     : (Array.isArray((hydrated as any)?.sensor_data) ? (hydrated as any).sensor_data : []);
@@ -2607,7 +2614,7 @@ const getRunDynamics = () => {
 };
 
 // --- Power presence ---
-const getPowerSummary = () => {
+const getPowerSummary = (workoutData: any, hydrated: any) => {
   const avg = (workoutData as any)?.avg_power ?? (workoutData as any)?.metrics?.avg_power ?? null;
   const max = (workoutData as any)?.max_power ?? (workoutData as any)?.metrics?.max_power ?? null;
   const np = (workoutData as any)?.normalized_power ?? (workoutData as any)?.metrics?.normalized_power ?? null;
