@@ -31,20 +31,33 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     } catch { return null; }
   }, [id, workouts]);
 
+  // Stable key for options to avoid refetch loops from new object identity each render
+  const optsKey = useMemo(() => JSON.stringify({
+    include_gps: opts?.include_gps !== false,
+    include_sensors: opts?.include_sensors === true,
+    include_swim: opts?.include_swim !== false,
+    resolution: opts?.resolution || 'low',
+    normalize: opts?.normalize !== false,
+    version: opts?.version || 'v1',
+  }), [
+    opts?.include_gps,
+    opts?.include_sensors,
+    opts?.include_swim,
+    opts?.resolution,
+    opts?.normalize,
+    opts?.version,
+  ]);
+
   const query = useQuery({
-    queryKey: ['workout-detail', id, opts],
+    queryKey: ['workout-detail', id, optsKey],
     enabled: !!id && isUuid(id) && !fromContext,
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       // Allow function to authorize with service role when available; fall back to anon
+      const normalized = JSON.parse(optsKey || '{}');
       const body = {
         id,
-        include_gps: opts?.include_gps !== false,
-        include_sensors: opts?.include_sensors === true ? true : false,
-        include_swim: opts?.include_swim !== false,
-        resolution: opts?.resolution || 'low',
-        normalize: opts?.normalize !== false,
-        version: opts?.version || 'v1',
+        ...normalized,
       } as any;
       const { data, error } = await (supabase.functions.invoke as any)('workout-detail', { body });
       if (error) throw error;
