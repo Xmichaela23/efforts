@@ -759,7 +759,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             } catch {}
                           }
                           // For non-swim planned workouts, avoid duplicating details already rendered by PlannedWorkoutSummary
-                          if (type!=='swim') return null;
+                          if (type!=='swim') { return null; }
                           // Endurance details from computed steps with ranges (guarded)
                           const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
                           if (steps.length > 1000) {
