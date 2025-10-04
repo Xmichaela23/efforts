@@ -248,6 +248,21 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Discipline-specific field visibility: ensure mutually exclusive primary metrics
+    try {
+      const isRide = /ride|bike|cycl/i.test(sport);
+      const isRun = /run|walk/i.test(sport);
+      if (isRide && !isRun) {
+        // Rides: expose speed_mps and cadence_rpm only
+        for (let i = 0; i < pace_s_per_km.length; i++) pace_s_per_km[i] = null;
+        for (let i = 0; i < cadence_spm.length; i++) cadence_spm[i] = null;
+      } else if (isRun && !isRide) {
+        // Runs/Walks: expose pace_s_per_km and cadence_spm only
+        for (let i = 0; i < speed_mps.length; i++) speed_mps[i] = null;
+        for (let i = 0; i < cadence_rpm.length; i++) cadence_rpm[i] = null;
+      }
+    } catch {}
+
     // Splits helper
     function computeSplits(splitMeters: number) {
       const out: any[] = [];

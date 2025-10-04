@@ -105,10 +105,10 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   }, [workoutData]);
 
   // Memoized derived data keyed by workout id (prevents duplicate heavy work)
+  // Directly use server-provided series; only derive track coords locally for the map
   const workoutIdKey = String((hydrated as any)?.id || (workoutData as any)?.id || '');
   const memo = useMemo(() => {
     const src = (hydrated || workoutData) as any;
-    // Build GPS-derived track once
     const gpsRaw = src?.gps_track;
     const gps = Array.isArray(gpsRaw)
       ? gpsRaw
@@ -121,40 +121,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
         return null;
       })
       .filter(Boolean) as [number,number][];
-
-    // Build normalized samples from computed.analysis.series if present
     const series = src?.computed?.analysis?.series || null;
-    const time_s: number[] = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
-    const distance_m: number[] = Array.isArray(series?.distance_m) ? series.distance_m : [];
-    const elev: (number|null)[] = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
-    const pace: (number|null)[] = Array.isArray(series?.pace_s_per_km) ? series.pace_s_per_km : [];
-    const hr: (number|null)[] = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
-    const len = Math.min(distance_m.length, time_s.length || distance_m.length);
-    const samples = (()=>{
-      const out:any[] = [];
-      let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
-      const a = 0.2;
-      for (let i=0;i<len;i++){
-        const t = Number(time_s?.[i] ?? i) || 0;
-        const d = Number(distance_m?.[i] ?? 0) || 0;
-        const e = typeof elev?.[i] === 'number' ? Number(elev[i]) : null;
-        if (e != null) ema = (ema==null ? e : a*e + (1-a)*ema);
-        const es = (ema != null) ? ema : (e != null ? e : (lastE != null ? lastE : 0));
-        let grade: number | null = null, vam: number | null = null;
-        if (lastE != null && lastD != null && lastT != null){
-          const dd = Math.max(1, d - lastD);
-          const dh = es - lastE;
-          const dt = Math.max(1, t - lastT);
-          grade = dh / dd;
-          vam = (dh/dt) * 3600;
-        }
-        out.push({ t_s: t, d_m: d, elev_m_sm: es, pace_s_per_km: Number.isFinite(pace?.[i]) ? Number(pace[i]) : null, hr_bpm: Number.isFinite(hr?.[i]) ? Number(hr[i]) : null, grade, vam_m_per_h: vam });
-        lastE = es; lastD = d; lastT = t;
-      }
-      return out;
-    })();
-
-    return { track, samples } as const;
+    return { track, series } as const;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workoutIdKey, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);
   // Initialize pool length state from explicit, inferred, or default
@@ -2323,57 +2291,13 @@ const formatMovingTime = () => {
              return null;
            })
            .filter(Boolean) as [number,number][];
-         // diagnostics
-         try {
-           const elevVals = samples.map((s:any)=>s.elev_m_sm).filter((v:any)=>Number.isFinite(v));
-           const eMin = elevVals.length? Math.min(...elevVals) : null;
-           const eMax = elevVals.length? Math.max(...elevVals) : null;
-           // eslint-disable-next-line no-console
-           console.log('[viewer] track pts:', track.length, 'samples:', samples.length, 'elev count:', elevVals.length, 'elev range:', eMin, eMax);
-         } catch {}
-         // If series elevation is effectively missing, derive from gps_track altitude
-         try {
-           const elevValsAll = samples.map((s:any)=>s.elev_m_sm).filter((v:any)=>Number.isFinite(v)) as number[];
-           const elevFinite = elevValsAll.length;
-           const eMin2 = elevValsAll.length ? Math.min(...elevValsAll) : 0;
-           const eMax2 = elevValsAll.length ? Math.max(...elevValsAll) : 0;
-           const eRange2 = Math.abs(eMax2 - eMin2);
-           const missingOrFlat = elevFinite < Math.max(3, Math.floor(samples.length*0.2)) || eRange2 < 0.5;
-           if (missingOrFlat) {
-             const pts = gps.map((p:any)=>({
-               lat: Number(p.lat ?? p.latitude ?? p.latitudeInDegree),
-               lon: Number(p.lng ?? p.lon ?? p.longitude ?? p.longitudeInDegree),
-               elev: (typeof p.elevation === 'number' ? Number(p.elevation) : (typeof p.altitude === 'number' ? Number(p.altitude) : NaN))
-             })).filter((p:any)=>[p.lat,p.lon].every(Number.isFinite));
-             if (pts.length > 1) {
-               const R = 6371000;
-               const hav = (a:any,b:any)=>{ const φ1=a.lat*Math.PI/180, φ2=b.lat*Math.PI/180; const dφ=(b.lat-a.lat)*Math.PI/180; const dλ=(b.lon-a.lon)*Math.PI/180; const s=Math.sin(dφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dλ/2)**2; return 2*R*Math.atan2(Math.sqrt(s),Math.sqrt(1-s)); };
-               const cum:number[] = [0];
-               for (let i=1;i<pts.length;i++) cum[i] = cum[i-1] + hav(pts[i-1], pts[i]);
-               const nearestIdx = (target:number)=>{ let lo=0, hi=cum.length-1; while(lo<hi){ const m=(lo+hi)>>1; (cum[m]<target)?(lo=m+1):(hi=m); } return lo; };
-               for (let i=0;i<samples.length;i++) {
-                 const idx = nearestIdx(samples[i].d_m);
-                 const ei = pts[idx]?.elev;
-                 if (Number.isFinite(ei)) samples[i].elev_m_sm = Number(ei);
-               }
-               // recompute grade/vam after setting elevation
-               for (let i=1;i<samples.length;i++) {
-                 const aS = samples[i-1], bS = samples[i];
-                 const dd = Math.max(1, bS.d_m - aS.d_m);
-                 const dh = (Number(bS.elev_m_sm) - Number(aS.elev_m_sm));
-                 const dt = Math.max(1, bS.t_s - aS.t_s);
-                 bS.grade = dh / dd;
-                 bS.vam_m_per_h = (dh/dt) * 3600;
-               }
-             }
-           }
-         } catch {}
+        // No client-side series transformation; use server-provided series as-is
         return (
           <div className="mt-2 mb-4 mx-[-16px]">
             {/* Reserve space to prevent layout shift */}
             <div style={{ height: 320 }}>
               <EffortsViewerMapbox
-              samples={(memo?.samples || samples) as any}
+              samples={(memo?.series || series) as any}
               trackLngLat={(memo?.track || track) as any}
               useMiles={!!useImperial}
               useFeet={!!useImperial}
@@ -2385,21 +2309,15 @@ const formatMovingTime = () => {
         );
       })()}
 
-      {/* Zones section (HR + Power) - separate from splits */}
+      {/* Zones section (HR only) - render once */}
       {(() => {
         const zonesHr = (hydrated||workoutData)?.computed?.analysis?.zones?.hr;
-        const zonesPwr = (hydrated||workoutData)?.computed?.analysis?.zones?.power;
-        if (!(zonesHr?.bins?.length || zonesPwr?.bins?.length)) return null;
+        if (!(zonesHr?.bins?.length)) return null;
         return (
           <div className="mt-4 mx-[-16px] px-3 py-3">
             {zonesHr?.bins?.length ? (
               <div className="my-4">
                 <HRZoneChart zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)} title="Heart Rate Zones" />
-              </div>
-            ) : null}
-            {zonesPwr?.bins?.length ? (
-              <div className="my-4">
-                <HRZoneChart zoneDurationsSeconds={zonesPwr.bins.map((b:any)=> Number(b.t_s)||0)} title="Power Zones" />
               </div>
             ) : null}
           </div>
