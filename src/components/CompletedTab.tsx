@@ -2225,14 +2225,7 @@ const formatMovingTime = () => {
          const elev = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
          const pace = Array.isArray(series?.pace_s_per_km) ? series.pace_s_per_km : [];
          const hr = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
-        if (!Array.isArray(distance_m) || distance_m.length < 2) {
-          // Reserve space to prevent layout shift while data isn't available
-          return (
-            <div className="mt-1 mx-[-16px]">
-              <div style={{ height: 320, borderRadius: 12, background: '#fff', border: '1px solid #eef2f7' }} />
-            </div>
-          );
-        }
+        // Proceed even if series is missing; map will still render from gps_track
          const len = Math.min(distance_m.length, time_s.length || distance_m.length);
          const samples = (()=>{
            const out:any[] = [];
