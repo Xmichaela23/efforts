@@ -59,7 +59,14 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   const [plannedLabel, setPlannedLabel] = useState<string | null>(null);
   
   useEffect(() => {
-    setHydrated(workoutData);
+    setHydrated((prev: any) => {
+      // Prefer latest props, but do not regress defined scalar fields to undefined/null.
+      const next = { ...(prev || {}), ...(workoutData || {}) } as any;
+      if ((workoutData as any)?.max_speed == null && (prev as any)?.max_speed != null) {
+        next.max_speed = (prev as any).max_speed;
+      }
+      return next;
+    });
   }, [workoutData]);
 
   // Silent fetch: hydrate computed summary (gap/distance) from DB on open (no compute trigger)
