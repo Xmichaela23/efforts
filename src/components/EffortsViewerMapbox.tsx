@@ -27,7 +27,7 @@ type Split = {
   avgHr_bpm: number | null;
   gain_m: number; avgGrade: number | null;
 };
-type MetricTab = "pace" | "spd" | "bpm" | "cad" | "pwr" | "elev";
+type MetricTab = "pace" | "spd" | "bpm" | "cad" | "pwr" | "elev" | "vam";
 
 /** ---------- Small utils/formatters ---------- */
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -641,6 +641,13 @@ function EffortsViewerMapbox({
       if (!finite.length || (Math.max(...finite) - Math.min(...finite) === 0)) return new Array(elev.length).fill(0);
       return elev;
     }
+    // VAM (vertical ascent meters/hour)
+    if (tab === "vam") {
+      const vam = normalizedSamples.map(s => Number.isFinite(s.vam_m_per_h as any) ? (s.vam_m_per_h as number) : NaN);
+      // Light smoothing
+      const sm = nanAwareMovAvg(vam as any, 5);
+      return sm.map(v => (Number.isFinite(v) ? v : NaN));
+    }
     // Speed (m/s → present directly)
     if (tab === "spd") {
       const spd = normalizedSamples.map(s => Number.isFinite(s.speed_mps as any) ? (s.speed_mps as number) : NaN);
@@ -745,6 +752,14 @@ function EffortsViewerMapbox({
       lo = pct(winsorized, isOutdoorGlobal ? 10 : 2);
       hi = pct(winsorized, isOutdoorGlobal ? 90 : 98);
     }
+    // VAM domain: symmetric around 0 using robust percentiles, with a floor span
+    if (tab === 'vam') {
+      const valsAbs = vals.map(v => Math.abs(v));
+      const winsAbs = winsorize(valsAbs, 5, 95);
+      const p90 = pct(winsAbs, 90);
+      const span = Math.max(p90, 450); // at least 450 m/h
+      lo = -span; hi = span;
+    }
     // Specific ranges for cadence/power to avoid super-narrow domains
     if (tab === 'cad') {
       const minC = Math.min(...winsorized);
@@ -781,6 +796,7 @@ function EffortsViewerMapbox({
       hi = Math.max(hi, maxVal);
     }
     if (tab === 'pwr') ensureMinSpan(50);
+    if (tab === 'vam') ensureMinSpan(200);
     if (tab === 'cad') ensureMinSpan(10);
     if (tab === 'elev') ensureMinSpan(isOutdoorGlobal ? (useFeet ? 20/3.28084 : 6) : (useFeet ? 10/3.28084 : 3));
     
@@ -1087,7 +1103,8 @@ function EffortsViewerMapbox({
               "bpm",
               normalizedSamples.some(s=>Number.isFinite(s.cad_rpm as any) || Number.isFinite(s.cad_spm as any)) ? "cad" : null,
               normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
-              "elev"
+              "elev",
+              normalizedSamples.some(s=>Number.isFinite(s.vam_m_per_h as any)) ? "vam" : null
             ].filter(Boolean) as MetricTab[]
           ) ).map((t) => (
             <button

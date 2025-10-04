@@ -2328,32 +2328,7 @@ const formatMovingTime = () => {
         </div>
       )}
 
-      {/* VAM section (separate) */}
-      {(() => {
-        const seriesAny = (hydrated||workoutData)?.computed?.analysis?.series as any;
-        const vamData = Array.isArray(seriesAny?.elevation_m)
-          ? (seriesAny.elevation_m as any[]).filter((n)=> Number.isFinite(n))
-          : [];
-        if (!(vamData && vamData.length > 0)) return null;
-        return (
-          <div className="mt-6 mx-[-16px] px-3 py-3">
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowVam(v => !v)}
-                className="text-[#64748b] font-semibold"
-                aria-pressed={showVam}
-              >
-                {showVam ? 'Hide VAM' : 'Show VAM'}
-              </button>
-            </div>
-            {showVam && (
-              <div className="mt-2">
-                {/* VAM chart moved here; integrate exported VamChart if needed */}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {/* VAM section removed; now a chart tab inside EffortsViewerMapbox */}
      {/* SEPARATE Power/Cadence Chart - at the bottom */}
       {(workoutData.swim_data || workoutData.ride_data) && (() => {
         // Try multiple data sources for sensor data
