@@ -752,13 +752,11 @@ function EffortsViewerMapbox({
       lo = pct(winsorized, isOutdoorGlobal ? 10 : 2);
       hi = pct(winsorized, isOutdoorGlobal ? 90 : 98);
     }
-    // VAM domain: symmetric around 0 using robust percentiles, with a floor span
+    // VAM domain: [0 .. max], floor at 450 m/h for visibility
     if (tab === 'vam') {
-      const valsAbs = vals.map(v => Math.abs(v));
-      const winsAbs = winsorize(valsAbs, 5, 95);
-      const p90 = pct(winsAbs, 90);
-      const span = Math.max(p90, 450); // at least 450 m/h
-      lo = -span; hi = span;
+      const finite = vals.filter(Number.isFinite) as number[];
+      const maxV = finite.length ? Math.max(...finite) : 0;
+      lo = 0; hi = Math.max(450, maxV);
     }
     // Specific ranges for cadence/power to avoid super-narrow domains
     if (tab === 'cad') {
@@ -1115,20 +1113,19 @@ function EffortsViewerMapbox({
           {tab !== "vam" ? (
             <path d={linePath} fill="none" stroke="#64748b" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
           ) : (() => {
-            const buildSegPath = (lo:number, hi:number) => {
-              let d = ""; const n = normalizedSamples.length;
+            const buildSegPath = (loR:number, hiR:number) => {
+              let d = ""; let pen = false; const n = normalizedSamples.length;
               for (let i = 0; i < n; i++) {
                 const v = Number.isFinite(metricRaw[i]) ? (metricRaw[i] as number) : NaN;
-                if (Number.isFinite(v) && v >= lo && v < hi) {
+                if (Number.isFinite(v) && v >= loR && v < hiR) {
                   const x = xFromDist(distCalc.distMono[i] ?? distCalc.d0);
                   const y = yFromValue(v);
-                  d += (i === 0 || !d.endsWith("M ") && d === "") ? `M ${x} ${y}` : ` L ${x} ${y}`;
+                  if (!pen) { d += `M ${x} ${y}`; pen = true; } else { d += ` L ${x} ${y}`; }
                 } else {
-                  // break segment
-                  d += " M ";
+                  pen = false;
                 }
               }
-              return d.replace(/ M \s*$/,'');
+              return d;
             };
             const green = buildSegPath(0, 400);
             const yellow = buildSegPath(400, 800);
