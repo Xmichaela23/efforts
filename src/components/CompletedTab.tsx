@@ -2159,6 +2159,17 @@ const formatMovingTime = () => {
             const avgHr = (hydrated||workoutData)?.avg_heart_rate ?? null;
             const avgPwr = (hydrated||workoutData)?.avg_power ?? null;
             const gain = (hydrated||workoutData)?.elevation_gain ?? null;
+            const calcVam = (() => {
+              try {
+                const dist = (computeDistanceKm(hydrated||workoutData) ?? Number((hydrated||workoutData)?.distance) ?? 0) * 1000;
+                const movingSec = (hydrated||workoutData)?.moving_time ?? (hydrated||workoutData)?.metrics?.moving_time ?? (hydrated||workoutData)?.computed?.overall?.duration_s_moving ?? null;
+                const elevGainM = Number(gain);
+                if (!Number.isFinite(elevGainM) || !Number.isFinite(movingSec as any) || (movingSec as number) <= 0) return null;
+                const hours = (movingSec as number) / 3600;
+                const vam = hours > 0 ? Math.round(elevGainM / hours) : null;
+                return Number.isFinite(vam as any) && (vam as number) > 0 ? (vam as number) : null;
+              } catch { return null; }
+            })();
             const cal = (hydrated||workoutData)?.calories ?? null;
             const cad = (hydrated||workoutData)?.avg_cadence ?? (hydrated||workoutData)?.avg_bike_cadence ?? (hydrated||workoutData)?.avg_run_cadence ?? null;
 
@@ -2203,6 +2214,12 @@ const formatMovingTime = () => {
                   <div className="text-base font-semibold tabular-nums mb-0.5">{Number.isFinite(cal as any)?cal:'—'}</div>
                   <div className="text-xs text-[#666666]">Calories</div>
                 </div>
+                {Number.isFinite(gain as any) && (
+                  <div>
+                    <div className="text-base font-semibold tabular-nums mb-0.5">{calcVam != null ? calcVam : '—'}</div>
+                    <div className="text-xs text-[#666666]">VAM</div>
+                  </div>
+                )}
               </div>
             );
           })()}

@@ -1067,7 +1067,15 @@ function EffortsViewerMapbox({
             <g key={i}>
               <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
               <text x={pl - 8} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700} textAnchor="end">
-                {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles)) : `${Math.round(v)}`}
+                {
+                  tab === "elev"
+                    ? fmtAlt(v, useFeet)
+                    : tab === "pace"
+                      ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles))
+                      : tab === "vam"
+                        ? `${Math.round(v)} m/h`
+                        : `${Math.round(v)}`
+                }
               </text>
             </g>
           ))}
@@ -1084,8 +1092,63 @@ function EffortsViewerMapbox({
               <path d={elevArea} fill="url(#elevGrad)" opacity={1} />
             </>
           )}
-          {/* metric line (smoothed) */}
-          <path d={linePath} fill="none" stroke="#64748b" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
+          {/* VAM background elevation silhouette when on VAM tab */}
+          {tab === "vam" && (() => {
+            const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
+            const finite = elev.filter(Number.isFinite) as number[];
+            if (!finite.length) return null;
+            const minE = Math.min(...finite), maxE = Math.max(...finite);
+            const [a, b] = yDomain; const span = Math.max(1, b - a);
+            const targetLo = a + span * 0.1; const targetHi = a + span * 0.9;
+            let d = ""; const n = normalizedSamples.length;
+            for (let i = 0; i < n; i++) {
+              const e = Number.isFinite(elev[i]) ? (elev[i] as number) : NaN;
+              const t = Number.isFinite(e) && (maxE > minE) ? (e - minE) / (maxE - minE) : 0;
+              const y = yFromValue(targetLo + t * (targetHi - targetLo));
+              const x = xFromDist(distCalc.distMono[i] ?? distCalc.d0);
+              d += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
+            }
+            return <path d={d} fill="none" stroke="#e2e8f0" strokeWidth={1} />;
+          })()}
+
+          {/* metric line (smoothed) or VAM threshold-colored segments */}
+          {tab !== "vam" ? (
+            <path d={linePath} fill="none" stroke="#64748b" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
+          ) : (() => {
+            const buildSegPath = (lo:number, hi:number) => {
+              let d = ""; const n = normalizedSamples.length;
+              for (let i = 0; i < n; i++) {
+                const v = Number.isFinite(metricRaw[i]) ? (metricRaw[i] as number) : NaN;
+                if (Number.isFinite(v) && v >= lo && v < hi) {
+                  const x = xFromDist(distCalc.distMono[i] ?? distCalc.d0);
+                  const y = yFromValue(v);
+                  d += (i === 0 || !d.endsWith("M ") && d === "") ? `M ${x} ${y}` : ` L ${x} ${y}`;
+                } else {
+                  // break segment
+                  d += " M ";
+                }
+              }
+              return d.replace(/ M \s*$/,'');
+            };
+            const green = buildSegPath(0, 400);
+            const yellow = buildSegPath(400, 800);
+            const red = buildSegPath(800, Number.POSITIVE_INFINITY);
+            const anyFinite = metricRaw.some(v => Number.isFinite(v));
+            return (
+              <>
+                {!anyFinite && (
+                  <text x={(W/2)} y={(H/2)} textAnchor="middle" fill="#94a3b8" fontSize={14} fontWeight={700}>No VAM data</text>
+                )}
+                {anyFinite && (
+                  <>
+                    <path d={green} fill="none" stroke="#10b981" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                    <path d={yellow} fill="none" stroke="#f59e0b" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                    <path d={red} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                  </>
+                )}
+              </>
+            );
+          })()}
 
           {/* cursor */}
           <line x1={cx} x2={cx} y1={P} y2={H - P} stroke="#0ea5e9" strokeWidth={1.5} />
