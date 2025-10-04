@@ -69,51 +69,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
     });
   }, [workoutData]);
 
-  // Silent fetch: hydrate computed summary (gap/distance) from DB on open (no compute trigger)
-  useEffect(() => {
-    (async () => {
-      try {
-        if (summaryFetched) return;
-        const wid = (hydrated as any)?.id || (workoutData as any)?.id;
-        if (!wid) return;
-        const needGap = !((hydrated as any)?.computed?.overall?.gap_pace_s_per_mi);
-        const needDist = !((hydrated as any)?.computed?.overall?.distance_m);
-        if (!needGap && !needDist) return;
-        setSummaryFetched(true);
-        const { data } = await supabase
-          .from('workouts')
-          .select('computed')
-          .eq('id', String(wid))
-          .maybeSingle();
-        const cmp = (() => { try { return typeof (data as any)?.computed === 'string' ? JSON.parse((data as any).computed) : (data as any)?.computed; } catch { return (data as any)?.computed; } })();
-        if (cmp) setHydrated((prev:any) => ({ ...(prev || workoutData), computed: cmp }));
-      } catch {}
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated?.id, workoutData?.id]);
-  
-  // Ensure server analytics exist; trigger compute once if missing and we have an id
-  useEffect(() => {
-    (async () => {
-      try {
-        const wid = (hydrated as any)?.id || (workoutData as any)?.id;
-        const hasAnalysis = Boolean((hydrated as any)?.computed?.analysis);
-        if (!wid || hasAnalysis || analysisInvoked) return;
-        setAnalysisInvoked(true);
-        await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: String(wid) } });
-        // Refresh computed
-        const { data } = await supabase
-          .from('workouts')
-          .select('computed')
-          .eq('id', String(wid))
-          .maybeSingle();
-        const cmp = (() => { try { return typeof (data as any)?.computed === 'string' ? JSON.parse((data as any).computed) : (data as any)?.computed; } catch { return (data as any)?.computed; } })();
-        if (cmp) setHydrated((prev:any) => ({ ...(prev || workoutData), computed: cmp }));
-      } catch {}
-    })();
-  }, [hydrated, workoutData, analysisInvoked]);
-  
-  // Canonical data comes from workouts only; no external hydration fetch here
+  // Single hydration path: rely on parent hook to supply computed/series; no duplicate fetches here
   
   // No need to initialize localSelectedMetric here - it's handled in the sub-component
 
@@ -2362,14 +2318,17 @@ const formatMovingTime = () => {
          } catch {}
         return (
           <div className="mt-1 mx-[-16px]">
-            <EffortsViewerMapbox
+            {/* Reserve space to prevent layout shift */}
+            <div style={{ height: 320 }}>
+              <EffortsViewerMapbox
               samples={(memo?.samples || samples) as any}
               trackLngLat={(memo?.track || track) as any}
               useMiles={!!useImperial}
               useFeet={!!useImperial}
               compact={compact}
               workoutData={workoutData}
-            />
+              />
+            </div>
           </div>
         );
       })()}

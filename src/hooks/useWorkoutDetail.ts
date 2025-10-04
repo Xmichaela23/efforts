@@ -71,8 +71,15 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     return () => { window.removeEventListener('workouts:invalidate', handler); };
   }, [queryClient]);
 
+  // Stable reference: memoize the returned object by workout id
+  const stableWorkout = useMemo(() => {
+    const w = (fromContext as any) || (query.data as any) || null;
+    return w ? { ...w } : null;
+    // Note: returning a new object only when the source w changes
+  }, [id, fromContext, query.data]);
+
   return {
-    workout: (fromContext as any) || (query.data as any) || null,
+    workout: stableWorkout,
     loading: query.isFetching || query.isPending,
     error: (query.error as any)?.message || null,
   };
