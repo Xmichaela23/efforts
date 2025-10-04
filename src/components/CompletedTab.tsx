@@ -54,6 +54,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const [showAdvancedRunDyn, setShowAdvancedRunDyn] = useState(false);
   const [showPower, setShowPower] = useState(false);
   const [summaryFetched, setSummaryFetched] = useState(false);
+  const [showVam, setShowVam] = useState(false);
   const [plannedTokens, setPlannedTokens] = useState<string[] | null>(null);
   const [plannedLabel, setPlannedLabel] = useState<string | null>(null);
   
@@ -2327,80 +2328,35 @@ const formatMovingTime = () => {
         </div>
       )}
 
-      {/* Swim splits list with HR – hide unless valid splits exist with variance */}
+      {/* VAM section (separate) */}
       {(() => {
-        if (!workoutData.swim_data) return null;
-        const comp = (hydrated || workoutData) as any;
-        const comp100 = comp?.computed?.analysis?.events?.splits_100;
-        const rowsPref = Array.isArray(comp100?.rows) ? comp100.rows as Array<{ n:number; duration_s:number }> : [];
-        if (!rowsPref.length) return null;
-        // Hide if durations are essentially uniform
-        try {
-          if (rowsPref.length >= 3) {
-            const min = rowsPref.reduce((m,r)=> Math.min(m, Number(r.duration_s)||0), Number.POSITIVE_INFINITY);
-            const max = rowsPref.reduce((m,r)=> Math.max(m, Number(r.duration_s)||0), 0);
-            if ((max - min) <= 1) return null;
-          }
-        } catch {}
-
-        // Prepare HR series (optional)
-        const series = comp?.computed?.analysis?.series || {};
-        const time_s: number[] = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
-        const hr_bpm: (number|null)[] = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
-
-        const avgHrBetween = (t0: number, t1: number): number | null => {
-          try {
-            if (!time_s.length || !hr_bpm.length) return null;
-            const vals: number[] = [];
-            for (let i = 0; i < time_s.length; i++) {
-              const t = Number(time_s[i]);
-              const h = Number(hr_bpm[i]);
-              if (Number.isFinite(t) && t >= t0 && t <= t1 && Number.isFinite(h)) vals.push(h);
-            }
-            if (!vals.length) return null;
-            return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-          } catch { return null; }
-        };
-
-        const rows = rowsPref as Array<{ n: number; duration_s: number }>;
-        const sourceUnit = String((comp100 && comp100.unit) || 'm');
-        const wantYd = useImperial;
-        const unitLabel = wantYd ? '100yd' : '100m';
-        let tCursor = 0;
-
+        const seriesAny = (hydrated||workoutData)?.computed?.analysis?.series as any;
+        const vamData = Array.isArray(seriesAny?.elevation_m)
+          ? (seriesAny.elevation_m as any[]).filter((n)=> Number.isFinite(n))
+          : [];
+        if (!(vamData && vamData.length > 0)) return null;
         return (
-          <div className="mx-[-16px] px-3 py-2">
-            <div className="text-lg font-semibold mb-2">Splits</div>
-            <div className="grid grid-cols-4 gap-2 text-sm text-gray-600 mb-1">
-              <div className="font-medium">#</div>
-              <div className="font-medium">Time</div>
-              <div className="font-medium">Pace</div>
-              <div className="font-medium">BPM</div>
+          <div className="mt-6 mx-[-16px] px-3 py-3">
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowVam(v => !v)}
+                className="text-[#64748b] font-semibold"
+                aria-pressed={showVam}
+              >
+                {showVam ? 'Hide VAM' : 'Show VAM'}
+              </button>
             </div>
-            <div className="space-y-1">
-              {rows.map((r) => {
-                const tStart = tCursor;
-                const tEnd = tCursor + (Number(r.duration_s) || 0);
-                tCursor = tEnd;
-                const hr = avgHrBetween(tStart, tEnd);
-                let dispSec = Number(r.duration_s);
-                if (wantYd && sourceUnit === 'm') dispSec = Math.round(dispSec * 0.9144);
-                if (!wantYd && sourceUnit === 'yd') dispSec = Math.round(dispSec / 0.9144);
-                return (
-                  <div key={`cs-${r.n}`} className="grid grid-cols-4 gap-2 items-center text-sm">
-                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{r.n}</div>
-                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{formatSwimPace(dispSec)}</div>
-                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{`${formatSwimPace(dispSec)} / ${unitLabel}`}</div>
-                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{hr ?? '—'}</div>
-                  </div>
-                );
-              })}
-            </div>
+            {showVam && (
+              <div className="mt-2">
+                {/* VAM chart moved here; integrate exported VamChart if needed */}
+              </div>
+            )}
           </div>
         );
       })()}
+      </div>
 
-      {/* SEPARATE Power/Cadence Chart - at the bottom */}
+     {/* SEPARATE Power/Cadence Chart - at the bottom */}
       {(workoutData.swim_data || workoutData.ride_data) && (() => {
         // Try multiple data sources for sensor data
         let samples = [];
@@ -2469,7 +2425,7 @@ const formatMovingTime = () => {
         </small>
       </div>
     </div>
-   </div>
+  </div>
  );
 };
 

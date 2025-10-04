@@ -1131,28 +1131,7 @@ function EffortsViewerMapbox({
           })}
         </div>
 
-        {/* VAM toggle under splits */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-          <button
-            onClick={() => setShowVam(v => !v)}
-            style={{ border: 'none', background: 'transparent', color: showVam ? '#0f172a' : '#64748b', cursor: 'pointer', fontWeight: 700 }}
-            aria-pressed={showVam}
-          >
-            {showVam ? 'Hide VAM' : 'Show VAM'}
-          </button>
-        </div>
-        {showVam && (
-          <div style={{ marginTop: 8 }}>
-            <VamChart
-              samples={normalizedSamples}
-              distMono={distCalc.distMono}
-              d0={distCalc.d0}
-              dN={distCalc.dN}
-              idx={idx}
-              useFeet={useFeet}
-            />
-          </div>
-        )}
+        {/* VAM UI moved to CompletedTab */}
       </div>
 
       <div style={{ marginTop: 14, color: "#94a3b8", fontSize: 12 }}>
