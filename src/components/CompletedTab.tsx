@@ -2210,6 +2210,65 @@ const formatMovingTime = () => {
 
      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - hidden for pool swims */}
      <div className="w-full">
+        {/* Top metrics (data-driven) */}
+        <div className="mx-[-16px] px-3 py-2 mb-2">
+          {(() => {
+            const useMi = !!useImperial;
+            const distKm = (computeDistanceKm(hydrated||workoutData) ?? Number((hydrated||workoutData)?.distance)) || 0;
+            const movingSec = (hydrated||workoutData)?.moving_time ?? (hydrated||workoutData)?.metrics?.moving_time ?? (hydrated||workoutData)?.computed?.overall?.duration_s_moving ?? null;
+            const avgSpeedKmh = Number((hydrated||workoutData)?.avg_speed) || null;
+            const avgPaceSpKm = (hydrated||workoutData)?.metrics?.avg_pace ?? (hydrated||workoutData)?.avg_pace ?? null;
+            const avgHr = (hydrated||workoutData)?.avg_heart_rate ?? null;
+            const avgPwr = (hydrated||workoutData)?.avg_power ?? null;
+            const gain = (hydrated||workoutData)?.elevation_gain ?? null;
+            const cal = (hydrated||workoutData)?.calories ?? null;
+            const cad = (hydrated||workoutData)?.avg_cadence ?? (hydrated||workoutData)?.avg_bike_cadence ?? (hydrated||workoutData)?.avg_run_cadence ?? null;
+
+            const fmtDist = (km:number)=> useMi ? (km*0.621371).toFixed(1) : km.toFixed(1);
+            const fmtTime = (s:number)=>{ const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=Math.floor(s%60); return h>0?`${h}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`:`${m}:${String(ss).padStart(2,'0')}`; };
+            const fmtSpeed = (kmh:number)=> useMi ? `${(kmh*0.621371).toFixed(1)} mph` : `${kmh.toFixed(1)} km/h`;
+            const fmtPace = (spkm:number)=>{ const spUnit = useMi ? spkm*1.60934 : spkm; const m=Math.floor(spUnit/60), s=Math.round(spUnit%60); return `${m}:${String(s).padStart(2,'0')}/${useMi?'mi':'km'}`; };
+
+            return (
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <div className="text-base font-semibold tabular-nums mb-0.5">{distKm?fmtDist(distKm):'—'} {useMi?'mi':'km'}</div>
+                  <div className="text-xs text-[#666666]">Distance</div>
+                </div>
+                <div>
+                  <div className="text-base font-semibold tabular-nums mb-0.5">{Number.isFinite(movingSec as any)?fmtTime(movingSec as number):'—'}</div>
+                  <div className="text-xs text-[#666666]">Moving Time</div>
+                </div>
+                <div>
+                  <div className="text-base font-semibold tabular-nums mb-0.5">{
+                    avgSpeedKmh ? fmtSpeed(avgSpeedKmh) : (Number.isFinite(avgPaceSpKm as any)?fmtPace(avgPaceSpKm as number):'—')
+                  }</div>
+                  <div className="text-xs text-[#666666]">{avgSpeedKmh? 'Avg Speed':'Avg Pace'}</div>
+                </div>
+                <div>
+                  <div className="text-base font-semibold tabular-nums mb-0.5">{Number.isFinite(avgHr as any)?avgHr:'—'}</div>
+                  <div className="text-xs text-[#666666]">Avg HR</div>
+                </div>
+                <div>
+                  <div className="text-base font-semibold tabular-nums mb-0.5">{Number.isFinite(avgPwr as any)?avgPwr:'—'}</div>
+                  <div className="text-xs text-[#666666]">Avg Power</div>
+                </div>
+                <div>
+                  <div className="text-base font-semibold tabular-nums mb-0.5">{Number.isFinite(gain as any)?(useImperial?Math.round((gain as number)*3.28084):Math.round(gain as number)):'—'} {useImperial?'ft':'m'}</div>
+                  <div className="text-xs text-[#666666]">Elevation Gain</div>
+                </div>
+                <div>
+                  <div className="text-base font-semibold tabular-nums mb-0.5">{Number.isFinite(cad as any)?Math.round(cad as number):'—'}</div>
+                  <div className="text-xs text-[#666666]">Cadence</div>
+                </div>
+                <div>
+                  <div className="text-base font-semibold tabular-nums mb-0.5">{Number.isFinite(cal as any)?cal:'—'}</div>
+                  <div className="text-xs text-[#666666]">Calories</div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
        {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
        {(() => {
          const isSwim = workoutData.swim_data;
@@ -2341,6 +2400,27 @@ const formatMovingTime = () => {
         );
       })()}
 
+      {/* Zones section (HR + Power) - separate from splits */}
+      {(() => {
+        const zonesHr = (hydrated||workoutData)?.computed?.analysis?.zones?.hr;
+        const zonesPwr = (hydrated||workoutData)?.computed?.analysis?.zones?.power;
+        if (!(zonesHr?.bins?.length || zonesPwr?.bins?.length)) return null;
+        return (
+          <div className="mt-4 mx-[-16px] px-3 py-3">
+            {zonesHr?.bins?.length ? (
+              <div className="my-4">
+                <HRZoneChart zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)} title="Heart Rate Zones" />
+              </div>
+            ) : null}
+            {zonesPwr?.bins?.length ? (
+              <div className="my-4">
+                <HRZoneChart zoneDurationsSeconds={zonesPwr.bins.map((b:any)=> Number(b.t_s)||0)} title="Power Zones" />
+              </div>
+            ) : null}
+          </div>
+        );
+      })()}
+
       {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
         <div className="mt-4 mx-[-16px] px-3 py-3">
           {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
@@ -2360,39 +2440,6 @@ const formatMovingTime = () => {
               </div>
             </div>
           )}
-          {/* Heart Rate Zone Chart - data-driven */}
-          {(() => {
-            const zones = (hydrated||workoutData)?.computed?.analysis?.zones?.hr;
-            if (zones?.bins && Array.isArray(zones.bins) && zones.bins.length > 0) {
-              const zDur = zones.bins.map((b:any)=> Number(b.t_s)||0);
-              return (
-                <div className="my-4">
-                  <HRZoneChart
-                    zoneDurationsSeconds={zDur}
-                    title="Heart Rate Zones"
-                  />
-                </div>
-              );
-            }
-            return null;
-          })()}
-          {/* Power Zones - if present */}
-          {(() => {
-            const pwr = (hydrated||workoutData)?.computed?.analysis?.zones?.power;
-            if (pwr?.bins && Array.isArray(pwr.bins) && pwr.bins.length > 0) {
-              // Reuse HRZoneChart for a quick stacked bar using durations
-              const zDur = pwr.bins.map((b:any)=> Number(b.t_s)||0);
-              return (
-                <div className="my-4">
-                  <HRZoneChart
-                    zoneDurationsSeconds={zDur}
-                    title="Power Zones"
-                  />
-                </div>
-              );
-            }
-            return null;
-          })()}
         </div>
       )}
 
