@@ -58,6 +58,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const [showVam, setShowVam] = useState(false);
   const [plannedTokens, setPlannedTokens] = useState<string[] | null>(null);
   const [plannedLabel, setPlannedLabel] = useState<string | null>(null);
+  const norm = useWorkoutData(hydrated||workoutData);
   
   useEffect(() => {
     setHydrated((prev: any) => {
@@ -2153,14 +2154,13 @@ const formatMovingTime = () => {
         <div className="mx-[-16px] px-3 py-2 mb-2">
           {(() => {
             const useMi = !!useImperial;
-            const data = useWorkoutData(hydrated||workoutData);
-            const distKm = data.distance_km ?? 0;
-            const movingSec = data.duration_s;
+            const distKm = norm.distance_km ?? 0;
+            const movingSec = norm.duration_s;
             const avgSpeedKmh = Number((hydrated||workoutData)?.avg_speed) || null;
             const avgPaceSpKm = (hydrated||workoutData)?.metrics?.avg_pace ?? (hydrated||workoutData)?.avg_pace ?? null;
-            const avgHr = data.avg_hr;
-            const avgPwr = data.avg_power;
-            const gain = data.elevation_gain_m;
+            const avgHr = norm.avg_hr;
+            const avgPwr = norm.avg_power;
+            const gain = norm.elevation_gain_m;
             const calcVam = (() => {
               try {
                 const dist = (computeDistanceKm(hydrated||workoutData) ?? Number((hydrated||workoutData)?.distance) ?? 0) * 1000;
