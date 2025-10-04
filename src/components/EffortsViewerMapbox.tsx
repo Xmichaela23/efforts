@@ -638,8 +638,10 @@ function EffortsViewerMapbox({
     if (tab === "elev") {
       const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
       const finite = elev.filter(Number.isFinite) as number[];
-      if (!finite.length || (Math.max(...finite) - Math.min(...finite) === 0)) return new Array(elev.length).fill(0);
-      return elev;
+      if (!finite.length) return new Array(elev.length).fill(NaN);
+      const minE = Math.min(...finite);
+      const rel = elev.map(v => (Number.isFinite(v) ? (v as number) - minE : NaN));
+      return rel;
     }
     // VAM (vertical ascent meters/hour)
     if (tab === "vam") {
@@ -754,7 +756,7 @@ function EffortsViewerMapbox({
     }
     // VAM domain: [0 .. max], floor at 450 m/h for visibility
     if (tab === 'vam') {
-      const finite = vals.filter(Number.isFinite) as number[];
+      const finite = metricRaw.filter(Number.isFinite) as number[];
       const maxV = finite.length ? Math.max(...finite) : 0;
       lo = 0; hi = Math.max(450, maxV);
     }
@@ -1129,7 +1131,7 @@ function EffortsViewerMapbox({
             };
             const green = buildSegPath(0, 400);
             const yellow = buildSegPath(400, 800);
-            const red = buildSegPath(800, Number.POSITIVE_INFINITY);
+            const red = buildSegPath(800, 1e9);
             const anyFinite = metricRaw.some(v => Number.isFinite(v));
             return (
               <>
