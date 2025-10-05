@@ -1202,6 +1202,34 @@ function EffortsViewerMapbox({
         </svg>
       </div>
 
+      {/* Metric buttons */}
+      <div style={{ marginTop: 8, padding: "0 6px" }}>
+        <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
+          {( (
+            [
+              normalizedSamples.some(s=>Number.isFinite(s.speed_mps as any)) ? "spd" : null,
+              normalizedSamples.some(s=>Number.isFinite(s.pace_s_per_km as any)) ? "pace" : null,
+              "bpm",
+              normalizedSamples.some(s=>Number.isFinite(s.cad_rpm as any) || Number.isFinite(s.cad_spm as any)) ? "cad" : null,
+              normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
+              "elev",
+              normalizedSamples.some(s=>Number.isFinite(s.vam_m_per_h as any)) ? "vam" : null
+            ].filter(Boolean) as MetricTab[]
+          ) ).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                border: "none", background: "transparent", color: tab === t ? "#0f172a" : "#64748b", cursor: "pointer",
+                padding: "6px 2px", borderBottom: tab === t ? "2px solid #0ea5e9" : "2px solid transparent", letterSpacing: 0.5
+              }}
+            >
+              {t === 'spd' ? 'SPEED' : t.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+      </div>
 
       {/* Splits */}
       <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>
