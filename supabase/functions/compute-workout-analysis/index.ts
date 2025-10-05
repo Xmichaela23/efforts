@@ -50,6 +50,19 @@ Deno.serve(async (req) => {
     if (!w) return new Response(JSON.stringify({ error: 'workout not found' }), { status: 404, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
 
     const sport = String(w.type || 'run').toLowerCase();
+    
+    // Fetch user FTP from baselines for cycling metrics
+    let userFtp: number | null = null;
+    try {
+      const { data: baselines } = await supabase
+        .from('user_baselines')
+        .select('ftp')
+        .eq('user_id', w.user_id)
+        .maybeSingle();
+      userFtp = baselines?.ftp ?? null;
+    } catch {
+      // FTP is optional, continue without it
+    }
 
     // Parse JSON columns if stringified
     function parseJson(val: any) {
@@ -328,11 +341,10 @@ Deno.serve(async (req) => {
           variabilityIndex = normalizedPower / avgPower;
         }
         
-        // Note: Intensity Factor requires user FTP baseline
-        // TODO: Fetch user FTP from database when available
-        // if (userFtp && userFtp > 0) {
-        //   intensityFactor = normalizedPower / userFtp;
-        // }
+        // Calculate Intensity Factor if user has FTP baseline
+        if (userFtp && userFtp > 0) {
+          intensityFactor = normalizedPower / userFtp;
+        }
       }
     }
 

@@ -1235,7 +1235,7 @@ const formatMovingTime = () => {
       </div>
       )}
       
-      {workoutData.ride_data ? (
+      {(workoutData.type === 'ride' || norm.sport === 'ride') ? (
         <>
           {/* Row 1 */}
           <div className="px-2 pb-1">
