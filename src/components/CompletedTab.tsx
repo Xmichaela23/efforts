@@ -692,8 +692,10 @@ const formatMaxSpeed = (speedValue: any): string => {
      {
        label: isRun ? 'Max Pace' : 'Max Speed',
        value: isRun
-         ? formatPace(workoutData.metrics?.max_pace || workoutData.max_pace)
-        : (Number.isFinite((workoutData as any)?.max_speed as any) ? formatMaxSpeed((workoutData as any).max_speed) : 'N/A'),
+        ? formatPace(workoutData.metrics?.max_pace || (workoutData as any)?.max_pace)
+       : (Number.isFinite((workoutData as any)?.max_speed as any)
+          ? (() => { const kmh = Number((workoutData as any).max_speed); if (!Number.isFinite(kmh)) return 'N/A'; return useImperial ? `${(kmh*0.621371).toFixed(1)} mph` : `${kmh.toFixed(1)} km/h`; })()
+          : 'N/A'),
        unit: isRun ? (useImperial ? '/mi' : '/km') : (useImperial ? 'mph' : 'km/h')
      },
     // Max cadence / stroke rate removed per request
@@ -1255,7 +1257,7 @@ const formatMovingTime = () => {
           {/* Max Speed (between Distance and Avg Power) */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {Number.isFinite((workoutData as any)?.max_speed as any) ? formatMaxSpeed((workoutData as any).max_speed) : 'N/A'}
+              {Number.isFinite((workoutData as any)?.max_speed as any) ? (useImperial ? `${(((workoutData as any).max_speed as number)*0.621371).toFixed(1)} mph` : `${((workoutData as any).max_speed as number).toFixed(1)} km/h`) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Max Speed</div>
