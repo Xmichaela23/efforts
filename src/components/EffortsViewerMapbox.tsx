@@ -1009,10 +1009,8 @@ function EffortsViewerMapbox({
           <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} width={54} />
           <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} width={54} />
           <Pill
-            label={tab==="elev"?"Grade":"Gain"}
-            titleAttr={tab==="elev"?"Grade at cursor":"Total elevation gain"}
+            label="Grade"
             value={(() => {
-              if (tab !== 'elev') return gainPillText;
               const i = Math.min(idx, Math.max(0, normalizedSamples.length - 1));
               const sNow = normalizedSamples[i];
               let g = Number(sNow?.grade);
@@ -1024,9 +1022,8 @@ function EffortsViewerMapbox({
               }
               return fmtPct(g);
             })()}
-            subValue={tab==="elev"?undefined:undefined}
             active={tab==="elev"}
-            width={tab==="elev" ? 110 : 54}
+            width={54}
           />
           <Pill 
             label="VAM" 
