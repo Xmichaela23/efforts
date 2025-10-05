@@ -144,6 +144,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
       })
       .filter(Boolean) as [number,number][];
     const series = src?.computed?.analysis?.series || null;
+    console.log('[memo] series check:', { has_series: !!series, series_keys: series ? Object.keys(series) : [] });
     return { track, series } as const;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workoutIdKey, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);
@@ -263,7 +264,17 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
           {/* Pace/Speed */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {Number.isFinite(norm.avg_pace_s_per_km as any) ? formatPace(norm.avg_pace_s_per_km as number, useImperial) : (Number.isFinite(norm.avg_speed_kmh as any) ? (useImperial ? `${((norm.avg_speed_kmh as number)*0.621371).toFixed(1)} mph` : `${(norm.avg_speed_kmh as number).toFixed(1)} km/h`) : 'N/A')}
+              {(() => {
+                console.log('[Speed Display] norm.avg_speed_kmh:', norm.avg_speed_kmh, 'isFinite:', Number.isFinite(norm.avg_speed_kmh));
+                if (Number.isFinite(norm.avg_pace_s_per_km as any)) {
+                  return formatPace(norm.avg_pace_s_per_km as number, useImperial);
+                }
+                if (Number.isFinite(norm.avg_speed_kmh as any) && norm.avg_speed_kmh !== null) {
+                  const kmh = Number(norm.avg_speed_kmh);
+                  return useImperial ? `${(kmh * 0.621371).toFixed(1)} mph` : `${kmh.toFixed(1)} km/h`;
+                }
+                return 'N/A';
+              })()}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">{Number.isFinite(norm.avg_pace_s_per_km as any) ? 'Avg Pace' : 'Avg Speed'}</div>
