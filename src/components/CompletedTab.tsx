@@ -630,7 +630,7 @@ const formatMaxSpeed = (speedValue: any): string => {
   const computeSwolf = (): number | null => {
     try {
       const nLengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
-      const dur = getDurationSeconds();
+      const dur = Number(norm.duration_s);
       if (!nLengths || !dur) return null;
       let totalStrokes: number | null = null;
       const s1 = Number((workoutData as any)?.strokes ?? (workoutData as any)?.metrics?.strokes);
@@ -773,9 +773,9 @@ const formatMaxSpeed = (speedValue: any): string => {
      return `${kj} kJ`;
    }
    // Fallback calculation if total_work not available
-   else if (workoutData.metrics?.avg_power && workoutData.duration) {
+  else if (workoutData.metrics?.avg_power && norm.duration_s) {
      // Convert duration from minutes to seconds for proper kJ calculation
-     const durationSeconds = workoutData.duration * 60;
+    const durationSeconds = Number(norm.duration_s);
      const kj = Math.round((workoutData.metrics.avg_power * durationSeconds) / 1000);
      if (import.meta.env?.DEV) console.log('✅ calculateTotalWork using fallback calc:', kj, 'kJ');
      return `${kj} kJ`;
@@ -793,15 +793,15 @@ const formatMaxSpeed = (speedValue: any): string => {
 
   // Enhanced VAM calculation for running with insights
  const calculateRunningVAM = () => {
-   if (!workoutData.swim_data) return null;
+  if (!workoutData.swim_data) return null;
+  
+  const elevationGain = (workoutData as any)?.elevation_gain ?? (workoutData as any)?.metrics?.elevation_gain;
+  const duration = Number(norm.duration_s);
    
-   const elevationGain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain;
-   const duration = workoutData.duration;
-   
-   if (!elevationGain || !duration) return null;
+  if (!elevationGain || !duration) return null;
    
    const elevationM = Number(elevationGain);
-   const durationHours = (duration * 60) / 3600;
+  const durationHours = duration / 3600;
    const vam = Math.round(elevationM / durationHours);
    
    // Professional VAM insights with actionable feedback
@@ -843,19 +843,19 @@ const formatMaxSpeed = (speedValue: any): string => {
    }
    
   const distance = norm.distance_m;
-   const duration = workoutData.duration;
-   const elevationGain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain;
+  const duration = Number(norm.duration_s);
+  const elevationGain = (workoutData as any)?.elevation_gain ?? (workoutData as any)?.metrics?.elevation_gain;
    
    if (import.meta.env?.DEV) console.log('🔍 GAP calculation - data:', { distance, duration, elevationGain });
    
-   if (!distance || !duration || !elevationGain) {
+  if (!distance || !duration || !elevationGain) {
      if (import.meta.env?.DEV) console.log('❌ GAP calculation skipped - missing data');
      return null;
    }
    
    // Convert to standard units - handle both km and miles
    let distanceMiles = Number(distance);
-   let durationMinutes = Number(duration);
+  let durationMinutes = Number(duration) / 60; // norm is seconds -> minutes
    let elevationFeet = Number(elevationGain);
    
    // If distance is in km, convert to miles
@@ -864,11 +864,7 @@ const formatMaxSpeed = (speedValue: any): string => {
      if (import.meta.env?.DEV) console.log('🔍 Converted distance from km to miles:', distanceMiles);
    }
    
-   // If duration is in seconds, convert to minutes
-   if (durationMinutes > 60) { // Likely in seconds if > 60
-     durationMinutes = durationMinutes / 60; // seconds to minutes
-     if (import.meta.env?.DEV) console.log('🔍 Converted duration from seconds to minutes:', durationMinutes);
-   }
+  // duration is already seconds converted to minutes
    
    // If elevation is in meters, convert to feet
    if (elevationFeet > 1000) { // Likely in meters if > 1000
@@ -916,7 +912,7 @@ const formatMaxSpeed = (speedValue: any): string => {
 
 const formatMovingTime = () => {
   // Prefer our unified swim-aware resolver
-  const s = getDurationSeconds();
+  const s = Number(norm.duration_s);
   if (Number.isFinite(s as any) && (s as number) > 0) return formatDuration(s as number);
   // Fallback: legacy fields
   const raw = (workoutData as any)?.metrics?.total_timer_time
