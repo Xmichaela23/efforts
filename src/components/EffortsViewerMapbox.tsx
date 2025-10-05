@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from "re
 import MapEffort from "./MapEffort";
 import WeatherDisplay from "./WeatherDisplay";
 import { useWeather } from "../hooks/useWeather";
+import { formatSpeed } from "../utils/workoutFormatting";
 
 /** ---------- Types ---------- */
 type Sample = {
@@ -977,12 +978,18 @@ function EffortsViewerMapbox({
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
             value={(() => {
               // Use the plotted, smoothed value for pace/speed to match the chart
-              if (tab === 'pace' || tab === 'spd') {
+              if (tab === 'spd') {
+                // For speed tab: value is speed_mps, use proper speed formatter
                 const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
-                return workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles);
+                return formatSpeed(v, useMiles);
+              }
+              if (tab === 'pace') {
+                // For pace tab: value is pace_s_per_km
+                const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
+                return fmtPace(v, useMiles);
               }
               // Fallback when not on pace/speed tab
-              return workoutData?.type === 'ride' ? fmtSpeed(s?.speed_mps ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles);
+              return workoutData?.type === 'ride' ? formatSpeed(s?.speed_mps ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles);
             })()}  
             active={tab==="pace" || tab==="spd"} 
             width={54}
@@ -1075,6 +1082,8 @@ function EffortsViewerMapbox({
                 {
                   tab === "elev"
                     ? fmtAlt(v, useFeet)
+                    : tab === "spd"
+                      ? formatSpeed(v, useMiles)
                     : tab === "pace"
                       ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles))
                       : tab === "vam"
