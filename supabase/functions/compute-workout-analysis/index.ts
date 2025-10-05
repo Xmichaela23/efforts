@@ -294,9 +294,9 @@ Deno.serve(async (req) => {
     }
 
     // Discipline-specific field visibility: ensure mutually exclusive primary metrics
+    const isRide = /ride|bike|cycl/i.test(sport);
+    const isRun = /run|walk/i.test(sport);
     try {
-      const isRide = /ride|bike|cycl/i.test(sport);
-      const isRun = /run|walk/i.test(sport);
       if (isRide && !isRun) {
         // Rides: expose speed_mps and cadence_rpm only
         for (let i = 0; i < pace_s_per_km.length; i++) pace_s_per_km[i] = null;

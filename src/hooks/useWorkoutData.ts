@@ -46,7 +46,7 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     const avg_speed_mps = Number.isFinite(avg_speed_kmh) ? (avg_speed_kmh as number) / 3.6 : null;
     const avg_pace_s_per_km = Number.isFinite(workoutData?.avg_pace) ? Number(workoutData.avg_pace) : (Number.isFinite(workoutData?.metrics?.avg_pace) ? Number(workoutData.metrics.avg_pace) : null);
     const avg_running_cadence_spm = Number.isFinite((workoutData as any)?.avg_running_cadence) ? Number((workoutData as any).avg_running_cadence) : (Number.isFinite((workoutData as any)?.avg_run_cadence) ? Number((workoutData as any).avg_run_cadence) : null);
-    const avg_cycling_cadence_rpm = Number.isFinite((workoutData as any)?.avg_bike_cadence) ? Number((workoutData as any).avg_bike_cadence) : (Number.isFinite((workoutData as any)?.metrics?.avg_bike_cadence) ? Number((workoutData as any).metrics.avg_bike_cadence) : null);
+    const avg_cycling_cadence_rpm = Number.isFinite((workoutData as any)?.avg_cadence) ? Number((workoutData as any).avg_cadence) : (Number.isFinite((workoutData as any)?.avg_bike_cadence) ? Number((workoutData as any).avg_bike_cadence) : (Number.isFinite((workoutData as any)?.metrics?.avg_bike_cadence) ? Number((workoutData as any).metrics.avg_bike_cadence) : null));
     const calories = Number.isFinite(workoutData?.calories) ? Number(workoutData.calories) : (Number.isFinite(workoutData?.metrics?.calories) ? Number(workoutData.metrics.calories) : null);
     
     // New fields for cycling metrics
