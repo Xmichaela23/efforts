@@ -218,7 +218,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   // 🆕 STRAVA WORKOUT HANDLING - Separate from Garmin
   if (workoutData.source === 'strava') {
     return (
-      <div className="space-y-2 px-2 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
+      <div className="px-2 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
         {/* Strava Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -982,18 +982,7 @@ const formatMovingTime = () => {
  ];
 
  return (
-  <div className="space-y-2 px-2 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
-     
-     
-    {/* Pool length editor removed here; shown as its own card below */}
-     
-    {/* 🧭 Swim Primary Metrics summary */}
-   {/* removed dead swim primary metrics block */}
-
-   {/* 🏊 Swim-specific metrics grid removed */}
-
-   {/* 📋 Workout Structure Analysis removed */}
-
+  <div className="px-2 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
      {/* 🏠 ALL METRICS - 3-column grid with tighter spacing */}
      {workoutData.swim_data ? (
        <div className="grid grid-cols-3 gap-1">
