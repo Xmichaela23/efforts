@@ -230,7 +230,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         </div>
 
         {/* Tab content */}
-        <div className="mt-6">
+        <div className="mt-2">
           {activeTab === 'summary' && (
             <div className="space-y-4">
               {workout.type === 'strength' ? (
