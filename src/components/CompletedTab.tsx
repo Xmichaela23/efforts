@@ -1129,10 +1129,10 @@ const formatMovingTime = () => {
 
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {norm.max_speed_mps ? `${(useImperial ? norm.max_speed_mps * 2.23694 : norm.max_speed_mps * 3.6).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
+              {norm.max_pace_s_per_km ? formatPace(norm.max_pace_s_per_km, useImperial) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Max Speed</div>
+              <div className="font-medium">Max Pace</div>
             </div>
           </div>
 
