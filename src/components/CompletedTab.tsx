@@ -296,7 +296,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
 
 
 
-// Helper functions
+ // Helper functions
 
   
 
@@ -430,147 +430,7 @@ const formatMaxSpeed = (speedValue: any): string => {
    return title;
  };
 
-   // 🏠 PRIMARY METRICS - Dynamic based on workout type
-  const getPrimaryMetrics = () => {
-    const isRun = workoutData.swim_data;
-    const isBike = workoutData.ride_data;
-    const isSwim = workoutData.swim_data;
-    // Detect pool vs open-water swims
-    const hasLengths = Number((workoutData as any)?.number_of_active_lengths) > 0
-      || (Array.isArray((workoutData as any)?.swim_data?.lengths) && (workoutData as any).swim_data.lengths.length > 0);
-    const providerStr = String((workoutData as any)?.provider_sport || (workoutData as any)?.activity_type || (workoutData as any)?.name || '').toLowerCase();
-    const openWaterHint = /open\s*water|ocean|ow\b/.test(providerStr);
-    const poolHint = /lap|pool/.test(providerStr);
-    const hasGps = Array.isArray((workoutData as any)?.gps_track) && (workoutData as any).gps_track.length > 10;
-    const isPoolSwim = isSwim && (hasLengths || poolHint || (!openWaterHint && !hasGps));
-    const isWalk = workoutData.walk_data;
-    
-    // Walking gets simplified metrics: time, distance, heart rate, calories, elevation
-    if (isWalk) {
-      return [
-        {
-          label: 'Duration', 
-          value: norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'
-        },
-        {
-          label: 'Distance',
-          value: (norm.distance_km ? formatDistance(norm.distance_km) : 'N/A'),
-          unit: useImperial ? 'mi' : 'km'
-        },
-        {
-          label: 'Heart Rate',
-          value: Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A',
-          unit: 'bpm'
-        },
-        {
-          label: 'Calories',
-          value: Number.isFinite(norm.calories as any) ? String(norm.calories) : 'N/A',
-          unit: 'cal'
-        },
-        {
-          label: 'Elevation Gain',
-          value: (Number.isFinite(norm.elevation_gain_m as any) ? formatElevation(norm.elevation_gain_m as number, useImperial) : 'N/A'),
-          unit: useImperial ? 'ft' : 'm'
-        }
-      ];
-    }
-    
-    const baseMetrics = [
-      {
-        label: 'Distance',
-        value: (norm.distance_km ? formatDistance(norm.distance_km) : 'N/A'),
-        unit: useImperial ? 'mi' : 'km'
-      },
-      {
-        label: 'Duration', 
-        value: (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')
-      },
-      {
-        label: 'Heart Rate',
-        value: Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A',
-        unit: 'bpm'
-      },
-      {
-        label: 'Elevation Gain',
-        value: (Number.isFinite(norm.elevation_gain_m as any) ? formatElevation(norm.elevation_gain_m as number, useImperial) : 'N/A'),
-        unit: useImperial ? 'ft' : 'm'
-      },
-      {
-        label: 'Calories',
-        value: Number.isFinite(norm.calories as any) ? String(norm.calories) : 'N/A',
-        unit: 'cal'
-      }
-    ];
-
-    // Discipline-specific display removed; keep metrics data-driven. For legacy blocks, avoid duplicate cadence.
-    if (false && isRun) {
-      return [
-        ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
-        {
-          label: 'Pace',
-          value: (Number.isFinite(norm.avg_pace_s_per_km as any) ? formatPace(norm.avg_pace_s_per_km as number, useImperial) : 'N/A'),
-          unit: useImperial ? '/mi' : '/km'
-        },
-        {
-          label: 'Cadence',
-          value: (Number.isFinite(norm.avg_running_cadence_spm as any) ? String(norm.avg_running_cadence_spm) : 'N/A'),
-          unit: 'spm'
-        },
-        ...baseMetrics.slice(3) // Elevation, Calories
-      ];
-    } else if (false && isBike) {
-      return [
-        ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
-        {
-          label: 'Power',
-          value: (Number.isFinite(norm.avg_power as any) ? String(norm.avg_power) : 'N/A'),
-          unit: 'W'
-        },
-        {
-          label: 'Speed',
-          value: (Number.isFinite(norm.avg_speed_kmh as any) ? (useImperial ? `${((norm.avg_speed_kmh as number)*0.621371).toFixed(1)} mph` : `${(norm.avg_speed_kmh as number).toFixed(1)} km/h`) : 'N/A'),
-          unit: useImperial ? 'mph' : 'mph'
-        },
-        {
-          label: 'Cadence',
-          value: (Number.isFinite(norm.avg_cycling_cadence_rpm as any) ? String(norm.avg_cycling_cadence_rpm) : 'N/A'),
-          unit: 'rpm'
-        },
-        ...baseMetrics.slice(3) // Elevation, Calories
-      ];
-    } else if (false && isSwim) {
-      // For pool swims, hide elevation; always show calories
-      const caloriesMetric = baseMetrics[4];
-      return [
-        ...baseMetrics.slice(0, 3),
-        {
-          label: 'Pace',
-          value: 'N/A',
-          unit: useImperial ? '/100yd' : '/100m'
-        },
-        {
-          label: 'Cadence',
-          value: 'N/A',
-          unit: 'spm'
-        },
-      // SWOLF removed per request
-       {
-          label: 'Lengths',
-          value: (() => {
-            const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null);
-            return n != null ? safeNumber(n) : 'N/A';
-          })()
-        },
-       {
-          label: 'Pool',
-          value: formatPoolLengthLabel()
-        },
-        caloriesMetric
-      ];
-    }
-
-    return baseMetrics;
-  };
+  // Primary metrics helper removed; metrics render inline and via norm
 
   // ----- Moving time resolver (strict) -----
   // Only use explicitly provided moving-time fields; do not infer from cadence or distance.
@@ -747,7 +607,15 @@ const formatMaxSpeed = (speedValue: any): string => {
     // Fallback: lengths
     const lengths = getSwimLengths();
     if (lengths.length) {
-      const L = inferPoolLengthMeters() || 25;
+      const L = (() => {
+        // Inline pool length inference (replaces inferPoolLengthMeters)
+        const explicit = Number(poolLengthMeters ?? (workoutData as any)?.pool_length);
+        if (Number.isFinite(explicit) && explicit > 0) return explicit;
+        const distM = norm.distance_m;
+        const nLengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
+        if (distM && nLengths > 0) return distM / nLengths;
+        return 25;
+      })();
       const total = lengths.reduce((a:number,l:any)=> a + Number(l?.distance_m ?? L), 0);
       const dur = lengths.reduce((a:number,l:any)=> a + Number(l?.duration_s ?? l?.duration ?? 0), 0);
       if (total>0 && dur>0) {
@@ -782,7 +650,7 @@ const formatMaxSpeed = (speedValue: any): string => {
     } catch { return null; }
   };
 
-  const primaryMetrics = getPrimaryMetrics();
+  // primaryMetrics removed; metrics are rendered directly where needed
 
  // 🏠 ADVANCED METRICS - Dynamic based on workout type
  const getAdvancedMetrics = () => {
@@ -1241,7 +1109,7 @@ const formatMovingTime = () => {
            </div>
            
            {/* Avg Pace/Speed */}
-         {workoutData.swim_data ? (
+          {workoutData.swim_data ? (
              <div className="px-2 py-1">
                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
                 {Number.isFinite(norm.avg_pace_s_per_km as any) ? formatPace(norm.avg_pace_s_per_km as number, useImperial) : 'N/A'}
@@ -1756,14 +1624,14 @@ const formatMovingTime = () => {
         // No client-side series transformation; use server-provided series as-is
         return (
           <div className="mt-6 mb-6 mx-[-16px]" style={{ minHeight: 700 }}>
-            <EffortsViewerMapbox
+              <EffortsViewerMapbox
               samples={(memo?.series || series) as any}
               trackLngLat={(memo?.track || track) as any}
               useMiles={!!useImperial}
               useFeet={!!useImperial}
               compact={compact}
               workoutData={workoutData}
-            />
+              />
           </div>
         );
       })()}
@@ -1806,7 +1674,7 @@ const formatMovingTime = () => {
       )}
 
       {/* VAM section removed; now a chart tab inside EffortsViewerMapbox */}
-     {/* SEPARATE Power/Cadence Chart - at the bottom */}
+      {/* SEPARATE Power/Cadence Chart - at the bottom */}
       {(workoutData.swim_data || workoutData.ride_data) && (() => {
         // Try multiple data sources for sensor data
         let samples = [];
@@ -1875,7 +1743,7 @@ const formatMovingTime = () => {
         </small>
       </div>
     </div>
-  </div>
+   </div>
  );
 };
 
