@@ -1065,7 +1065,7 @@ function EffortsViewerMapbox({
         
         {/* Distance, time, altitude (left) and final totals (right) */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
-          <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
+          <div style={{ fontSize: 13, color: "#475569", fontWeight: 700 }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
           <div style={{ 
             fontWeight: 700, 
             fontSize: 18, 
@@ -1075,7 +1075,7 @@ function EffortsViewerMapbox({
           }}>
             {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
           </div>
-          <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 13, color: "#475569", fontWeight: 700, whiteSpace: "nowrap" }}>
             {(() => {
               const gainNow = atEnd ? (Number.isFinite(totalGain_m) ? totalGain_m : (sigGain_m[sigGain_m.length - 1] ?? 0)) : (sigGain_m[Math.min(idx, sigGain_m.length - 1)] ?? 0);
               const lossNow = atEnd ? (Number.isFinite(totalLoss_m) ? totalLoss_m : (sigLoss_m[sigLoss_m.length - 1] ?? 0)) : (sigLoss_m[Math.min(idx, sigLoss_m.length - 1)] ?? 0);
