@@ -640,12 +640,16 @@ function EffortsViewerMapbox({
       const finite = elev.filter(Number.isFinite) as number[];
       if (!finite.length) return new Array(elev.length).fill(NaN);
       const minE = Math.min(...finite);
+      const maxE = Math.max(...finite);
       const rel = elev.map(v => (Number.isFinite(v) ? (v as number) - minE : NaN));
+      if (import.meta.env?.DEV) console.log('[ELEV DEBUG] min:', minE, 'max:', maxE, 'range:', maxE - minE, 'rel values:', rel.filter(Number.isFinite).length);
       return rel;
     }
     // VAM (vertical ascent meters/hour)
     if (tab === "vam") {
       const vam = normalizedSamples.map(s => Number.isFinite(s.vam_m_per_h as any) ? (s.vam_m_per_h as number) : NaN);
+      const finite = vam.filter(Number.isFinite) as number[];
+      if (import.meta.env?.DEV) console.log('[VAM DEBUG] raw vam values:', finite.length, 'min:', Math.min(...finite), 'max:', Math.max(...finite));
       // Light smoothing
       const sm = nanAwareMovAvg(vam as any, 5);
       return sm.map(v => (Number.isFinite(v) ? v : NaN));
