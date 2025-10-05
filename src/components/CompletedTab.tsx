@@ -8,6 +8,8 @@ import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
+import { computeDistanceKm } from '@/utils/workoutDataDerivation';
+import { formatDuration, formatPace, formatElevation } from '@/utils/workoutFormatting';
 import { useWorkoutData } from '@/hooks/useWorkoutData';
 // keeping local logic for now; Today's view uses shared resolver
 
@@ -1572,82 +1574,11 @@ const formatMovingTime = () => {
     {/* Pool length editor removed here; shown as its own card below */}
      
     {/* 🧭 Swim Primary Metrics summary */}
-   {false && (()=>{
-      const km = computeDistanceKm(hydrated||workoutData) || 0;
-      const yardPool = isYardPool();
-      const meters = Math.round(km*1000);
-      const yards = Math.round(meters / 0.9144);
-      const distLabel = km ? (yardPool === true ? `${yards} yd` : `${meters} m`) : '—';
-      const timeTotal = formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration);
-      const moving = formatDuration((workoutData as any)?.total_timer_time ?? (workoutData as any)?.moving_time ?? (workoutData as any)?.elapsed_time);
-      const cals = workoutData.calories ? `${safeNumber(workoutData.calories)} calories` : '—';
-      const p100 = computeSwimAvgPaceSecPer100();
-      const pace = p100 ? `${formatSwimPace(p100)} ${isYardPool()===true?'/100yd':'/100m'}` : '—';
-      const hrAvg = workoutData.avg_heart_rate ? `${safeNumber(workoutData.avg_heart_rate)} avg HR` : '—';
-      const hrMax = workoutData.max_heart_rate ? ` (${safeNumber(workoutData.max_heart_rate)} max)` : '';
-      return (
-        <div className="grid grid-cols-2 gap-y-1 text-sm text-gray-800 mb-1">
-          <div className="font-medium">Pool Swim - {distLabel}</div>
-          <div className="text-right text-gray-600">{formatDate(workoutData.timestamp || workoutData.date)} {formatTime(workoutData.timestamp || workoutData.date)}</div>
-          <div>{timeTotal} total ({moving} moving)</div>
-          <div className="text-right">{cals}</div>
-          <div>{pace} avg pace</div>
-          <div className="text-right">{hrAvg}{hrMax}</div>
-        </div>
-      );
-    })()}
+   {/* removed dead swim primary metrics block */}
 
-    {/* 🏊 Swim-specific metrics grid */}
-   {false && (()=>{
-      const pool = formatPoolLengthLabel();
-      const lengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
-      const strokes = Number((workoutData as any)?.strokes);
-      const swolf = computeSwolf();
-      const spl = computeAvgStrokesPerLength();
-      const sr = computeAvgStrokeRate();
-      return (
-        <div className="grid grid-cols-2 gap-1 text-sm mb-2">
-          <div>Pool: <span className="font-medium">{pool}</span></div>
-          <div className="text-right"><span className="font-medium">{lengths || '—'}</span> lengths</div>
-          <div>{Number.isFinite(strokes) ? `${strokes} total strokes` : '—'}</div>
-          <div className="text-right">SWOLF: <span className="font-medium">{swolf ?? '—'}</span></div>
-          <div>{spl != null ? `${spl} avg strokes/length` : '—'}</div>
-          <div className="text-right">{sr != null ? `${sr} avg stroke rate` : '—'}</div>
-        </div>
-      );
-    })()}
+   {/* 🏊 Swim-specific metrics grid removed */}
 
-    {/* 📋 Workout Structure Analysis */}
-   {false && (()=>{
-      const detected = detectSets();
-      const hasAny = (detected.summary.length + detected.performance.length) > 0 || (plannedTokens && plannedTokens.length>0);
-      if (!hasAny) return null;
-      return (
-        <div className="border border-gray-100 rounded-md p-3 mb-2">
-          <div className="text-sm font-semibold mb-1">Workout Structure Analysis</div>
-          {/* Planned summary removed for Completed swim view */}
-          {detected.summary.length>0 && (
-            <div className="text-xs text-gray-800 space-y-1 mb-1">
-              {detected.summary.map((s, i)=> (
-                <div key={`sum-${i}`}>• {s}</div>
-              ))}
-            </div>
-          )}
-          {detected.performance.length>0 && (
-            <div className="text-xs text-gray-800 space-y-0.5">
-              {detected.performance.map((s, i)=> (
-                <div key={`perf-${i}`} className="flex items-center justify-between">
-                  <div>{s.label}</div>
-                  <div className="font-mono">{s.pace_per100_s != null ? `${formatSwimPace(s.pace_per100_s)}` : '—'}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          {/* Fixed 100 splits */}
-          {(() => { return null; })()}
-        </div>
-      );
-    })()}
+   {/* 📋 Workout Structure Analysis removed */}
 
      {/* 🏠 ALL METRICS - 3-column grid with tighter spacing */}
      {workoutData.swim_data ? (
