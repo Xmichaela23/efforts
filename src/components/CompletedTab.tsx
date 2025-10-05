@@ -1190,7 +1190,8 @@ const formatMovingTime = () => {
        )}
 
        {/* Row 2: GAP, Max Speed, Avg Cadence */}
-      {workoutData.swim_data && (
+      {/* GAP for runs */}
+      {(workoutData.type === 'run' || workoutData.type === 'walk') && (
         <div className="px-2 py-1">
           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
             {(() => {
@@ -1209,7 +1210,8 @@ const formatMovingTime = () => {
         </div>
       )}
 
-      {workoutData.ride_data && workoutData.walk_data && (
+      {/* Max Pace/Speed for runs/walks */}
+      {(workoutData.type === 'run' || workoutData.type === 'walk' || norm.sport === 'run' || norm.sport === 'walk') && (
       <div className="px-2 py-1">
         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
           {(workoutData.swim_data || workoutData.walk_data)
