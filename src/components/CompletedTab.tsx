@@ -218,7 +218,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   // 🆕 STRAVA WORKOUT HANDLING - Separate from Garmin
   if (workoutData.source === 'strava') {
     return (
-      <div className="px-2 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
+      <>
         {/* Strava Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -231,7 +231,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
         </div>
 
         {/* Strava Key Metrics - Basic Structure */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 px-2">
           {/* Duration */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -305,7 +305,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
             )}
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -982,10 +982,10 @@ const formatMovingTime = () => {
  ];
 
  return (
-  <div className="px-2 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
+  <>
      {/* 🏠 ALL METRICS - 3-column grid with tighter spacing */}
      {workoutData.swim_data ? (
-       <div className="grid grid-cols-3 gap-1">
+       <div className="grid grid-cols-3 gap-1 px-2">
          {/* Distance */}
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -1069,7 +1069,7 @@ const formatMovingTime = () => {
          </div>
        </div>
      ) : (
-       <div className="grid grid-cols-3 gap-1">
+       <div className="grid grid-cols-3 gap-1 px-2">
        {/* General metrics - Only for non-cycling workouts */}
        {workoutData.ride_data && workoutData.walk_data && (
          <>
@@ -1758,7 +1758,7 @@ const formatMovingTime = () => {
         </small>
       </div>
     </div>
-   </div>
+   </>
  );
 };
 
