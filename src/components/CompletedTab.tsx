@@ -62,6 +62,23 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const [plannedLabel, setPlannedLabel] = useState<string | null>(null);
   const norm = useWorkoutData(hydrated||workoutData);
   
+  // Debug: log norm data AND raw workoutData to diagnose speed issue
+  console.log('[CompletedTab] RAW workoutData:', {
+    avg_speed: workoutData?.avg_speed,
+    metrics_avg_speed: workoutData?.metrics?.avg_speed,
+    has_computed: !!workoutData?.computed,
+    has_series: !!workoutData?.computed?.analysis?.series,
+    series_keys: workoutData?.computed?.analysis?.series ? Object.keys(workoutData.computed.analysis.series) : []
+  });
+  console.log('[CompletedTab] norm data:', {
+    avg_speed_kmh: norm.avg_speed_kmh,
+    avg_speed_mps: norm.avg_speed_mps,
+    avg_pace_s_per_km: norm.avg_pace_s_per_km,
+    distance_km: norm.distance_km,
+    duration_s: norm.duration_s,
+    elevation_gain_m: norm.elevation_gain_m
+  });
+  
   useEffect(() => {
     setHydrated((prev: any) => {
       // Prefer latest props, but do not regress defined scalar fields to undefined/null.
