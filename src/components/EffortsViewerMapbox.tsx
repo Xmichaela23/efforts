@@ -308,19 +308,27 @@ function computeSplits(samples: Sample[], metersPerSplit: number): Split[] {
 }
 
 /** ---------- Tiny UI atoms ---------- */
-const Pill = ({ label, value, subValue, active=false, titleAttr, width }: { label: string; value: string | number; subValue?: string; active?: boolean; titleAttr?: string; width?: number }) => (
-  <div title={titleAttr || ''} style={{
-    padding: "2px 0",
-    borderRadius: 0,
-    border: "none",
-    background: "transparent",
-    display: "flex",
-    flexDirection: "column",
-    gap: 1,
-    width: `${width ?? 54}px`,
-    textAlign: "center",
-    overflow: "hidden"
-  }}>
+const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick }: { label: string; value: string | number; subValue?: string; active?: boolean; titleAttr?: string; width?: number; onClick?: () => void }) => (
+  <div 
+    title={titleAttr || ''} 
+    onClick={onClick}
+    style={{
+      padding: "2px 0",
+      borderRadius: 0,
+      border: "none",
+      background: "transparent",
+      display: "flex",
+      flexDirection: "column",
+      gap: 1,
+      width: `${width ?? 54}px`,
+      textAlign: "center",
+      overflow: "hidden",
+      cursor: onClick ? "pointer" : "default",
+      transition: "opacity 0.15s ease"
+    }}
+    onMouseEnter={(e) => { if (onClick) e.currentTarget.style.opacity = "0.7"; }}
+    onMouseLeave={(e) => { if (onClick) e.currentTarget.style.opacity = "1"; }}
+  >
     <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{label}</span>
     <span style={{ fontSize: 12, fontWeight: 700, color: active ? "#0284c7" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
     {subValue ? (
@@ -993,6 +1001,7 @@ function EffortsViewerMapbox({
             })()}  
             active={tab==="pace" || tab==="spd"} 
             width={54}
+            onClick={() => setTab(normalizedSamples.some(s => Number.isFinite(s.speed_mps as any)) ? "spd" : "pace")}
           />
           <Pill 
             label="HR" 
@@ -1004,10 +1013,23 @@ function EffortsViewerMapbox({
               return s?.hr_bpm != null ? `${s.hr_bpm} bpm` : '—';
             })()} 
             active={tab==="bpm"} 
-            width={54} 
+            width={54}
+            onClick={() => setTab("bpm")}
           />
-          <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} width={54} />
-          <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} width={54} />
+          <Pill 
+            label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} 
+            value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} 
+            active={tab==="cad"} 
+            width={54}
+            onClick={() => setTab("cad")}
+          />
+          <Pill 
+            label="Power" 
+            value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} 
+            active={tab==="pwr"} 
+            width={54}
+            onClick={() => setTab("pwr")}
+          />
           <Pill
             label="Grade"
             value={(() => {
@@ -1024,6 +1046,7 @@ function EffortsViewerMapbox({
             })()}
             active={tab==="elev"}
             width={54}
+            onClick={() => setTab("elev")}
           />
           <Pill 
             label="VAM" 
@@ -1035,7 +1058,8 @@ function EffortsViewerMapbox({
               return s?.vam_m_per_h != null ? fmtVAM(s.vam_m_per_h, useFeet) : '—';
             })()} 
             active={tab==="vam"} 
-            width={54} 
+            width={54}
+            onClick={() => setTab("vam")}
           />
         </div>
         
@@ -1178,34 +1202,6 @@ function EffortsViewerMapbox({
         </svg>
       </div>
 
-      {/* Metric buttons */}
-      <div style={{ marginTop: 8, padding: "0 6px" }}>
-        <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
-          {( (
-            [
-              normalizedSamples.some(s=>Number.isFinite(s.speed_mps as any)) ? "spd" : null,
-              normalizedSamples.some(s=>Number.isFinite(s.pace_s_per_km as any)) ? "pace" : null,
-              "bpm",
-              normalizedSamples.some(s=>Number.isFinite(s.cad_rpm as any) || Number.isFinite(s.cad_spm as any)) ? "cad" : null,
-              normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
-              "elev",
-              normalizedSamples.some(s=>Number.isFinite(s.vam_m_per_h as any)) ? "vam" : null
-            ].filter(Boolean) as MetricTab[]
-          ) ).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                border: "none", background: "transparent", color: tab === t ? "#0f172a" : "#64748b", cursor: "pointer",
-                padding: "6px 2px", borderBottom: tab === t ? "2px solid #0ea5e9" : "2px solid transparent", letterSpacing: 0.5
-              }}
-            >
-              {t === 'spd' ? 'SPEED' : t.toUpperCase()}
-            </button>
-          ))}
-        </div>
-
-      </div>
 
       {/* Splits */}
       <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>
