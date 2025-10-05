@@ -1091,7 +1091,7 @@ const formatMovingTime = () => {
                   if (!meters) return 'N/A';
                   return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
                 }
-                return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
+                return km ? formatDistance(km, useImperial) : 'N/A';
                })()}
              </div>
              <div className="text-xs text-[#666666] font-normal">
@@ -1112,7 +1112,8 @@ const formatMovingTime = () => {
                        ?? (typeof (workoutData as any)?.duration === 'number' ? (workoutData as any).duration * 60 : null);
                  return Number.isFinite(Number(s)) && Number(s) > 0 ? formatDuration(Number(s)) : 'N/A';
                }
-               return formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration);
+               // For runs/walks: use norm.duration_s or norm.elapsed_s
+               return norm.duration_s ? formatDuration(norm.duration_s) : (norm.elapsed_s ? formatDuration(norm.elapsed_s) : 'N/A');
              })()}
             </div>
             <div className="text-xs text-[#666666] font-normal">
