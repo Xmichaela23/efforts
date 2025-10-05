@@ -1080,183 +1080,119 @@ const formatMovingTime = () => {
        {/* General metrics - For runs/walks */}
        {(workoutData.type === 'run' || workoutData.type === 'walk' || norm.sport === 'run' || norm.sport === 'walk') && (
          <>
-          {/* Distance */}
-           <div className="px-2 pb-1">
-             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-               {(() => {
-                 const src = (hydrated || workoutData);
-                 const km = (computeDistanceKm(src) ?? Number(src?.distance)) || 0;
-                if (workoutData.swim_data) {
-                  const meters = Math.round(km * 1000);
-                  if (!meters) return 'N/A';
-                  return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
-                }
-                return km ? formatDistance(km, useImperial) : 'N/A';
-               })()}
-             </div>
-             <div className="text-xs text-[#666666] font-normal">
-               <div className="font-medium">Distance</div>
-             </div>
-           </div>
-
-          {/* Duration */}
+          {/* Row 1 */}
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {(() => {
-               if (workoutData.swim_data) {
-                 // Duration (elapsed) must use explicit elapsed fields; do not use moving-time resolver
-                 const s = (workoutData as any)?.metrics?.total_elapsed_time
-                       ?? (workoutData as any)?.total_elapsed_time
-                       ?? (workoutData as any)?.elapsed_time
-                       ?? (workoutData as any)?.metrics?.elapsed_time
-                       ?? (typeof (workoutData as any)?.duration === 'number' ? (workoutData as any).duration * 60 : null);
-                 return Number.isFinite(Number(s)) && Number(s) > 0 ? formatDuration(Number(s)) : 'N/A';
-               }
-               // For runs/walks: use norm.duration_s or norm.elapsed_s
-               return norm.duration_s ? formatDuration(norm.duration_s) : (norm.elapsed_s ? formatDuration(norm.elapsed_s) : 'N/A');
-             })()}
+              {norm.distance_km ? formatDistance(norm.distance_km, useImperial) : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Distance</div>
+            </div>
+          </div>
+
+          <div className="px-2 pb-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.duration_s ? formatDuration(norm.duration_s) : (norm.elapsed_s ? formatDuration(norm.elapsed_s) : 'N/A')}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Duration</div>
             </div>
           </div>
-           
-           {/* Avg HR */}
-           <div className="px-2 py-1">
-             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A'}
-             </div>
-             <div className="text-xs text-[#666666] font-normal">
-               <div className="font-medium">Avg HR</div>
-             </div>
-           </div>
-           
-           {/* Avg Pace/Speed */}
-          {workoutData.swim_data ? (
-             <div className="px-2 py-1">
-               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                {Number.isFinite(norm.avg_pace_s_per_km as any) ? formatPace(norm.avg_pace_s_per_km as number, useImperial) : 'N/A'}
-               </div>
-               <div className="text-xs text-[#666666] font-normal">
-                 <div className="font-medium">Avg Pace</div>
-               </div>
-             </div>
-           ) : workoutData.ride_data ? (
-             <div className="px-2 py-1">
-               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {(() => { return 'N/A'; })()}
-               </div>
-               <div className="text-xs text-[#666666] font-normal">
-                 <div className="font-medium">Avg Pace {useImperial ? '/100yd' : '/100m'}</div>
-               </div>
-             </div>
-           ) : (
-             <div className="px-2 py-1">
-               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                {Number.isFinite(norm.avg_speed_kmh as any) ? (useImperial ? `${((norm.avg_speed_kmh as number)*0.621371).toFixed(1)} mph` : `${(norm.avg_speed_kmh as number).toFixed(1)} km/h`) : 'N/A'}
-               </div>
-               <div className="text-xs text-[#666666] font-normal">
-                 <div className="font-medium">Avg Speed</div>
-               </div>
-             </div>
-           )}
 
-          {/* Swim-only cards: Lengths, Pool */}
-          {workoutData.swim_data && (
-            <>
-              <div className="px-2 py-1">
-                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                  {(() => { const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null); return n != null ? String(n) : 'N/A'; })()}
-                </div>
-                <div className="text-xs text-[#666666] font-normal">
-                  <div className="font-medium">Lengths</div>
-                </div>
-              </div>
-              <div className="px-2 py-1">
-                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                  {(() => {
-                    const Lm = Number(poolLengthMeters ?? (workoutData as any)?.pool_length);
-                    if (!Lm) return 'N/A';
-                    const isYd = Lm >= 20 && Lm <= 26;
-                    return isYd ? `${Math.round(Lm / 0.9144)} yd` : `${Lm} m`;
-                  })()}
-                </div>
-                <div className="text-xs text-[#666666] font-normal">
-                  <div className="font-medium">Pool</div>
-                </div>
-              </div>
-            </>
-          )}
+          <div className="px-2 pb-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {formatMovingTime()}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Moving Time</div>
+            </div>
+          </div>
+
+          {/* Row 2 */}
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.avg_pace_s_per_km ? formatPace(norm.avg_pace_s_per_km, useImperial) : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Avg Pace</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.avg_speed_kmh ? `${(useImperial ? norm.avg_speed_kmh * 0.621371 : norm.avg_speed_kmh).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Avg Speed</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.max_speed_mps ? `${(useImperial ? norm.max_speed_mps * 2.23694 : norm.max_speed_mps * 3.6).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Max Speed</div>
+            </div>
+          </div>
+
+          {/* Row 3 */}
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.avg_hr ? `${norm.avg_hr} bpm` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Avg HR</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.max_hr ? `${norm.max_hr} bpm` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Max HR</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.elevation_gain_m ? `${(useImperial ? norm.elevation_gain_m * 3.28084 : norm.elevation_gain_m).toFixed(0)} ${useImperial ? 'ft' : 'm'}` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Elevation</div>
+            </div>
+          </div>
+
+          {/* Row 4 */}
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.avg_running_cadence_spm ? `${norm.avg_running_cadence_spm} spm` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Cadence</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.max_cadence_rpm ? `${norm.max_cadence_rpm} spm` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Max Cadence</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.calories ? String(norm.calories) : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Calories</div>
+            </div>
+          </div>
          </>
        )}
-
-       {/* Row 2: GAP, Max Speed, Avg Cadence */}
-      {/* GAP for runs */}
-      {(workoutData.type === 'run' || workoutData.type === 'walk') && (
-        <div className="px-2 py-1">
-          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-            {(() => {
-              const src = (hydrated || workoutData) as any;
-              const gapSec = src?.computed?.overall?.gap_pace_s_per_mi ?? src?.metrics?.gap_pace_s_per_mi;
-              if (Number.isFinite(gapSec) && (gapSec as number) > 0) {
-                const sec = Number(gapSec);
-                return `${Math.floor(sec/60)}:${String(Math.round(sec%60)).padStart(2,'0')}/mi`;
-              }
-              return 'N/A';
-            })()}
-          </div>
-          <div className="text-xs text-[#666666] font-normal">
-            <div className="font-medium">GAP</div>
-          </div>
-        </div>
-      )}
-
-      {/* Max Pace/Speed for runs/walks */}
-      {(workoutData.type === 'run' || workoutData.type === 'walk' || norm.sport === 'run' || norm.sport === 'walk') && (
-      <div className="px-2 py-1">
-        <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-          {(workoutData.swim_data || workoutData.walk_data)
-            ? (() => {
-                // Preferred: stored max_pace (sec/km). Fallback: derive from samples.
-                const stored = (workoutData as any)?.metrics?.max_pace ?? (workoutData as any)?.max_pace;
-                let secPerKm: number | null = null;
-                if (Number.isFinite(stored) && Number(stored) > 0) {
-                  const n = Number(stored);
-                  secPerKm = n < 30 ? n * 60 : n; // tolerate minutes value
-                } else {
-                  try {
-                    const samples = Array.isArray((workoutData as any)?.sensor_data?.samples)
-                      ? (workoutData as any).sensor_data.samples
-                      : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
-                    let maxMps = 0;
-                    for (let i = 0; i < samples.length; i += 1) {
-                      const s: any = samples[i] || {};
-                      const v = (typeof s.speedMetersPerSecond === 'number' ? s.speedMetersPerSecond
-                        : (typeof s.v === 'number' ? s.v
-                        : (typeof s.speed === 'number' ? s.speed : NaN)));
-                      if (Number.isFinite(v) && v > maxMps) maxMps = v;
-                    }
-                    if (maxMps > 0.5) secPerKm = 1000 / maxMps;
-                  } catch {}
-                }
-                if (!Number.isFinite(secPerKm) || (secPerKm as number) <= 0) return 'N/A';
-                const secPerMile = (secPerKm as number) * 1.60934;
-                if (workoutData.walk_data && secPerMile < 360) return 'N/A';
-                return formatPace(secPerKm);
-              })()
-            : (() => {
-                const speedKmh = Number((workoutData as any)?.max_speed);
-                if (speedKmh && speedKmh > 0) {
-                  return useImperial ? `${(speedKmh * 0.621371).toFixed(1)} mph` : `${speedKmh.toFixed(1)} km/h`;
-                }
-                return 'N/A';
-              })()}
-        </div>
-        <div className="text-xs text-[#666666] font-normal">
-          <div className="font-medium">{(workoutData.swim_data || workoutData.walk_data) ? 'Max Pace' : 'Max Speed'}</div>
-        </div>
-      </div>
-      )}
       
       {(workoutData.type === 'ride' || norm.sport === 'ride') ? (
         <>
