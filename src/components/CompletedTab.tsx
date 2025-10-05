@@ -9,7 +9,7 @@ import HRZoneChart from './HRZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 import { computeDistanceKm } from '@/utils/workoutDataDerivation';
-import { formatDuration, formatPace, formatElevation } from '@/utils/workoutFormatting';
+import { formatDuration, formatPace, formatElevation, formatDistance, formatSwimPace } from '@/utils/workoutFormatting';
 import { useWorkoutData } from '@/hooks/useWorkoutData';
 // keeping local logic for now; Today's view uses shared resolver
 
@@ -246,11 +246,10 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
           {/* Pace/Speed */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.avg_pace ? `${workoutData.avg_pace.toFixed(1)} min/km` : 
-               workoutData.avg_speed ? `${(workoutData.avg_speed * 3.6).toFixed(1)} km/h` : 'N/A'}
+              {Number.isFinite(norm.avg_pace_s_per_km as any) ? formatPace(norm.avg_pace_s_per_km as number, useImperial) : (Number.isFinite(norm.avg_speed_kmh as any) ? (useImperial ? `${((norm.avg_speed_kmh as number)*0.621371).toFixed(1)} mph` : `${(norm.avg_speed_kmh as number).toFixed(1)} km/h`) : 'N/A')}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">{workoutData.swim_data ? 'Avg Pace' : 'Avg Speed'}</div>
+              <div className="font-medium">{Number.isFinite(norm.avg_pace_s_per_km as any) ? 'Avg Pace' : 'Avg Speed'}</div>
             </div>
           </div>
         </div>
@@ -297,104 +296,15 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
 
 
 
- // Helper functions
- const safeNumber = (value: any): string => {
-   if (value === null || value === undefined || isNaN(value)) return 'N/A';
-   return String(value);
- };
+// Helper functions
 
-   const formatDuration = (seconds: any): string => {
-    const num = Number(seconds);
-    if (num === null || num === undefined || isNaN(num) || num === 0) {
-      // Handle duration in minutes (from Garmin data) vs seconds
-      const durationMinutes = workoutData.duration || 0;
-      if (durationMinutes > 0) {
-        const hours = Math.floor(durationMinutes / 60);
-        const minutes = durationMinutes % 60;
-        if (hours > 0) {
-          return `${hours}:${minutes.toString().padStart(2, '0')}:00`;
-        }
-        return `${minutes}:00`;
-      }
-      return '0:00';
-    }
-    
-    // Handle duration in seconds
-    const hours = Math.floor(num / 3600);
-    const minutes = Math.floor((num % 3600) / 60);
-    const secs = num % 60;
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
+  
 
- const haversine = (lat: number, lon: number, lat2: number, lon2: number) => {
-   const toRad = (d: number) => (d * Math.PI) / 180;
-   const R = 6371000;
-   const dLat = toRad(lat2 - lat);
-   const dLon = toRad(lon2 - lon);
-   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
- };
+ 
 
- const computeDistanceKm = (w: any): number | null => {
-  // Prefer server-computed overall distance (meters) when available
-  try {
-    const computedMeters = (w as any)?.computed?.overall?.distance_m;
-    if (typeof computedMeters === 'number' && computedMeters > 0) return computedMeters / 1000;
-  } catch {}
-  // Swim: derive from lengths if present
-  try {
-    if (workoutData.swim_data) {
-      const lengths = Array.isArray((w as any)?.swim_data?.lengths) ? (w as any).swim_data.lengths : [];
-      if (lengths.length > 0) {
-        let meters = 0;
-        for (const len of lengths) {
-          const d = Number((len as any)?.distance_m ?? (len as any)?.distance);
-          if (Number.isFinite(d) && d > 0) meters += d;
-        }
-        if (meters > 0) return meters / 1000;
-        // Fallback: count * inferred pool length
-        const L = (() => {
-          const explicit = Number((w as any)?.pool_length);
-          if (Number.isFinite(explicit) && explicit > 0) return explicit;
-          const inf = inferPoolLengthMeters();
-          return Number.isFinite(inf as any) && (inf as any) > 0 ? (inf as number) : 0;
-        })();
-        if (L > 0) return (lengths.length * L) / 1000;
-      }
-    }
-  } catch {}
-  // Prefer explicit meters → km if present
-  const meters = (w as any)?.distance_meters ?? (w as any)?.metrics?.distance_meters ?? (w as any)?.strava_data?.original_activity?.distance;
-  if (typeof meters === 'number' && meters > 0) return (meters as number) / 1000;
-  // Else, if distance is already km (normalized), use as-is. If it's suspiciously large (meters), convert.
-  if (typeof (w as any)?.distance === 'number' && (w as any).distance > 0) return (w as any).distance > 2000 ? (w as any).distance / 1000 : (w as any).distance;
-  const track = Array.isArray((w as any)?.gps_track) ? (w as any).gps_track : null;
-  if (track && track.length > 1) {
-    let meters = 0;
-    for (let i = 1; i < track.length; i++) {
-      const a = track[i - 1];
-      const b = track[i];
-      if (a?.lat != null && a?.lng != null && b?.lat != null && b?.lng != null) {
-        meters += haversine(a.lat, a.lng, b.lat, b.lng);
-      }
-    }
-    if (meters > 0) return meters / 1000;
-  }
-  const steps = (w as any)?.steps ?? (w as any)?.metrics?.steps;
-  if (typeof steps === 'number' && steps > 0) return (steps * 0.78) / 1000;
-  return null;
-};
+ 
 
- const formatDistance = (km: any): string => {
-   const num = Number(km);
-   if (!num || isNaN(num)) return '0.0';
-   if (useImperial) return (num * 0.621371).toFixed(1);
-   return num.toFixed(1);
- };
+ 
 
  // Format average speed specifically
 const formatAvgSpeed = (speedValue: any): string => {
@@ -404,7 +314,7 @@ const formatAvgSpeed = (speedValue: any): string => {
     return `${speedMph.toFixed(1)} mph`;
   }
   return 'N/A';
-};
+
 
 // Format max speed specifically  
 const formatMaxSpeed = (speedValue: any): string => {
@@ -416,74 +326,9 @@ const formatMaxSpeed = (speedValue: any): string => {
   return 'N/A';
 };
 
- const formatSpeed = (speedValue: any): string => {
-  // 🚨 TESTING: This is the UPDATED formatSpeed function - if you see this log, the fix is loaded!
-  if (import.meta.env?.DEV) console.log('🚨 UPDATED formatSpeed function is running!');
-  
-  // 🔧 FIXED: This function should actually be looking for BEST PACE, not speed
-  // For running/walking, we want the fastest pace (lowest time per km)
-  // For cycling, we want the fastest speed (highest km/h)
-  
-  if (workoutData.swim_data) {
-    // For swimming: Look for best pace (fastest pace = lowest time per km)
-    const maxPaceSecondsPerKm = Number(workoutData.max_pace);
-    const avgPaceSecondsPerKm = Number(workoutData.avg_pace);
-    
-    if (import.meta.env?.DEV) console.log('🔍 formatSpeed (SWIM) - looking for best pace:', {
-      max_pace: workoutData.max_pace,
-      avg_pace: workoutData.avg_pace,
-      maxPaceSecondsPerKm,
-      avgPaceSecondsPerKm
-    });
-    
-    // Use max_pace (fastest pace) if available, otherwise avg_pace
-    const paceSecondsPerKm = maxPaceSecondsPerKm || avgPaceSecondsPerKm;
-    
-    if (paceSecondsPerKm && paceSecondsPerKm > 0) {
-      // Convert seconds per km to minutes per mile
-      const paceSecondsPerMile = paceSecondsPerKm * 1.60934;
-      const minutes = Math.floor(paceSecondsPerMile / 60);
-      const seconds = Math.round(paceSecondsPerMile % 60);
-      const paceString = `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
-      if (import.meta.env?.DEV) console.log('🔍 formatSpeed returning best pace:', paceString);
-      return paceString;
-    }
-  } else {
-    // For cycling: Look for fastest speed (highest km/h)
-    const maxSpeedKmh = Number(((hydrated as any)?.max_speed ?? (workoutData as any)?.max_speed));
-    const avgSpeedKmh = Number(workoutData.avg_speed);
-    
-    if (import.meta.env?.DEV) console.log('🔍 formatSpeed (CYCLE) - looking for fastest speed:', {
-      max_speed: workoutData.max_speed,
-      avg_speed: workoutData.avg_speed,
-      maxSpeedKmh,
-      avgSpeedKmh
-    });
-    
-    // Use max_speed (fastest speed) if available, otherwise avg_speed
-    const speedKmh = maxSpeedKmh || avgSpeedKmh;
-    
-    if (speedKmh && speedKmh > 0) {
-      // Convert km/h to mph: multiply by 0.621371
-      const speedMph = speedKmh * 0.621371;
-      if (import.meta.env?.DEV) console.log('🔍 formatSpeed returning fastest speed:', speedMph.toFixed(1), 'mph');
-      return `${speedMph.toFixed(1)} mph`;
-    }
-  }
-  
-  if (import.meta.env?.DEV) console.log('🔍 formatSpeed returning N/A - no pace/speed data found');
-  return 'N/A';
-};
+ 
 
- const formatElevation = (m: any): string => {
-   const num = Number(m);
-   if (!num || isNaN(num) || num === 0) return '0';
-   
-   if (useImperial) {
-     return Math.round(num * 3.28084).toString();
-   }
-   return num.toString();
- };
+ 
 
  const formatTemperature = (c: any): string => {
    if (import.meta.env?.DEV) console.log('🔍 formatTemperature called with:', c, typeof c);
@@ -508,65 +353,9 @@ const formatMaxSpeed = (speedValue: any): string => {
  };
 
  // Format pace using basic calculation from distance and duration
-const formatPace = (paceValue: any): string => {
-  let secondsPerKm: number | null = null;
-  const raw = Number(paceValue);
-  if (Number.isFinite(raw) && raw > 0) {
-    // Normalize: if value looks like minutes/km (< 30), convert to seconds/km
-    secondsPerKm = raw < 30 ? raw * 60 : raw;
-  }
+ 
 
-  if (secondsPerKm != null) {
-    const secondsPerMile = secondsPerKm * 1.60934; // km → mi
-    const minutes = Math.floor(secondsPerMile / 60);
-    const seconds = Math.round(secondsPerMile % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
-  }
-
-  // Fallback: compute average pace from distance (km) and duration (minutes)
-  const distanceKm = Number(workoutData.distance);
-  const durationMinutes = Number(workoutData.duration);
-  if (distanceKm && durationMinutes && distanceKm > 0 && durationMinutes > 0) {
-    const distanceMiles = distanceKm * 0.621371;
-    const paceMinPerMile = durationMinutes / distanceMiles;
-    const minutes = Math.floor(paceMinPerMile);
-    const seconds = Math.round((paceMinPerMile - minutes) * 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
-  }
-
-  return 'N/A';
-};
-
- // Format swim pace (seconds per 100m) to MM:SS format
- const formatSwimPace = (seconds: any): string => {
-   const num = Number(seconds);
-   if (!num || isNaN(num)) return 'N/A';
-   
-   const minutes = Math.floor(num / 60);
-   const secs = Math.floor(num % 60);
-   return `${minutes}:${secs.toString().padStart(2, '0')}`;
- };
-
- const formatTime = (timestamp: any): string => {
-   if (import.meta.env?.DEV) console.log('🔍 formatTime called with:', timestamp, typeof timestamp);
-   
-   // 🔧 GARMIN DATA EXTRACTION: Try multiple timestamp sources
-   const timeValue = timestamp || 
-                    workoutData.timestamp || 
-                    workoutData.start_time || 
-                    workoutData.created_at;
-   
-   if (!timeValue) return 'N/A';
-   const date = new Date(timeValue);
-   const result = date.toLocaleTimeString('en-US', { 
-     timeZone: 'America/Los_Angeles', // PST/PDT
-     hour: 'numeric', 
-     minute: '2-digit',
-     hour12: true 
-   });
-   if (import.meta.env?.DEV) console.log('🔍 formatTime result:', result);
-   return result;
- };
+ 
 
  const formatDate = (dateStr: any): string => {
    // 🔧 GARMIN DATA EXTRACTION: Try multiple date sources
@@ -661,29 +450,26 @@ const formatPace = (paceValue: any): string => {
       return [
         {
           label: 'Duration', 
-          value: formatDuration(workoutData.duration)
+          value: norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'
         },
         {
           label: 'Distance',
-          value: (() => {
-            const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
-            return km ? formatDistance(km) : 'N/A';
-          })(),
+          value: (norm.distance_km ? formatDistance(norm.distance_km) : 'N/A'),
           unit: useImperial ? 'mi' : 'km'
         },
         {
           label: 'Heart Rate',
-          value: workoutData.avg_heart_rate ? safeNumber(workoutData.avg_heart_rate) : 'N/A',
+          value: Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A',
           unit: 'bpm'
         },
         {
           label: 'Calories',
-          value: workoutData.metrics?.calories || workoutData.calories ? safeNumber(workoutData.metrics?.calories || workoutData.calories) : 'N/A',
+          value: Number.isFinite(norm.calories as any) ? String(norm.calories) : 'N/A',
           unit: 'cal'
         },
         {
           label: 'Elevation Gain',
-          value: (() => { const v = (workoutData as any)?.elevation_gain; return v != null ? formatElevation(v) : 'N/A'; })(),
+          value: (Number.isFinite(norm.elevation_gain_m as any) ? formatElevation(norm.elevation_gain_m as number, useImperial) : 'N/A'),
           unit: useImperial ? 'ft' : 'm'
         }
       ];
@@ -692,29 +478,26 @@ const formatPace = (paceValue: any): string => {
     const baseMetrics = [
       {
         label: 'Distance',
-        value: (() => {
-          const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
-          return km ? formatDistance(km) : 'N/A';
-        })(),
+        value: (norm.distance_km ? formatDistance(norm.distance_km) : 'N/A'),
         unit: useImperial ? 'mi' : 'km'
       },
       {
         label: 'Duration', 
-        value: (()=>{ const s = getElapsedSeconds(); return Number.isFinite(s as any) && (s as number) > 0 ? formatDuration(s as number) : 'N/A'; })()
+        value: (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')
       },
       {
         label: 'Heart Rate',
-        value: workoutData.avg_heart_rate ? safeNumber(workoutData.avg_heart_rate) : 'N/A',
+        value: Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A',
         unit: 'bpm'
       },
       {
         label: 'Elevation Gain',
-        value: (() => { const v = (workoutData as any)?.elevation_gain; return v != null ? formatElevation(v) : 'N/A'; })(),
+        value: (Number.isFinite(norm.elevation_gain_m as any) ? formatElevation(norm.elevation_gain_m as number, useImperial) : 'N/A'),
         unit: useImperial ? 'ft' : 'm'
       },
       {
         label: 'Calories',
-        value: workoutData.metrics?.calories || workoutData.calories ? safeNumber(workoutData.metrics?.calories || workoutData.calories) : 'N/A',
+        value: Number.isFinite(norm.calories as any) ? String(norm.calories) : 'N/A',
         unit: 'cal'
       }
     ];
@@ -725,25 +508,12 @@ const formatPace = (paceValue: any): string => {
         ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
         {
           label: 'Pace',
-          value: formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace),
+          value: (Number.isFinite(norm.avg_pace_s_per_km as any) ? formatPace(norm.avg_pace_s_per_km as number, useImperial) : 'N/A'),
           unit: useImperial ? '/mi' : '/km'
         },
         {
           label: 'Cadence',
-          value: (() => {
-            const v = (
-              workoutData.avg_cadence ??
-              workoutData.metrics?.avg_cadence ??
-              workoutData.avg_running_cadence ??
-              workoutData.avg_run_cadence ??
-              workoutData.max_cadence ??
-              workoutData.metrics?.max_cadence ??
-              workoutData.max_running_cadence ??
-              workoutData.max_run_cadence
-            );
-            const n = typeof v === 'string' ? parseFloat(v) : (v as number);
-            return n != null && !isNaN(Number(n)) ? safeNumber(n) : 'N/A';
-          })(),
+          value: (Number.isFinite(norm.avg_running_cadence_spm as any) ? String(norm.avg_running_cadence_spm) : 'N/A'),
           unit: 'spm'
         },
         ...baseMetrics.slice(3) // Elevation, Calories
@@ -753,30 +523,17 @@ const formatPace = (paceValue: any): string => {
         ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
         {
           label: 'Power',
-          value: workoutData.avg_power ? safeNumber(workoutData.avg_power) : 'N/A',
+          value: (Number.isFinite(norm.avg_power as any) ? String(norm.avg_power) : 'N/A'),
           unit: 'W'
         },
         {
           label: 'Speed',
-          value: formatAvgSpeed(workoutData.avg_speed),
+          value: (Number.isFinite(norm.avg_speed_kmh as any) ? (useImperial ? `${((norm.avg_speed_kmh as number)*0.621371).toFixed(1)} mph` : `${(norm.avg_speed_kmh as number).toFixed(1)} km/h`) : 'N/A'),
           unit: useImperial ? 'mph' : 'mph'
         },
         {
           label: 'Cadence',
-          value: (() => {
-            const v = (
-              workoutData.avg_cadence ??
-              workoutData.metrics?.avg_cadence ??
-              workoutData.avg_bike_cadence ??
-              workoutData.metrics?.avg_bike_cadence ??
-              workoutData.max_cadence ??
-              workoutData.metrics?.max_cadence ??
-              workoutData.max_bike_cadence ??
-              workoutData.metrics?.max_bike_cadence
-            );
-            const n = typeof v === 'string' ? parseFloat(v) : (v as number);
-            return n != null && !isNaN(Number(n)) ? safeNumber(n) : 'N/A';
-          })(),
+          value: (Number.isFinite(norm.avg_cycling_cadence_rpm as any) ? String(norm.avg_cycling_cadence_rpm) : 'N/A'),
           unit: 'rpm'
         },
         ...baseMetrics.slice(3) // Elevation, Calories
@@ -788,28 +545,23 @@ const formatPace = (paceValue: any): string => {
         ...baseMetrics.slice(0, 3),
         {
           label: 'Pace',
-          value: (() => {
-            const s = computeSwimAvgPaceSecPer100();
-            if (!s) return 'N/A';
-            const disp = useImperial ? Math.round(s * 0.9144) : s;
-            return formatSwimPace(disp);
-          })(),
+          value: 'N/A',
           unit: useImperial ? '/100yd' : '/100m'
         },
         {
           label: 'Cadence',
-          value: workoutData.avg_cadence ? safeNumber(workoutData.avg_cadence) : 'N/A',
+          value: 'N/A',
           unit: 'spm'
         },
       // SWOLF removed per request
-        {
+       {
           label: 'Lengths',
           value: (() => {
             const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null);
             return n != null ? safeNumber(n) : 'N/A';
           })()
         },
-        {
+       {
           label: 'Pool',
           value: formatPoolLengthLabel()
         },
@@ -822,147 +574,14 @@ const formatPace = (paceValue: any): string => {
 
   // ----- Moving time resolver (strict) -----
   // Only use explicitly provided moving-time fields; do not infer from cadence or distance.
-  const getDurationSeconds = (): number | null => {
-    try {
-      const src = (hydrated || workoutData) as any;
-
-      // 0) Explicit seconds in metrics (provider timer seconds preferred for moving on swims)
-      try {
-        const tmr = Number(src?.metrics?.total_timer_time_seconds);
-        if (Number.isFinite(tmr) && tmr > 0) return Math.round(tmr);
-      } catch {}
-
-      // 1) Derive from distance and average speed/pace (clamp to elapsed)
-      try {
-        const distM = getDistanceMeters();
-        const avgSpeedKph = Number(src?.avg_speed); // stored as km/h
-        const avgPaceSecPerKm = Number(src?.avg_pace); // sec/km for run/walk
-        const elapsed = (()=>{ const s=getElapsedSeconds(); return Number.isFinite(s as any) && (s as number) > 0 ? (s as number) : null; })();
-        if (Number.isFinite(distM) && (distM as number) > 0) {
-          // Prefer speed when available
-          if (Number.isFinite(avgSpeedKph) && (avgSpeedKph as number) > 0) {
-            const mps = (avgSpeedKph as number) / 3.6;
-            if (mps > 0) {
-              let sec = Math.round((distM as number) / mps);
-              if (elapsed && sec > elapsed) sec = elapsed;
-              if (sec > 0) return sec;
-            }
-          }
-          // Fall back to pace if present (mainly run/walk)
-          if (Number.isFinite(avgPaceSecPerKm) && (avgPaceSecPerKm as number) > 0) {
-            let sec = Math.round((distM as number) / 1000 * (avgPaceSecPerKm as number));
-            if (elapsed && sec > elapsed) sec = elapsed;
-            if (sec > 0) return sec;
-          }
-        }
-      } catch {}
-
-      // 2) Server-computed moving seconds
-      const computed = Number(src?.computed?.overall?.duration_s_moving);
-      if (Number.isFinite(computed) && computed > 0) return Math.round(computed);
-
-      // 3) Sample-based explicit timer duration (device timer, not inferred)
-      const samples = Array.isArray(src?.sensor_data?.samples)
-        ? src.sensor_data.samples
-        : (Array.isArray(src?.sensor_data) ? src.sensor_data : []);
-      if (Array.isArray(samples) && samples.length > 0) {
-        const last: any = samples[samples.length - 1];
-        const timer = Number(last?.timerDurationInSeconds ?? last?.timerDuration);
-        if (Number.isFinite(timer) && timer > 0) return Math.round(timer);
-      }
-
-      // 4) Provider moving-time fields (minutes)
-      const candidates = [
-        (src as any)?.metrics?.total_timer_time,
-        (src as any)?.moving_time,
-        (src as any)?.metrics?.moving_time,
-      ];
-      for (const c of candidates) {
-        const n = Number(c);
-        if (Number.isFinite(n) && n > 0) return Math.round(n);
-      }
-
-      return null;
-    } catch {
-      return null;
-    }
-  };
+  
 
   // ----- Elapsed time resolver (exact seconds when available) -----
-  const getElapsedSeconds = (): number | null => {
-    try {
-      const src = (hydrated || workoutData) as any;
-      // 1) Samples last clock/elapsed duration
-      const samples = Array.isArray(src?.sensor_data?.samples)
-        ? src.sensor_data.samples
-        : (Array.isArray(src?.sensor_data) ? src.sensor_data : []);
-      if (Array.isArray(samples) && samples.length > 0) {
-        const last: any = samples[samples.length - 1];
-        const clock = Number(last?.clockDurationInSeconds ?? last?.elapsedDurationInSeconds ?? last?.sumDurationInSeconds);
-        if (Number.isFinite(clock) && clock > 0) return Math.round(clock);
-      }
-      // 2) Metrics explicit seconds if present
-      const metricsSec = Number(src?.metrics?.total_elapsed_time_seconds);
-      if (Number.isFinite(metricsSec) && metricsSec > 0) return Math.round(metricsSec);
-      // 3) Minute fields → seconds
-      const minCands = [
-        Number(src?.metrics?.total_elapsed_time),
-        Number(src?.total_elapsed_time),
-        Number(src?.elapsed_time),
-        Number(src?.metrics?.elapsed_time),
-        Number(src?.duration)
-      ];
-      const minutes = minCands.find((v)=> Number.isFinite(v) && v > 0) as number | undefined;
-      if (typeof minutes === 'number') return Math.round(minutes * 60);
-      return null;
-    } catch {
-      return null;
-    }
-  };
+  
 
-  const getDistanceMeters = (): number | null => {
-    // Swims: only trust server-computed distance (prefer hydrated row if present)
-    if (workoutData.swim_data) {
-      try {
-        const src = (hydrated || workoutData) as any;
-        const cm = Number(src?.computed?.overall?.distance_m);
-        return Number.isFinite(cm) && cm > 0 ? Math.round(cm) : null;
-      } catch { return null; }
-    }
-    // Non-swim: computed is preferred; then samples; then explicit km
-    try { const cm = Number((workoutData as any)?.computed?.overall?.distance_m); if (Number.isFinite(cm) && cm > 0) return Math.round(cm); } catch {}
-    // 2) From samples
-    try {
-      const rawSamples = (hydrated || workoutData) as any;
-      const samples = Array.isArray(rawSamples?.sensor_data?.samples)
-        ? rawSamples.sensor_data.samples
-        : (Array.isArray(rawSamples?.sensor_data) ? rawSamples.sensor_data : []);
-      if (samples.length > 1) {
-        const last = Number(samples[samples.length - 1]?.totalDistanceInMeters ?? samples[samples.length - 1]?.distanceInMeters);
-        if (Number.isFinite(last) && last > 0) return Math.round(last);
-      }
-    } catch {}
-    // 3) Explicit distance (km)
-    const dk = Number((workoutData as any)?.distance);
-    if (Number.isFinite(dk) && dk > 0) return Math.round(dk * 1000);
-    // 4) Sum lengths
-    try {
-      const lengths = getSwimLengths();
-      if (lengths.length) {
-        const sum = lengths.reduce((a:number,l:any)=> a + Number(l?.distance_m ?? l?.distance ?? 0), 0);
-        if (Number.isFinite(sum) && sum > 0) return Math.round(sum);
-      }
-    } catch {}
-    // 5) lengths count × pool length
-    try {
-      const n = Number((workoutData as any)?.number_of_active_lengths);
-      const L = inferPoolLengthMeters();
-      if (Number.isFinite(n) && n > 0 && Number.isFinite(L as any) && (L as any) > 0) return Math.round(n * (L as number));
-    } catch {}
-    return null;
-  };
+  
 
-  const inferPoolLengthMeters = (): number | null => {
+  /* removed legacy inferPoolLengthMeters */
     // 1) Explicit per-workout override/state
     const explicit = Number(poolLengthMeters ?? (workoutData as any).pool_length);
     if (Number.isFinite(explicit) && explicit > 0) return explicit;
@@ -985,7 +604,7 @@ const formatPace = (paceValue: any): string => {
       if (Number.isFinite(bLen) && bLen > 0) return bLen;
     } catch {}
     // 4) Infer from lengths when distance is available
-    const distM = getDistanceMeters();
+    const distM = norm.distance_m;
     const nLengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
     if (distM && nLengths > 0) return distM / nLengths;
     // 5) Local default
@@ -997,58 +616,11 @@ const formatPace = (paceValue: any): string => {
     return null;
   };
 
-  const isYardPool = (): boolean | null => {
-    const L = inferPoolLengthMeters();
-    if (!L) return null;
-    if (Math.abs(L - 22.86) <= 0.6) return true; // 25y
-    if (Math.abs(L - 45.72) <= 1.2) return true; // 50y
-    if (Math.abs(L - 25) <= 0.8 || Math.abs(L - 50) <= 1.2 || Math.abs(L - 33.33) <= 1.0) return false;
-    return null;
-  };
+  /* removed legacy isYardPool */
 
-  const computeSwimAvgPaceSecPer100 = (): number | null => {
-    const sec = getDurationSeconds();
-    const distM = getDistanceMeters();
-    if (!sec || !distM || distM <= 0) return null;
-    const yardPool = isYardPool();
-    if (yardPool === true) {
-      const distYd = distM / 0.9144;
-      if (distYd <= 0) return null;
-      return sec / (distYd / 100);
-    }
-    return sec / (distM / 100);
-  };
+  /* removed legacy computeSwimAvgPaceSecPer100 */
 
-  const formatPoolLengthLabel = (): string => {
-    const L = inferPoolLengthMeters();
-    if (!L) return 'N/A';
-    // Snap to canonical pool lengths, displaying true reference labels
-    // Yard candidates (meters): 25 yd = 22.86, 50 yd = 45.72
-    const yardCandidates = [
-      { m: 22.86, label: '25 yd' },
-      { m: 45.72, label: '50 yd' }
-    ];
-    // Metric candidates (meters): 25 m, 33.33 m, 50 m
-    const metricCandidates = [
-      { m: 25.0, label: '25 m' },
-      { m: 33.33, label: '33.33 m' },
-      { m: 50.0, label: '50 m' }
-    ];
-    const pickNearest = (cands: Array<{ m: number; label: string }>): string => {
-      let best = cands[0];
-      let bestDelta = Math.abs(L - best.m);
-      for (let i = 1; i < cands.length; i += 1) {
-        const d = Math.abs(L - cands[i].m);
-        if (d < bestDelta) { best = cands[i]; bestDelta = d; }
-      }
-      return best.label;
-    };
-    const yardPool = isYardPool();
-    if (yardPool === true) return pickNearest(yardCandidates);
-    if (yardPool === false) return pickNearest(metricCandidates);
-    // Unknown: choose the nearest across both sets
-    return pickNearest([...yardCandidates, ...metricCandidates]);
-  };
+  /* removed legacy formatPoolLengthLabel */
 
   const formatMetersCompact = (m: number | null | undefined): string => {
     const n = Number(m);
@@ -1224,7 +796,7 @@ const formatPace = (paceValue: any): string => {
      return [
        {
          label: 'Avg Pace',
-         value: formatPace(workoutData.avg_pace),
+         value: (Number.isFinite(norm.avg_pace_s_per_km as any) ? formatPace(norm.avg_pace_s_per_km as number, useImperial) : 'N/A'),
          unit: '/mi'
        },
        {
@@ -1246,14 +818,14 @@ const formatPace = (paceValue: any): string => {
    const baseMetrics = [
      {
        label: 'Max HR',
-       value: workoutData.max_heart_rate ? safeNumber(workoutData.max_heart_rate) : 'N/A',
+      value: Number.isFinite(norm.max_hr as any) ? String(norm.max_hr) : 'N/A',
        unit: 'bpm'
      },
      {
        label: isRun ? 'Max Pace' : 'Max Speed',
        value: isRun
          ? formatPace(workoutData.metrics?.max_pace || workoutData.max_pace)
-         : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A'),
+        : (Number.isFinite((workoutData as any)?.max_speed as any) ? formatMaxSpeed((workoutData as any).max_speed) : 'N/A'),
        unit: isRun ? (useImperial ? '/mi' : '/km') : (useImperial ? 'mph' : 'km/h')
      },
     // Max cadence / stroke rate removed per request
@@ -1277,7 +849,7 @@ const formatPace = (paceValue: any): string => {
        ...baseMetrics,
        {
          label: 'Max Power',
-         value: workoutData.max_power ? safeNumber(workoutData.max_power) : 'N/A',
+        value: Number.isFinite(norm.max_power as any) ? String(norm.max_power) : 'N/A',
          unit: 'W'
        },
        {
@@ -1343,68 +915,11 @@ const formatPace = (paceValue: any): string => {
  };
 
  // Derive average stride length for runs/walks (meters)
- const deriveStrideLengthMeters = (): number | null => {
-   try {
-     // Already provided?
-     const metricVal = (workoutData as any)?.metrics?.avg_stride_length_m || (workoutData as any)?.avg_stride_length_m;
-     if (Number.isFinite(metricVal)) return Number(metricVal);
-     // From samples
-     const samples = Array.isArray((hydrated as any)?.sensor_data?.samples)
-       ? (hydrated as any).sensor_data.samples
-       : (Array.isArray((hydrated as any)?.sensor_data) ? (hydrated as any).sensor_data : []);
-     const arr = samples
-       .map((s: any) => s.strideLengthInMeters ?? s.stride_length_m ?? s.strideLength ?? null)
-       .filter((v: any) => Number.isFinite(v));
-     if (arr.length > 10) {
-       const avg = arr.reduce((a: number, b: number) => a + Number(b), 0) / arr.length;
-       if (Number.isFinite(avg) && avg > 0) return avg;
-     }
-     // From distance and steps
-     const km = computeDistanceKm(workoutData);
-     const steps = Number((workoutData as any)?.steps ?? (workoutData as any)?.metrics?.steps);
-     if (Number.isFinite(km) && Number.isFinite(steps) && steps > 0) {
-       return (Number(km) * 1000) / steps;
-     }
-   } catch {}
-   return null;
- };
+ 
 
- const formatStrideLength = (meters: number | null): string => {
-   if (!Number.isFinite(meters as any) || (meters as any) <= 0) return 'N/A';
-   const m = Number(meters);
-   if (useImperial) {
-     const inches = m * 39.3701;
-     return `${inches.toFixed(1)} in`;
-   }
-   return `${(m * 100).toFixed(1)} cm`;
- };
+ 
 
- const calculateVAM = () => {
-   if (import.meta.env?.DEV) console.log('🔍 calculateVAM - avg_vam:', workoutData.metrics?.avg_vam);
-   
-   // 🔧 GARMIN DATA EXTRACTION: Try all possible VAM sources
-   const avgVam = workoutData.metrics?.avg_vam || 
-                 workoutData.avg_vam || 
-                 workoutData.vam;
-   
-   // Use avg_vam from FIT file if available
-   if (avgVam) {
-     const vam = Math.round(Number(avgVam) * 1000); // Convert to m/h
-     if (import.meta.env?.DEV) console.log('✅ calculateVAM using avg_vam:', vam, 'm/h');
-     return `${vam} m/h`;
-   }
-   // Fallback calculation
-   else if (workoutData.elevation_gain && workoutData.duration) {
-     const elevationM = Number(workoutData.elevation_gain);
-     // workoutData.duration is in MINUTES, convert to hours
-     const durationHours = (workoutData.duration * 60) / 3600;
-     const vam = Math.round(elevationM / durationHours);
-     if (import.meta.env?.DEV) console.log('✅ calculateVAM using fallback calc:', vam, 'm/h');
-     return `${vam} m/h`;
-   }
-   if (import.meta.env?.DEV) console.log('✅ calculateVAM returning N/A');
-   return 'N/A';
- };
+ 
 
   // Enhanced VAM calculation for running with insights
  const calculateRunningVAM = () => {
@@ -1457,7 +972,7 @@ const formatPace = (paceValue: any): string => {
      return null;
    }
    
-   const distance = workoutData.distance;
+  const distance = norm.distance_m;
    const duration = workoutData.duration;
    const elevationGain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain;
    
@@ -1559,7 +1074,12 @@ const formatMovingTime = () => {
    },
    {
      label: 'VAM',
-     value: calculateVAM()
+    value: (() => {
+      const vam = (norm.elevation_gain_m && norm.duration_s && norm.duration_s > 0)
+        ? (norm.elevation_gain_m / (norm.duration_s / 3600))
+        : null;
+      return Number.isFinite(vam as any) && (vam as number) > 0 ? Math.round(vam as number) : '—';
+    })()
    },
    {
      label: 'Moving Time',
@@ -1606,7 +1126,7 @@ const formatMovingTime = () => {
          {/* Avg Pace /100 */}
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {(() => { const s = computeSwimAvgPaceSecPer100(); if (!s) return 'N/A'; const disp = useImperial ? Math.round(s*0.9144) : s; return formatSwimPace(disp); })()}
+              {(() => { return 'N/A'; })()}
            </div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Avg Pace {useImperial ? '/100yd' : '/100m'}</div></div>
          </div>
@@ -1622,7 +1142,7 @@ const formatMovingTime = () => {
          {/* Avg HR */}
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.avg_heart_rate ? safeNumber(workoutData.avg_heart_rate) : 'N/A'}
+            {Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A'}
            </div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Avg HR</div></div>
          </div>
@@ -1652,7 +1172,7 @@ const formatMovingTime = () => {
          {/* Max HR */}
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.max_heart_rate ? safeNumber(workoutData.max_heart_rate) : 'N/A'}
+            {Number.isFinite(norm.max_hr as any) ? String(norm.max_hr) : 'N/A'}
            </div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Max HR</div></div>
          </div>
@@ -1660,7 +1180,7 @@ const formatMovingTime = () => {
          {/* Calories */}
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.calories ? safeNumber(workoutData.calories) : 'N/A'}
+            {Number.isFinite(norm.calories as any) ? String(norm.calories) : 'N/A'}
            </div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Calories</div></div>
          </div>
@@ -1713,7 +1233,7 @@ const formatMovingTime = () => {
            {/* Avg HR */}
            <div className="px-2 py-1">
              <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-               {workoutData.avg_heart_rate ? safeNumber(workoutData.avg_heart_rate) : 'N/A'}
+              {Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A'}
              </div>
              <div className="text-xs text-[#666666] font-normal">
                <div className="font-medium">Avg HR</div>
@@ -1721,10 +1241,10 @@ const formatMovingTime = () => {
            </div>
            
            {/* Avg Pace/Speed */}
-          {workoutData.swim_data ? (
+         {workoutData.swim_data ? (
              <div className="px-2 py-1">
                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                 {formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
+                {Number.isFinite(norm.avg_pace_s_per_km as any) ? formatPace(norm.avg_pace_s_per_km as number, useImperial) : 'N/A'}
                </div>
                <div className="text-xs text-[#666666] font-normal">
                  <div className="font-medium">Avg Pace</div>
@@ -1733,7 +1253,7 @@ const formatMovingTime = () => {
            ) : workoutData.ride_data ? (
              <div className="px-2 py-1">
                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                {(() => { const s = computeSwimAvgPaceSecPer100(); if (!s) return 'N/A'; const disp = useImperial ? Math.round(s*0.9144) : s; return formatSwimPace(disp); })()}
+           {(() => { return 'N/A'; })()}
                </div>
                <div className="text-xs text-[#666666] font-normal">
                  <div className="font-medium">Avg Pace {useImperial ? '/100yd' : '/100m'}</div>
@@ -1742,7 +1262,7 @@ const formatMovingTime = () => {
            ) : (
              <div className="px-2 py-1">
                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                 {formatAvgSpeed(workoutData.avg_speed)}
+                {Number.isFinite(norm.avg_speed_kmh as any) ? (useImperial ? `${((norm.avg_speed_kmh as number)*0.621371).toFixed(1)} mph` : `${(norm.avg_speed_kmh as number).toFixed(1)} km/h`) : 'N/A'}
                </div>
                <div className="text-xs text-[#666666] font-normal">
                  <div className="font-medium">Avg Speed</div>
@@ -1798,7 +1318,7 @@ const formatMovingTime = () => {
           {(workoutData.swim_data || workoutData.walk_data)
             ? (() => {
                 // Preferred: stored max_pace (sec/km). Fallback: derive from samples.
-                const stored = workoutData.metrics?.max_pace ?? workoutData.max_pace;
+                const stored = (workoutData as any)?.metrics?.max_pace ?? (workoutData as any)?.max_pace;
                 let secPerKm: number | null = null;
                 if (Number.isFinite(stored) && Number(stored) > 0) {
                   const n = Number(stored);
@@ -1824,7 +1344,7 @@ const formatMovingTime = () => {
                 if (workoutData.walk_data && secPerMile < 360) return 'N/A';
                 return formatPace(secPerKm);
               })()
-            : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A')}
+            : (Number.isFinite((workoutData as any)?.max_speed as any) ? formatMaxSpeed((workoutData as any).max_speed) : 'N/A')}
         </div>
         <div className="text-xs text-[#666666] font-normal">
           <div className="font-medium">{(workoutData.swim_data || workoutData.walk_data) ? 'Max Pace' : 'Max Speed'}</div>
@@ -1837,7 +1357,7 @@ const formatMovingTime = () => {
           {/* Avg Speed (top-left) */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {formatAvgSpeed(workoutData.avg_speed)}
+              {Number.isFinite(norm.avg_speed_kmh as any) ? (useImperial ? `${((norm.avg_speed_kmh as number)*0.621371).toFixed(1)} mph` : `${(norm.avg_speed_kmh as number).toFixed(1)} km/h`) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Avg Speed</div>
@@ -1857,7 +1377,7 @@ const formatMovingTime = () => {
           {/* Distance */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {formatDistance((computeDistanceKm(workoutData) ?? Number(workoutData.distance) ?? 0))}
+              {norm.distance_km ? formatDistance(norm.distance_km) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Distance</div>
@@ -1867,7 +1387,7 @@ const formatMovingTime = () => {
           {/* Max Speed (between Distance and Avg Power) */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A'}
+              {Number.isFinite((workoutData as any)?.max_speed as any) ? formatMaxSpeed((workoutData as any).max_speed) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Max Speed</div>
@@ -1877,7 +1397,7 @@ const formatMovingTime = () => {
           {/* Avg Power */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.avg_power ? safeNumber(workoutData.avg_power) : 'N/A'}
+              {Number.isFinite(norm.avg_power as any) ? String(norm.avg_power) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Avg Power</div>
@@ -1887,7 +1407,7 @@ const formatMovingTime = () => {
           {/* Avg HR */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.avg_heart_rate ? safeNumber(workoutData.avg_heart_rate) : 'N/A'}
+              {Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Avg HR</div>
@@ -1900,8 +1420,7 @@ const formatMovingTime = () => {
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
-                const val = (workoutData as any)?.elevation_gain;
-                return val != null ? formatElevation(val) : 'N/A';
+                return Number.isFinite(norm.elevation_gain_m as any) ? formatElevation(norm.elevation_gain_m as number, useImperial) : 'N/A';
               })()}
             </div>
             <div className="text-xs text-[#666666] font-normal">
@@ -1912,7 +1431,7 @@ const formatMovingTime = () => {
           {/* Calories */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.calories ? safeNumber(workoutData.calories) : 'N/A'}
+              {Number.isFinite(norm.calories as any) ? String(norm.calories) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Calories</div>
@@ -1923,7 +1442,7 @@ const formatMovingTime = () => {
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
-                const field = workoutData.max_power ?? workoutData.metrics?.max_power;
+                const field = (workoutData as any)?.max_power ?? (workoutData as any)?.metrics?.max_power;
                 if (field != null) return safeNumber(field);
                 const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
                 const maxSensor = sensors
@@ -1945,7 +1464,7 @@ const formatMovingTime = () => {
           {/* Max HR */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.max_heart_rate ? safeNumber(workoutData.max_heart_rate) : 'N/A'}
+              {Number.isFinite(norm.max_hr as any) ? String(norm.max_hr) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Max HR</div>
@@ -1987,7 +1506,7 @@ const formatMovingTime = () => {
           {!isPoolSwim && (
             <div className="px-2 py-1">
               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                {(() => { const v = (workoutData as any)?.elevation_gain; return v != null ? formatElevation(v) : 'N/A'; })()} {useImperial ? 'ft' : 'm'}
+              {(() => { return Number.isFinite(norm.elevation_gain_m as any) ? `${formatElevation(norm.elevation_gain_m as number, useImperial)} ${useImperial ? 'ft' : 'm'}` : 'N/A'; })()}
               </div>
               <div className="text-xs text-[#666666] font-normal">
                 <div className="font-medium">Elevation Gain</div>
@@ -1997,17 +1516,25 @@ const formatMovingTime = () => {
      
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.calories ? safeNumber(workoutData.calories) : 'N/A'}
+              {Number.isFinite(norm.calories as any) ? String(norm.calories) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Calories</div>
             </div>
           </div>
      
-          {(workoutData.swim_data || workoutData.walk_data) && (
+          {(norm.distance_m && norm.duration_s && norm.duration_s > 0) && (
             <div className="px-2 py-1">
               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                {formatStrideLength(deriveStrideLengthMeters())}
+                {(() => {
+                  const spm = Number((hydrated||workoutData)?.avg_running_cadence ?? (hydrated||workoutData)?.avg_run_cadence);
+                  if (!Number.isFinite(spm) || spm <= 0) return '—';
+                  const m = Number(norm.distance_m);
+                  const s = Number(norm.duration_s);
+                  if (!Number.isFinite(m) || m <= 0 || !Number.isFinite(s) || s <= 0) return '—';
+                  const stride = m / (spm * (s / 60));
+                  return Number.isFinite(stride) && stride > 0 ? `${stride.toFixed(2)}m` : '—';
+                })()}
               </div>
               <div className="text-xs text-[#666666] font-normal">
                 <div className="font-medium">Stride Length</div>
@@ -2017,7 +1544,7 @@ const formatMovingTime = () => {
      
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.max_heart_rate ? safeNumber(workoutData.max_heart_rate) : 'N/A'}
+              {Number.isFinite(norm.max_hr as any) ? String(norm.max_hr) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Max HR</div>
@@ -2149,7 +1676,7 @@ const formatMovingTime = () => {
                 </div>
                 {Number.isFinite(gain as any) && (
                   <div>
-                    <div className="text-base font-semibold tabular-nums mb-0.5">{calcVam != null ? calcVam : '—'}</div>
+                    <div className="text-base font-semibold tabular-nums mb-0.5">{(() => { try { const elev = Number(gain); const dur = Number(movingSec); if (Number.isFinite(elev) && elev > 0 && Number.isFinite(dur) && dur > 0) { const vam = Math.round(elev / (dur/3600)); return vam; } } catch {} return '—'; })()}</div>
                     <div className="text-xs text-[#666666]">VAM</div>
                   </div>
                 )}
