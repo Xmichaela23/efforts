@@ -295,6 +295,47 @@ Deno.serve(async (req) => {
       }
     } catch {}
 
+    // Normalized Power (NP) calculation for cyclists
+    // Rolling 30-second average, raised to 4th power, averaged, then 4th root
+    let normalizedPower: number | null = null;
+    let intensityFactor: number | null = null;
+    let variabilityIndex: number | null = null;
+    
+    if (isRide && hasRows && power_watts.some(p => p !== null)) {
+      const windowSize = 30; // 30 seconds
+      const rollingAvgs: number[] = [];
+      
+      for (let i = 0; i < rows.length; i++) {
+        const windowStart = Math.max(0, i - windowSize + 1);
+        const windowRows = rows.slice(windowStart, i + 1);
+        const windowPowers = windowRows
+          .map(r => r.power_w)
+          .filter((p): p is number => p !== null && !isNaN(p));
+        
+        if (windowPowers.length > 0) {
+          const avgPower = windowPowers.reduce((a, b) => a + b, 0) / windowPowers.length;
+          rollingAvgs.push(Math.pow(avgPower, 4));
+        }
+      }
+      
+      if (rollingAvgs.length > 0) {
+        const avgOfFourthPowers = rollingAvgs.reduce((a, b) => a + b, 0) / rollingAvgs.length;
+        normalizedPower = Math.pow(avgOfFourthPowers, 0.25);
+        
+        // Calculate Variability Index (NP / Avg Power)
+        const avgPower = power_watts.filter((p): p is number => p !== null).reduce((a, b) => a + b, 0) / power_watts.filter(p => p !== null).length;
+        if (avgPower > 0) {
+          variabilityIndex = normalizedPower / avgPower;
+        }
+        
+        // Note: Intensity Factor requires user FTP baseline
+        // TODO: Fetch user FTP from database when available
+        // if (userFtp && userFtp > 0) {
+        //   intensityFactor = normalizedPower / userFtp;
+        // }
+      }
+    }
+
     // Splits helper
     function computeSplits(splitMeters: number) {
       const out: any[] = [];
@@ -496,9 +537,21 @@ Deno.serve(async (req) => {
       return { ...c, overall, analysis };
     })();
 
+    // Update workout with computed analysis and power metrics
+    const updatePayload: any = { computed };
+    if (normalizedPower !== null) {
+      updatePayload.normalized_power = Math.round(normalizedPower);
+    }
+    if (variabilityIndex !== null) {
+      updatePayload.variability_index = variabilityIndex;
+    }
+    if (intensityFactor !== null) {
+      updatePayload.intensity_factor = intensityFactor;
+    }
+
     const { error: upErr } = await supabase
       .from('workouts')
-      .update({ computed })
+      .update(updatePayload)
       .eq('id', workout_id);
     if (upErr) throw upErr;
 

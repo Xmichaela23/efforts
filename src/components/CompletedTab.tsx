@@ -1237,17 +1237,25 @@ const formatMovingTime = () => {
       
       {workoutData.ride_data ? (
         <>
-          {/* Avg Speed (top-left) */}
+          {/* Row 1 */}
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {Number.isFinite(norm.avg_speed_kmh as any) ? (useImperial ? `${((norm.avg_speed_kmh as number)*0.621371).toFixed(1)} mph` : `${(norm.avg_speed_kmh as number).toFixed(1)} km/h`) : 'N/A'}
+              {norm.distance_km ? `${(useImperial ? norm.distance_km * 0.621371 : norm.distance_km).toFixed(1)} ${useImperial ? 'mi' : 'km'}` : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Avg Speed</div>
+              <div className="font-medium">Distance</div>
             </div>
           </div>
 
-          {/* Moving Time */}
+          <div className="px-2 pb-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Duration</div>
+            </div>
+          </div>
+
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {formatMovingTime()}
@@ -1257,62 +1265,92 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          {/* Distance */}
-          <div className="px-2 pb-1">
+          {/* Row 2 */}
+          <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {norm.distance_km ? formatDistance(norm.distance_km) : 'N/A'}
+              {norm.avg_speed_kmh ? `${(useImperial ? norm.avg_speed_kmh * 0.621371 : norm.avg_speed_kmh).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Distance</div>
+              <div className="font-medium">Avg Speed</div>
             </div>
           </div>
 
-          {/* Max Speed (between Distance and Avg Power) */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {Number.isFinite((workoutData as any)?.max_speed as any) ? (useImperial ? `${(((workoutData as any).max_speed as number)*0.621371).toFixed(1)} mph` : `${((workoutData as any).max_speed as number).toFixed(1)} km/h`) : 'N/A'}
+              {norm.max_speed_mps ? `${(useImperial ? norm.max_speed_mps * 2.23694 : norm.max_speed_mps * 3.6).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Max Speed</div>
             </div>
           </div>
 
-          {/* Avg Power */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {Number.isFinite(norm.avg_power as any) ? String(norm.avg_power) : 'N/A'}
+              {norm.avg_power ? `${norm.avg_power} W` : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Avg Power</div>
             </div>
           </div>
 
-          {/* Avg HR */}
+          {/* Row 3 */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A'}
+              {norm.max_power ? `${norm.max_power} W` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Max Power</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.normalized_power ? `${norm.normalized_power} W` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Norm Power</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.avg_hr ? `${norm.avg_hr} bpm` : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Avg HR</div>
             </div>
           </div>
 
-          {/* Avg Cadence tile removed – shown in top metrics grid only */}
-
-          {/* Elevation Gain (replace VAM) */}
+          {/* Row 4 */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {(() => {
-                return Number.isFinite(norm.elevation_gain_m as any) ? formatElevation(norm.elevation_gain_m as number, useImperial) : 'N/A';
-              })()}
+              {norm.max_hr ? `${norm.max_hr} bpm` : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Elevation Gain</div>
+              <div className="font-medium">Max HR</div>
             </div>
           </div>
 
-          {/* Calories */}
           <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.elevation_gain_m ? `${(useImperial ? norm.elevation_gain_m * 3.28084 : norm.elevation_gain_m).toFixed(0)} ${useImperial ? 'ft' : 'm'}` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Elevation</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {norm.avg_cycling_cadence_rpm ? `${norm.avg_cycling_cadence_rpm} rpm` : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Cadence</div>
+            </div>
+          </div>
+
+          {/* Calories removed from grid - keeping Calories below if needed */}
+          <div className="px-2 py-1" style={{display: 'none'}}>
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {Number.isFinite(norm.calories as any) ? String(norm.calories) : 'N/A'}
             </div>
