@@ -1028,6 +1028,18 @@ function EffortsViewerMapbox({
             active={tab==="elev"}
             width={tab==="elev" ? 110 : 54}
           />
+          <Pill 
+            label="VAM" 
+            value={(() => {
+              if (tab === 'vam') {
+                const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? Math.round(metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
+                return v != null ? fmtVAM(v, useFeet) : '—';
+              }
+              return s?.vam_m_per_h != null ? fmtVAM(s.vam_m_per_h, useFeet) : '—';
+            })()} 
+            active={tab==="vam"} 
+            width={54} 
+          />
         </div>
         
         {/* Distance, time, altitude (left) and final totals (right) */}
