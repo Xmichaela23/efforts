@@ -558,8 +558,8 @@ const formatMaxSpeed = (speedValue: any): string => {
     try {
       const lengths = getSwimLengths();
       if (!lengths.length) return [];
-      const Lm = inferPoolLengthMeters() || 25; // default assumption
-      const isYd = isYardPool() === true;
+      const Lm = Number(poolLengthMeters ?? (workoutData as any)?.pool_length) || 25; // default assumption
+      const isYd = Lm >= 20 && Lm <= 26; // Yard pools are typically 25 yards (~22.86m)
       const unitLenM = isYd ? 91.44 : 100;
       const perSplit = Math.max(1, Math.round(unitLenM / Lm));
       const splits: Array<{ idx: number; duration_s: number; avg_hr: number | null; unit: 'm' | 'yd' }> = [];
@@ -735,11 +735,11 @@ const formatMaxSpeed = (speedValue: any): string => {
        ...baseMetrics,
        {
          label: 'Steps',
-         value: workoutData.steps ? safeNumber(workoutData.steps) : 'N/A'
+         value: workoutData.steps ? String(workoutData.steps) : 'N/A'
        },
        {
          label: 'TSS',
-         value: workoutData.tss ? safeNumber(Math.round(workoutData.tss * 10) / 10) : 'N/A'
+         value: workoutData.tss ? String(Math.round(workoutData.tss * 10) / 10) : 'N/A'
        }
      ];
    } else if (isBike) {
@@ -752,11 +752,11 @@ const formatMaxSpeed = (speedValue: any): string => {
        },
        {
          label: 'TSS',
-         value: workoutData.tss ? safeNumber(Math.round(workoutData.tss * 10) / 10) : 'N/A'
+         value: workoutData.tss ? String(Math.round(workoutData.tss * 10) / 10) : 'N/A'
        },
        {
          label: 'Intensity Factor',
-         value: workoutData.intensity_factor ? `${safeNumber(workoutData.intensity_factor)}%` : 'N/A'
+         value: workoutData.intensity_factor ? `${workoutData.intensity_factor}%` : 'N/A'
        }
      ];
   } else if (isSwim) {
@@ -771,11 +771,11 @@ const formatMaxSpeed = (speedValue: any): string => {
       },
       {
         label: 'TSS',
-        value: workoutData.tss ? safeNumber(Math.round(workoutData.tss * 10) / 10) : 'N/A'
+        value: workoutData.tss ? String(Math.round(workoutData.tss * 10) / 10) : 'N/A'
       },
       {
         label: 'Intensity Factor',
-        value: workoutData.intensity_factor ? `${safeNumber(workoutData.intensity_factor)}%` : 'N/A'
+        value: workoutData.intensity_factor ? `${workoutData.intensity_factor}%` : 'N/A'
       }
     ];
   }
@@ -956,11 +956,11 @@ const formatMovingTime = () => {
  const trainingMetrics = [
    {
      label: 'Normalized Power',
-     value: workoutData.metrics?.normalized_power ? `${safeNumber(workoutData.metrics.normalized_power)} W` : 'N/A'
+     value: workoutData.metrics?.normalized_power ? `${workoutData.metrics.normalized_power} W` : 'N/A'
    },
    {
      label: 'Training Load',
-     value: workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score)) : 'N/A'
+     value: workoutData.metrics?.training_stress_score ? String(Math.round(workoutData.metrics.training_stress_score)) : 'N/A'
    },
    {
      label: 'Total Work',
@@ -1017,7 +1017,7 @@ const formatMovingTime = () => {
          {/* Duration (Elapsed) */}
          <div className="px-2 py-1">
           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-            {(() => { const s = getElapsedSeconds(); return Number.isFinite(s as any) && (s as number) > 0 ? formatDuration(s as number) : 'N/A'; })()}
+            {norm.elapsed_s ? formatDuration(norm.elapsed_s) : 'N/A'}
           </div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Duration</div></div>
          </div>
@@ -1033,7 +1033,7 @@ const formatMovingTime = () => {
          {/* Lengths */}
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {(() => { const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null); return n != null ? safeNumber(n) : 'N/A'; })()}
+             {(() => { const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null); return n != null ? String(n) : 'N/A'; })()}
            </div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Lengths</div></div>
          </div>
@@ -1041,14 +1041,21 @@ const formatMovingTime = () => {
          {/* Avg stroke rate */}
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {(() => { const v = computeAvgStrokeRate(); return v != null ? safeNumber(v) : 'N/A'; })()}
+             {(() => { const v = computeAvgStrokeRate(); return v != null ? String(v) : 'N/A'; })()}
            </div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Avg stroke rate</div></div>
          </div>
 
          {/* Pool length */}
          <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{formatPoolLengthLabel()}</div>
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {(() => {
+               const Lm = Number(poolLengthMeters ?? (workoutData as any)?.pool_length);
+               if (!Lm) return 'N/A';
+               const isYd = Lm >= 20 && Lm <= 26;
+               return isYd ? `${Math.round(Lm / 0.9144)} yd` : `${Lm} m`;
+             })()}
+           </div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Pool</div></div>
          </div>
 
@@ -1158,14 +1165,21 @@ const formatMovingTime = () => {
             <>
               <div className="px-2 py-1">
                 <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                  {(() => { const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null); return n != null ? safeNumber(n) : 'N/A'; })()}
+                  {(() => { const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null); return n != null ? String(n) : 'N/A'; })()}
                 </div>
                 <div className="text-xs text-[#666666] font-normal">
                   <div className="font-medium">Lengths</div>
                 </div>
               </div>
               <div className="px-2 py-1">
-                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{formatPoolLengthLabel()}</div>
+                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+                  {(() => {
+                    const Lm = Number(poolLengthMeters ?? (workoutData as any)?.pool_length);
+                    if (!Lm) return 'N/A';
+                    const isYd = Lm >= 20 && Lm <= 26;
+                    return isYd ? `${Math.round(Lm / 0.9144)} yd` : `${Lm} m`;
+                  })()}
+                </div>
                 <div className="text-xs text-[#666666] font-normal">
                   <div className="font-medium">Pool</div>
                 </div>
@@ -1227,7 +1241,13 @@ const formatMovingTime = () => {
                 if (workoutData.walk_data && secPerMile < 360) return 'N/A';
                 return formatPace(secPerKm);
               })()
-            : (Number.isFinite((workoutData as any)?.max_speed as any) ? formatMaxSpeed((workoutData as any).max_speed) : 'N/A')}
+            : (() => {
+                const speedKmh = Number((workoutData as any)?.max_speed);
+                if (speedKmh && speedKmh > 0) {
+                  return useImperial ? `${(speedKmh * 0.621371).toFixed(1)} mph` : `${speedKmh.toFixed(1)} km/h`;
+                }
+                return 'N/A';
+              })()}
         </div>
         <div className="text-xs text-[#666666] font-normal">
           <div className="font-medium">{(workoutData.swim_data || workoutData.walk_data) ? 'Max Pace' : 'Max Speed'}</div>
@@ -1364,13 +1384,13 @@ const formatMovingTime = () => {
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
                 const field = (workoutData as any)?.max_power ?? (workoutData as any)?.metrics?.max_power;
-                if (field != null) return safeNumber(field);
+                if (field != null) return String(field);
                 const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
                 const maxSensor = sensors
                   .map((s: any) => Number(s.power))
                   .filter((n: any) => Number.isFinite(n))
                   .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
-                return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
+                return Number.isFinite(maxSensor) ? String(maxSensor) : 'N/A';
               })()}
             </div>
             <div className="text-xs text-[#666666] font-normal">
@@ -1484,13 +1504,13 @@ const formatMovingTime = () => {
                     workoutData.max_bike_cadence ??
                     workoutData.max_running_cadence
                   );
-                  if (field != null) return safeNumber(field);
+                  if (field != null) return String(field);
                   const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
                   const maxSensor = sensors
                     .map((s: any) => Number(s.cadence) || Number(s.bikeCadence) || Number(s.runCadence))
                     .filter((n: any) => Number.isFinite(n))
                     .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
-                  return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
+                  return Number.isFinite(maxSensor) ? String(maxSensor) : 'N/A';
                 })()}
               </div>
               <div className="text-xs text-[#666666] font-normal">
