@@ -976,15 +976,15 @@ function EffortsViewerMapbox({
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
             value={(() => {
-              // Use the plotted, smoothed value for pace to match the chart
-              if (tab === 'pace') {
+              // Use the plotted, smoothed value for pace/speed to match the chart
+              if (tab === 'pace' || tab === 'spd') {
                 const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
                 return workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles);
               }
-              // Fallback when not on pace tab
-              return workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles);
+              // Fallback when not on pace/speed tab
+              return workoutData?.type === 'ride' ? fmtSpeed(s?.speed_mps ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles);
             })()}  
-            active={tab==="pace"} 
+            active={tab==="pace" || tab==="spd"} 
             width={54}
           />
           <Pill 

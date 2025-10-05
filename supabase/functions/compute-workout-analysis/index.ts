@@ -2,7 +2,7 @@
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const ANALYSIS_VERSION = 'v0.1.1'; // pace/elevation smoothing
+const ANALYSIS_VERSION = 'v0.1.2'; // elevation merge from GPS fix
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
   let ema: number | null = null;
@@ -198,6 +198,38 @@ Deno.serve(async (req) => {
           out.push({ t: Math.max(0, getTs(gps[i]) - tStart), d: cum, elev });
         }
         rows = out;
+      }
+    }
+    // ELEVATION FIX: Merge elevation from GPS into sensor-based rows
+    // Sensor data often lacks elevation, but GPS track has it
+    if (rows.length >= 2 && Array.isArray(gps) && gps.length > 1) {
+      const getTs = (p:any) => Number(p?.timestamp ?? p?.startTimeInSeconds ?? p?.ts ?? 0);
+      const tStart = getTs(gps[0]) || 0;
+      
+      // Build GPS elevation lookup by timestamp
+      const gpsElevByTime = new Map<number, number>();
+      for (const g of gps) {
+        const t = Math.max(0, getTs(g) - tStart);
+        const elev = (typeof g?.elevation === 'number' ? g.elevation : (typeof g?.altitude === 'number' ? g.altitude : undefined));
+        if (typeof elev === 'number') {
+          gpsElevByTime.set(t, elev);
+        }
+      }
+      
+      // Merge elevation into rows by closest timestamp match
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].elev == null) {
+          const t = rows[i].t || 0;
+          // Find closest GPS timestamp
+          let closest = gpsElevByTime.get(t);
+          if (closest == null) {
+            // Search within ±2 seconds
+            for (let dt = 1; dt <= 2 && closest == null; dt++) {
+              closest = gpsElevByTime.get(t + dt) ?? gpsElevByTime.get(t - dt);
+            }
+          }
+          if (closest != null) rows[i].elev = closest;
+        }
       }
     }
     const hasRows = rows.length >= 2;
