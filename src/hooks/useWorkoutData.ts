@@ -33,7 +33,10 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     const max_hr = Number.isFinite(workoutData?.max_heart_rate) ? Number(workoutData.max_heart_rate) : (Number.isFinite(workoutData?.metrics?.max_heart_rate) ? Number(workoutData.metrics.max_heart_rate) : null);
     const max_power = Number.isFinite(workoutData?.max_power) ? Number(workoutData.max_power) : (Number.isFinite(workoutData?.metrics?.max_power) ? Number(workoutData.metrics.max_power) : null);
     // Prefer metrics.avg_speed (already in km/h), fallback to root avg_speed (also km/h for Strava)
-    const avg_speed_kmh = Number.isFinite(workoutData?.metrics?.avg_speed) ? Number(workoutData.metrics.avg_speed) : (Number.isFinite(workoutData?.avg_speed) ? Number(workoutData.avg_speed) : null);
+    // Final fallback: calculate from distance and duration
+    const avg_speed_kmh = Number.isFinite(workoutData?.metrics?.avg_speed) ? Number(workoutData.metrics.avg_speed) 
+      : (Number.isFinite(workoutData?.avg_speed) ? Number(workoutData.avg_speed) 
+      : (distance_km && duration_s && duration_s > 0 ? (distance_km / (duration_s / 3600)) : null));
     const avg_speed_mps = Number.isFinite(avg_speed_kmh) ? (avg_speed_kmh as number) / 3.6 : null;
     const avg_pace_s_per_km = Number.isFinite(workoutData?.avg_pace) ? Number(workoutData.avg_pace) : (Number.isFinite(workoutData?.metrics?.avg_pace) ? Number(workoutData.metrics.avg_pace) : null);
     const avg_running_cadence_spm = Number.isFinite((workoutData as any)?.avg_running_cadence) ? Number((workoutData as any).avg_running_cadence) : (Number.isFinite((workoutData as any)?.avg_run_cadence) ? Number((workoutData as any).avg_run_cadence) : null);
