@@ -1077,11 +1077,11 @@ const formatMovingTime = () => {
        </div>
      ) : (
        <div className="grid grid-cols-3 gap-1 px-2">
-       {/* General metrics - Only for non-cycling workouts */}
-       {workoutData.ride_data && workoutData.walk_data && (
+       {/* General metrics - For runs/walks */}
+       {(workoutData.type === 'run' || workoutData.type === 'walk' || norm.sport === 'run' || norm.sport === 'walk') && (
          <>
           {/* Distance */}
-           <div className="px-2 py-1">
+           <div className="px-2 pb-1">
              <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
                {(() => {
                  const src = (hydrated || workoutData);
@@ -1100,7 +1100,7 @@ const formatMovingTime = () => {
            </div>
 
           {/* Duration */}
-          <div className="px-2 py-1">
+          <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
              {(() => {
                if (workoutData.swim_data) {
