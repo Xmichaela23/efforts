@@ -233,7 +233,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
         {/* Strava Key Metrics - Basic Structure */}
         <div className="grid grid-cols-3 gap-3 px-2">
           {/* Duration */}
-          <div className="px-2 py-1">
+          <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
                 const kmFrom = (() => {
@@ -262,7 +262,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
           </div>
 
           {/* Pace/Speed */}
-          <div className="px-2 py-1">
+          <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
                 console.log('[Speed Display] norm.avg_speed_kmh:', norm.avg_speed_kmh, 'isFinite:', Number.isFinite(norm.avg_speed_kmh));
@@ -987,7 +987,7 @@ const formatMovingTime = () => {
      {workoutData.swim_data ? (
        <div className="grid grid-cols-3 gap-1 px-2">
          {/* Distance */}
-         <div className="px-2 py-1">
+         <div className="px-2 pb-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
              {(() => {
                const src = (hydrated || workoutData);
@@ -1001,13 +1001,13 @@ const formatMovingTime = () => {
          </div>
 
          {/* Moving Time */}
-         <div className="px-2 py-1">
+         <div className="px-2 pb-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{formatMovingTime()}</div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Moving Time</div></div>
          </div>
 
          {/* Avg Pace /100 */}
-         <div className="px-2 py-1">
+         <div className="px-2 pb-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => { return 'N/A'; })()}
            </div>
@@ -1238,7 +1238,7 @@ const formatMovingTime = () => {
       {workoutData.ride_data ? (
         <>
           {/* Avg Speed (top-left) */}
-          <div className="px-2 py-1">
+          <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {Number.isFinite(norm.avg_speed_kmh as any) ? (useImperial ? `${((norm.avg_speed_kmh as number)*0.621371).toFixed(1)} mph` : `${(norm.avg_speed_kmh as number).toFixed(1)} km/h`) : 'N/A'}
             </div>
@@ -1248,7 +1248,7 @@ const formatMovingTime = () => {
           </div>
 
           {/* Moving Time */}
-          <div className="px-2 py-1">
+          <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {formatMovingTime()}
             </div>
@@ -1258,7 +1258,7 @@ const formatMovingTime = () => {
           </div>
 
           {/* Distance */}
-          <div className="px-2 py-1">
+          <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.distance_km ? formatDistance(norm.distance_km) : 'N/A'}
             </div>
