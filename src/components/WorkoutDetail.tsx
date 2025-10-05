@@ -159,7 +159,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     (workout.strength_exercises?.length > 0 || workout.completed_exercises?.length > 0);
 
   return (
-    <div className="space-y-6">
+    <div>
       {/* Tab navigation with delete button */}
       <div className="w-full">
         <div className="flex items-center justify-between border-b border-gray-200">
@@ -230,7 +230,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         </div>
 
         {/* Tab content */}
-        <div className="mt-2">
+        <div>
           {activeTab === 'summary' && (
             <div className="space-y-4">
               {workout.type === 'strength' ? (
