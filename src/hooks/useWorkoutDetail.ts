@@ -72,8 +72,17 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       const normalized = JSON.parse(optsKey || '{}');
 
       const fetchDetail = async () => {
+        // Get current session for auth
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Session expired - please log in again');
+        
         const body = { id, ...normalized } as any;
-        const { data, error } = await (supabase.functions.invoke as any)('workout-detail', { body });
+        const { data, error } = await supabase.functions.invoke('workout-detail', {
+          body,
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        });
         if (error) throw error;
         return (data as any)?.workout || null;
       };
@@ -99,7 +108,13 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
           if (!session) {
             throw new Error('Session expired - please log in again');
           }
-          await (supabase.functions.invoke as any)('compute-workout-analysis', { body: { workout_id: id } });
+          // Explicitly pass auth token in headers
+          await supabase.functions.invoke('compute-workout-analysis', {
+            body: { workout_id: id },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`
+            }
+          });
         } catch (err) {
           console.error('Failed to invoke compute-workout-analysis:', err);
         }
