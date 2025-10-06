@@ -138,8 +138,6 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   // Sanitize completed exercises to avoid rendering raw objects by mistake
   const completedExercises = getCompletedExercises().map((ex: any) => {
-    console.log('🔍 Raw exercise data:', ex);
-    
     // Extract clean exercise name (text before colon, or full name if no colon)
     const cleanName = ex?.name ? String(ex.name).split(':')[0].trim() : '';
     
@@ -160,7 +158,6 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           completed: true
         }));
         
-        console.log('🔍 Converted old format to sets:', { name: cleanName, sets: generatedSets });
         return { ...ex, name: cleanName, sets: generatedSets };
       }
     }
@@ -174,7 +171,6 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           completed: Boolean(s?.completed)
         }))
       : [];
-    console.log('🔍 Processed exercise:', { name: cleanName, sets: safeSets });
     return { ...ex, name: cleanName, sets: safeSets };
   });
 
