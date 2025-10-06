@@ -351,17 +351,51 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
   // No interactive hydration path; assume data present during development
 
+  // Helper: Extract exercises from computed.steps (unified field single source of truth)
+  const extractExercisesFromComputed = (workout: any) => {
+    try {
+      const computed = workout?.computed;
+      const steps: any[] = Array.isArray(computed?.steps) ? computed.steps : [];
+      
+      // Filter steps that have strength objects
+      const strengthSteps = steps.filter(st => st?.strength && typeof st.strength === 'object');
+      
+      return strengthSteps.map((st: any) => {
+        const s = st.strength;
+        const name = String(s?.name || 'Exercise');
+        const sets = Number(s?.sets || s?.setsCount || 0);
+        const reps = (() => {
+          const r = s?.reps || s?.repCount;
+          if (typeof r === 'string') return r;
+          if (typeof r === 'number') return Math.max(1, Math.round(r));
+          return 0;
+        })();
+        const weight = Number(s?.weight || s?.load || 0);
+        
+        return { name, sets, reps, weight };
+      });
+    } catch {
+      return [];
+    }
+  };
+
   // Strength and Mobility use compare table
   if (type === 'strength' || type === 'mobility') {
     const exerciseField = type === 'strength' ? 'strength_exercises' : 'mobility_exercises';
-    const plannedExercises = (planned?.[exerciseField] || []).map((ex: any)=>{
-      // Normalize planned fields even if a completed workout object is passed in
-      const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
-      const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
-      const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
-      const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
-      return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum };
-    });
+    
+    // Try to extract from computed.steps first (unified field), fallback to direct field
+    let plannedExercises = extractExercisesFromComputed(planned);
+    if (plannedExercises.length === 0) {
+      // Fallback to direct field if computed.steps not available
+      plannedExercises = (planned?.[exerciseField] || []).map((ex: any)=>{
+        const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
+        const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
+        const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
+        const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
+        return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum };
+      });
+    }
+    
     const completedExercises = (completed?.[exerciseField] || []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }));
     return (
       <div className="space-y-4">
