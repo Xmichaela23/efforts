@@ -1120,15 +1120,6 @@ const formatMovingTime = () => {
 
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {norm.avg_speed_kmh ? `${(useImperial ? norm.avg_speed_kmh * 0.621371 : norm.avg_speed_kmh).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
-            </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Avg Speed</div>
-            </div>
-          </div>
-
-          <div className="px-2 py-1">
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.max_pace_s_per_km ? formatPace(norm.max_pace_s_per_km, useImperial) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
@@ -1136,7 +1127,6 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          {/* Row 3 */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.avg_hr ? `${norm.avg_hr} bpm` : 'N/A'}
@@ -1146,6 +1136,7 @@ const formatMovingTime = () => {
             </div>
           </div>
 
+          {/* Row 3 */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.max_hr ? `${norm.max_hr} bpm` : 'N/A'}
@@ -1164,7 +1155,6 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          {/* Row 4 */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.avg_running_cadence_spm ? `${norm.avg_running_cadence_spm} spm` : 'N/A'}
@@ -1174,6 +1164,7 @@ const formatMovingTime = () => {
             </div>
           </div>
 
+          {/* Row 4 */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.max_cadence_rpm ? `${norm.max_cadence_rpm} spm` : 'N/A'}
@@ -1191,6 +1182,8 @@ const formatMovingTime = () => {
               <div className="font-medium">Calories</div>
             </div>
           </div>
+
+          <div style={{width: 54}}></div>
          </>
        )}
       
