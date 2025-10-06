@@ -62,6 +62,10 @@ export interface HRZoneChartProps {
   hrMaxFormula?: "auto" | "tanaka" | "fox" | "gellish" | "gulati";
   zonePreset?: "run" | "default";   // running bands vs classic %HRmax
 
+  // Workout summary (when using zoneDurationsSeconds without samples)
+  avgHr?: number;
+  maxHr?: number;
+
   // UI
   colors?: string[];
   title?: string;
@@ -100,6 +104,8 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
   useReserve = false,
   hrMaxFormula = "auto",
   zonePreset = "run",
+  avgHr: providedAvgHr,
+  maxHr: providedMaxHr,
   colors = DEFAULT_COLORS,
   title = "Heart Rate Zones",
 }) => {
@@ -174,7 +180,7 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
         color: colors[i % colors.length],
       })).filter(z => z.duration > 0);
       
-      return { zoneData, totalTime: total, avgHr: 0, maxHr: 0 };
+      return { zoneData, totalTime: total, avgHr: providedAvgHr ?? 0, maxHr: providedMaxHr ?? 0 };
     }
 
     // Process samples

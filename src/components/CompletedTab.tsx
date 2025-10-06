@@ -1400,7 +1400,12 @@ const formatMovingTime = () => {
           <div className="mt-6 mx-[-16px] px-3 py-3 space-y-4">
             {zonesHr?.bins?.length ? (
               <div className="my-4">
-                <HRZoneChart zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)} title="Heart Rate Zones" />
+                <HRZoneChart 
+                  zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)} 
+                  avgHr={norm.avg_hr ?? undefined}
+                  maxHr={norm.max_hr ?? undefined}
+                  title="Heart Rate Zones" 
+                />
               </div>
             ) : null}
           </div>
