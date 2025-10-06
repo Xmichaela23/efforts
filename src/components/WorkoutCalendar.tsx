@@ -193,6 +193,22 @@ export default function WorkoutCalendar({
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
   const { items: unifiedItems, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
+  
+  // DEBUG: Log strength workouts from unified feed
+  React.useEffect(() => {
+    const strengthItems = unifiedItems.filter((it:any)=> String(it?.type||'').toLowerCase()==='strength');
+    if (strengthItems.length > 0) {
+      console.log('🔍 [WorkoutCalendar] Strength items from useWeekUnified:', strengthItems.map((it:any)=> ({
+        id: it.id,
+        date: it.date,
+        status: it.status,
+        hasPlanned: !!it?.planned,
+        plannedSteps: Array.isArray(it?.planned?.steps) ? it.planned.steps.length : 0,
+        plannedStrengthEx: Array.isArray(it?.planned?.strength_exercises) ? it.planned.strength_exercises.length : 0,
+      })));
+    }
+  }, [unifiedItems]);
+  
   // Adapt unified items → planned + workouts shapes expected below
   const unifiedPlanned = unifiedItems.filter((it:any)=> !!it?.planned).map((it:any)=> ({
     id: it.id,

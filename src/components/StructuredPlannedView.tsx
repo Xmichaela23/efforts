@@ -11,6 +11,19 @@ type StructuredPlannedViewProps = {
 };
 
 const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, showHeader = true, onEdit, onComplete }) => {
+  // DEBUG: Log what we receive
+  const workoutType = String((workout as any)?.type || '').toLowerCase();
+  if (workoutType === 'strength') {
+    console.log('🔍 [StructuredPlannedView] Strength workout received:', {
+      id: (workout as any)?.id,
+      type: workoutType,
+      computed: (workout as any)?.computed,
+      strength_exercises: (workout as any)?.strength_exercises,
+      hasComputedSteps: Array.isArray((workout as any)?.computed?.steps),
+      stepsCount: Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps.length : 0,
+    });
+  }
+  
   // Normalize possibly stringified JSON blobs from planned_workouts
   const computedAny: any = (() => {
     try {
