@@ -111,25 +111,37 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     };
   };
 
+  // Parse possibly stringified JSONB columns
+  const parseExercises = (raw: any): any[] => {
+    try {
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === 'string' && raw.trim()) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  };
+
   // Determine which exercises array to use - supports both strength and mobility
   const getCompletedExercises = () => {
     // If we have a saved completed workout for the day, prefer it (check both fields)
-    if ((completedForDay as any)?.strength_exercises && (completedForDay as any).strength_exercises.length > 0) {
-      return (completedForDay as any).strength_exercises as any[];
-    }
-    if ((completedForDay as any)?.mobility_exercises && (completedForDay as any).mobility_exercises.length > 0) {
-      return (completedForDay as any).mobility_exercises as any[];
-    }
-    if ((workoutData as any).strength_exercises && (workoutData as any).strength_exercises.length > 0) {
-      return (workoutData as any).strength_exercises as any[];
-    }
-    if ((workoutData as any).mobility_exercises && (workoutData as any).mobility_exercises.length > 0) {
-      return (workoutData as any).mobility_exercises as any[];
-    }
-    if ((workoutData as any).completed_exercises && (workoutData as any).completed_exercises.length > 0) {
-      return (workoutData as any).completed_exercises as any[];
-    }
-    return [] as any[];
+    const dayStrength = parseExercises((completedForDay as any)?.strength_exercises);
+    if (dayStrength.length > 0) return dayStrength;
+    
+    const dayMobility = parseExercises((completedForDay as any)?.mobility_exercises);
+    if (dayMobility.length > 0) return dayMobility;
+    
+    const workoutStrength = parseExercises((workoutData as any).strength_exercises);
+    if (workoutStrength.length > 0) return workoutStrength;
+    
+    const workoutMobility = parseExercises((workoutData as any).mobility_exercises);
+    if (workoutMobility.length > 0) return workoutMobility;
+    
+    const completed = parseExercises((workoutData as any).completed_exercises);
+    if (completed.length > 0) return completed;
+    
+    return [];
   };
 
   // Sanitize completed exercises to avoid rendering raw objects by mistake
