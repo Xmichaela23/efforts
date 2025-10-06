@@ -54,11 +54,13 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     const calories = Number.isFinite(workoutData?.calories) ? Number(workoutData.calories) : (Number.isFinite(workoutData?.metrics?.calories) ? Number(workoutData.metrics.calories) : null);
     
     // New fields for cycling metrics
-    const max_speed_mps = Number.isFinite(workoutData?.max_speed) ? Number(workoutData.max_speed) : (Number.isFinite(workoutData?.metrics?.max_speed) ? Number(workoutData.metrics.max_speed) : null);
+    // max_speed is stored in km/h, convert to m/s
+    const max_speed_kmh = Number.isFinite(workoutData?.max_speed) ? Number(workoutData.max_speed) : (Number.isFinite(workoutData?.metrics?.max_speed) ? Number(workoutData.metrics.max_speed) : null);
+    const max_speed_mps = max_speed_kmh ? max_speed_kmh / 3.6 : null;
     const max_cadence_rpm = Number.isFinite(workoutData?.max_cadence) ? Number(workoutData.max_cadence) : (Number.isFinite(workoutData?.max_cycling_cadence) ? Number(workoutData.max_cycling_cadence) : (Number.isFinite(workoutData?.max_running_cadence) ? Number(workoutData.max_running_cadence) : null));
-    // Calculate max_pace from max_speed for runs
+    // Calculate max_pace from max_speed for runs (max_speed in km/h)
     const max_pace_s_per_km = Number.isFinite(workoutData?.max_pace) ? Number(workoutData.max_pace)
-      : (max_speed_mps && max_speed_mps > 0 ? (1000 / max_speed_mps) : null);
+      : (max_speed_kmh && max_speed_kmh > 0 ? (3600 / max_speed_kmh) : null);
     const work_kj = Number.isFinite(workoutData?.total_work) ? Number(workoutData.total_work) : null;
     const normalized_power = Number.isFinite(workoutData?.normalized_power) ? Number(workoutData.normalized_power) : null;
     const intensity_factor = Number.isFinite(workoutData?.intensity_factor) ? Number(workoutData.intensity_factor) : null;
