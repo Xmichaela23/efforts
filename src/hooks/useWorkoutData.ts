@@ -62,9 +62,11 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     const max_pace_s_per_km = Number.isFinite(workoutData?.max_pace) ? Number(workoutData.max_pace)
       : (max_speed_kmh && max_speed_kmh > 0 ? (3600 / max_speed_kmh) : null);
     const work_kj = Number.isFinite(workoutData?.total_work) ? Number(workoutData.total_work) : null;
-    const normalized_power = Number.isFinite(workoutData?.normalized_power) ? Number(workoutData.normalized_power) : null;
-    const intensity_factor = Number.isFinite(workoutData?.intensity_factor) ? Number(workoutData.intensity_factor) : null;
-    const variability_index = Number.isFinite(workoutData?.variability_index) ? Number(workoutData.variability_index) : null;
+    // Read from computed.analysis.power (server-calculated)
+    const powerMetrics = workoutData?.computed?.analysis?.power;
+    const normalized_power = Number.isFinite(powerMetrics?.normalized_power) ? Number(powerMetrics.normalized_power) : null;
+    const intensity_factor = Number.isFinite(powerMetrics?.intensity_factor) ? Number(powerMetrics.intensity_factor) : null;
+    const variability_index = Number.isFinite(powerMetrics?.variability_index) ? Number(powerMetrics.variability_index) : null;
     
     const sport = typeof workoutData?.type === 'string' ? String(workoutData.type).toLowerCase() : null;
     const series = workoutData?.computed?.analysis?.series || null;

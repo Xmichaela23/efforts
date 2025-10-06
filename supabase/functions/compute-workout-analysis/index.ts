@@ -2,7 +2,7 @@
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const ANALYSIS_VERSION = 'v0.1.2'; // elevation merge from GPS fix
+const ANALYSIS_VERSION = 'v0.1.3'; // elevation + normalized power
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
   let ema: number | null = null;
@@ -51,6 +51,27 @@ Deno.serve(async (req) => {
 
     const sport = String(w.type || 'run').toLowerCase();
     
+    // Fetch user FTP from performance_numbers JSONB for cycling metrics
+    let userFtp: number | null = null;
+    try {
+      if (w.user_id) {
+        const { data: baseline } = await supabase
+          .from('user_baselines')
+          .select('performance_numbers')
+          .eq('user_id', w.user_id)
+          .maybeSingle();
+        if (baseline?.performance_numbers) {
+          const perfNumbers = typeof baseline.performance_numbers === 'string' 
+            ? JSON.parse(baseline.performance_numbers) 
+            : baseline.performance_numbers;
+          if (perfNumbers?.ftp) {
+            userFtp = Number(perfNumbers.ftp);
+          }
+        }
+      }
+    } catch (e) {
+      // FTP is optional
+    }
 
     // Parse JSON columns if stringified
     function parseJson(val: any) {
@@ -296,6 +317,51 @@ Deno.serve(async (req) => {
       }
     } catch {}
 
+    // Normalized Power (NP) calculation for cyclists
+    let normalizedPower: number | null = null;
+    let intensityFactor: number | null = null;
+    let variabilityIndex: number | null = null;
+    
+    try {
+      if (isRide && hasRows && power_watts.some(p => p !== null)) {
+        const windowSize = 30; // 30 seconds rolling window
+        const rollingAvgs: number[] = [];
+        
+        for (let i = 0; i < rows.length; i++) {
+          const windowStart = Math.max(0, i - windowSize + 1);
+          const windowPowers = rows.slice(windowStart, i + 1)
+            .map(r => r.power_w)
+            .filter((p): p is number => p !== null && !isNaN(p));
+          
+          if (windowPowers.length > 0) {
+            const avgPower = windowPowers.reduce((a, b) => a + b, 0) / windowPowers.length;
+            rollingAvgs.push(Math.pow(avgPower, 4));
+          }
+        }
+        
+        if (rollingAvgs.length > 0) {
+          const avgOfFourthPowers = rollingAvgs.reduce((a, b) => a + b, 0) / rollingAvgs.length;
+          normalizedPower = Math.pow(avgOfFourthPowers, 0.25);
+          
+          // Variability Index: NP / Avg Power
+          const powerValues = power_watts.filter((p): p is number => p !== null);
+          if (powerValues.length > 0) {
+            const avgPower = powerValues.reduce((a, b) => a + b, 0) / powerValues.length;
+            if (avgPower > 0) {
+              variabilityIndex = normalizedPower / avgPower;
+            }
+          }
+          
+          // Intensity Factor: NP / FTP (if user has FTP)
+          if (userFtp && userFtp > 0) {
+            intensityFactor = normalizedPower / userFtp;
+          }
+        }
+      }
+    } catch (e) {
+      // NP is optional, don't fail
+    }
+
     // Splits helper
     function computeSplits(splitMeters: number) {
       const out: any[] = [];
@@ -337,6 +403,11 @@ Deno.serve(async (req) => {
       },
     zones: {},
       bests: {},
+      power: normalizedPower !== null ? {
+        normalized_power: Math.round(normalizedPower),
+        variability_index: variabilityIndex,
+        intensity_factor: intensityFactor
+      } : undefined,
       ui: { footnote: `Computed at ${ANALYSIS_VERSION}`, renderHints: { preferPace: sport === 'run' } }
     };
 
