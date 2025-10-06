@@ -202,7 +202,7 @@ export default function WorkoutCalendar({
     source: 'training_plan',
     provider: 'workouts',
     // Map planned_data fields expected by label derivation; include total for WU/CD
-    computed: (it.planned && Array.isArray(it.planned.steps)) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : (it.planned || null),
+    computed: (it.planned && Array.isArray(it.planned.steps)) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null,
     total_duration_seconds: it.planned?.total_duration_seconds || null,
     description: it.planned?.description || null,
     tags: it.planned?.tags || null,
