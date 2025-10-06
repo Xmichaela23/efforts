@@ -922,10 +922,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     {/* Use StrengthCompletedView for both strength and mobility workouts */}
                     <StrengthCompletedView 
                       workoutData={{
-                        ...workout,
+                        ...completedData,
                         // For mobility, read from mobility_exercises and map to strength_exercises shape
-                        strength_exercises: Array.isArray((workout as any).strength_exercises)
-                          ? (workout as any).strength_exercises.map((ex: any) => ({
+                        strength_exercises: Array.isArray((completedData as any).strength_exercises)
+                          ? (completedData as any).strength_exercises.map((ex: any) => ({
                               ...ex,
                               sets: Array.isArray(ex?.sets)
                                 ? ex.sets.map((s: any) => ({
@@ -936,8 +936,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                                   }))
                                 : []
                             }))
-                          : (workout.type === 'mobility' && Array.isArray((workout as any).mobility_exercises))
-                            ? (workout as any).mobility_exercises.map((ex: any) => ({
+                          : (completedData.type === 'mobility' && Array.isArray((completedData as any).mobility_exercises))
+                            ? (completedData as any).mobility_exercises.map((ex: any) => ({
                                 ...ex,
                                 sets: Array.isArray(ex?.sets)
                                   ? ex.sets.map((s: any) => ({
