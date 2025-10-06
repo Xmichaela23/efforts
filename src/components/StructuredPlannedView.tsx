@@ -89,7 +89,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const poolLenM: number | null = (typeof (workout as any)?.pool_length_m === 'number') ? (workout as any).pool_length_m : null;
   const lines: string[] = [];
   let totalSecsFromSteps = 0;
-  // Strength: no client fallback — render only server-computed steps
+  // Fallback for strength: render from strength_exercises if computed.steps missing
+  const strengthExercises: any[] = (() => {
+    try {
+      const raw = (workout as any)?.strength_exercises;
+      if (Array.isArray(raw)) return raw as any[];
+      if (typeof raw === 'string') { const p = JSON.parse(raw); if (Array.isArray(p)) return p as any[]; }
+    } catch {}
+    return [];
+  })();
   let preferStrengthLines = false;
   // Prefer server-computed v3 steps when present
   try {
@@ -226,6 +234,31 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const handledByComputedFlag = true;
     }
   } catch {}
+
+  // Fallback: if no computed steps but strength_exercises exists, render those
+  if (lines.length === 0 && isStrengthContext && strengthExercises.length > 0) {
+    try {
+      const unit = (String((workout as any)?.units||'').toLowerCase()==='metric') ? ' kg' : ' lb';
+      for (const ex of strengthExercises) {
+        const name = String(ex?.name || '').replace(/_/g, ' ').trim();
+        if (!name) continue;
+        const sets = Number(ex?.sets) || 0;
+        const repsVal: any = ((): any => {
+          const r = ex?.reps;
+          if (typeof r === 'string') return r.toUpperCase();
+          if (typeof r === 'number') return Math.max(1, Math.round(r));
+          return undefined;
+        })();
+        const wt = Number(ex?.weight) || 0;
+        const normNm = name.toLowerCase().replace(/[\s-]/g, '');
+        const isBw = /^(?:.*(?:dip|chinup|pullup|pushup|plank).*)$/.test(normNm);
+        const parts: string[] = [name];
+        if (sets > 0 && repsVal != null) parts.push(`${sets}×${repsVal}`);
+        if (wt > 0 && !isBw) parts.push(`@ ${Math.round(wt)}${unit}`);
+        lines.push(parts.join(' '));
+      }
+    } catch {}
+  }
 
   // No UI fabrication: rely on server-computed steps only
 
