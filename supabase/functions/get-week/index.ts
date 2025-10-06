@@ -227,11 +227,12 @@ Deno.serve(async (req) => {
           if (ids.length) {
             const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/materialize-plan`;
             const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-            for (const id of ids) {
+            // Wait for all materializations to complete
+            await Promise.all(ids.map(async (id) => {
               try {
                 await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ planned_workout_id: id }) });
               } catch {}
-            }
+            }));
             if (debug) debugNotes.push({ where:'materialize', count: ids.length });
           }
         } catch {}
@@ -329,9 +330,10 @@ Deno.serve(async (req) => {
       if (needsWuCd.length) {
         const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/materialize-plan`;
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-        for (const id of needsWuCd) {
+        // Wait for all materializations to complete in parallel
+        await Promise.all(needsWuCd.map(async (id) => {
           try { await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ planned_workout_id: id }) }); } catch {}
-        }
+        }));
         if (debug) errors.push({ where:'materialize_wu_cd', count: needsWuCd.length });
         // Reload planned rows that were adjusted (best-effort, limited scope) so UI sees cooldown immediately
         try {
