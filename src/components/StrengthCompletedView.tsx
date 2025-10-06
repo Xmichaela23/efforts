@@ -138,6 +138,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   // Sanitize completed exercises to avoid rendering raw objects by mistake
   const completedExercises = getCompletedExercises().map((ex: any) => {
+    console.log('🔍 Raw exercise data:', ex);
     const safeSets = Array.isArray(ex?.sets)
       ? ex.sets.map((s: any) => ({
           reps: Number((s?.reps as any) ?? 0) || 0,
@@ -146,6 +147,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           completed: Boolean(s?.completed)
         }))
       : [];
+    console.log('🔍 Processed exercise:', { name: ex.name, sets: safeSets });
     return { ...ex, sets: safeSets };
   });
 
