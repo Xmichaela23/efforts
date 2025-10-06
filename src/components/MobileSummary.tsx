@@ -351,9 +351,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
   // No interactive hydration path; assume data present during development
 
-  // Strength uses compare table
-  if (type === 'strength') {
-    const plannedStrength = (planned?.strength_exercises || []).map((ex: any)=>{
+  // Strength and Mobility use compare table
+  if (type === 'strength' || type === 'mobility') {
+    const exerciseField = type === 'strength' ? 'strength_exercises' : 'mobility_exercises';
+    const plannedExercises = (planned?.[exerciseField] || []).map((ex: any)=>{
       // Normalize planned fields even if a completed workout object is passed in
       const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
       const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
@@ -361,10 +362,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
       const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
       return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum };
     });
-    const completedStrength = (completed?.strength_exercises || []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }));
+    const completedExercises = (completed?.[exerciseField] || []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }));
     return (
       <div className="space-y-4">
-        <StrengthCompareTable planned={plannedStrength} completed={completedStrength} />
+        <StrengthCompareTable planned={plannedExercises} completed={completedExercises} />
         {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
           <div className="text-sm text-gray-700">
             <div className="font-medium mb-1">Add‑ons</div>
