@@ -1092,7 +1092,7 @@ const formatMovingTime = () => {
 
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {norm.duration_s ? formatDuration(norm.duration_s) : (norm.elapsed_s ? formatDuration(norm.elapsed_s) : 'N/A')}
+              {norm.elapsed_s ? formatDuration(norm.elapsed_s) : (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Duration</div>
@@ -1101,7 +1101,7 @@ const formatMovingTime = () => {
 
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {formatMovingTime()}
+              {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Moving Time</div>
@@ -1208,7 +1208,7 @@ const formatMovingTime = () => {
 
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
+              {norm.elapsed_s ? formatDuration(norm.elapsed_s) : (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Duration</div>
@@ -1217,7 +1217,7 @@ const formatMovingTime = () => {
 
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {formatMovingTime()}
+              {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Moving Time</div>
