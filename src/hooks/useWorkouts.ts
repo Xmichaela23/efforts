@@ -216,6 +216,8 @@ export const useWorkouts = () => {
           'moving_time','elapsed_time','timestamp','start_position_lat','start_position_long',
           // computed snapshot and metrics (small JSON); exclude gps_track/sensor_data/swim_data
           'computed','metrics',
+          // strength and mobility exercise data (matches get-week selection)
+          'strength_exercises','mobility_exercises',
           'created_at','updated_at'
         ].join(','))
         .eq("user_id", user.id)

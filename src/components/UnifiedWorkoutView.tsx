@@ -916,13 +916,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       workoutData={completedData}
                     />
                   </div>
-                ) : workout.type === 'strength' ? (
+                ) : (workout.type === 'strength' || workout.type === 'mobility') ? (
                   <div className="p-4">
-                    <h3 className="font-semibold mb-4">Strength Workout Completed</h3>
-                    {/* Use StrengthCompletedView for strength workouts with sanitized sets */}
+                    <h3 className="font-semibold mb-4">{workout.type === 'mobility' ? 'Mobility' : 'Strength'} Workout Completed</h3>
+                    {/* Use StrengthCompletedView for both strength and mobility workouts */}
                     <StrengthCompletedView 
                       workoutData={{
                         ...workout,
+                        // For mobility, read from mobility_exercises and map to strength_exercises shape
                         strength_exercises: Array.isArray((workout as any).strength_exercises)
                           ? (workout as any).strength_exercises.map((ex: any) => ({
                               ...ex,
@@ -935,7 +936,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                                   }))
                                 : []
                             }))
-                          : []
+                          : (workout.type === 'mobility' && Array.isArray((workout as any).mobility_exercises))
+                            ? (workout as any).mobility_exercises.map((ex: any) => ({
+                                ...ex,
+                                sets: Array.isArray(ex?.sets)
+                                  ? ex.sets.map((s: any) => ({
+                                      reps: Number((s?.reps as any) ?? 0) || 0,
+                                      weight: Number((s?.weight as any) ?? 0) || 0,
+                                      rir: typeof s?.rir === 'number' ? s.rir : undefined,
+                                      completed: Boolean(s?.completed)
+                                    }))
+                                  : []
+                              }))
+                            : []
                       }}
                       plannedWorkout={linkedPlanned}
                     />

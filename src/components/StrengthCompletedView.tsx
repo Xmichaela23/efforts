@@ -60,15 +60,16 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     return null;
   }, [workoutData, passedPlannedWorkout]);
 
-  // Find completed strength workout for the same date (logger save)
+  // Find completed workout for the same date (logger save) - supports both strength and mobility
   const completedForDay = useMemo(() => {
+    const workoutType = String(workoutData?.type || '').toLowerCase();
     const sameDay = workouts.find(w => 
       normalizeDate(w.date) === normalizeDate(workoutData.date) &&
-      w.type === 'strength' &&
-      (w.workout_status === 'completed' || (w as any).status === 'completed')
+      (w.type === workoutType) &&
+      ((w as any).workout_status === 'completed' || (w as any).status === 'completed')
     );
     return sameDay || null;
-  }, [workouts, workoutData.date]);
+  }, [workouts, workoutData.date, workoutData.type]);
 
   // FIXED: Calculate volume for an exercise - count sets with actual data
   const calculateExerciseVolume = (sets: Array<{ reps: number; weight: number; completed?: boolean }>) => {
@@ -77,12 +78,13 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
       .reduce((total, set) => total + (set.reps * set.weight), 0);
   };
 
-  // Calculate planned vs actual comparison for an exercise
+  // Calculate planned vs actual comparison for an exercise - supports both strength and mobility
   const getExerciseComparison = (exerciseName: string, completedSets: any[]) => {
-    if (!plannedWorkout?.strength_exercises) return null;
+    const plannedExercises = (plannedWorkout?.strength_exercises || plannedWorkout?.mobility_exercises);
+    if (!plannedExercises) return null;
     
-    const plannedExercise = plannedWorkout.strength_exercises.find(
-      ex => ex.name.toLowerCase() === exerciseName.toLowerCase()
+    const plannedExercise = plannedExercises.find(
+      (ex: any) => ex.name.toLowerCase() === exerciseName.toLowerCase()
     );
     
     if (!plannedExercise) return null;
@@ -107,17 +109,23 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     };
   };
 
-  // Determine which exercises array to use
+  // Determine which exercises array to use - supports both strength and mobility
   const getCompletedExercises = () => {
-    // If we have a saved completed workout for the day, prefer it
-    if (completedForDay?.strength_exercises && completedForDay.strength_exercises.length > 0) {
-      return completedForDay.strength_exercises as any[];
+    // If we have a saved completed workout for the day, prefer it (check both fields)
+    if ((completedForDay as any)?.strength_exercises && (completedForDay as any).strength_exercises.length > 0) {
+      return (completedForDay as any).strength_exercises as any[];
     }
-    if (workoutData.strength_exercises && workoutData.strength_exercises.length > 0) {
-      return workoutData.strength_exercises as any[];
+    if ((completedForDay as any)?.mobility_exercises && (completedForDay as any).mobility_exercises.length > 0) {
+      return (completedForDay as any).mobility_exercises as any[];
     }
-    if (workoutData.completed_exercises && workoutData.completed_exercises.length > 0) {
-      return workoutData.completed_exercises as any[];
+    if ((workoutData as any).strength_exercises && (workoutData as any).strength_exercises.length > 0) {
+      return (workoutData as any).strength_exercises as any[];
+    }
+    if ((workoutData as any).mobility_exercises && (workoutData as any).mobility_exercises.length > 0) {
+      return (workoutData as any).mobility_exercises as any[];
+    }
+    if ((workoutData as any).completed_exercises && (workoutData as any).completed_exercises.length > 0) {
+      return (workoutData as any).completed_exercises as any[];
     }
     return [] as any[];
   };
@@ -209,7 +217,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
       {/* Exercises */}
       {showComparison && plannedWorkout ? (
         <StrengthCompareTable
-          planned={(plannedWorkout.strength_exercises || []).map((ex: any)=>{
+          planned={((plannedWorkout as any).strength_exercises || (plannedWorkout as any).mobility_exercises || []).map((ex: any)=>{
             // Normalize planned fields - handle both array and individual value formats
             const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
             const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
