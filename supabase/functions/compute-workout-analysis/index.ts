@@ -438,85 +438,12 @@ Deno.serve(async (req) => {
     if (pwrZones) analysis.zones.power = pwrZones as any;
   } catch {}
 
-    // --- Swim 100m splits: prefer series-derived buckets; fall back to lengths ---
-    try {
-      if (String(w.type || '').toLowerCase().includes('swim')) {
-        let rows100Series: Array<{ n:number; duration_s:number }> = [];
-        // Prefer distance/time series when available for real variation
-        if (hasRows && distance_m.length > 1 && time_s.length === distance_m.length) {
-          let next = 100; // meters
-          let lastTCross = 0; // seconds since start
-          let maxIterations = 10000; // Safety guard against infinite loops
-          for (let i = 1; i < distance_m.length && next <= (distance_m[distance_m.length-1] || 0) && maxIterations-- > 0; i += 1) {
-            const dPrev = Number(distance_m[i-1] || 0);
-            const dCurr = Number(distance_m[i] || 0);
-            const tPrev = Number(time_s[i-1] || 0);
-            const tCurr = Number(time_s[i] || 0);
-            const dd = dCurr - dPrev;
-            const dt = tCurr - tPrev;
-            if (dd <= 0 || dt < 0) continue;
-            while (next <= dCurr) {
-              const frac = Math.max(0, Math.min(1, (next - dPrev) / dd));
-              const tCross = tPrev + frac * dt;
-              const dur = Math.max(1, Math.round(tCross - lastTCross));
-              rows100Series.push({ n: rows100Series.length + 1, duration_s: dur });
-              lastTCross = tCross;
-              next += 100;
-            }
-          }
-        }
-
-        if (rows100Series.length) {
-          const prevUnit = (analysis as any)?.events?.splits_100?.unit;
-          const unit = (prevUnit === 'yd' || prevUnit === 'm') ? prevUnit : 'm';
-          analysis.events.splits_100 = { unit, rows: rows100Series } as any;
-        } else {
-          // Fallback: compute 100m splits from swim_data.lengths (canonical meters)
-          const swim = parseJson((w as any).swim_data) || null;
-          const lengths: Array<{ distance_m?: number; duration_s?: number }> = Array.isArray(swim?.lengths) ? swim.lengths : [];
-          if (lengths.length) {
-            // Validate: if durations are essentially identical, skip fallback to avoid perpetuating bad data
-            try {
-              const durs = lengths.map(l=> Number(l?.duration_s ?? NaN)).filter(n=> Number.isFinite(n));
-              if (durs.length >= 3) {
-                const min = durs.reduce((m,n)=> Math.min(m,n), Number.POSITIVE_INFINITY);
-                const max = durs.reduce((m,n)=> Math.max(m,n), 0);
-                if ((max - min) <= 1) {
-                  // All durations ~equal → do not set splits from lengths
-                  return;
-                }
-              }
-            } catch {}
-            let totalLenDur = 0;
-            for (const len of lengths) totalLenDur += Number(len?.duration_s ?? 0);
-            const prevComputed = parseJson((w as any).computed) || {};
-            const movingSecFromPrev = Number(prevComputed?.overall?.duration_s_moving ?? NaN);
-            const movingSecFromSeries = (hasRows && time_s.length) ? Number(time_s[time_s.length - 1]) : NaN;
-            const targetMovingSec = Number.isFinite(movingSecFromPrev) ? movingSecFromPrev : (Number.isFinite(movingSecFromSeries) ? movingSecFromSeries : totalLenDur);
-            const scale = (totalLenDur > 0 && Number.isFinite(targetMovingSec) && targetMovingSec > 0) ? (targetMovingSec / totalLenDur) : 1;
-
-            let acc = 0; let bucket = 100; let tAcc = 0;
-            const rows100: Array<{ n:number; duration_s:number }> = [];
-            for (const len of lengths) {
-              const d = Number(len?.distance_m ?? 0);
-              const td = Math.max(0, Number(len?.duration_s ?? 0) * scale);
-              acc += Number.isFinite(d) ? d : 0;
-              tAcc += Number.isFinite(td) ? td : 0;
-              let safetyCounter = 1000; // Prevent infinite loop
-              while (acc >= bucket && safetyCounter-- > 0) {
-                rows100.push({ n: rows100.length + 1, duration_s: Math.max(1, Math.round(tAcc)) });
-                tAcc = 0; bucket += 100;
-              }
-            }
-            if (rows100.length) {
-              const prevUnit = (analysis as any)?.events?.splits_100?.unit;
-              const unit = (prevUnit === 'yd' || prevUnit === 'm') ? prevUnit : 'm';
-              analysis.events.splits_100 = { unit, rows: rows100 } as any;
-            }
-          }
-        }
-      }
-    } catch {}
+    // --- DISABLED: Swim 100m splits calculation ---
+    // Removed because:
+    // 1. Causes timeouts/infinite loops on certain data
+    // 2. Garmin doesn't provide accurate per-length timing for pool swims
+    // 3. Only overall avg pace (calculated below) is reliable from the data we have
+    // If splits are needed in the future, would require different data source or algorithm
 
     // Derive canonical overall for swims and endurance
     const overall = (() => {
@@ -545,10 +472,32 @@ Deno.serve(async (req) => {
                 if (Number.isFinite(nLen) && nLen>0 && Number.isFinite(poolM) && poolM>0) dist = Math.round(nLen*poolM);
               }
             }
-            // Extract moving time: sum lengths or from raw data
+            // Extract time from Garmin: for pool swims, get timer/clock duration from last sample
             let dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries) : null;
+            let elapsedDur = null;
+            
+            if (!dur && ga) {
+              try {
+                const raw = parseJson(ga.raw_data) || {};
+                const samples = Array.isArray(raw?.samples) ? raw.samples : [];
+                if (samples.length > 0) {
+                  // Last sample has cumulative timer/clock duration
+                  const lastSample = samples[samples.length - 1];
+                  const timerS = Number(lastSample?.timerDurationInSeconds);
+                  const clockS = Number(lastSample?.clockDurationInSeconds);
+                  if (Number.isFinite(timerS) && timerS > 0) dur = Math.round(timerS);
+                  if (Number.isFinite(clockS) && clockS > 0) elapsedDur = Math.round(clockS);
+                }
+                // Fallback to summary if samples don't have it
+                if (!dur) {
+                  const garminDur = Number(raw?.summary?.durationInSeconds ?? raw?.durationInSeconds);
+                  if (Number.isFinite(garminDur) && garminDur > 0) dur = Math.round(garminDur);
+                }
+              } catch {}
+            }
+            
             if (!dur) {
-              // Try lengths first (most accurate for swims)
+              // Try lengths as fallback
               const swim = parseJson((w as any).swim_data) || null;
               const lengths: any[] = Array.isArray(swim?.lengths) ? swim.lengths : [];
               if (lengths.length > 0) {
@@ -556,24 +505,18 @@ Deno.serve(async (req) => {
                   const d = Number(len?.duration_s ?? 0);
                   return sum + (Number.isFinite(d) ? d : 0);
                 }, 0);
-                if (lengthSum > 0) dur = Math.round(lengthSum);
+                if (lengthSum > 0) {
+                  dur = Math.round(lengthSum);
+                  elapsedDur = dur; // Use same value
+                }
               }
             }
-            // Fallback: convert moving_time from minutes to seconds
+            
+            // Last resort fallback from workouts table fields (already in minutes, convert to seconds)
             if (!dur) {
               const moveMin = Number((w as any)?.moving_time);
               if (Number.isFinite(moveMin) && moveMin > 0) dur = Math.round(moveMin * 60);
             }
-            // Extract elapsed time from Garmin summary
-            let elapsedDur = null;
-            if (ga) {
-              try {
-                const raw = parseJson(ga.raw_data) || {};
-                const elapsedS = Number(raw?.summary?.durationInSeconds);
-                if (Number.isFinite(elapsedS) && elapsedS > 0) elapsedDur = Math.round(elapsedS);
-              } catch {}
-            }
-            // Fallback: convert elapsed_time from minutes to seconds
             if (!elapsedDur) {
               const elapsedMin = Number((w as any)?.elapsed_time);
               if (Number.isFinite(elapsedMin) && elapsedMin > 0) elapsedDur = Math.round(elapsedMin * 60);
@@ -588,14 +531,26 @@ Deno.serve(async (req) => {
           // Non-swim (runs, rides)
           const dist = Number.isFinite(distSeries) && distSeries>0 ? Math.round(distSeries)
             : (Number((w as any)?.distance)*1000 || prevOverall?.distance_m || null);
-          // Extract original Garmin seconds from raw data
+          // Extract duration from last sample (same as swims)
           let dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries) : null;
+          let elapsedDur = null;
+
           if (!dur && ga) {
             try {
               const raw = parseJson(ga.raw_data) || {};
-              // Check both root and summary levels
-              const movingS = Number(raw?.movingDurationInSeconds ?? raw?.timerDurationInSeconds ?? raw?.summary?.movingDurationInSeconds ?? raw?.summary?.timerDurationInSeconds);
-              if (Number.isFinite(movingS) && movingS > 0) dur = Math.round(movingS);
+              const samples = Array.isArray(raw?.samples) ? raw.samples : [];
+              if (samples.length > 0) {
+                const lastSample = samples[samples.length - 1];
+                const movingS = Number(lastSample?.movingDurationInSeconds);
+                const clockS = Number(lastSample?.clockDurationInSeconds);
+                if (Number.isFinite(movingS) && movingS > 0) dur = Math.round(movingS);
+                if (Number.isFinite(clockS) && clockS > 0) elapsedDur = Math.round(clockS);
+              }
+              // Fallback to summary (even though we know it's NULL)
+              if (!dur) {
+                const garminDur = Number(raw?.summary?.durationInSeconds ?? raw?.durationInSeconds);
+                if (Number.isFinite(garminDur) && garminDur > 0) dur = Math.round(garminDur);
+              }
             } catch {}
           }
           // Last resort: convert moving_time from minutes to seconds
@@ -603,7 +558,7 @@ Deno.serve(async (req) => {
             const moveMin = Number((w as any)?.moving_time);
             if (Number.isFinite(moveMin) && moveMin > 0) dur = Math.round(moveMin * 60);
           }
-          return { ...(prevOverall||{}), distance_m: dist, duration_s_moving: dur };
+          return { ...(prevOverall||{}), distance_m: dist, duration_s_moving: dur, duration_s_elapsed: elapsedDur };
         } catch { return prevOverall || {}; }
       }
       return prevOverall || {};

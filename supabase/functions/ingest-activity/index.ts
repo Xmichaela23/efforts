@@ -490,9 +490,43 @@ async function mapGarminToWorkout(activity, userId) {
     date: date,
     timestamp: timestamp,
     // Use provider seconds precisely: elapsed vs moving
-    duration: (()=>{ const s = Number(computeInput?.summary?.durationInSeconds); return Number.isFinite(s) && s>0 ? Math.floor(s/60) : null; })(),
-    moving_time: (()=>{ const ms = Number(computeInput?.summary?.movingDurationInSeconds ?? computeInput?.summary?.timerDurationInSeconds); if (Number.isFinite(ms) && ms>0) return Math.floor(ms/60); if (type==='swim') { const d = deriveSwimMovingSeconds(computeInput); return Number.isFinite(d as any) && (d as number) > 0 ? Math.floor((d as number)/60) : null; } return null; })(),
-    elapsed_time: (()=>{ const s = Number(computeInput?.summary?.durationInSeconds); return Number.isFinite(s) && s>0 ? Math.floor(s/60) : null; })(),
+    duration: (()=>{ 
+      // For ALL activities with samples, extract clock duration from last sample
+      if (enrichedData?.raw_data?.samples) {
+        const samples = Array.isArray(enrichedData.raw_data.samples) ? enrichedData.raw_data.samples : [];
+        if (samples.length > 0) {
+          const clockS = Number(samples[samples.length - 1]?.clockDurationInSeconds);
+          if (Number.isFinite(clockS) && clockS > 0) return Math.floor(clockS / 60);
+        }
+      }
+      const s = Number(computeInput?.summary?.durationInSeconds); 
+      return Number.isFinite(s) && s>0 ? Math.floor(s/60) : null; 
+    })(),
+    moving_time: (()=>{ 
+      // For ALL activities with samples, extract moving duration from last sample
+      if (enrichedData?.raw_data?.samples) {
+        const samples = Array.isArray(enrichedData.raw_data.samples) ? enrichedData.raw_data.samples : [];
+        if (samples.length > 0) {
+          const movingS = Number(samples[samples.length - 1]?.movingDurationInSeconds);
+          if (Number.isFinite(movingS) && movingS > 0) return Math.floor(movingS / 60);
+        }
+      }
+      const ms = Number(computeInput?.summary?.movingDurationInSeconds ?? computeInput?.summary?.timerDurationInSeconds); 
+      if (Number.isFinite(ms) && ms>0) return Math.floor(ms/60);
+      return null;
+    })(),
+    elapsed_time: (()=>{ 
+      // For ALL activities with samples, extract clock duration from last sample
+      if (enrichedData?.raw_data?.samples) {
+        const samples = Array.isArray(enrichedData.raw_data.samples) ? enrichedData.raw_data.samples : [];
+        if (samples.length > 0) {
+          const clockS = Number(samples[samples.length - 1]?.clockDurationInSeconds);
+          if (Number.isFinite(clockS) && clockS > 0) return Math.floor(clockS / 60);
+        }
+      }
+      const s = Number(computeInput?.summary?.durationInSeconds); 
+      return Number.isFinite(s) && s>0 ? Math.floor(s/60) : null; 
+    })(),
     distance: activity.distance_meters != null ? Number((activity.distance_meters / 1000).toFixed(3)) : null,
     workout_status: 'completed',
     source: 'garmin',
