@@ -24,8 +24,10 @@ interface CompletedExercise {
 
 const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData, plannedWorkout: passedPlannedWorkout }) => {
   console.log('🔍 StrengthCompletedView received workoutData:', workoutData);
-  console.log('🔍 strength_exercises:', workoutData.strength_exercises);
-  console.log('🔍 completed_exercises:', workoutData.completed_exercises);
+  console.log('🔍 workoutData.type:', (workoutData as any)?.type);
+  console.log('🔍 strength_exercises:', (workoutData as any)?.strength_exercises);
+  console.log('🔍 mobility_exercises:', (workoutData as any)?.mobility_exercises);
+  console.log('🔍 completed_exercises:', (workoutData as any)?.completed_exercises);
   console.log('🔍 workoutData type:', typeof workoutData);
   console.log('🔍 workoutData keys:', Object.keys(workoutData));
   
