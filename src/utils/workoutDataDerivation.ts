@@ -4,9 +4,15 @@ export const getDurationSeconds = (workout: any): number | null => {
 };
 
 export const getElapsedSeconds = (workout: any): number | null => {
-  const minutes = workout?.elapsed_time ?? workout?.metrics?.elapsed_time ?? null;
-  // elapsed_time is typically stored in minutes, convert to seconds
-  return Number.isFinite(minutes) ? Number(minutes) * 60 : null;
+  // elapsed_time is in minutes (rounded), moving_time is in seconds (precise)
+  // For workouts with no pauses, use the more precise moving time
+  const movingSec = workout?.moving_time ?? workout?.metrics?.moving_time ?? workout?.computed?.overall?.duration_s_moving ?? null;
+  const elapsedMin = workout?.elapsed_time ?? workout?.metrics?.elapsed_time ?? null;
+  const elapsedSec = Number.isFinite(elapsedMin) ? Number(elapsedMin) * 60 : null;
+  
+  // Use whichever is greater (handles case where elapsed is rounded down)
+  if (elapsedSec && movingSec) return Math.max(elapsedSec, movingSec);
+  return elapsedSec ?? movingSec;
 };
 
 export const getDistanceMeters = (workout: any): number | null => {
