@@ -24,9 +24,11 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       if (!id || !Array.isArray(workouts)) return null;
       const w = (workouts as any[]).find((x:any)=> String(x?.id||'') === String(id));
       if (!w) return null;
-      // Consider it hydrated if it already has gps_track or sensor_data
+      // Consider it hydrated if it already has meaningful gps_track or sensor_data
       const hasGps = Array.isArray((w as any)?.gps_track) && (w as any).gps_track.length>0;
-      const hasSensors = !!(w as any)?.sensor_data;
+      // Check if sensor_data is actually an array/object with data, not just a string
+      const sensorData = (w as any)?.sensor_data;
+      const hasSensors = Array.isArray(sensorData) && sensorData.length > 0;
       return (hasGps || hasSensors) ? w : null;
     } catch { return null; }
   }, [id, workouts]);

@@ -2,7 +2,7 @@
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const ANALYSIS_VERSION = 'v0.1.7'; // elevation + NP + duration + swim pace
+const ANALYSIS_VERSION = 'v0.1.8'; // elevation + NP + swim pace (no sample timeout)
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
   let ema: number | null = null;
@@ -137,14 +137,6 @@ Deno.serve(async (req) => {
     if (((sensor?.length ?? 0) < 2) && ((gps?.length ?? 0) < 2) && ga) {
       const sRaw = parseJson(ga.sensor_data) || parseJson(ga.samples_data) || [];
       sensor = Array.isArray(sRaw?.samples) ? sRaw.samples : (Array.isArray(sRaw) ? sRaw : []);
-      // Also try raw_data.samples for swim activities
-      if (sensor.length < 2) {
-        const rawData = parseJson(ga.raw_data) || {};
-        const rawSamples = rawData?.samples || [];
-        if (Array.isArray(rawSamples) && rawSamples.length > 0) {
-          sensor = rawSamples;
-        }
-      }
       gps = parseJson(ga.gps_track) || [];
     }
 
@@ -418,8 +410,9 @@ Deno.serve(async (req) => {
       } : undefined,
       swim: (() => {
         if (sport !== 'swim') return undefined;
-        const dist = Number(distance_m[distance_m.length - 1] || 0);
-        const dur = Number(time_s[time_s.length - 1] || 0);
+        // Use overall distance/duration (works even without samples)
+        const dist = overall?.distance_m || 0;
+        const dur = overall?.duration_s_moving || 0;
         if (dist <= 0 || dur <= 0) return undefined;
         // Pace per 100m (seconds)
         const per100m = (dur / dist) * 100;
