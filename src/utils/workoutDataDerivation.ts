@@ -9,7 +9,11 @@ export const getDurationSeconds = (workout: any): number | null => {
 };
 
 export const getElapsedSeconds = (workout: any): number | null => {
-  // elapsed_time is in minutes, convert to seconds
+  // Prefer computed elapsed (already in seconds)
+  const computed = workout?.computed?.overall?.duration_s_elapsed;
+  if (Number.isFinite(computed)) return Number(computed);
+  
+  // Fallback: elapsed_time is in minutes, convert to seconds
   const elapsedMin = workout?.elapsed_time ?? workout?.metrics?.elapsed_time ?? null;
   const elapsedSec = Number.isFinite(elapsedMin) ? Number(elapsedMin) * 60 : null;
   

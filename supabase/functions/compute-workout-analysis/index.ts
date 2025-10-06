@@ -2,7 +2,7 @@
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const ANALYSIS_VERSION = 'v0.1.3'; // elevation + normalized power
+const ANALYSIS_VERSION = 'v0.1.6'; // elevation + NP + duration from samples
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
   let ema: number | null = null;
@@ -137,6 +137,14 @@ Deno.serve(async (req) => {
     if (((sensor?.length ?? 0) < 2) && ((gps?.length ?? 0) < 2) && ga) {
       const sRaw = parseJson(ga.sensor_data) || parseJson(ga.samples_data) || [];
       sensor = Array.isArray(sRaw?.samples) ? sRaw.samples : (Array.isArray(sRaw) ? sRaw : []);
+      // Also try raw_data.samples for swim activities
+      if (sensor.length < 2) {
+        const rawData = parseJson(ga.raw_data) || {};
+        const rawSamples = rawData?.samples || [];
+        if (Array.isArray(rawSamples) && rawSamples.length > 0) {
+          sensor = rawSamples;
+        }
+      }
       gps = parseJson(ga.gps_track) || [];
     }
 
@@ -543,19 +551,64 @@ Deno.serve(async (req) => {
                 if (Number.isFinite(nLen) && nLen>0 && Number.isFinite(poolM) && poolM>0) dist = Math.round(nLen*poolM);
               }
             }
-            const dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries)
-              : (Number((w as any)?.moving_time)||null);
+            // Extract moving time: sum lengths or from raw data
+            let dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries) : null;
+            if (!dur) {
+              // Try lengths first (most accurate for swims)
+              const swim = parseJson((w as any).swim_data) || null;
+              const lengths: any[] = Array.isArray(swim?.lengths) ? swim.lengths : [];
+              if (lengths.length > 0) {
+                const lengthSum = lengths.reduce((sum:number, len:any) => {
+                  const d = Number(len?.duration_s ?? 0);
+                  return sum + (Number.isFinite(d) ? d : 0);
+                }, 0);
+                if (lengthSum > 0) dur = Math.round(lengthSum);
+              }
+            }
+            // Fallback: convert moving_time from minutes to seconds
+            if (!dur) {
+              const moveMin = Number((w as any)?.moving_time);
+              if (Number.isFinite(moveMin) && moveMin > 0) dur = Math.round(moveMin * 60);
+            }
+            // Extract elapsed time from Garmin summary
+            let elapsedDur = null;
+            if (ga) {
+              try {
+                const raw = parseJson(ga.raw_data) || {};
+                const elapsedS = Number(raw?.summary?.durationInSeconds);
+                if (Number.isFinite(elapsedS) && elapsedS > 0) elapsedDur = Math.round(elapsedS);
+              } catch {}
+            }
+            // Fallback: convert elapsed_time from minutes to seconds
+            if (!elapsedDur) {
+              const elapsedMin = Number((w as any)?.elapsed_time);
+              if (Number.isFinite(elapsedMin) && elapsedMin > 0) elapsedDur = Math.round(elapsedMin * 60);
+            }
             return {
               ...(prevOverall||{}),
               distance_m: dist || prevOverall?.distance_m || 0,
               duration_s_moving: dur || prevOverall?.duration_s_moving || null,
+              duration_s_elapsed: elapsedDur || prevOverall?.duration_s_elapsed || null,
             };
           }
-          // Non-swim
+          // Non-swim (runs, rides)
           const dist = Number.isFinite(distSeries) && distSeries>0 ? Math.round(distSeries)
             : (Number((w as any)?.distance)*1000 || prevOverall?.distance_m || null);
-          const dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries)
-            : (Number((w as any)?.moving_time)|| prevOverall?.duration_s_moving || null);
+          // Extract original Garmin seconds from raw data
+          let dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries) : null;
+          if (!dur && ga) {
+            try {
+              const raw = parseJson(ga.raw_data) || {};
+              // Check both root and summary levels
+              const movingS = Number(raw?.movingDurationInSeconds ?? raw?.timerDurationInSeconds ?? raw?.summary?.movingDurationInSeconds ?? raw?.summary?.timerDurationInSeconds);
+              if (Number.isFinite(movingS) && movingS > 0) dur = Math.round(movingS);
+            } catch {}
+          }
+          // Last resort: convert moving_time from minutes to seconds
+          if (!dur) {
+            const moveMin = Number((w as any)?.moving_time);
+            if (Number.isFinite(moveMin) && moveMin > 0) dur = Math.round(moveMin * 60);
+          }
           return { ...(prevOverall||{}), distance_m: dist, duration_s_moving: dur };
         } catch { return prevOverall || {}; }
       }
