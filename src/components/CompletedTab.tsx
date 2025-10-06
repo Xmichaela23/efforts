@@ -999,7 +999,13 @@ const formatMovingTime = () => {
          {/* Avg Pace /100 */}
          <div className="px-2 pb-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {(() => { return 'N/A'; })()}
+              {(() => {
+                const pace = useImperial ? norm.avg_swim_pace_per_100yd : norm.avg_swim_pace_per_100m;
+                if (!pace) return 'N/A';
+                const mins = Math.floor(pace / 60);
+                const secs = Math.round(pace % 60);
+                return `${mins}:${String(secs).padStart(2, '0')}`;
+              })()}
            </div>
            <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Avg Pace {useImperial ? '/100yd' : '/100m'}</div></div>
          </div>

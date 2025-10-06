@@ -19,6 +19,8 @@ export type WorkoutDataNormalized = {
   avg_pace_s_per_km: number | null;
   avg_running_cadence_spm: number | null;
   avg_cycling_cadence_rpm: number | null;
+  avg_swim_pace_per_100m: number | null;
+  avg_swim_pace_per_100yd: number | null;
   calories: number | null;
   work_kj: number | null;
   normalized_power: number | null;
@@ -68,8 +70,13 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     const intensity_factor = Number.isFinite(powerMetrics?.intensity_factor) ? Number(powerMetrics.intensity_factor) : null;
     const variability_index = Number.isFinite(powerMetrics?.variability_index) ? Number(powerMetrics.variability_index) : null;
     
+    // Read swim pace (server-calculated)
+    const swimMetrics = workoutData?.computed?.analysis?.swim;
+    const avg_swim_pace_per_100m = Number.isFinite(swimMetrics?.avg_pace_per_100m) ? Number(swimMetrics.avg_pace_per_100m) : null;
+    const avg_swim_pace_per_100yd = Number.isFinite(swimMetrics?.avg_pace_per_100yd) ? Number(swimMetrics.avg_pace_per_100yd) : null;
+    
     const sport = typeof workoutData?.type === 'string' ? String(workoutData.type).toLowerCase() : null;
     const series = workoutData?.computed?.analysis?.series || null;
-    return { distance_m, distance_km, duration_s, elapsed_s, elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, calories, work_kj, normalized_power, intensity_factor, variability_index, sport, series };
+    return { distance_m, distance_km, duration_s, elapsed_s, elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, sport, series };
   }, [workoutData]);
 };

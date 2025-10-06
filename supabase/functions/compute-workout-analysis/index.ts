@@ -2,7 +2,7 @@
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const ANALYSIS_VERSION = 'v0.1.6'; // elevation + NP + duration from samples
+const ANALYSIS_VERSION = 'v0.1.7'; // elevation + NP + duration + swim pace
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
   let ema: number | null = null;
@@ -416,6 +416,21 @@ Deno.serve(async (req) => {
         variability_index: variabilityIndex,
         intensity_factor: intensityFactor
       } : undefined,
+      swim: (() => {
+        if (sport !== 'swim') return undefined;
+        const dist = Number(distance_m[distance_m.length - 1] || 0);
+        const dur = Number(time_s[time_s.length - 1] || 0);
+        if (dist <= 0 || dur <= 0) return undefined;
+        // Pace per 100m (seconds)
+        const per100m = (dur / dist) * 100;
+        // Pace per 100yd (seconds)
+        const distYards = dist / 0.9144;
+        const per100yd = (dur / distYards) * 100;
+        return {
+          avg_pace_per_100m: Math.round(per100m),
+          avg_pace_per_100yd: Math.round(per100yd)
+        };
+      })(),
       ui: { footnote: `Computed at ${ANALYSIS_VERSION}`, renderHints: { preferPace: sport === 'run' } }
     };
 
