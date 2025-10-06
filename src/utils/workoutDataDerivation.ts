@@ -4,8 +4,9 @@ export const getDurationSeconds = (workout: any): number | null => {
 };
 
 export const getElapsedSeconds = (workout: any): number | null => {
-  const s = workout?.elapsed_time ?? workout?.metrics?.elapsed_time ?? null;
-  return Number.isFinite(s) ? Number(s) : null;
+  const minutes = workout?.elapsed_time ?? workout?.metrics?.elapsed_time ?? null;
+  // elapsed_time is typically stored in minutes, convert to seconds
+  return Number.isFinite(minutes) ? Number(minutes) * 60 : null;
 };
 
 export const getDistanceMeters = (workout: any): number | null => {
