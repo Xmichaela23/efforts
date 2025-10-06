@@ -139,6 +139,33 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
   // Sanitize completed exercises to avoid rendering raw objects by mistake
   const completedExercises = getCompletedExercises().map((ex: any) => {
     console.log('🔍 Raw exercise data:', ex);
+    
+    // Extract clean exercise name (text before colon, or full name if no colon)
+    const cleanName = ex?.name ? String(ex.name).split(':')[0].trim() : '';
+    
+    // Handle old mobility format: {name, duration: '2x8', weight: 20}
+    if (!Array.isArray(ex?.sets) && ex?.duration && typeof ex.duration === 'string') {
+      // Parse duration like "2x8" or "3x10"
+      const match = ex.duration.match(/(\d+)x(\d+)/i);
+      if (match) {
+        const numSets = parseInt(match[1], 10);
+        const reps = parseInt(match[2], 10);
+        const weight = Number(ex?.weight || 0);
+        
+        // Generate sets array
+        const generatedSets = Array.from({ length: numSets }, () => ({
+          reps,
+          weight,
+          rir: undefined,
+          completed: true
+        }));
+        
+        console.log('🔍 Converted old format to sets:', { name: cleanName, sets: generatedSets });
+        return { ...ex, name: cleanName, sets: generatedSets };
+      }
+    }
+    
+    // Handle standard format with sets array
     const safeSets = Array.isArray(ex?.sets)
       ? ex.sets.map((s: any) => ({
           reps: Number((s?.reps as any) ?? 0) || 0,
@@ -147,8 +174,8 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           completed: Boolean(s?.completed)
         }))
       : [];
-    console.log('🔍 Processed exercise:', { name: ex.name, sets: safeSets });
-    return { ...ex, sets: safeSets };
+    console.log('🔍 Processed exercise:', { name: cleanName, sets: safeSets });
+    return { ...ex, name: cleanName, sets: safeSets };
   });
 
   // Calculate total workout statistics
