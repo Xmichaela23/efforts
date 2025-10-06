@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
@@ -15,6 +15,20 @@ export type WorkoutDetailOptions = {
 export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   const queryClient = useQueryClient();
   const { workouts } = useAppContext();
+  const [hasSession, setHasSession] = useState(false);
+
+  // Check for active session
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) setHasSession(!!session);
+    })();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
+      if (mounted) setHasSession(!!session);
+    });
+    return () => { mounted = false; subscription.unsubscribe(); };
+  }, []);
 
   const isUuid = (v?: string | null) => !!v && /[0-9a-fA-F-]{36}/.test(v);
 
@@ -52,7 +66,7 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
 
   const query = useQuery({
     queryKey: ['workout-detail', id, optsKey],
-    enabled: !!id && isUuid(id) && !fromContext,
+    enabled: !!id && isUuid(id) && !fromContext && hasSession,
     queryFn: async () => {
       // Build normalized options once
       const normalized = JSON.parse(optsKey || '{}');
@@ -80,8 +94,15 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       // If analysis missing → compute once and wait
       if (!hasSeries(remote)) {
         try {
+          // Validate session before invoking edge function
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            throw new Error('Session expired - please log in again');
+          }
           await (supabase.functions.invoke as any)('compute-workout-analysis', { body: { workout_id: id } });
-        } catch {}
+        } catch (err) {
+          console.error('Failed to invoke compute-workout-analysis:', err);
+        }
         for (let i = 0; i < 6; i++) {
           await new Promise((r) => setTimeout(r, 700));
           try {

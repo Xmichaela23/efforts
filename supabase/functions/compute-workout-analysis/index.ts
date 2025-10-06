@@ -408,22 +408,6 @@ Deno.serve(async (req) => {
         variability_index: variabilityIndex,
         intensity_factor: intensityFactor
       } : undefined,
-      swim: (() => {
-        if (sport !== 'swim') return undefined;
-        // Use overall distance/duration (works even without samples)
-        const dist = overall?.distance_m || 0;
-        const dur = overall?.duration_s_moving || 0;
-        if (dist <= 0 || dur <= 0) return undefined;
-        // Pace per 100m (seconds)
-        const per100m = (dur / dist) * 100;
-        // Pace per 100yd (seconds)
-        const distYards = dist / 0.9144;
-        const per100yd = (dur / distYards) * 100;
-        return {
-          avg_pace_per_100m: Math.round(per100m),
-          avg_pace_per_100yd: Math.round(per100yd)
-        };
-      })(),
       ui: { footnote: `Computed at ${ANALYSIS_VERSION}`, renderHints: { preferPace: sport === 'run' } }
     };
 
@@ -462,7 +446,8 @@ Deno.serve(async (req) => {
         if (hasRows && distance_m.length > 1 && time_s.length === distance_m.length) {
           let next = 100; // meters
           let lastTCross = 0; // seconds since start
-          for (let i = 1; i < distance_m.length && next <= (distance_m[distance_m.length-1] || 0); i += 1) {
+          let maxIterations = 10000; // Safety guard against infinite loops
+          for (let i = 1; i < distance_m.length && next <= (distance_m[distance_m.length-1] || 0) && maxIterations-- > 0; i += 1) {
             const dPrev = Number(distance_m[i-1] || 0);
             const dCurr = Number(distance_m[i] || 0);
             const tPrev = Number(time_s[i-1] || 0);
@@ -517,7 +502,8 @@ Deno.serve(async (req) => {
               const td = Math.max(0, Number(len?.duration_s ?? 0) * scale);
               acc += Number.isFinite(d) ? d : 0;
               tAcc += Number.isFinite(td) ? td : 0;
-              while (acc >= bucket) {
+              let safetyCounter = 1000; // Prevent infinite loop
+              while (acc >= bucket && safetyCounter-- > 0) {
                 rows100.push({ n: rows100.length + 1, duration_s: Math.max(1, Math.round(tAcc)) });
                 tAcc = 0; bucket += 100;
               }
@@ -543,7 +529,7 @@ Deno.serve(async (req) => {
           const distSeries = hasRows ? Number(distance_m[distance_m.length-1]||0) : NaN;
           const timeSeries = hasRows ? Number(time_s[time_s.length-1]||0) : NaN;
           // Swims: ensure non-zero distance
-          if (type==='swim') {
+          if (type.includes('swim')) {
             let dist = Number.isFinite(distSeries) && distSeries>0 ? distSeries : null;
             if (!dist) {
               // lengths.sum
@@ -623,17 +609,49 @@ Deno.serve(async (req) => {
       return prevOverall || {};
     })();
 
+    // Add swim pace metrics to analysis (needs overall data)
+    if (sport.includes('swim')) {
+      console.log('🏊 Swim overall:', { dist: overall?.distance_m, dur: overall?.duration_s_moving, elapsed: overall?.duration_s_elapsed });
+      if (overall?.distance_m && overall?.duration_s_moving) {
+        const dist = overall.distance_m;
+        const dur = overall.duration_s_moving;
+        const per100m = (dur / dist) * 100;
+        const distYards = dist / 0.9144;
+        const per100yd = (dur / distYards) * 100;
+        analysis.swim = {
+          avg_pace_per_100m: Math.round(per100m),
+          avg_pace_per_100yd: Math.round(per100yd)
+        };
+        console.log('🏊 Swim pace calculated:', analysis.swim);
+      } else {
+        console.log('❌ Swim pace NOT calculated - missing distance or duration');
+      }
+    }
+
     // Write under workouts.computed with updated overall and analysis
     const computed = (() => {
       const c = parseJson(w.computed) || {};
       return { ...c, overall, analysis };
     })();
 
+    console.log('📝 About to UPDATE:', {
+      workout_id,
+      type: String(w.type),
+      has_overall: !!computed.overall,
+      has_analysis: !!computed.analysis,
+      analysis_version: computed.analysis?.version,
+      swim_in_analysis: !!computed.analysis?.swim,
+      power_in_analysis: !!computed.analysis?.power
+    });
+
     // Update workout with computed analysis
     const { error: upErr } = await supabase
       .from('workouts')
       .update({ computed })
       .eq('id', workout_id);
+    
+    console.log('✅ UPDATE result:', { error: upErr ? String(upErr) : null });
+    
     if (upErr) throw upErr;
 
     return new Response(JSON.stringify({ success: true, analysisVersion: ANALYSIS_VERSION }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
