@@ -309,17 +309,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
     );
   }
 
-  // 🔒 EXISTING GARMIN LOGIC - allow swims without GPS
-  if (workoutData.swim_data && (!workoutData.gps_track || workoutData.gps_track.length === 0)) {
-   return (
-     <div className="flex items-center justify-center h-64">
-       <div className="text-center">
-         <div className="text-gray-500 text-lg mb-2">No GPS data available</div>
-         <div className="text-gray-400 text-sm">This workout doesn't have GPS tracking data</div>
-       </div>
-     </div>
-   );
-  }
+  // Pool swims don't need GPS - they have metrics from lengths data
 
 
 
