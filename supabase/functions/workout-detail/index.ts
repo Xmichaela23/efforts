@@ -93,7 +93,8 @@ Deno.serve(async (req) => {
       'id','user_id','date','type','workout_status','planned_id','name','metrics','computed',
       'avg_heart_rate','max_heart_rate','avg_power','max_power','avg_cadence','max_cadence',
       'avg_speed','distance','duration','elapsed_time','moving_time','calories','steps','elevation_gain','elevation_loss',
-      'start_position_lat','start_position_long','timestamp'
+      'start_position_lat','start_position_long','timestamp',
+      'strength_exercises','mobility_exercises'
     ].join(',');
     const gpsSel = opts.include_gps ? ',gps_track' : '';
     const sensSel = opts.include_sensors ? ',sensor_data' : '';
@@ -117,6 +118,8 @@ Deno.serve(async (req) => {
     // Parse/attach structured fields
     try { (detail as any).computed = (()=>{ try { return typeof row.computed === 'string' ? JSON.parse(row.computed) : (row.computed || null); } catch { return row.computed || null; } })(); } catch {}
     try { (detail as any).metrics  = (()=>{ try { return typeof row.metrics  === 'string' ? JSON.parse(row.metrics)  : (row.metrics  || null); } catch { return row.metrics  || null; } })(); } catch {}
+    try { (detail as any).strength_exercises = (()=>{ try { return typeof row.strength_exercises === 'string' ? JSON.parse(row.strength_exercises) : (row.strength_exercises || null); } catch { return row.strength_exercises || null; } })(); } catch {}
+    try { (detail as any).mobility_exercises = (()=>{ try { return typeof row.mobility_exercises === 'string' ? JSON.parse(row.mobility_exercises) : (row.mobility_exercises || null); } catch { return row.mobility_exercises || null; } })(); } catch {}
     if (opts.include_gps) {
       try { (detail as any).gps_track = typeof row.gps_track === 'string' ? JSON.parse(row.gps_track) : (row.gps_track || null); } catch { (detail as any).gps_track = row.gps_track || null; }
     }

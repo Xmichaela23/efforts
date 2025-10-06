@@ -23,14 +23,6 @@ interface CompletedExercise {
 }
 
 const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData, plannedWorkout: passedPlannedWorkout }) => {
-  console.log('🔍 StrengthCompletedView received workoutData:', workoutData);
-  console.log('🔍 workoutData.type:', (workoutData as any)?.type);
-  console.log('🔍 strength_exercises:', (workoutData as any)?.strength_exercises);
-  console.log('🔍 mobility_exercises:', (workoutData as any)?.mobility_exercises);
-  console.log('🔍 completed_exercises:', (workoutData as any)?.completed_exercises);
-  console.log('🔍 workoutData type:', typeof workoutData);
-  console.log('🔍 workoutData keys:', Object.keys(workoutData));
-  
   const { workouts } = useAppContext();
   const [showComparison, setShowComparison] = useState(false);
 
@@ -157,7 +149,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     return { ...ex, sets: safeSets };
   });
 
-  // FIXED: Calculate total workout statistics - handle both array and single exercise formats
+  // Calculate total workout statistics
   const workoutStats = useMemo(() => {
     let totalSets = 0;
     let totalReps = 0;
@@ -170,11 +162,6 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
         totalSets += setsWithData.length;
         totalReps += setsWithData.reduce((sum, set) => sum + (set.reps || 0), 0);
         totalVolume += calculateExerciseVolume(exercise.sets);
-      } else if (exercise.notes) {
-        // Exercise with notes (from our description parsing)
-        totalSets += 1;
-        totalReps += exercise.reps || 0;
-        totalVolume += 0; // No weight data from description
       }
     });
 
@@ -261,23 +248,6 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           ) : (
             completedExercises.map((exercise: CompletedExercise, index: number) => {
               if (!exercise.name) return null;
-              
-              // Check if this is a workout with description details (from our fix)
-              if (exercise.notes) {
-                return (
-                  <div key={exercise.id || index} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{exercise.name}</h3>
-                      </div>
-                    </div>
-                    
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-700">{exercise.notes}</p>
-                    </div>
-                  </div>
-                );
-              }
               
               // Regular exercise with sets array
               if (!exercise.sets || !Array.isArray(exercise.sets)) return null;
