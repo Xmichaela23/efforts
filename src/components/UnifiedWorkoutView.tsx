@@ -382,7 +382,24 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         } catch {}
 
         const rowHasV3 = (() => { try { return Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length>0 && Number((row as any)?.computed?.total_duration_seconds) > 0; } catch { return false; }})();
-        const needsHydrate = !rowHasV3 && Array.isArray(stepsPreset) && stepsPreset.length>0;
+        const isStrength = String((row as any)?.type || '').toLowerCase() === 'strength';
+        
+        // Strength workouts: use server-side materialization for correct grouped structure
+        if (isStrength && !rowHasV3) {
+          try {
+            const pid = String(row.id);
+            await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
+            const { data: refreshed } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
+            if (refreshed) {
+              setHydratedPlanned(refreshed);
+              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+              return;
+            }
+          } catch {}
+        }
+        
+        // Skip client-side hydration for strength workouts
+        const needsHydrate = !rowHasV3 && !isStrength && Array.isArray(stepsPreset) && stepsPreset.length>0;
 
         if (needsHydrate) {
           const { data: { user } } = await supabase.auth.getUser();
