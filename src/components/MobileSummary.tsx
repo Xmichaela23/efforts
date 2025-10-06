@@ -381,22 +381,28 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
   // Strength and Mobility use compare table
   if (type === 'strength' || type === 'mobility') {
-    const exerciseField = type === 'strength' ? 'strength_exercises' : 'mobility_exercises';
-    
     // Try to extract from computed.steps first (unified field), fallback to direct field
     let plannedExercises = extractExercisesFromComputed(planned);
     if (plannedExercises.length === 0) {
       // Fallback to direct field if computed.steps not available
-      plannedExercises = (planned?.[exerciseField] || []).map((ex: any)=>{
-        const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
-        const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
-        const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
-        const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
-        return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum };
-      });
+      const directExercises = type === 'strength' 
+        ? (planned?.strength_exercises || [])
+        : (planned?.mobility_exercises || []);
+      
+      if (Array.isArray(directExercises)) {
+        plannedExercises = directExercises.map((ex: any)=>{
+          const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
+          const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
+          const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
+          const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
+          return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum };
+        });
+      }
     }
     
-    const completedExercises = (completed?.[exerciseField] || []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }));
+    const completedExercises = type === 'strength'
+      ? (Array.isArray(completed?.strength_exercises) ? completed.strength_exercises : []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }))
+      : (Array.isArray(completed?.mobility_exercises) ? completed.mobility_exercises : []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }));
     return (
       <div className="space-y-4">
         <StrengthCompareTable planned={plannedExercises} completed={completedExercises} />
