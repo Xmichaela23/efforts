@@ -376,6 +376,7 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
     steps.push({ id: uid(), kind:'strength', strength: { name: 'strength block' } });
     return { steps, total_s: 0 };
   }
+  console.log(`🔍 Parsing ${tokens.length} tokens for ${discipline}:`, tokens);
   for (const tok of tokens) {
     let added: any[] = [];
     if (discipline==='run' || discipline==='walk') added = expandRunToken(tok, baselines);
@@ -405,8 +406,15 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
         const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
+        console.log(`  ✅ Matched drill (name first): name="${name}", reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${equip}`);
         const distM = unit==='yd'? ydToM(dist) : dist;
-        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        for(let i=0;i<reps;i++) { 
+          steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); 
+          if(rest) {
+            steps.push({ id: uid(), kind:'recovery', duration_s: rest });
+            console.log(`    🔄 Added recovery step: ${rest}s`);
+          }
+        }
         continue;
       }
       // Drill (count first): swim_drills_6x50yd_fingertipdrag (optional _r15, optional equipment)
@@ -699,8 +707,13 @@ Deno.serve(async (req) => {
     let count = 0;
     for (const row of rows) {
       try {
+        console.log(`📋 Materializing: ${row.type} - ${row.name} (${row.id})`);
         const { steps, total_s } = expandTokensForRow(row, baselines);
+        console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
         if (steps && steps.length) {
+          // Count recovery steps
+          const recoverySteps = steps.filter((st:any) => st.kind === 'recovery' || st.kind === 'rest').length;
+          console.log(`  🔄 Recovery steps: ${recoverySteps}`);
           // Assign stable planned_index per step
           const withIndex = steps.map((st:any, idx:number)=> ({ ...st, planned_index: idx }));
           const v3 = withIndex.map(toV3Step);
@@ -708,7 +721,9 @@ Deno.serve(async (req) => {
           await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
           count += 1;
         }
-      } catch {}
+      } catch (err) {
+        console.error(`❌ Error materializing ${row.id}:`, err);
+      }
     }
     return new Response(JSON.stringify({ success:true, materialized: count }), { headers:{ ...corsHeaders, 'Content-Type':'application/json'} });
   } catch (e) {
