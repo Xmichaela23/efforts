@@ -43,28 +43,7 @@ function deriveSwimMovingSeconds(activityLike: any): number | null {
     const ms = Number(s.movingDurationInSeconds ?? s.timerDurationInSeconds);
     if (Number.isFinite(ms) && ms > 0) return Math.round(ms);
 
-    // 2) From lengths (authoritative for pool)
-    try {
-      const swim = activityLike?.swim_data ?? {};
-      const lens = Array.isArray(swim?.lengths) ? swim.lengths : [];
-      if (lens.length) {
-        const durs:number[] = lens.map((l:any)=> Number(l?.duration_s ?? NaN)).filter((n)=> Number.isFinite(n) && n > 0);
-        if (durs.length) {
-          const min = durs.reduce((m,n)=> Math.min(m,n), Number.POSITIVE_INFINITY);
-          const max = durs.reduce((m,n)=> Math.max(m,n), 0);
-          // If all lengths have essentially the same duration (likely reconstructed), treat as unreliable
-          const essentiallyUniform = durs.length >= 3 && (max - min) <= 1;
-          if (!essentiallyUniform) {
-            let sum = durs.reduce((a,b)=> a + b, 0);
-            const durS = Number(s.durationInSeconds ?? activityLike?.duration_seconds);
-            if (Number.isFinite(durS) && durS > 0 && sum > durS) sum = durS; // never exceed total elapsed
-            if (sum > 0) return Math.round(sum);
-          }
-        }
-      }
-    } catch {}
-
-    // 3) Distance ÷ avg speed, or distance × avg pace
+    // 2) Distance ÷ avg speed (Garmin's avgSpeed is based on moving time, not timer time!)
     const distM = Number(s.totalDistanceInMeters ?? s.distanceInMeters ?? activityLike?.distance_meters);
     const avgMps = Number(s.averageSpeedInMetersPerSecond ?? activityLike?.avg_speed_mps);
     const durS_forClamp = Number(s.durationInSeconds ?? activityLike?.duration_seconds);
@@ -73,6 +52,29 @@ function deriveSwimMovingSeconds(activityLike: any): number | null {
       if (Number.isFinite(durS_forClamp) && durS_forClamp > 0) est = Math.min(est, durS_forClamp);
       return Math.round(est);
     }
+
+    // 3) From lengths (only if non-uniform, indicating real Garmin lengths not reconstruction)
+    try {
+      const swim = activityLike?.swim_data ?? {};
+      const lens = Array.isArray(swim?.lengths) ? swim.lengths : [];
+      if (lens.length) {
+        const durs:number[] = lens.map((l:any)=> Number(l?.duration_s ?? NaN)).filter((n)=> Number.isFinite(n) && n > 0);
+        if (durs.length) {
+          const min = durs.reduce((m,n)=> Math.min(m,n), Number.POSITIVE_INFINITY);
+          const max = durs.reduce((m,n)=> Math.max(m,n), 0);
+          // Only use if non-uniform (real Garmin data, not our equal-time reconstruction)
+          const essentiallyUniform = durs.length >= 3 && (max - min) <= 1;
+          if (!essentiallyUniform) {
+            let sum = durs.reduce((a,b)=> a + b, 0);
+            const durS = Number(s.durationInSeconds ?? activityLike?.duration_seconds);
+            if (Number.isFinite(durS) && durS > 0 && sum > durS) sum = durS;
+            if (sum > 0) return Math.round(sum);
+          }
+        }
+      }
+    } catch {}
+
+    // 4) Distance × avg pace
     const avgMinPerKm = Number(s.averagePaceInMinutesPerKilometer);
     if (Number.isFinite(distM) && distM > 0 && Number.isFinite(avgMinPerKm) && avgMinPerKm > 0) {
       let est = (distM / 1000) * avgMinPerKm * 60;
@@ -467,6 +469,7 @@ async function mapGarminToWorkout(activity, userId) {
     const merged = {
       ...activity,
       sensor_data: enrichedData?.sensor_data || activity.sensor_data || null,
+      swim_data: activity.swim_data || null,
       summary,
       // Normalize common top-level fields for compute fallbacks
       distance_meters: activity.distance_meters ?? summary?.distanceInMeters ?? summary?.totalDistanceInMeters ?? null,
@@ -503,8 +506,8 @@ async function mapGarminToWorkout(activity, userId) {
       return Number.isFinite(s) && s>0 ? Math.floor(s/60) : null; 
     })(),
     moving_time: (()=>{ 
-      // For ALL activities with samples, extract moving duration from last sample
-      if (enrichedData?.raw_data?.samples) {
+      // For non-swim activities, extract moving duration from last sample
+      if (type !== 'swim' && enrichedData?.raw_data?.samples) {
         const samples = Array.isArray(enrichedData.raw_data.samples) ? enrichedData.raw_data.samples : [];
         if (samples.length > 0) {
           const movingS = Number(samples[samples.length - 1]?.movingDurationInSeconds);
@@ -513,6 +516,11 @@ async function mapGarminToWorkout(activity, userId) {
       }
       const ms = Number(computeInput?.summary?.movingDurationInSeconds ?? computeInput?.summary?.timerDurationInSeconds); 
       if (Number.isFinite(ms) && ms>0) return Math.floor(ms/60);
+      // For swims, use the derive helper which sums swim lengths
+      if (type === 'swim') {
+        const derived = deriveSwimMovingSeconds(computeInput);
+        if (Number.isFinite(derived as any) && (derived as number) > 0) return Math.floor((derived as number) / 60);
+      }
       return null;
     })(),
     elapsed_time: (()=>{ 
@@ -593,6 +601,15 @@ async function mapGarminToWorkout(activity, userId) {
     // If details provided normalized lengths/laps, persist them
     swim_data: (()=>{
       try {
+        console.log('🏊 swim_data check:', {
+          has_computeInput_swim_data: !!computeInput?.swim_data,
+          has_computeInput_lengths: !!computeInput?.swim_data?.lengths,
+          num_computeInput_lengths: Array.isArray(computeInput?.swim_data?.lengths) ? computeInput.swim_data.lengths.length : 0,
+          has_activity_swim_data: !!activity.swim_data,
+          activity_swim_data_type: typeof activity.swim_data,
+          has_activity_lengths: !!activity.swim_data?.lengths,
+          num_activity_lengths: Array.isArray(activity.swim_data?.lengths) ? activity.swim_data.lengths.length : 0
+        });
         return computeInput?.swim_data?.lengths ? JSON.stringify({
           lengths: computeInput.swim_data.lengths
         }) : activity.swim_data ? JSON.stringify(activity.swim_data) : null;

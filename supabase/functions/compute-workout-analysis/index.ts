@@ -472,44 +472,68 @@ Deno.serve(async (req) => {
                 if (Number.isFinite(nLen) && nLen>0 && Number.isFinite(poolM) && poolM>0) dist = Math.round(nLen*poolM);
               }
             }
-            // Extract time from Garmin: for pool swims, get timer/clock duration from last sample
-            let dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries) : null;
+            // Extract time from Garmin: for pool swims, use distance/speed or non-uniform lengths
+            let dur = null;
             let elapsedDur = null;
             
-            if (!dur && ga) {
+            // 1) Distance ÷ avg speed (Garmin's avgSpeed is based on moving time!)
+            if (ga) {
               try {
                 const raw = parseJson(ga.raw_data) || {};
-                const samples = Array.isArray(raw?.samples) ? raw.samples : [];
-                if (samples.length > 0) {
-                  // Last sample has cumulative timer/clock duration
-                  const lastSample = samples[samples.length - 1];
-                  const timerS = Number(lastSample?.timerDurationInSeconds);
-                  const clockS = Number(lastSample?.clockDurationInSeconds);
-                  if (Number.isFinite(timerS) && timerS > 0) dur = Math.round(timerS);
-                  if (Number.isFinite(clockS) && clockS > 0) elapsedDur = Math.round(clockS);
-                }
-                // Fallback to summary if samples don't have it
-                if (!dur) {
-                  const garminDur = Number(raw?.summary?.durationInSeconds ?? raw?.durationInSeconds);
-                  if (Number.isFinite(garminDur) && garminDur > 0) dur = Math.round(garminDur);
+                const summary = raw?.summary || {};
+                const distM = Number(summary?.distanceInMeters ?? summary?.totalDistanceInMeters);
+                const avgMps = Number(summary?.averageSpeedInMetersPerSecond);
+                if (Number.isFinite(distM) && distM > 0 && Number.isFinite(avgMps) && avgMps > 0) {
+                  dur = Math.round(distM / avgMps);
+                  console.log(`🏊 Using distance/avgSpeed = ${dur}s for moving time`);
                 }
               } catch {}
             }
             
+            // 2) Try summing swim lengths (only if non-uniform, indicating real Garmin data)
             if (!dur) {
-              // Try lengths as fallback
               const swim = parseJson((w as any).swim_data) || null;
               const lengths: any[] = Array.isArray(swim?.lengths) ? swim.lengths : [];
               if (lengths.length > 0) {
-                const lengthSum = lengths.reduce((sum:number, len:any) => {
-                  const d = Number(len?.duration_s ?? 0);
-                  return sum + (Number.isFinite(d) ? d : 0);
-                }, 0);
-                if (lengthSum > 0) {
-                  dur = Math.round(lengthSum);
-                  elapsedDur = dur; // Use same value
+                const durs = lengths.map(l => Number(l?.duration_s ?? 0)).filter(d => d > 0);
+                if (durs.length) {
+                  const min = Math.min(...durs);
+                  const max = Math.max(...durs);
+                  const essentiallyUniform = durs.length >= 3 && (max - min) <= 1;
+                  if (!essentiallyUniform) {
+                    const lengthSum = durs.reduce((a,b) => a + b, 0);
+                    if (lengthSum > 0) {
+                      dur = Math.round(lengthSum);
+                      console.log(`🏊 Using sum of ${lengths.length} non-uniform lengths = ${dur}s`);
+                    }
+                  }
                 }
               }
+            }
+            
+            // 3) Extract elapsed time from samples
+            if (ga) {
+              try {
+                const raw = parseJson(ga.raw_data) || {};
+                const samples = Array.isArray(raw?.samples) ? raw.samples : [];
+                if (samples.length > 0) {
+                  const lastSample = samples[samples.length - 1];
+                  const clockS = Number(lastSample?.clockDurationInSeconds);
+                  if (Number.isFinite(clockS) && clockS > 0) elapsedDur = Math.round(clockS);
+                }
+              } catch {}
+            }
+            
+            // 4) Fallback: timeSeries or summary duration
+            if (!dur) {
+              dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries) : null;
+            }
+            if (!dur && ga) {
+              try {
+                const raw = parseJson(ga.raw_data) || {};
+                const garminDur = Number(raw?.summary?.durationInSeconds ?? raw?.durationInSeconds);
+                if (Number.isFinite(garminDur) && garminDur > 0) dur = Math.round(garminDur);
+              } catch {}
             }
             
             // Last resort fallback from workouts table fields (already in minutes, convert to seconds)
