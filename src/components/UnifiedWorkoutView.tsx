@@ -782,13 +782,17 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 onClick={async()=>{
                   try {
                     const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
-                    if (!pid) return;
+                    const wid = String((workout as any)?.id || '');
+                    if (!pid || !wid) return;
                     // disable re-link noise then detach
                     suppressRelinkUntil.current = Date.now() + 15000; // 15s
-                    // Soft-unattach only switches UI state; preserve DB linkage unless user confirms destructive unattach
+                    // Remove the database link
                     try {
+                      await supabase.from('workouts').update({ planned_id: null } as any).eq('id', wid);
                       await supabase.from('planned_workouts').update({ workout_status: 'planned' } as any).eq('id', pid);
                     } catch {}
+                    // Clear local state
+                    (workout as any).planned_id = null;
                     setLinkedPlanned(null);
                     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                     try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
