@@ -1546,27 +1546,30 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               return sum;
             }, 0);
             
-            // Get planned duration (for swims, estimate from distance using baseline pace)
+            // Get planned duration (sum explicit durations from steps, same as Planned tab)
             const plannedTotalSeconds = (() => {
-              // Get baseline swim pace
+              // Sum explicit seconds from all steps first
+              let timedTotal = 0;
+              stepsDisplay.forEach((st: any) => {
+                const secs = Number(st?.seconds ?? st?.duration ?? st?.duration_s ?? st?.duration_sec);
+                if (Number.isFinite(secs) && secs > 0) {
+                  timedTotal += Math.round(secs);
+                }
+              });
+              
+              // If we got explicit times, use them (includes warmup, rest, cooldown, etc)
+              if (timedTotal > 0) return timedTotal;
+              
+              // Fallback: estimate from distance using baseline pace (only if no explicit times)
               const secPer100FromBaseline = (() => {
                 const pace = Number(planned?.baselines_template?.swim_pace_per_100_sec ?? planned?.baselines?.swim_pace_per_100_sec);
                 return (Number.isFinite(pace) && pace > 0) ? pace : 90; // Default 1:30/100m
               })();
               
-              // Estimate from distance using baseline pace (same logic as StructuredPlannedView)
               let estTotal = 0;
-              let timedTotal = 0;
               const poolUnit = planned?.pool_unit as 'yd' | 'm' | null;
               
               stepsDisplay.forEach((st: any) => {
-                // Add explicit seconds if present
-                const secs = Number(st?.seconds);
-                if (Number.isFinite(secs) && secs > 0) {
-                  timedTotal += Math.round(secs);
-                }
-                
-                // Estimate from distance for swims
                 const distM = Number(st?.distanceMeters ?? st?.distance_m ?? st?.m ?? st?.meters);
                 const distYd = Number(st?.distance_yd ?? st?.distance_yds);
                 
@@ -1581,8 +1584,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                 }
               });
               
-              // For swims, prefer baseline-estimated duration; else use timed steps
-              return estTotal > 0 ? Math.round(estTotal) : timedTotal;
+              return estTotal > 0 ? Math.round(estTotal) : 0;
             })();
             
             const executedMeters = Number(compOverall?.distance_m) || (Number((completed as any)?.distance) * 1000) || 0;
