@@ -1538,43 +1538,27 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const plannedTotalSeconds = (() => {
               // Priority 1: Use server-computed total_duration_seconds (most accurate, in seconds)
               const serverTotalSec = Number(planned?.computed?.total_duration_seconds ?? planned?.total_duration_seconds);
-              console.log('🏊 DEBUG planned duration:', {
-                'planned?.computed?.total_duration_seconds': planned?.computed?.total_duration_seconds,
-                'planned?.total_duration_seconds': planned?.total_duration_seconds,
-                'planned?.duration': (planned as any)?.duration,
-                'serverTotalSec': serverTotalSec,
-                'stepsDisplay.length': stepsDisplay.length,
-                'stepsDisplay[0]': stepsDisplay[0],
-                'plannedStepsFull.length': plannedStepsFull.length,
-                'plannedStepsFull[0]?.seconds': plannedStepsFull[0]?.seconds
-              });
               if (Number.isFinite(serverTotalSec) && serverTotalSec > 0) {
-                console.log('✅ Using serverTotalSec:', serverTotalSec);
                 return Math.round(serverTotalSec);
               }
               
               // Priority 1b: Use planned.duration (stored in minutes by materialize-plan)
               const durationMin = Number((planned as any)?.duration);
               if (Number.isFinite(durationMin) && durationMin > 0) {
-                console.log('✅ Using planned.duration (minutes):', durationMin);
                 return Math.round(durationMin * 60);
               }
               
               // Priority 2: Sum explicit seconds from all steps
               let timedTotal = 0;
-              stepsDisplay.forEach((st: any, idx: number) => {
+              stepsDisplay.forEach((st: any) => {
                 const secs = Number(st?.seconds ?? st?.duration ?? st?.duration_s ?? st?.duration_sec);
                 if (Number.isFinite(secs) && secs > 0) {
-                  console.log(`  Step ${idx}: ${secs}s`);
                   timedTotal += Math.round(secs);
                 }
               });
               
               // If we got explicit times, use them (includes warmup, rest, cooldown, etc)
-              if (timedTotal > 0) {
-                console.log('✅ Using timedTotal from steps:', timedTotal);
-                return timedTotal;
-              }
+              if (timedTotal > 0) return timedTotal;
               
               // Priority 3: Fallback - estimate from distance using baseline pace (only if no explicit times)
               const secPer100FromBaseline = (() => {

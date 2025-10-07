@@ -563,6 +563,30 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       }
     }
   } catch {}
+  
+  // For swim steps with distance but no duration, estimate duration using baseline pace
+  if (discipline === 'swim') {
+    try {
+      const swimPacePer100Sec = (() => {
+        const pace = baselines?.swim_pace_per_100_sec ?? (row as any)?.baselines_template?.swim_pace_per_100_sec ?? (row as any)?.baselines?.swim_pace_per_100_sec;
+        return (typeof pace === 'number' && pace > 0) ? pace : 90; // Default 1:30/100m
+      })();
+      const poolUnit = (row as any)?.pool_unit as 'yd' | 'm' | null;
+      
+      for (const st of steps) {
+        // Skip if step already has duration
+        if (typeof st.duration_s === 'number' && st.duration_s > 0) continue;
+        
+        const distM = typeof st.distanceMeters === 'number' ? st.distanceMeters : 0;
+        if (distM > 0) {
+          // Convert to appropriate unit and estimate duration
+          const dist100 = (poolUnit === 'yd') ? (distM / 0.9144) / 100 : distM / 100;
+          st.duration_s = Math.round(dist100 * swimPacePer100Sec);
+        }
+      }
+    } catch {}
+  }
+  
   const total_s = steps.reduce((s,st)=> s + (Number(st.duration_s)||0), 0);
   return { steps, total_s };
 }
