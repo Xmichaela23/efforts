@@ -237,7 +237,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     })();
   }, [activeTab, isCompleted, linkedPlanned?.id, workout?.id]);
 
-  // Summary tab planned: read-only; no client materialization
+  // Summary tab planned: read-only; trigger materialization if needed
   useEffect(() => {
     (async () => {
       try {
@@ -246,9 +246,29 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (!pid) return;
         const { data: row } = await supabase
           .from('planned_workouts')
-          .select('id,type,computed,steps_preset,export_hints,tags,workout_structure,rendered_description,description,name')
+          .select('id,type,computed,steps_preset,export_hints,tags,workout_structure,rendered_description,description,name,strength_exercises,mobility_exercises')
           .eq('id', pid)
           .maybeSingle();
+        
+        // If computed.steps is missing for strength/mobility, trigger server materialization
+        const workoutType = String(row?.type || '').toLowerCase();
+        const hasComputed = Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length > 0;
+        if (!hasComputed && (workoutType === 'strength' || workoutType === 'mobility')) {
+          try {
+            await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
+            // Refetch after materialization
+            const { data: refreshed } = await supabase
+              .from('planned_workouts')
+              .select('id,type,computed,steps_preset,export_hints,tags,workout_structure,rendered_description,description,name,strength_exercises,mobility_exercises')
+              .eq('id', pid)
+              .maybeSingle();
+            setHydratedPlanned(refreshed as any);
+            return;
+          } catch (e) {
+            console.error('Failed to materialize planned workout:', e);
+          }
+        }
+        
         setHydratedPlanned(row as any);
       } catch {}
     })();

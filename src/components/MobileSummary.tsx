@@ -413,9 +413,21 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
       }
     }
     
+    // Parse completed exercises (may be JSON string from database)
+    const parseCompletedExercises = (raw: any): any[] => {
+      try {
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === 'string' && raw.trim()) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {}
+      return [];
+    };
+    
     const completedExercises = type === 'strength'
-      ? (Array.isArray(completed?.strength_exercises) ? completed.strength_exercises : []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }))
-      : (Array.isArray(completed?.mobility_exercises) ? completed.mobility_exercises : []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }));
+      ? parseCompletedExercises(completed?.strength_exercises).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }))
+      : parseCompletedExercises(completed?.mobility_exercises).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }));
     
     console.log('🔍 [MobileSummary] Final planned exercises:', plannedExercises);
     console.log('🔍 [MobileSummary] Final completed exercises:', completedExercises);
