@@ -1629,13 +1629,34 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const anyVal = (distPct != null) || (timePct != null);
             if (!anyVal) return null;
             
+            const fmtDist = (m: number) => useImperial ? `${Math.round(m / 0.9144)} yd` : `${Math.round(m)} m`;
+            const fmtTime = (s: number) => { const min = Math.floor(s / 60); const sec = Math.round(s % 60); return `${min}:${String(sec).padStart(2, '0')}`; };
+            
             return (
-              <div className="flex items-center justify-center gap-6 text-center">
-                <div className="flex items-end gap-3">
-                  {chip('Distance', distPct, distDelta != null ? fmtDistDelta(distDelta) : '—')}
-                  {chip('Duration', timePct, timeDelta != null ? fmtTimeDelta(timeDelta) : '—')}
+              <>
+                <div className="flex items-center justify-center gap-6 text-center">
+                  <div className="flex items-end gap-3">
+                    {chip('Distance', distPct, distDelta != null ? fmtDistDelta(distDelta) : '—')}
+                    {chip('Duration', timePct, timeDelta != null ? fmtTimeDelta(timeDelta) : '—')}
+                  </div>
                 </div>
-              </div>
+                
+                {/* Simple summary row showing planned vs executed */}
+                <div className="mt-4 px-4 py-3 bg-gray-50 rounded-lg">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Planned</div>
+                      <div className="font-medium">{plannedTotalMeters > 0 ? fmtDist(plannedTotalMeters) : '—'}</div>
+                      <div className="text-gray-600">{plannedTotalSeconds > 0 ? fmtTime(plannedTotalSeconds) : '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Executed</div>
+                      <div className="font-medium">{executedMeters > 0 ? fmtDist(executedMeters) : '—'}</div>
+                      <div className="text-gray-600">{executedSeconds > 0 ? fmtTime(executedSeconds) : '—'}</div>
+                    </div>
+                  </div>
+                </div>
+              </>
             );
           })()}
         </div>
