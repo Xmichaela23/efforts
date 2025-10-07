@@ -1534,9 +1534,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               return sum;
             }, 0);
             
-            // Get planned duration (sum explicit durations from steps, same as Planned tab)
+            // Get planned duration - prioritize server-computed total, then explicit step durations, then estimate
             const plannedTotalSeconds = (() => {
-              // Sum explicit seconds from all steps first
+              // Priority 1: Use server-computed total_duration_seconds (most accurate)
+              const serverTotal = Number(planned?.computed?.total_duration_seconds ?? planned?.total_duration_seconds);
+              if (Number.isFinite(serverTotal) && serverTotal > 0) {
+                return Math.round(serverTotal);
+              }
+              
+              // Priority 2: Sum explicit seconds from all steps
               let timedTotal = 0;
               stepsDisplay.forEach((st: any) => {
                 const secs = Number(st?.seconds ?? st?.duration ?? st?.duration_s ?? st?.duration_sec);
@@ -1548,7 +1554,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               // If we got explicit times, use them (includes warmup, rest, cooldown, etc)
               if (timedTotal > 0) return timedTotal;
               
-              // Fallback: estimate from distance using baseline pace (only if no explicit times)
+              // Priority 3: Fallback - estimate from distance using baseline pace (only if no explicit times)
               const secPer100FromBaseline = (() => {
                 const pace = Number(planned?.baselines_template?.swim_pace_per_100_sec ?? planned?.baselines?.swim_pace_per_100_sec);
                 return (Number.isFinite(pace) && pace > 0) ? pace : 90; // Default 1:30/100m
