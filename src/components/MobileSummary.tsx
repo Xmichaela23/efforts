@@ -286,18 +286,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     }
   }
 
-  const [planned, setEffectivePlanned] = useState<any>(planned);
-  // Only replace local planned when the id changes, not on every prop update
-  useEffect(() => {
-    const newId = String((planned as any)?.id || '');
-    const curId = String((planned as any)?.id || '');
-    if (newId && newId !== curId) setEffectivePlanned(planned);
-  }, [planned?.id]);
-  // No client hydration: trust server feed; keep prop as effective
-  useEffect(() => {
-    setEffectivePlanned(planned);
-  }, [planned]);
-
   const type = String((planned as any)?.type || (completed as any)?.type || '').toLowerCase();
   const isRidePlanned = /ride|bike|cycling/.test(type);
   const refinedType = String((completed as any)?.refined_type || '').toLowerCase();
