@@ -412,7 +412,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             const { data: refreshed } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
             if (refreshed) {
               setHydratedPlanned(refreshed);
-              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+              // Delay invalidate event to ensure state update completes first
+              setTimeout(() => {
+                try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+              }, 100);
               return;
             }
           } catch {}
@@ -444,7 +447,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               // Preserve authoritative DB total_duration_seconds if present on row
               const authoritativeTotal = Number((row as any)?.total_duration_seconds);
               setHydratedPlanned({ ...row, ...(Number.isFinite(authoritativeTotal) && authoritativeTotal>0 ? { total_duration_seconds: authoritativeTotal } : {}), ...update });
-              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+              // Delay invalidate event to ensure state update completes first
+              setTimeout(() => {
+                try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+              }, 100);
               return;
             }
           } catch {}
