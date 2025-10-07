@@ -806,13 +806,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             onClose={()=>setAssocOpen(false)}
             onAssociated={async(pid)=>{ 
               try { (workout as any).planned_id = pid; } catch {}
-              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
               try {
                 // Wait for materialize-plan to finish generating steps, then fetch
                 await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
                 const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
                 setLinkedPlanned(data || null);
                 await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any)?.id) } });
+                // Dispatch invalidate AFTER we've set the complete data, so other listeners don't overwrite it
+                try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                 try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
               } catch {}
             }}
@@ -953,13 +954,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         onClose={()=>setAssocOpen(false)}
                         onAssociated={async(pid)=>{ 
                           try { (workout as any).planned_id = pid; } catch {}
-                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                           try {
                             // Wait for materialize-plan to finish generating steps, then fetch
                             await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
                             const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
                             setLinkedPlanned(data || null);
                             await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any)?.id) } });
+                            // Dispatch invalidate AFTER we've set the complete data, so other listeners don't overwrite it
+                            try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                             try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                           } catch {}
                         }}
