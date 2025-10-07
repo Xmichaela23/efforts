@@ -1536,10 +1536,16 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             
             // Get planned duration - prioritize server-computed total, then explicit step durations, then estimate
             const plannedTotalSeconds = (() => {
-              // Priority 1: Use server-computed total_duration_seconds (most accurate)
-              const serverTotal = Number(planned?.computed?.total_duration_seconds ?? planned?.total_duration_seconds);
-              if (Number.isFinite(serverTotal) && serverTotal > 0) {
-                return Math.round(serverTotal);
+              // Priority 1: Use server-computed total_duration_seconds (most accurate, in seconds)
+              const serverTotalSec = Number(planned?.computed?.total_duration_seconds ?? planned?.total_duration_seconds);
+              if (Number.isFinite(serverTotalSec) && serverTotalSec > 0) {
+                return Math.round(serverTotalSec);
+              }
+              
+              // Priority 1b: Use planned.duration (stored in minutes by materialize-plan)
+              const durationMin = Number((planned as any)?.duration);
+              if (Number.isFinite(durationMin) && durationMin > 0) {
+                return Math.round(durationMin * 60);
               }
               
               // Priority 2: Sum explicit seconds from all steps
