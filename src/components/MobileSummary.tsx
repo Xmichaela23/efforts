@@ -1532,33 +1532,96 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
       })()}
 
       {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
-      <table className="w-full text-[13px] table-fixed">
-        <colgroup>
-          <col className="w-[36%]" />
-          <col className="w-[22%]" />
-          <col className="w-[16%]" />
-          <col className="w-[14%]" />
-          <col className="w-[12%]" />
-        </colgroup>
-        <thead>
-          <tr className="border-b border-gray-200">
-            <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Planned</th>
-            {isPoolSwim ? (
-              <>
-                <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Time</th>
-                <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap" colSpan={2}>HR</th>
-              </>
-            ) : (
-              <>
-                <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">{isRideSport ? 'Watts' : (isSwimSport ? '/100 (pref)' : 'Pace')}</th>
-                <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Dist</th>
-                <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Time</th>
-                <th className="px-1 py-2 text-left font-medium text-gray-600 whitespace-nowrap">BPM</th>
-              </>
-            )}
-          </tr>
-        </thead>
-        <tbody>
+      
+      {/* Pool swims: show distance and duration chips (no per-interval data) */}
+      {isPoolSwim ? (
+        <div className="w-full pt-1 pb-2">
+          {(() => {
+            const compOverall = (completed as any)?.computed?.overall || {};
+            const plannedTotalMeters = stepsDisplay.reduce((sum: number, st: any) => {
+              const meters = Number((st as any)?.distanceMeters ?? (st as any)?.distance_m ?? (st as any)?.m ?? (st as any)?.meters);
+              const yd = Number((st as any)?.distance_yd ?? (st as any)?.distance_yds);
+              if (Number.isFinite(meters) && meters > 0) return sum + meters;
+              if (Number.isFinite(yd) && yd > 0) return sum + (yd * 0.9144);
+              return sum;
+            }, 0);
+            const plannedTotalSeconds = stepsDisplay.reduce((sum: number, st: any) => {
+              const sec = [(st as any)?.seconds, (st as any)?.duration, (st as any)?.duration_sec, (st as any)?.duration_s]
+                .map((v: any) => Number(v)).find((n: number) => Number.isFinite(n) && n > 0);
+              return sum + (sec || 0);
+            }, 0);
+            
+            const executedMeters = Number(compOverall?.distance_m) || (Number((completed as any)?.distance) * 1000) || 0;
+            const executedSeconds = Number(compOverall?.duration_s_moving) || (Number((completed as any)?.moving_time) * 60) || 0;
+            
+            const distPct = plannedTotalMeters > 0 ? Math.round((executedMeters / plannedTotalMeters) * 100) : null;
+            const timePct = plannedTotalSeconds > 0 ? Math.round((executedSeconds / plannedTotalSeconds) * 100) : null;
+            
+            const distDelta = plannedTotalMeters > 0 && executedMeters > 0 ? executedMeters - plannedTotalMeters : null;
+            const timeDelta = plannedTotalSeconds > 0 && executedSeconds > 0 ? executedSeconds - plannedTotalSeconds : null;
+            
+            const chip = (label: string, pct: number | null, text: string) => {
+              if (pct == null) return null;
+              const color = getPercentageColor(pct);
+              return (
+                <div className="flex flex-col items-center px-2">
+                  <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
+                  <div className="text-[11px] text-gray-700">{label}</div>
+                  <div className="text-[11px] text-gray-600">{text}</div>
+                </div>
+              );
+            };
+            
+            const fmtDistDelta = (m: number) => {
+              const sign = m >= 0 ? '+' : '−';
+              const abs = Math.abs(m);
+              if (useImperial) {
+                const yd = Math.round(abs / 0.9144);
+                return `${sign}${yd} yd`;
+              }
+              return `${sign}${Math.round(abs)} m`;
+            };
+            
+            const fmtTimeDelta = (s: number) => {
+              const sign = s >= 0 ? '+' : '−';
+              const v = Math.abs(Math.round(s));
+              const m = Math.floor(v / 60);
+              const ss = v % 60;
+              return `${sign}${m}:${String(ss).padStart(2, '0')}`;
+            };
+            
+            const anyVal = (distPct != null) || (timePct != null);
+            if (!anyVal) return null;
+            
+            return (
+              <div className="flex items-center justify-center gap-6 text-center">
+                <div className="flex items-end gap-3">
+                  {chip('Distance', distPct, distDelta != null ? fmtDistDelta(distDelta) : '—')}
+                  {chip('Duration', timePct, timeDelta != null ? fmtTimeDelta(timeDelta) : '—')}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      ) : (
+        <table className="w-full text-[13px] table-fixed">
+          <colgroup>
+            <col className="w-[36%]" />
+            <col className="w-[22%]" />
+            <col className="w-[16%]" />
+            <col className="w-[14%]" />
+            <col className="w-[12%]" />
+          </colgroup>
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Planned</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">{isRideSport ? 'Watts' : (isSwimSport ? '/100 (pref)' : 'Pace')}</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Dist</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Time</th>
+              <th className="px-1 py-2 text-left font-medium text-gray-600 whitespace-nowrap">BPM</th>
+            </tr>
+          </thead>
+          <tbody>
           {stepsDisplay.map((st, idx) => {
             let row: any = null;
             if (hasServerComputed) {
@@ -1653,46 +1716,24 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                     )}
                   </div>
                 </td>
-                {isPoolSwim ? (
-                  <>
-                    <td className="px-2 py-1.5 font-medium">{timeCell}</td>
-                    <td className="px-2 py-1.5 text-[13px]" colSpan={2}>
-                      <div className="text-left">
-                        {hrVal != null ? (
-                          <>
-                            <div className="font-medium">{hrVal}</div>
-                            <div className="text-[10px] text-gray-500">bpm</div>
-                          </>
-                        ) : '—'}
-                      </div>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td className="px-2 py-1.5 font-medium">{execCell}</td>
-                    <td className="px-2 py-1.5">{distCell}</td>
-                    <td className="px-2 py-1.5">{timeCell}</td>
-                    <td className="px-1 py-1.5 text-[13px]">
-                      <div className="text-right">
-                        {hrVal != null ? (
-                          <>
-                            <div className="font-medium">{hrVal}</div>
-                            <div className="text-[10px] text-gray-500">bpm</div>
-                          </>
-                        ) : '—'}
-                      </div>
-                    </td>
-                  </>
-                )}
+                <td className="px-2 py-1.5 font-medium">{execCell}</td>
+                <td className="px-2 py-1.5">{distCell}</td>
+                <td className="px-2 py-1.5">{timeCell}</td>
+                <td className="px-1 py-1.5 text-[13px]">
+                  <div className="text-right">
+                    {hrVal != null ? (
+                      <>
+                        <div className="font-medium">{hrVal}</div>
+                        <div className="text-[10px] text-gray-500">bpm</div>
+                      </>
+                    ) : '—'}
+                  </div>
+                </td>
               </tr>
             );
           })}
-        </tbody>
-      </table>
-      {isPoolSwim && (
-        <div className="px-2 py-2 text-xs text-gray-500 italic">
-          Pool swim: intervals matched by time. Distance/pace/stroke rate per interval not available from Garmin API.
-        </div>
+          </tbody>
+        </table>
       )}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
         <div className="py-2">
