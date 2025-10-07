@@ -418,30 +418,69 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         continue;
       }
       // Drill (count first): swim_drills_6x50yd_fingertipdrag (optional _r15, optional equipment)
-      m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
+      // Use negative lookahead to prevent drill name from consuming _r\d+ pattern
+      m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+?)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?$/);
       if (m) {
         const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name=m[4].replace(/_/g,' '); const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
+        console.log(`  ✅ Matched drill (count first): name="${name}", reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${equip}`);
         const distM = unit==='yd'? ydToM(dist) : dist;
-        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        for(let i=0;i<reps;i++) { 
+          steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); 
+          if(rest) {
+            steps.push({ id: uid(), kind:'recovery', duration_s: rest });
+            console.log(`    🔄 Added recovery step: ${rest}s`);
+          }
+        }
         continue;
       }
-      // Aerobic sets: swim_aerobic_6x150yd(_r20)?
-      m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/);
+      // Aerobic sets: swim_aerobic_6x150yd[_easy](_r20)?
+      m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_([a-z]+?))?(?:_r(\d+))?$/);
       if (m) {
-        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const rest=parseInt(m[4]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
-        for(let i=0;i<reps;i++){ steps.push({ id: uid(), kind:'work', distance_m: distM, label:'aerobic' }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const label=m[4]||'aerobic'; const rest=parseInt(m[5]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
+        console.log(`  ✅ Matched aerobic: reps=${reps}, dist=${dist}${unit}, label="${label}", rest=${rest}s`);
+        for(let i=0;i<reps;i++){ 
+          steps.push({ id: uid(), kind:'work', distance_m: distM, label }); 
+          if(rest) {
+            steps.push({ id: uid(), kind:'recovery', duration_s: rest });
+            console.log(`    🔄 Added recovery step: ${rest}s`);
+          }
+        }
         continue;
       }
       // Threshold sets: swim_threshold_8x100yd(_r10)?
-      m = s.match(/swim_threshold_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/);
+      m = s.match(/swim_threshold_(\d+)x(\d+)(yd|m)(?:_r(\d+))?$/);
       if (m) {
         const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const rest=parseInt(m[4]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
-        for(let i=0;i<reps;i++){ steps.push({ id: uid(), kind:'work', distance_m: distM, label:'threshold' }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        console.log(`  ✅ Matched threshold: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
+        for(let i=0;i<reps;i++){ 
+          steps.push({ id: uid(), kind:'work', distance_m: distM, label:'threshold' }); 
+          if(rest) {
+            steps.push({ id: uid(), kind:'recovery', duration_s: rest });
+            console.log(`    🔄 Added recovery step: ${rest}s`);
+          }
+        }
         continue;
       }
-      // Pull/Kick sets
-      m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
-      if (m) { const kind=m[1]; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const eq=m[6]|| sessionEquip || (kind==='pull'?'buoy': (kind==='kick'?'board':null)); const distM=unit==='yd'? ydToM(dist):dist; for(let i=0;i<reps;i++){ steps.push({ id: uid(), kind:'work', distance_m: distM, label:kind, equipment:eq||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); } continue; }
+      // Pull/Kick sets: swim_pull_4x100yd_r20_buoy
+      m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?$/);
+      if (m) { 
+        const kind=m[1]; 
+        const reps=parseInt(m[2],10); 
+        const dist=parseInt(m[3],10); 
+        const unit=m[4]; 
+        const rest=parseInt(m[5]||'0',10); 
+        const eq=m[6]|| sessionEquip || (kind==='pull'?'buoy': (kind==='kick'?'board':null)); 
+        const distM=unit==='yd'? ydToM(dist):dist; 
+        console.log(`  ✅ Matched ${kind}: reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${eq}`);
+        for(let i=0;i<reps;i++){ 
+          steps.push({ id: uid(), kind:'work', distance_m: distM, label:kind, equipment:eq||undefined }); 
+          if(rest) {
+            steps.push({ id: uid(), kind:'recovery', duration_s: rest });
+            console.log(`    🔄 Added recovery step: ${rest}s`);
+          }
+        } 
+        continue; 
+      }
       // Fallback distance/time
       if (/\d+yd/.test(s)) { const mm=s.match(/(\d+)yd/); const yd=mm?parseInt(mm[1],10):0; const mtr=ydToM(yd); steps.push({ id: uid(), kind:'work', distance_m: mtr }); continue; }
       if (/\d+min/.test(s)) { const sec=minutesTokenToSeconds(s) ?? 600; steps.push({ id: uid(), kind:'work', duration_s: sec }); continue; }
@@ -587,17 +626,24 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       const swimPacePer100Sec = (() => {
         // Try numeric format first (seconds per 100)
         const numPace = baselines?.swim_pace_per_100_sec ?? (row as any)?.baselines_template?.swim_pace_per_100_sec ?? (row as any)?.baselines?.swim_pace_per_100_sec;
-        if (typeof numPace === 'number' && numPace > 0) return numPace;
+        if (typeof numPace === 'number' && numPace > 0) {
+          console.log(`  🏊 Using numeric baseline pace: ${numPace}s per 100`);
+          return numPace;
+        }
         
         // Try string format "mm:ss" (e.g., "2:10")
         const strPace = (baselines as any)?.swimPace100 ?? (row as any)?.baselines_template?.swimPace100 ?? (row as any)?.baselines?.swimPace100;
         if (typeof strPace === 'string' && /^\d{1,2}:\d{2}$/.test(strPace)) {
           const [mm, ss] = strPace.split(':').map((t:string)=>parseInt(t,10));
           const sec = mm*60 + ss;
-          if (sec > 0) return sec;
+          if (sec > 0) {
+            console.log(`  🏊 Using string baseline pace: ${strPace} (${sec}s per 100)`);
+            return sec;
+          }
         }
         
         // Default fallback: 1:30/100 (90 seconds)
+        console.log(`  🏊 No baseline found, using default: 90s per 100 (1:30/100)`);
         return 90;
       })();
       
@@ -605,6 +651,8 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       const userUnits = String((row as any)?.units || '').toLowerCase();
       const baselineUnit = (userUnits === 'imperial') ? 'yd' : 'm';
       const poolUnit = ((row as any)?.pool_unit as 'yd' | 'm' | null) || baselineUnit;
+      
+      console.log(`  🏊 Baseline unit: ${baselineUnit}, Pool unit: ${poolUnit}`);
       
       for (const st of steps) {
         // Skip if step already has duration
@@ -622,7 +670,9 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             // Baseline is per 100 meters
             dist100 = distM / 100;
           }
-          st.duration_s = Math.round(dist100 * swimPacePer100Sec);
+          const calcDur = Math.round(dist100 * swimPacePer100Sec);
+          st.duration_s = calcDur;
+          console.log(`    ⏱️  ${distM}m → ${Math.round(distM/0.9144)}yd → ${dist100.toFixed(2)} × ${swimPacePer100Sec}s = ${calcDur}s`);
         }
       }
     } catch {}

@@ -117,16 +117,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         return '';
       };
       const isSwim = String((workout as any)?.type||'').toLowerCase()==='swim'
-      // No UI accessory fallback; rely on server-computed equipment only
-      // Estimate total duration using baselines for distance steps (swim only)
-      let estTotal = 0;
-      const secPer100FromPN = (() => {
-        const num = (pn && typeof (pn as any)?.swim_pace_per_100_sec === 'number') ? (pn as any).swim_pace_per_100_sec : null;
-        if (typeof num === 'number' && isFinite(num) && num > 0) return num as number;
-        const txt = String((pn as any)?.swimPace100 || '').trim();
-        if (/^\d+:\d{2}$/.test(txt)) { const [mm, ss] = txt.split(':').map((t:string)=>parseInt(t,10)); return mm*60 + ss; }
-        return null;
-      })();
+      // Client is DUMB: just sum server-computed durations, no recalculation
       v3.forEach((st:any)=>{
         const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
         if (typeof secs==='number' && secs>0) totalSecsFromSteps += Math.max(1, Math.round(secs));
@@ -136,16 +127,6 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           const n = Number(d1 ?? d2 ?? d3);
           return Number.isFinite(n) && n>0 ? Math.round(n) : undefined;
         })();
-        if (isSwim && typeof secPer100FromPN==='number') {
-          if (typeof distM==='number' && distM>0) {
-            const sec = (poolUnit==='yd') ? ((distM/0.9144)/100)*secPer100FromPN : ((distM/100)*secPer100FromPN);
-            estTotal += sec;
-          } else if (typeof distYdRaw==='number' && distYdRaw>0) {
-            // Compute directly from authored yards when distanceMeters is absent
-            const sec = (distYdRaw/100)*secPer100FromPN;
-            estTotal += sec;
-          }
-        }
         const pTxt = typeof st?.paceTarget==='string' ? st.paceTarget : undefined;
         const powRange = (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
         const pow = typeof st?.powerTarget==='string' ? st.powerTarget : undefined;
@@ -220,10 +201,6 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           lines.push(ln);
         }
       });
-      if (isSwim) {
-        // prefer baseline-estimated duration when available, else timed steps sum
-        if (estTotal > 0) totalSecsFromSteps = Math.round(estTotal);
-      }
       // Mark that we handled with computed to avoid legacy fallbacks
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const handledByComputedFlag = true;
