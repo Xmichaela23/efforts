@@ -286,11 +286,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     }
   }
 
-  const [effectivePlanned, setEffectivePlanned] = useState<any>(planned);
+  const [planned, setEffectivePlanned] = useState<any>(planned);
   // Only replace local planned when the id changes, not on every prop update
   useEffect(() => {
     const newId = String((planned as any)?.id || '');
-    const curId = String((effectivePlanned as any)?.id || '');
+    const curId = String((planned as any)?.id || '');
     if (newId && newId !== curId) setEffectivePlanned(planned);
   }, [planned?.id]);
   // No client hydration: trust server feed; keep prop as effective
@@ -298,11 +298,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     setEffectivePlanned(planned);
   }, [planned]);
 
-  const type = String((effectivePlanned as any)?.type || (completed as any)?.type || '').toLowerCase();
+  const type = String((planned as any)?.type || (completed as any)?.type || '').toLowerCase();
   const isRidePlanned = /ride|bike|cycling/.test(type);
   const refinedType = String((completed as any)?.refined_type || '').toLowerCase();
   const isPoolSwim = refinedType === 'pool_swim' || (type === 'swim' && refinedType !== 'open_water_swim');
-  const tokens: string[] = Array.isArray((effectivePlanned as any)?.steps_preset) ? ((effectivePlanned as any).steps_preset as any[]).map((t:any)=>String(t)) : [];
+  const tokens: string[] = Array.isArray((planned as any)?.steps_preset) ? ((planned as any).steps_preset as any[]).map((t:any)=>String(t)) : [];
   const tokensJoined = tokens.join(' ').toLowerCase();
   const defaultDurations = (() => {
     const pickMin = (re: RegExp): number | null => {
@@ -476,8 +476,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
   const hasServerComputed = computedIntervals.length > 0;
   // Prefer full planned steps (same source as Planned tab) for labels; use server "light" only for alignment
-  const plannedStepsFull: any[] = Array.isArray((effectivePlanned as any)?.computed?.steps)
-    ? ((effectivePlanned as any).computed.steps as any[]).map((s:any, idx:number)=> ({ planned_index: (s as any)?.planned_index ?? idx, ...s }))
+  const plannedStepsFull: any[] = Array.isArray((planned as any)?.computed?.steps)
+    ? ((planned as any).computed.steps as any[]).map((s:any, idx:number)=> ({ planned_index: (s as any)?.planned_index ?? idx, ...s }))
     : [];
   const plannedStepsLight: any[] = hasServerPlanned
     ? serverPlannedLight.map((s:any)=> ({ id: s.planned_step_id || undefined, planned_index: s.planned_index, distanceMeters: s.meters, duration: s.seconds }))
@@ -498,7 +498,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
   }, [isRidePlanned]);
 
   const descPaceSteps: any[] = useMemo(() => {
-    const txt = String((effectivePlanned as any)?.rendered_description || '');
+    const txt = String((planned as any)?.rendered_description || '');
     if (!txt) return [];
     const lines = txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
     const out: any[] = [];
@@ -530,7 +530,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
       }
     }
     return out;
-  }, [ (effectivePlanned as any)?.rendered_description, isRidePlanned, ftp ]);
+  }, [ (planned as any)?.rendered_description, isRidePlanned, ftp ]);
   // Prefer structured steps when present; otherwise prefill from description so the ledger is always populated
   // Display steps come from full planned steps when available, else light, else description-derived
   // For long runs, a single description line is valid → accept desc-derived even if length === 1
@@ -695,7 +695,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
         .map((v:any)=>Number(v)).find((n:number)=>Number.isFinite(n) && n>0) as number | undefined;
       if (Number.isFinite(sec)) plannedSec = Number(sec);
       if (plannedSec == null) {
-        const desc = String((effectivePlanned as any)?.rendered_description || (effectivePlanned as any)?.description || '').toLowerCase();
+        const desc = String((planned as any)?.rendered_description || (planned as any)?.description || '').toLowerCase();
         // Prefer explicit label like "Total duration: 70:00" else any mm:ss before @
         let m = desc.match(/total\s*duration\s*:\s*(\d{1,3}):(\d{2})/);
         if (!m) m = desc.match(/\b(\d{1,3}):(\d{2})\b\s*@/);
@@ -1162,10 +1162,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           // Planned totals
           const plannedSecondsTotal = (() => {
             // prefer computed.total_duration_seconds
-            const t = Number((effectivePlanned as any)?.computed?.total_duration_seconds);
+            const t = Number((planned as any)?.computed?.total_duration_seconds);
             if (Number.isFinite(t) && t > 0) return t;
             // fallback: sum step durations
-            const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+            const arr = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
             const s = arr.reduce((sum:number, st:any)=> sum + (Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0), 0);
             return s > 0 ? s : null;
           })();
@@ -1173,15 +1173,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           // Planned and executed session-averaged pace (strict, totals-based)
           const plannedPaceSecPerMi = (() => {
             const secondsTotal = (() => {
-              const t = Number((effectivePlanned as any)?.computed?.total_duration_seconds);
+              const t = Number((planned as any)?.computed?.total_duration_seconds);
               if (Number.isFinite(t) && t>0) return t;
-              const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              const arr = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
               if (!arr.length) return null;
               const s = arr.reduce((sum:number, st:any)=> sum + (Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0), 0);
               return s>0 ? s : null;
             })();
             const metersTotal = (() => {
-              const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              const arr = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
               if (!arr.length) return null;
               let meters = 0;
               for (const st of arr) {
@@ -1224,7 +1224,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           })();
 
           const plannedDistanceMeters = (() => {
-            const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+            const arr = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
             let m = 0; for (const st of arr) { const dm = Number(st?.distanceMeters || st?.distance_m || st?.m || 0); if (Number.isFinite(dm) && dm>0) m += dm; }
             if (m > 0) return m;
             if (plannedSecondsTotal && plannedPaceSecPerMi) {
@@ -1311,20 +1311,20 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           if (isSwim) {
             // Planned totals
             const plannedSecondsTotal = (() => {
-              const t = Number((effectivePlanned as any)?.computed?.total_duration_seconds);
+              const t = Number((planned as any)?.computed?.total_duration_seconds);
               if (Number.isFinite(t) && t > 0) return t;
-              const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              const arr = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
               const s = arr.reduce((sum:number, st:any)=> sum + (Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0), 0);
               return s > 0 ? s : null;
             })();
 
-            const swimUnit = String((effectivePlanned as any)?.swim_unit || 'yd').toLowerCase();
+            const swimUnit = String((planned as any)?.swim_unit || 'yd').toLowerCase();
 
             // Planned per-100 seconds (prefer baselines, else duration‑weighted from steps, else derive from distance+time)
             const plannedPer100 = (() => {
-              const fromBaseline = Number((effectivePlanned as any)?.baselines_template?.swim_pace_per_100_sec ?? (effectivePlanned as any)?.baselines?.swim_pace_per_100_sec);
+              const fromBaseline = Number((planned as any)?.baselines_template?.swim_pace_per_100_sec ?? (planned as any)?.baselines?.swim_pace_per_100_sec);
               if (Number.isFinite(fromBaseline) && (fromBaseline as number) > 0) return Math.round(fromBaseline as number);
-              const steps = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              const steps = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
               let sum = 0; let w = 0;
               for (const st of steps) {
                 const dur = Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0);
@@ -1339,7 +1339,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               if (w > 0) return Math.round(sum / w);
               // Derive from planned distance and time
               const distM = (() => {
-                const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+                const arr = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
                 let m = 0; for (const st of arr) { const dm = Number(st?.distanceMeters || st?.distance_m || st?.m || 0); if (Number.isFinite(dm) && dm>0) m += dm; }
                 return m > 0 ? m : null;
               })();
@@ -1408,9 +1408,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           // ------------ BIKE/RIDE (session-average power vs planned + duration) ------------
           if (isRide) {
             const plannedSecondsTotal = (() => {
-              const t = Number((effectivePlanned as any)?.computed?.total_duration_seconds);
+              const t = Number((planned as any)?.computed?.total_duration_seconds);
               if (Number.isFinite(t) && t > 0) return t;
-              const arr = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+              const arr = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
               const s = arr.reduce((sum:number, st:any)=> sum + (Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0), 0);
               return s > 0 ? s : null;
             })();
@@ -1418,7 +1418,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             // Duration-weighted planned watts from steps; fall back to description-derived with FTP
             const plannedWatts = (() => {
               const ftpNum = Number(ftp);
-              const steps = Array.isArray(plannedStepsFull) && plannedStepsFull.length ? plannedStepsFull : (Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : []);
+              const steps = Array.isArray(plannedStepsFull) && plannedStepsFull.length ? plannedStepsFull : (Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : []);
               const isWorkStep = (st:any) => {
                 const k = String(st?.type || st?.kind || st?.name || '').toLowerCase();
                 return !(k.includes('warm') || k.includes('cool') || k.includes('rest') || k.includes('recovery') || k.includes('jog'));
@@ -1451,7 +1451,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             // Executed watts
             const executedWatts = (() => {
               // Prefer duration-weighted executed watts only across executed intervals that correspond to planned work steps with power targets
-              const steps = Array.isArray(plannedStepsFull) && plannedStepsFull.length ? plannedStepsFull : (Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : []);
+              const steps = Array.isArray(plannedStepsFull) && plannedStepsFull.length ? plannedStepsFull : (Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : []);
               const isWorkStep = (st:any) => { const k = String(st?.type || st?.kind || st?.name || '').toLowerCase(); return !(k.includes('warm') || k.includes('cool') || k.includes('rest') || k.includes('recovery') || k.includes('jog')); };
               const hasPowerTarget = (st:any) => {
                 const pr = (st as any)?.power_range; const lo=Number(pr?.lower), hi=Number(pr?.upper);
