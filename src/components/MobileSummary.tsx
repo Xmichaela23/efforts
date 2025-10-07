@@ -778,6 +778,206 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     return null;
   };
 
+  // ========== RULE-BASED COLOR CODING ==========
+  
+  type WorkoutIntent = 'RULE_A_RECOVERY' | 'RULE_B_TECHNIQUE' | 'RULE_C_INTENSITY' | 'NEUTRAL';
+  type MetricType = 'duration' | 'distance' | 'pace';
+  
+  /**
+   * Determine primary workout intent from tokens, tags, and description
+   * Priority: Intensity > Recovery/Easy > Technique/Drill > Neutral
+   */
+  const determineWorkoutIntent = (planned: any): WorkoutIntent => {
+    if (!planned) return 'NEUTRAL';
+    
+    const stepsPreset = Array.isArray(planned.steps_preset) ? planned.steps_preset : [];
+    const tags = Array.isArray(planned.tags) ? planned.tags : [];
+    const description = String(planned.description || '').toLowerCase();
+    const tokens = stepsPreset.join(' ').toLowerCase();
+    
+    // Priority 1: Intensity work (threshold, vo2, interval, tempo)
+    if (
+      tokens.includes('threshold') ||
+      tokens.includes('vo2') ||
+      tokens.includes('interval_') ||
+      tokens.includes('tempo') ||
+      tokens.includes('_thr_') ||
+      tokens.includes('bike_thr') ||
+      tokens.includes('bike_vo2') ||
+      tokens.includes('swim_threshold')
+    ) {
+      return 'RULE_C_INTENSITY';
+    }
+    
+    // Priority 2: Recovery/Easy zone
+    if (
+      tokens.includes('recovery') ||
+      tokens.includes('easypace') ||
+      tokens.includes('_z1') ||
+      tokens.includes('_z2') ||
+      tokens.includes('easy_') ||
+      tokens.includes('longrun_') ||
+      tags.includes('recovery') ||
+      tags.includes('easy_run') ||
+      tags.includes('z1') ||
+      tags.includes('z2') ||
+      tags.includes('endurance') ||
+      description.includes('recovery') ||
+      description.includes('easy pace')
+    ) {
+      return 'RULE_A_RECOVERY';
+    }
+    
+    // Priority 3: Technique/Drill
+    if (
+      tokens.includes('drill') ||
+      tokens.includes('swim_drill') ||
+      tags.includes('technique') ||
+      description.includes('drill') ||
+      description.includes('technique')
+    ) {
+      return 'RULE_B_TECHNIQUE';
+    }
+    
+    return 'NEUTRAL';
+  };
+  
+  /**
+   * Get color class based on workout intent, metric type, and percentage
+   */
+  const getRuleBasedColor = (intent: WorkoutIntent, metricType: MetricType, pct: number): string => {
+    // RULE A: Recovery/Easy Sessions
+    if (intent === 'RULE_A_RECOVERY') {
+      if (metricType === 'duration') {
+        if (pct < 90) return 'text-green-600';
+        if (pct >= 90 && pct <= 110) return 'text-green-600';
+        return 'text-red-600'; // >110% = too long
+      }
+      if (metricType === 'distance') {
+        if (pct < 95) return 'text-yellow-600';
+        if (pct >= 95 && pct <= 115) return 'text-green-600';
+        return 'text-red-600'; // >115% = too far
+      }
+      if (metricType === 'pace') {
+        if (pct < 90) return 'text-yellow-600'; // too slow
+        if (pct >= 90 && pct <= 110) return 'text-green-600';
+        return 'text-red-600'; // >110% = too fast (remember: higher % = faster pace)
+      }
+    }
+    
+    // RULE B: Technique/Drill Sessions
+    if (intent === 'RULE_B_TECHNIQUE') {
+      if (metricType === 'duration') {
+        if (pct < 80) return 'text-gray-400';
+        if (pct >= 80 && pct <= 120) return 'text-green-600';
+        return 'text-yellow-600'; // >120% = significantly longer
+      }
+      if (metricType === 'distance') {
+        if (pct < 95) return 'text-yellow-600';
+        if (pct >= 95 && pct <= 125) return 'text-green-600';
+        return 'text-gray-400'; // >125% = extra volume (neutral)
+      }
+      if (metricType === 'pace') {
+        return 'text-gray-400'; // No pace prescription for drill work
+      }
+    }
+    
+    // RULE C: Intensity Sessions
+    if (intent === 'RULE_C_INTENSITY') {
+      if (metricType === 'duration') {
+        if (pct < 90) return 'text-green-600'; // faster is good
+        if (pct >= 90 && pct <= 110) return 'text-green-600';
+        return 'text-yellow-600'; // >110% = took too long
+      }
+      if (metricType === 'distance') {
+        if (pct < 95) return 'text-yellow-600';
+        if (pct >= 95 && pct <= 115) return 'text-green-600';
+        return 'text-green-600'; // >115% = extra distance (good for intensity)
+      }
+      if (metricType === 'pace') {
+        if (pct < 95) return 'text-yellow-600'; // slower than target
+        if (pct >= 95 && pct <= 100) return 'text-green-600';
+        return 'text-green-600'; // >100% = faster than target (good)
+      }
+    }
+    
+    // NEUTRAL: Fallback to generic color logic
+    if (pct >= 90 && pct <= 110) return 'text-green-600';
+    if (pct >= 80 && pct <= 120) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+  
+  /**
+   * Generate contextual message based on intent and metrics
+   */
+  const getContextualMessage = (
+    intent: WorkoutIntent,
+    durationPct: number | null,
+    distancePct: number | null,
+    pacePct: number | null,
+    workoutType: string
+  ): { icon: string; text: string } | null => {
+    const isSwim = workoutType.toLowerCase() === 'swim';
+    const isRun = workoutType.toLowerCase() === 'run';
+    const isRide = ['ride', 'bike', 'cycling'].includes(workoutType.toLowerCase());
+    
+    // RULE A: Recovery/Easy
+    if (intent === 'RULE_A_RECOVERY') {
+      // Check for violations first
+      if (pacePct != null && pacePct > 110) {
+        return { icon: '⚠️', text: 'Pace too fast for prescribed recovery zone' };
+      }
+      if (distancePct != null && distancePct > 115) {
+        return { icon: '⚠️', text: 'Distance exceeded recovery zone prescription' };
+      }
+      if (durationPct != null && durationPct > 110) {
+        return { icon: '⚠️', text: 'Duration longer than prescribed recovery zone' };
+      }
+      // All good
+      return { icon: '✓', text: 'Recovery zone maintained' };
+    }
+    
+    // RULE B: Technique/Drill
+    if (intent === 'RULE_B_TECHNIQUE') {
+      if (durationPct != null && durationPct > 120) {
+        return { icon: '⚠️', text: 'Drill session took significantly longer than planned' };
+      }
+      return { icon: '✓', text: 'Workout completed - all prescribed sets done' };
+    }
+    
+    // RULE C: Intensity
+    if (intent === 'RULE_C_INTENSITY') {
+      // Positive messages for faster execution
+      if (pacePct != null && pacePct > 100) {
+        const delta = pacePct - 100;
+        if (isSwim) {
+          return { icon: '💪', text: `Averaged faster than target pace` };
+        }
+        return { icon: '💪', text: `Averaged ${delta}% faster than target pace` };
+      }
+      if (durationPct != null && durationPct < 95) {
+        return { icon: '💪', text: 'Completed intervals faster than planned' };
+      }
+      // Warnings for slower
+      if (pacePct != null && pacePct < 95) {
+        return { icon: '⚠️', text: 'Pace slower than intensity target' };
+      }
+      if (durationPct != null && durationPct > 110) {
+        return { icon: '⚠️', text: 'Intervals took longer than prescribed' };
+      }
+      // On target
+      return { icon: '✓', text: 'Intensity targets achieved' };
+    }
+    
+    // NEUTRAL: Generic message
+    if (durationPct != null || distancePct != null || pacePct != null) {
+      return { icon: '✓', text: 'Workout completed' };
+    }
+    
+    return null;
+  };
+  
+  // Legacy function for backward compatibility (used in interval tables)
   const getPercentageColor = (pct: number): string => {
     if (pct >= 90 && pct <= 110) return 'text-green-600';
     if (pct >= 80 && pct <= 120) return 'text-yellow-600';
@@ -1257,9 +1457,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const anyVal = (pacePct!=null) || (durationPct!=null) || (distPct!=null);
           if (!anyVal) return null;
 
-          const chip = (label:string, pct:number|null, text:string) => {
+          // Determine workout intent for rule-based coloring
+          const workoutIntent = determineWorkoutIntent(planned);
+
+          const chip = (label:string, pct:number|null, text:string, metricType: MetricType) => {
             if (pct==null) return null;
-            const color = getPercentageColor(pct);
+            const color = getRuleBasedColor(workoutIntent, metricType, pct);
             return (
               <div className="flex flex-col items-center px-2">
                 <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
@@ -1283,14 +1486,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             return `${sign}${val} mi`;
           };
 
+          // Get contextual message
+          const message = getContextualMessage(workoutIntent, durationPct, distPct, pacePct, 'run');
+
           return (
             <div className="w-full pt-1 pb-2">
               <div className="flex items-center justify-center gap-6 text-center">
                 <div className="flex items-end gap-3">
-                  {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—')}
-                  {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—')}
+                  {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—', 'pace')}
+                  {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
                 </div>
               </div>
+              {message && (
+                <div className="mt-2 text-xs text-gray-600 text-center">
+                  {message.icon} {message.text}
+                </div>
+              )}
             </div>
           );
           }
@@ -1365,9 +1576,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const durationPct = (plannedSecondsTotal && executedSeconds) ? Math.round((executedSeconds as number / (plannedSecondsTotal as number)) * 100) : null;
             const durationDelta = (plannedSecondsTotal && executedSeconds) ? ((executedSeconds as number) - (plannedSecondsTotal as number)) : null;
 
-            const chip = (label:string, pct:number|null, text:string) => {
+            // Determine workout intent for rule-based coloring
+            const workoutIntent = determineWorkoutIntent(planned);
+
+            const chip = (label:string, pct:number|null, text:string, metricType: MetricType) => {
               if (pct==null) return null;
-              const color = getPercentageColor(pct);
+              const color = getRuleBasedColor(workoutIntent, metricType, pct);
               return (
                 <div className="flex flex-col items-center px-2">
                   <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
@@ -1381,14 +1595,23 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
             const anyVal = (pacePct!=null) || (durationPct!=null);
             if (!anyVal) return null;
+
+            // Get contextual message
+            const message = getContextualMessage(workoutIntent, durationPct, null, pacePct, 'swim');
+
             return (
               <div className="w-full pt-1 pb-2">
                 <div className="flex items-center justify-center gap-6 text-center">
                   <div className="flex items-end gap-3">
-                    {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPer100(paceDeltaSec) : '—')}
-                    {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—')}
+                    {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPer100(paceDeltaSec) : '—', 'pace')}
+                    {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
                   </div>
                 </div>
+                {message && (
+                  <div className="mt-2 text-xs text-gray-600 text-center">
+                    {message.icon} {message.text}
+                  </div>
+                )}
               </div>
             );
           }
@@ -1487,9 +1710,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const durationPct = (plannedSecondsTotal && executedSeconds) ? Math.round((executedSeconds as number / (plannedSecondsTotal as number)) * 100) : null;
             const durationDelta = (plannedSecondsTotal && executedSeconds) ? ((executedSeconds as number) - (plannedSecondsTotal as number)) : null;
 
-            const chip = (label:string, pct:number|null, text:string) => {
+            // Determine workout intent for rule-based coloring
+            const workoutIntent = determineWorkoutIntent(planned);
+
+            const chip = (label:string, pct:number|null, text:string, metricType: MetricType) => {
               if (pct==null) return null;
-              const color = getPercentageColor(pct);
+              const color = getRuleBasedColor(workoutIntent, metricType, pct);
               return (
                 <div className="flex flex-col items-center px-2">
                   <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
@@ -1503,14 +1729,23 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
             const anyVal = (powerPct!=null) || (durationPct!=null);
             if (!anyVal) return null;
+
+            // Get contextual message (treat power like pace for bikes)
+            const message = getContextualMessage(workoutIntent, durationPct, null, powerPct, 'bike');
+
             return (
               <div className="w-full pt-1 pb-2">
                 <div className="flex items-center justify-center gap-6 text-center">
                   <div className="flex items-end gap-3">
-                    {chip('Watts', powerPct, powerDelta!=null ? fmtDeltaWatts(powerDelta) : '—')}
-                    {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—')}
+                    {chip('Watts', powerPct, powerDelta!=null ? fmtDeltaWatts(powerDelta) : '—', 'pace')}
+                    {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
                   </div>
                 </div>
+                {message && (
+                  <div className="mt-2 text-xs text-gray-600 text-center">
+                    {message.icon} {message.text}
+                  </div>
+                )}
               </div>
             );
           }
@@ -1596,9 +1831,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const distDelta = plannedTotalMeters > 0 && executedMeters > 0 ? executedMeters - plannedTotalMeters : null;
             const timeDelta = plannedTotalSeconds > 0 && executedSeconds > 0 ? executedSeconds - plannedTotalSeconds : null;
             
-            const chip = (label: string, pct: number | null, text: string) => {
+            // Determine workout intent for rule-based coloring
+            const workoutIntent = determineWorkoutIntent(planned);
+
+            const chip = (label: string, pct: number | null, text: string, metricType: MetricType) => {
               if (pct == null) return null;
-              const color = getPercentageColor(pct);
+              const color = getRuleBasedColor(workoutIntent, metricType, pct);
               return (
                 <div className="flex flex-col items-center px-2">
                   <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
@@ -1632,14 +1870,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const fmtDist = (m: number) => useImperial ? `${Math.round(m / 0.9144)} yd` : `${Math.round(m)} m`;
             const fmtTime = (s: number) => { const min = Math.floor(s / 60); const sec = Math.round(s % 60); return `${min}:${String(sec).padStart(2, '0')}`; };
             
+            // Get contextual message
+            const message = getContextualMessage(workoutIntent, timePct, distPct, null, 'swim');
+
             return (
               <>
                 <div className="flex items-center justify-center gap-6 text-center">
                   <div className="flex items-end gap-3">
-                    {chip('Distance', distPct, distDelta != null ? fmtDistDelta(distDelta) : '—')}
-                    {chip('Duration', timePct, timeDelta != null ? fmtTimeDelta(timeDelta) : '—')}
+                    {chip('Distance', distPct, distDelta != null ? fmtDistDelta(distDelta) : '—', 'distance')}
+                    {chip('Duration', timePct, timeDelta != null ? fmtTimeDelta(timeDelta) : '—', 'duration')}
                   </div>
                 </div>
+                {message && (
+                  <div className="mt-2 text-xs text-gray-600 text-center">
+                    {message.icon} {message.text}
+                  </div>
+                )}
                 
                 {/* Simple summary row showing planned vs executed */}
                 <div className="mt-4 px-4 py-3 bg-gray-50 rounded-lg">
@@ -1810,5 +2056,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     </div>
   );
 }
+
+
+
+
 
 
