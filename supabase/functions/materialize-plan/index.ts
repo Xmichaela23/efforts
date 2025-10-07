@@ -410,7 +410,8 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         const distM = unit==='yd'? ydToM(dist) : dist;
         for(let i=0;i<reps;i++) { 
           steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); 
-          if(rest) {
+          // Only add rest BETWEEN reps, not after the last rep
+          if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
             console.log(`    🔄 Added recovery step: ${rest}s`);
           }
@@ -426,7 +427,8 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         const distM = unit==='yd'? ydToM(dist) : dist;
         for(let i=0;i<reps;i++) { 
           steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); 
-          if(rest) {
+          // Only add rest BETWEEN reps, not after the last rep
+          if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
             console.log(`    🔄 Added recovery step: ${rest}s`);
           }
@@ -440,7 +442,8 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         console.log(`  ✅ Matched aerobic: reps=${reps}, dist=${dist}${unit}, label="${label}", rest=${rest}s`);
         for(let i=0;i<reps;i++){ 
           steps.push({ id: uid(), kind:'work', distance_m: distM, label }); 
-          if(rest) {
+          // Only add rest BETWEEN reps, not after the last rep
+          if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
             console.log(`    🔄 Added recovery step: ${rest}s`);
           }
@@ -454,7 +457,8 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         console.log(`  ✅ Matched threshold: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
         for(let i=0;i<reps;i++){ 
           steps.push({ id: uid(), kind:'work', distance_m: distM, label:'threshold' }); 
-          if(rest) {
+          // Only add rest BETWEEN reps, not after the last rep
+          if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
             console.log(`    🔄 Added recovery step: ${rest}s`);
           }
@@ -474,7 +478,8 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         console.log(`  ✅ Matched ${kind}: reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${eq}`);
         for(let i=0;i<reps;i++){ 
           steps.push({ id: uid(), kind:'work', distance_m: distM, label:kind, equipment:eq||undefined }); 
-          if(rest) {
+          // Only add rest BETWEEN reps, not after the last rep
+          if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
             console.log(`    🔄 Added recovery step: ${rest}s`);
           }
@@ -658,7 +663,8 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         // Skip if step already has duration
         if (typeof st.duration_s === 'number' && st.duration_s > 0) continue;
         
-        const distM = typeof st.distanceMeters === 'number' ? st.distanceMeters : 0;
+        // Check both camelCase and snake_case field names
+        const distM = typeof st.distanceMeters === 'number' ? st.distanceMeters : (typeof st.distance_m === 'number' ? st.distance_m : 0);
         if (distM > 0) {
           // Convert distance to baseline unit, calculate duration, then apply
           let dist100: number;

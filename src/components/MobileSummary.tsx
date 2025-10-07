@@ -1295,8 +1295,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           );
           }
 
-          // ------------ SWIM (session-average per-100 pace + duration) ------------
-          if (isSwim) {
+          // ------------ SWIM (session-average per-100 pace + duration) - OPEN WATER ONLY ------------
+          if (isSwim && !isPoolSwim) {
             // Planned totals
             const plannedSecondsTotal = (() => {
               const t = Number((planned as any)?.computed?.total_duration_seconds);
