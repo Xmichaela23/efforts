@@ -300,6 +300,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
   const type = String((effectivePlanned as any)?.type || (completed as any)?.type || '').toLowerCase();
   const isRidePlanned = /ride|bike|cycling/.test(type);
+  const refinedType = String((completed as any)?.refined_type || '').toLowerCase();
+  const isPoolSwim = refinedType === 'pool_swim' || (type === 'swim' && refinedType !== 'open_water_swim');
   const tokens: string[] = Array.isArray((effectivePlanned as any)?.steps_preset) ? ((effectivePlanned as any).steps_preset as any[]).map((t:any)=>String(t)) : [];
   const tokensJoined = tokens.join(' ').toLowerCase();
   const defaultDurations = (() => {
@@ -1541,10 +1543,19 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
         <thead>
           <tr className="border-b border-gray-200">
             <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Planned</th>
-            <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">{isRideSport ? 'Watts' : (isSwimSport ? '/100 (pref)' : 'Pace')}</th>
-            <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Dist</th>
-            <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Time</th>
-            <th className="px-1 py-2 text-left font-medium text-gray-600 whitespace-nowrap">BPM</th>
+            {isPoolSwim ? (
+              <>
+                <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Time</th>
+                <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap" colSpan={2}>HR</th>
+              </>
+            ) : (
+              <>
+                <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">{isRideSport ? 'Watts' : (isSwimSport ? '/100 (pref)' : 'Pace')}</th>
+                <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Dist</th>
+                <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Time</th>
+                <th className="px-1 py-2 text-left font-medium text-gray-600 whitespace-nowrap">BPM</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -1636,24 +1647,47 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                     )}
                   </div>
                 </td>
-                <td className="px-2 py-1.5 font-medium">{execCell}</td>
-                <td className="px-2 py-1.5">{distCell}</td>
-                <td className="px-2 py-1.5">{timeCell}</td>
-                <td className="px-1 py-1.5 text-[13px]">
-                  <div className="text-right">
-                    {hrVal != null ? (
-                      <>
-                        <div className="font-medium">{hrVal}</div>
-                        <div className="text-[10px] text-gray-500">bpm</div>
-                      </>
-                    ) : '—'}
-                  </div>
-                </td>
+                {isPoolSwim ? (
+                  <>
+                    <td className="px-2 py-1.5 font-medium">{timeCell}</td>
+                    <td className="px-2 py-1.5 text-[13px]" colSpan={2}>
+                      <div className="text-left">
+                        {hrVal != null ? (
+                          <>
+                            <div className="font-medium">{hrVal}</div>
+                            <div className="text-[10px] text-gray-500">bpm</div>
+                          </>
+                        ) : '—'}
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="px-2 py-1.5 font-medium">{execCell}</td>
+                    <td className="px-2 py-1.5">{distCell}</td>
+                    <td className="px-2 py-1.5">{timeCell}</td>
+                    <td className="px-1 py-1.5 text-[13px]">
+                      <div className="text-right">
+                        {hrVal != null ? (
+                          <>
+                            <div className="font-medium">{hrVal}</div>
+                            <div className="text-[10px] text-gray-500">bpm</div>
+                          </>
+                        ) : '—'}
+                      </div>
+                    </td>
+                  </>
+                )}
               </tr>
             );
           })}
         </tbody>
       </table>
+      {isPoolSwim && (
+        <div className="px-2 py-2 text-xs text-gray-500 italic">
+          Pool swim: intervals matched by time. Distance/pace/stroke rate per interval not available from Garmin API.
+        </div>
+      )}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
         <div className="py-2">
           <div className="grid grid-cols-2 gap-4">

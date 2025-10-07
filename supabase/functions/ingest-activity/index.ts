@@ -445,8 +445,13 @@ async function mapGarminToWorkout(activity, userId) {
   try {
     const garminActivityId = activity.garmin_activity_id || activity.summaryId || activity.activityId;
     if (garminActivityId) {
-      const { data: gaData } = await supabase.from('garmin_activities').select('avg_power, max_power, avg_bike_cadence, max_bike_cadence, avg_run_cadence, max_run_cadence, sensor_data, raw_data').eq('user_id', userId).eq('garmin_activity_id', garminActivityId).maybeSingle();
+      const { data: gaData } = await supabase.from('garmin_activities').select('avg_power, max_power, avg_bike_cadence, max_bike_cadence, avg_run_cadence, max_run_cadence, sensor_data, raw_data, samples_data').eq('user_id', userId).eq('garmin_activity_id', garminActivityId).maybeSingle();
       if (gaData) {
+        // Build sensor_data with fallback chain: prefer sensor_data, then samples_data, then raw_data.samples
+        const sensorDataResolved = gaData.sensor_data 
+          || (gaData.samples_data ? { samples: gaData.samples_data } : null)
+          || (gaData.raw_data?.samples ? { samples: gaData.raw_data.samples } : null);
+        
         enrichedData = {
           avg_power: gaData.avg_power,
           max_power: gaData.max_power,
@@ -454,10 +459,11 @@ async function mapGarminToWorkout(activity, userId) {
           max_bike_cadence: gaData.max_bike_cadence,
           avg_run_cadence: gaData.avg_run_cadence,
           max_run_cadence: gaData.max_run_cadence,
-          sensor_data: gaData.sensor_data,
+          sensor_data: sensorDataResolved,
           raw_data: gaData.raw_data
         };
-        console.log(`🔋 Enriched Garmin data for ${garminActivityId}: Power=${gaData.avg_power}W, Cadence=${gaData.avg_bike_cadence || gaData.avg_run_cadence}`);
+        const sampleCount = Array.isArray(sensorDataResolved?.samples) ? sensorDataResolved.samples.length : 0;
+        console.log(`🔋 Enriched Garmin data for ${garminActivityId}: Power=${gaData.avg_power}W, Cadence=${gaData.avg_bike_cadence || gaData.avg_run_cadence}, Samples=${sampleCount}`);
       }
     }
   } catch (error) {
@@ -601,15 +607,6 @@ async function mapGarminToWorkout(activity, userId) {
     // If details provided normalized lengths/laps, persist them
     swim_data: (()=>{
       try {
-        console.log('🏊 swim_data check:', {
-          has_computeInput_swim_data: !!computeInput?.swim_data,
-          has_computeInput_lengths: !!computeInput?.swim_data?.lengths,
-          num_computeInput_lengths: Array.isArray(computeInput?.swim_data?.lengths) ? computeInput.swim_data.lengths.length : 0,
-          has_activity_swim_data: !!activity.swim_data,
-          activity_swim_data_type: typeof activity.swim_data,
-          has_activity_lengths: !!activity.swim_data?.lengths,
-          num_activity_lengths: Array.isArray(activity.swim_data?.lengths) ? activity.swim_data.lengths.length : 0
-        });
         return computeInput?.swim_data?.lengths ? JSON.stringify({
           lengths: computeInput.swim_data.lengths
         }) : activity.swim_data ? JSON.stringify(activity.swim_data) : null;
