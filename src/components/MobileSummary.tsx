@@ -354,11 +354,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
   // Helper: Extract exercises from computed.steps (unified field single source of truth)
   const extractExercisesFromComputed = (workout: any) => {
     try {
+      console.log('🔍 [MobileSummary] extractExercisesFromComputed - workout:', workout);
       const computed = workout?.computed;
+      console.log('🔍 [MobileSummary] computed:', computed);
       const steps: any[] = Array.isArray(computed?.steps) ? computed.steps : [];
+      console.log('🔍 [MobileSummary] steps count:', steps.length);
       
       // Filter steps that have strength objects
       const strengthSteps = steps.filter(st => st?.strength && typeof st.strength === 'object');
+      console.log('🔍 [MobileSummary] strengthSteps count:', strengthSteps.length);
       
       return strengthSteps.map((st: any) => {
         const s = st.strength;
@@ -374,20 +378,29 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
         
         return { name, sets, reps, weight };
       });
-    } catch {
+    } catch (e) {
+      console.error('🔍 [MobileSummary] extractExercisesFromComputed error:', e);
       return [];
     }
   };
 
   // Strength and Mobility use compare table
   if (type === 'strength' || type === 'mobility') {
+    console.log('🔍 [MobileSummary] Type:', type);
+    console.log('🔍 [MobileSummary] Planned:', planned);
+    console.log('🔍 [MobileSummary] Completed:', completed);
+    
     // Try to extract from computed.steps first (unified field), fallback to direct field
     let plannedExercises = extractExercisesFromComputed(planned);
+    console.log('🔍 [MobileSummary] Planned exercises from computed:', plannedExercises);
+    
     if (plannedExercises.length === 0) {
       // Fallback to direct field if computed.steps not available
       const directExercises = type === 'strength' 
         ? (planned?.strength_exercises || [])
         : (planned?.mobility_exercises || []);
+      
+      console.log('🔍 [MobileSummary] Direct exercises fallback:', directExercises);
       
       if (Array.isArray(directExercises)) {
         plannedExercises = directExercises.map((ex: any)=>{
@@ -403,6 +416,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     const completedExercises = type === 'strength'
       ? (Array.isArray(completed?.strength_exercises) ? completed.strength_exercises : []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }))
       : (Array.isArray(completed?.mobility_exercises) ? completed.mobility_exercises : []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }));
+    
+    console.log('🔍 [MobileSummary] Final planned exercises:', plannedExercises);
+    console.log('🔍 [MobileSummary] Final completed exercises:', completedExercises);
     return (
       <div className="space-y-4">
         <StrengthCompareTable planned={plannedExercises} completed={completedExercises} />
