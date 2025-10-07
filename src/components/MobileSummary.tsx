@@ -795,7 +795,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     const description = String(planned.description || '').toLowerCase();
     const tokens = stepsPreset.join(' ').toLowerCase();
     
-    // Priority 1: Intensity work (threshold, vo2, interval, tempo)
+    // Priority 1: Intensity work (threshold, vo2, interval, tempo) - CHECK TOKENS ONLY
     if (
       tokens.includes('threshold') ||
       tokens.includes('vo2') ||
@@ -809,7 +809,16 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
       return 'RULE_C_INTENSITY';
     }
     
-    // Priority 2: Recovery/Easy zone
+    // Priority 2: Technique/Drill - CHECK TOKENS AND TAGS FIRST (moved before Recovery)
+    if (
+      tokens.includes('drill') ||
+      tokens.includes('swim_drill') ||
+      tags.includes('technique')
+    ) {
+      return 'RULE_B_TECHNIQUE';
+    }
+    
+    // Priority 3: Recovery/Easy zone - CHECK TOKENS AND TAGS ONLY (no description yet)
     if (
       tokens.includes('recovery') ||
       tokens.includes('easypace') ||
@@ -821,22 +830,17 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
       tags.includes('easy_run') ||
       tags.includes('z1') ||
       tags.includes('z2') ||
-      tags.includes('endurance') ||
-      description.includes('recovery') ||
-      description.includes('easy pace')
+      tags.includes('endurance')
     ) {
       return 'RULE_A_RECOVERY';
     }
     
-    // Priority 3: Technique/Drill
-    if (
-      tokens.includes('drill') ||
-      tokens.includes('swim_drill') ||
-      tags.includes('technique') ||
-      description.includes('drill') ||
-      description.includes('technique')
-    ) {
+    // Priority 4: Fallback to description text ONLY if no tokens/tags matched
+    if (description.includes('drill') || description.includes('technique')) {
       return 'RULE_B_TECHNIQUE';
+    }
+    if (description.includes('recovery') || description.includes('easy pace')) {
+      return 'RULE_A_RECOVERY';
     }
     
     return 'NEUTRAL';
