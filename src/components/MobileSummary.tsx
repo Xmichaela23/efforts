@@ -912,6 +912,66 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
   };
   
   /**
+   * Check if executed pace falls within prescribed pace range
+   */
+  const checkPaceWithinRange = (
+    planned: any,
+    executedSecPerMi: number | null
+  ): { withinRange: boolean; rangeExists: boolean; lowerBound: number | null; upperBound: number | null } => {
+    if (!executedSecPerMi || !planned) {
+      return { withinRange: false, rangeExists: false, lowerBound: null, upperBound: null };
+    }
+
+    // Check if any steps have pace_range
+    const steps = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : [];
+    let hasRange = false;
+    let totalDuration = 0;
+    let weightedLower = 0;
+    let weightedUpper = 0;
+
+    for (const st of steps) {
+      const dur = Number(st?.seconds || st?.duration || 0);
+      if (dur <= 0) continue;
+
+      // Check for pace_range in various formats
+      const prng = (st as any)?.pace_range || (st as any)?.paceRange;
+      let lower: number | null = null;
+      let upper: number | null = null;
+
+      if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
+        // Object format: { lower: "8:02/mi", upper: "8:42/mi" }
+        const lowerMatch = String(prng.lower).match(/(\d{1,2}):(\d{2})/);
+        const upperMatch = String(prng.upper).match(/(\d{1,2}):(\d{2})/);
+        if (lowerMatch && upperMatch) {
+          lower = parseInt(lowerMatch[1], 10) * 60 + parseInt(lowerMatch[2], 10);
+          upper = parseInt(upperMatch[1], 10) * 60 + parseInt(upperMatch[2], 10);
+        }
+      } else if (Array.isArray(prng) && prng.length === 2) {
+        // Array format: [502, 522] (seconds per mile)
+        lower = Number(prng[0]);
+        upper = Number(prng[1]);
+      }
+
+      if (lower && upper && lower > 0 && upper > 0) {
+        hasRange = true;
+        weightedLower += lower * dur;
+        weightedUpper += upper * dur;
+        totalDuration += dur;
+      }
+    }
+
+    if (!hasRange || totalDuration === 0) {
+      return { withinRange: false, rangeExists: false, lowerBound: null, upperBound: null };
+    }
+
+    const avgLower = Math.round(weightedLower / totalDuration);
+    const avgUpper = Math.round(weightedUpper / totalDuration);
+    const withinRange = executedSecPerMi >= avgLower && executedSecPerMi <= avgUpper;
+
+    return { withinRange, rangeExists: true, lowerBound: avgLower, upperBound: avgUpper };
+  };
+
+  /**
    * Generate contextual message based on intent and metrics
    */
   const getContextualMessage = (
@@ -919,7 +979,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     durationPct: number | null,
     distancePct: number | null,
     pacePct: number | null,
-    workoutType: string
+    workoutType: string,
+    planned: any = null,
+    executedSecPerMi: number | null = null
   ): { icon: string; text: string } | null => {
     const isSwim = workoutType.toLowerCase() === 'swim';
     const isRun = workoutType.toLowerCase() === 'run';
@@ -949,8 +1011,23 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
       return { icon: '✓', text: 'Workout completed - all prescribed sets done' };
     }
     
-    // RULE C: Intensity
+    // RULE C: Intensity - CHECK FOR PACE RANGES FIRST
     if (intent === 'RULE_C_INTENSITY') {
+      // For interval workouts, check if pace is within prescribed range
+      if (isRun && executedSecPerMi && planned) {
+        const rangeCheck = checkPaceWithinRange(planned, executedSecPerMi);
+        if (rangeCheck.rangeExists) {
+          if (rangeCheck.withinRange) {
+            return { icon: '✓', text: 'Executed within prescribed pace range' };
+          } else if (executedSecPerMi < rangeCheck.lowerBound!) {
+            return { icon: '💪', text: 'Averaged faster than prescribed range' };
+          } else {
+            return { icon: '⚠️', text: 'Pace slower than prescribed range' };
+          }
+        }
+      }
+
+      // Fallback to percentage-based logic for workouts without ranges
       // Positive messages for faster execution
       if (pacePct != null && pacePct > 100) {
         const delta = pacePct - 100;
@@ -1490,8 +1567,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             return `${sign}${val} mi`;
           };
 
-          // Get contextual message
-          const message = getContextualMessage(workoutIntent, durationPct, distPct, pacePct, 'run');
+          // Get contextual message (pass planned and executedSecPerMi for range validation)
+          const message = getContextualMessage(workoutIntent, durationPct, distPct, pacePct, 'run', planned, executedSecPerMi);
 
           return (
             <div className="w-full pt-1 pb-2">

@@ -69,7 +69,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
   // Structured-only renderer
   const ws: any = structureAny || {};
-  const { loadUserBaselines } = useAppContext?.() || ({} as any);
+  const { loadUserBaselines, useImperial } = useAppContext?.() || ({} as any);
   const [ctxPN, setCtxPN] = useState<any | null>(null);
   const [savingPool, setSavingPool] = useState<boolean>(false);
   const [refresh, setRefresh] = useState<number>(0);
@@ -105,8 +105,19 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const displayYards = isSwimType && (poolUnit==='yd' || tokensPreferYd);
       const fmtDist = (m:number)=>{
         const x = Math.max(1, Math.round(Number(m)||0));
-        if (displayYards) { const yd = Math.round(x / 0.9144); return `${yd} yd`; }
-        return `${x} m`;
+        // For swims: use pool_unit preference (yd or m)
+        if (isSwimType) {
+          if (displayYards) { const yd = Math.round(x / 0.9144); return `${yd} yd`; }
+          return `${x} m`;
+        }
+        // For runs/bikes: use user's imperial/metric preference
+        if (useImperial) {
+          const mi = x / 1609.34;
+          return mi < 1 ? `${mi.toFixed(2)} mi` : `${mi.toFixed(1)} mi`;
+        }
+        // Metric: show km for runs/bikes
+        const km = x / 1000;
+        return km < 1 ? `${Math.round(x)} m` : `${km.toFixed(1)} km`;
       };
       const niceKind = (k:string)=>{
         const t = String(k||'').toLowerCase();
@@ -127,7 +138,20 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           const n = Number(d1 ?? d2 ?? d3);
           return Number.isFinite(n) && n>0 ? Math.round(n) : undefined;
         })();
-        const pTxt = typeof st?.paceTarget==='string' ? st.paceTarget : undefined;
+        // Check for pace range first, then fall back to single pace target
+        const pTxt = ((): string | undefined => {
+          // Priority 1: Check for pace_range object with lower/upper bounds
+          const prng = (st as any)?.pace_range || (st as any)?.paceRange;
+          if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
+            return `${prng.lower}–${prng.upper}`;
+          }
+          // Priority 2: Check for pace_range array [lower, upper]
+          if (Array.isArray(prng) && prng.length === 2 && prng[0] && prng[1]) {
+            return `${prng[0]}–${prng[1]}`;
+          }
+          // Priority 3: Fall back to single pace target
+          return typeof st?.paceTarget==='string' ? st.paceTarget : undefined;
+        })();
         const powRange = (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
         const pow = typeof st?.powerTarget==='string' ? st.powerTarget : undefined;
         const kind = niceKind(st?.kind);
@@ -185,10 +209,10 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           return;
         }
 
+        // Non-swim workouts (run, bike): show miles/km, NOT yards
         const pieces: string[] = [];
         if (kind) pieces.push(kind);
         if (typeof distM==='number' && distM>0) pieces.push(fmtDist(distM));
-        else if (typeof distYdRaw==='number') pieces.push(`${distYdRaw} yd`);
         else if (typeof secs==='number' && secs>0) pieces.push(fmtDur(secs));
         if (pTxt) pieces.push(`@ ${pTxt}`);
         else if (powRange) pieces.push(`@ ${powRange}`);
