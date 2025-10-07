@@ -426,9 +426,30 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
       return [];
     };
     
-    const completedExercises = type === 'strength'
-      ? parseCompletedExercises(completed?.strength_exercises).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }))
-      : parseCompletedExercises(completed?.mobility_exercises).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }));
+    const completedRaw = type === 'strength'
+      ? parseCompletedExercises(completed?.strength_exercises)
+      : parseCompletedExercises(completed?.mobility_exercises);
+    
+    const completedExercises = completedRaw.map((ex: any) => {
+      // Handle old mobility format with duration string - convert to setsArray
+      if (ex.duration && typeof ex.duration === 'string') {
+        const match = ex.duration.match(/(\d+)x(\d+)/i);
+        if (match) {
+          const numSets = parseInt(match[1], 10);
+          const reps = parseInt(match[2], 10);
+          const weight = Number(ex.weight || 0);
+          // Generate setsArray from duration
+          const setsArray = Array.from({ length: numSets }, () => ({
+            reps,
+            weight,
+            completed: true
+          }));
+          return { name: ex.name, setsArray };
+        }
+      }
+      // Handle standard format with sets array
+      return { name: ex.name, setsArray: Array.isArray(ex.sets) ? ex.sets : [] };
+    });
     return (
       <div className="space-y-4">
         <StrengthCompareTable planned={plannedExercises} completed={completedExercises} />
