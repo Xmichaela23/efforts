@@ -127,12 +127,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         if (/^\d+:\d{2}$/.test(txt)) { const [mm, ss] = txt.split(':').map((t:string)=>parseInt(t,10)); return mm*60 + ss; }
         return null;
       })();
-      console.log('🏊 Planned steps:', v3.length, 'steps');
-      v3.forEach((st:any, idx:number)=>{
+      v3.forEach((st:any)=>{
         const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
-        if (idx < 3 || st?.kind === 'recovery' || st?.kind === 'rest') {
-          console.log(`  Step ${idx}:`, { kind: st?.kind, seconds: st?.seconds, distanceMeters: st?.distanceMeters, label: st?.label });
-        }
         if (typeof secs==='number' && secs>0) totalSecsFromSteps += Math.max(1, Math.round(secs));
         const distM = typeof st?.distanceMeters==='number' ? st.distanceMeters : undefined;
         const distYdRaw = ((): number | undefined => {
