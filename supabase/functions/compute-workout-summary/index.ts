@@ -257,6 +257,57 @@ function stepRole(st:any): 'warmup'|'cooldown'|'recovery'|'work' {
   return 'work';
 }
 
+function formatPlannedLabel(st: any): string | null {
+  if (!st) return null;
+  
+  // Priority 1: Explicit label/name/description
+  const explicitLabel = String(st?.label || st?.name || st?.description || '').trim();
+  if (explicitLabel) return explicitLabel;
+  
+  // Priority 2: Construct from distance/duration + kind
+  const meters = deriveMetersFromPlannedStep(st);
+  const seconds = deriveSecondsFromPlannedStep(st);
+  const kind = String(st?.kind || st?.type || '').trim();
+  const reps = Number(st?.reps || st?.repeat || st?.repetitions || 1);
+  
+  // Format distance-based label
+  if (meters && meters > 0) {
+    // Convert to most appropriate unit
+    let distStr = '';
+    if (meters >= 1000 && meters % 1000 === 0) {
+      distStr = `${meters / 1000}km`;
+    } else if (meters >= 900) {
+      distStr = `${Math.round(meters)}m`;
+    } else {
+      // Try yards for swim
+      const yards = Math.round(meters / 0.9144);
+      if (Math.abs(yards * 0.9144 - meters) < 1) {
+        distStr = `${yards}yd`;
+      } else {
+        distStr = `${Math.round(meters)}m`;
+      }
+    }
+    
+    const repPrefix = (reps && reps > 1) ? `${reps}×` : '';
+    const suffix = kind ? ` — ${kind}` : '';
+    return `${repPrefix}${distStr}${suffix}`;
+  }
+  
+  // Format time-based label
+  if (seconds && seconds > 0) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    const timeStr = secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
+    const suffix = kind ? ` — ${kind}` : '';
+    return `${timeStr}${suffix}`;
+  }
+  
+  // Fallback to kind or role
+  if (kind) return kind;
+  const role = stepRole(st);
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
 // -------------------------- Align config & types --------------------------
 type Sport = 'run'|'ride'|'swim'|'walk'|'strength';
 
@@ -404,7 +455,37 @@ Deno.serve(async (req) => {
         first: Array.isArray(samplesIn) ? samplesIn[0] : null
       });
     } catch {}
-    const samples = Array.isArray(samplesIn) ? samplesIn.filter(Boolean) : [];
+    let samples = Array.isArray(samplesIn) ? samplesIn.filter(Boolean) : [];
+
+    // If no samples in workouts.sensor_data (common for Garmin - too large), load from garmin_activities
+    if (samples.length === 0 && w.garmin_activity_id && w.user_id) {
+      try {
+        const { data: gaData } = await supabase
+          .from('garmin_activities')
+          .select('samples_data, raw_data, sensor_data')
+          .eq('user_id', w.user_id)
+          .eq('garmin_activity_id', w.garmin_activity_id)
+          .maybeSingle();
+        
+        if (gaData) {
+          const samplesFromGA = 
+            (Array.isArray(gaData.samples_data) && gaData.samples_data.length > 0)
+              ? gaData.samples_data
+            : (Array.isArray(gaData.raw_data?.samples) && gaData.raw_data.samples.length > 0)
+              ? gaData.raw_data.samples
+            : (Array.isArray(gaData.sensor_data?.samples) && gaData.sensor_data.samples.length > 0)
+              ? gaData.sensor_data.samples
+            : [];
+          
+          if (samplesFromGA.length > 0) {
+            samples = samplesFromGA;
+            console.log(`📊 Loaded ${samples.length} samples from garmin_activities (too large for workouts.sensor_data)`);
+          }
+        }
+      } catch (err) {
+        console.error('⚠️ Failed to load samples from garmin_activities:', err);
+      }
+    }
 
     // Helper used by normalize fallback (defined early to avoid hoist issues)
     function computeFromSummaryDataEarly(wAny:any): { meters:number; secs:number } {
@@ -750,6 +831,7 @@ Deno.serve(async (req) => {
       const confident = (pctMoving ?? 100) >= 70 && (overlap ?? 1) >= 0.6;
       return {
         planned_step_id: (st?.id ?? null),
+        planned_label: formatPlannedLabel(st),
         kind: st?.type || st?.kind || null,
         role: (sport === 'swim' && role === 'recovery') ? 'rest' : role,
         planned: {
@@ -1099,6 +1181,10 @@ Deno.serve(async (req) => {
     let cursorT = rows.length ? rows[0].t : 0;
     let cursorD = rows.length ? (rows[0].d || 0) : 0;
 
+    // Detect pool swims: check if rows have distance progression
+    const hasDistanceProgression = rows.length > 1 && rows.some(r => (r.d || 0) > 1);
+    const isPoolSwim = sport === 'swim' && !hasDistanceProgression;
+
     type Info = { st:any; startIdx:number; endIdx:number|null; measured:boolean; role:'warmup'|'cooldown'|'recovery'|'work'|'pre_extra'|'post_extra' };
     const infos: Info[] = [];
 
@@ -1110,6 +1196,21 @@ Deno.serve(async (req) => {
       const startD = cursorD;
       let targetMeters = deriveMetersFromPlannedStep(st);
       let targetSeconds = deriveSecondsFromPlannedStep(st);
+      
+      // For pool swims with distance but no time: convert distance to expected time using baseline pace
+      if (isPoolSwim && targetMeters > 0 && (!targetSeconds || targetSeconds <= 0)) {
+        // Use baseline swim pace to estimate duration from planned distance
+        const baselinePacePer100 = (() => {
+          try {
+            const pace = Number((w as any)?.baselines_template?.swim_pace_per_100_sec ?? (w as any)?.baselines?.swim_pace_per_100_sec);
+            return (Number.isFinite(pace) && pace > 0) ? pace : 90; // Default 1:30/100m if not set
+          } catch { return 90; }
+        })();
+        const estimatedSeconds = Math.round((targetMeters / 100) * baselinePacePer100);
+        targetSeconds = estimatedSeconds;
+        console.log(`🏊 Pool swim: converted ${targetMeters}m to ${estimatedSeconds}s using baseline pace`);
+      }
+      
       // Guard: some interval steps surface tiny duration hints (e.g., 0:30) without distance.
       // For work reps, prefer distance; if distance is missing and duration < 60s, treat as unspecified
       if (role === 'work' && (!targetMeters || targetMeters <= 0) && (targetSeconds != null && targetSeconds < 60)) {
@@ -1117,7 +1218,11 @@ Deno.serve(async (req) => {
       }
 
       if ((targetMeters && targetMeters > 0) || (targetSeconds && targetSeconds > 0)) {
-        if (targetMeters && targetMeters > 0) {
+        // For pool swims, ALWAYS use time-based slicing (distance progression not available)
+        if (isPoolSwim && targetSeconds && targetSeconds > 0) {
+          const goalT = startT + targetSeconds;
+          while (idx < rows.length && (rows[idx].t || 0) < goalT) idx += 1;
+        } else if (targetMeters && targetMeters > 0 && hasDistanceProgression) {
           const goalD = startD + targetMeters;
           while (idx < rows.length && (rows[idx].d || 0) < goalD) idx += 1;
         } else if (targetSeconds && targetSeconds > 0) {
@@ -1324,6 +1429,7 @@ Deno.serve(async (req) => {
 
       outIntervals.push({
         planned_step_id: st?.id ?? null,
+        planned_label: formatPlannedLabel(st),
         kind: st?.type || st?.kind || null,
         role: info.role || (info.measured ? 'work' : null),
         planned: {

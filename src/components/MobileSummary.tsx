@@ -1570,8 +1570,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               }
             }
             const pct = (hasServerComputed && shouldShowPercentage(st)) ? calculateExecutionPercentage(st, row?.executed) : null;
-            // Planned label: include duration + pace target, right-aligned details
+            // Planned label: prioritize server-computed label, fallback to client-side generation
             const plannedLabel = (() => {
+              // Priority 1: Use server-computed planned_label if available
+              if (row?.planned_label && typeof row.planned_label === 'string' && row.planned_label.trim()) {
+                return row.planned_label;
+              }
+              
+              // Priority 2: Fallback to client-side label generation (backwards compatibility)
               const base = plannedLabelStrict(st);
               const dur = (() => {
                 const sec = [ (st as any)?.seconds, (st as any)?.duration, (st as any)?.duration_sec, (st as any)?.durationSeconds, (st as any)?.time_sec, (st as any)?.timeSeconds ]
