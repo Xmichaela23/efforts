@@ -794,6 +794,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     // Clear local state
                     (workout as any).planned_id = null;
                     setLinkedPlanned(null);
+                    setHydratedPlanned(null); // Also clear hydratedPlanned
                     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                     try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                     setActiveTab('completed');
@@ -815,6 +816,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
                 const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
                 setLinkedPlanned(data || null);
+                setHydratedPlanned(data || null); // Also update hydratedPlanned for planned steps
                 await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any)?.id) } });
                 // Dispatch invalidate AFTER we've set the complete data, so other listeners don't overwrite it
                 try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
@@ -963,6 +965,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                             await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
                             const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
                             setLinkedPlanned(data || null);
+                            setHydratedPlanned(data || null); // Also update hydratedPlanned for planned steps
                             await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any)?.id) } });
                             // Dispatch invalidate AFTER we've set the complete data, so other listeners don't overwrite it
                             try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
