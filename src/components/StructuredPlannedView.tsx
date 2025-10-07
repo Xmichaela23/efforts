@@ -127,8 +127,12 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         if (/^\d+:\d{2}$/.test(txt)) { const [mm, ss] = txt.split(':').map((t:string)=>parseInt(t,10)); return mm*60 + ss; }
         return null;
       })();
-      v3.forEach((st:any)=>{
+      console.log('🏊 Planned steps:', v3.length, 'steps');
+      v3.forEach((st:any, idx:number)=>{
         const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
+        if (idx < 3 || st?.kind === 'recovery' || st?.kind === 'rest') {
+          console.log(`  Step ${idx}:`, { kind: st?.kind, seconds: st?.seconds, distanceMeters: st?.distanceMeters, label: st?.label });
+        }
         if (typeof secs==='number' && secs>0) totalSecsFromSteps += Math.max(1, Math.round(secs));
         const distM = typeof st?.distanceMeters==='number' ? st.distanceMeters : undefined;
         const distYdRaw = ((): number | undefined => {
@@ -196,8 +200,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
             ? fmtDist(distM)
             : (typeof distYdRaw==='number' ? `${distYdRaw} yd` : undefined);
           const baseLabel = (typeof st?.label==='string' && st.label.trim()) ? st.label.trim().replace(/^drill\s*/i,'Drill ') : (kind || '').trim();
-          const seg = [distTxt ? `1 × ${distTxt}` : (typeof secs==='number' && secs>0 ? `1 × ${fmtDur(secs)}` : undefined), baseLabel || undefined].filter(Boolean).join(' — ')
-          lines.push([seg, equip].filter(Boolean).join(''))
+          const timeTxt = (typeof secs==='number' && secs>0) ? `1 × ${fmtDur(secs)}` : undefined;
+          const seg = [distTxt || timeTxt, baseLabel || undefined].filter(Boolean).join(' — ')
+          if (seg && seg.trim()) {
+            lines.push([seg, equip].filter(Boolean).join(''))
+          }
           return;
         }
 

@@ -401,6 +401,14 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
       }
+      // Drill (name first): swim_drill_catchup_4x50yd_r15 (optional equipment)
+      m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
+      if (m) {
+        const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
+        const distM = unit==='yd'? ydToM(dist) : dist;
+        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        continue;
+      }
       // Drill (count first): swim_drills_6x50yd_fingertipdrag (optional _r15, optional equipment)
       m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
@@ -567,11 +575,28 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
   // For swim steps with distance but no duration, estimate duration using baseline pace
   if (discipline === 'swim') {
     try {
+      // Parse baseline swim pace from various formats (string "mm:ss" or number seconds)
       const swimPacePer100Sec = (() => {
-        const pace = baselines?.swim_pace_per_100_sec ?? (row as any)?.baselines_template?.swim_pace_per_100_sec ?? (row as any)?.baselines?.swim_pace_per_100_sec;
-        return (typeof pace === 'number' && pace > 0) ? pace : 90; // Default 1:30/100m
+        // Try numeric format first (seconds per 100)
+        const numPace = baselines?.swim_pace_per_100_sec ?? (row as any)?.baselines_template?.swim_pace_per_100_sec ?? (row as any)?.baselines?.swim_pace_per_100_sec;
+        if (typeof numPace === 'number' && numPace > 0) return numPace;
+        
+        // Try string format "mm:ss" (e.g., "2:10")
+        const strPace = (baselines as any)?.swimPace100 ?? (row as any)?.baselines_template?.swimPace100 ?? (row as any)?.baselines?.swimPace100;
+        if (typeof strPace === 'string' && /^\d{1,2}:\d{2}$/.test(strPace)) {
+          const [mm, ss] = strPace.split(':').map((t:string)=>parseInt(t,10));
+          const sec = mm*60 + ss;
+          if (sec > 0) return sec;
+        }
+        
+        // Default fallback: 1:30/100 (90 seconds)
+        return 90;
       })();
-      const poolUnit = (row as any)?.pool_unit as 'yd' | 'm' | null;
+      
+      // Determine baseline unit from user's preferred units (imperial=yards, metric=meters)
+      const userUnits = String((row as any)?.units || '').toLowerCase();
+      const baselineUnit = (userUnits === 'imperial') ? 'yd' : 'm';
+      const poolUnit = ((row as any)?.pool_unit as 'yd' | 'm' | null) || baselineUnit;
       
       for (const st of steps) {
         // Skip if step already has duration
@@ -579,8 +604,16 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         
         const distM = typeof st.distanceMeters === 'number' ? st.distanceMeters : 0;
         if (distM > 0) {
-          // Convert to appropriate unit and estimate duration
-          const dist100 = (poolUnit === 'yd') ? (distM / 0.9144) / 100 : distM / 100;
+          // Convert distance to baseline unit, calculate duration, then apply
+          let dist100: number;
+          if (baselineUnit === 'yd') {
+            // Baseline is per 100 yards
+            const distYd = distM / 0.9144;
+            dist100 = distYd / 100;
+          } else {
+            // Baseline is per 100 meters
+            dist100 = distM / 100;
+          }
           st.duration_s = Math.round(dist100 * swimPacePer100Sec);
         }
       }
