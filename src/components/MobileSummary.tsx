@@ -1545,11 +1545,27 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               if (Number.isFinite(yd) && yd > 0) return sum + (yd * 0.9144);
               return sum;
             }, 0);
-            const plannedTotalSeconds = stepsDisplay.reduce((sum: number, st: any) => {
-              const sec = [(st as any)?.seconds, (st as any)?.duration, (st as any)?.duration_sec, (st as any)?.duration_s]
-                .map((v: any) => Number(v)).find((n: number) => Number.isFinite(n) && n > 0);
-              return sum + (sec || 0);
-            }, 0);
+            
+            // Get planned duration from planned workout, not by summing steps (steps may not have duration)
+            const plannedTotalSeconds = (() => {
+              // Try planned workout computed.total_duration_seconds first
+              const compDur = Number(planned?.computed?.total_duration_seconds);
+              if (Number.isFinite(compDur) && compDur > 0) return Math.round(compDur);
+              
+              // Try planned workout duration (in minutes)
+              const pwDur = Number(planned?.duration);
+              if (Number.isFinite(pwDur) && pwDur > 0) return Math.round(pwDur * 60);
+              
+              const pwDurS = Number(planned?.duration_seconds);
+              if (Number.isFinite(pwDurS) && pwDurS > 0) return Math.round(pwDurS);
+              
+              // Fallback: sum steps (may be 0 for distance-only workouts)
+              return stepsDisplay.reduce((sum: number, st: any) => {
+                const sec = [(st as any)?.seconds, (st as any)?.duration, (st as any)?.duration_sec, (st as any)?.duration_s]
+                  .map((v: any) => Number(v)).find((n: number) => Number.isFinite(n) && n > 0);
+                return sum + (sec || 0);
+              }, 0);
+            })();
             
             const executedMeters = Number(compOverall?.distance_m) || (Number((completed as any)?.distance) * 1000) || 0;
             const executedSeconds = Number(compOverall?.duration_s_moving) || (Number((completed as any)?.moving_time) * 60) || 0;
