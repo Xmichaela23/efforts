@@ -795,13 +795,13 @@ function EffortsViewerMapbox({
       if (isOutdoorGlobal) {
         // Remove zeros, impossible spikes, and outliers
         const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 50 && v <= 2000 ? v : NaN));
-        const withoutOutliers = removeOutliers(cleaned, 2.5);
-        const ma = nanAwareMovAvg(withoutOutliers, 21); // Much more aggressive smoothing (was 5)
+        const withoutOutliers = removeOutliers(cleaned, 2.0); // More aggressive outlier removal (was 2.5)
+        const ma = nanAwareMovAvg(withoutOutliers, 35); // MUCH more aggressive smoothing (was 21)
         return ma.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
       }
       const wins = winsorize(pwr as number[], 5, 99);
-      const withoutOutliers = removeOutliers(wins, 2.5);
-      return smoothWithOutlierHandling(withoutOutliers, 21, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN)); // More aggressive (was 5)
+      const withoutOutliers = removeOutliers(wins, 2.0); // More aggressive outlier removal
+      return smoothWithOutlierHandling(withoutOutliers, 35, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN)); // MUCH more aggressive (was 21)
     }
     // Default fallback (shouldn't be reached)
     return [];
@@ -1247,7 +1247,7 @@ function EffortsViewerMapbox({
           {yTicks.map((v, i) => (
             <g key={i}>
               <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#e5e7eb" strokeWidth="1" />
-              <text x={pl - 8} y={yFromValue(v) + 4} fill="#6b7280" fontSize={13} fontWeight={500} textAnchor="end">
+              <text x={pl - 8} y={yFromValue(v) + 4} fill="#6b7280" fontSize={16} fontWeight={500} textAnchor="end">
                 {fmtYAxis(v, tab, workoutData?.type || 'run', useMiles, useFeet)}
               </text>
             </g>
@@ -1258,8 +1258,8 @@ function EffortsViewerMapbox({
             <>
               <defs>
                 <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#e8f5ff" stopOpacity={0.75} />
-                  <stop offset="100%" stopColor="#dff0ff" stopOpacity={0.55} />
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.1} />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0.4} />
                 </linearGradient>
               </defs>
               <path d={elevArea} fill="url(#elevGrad)" opacity={1} />
