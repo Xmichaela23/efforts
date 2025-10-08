@@ -232,6 +232,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       const wid = String(selectedWorkout.id);
       const isCompleted = String(selectedWorkout.workout_status || '').toLowerCase() === 'completed';
       
+      console.log('[AppLayout] Refreshing selectedWorkout:', wid, 'isCompleted:', isCompleted);
+      
       if (isCompleted) {
         // Refresh from workouts table
         try {
@@ -240,10 +242,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             .select('*')
             .eq('id', wid)
             .maybeSingle();
+          console.log('[AppLayout] Fetched workout data:', { id: data?.id, planned_id: data?.planned_id });
           if (data) {
             setSelectedWorkout(data);
           }
-        } catch {}
+        } catch (e) {
+          console.error('[AppLayout] Failed to fetch workout:', e);
+        }
       } else {
         // Refresh from planned_workouts table
         try {
@@ -252,20 +257,26 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             .select('*')
             .eq('id', wid)
             .maybeSingle();
+          console.log('[AppLayout] Fetched planned data:', { id: data?.id, completed_workout_id: data?.completed_workout_id });
           if (data) {
             setSelectedWorkout(data);
           }
-        } catch {}
+        } catch (e) {
+          console.error('[AppLayout] Failed to fetch planned:', e);
+        }
       }
     };
 
-    const handleInvalidate = () => refreshSelectedWorkout();
-    window.addEventListener('workouts:invalidate', handleInvalidate);
-    window.addEventListener('planned:invalidate', handleInvalidate);
+    const handleInvalidate = (e: Event) => {
+      console.log('[AppLayout] Invalidate event received:', e.type);
+      refreshSelectedWorkout();
+    };
+    window.addEventListener('workouts:invalidate', handleInvalidate as any);
+    window.addEventListener('planned:invalidate', handleInvalidate as any);
     
     return () => {
-      window.removeEventListener('workouts:invalidate', handleInvalidate);
-      window.removeEventListener('planned:invalidate', handleInvalidate);
+      window.removeEventListener('workouts:invalidate', handleInvalidate as any);
+      window.removeEventListener('planned:invalidate', handleInvalidate as any);
     };
   }, [selectedWorkout?.id, selectedWorkout?.workout_status]);
 
