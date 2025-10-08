@@ -571,7 +571,7 @@ function EffortsViewerMapbox({
   /** ----- Chart prep ----- */
   const W = 700, H = 260;           // overall SVG size (in SVG units)
   const P = 24;                     // vertical padding (top/bottom)
-  const [pl, setPl] = useState(56); // left padding (space for Y labels)
+  const [pl, setPl] = useState(66); // left padding (space for Y labels) - increased to prevent clipping
   const pr = 8;                     // right padding (tight)
 
   // cumulative positive gain (m) and loss (m), used for the InfoCard
@@ -722,7 +722,7 @@ function EffortsViewerMapbox({
       // Detect if indoor (for adaptive smoothing)
       const hasGPSTrack = ((workoutData as any)?.gps_data?.length || 0) > 10;
       const isIndoor = !hasGPSTrack;
-      const speedSmoothingWindow = isIndoor ? 7 : 19; // More aggressive for outdoor GPS noise
+      const speedSmoothingWindow = isIndoor ? 7 : 45; // Much more aggressive for outdoor GPS noise
       
       const wins = winsorize(spd as number[], 5, 99);
       return smoothWithOutlierHandling(wins, speedSmoothingWindow, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
@@ -1467,7 +1467,7 @@ function VamChart({
   idx: number;
   useFeet: boolean;
 }) {
-  const W = 700, H = 200; const P = 20; const pl = 56; const pr = 8;
+  const W = 700, H = 200; const P = 20; const pl = 66; const pr = 8;
   const xFromDist = (d: number) => {
     const range = Math.max(1, dN - d0);
     const ratio = (d - d0) / range;
