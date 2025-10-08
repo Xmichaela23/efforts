@@ -874,12 +874,16 @@ function EffortsViewerMapbox({
         lo = 0; hi = 100;
       }
     }
-    // SPEED domain: use actual speed values with proper min/max
+    // SPEED domain: use RAW speed values (before smoothing) to show full range
     if (tab === 'spd' || tab === 'speed') {
-      const finite = metricRaw.filter(Number.isFinite) as number[];
-      if (finite.length) {
-        lo = Math.max(0, Math.min(...finite)); // Speed can't be negative
-        hi = Math.max(...finite);
+      // Get raw speed data directly from samples (before smoothing)
+      const rawSpeedValues = normalizedSamples
+        .map(s => Number.isFinite(s.speed_mps as any) ? (s.speed_mps as number) : NaN)
+        .filter(Number.isFinite) as number[];
+      
+      if (rawSpeedValues.length) {
+        lo = Math.max(0, Math.min(...rawSpeedValues)); // Speed can't be negative
+        hi = Math.max(...rawSpeedValues); // Use raw max, not smoothed max
       } else {
         lo = 0; hi = 10; // Default fallback
       }
