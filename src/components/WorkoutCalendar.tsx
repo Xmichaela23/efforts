@@ -228,7 +228,8 @@ export default function WorkoutCalendar({
     // Pass sets for strength and mobility so views can read exercise data
     strength_exercises: Array.isArray((it as any)?.executed?.strength_exercises) ? (it as any).executed.strength_exercises : undefined,
     mobility_exercises: Array.isArray((it as any)?.executed?.mobility_exercises) ? (it as any).executed.mobility_exercises : undefined,
-    // keep shape minimal; calendar only uses status, date, type, maybe planned_id
+    // Include planned_id for linking logic
+    planned_id: (it as any)?.executed?.planned_id || undefined,
   }));
 
   // No legacy backstop: unified feed is authoritative
