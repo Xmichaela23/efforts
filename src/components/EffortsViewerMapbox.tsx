@@ -722,7 +722,7 @@ function EffortsViewerMapbox({
       // Detect if indoor (for adaptive smoothing)
       const hasGPSTrack = ((workoutData as any)?.gps_data?.length || 0) > 10;
       const isIndoor = !hasGPSTrack;
-      const speedSmoothingWindow = isIndoor ? 7 : 45; // Much more aggressive for outdoor GPS noise
+      const speedSmoothingWindow = isIndoor ? 7 : 21; // Light smoothing - preserves actual user peaks while removing GPS noise
       
       const wins = winsorize(spd as number[], 5, 99);
       return smoothWithOutlierHandling(wins, speedSmoothingWindow, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
