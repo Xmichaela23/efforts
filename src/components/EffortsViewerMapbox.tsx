@@ -790,12 +790,12 @@ function EffortsViewerMapbox({
         // Remove zeros, impossible spikes, and outliers
         const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 50 && v <= 2000 ? v : NaN));
         const withoutOutliers = removeOutliers(cleaned, 2.0); // More aggressive outlier removal (was 2.5)
-        const ma = nanAwareMovAvg(withoutOutliers, 35); // MUCH more aggressive smoothing (was 21)
+        const ma = nanAwareMovAvg(withoutOutliers, 49); // VERY aggressive smoothing for trainer data (was 35)
         return ma.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
       }
       const wins = winsorize(pwr as number[], 5, 99);
       const withoutOutliers = removeOutliers(wins, 2.0); // More aggressive outlier removal
-      return smoothWithOutlierHandling(withoutOutliers, 35, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN)); // MUCH more aggressive (was 21)
+      return smoothWithOutlierHandling(withoutOutliers, 49, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN)); // VERY aggressive (was 35)
     }
     // Default fallback (shouldn't be reached)
     return [];
