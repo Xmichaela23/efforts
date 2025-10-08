@@ -16,6 +16,16 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
 
   const windowDays = 7; // Increased from 3 to 7 days to catch more planned workouts
 
+  // Normalize sport type to match server-side logic
+  const normalizeSportType = (s: string | null | undefined): string => {
+    const t = String(s||'').toLowerCase();
+    if (t.includes('swim')) return 'swim';
+    if (t.includes('ride') || t.includes('bike') || t.includes('cycl')) return 'ride';
+    if (t.includes('run') || t.includes('jog')) return 'run';
+    if (t.includes('walk') || t.includes('hike')) return 'walk';
+    return t || 'run';
+  };
+
   const searchForCandidates = async () => {
       try {
         setLoading(true);
@@ -23,7 +33,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { setCandidates([]); setLoading(false); return; }
 
-        const type = String(workout?.type || '').toLowerCase();
+        const type = normalizeSportType(workout?.type);
         const d = String(workout?.date || '').slice(0,10);
         const toIso = (base: string, delta: number) => {
           const p = base.split('-').map((x)=>parseInt(x,10));
