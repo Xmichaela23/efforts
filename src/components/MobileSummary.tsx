@@ -991,24 +991,24 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     if (intent === 'RULE_A_RECOVERY') {
       // Check for violations first
       if (pacePct != null && pacePct > 110) {
-        return { icon: '⚠️', text: 'Pace too fast for prescribed recovery zone' };
+        return { icon: '', text: 'Pace too fast for prescribed recovery zone' };
       }
       if (distancePct != null && distancePct > 115) {
-        return { icon: '⚠️', text: 'Distance exceeded recovery zone prescription' };
+        return { icon: '', text: 'Distance exceeded recovery zone prescription' };
       }
       if (durationPct != null && durationPct > 110) {
-        return { icon: '⚠️', text: 'Duration longer than prescribed recovery zone' };
+        return { icon: '', text: 'Duration longer than prescribed recovery zone' };
       }
       // All good
-      return { icon: '✓', text: 'Recovery zone maintained' };
+      return { icon: '', text: 'Recovery zone maintained' };
     }
     
     // RULE B: Technique/Drill
     if (intent === 'RULE_B_TECHNIQUE') {
       if (durationPct != null && durationPct > 120) {
-        return { icon: '⚠️', text: 'Drill session took significantly longer than planned' };
+        return { icon: '', text: 'Drill session took significantly longer than planned' };
       }
-      return { icon: '✓', text: 'Workout completed - all prescribed sets done' };
+      return { icon: '', text: 'Workout completed - all prescribed sets done' };
     }
     
     // RULE C: Intensity - CHECK FOR PACE RANGES FIRST
@@ -1018,11 +1018,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
         const rangeCheck = checkPaceWithinRange(planned, executedSecPerMi);
         if (rangeCheck.rangeExists) {
           if (rangeCheck.withinRange) {
-            return { icon: '✓', text: 'Executed within prescribed pace range' };
+            return { icon: '', text: 'Executed within prescribed pace range' };
           } else if (executedSecPerMi < rangeCheck.lowerBound!) {
-            return { icon: '💪', text: 'Averaged faster than prescribed range' };
+            return { icon: '', text: 'Averaged faster than prescribed range' };
           } else {
-            return { icon: '⚠️', text: 'Pace slower than prescribed range' };
+            return { icon: '', text: 'Pace slower than prescribed range' };
           }
         }
       }
@@ -1032,27 +1032,27 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
       if (pacePct != null && pacePct > 100) {
         const delta = pacePct - 100;
         if (isSwim) {
-          return { icon: '💪', text: `Averaged faster than target pace` };
+          return { icon: '', text: `Averaged faster than target pace` };
         }
-        return { icon: '💪', text: `Averaged ${delta}% faster than target pace` };
+        return { icon: '', text: `Averaged ${delta}% faster than target pace` };
       }
       if (durationPct != null && durationPct < 95) {
-        return { icon: '💪', text: 'Completed intervals faster than planned' };
+        return { icon: '', text: 'Completed intervals faster than planned' };
       }
       // Warnings for slower
       if (pacePct != null && pacePct < 95) {
-        return { icon: '⚠️', text: 'Pace slower than intensity target' };
+        return { icon: '', text: 'Pace slower than intensity target' };
       }
       if (durationPct != null && durationPct > 110) {
-        return { icon: '⚠️', text: 'Intervals took longer than prescribed' };
+        return { icon: '', text: 'Intervals took longer than prescribed' };
       }
       // On target
-      return { icon: '✓', text: 'Intensity targets achieved' };
+      return { icon: '', text: 'Intensity targets achieved' };
     }
     
     // NEUTRAL: Generic message
     if (durationPct != null || distancePct != null || pacePct != null) {
-      return { icon: '✓', text: 'Workout completed' };
+      return { icon: '', text: 'Workout completed' };
     }
     
     return null;
