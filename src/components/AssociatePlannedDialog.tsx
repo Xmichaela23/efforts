@@ -78,13 +78,29 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           return true;
         });
 
-        console.log('🔍 Filtered candidates:', {
-          original: data?.length || 0,
-          filtered: filteredCandidates.length,
-          candidates: filteredCandidates
+        // Sort by relevance: same-day first, then closest date
+        const sortedCandidates = filteredCandidates.sort((a:any, b:any) => {
+          const aDate = String(a.date || '').slice(0,10);
+          const bDate = String(b.date || '').slice(0,10);
+          const workoutDate = String(d).slice(0,10);
+          
+          // Same-day matches come first
+          if (aDate === workoutDate && bDate !== workoutDate) return -1;
+          if (bDate === workoutDate && aDate !== workoutDate) return 1;
+          
+          // Otherwise sort by date proximity (closest first)
+          const aDiff = Math.abs(new Date(aDate).getTime() - new Date(workoutDate).getTime());
+          const bDiff = Math.abs(new Date(bDate).getTime() - new Date(workoutDate).getTime());
+          return aDiff - bDiff;
         });
 
-        setCandidates(filteredCandidates);
+        console.log('🔍 Filtered candidates:', {
+          original: data?.length || 0,
+          filtered: sortedCandidates.length,
+          candidates: sortedCandidates
+        });
+
+        setCandidates(sortedCandidates);
       } catch (e: any) {
         setError(e?.message || 'Failed to load candidates');
       } finally {
@@ -195,12 +211,22 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           <div className="text-sm text-gray-600">No matching planned rows in ±{windowDays} days.</div>
         ) : (
           <div className="space-y-2 max-h-64 overflow-auto">
-            {candidates.map((p) => (
-              <button key={p.id} onClick={() => associate(p)} className="w-full text-left border rounded p-2 hover:bg-gray-50">
-                <div className="text-sm font-medium">{p.date} — {p.name || p.type}</div>
-                <div className="text-xs text-gray-600">Week {p.week_number}, Day {p.day_number}</div>
-              </button>
-            ))}
+            {candidates.map((p) => {
+              const isSameDay = String(p.date || '').slice(0,10) === String(workout?.date || '').slice(0,10);
+              return (
+                <button 
+                  key={p.id} 
+                  onClick={() => associate(p)} 
+                  className={`w-full text-left border rounded p-2 hover:bg-gray-50 ${isSameDay ? 'border-blue-500 bg-blue-50' : ''}`}
+                >
+                  <div className="text-sm font-medium">
+                    {p.date} — {p.name || p.type}
+                    {isSameDay && <span className="ml-2 text-xs text-blue-600 font-semibold">• Same day</span>}
+                  </div>
+                  <div className="text-xs text-gray-600">Week {p.week_number}, Day {p.day_number}</div>
+                </button>
+              );
+            })}
           </div>
         )}
         <div className="flex justify-between gap-2 pt-2">
