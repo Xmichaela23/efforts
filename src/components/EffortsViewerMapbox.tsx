@@ -691,15 +691,9 @@ function EffortsViewerMapbox({
   const metricRaw: number[] = useMemo(() => {
     // Elevation (already EMA smoothed when building samples)
     if (tab === "elev") {
+      // Return ACTUAL elevation values, not relative changes
       const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
-      const finite = elev.filter(Number.isFinite) as number[];
-      console.log('[ELEV DEBUG] samples:', normalizedSamples.length, 'finite elev:', finite.length, 'first 5:', finite.slice(0, 5));
-      if (!finite.length) return new Array(elev.length).fill(NaN);
-      const minE = Math.min(...finite);
-      const maxE = Math.max(...finite);
-      const rel = elev.map(v => (Number.isFinite(v) ? (v as number) - minE : NaN));
-      console.log('[ELEV DEBUG] min:', minE, 'max:', maxE, 'range:', maxE - minE, 'rel values:', rel.filter(Number.isFinite).length);
-      return rel;
+      return elev;
     }
     // VAM (vertical ascent meters/hour)
     if (tab === "vam") {
@@ -1268,8 +1262,8 @@ function EffortsViewerMapbox({
             <>
               <defs>
                 <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.05} />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity={0.15} />
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.02} />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0.08} />
                 </linearGradient>
               </defs>
               <path d={elevArea} fill="url(#elevGrad)" opacity={1} />
