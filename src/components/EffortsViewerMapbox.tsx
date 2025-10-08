@@ -777,14 +777,31 @@ function EffortsViewerMapbox({
       const hasDataInSamples = pwrFromSamples.some(v => Number.isFinite(v));
       // TODO: MIGRATION CODE - Remove pwrSeries fallback after backfill
       const pwr = hasDataInSamples ? pwrFromSamples : (pwrSeries && pwrSeries.length ? pwrSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN));
+      
+      // Remove outliers using z-score before smoothing
+      const removeOutliers = (data: number[], threshold: number = 2.5): number[] => {
+        const finite = data.filter(Number.isFinite);
+        if (finite.length === 0) return data;
+        const mean = finite.reduce((a, b) => a + b) / finite.length;
+        const stdDev = Math.sqrt(finite.reduce((sq, n) => sq + (n - mean) ** 2, 0) / finite.length);
+        
+        return data.map(val => {
+          if (!Number.isFinite(val)) return val;
+          const zScore = Math.abs((val - mean) / stdDev);
+          return zScore > threshold ? mean : val;
+        });
+      };
+      
       if (isOutdoorGlobal) {
-        // Light smoothing; remove zeros and impossible spikes (< 50 or > 2000)
+        // Remove zeros, impossible spikes, and outliers
         const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 50 && v <= 2000 ? v : NaN));
-        const ma = nanAwareMovAvg(cleaned, 5);
+        const withoutOutliers = removeOutliers(cleaned, 2.5);
+        const ma = nanAwareMovAvg(withoutOutliers, 21); // Much more aggressive smoothing (was 5)
         return ma.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
       }
       const wins = winsorize(pwr as number[], 5, 99);
-      return smoothWithOutlierHandling(wins, 5, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
+      const withoutOutliers = removeOutliers(wins, 2.5);
+      return smoothWithOutlierHandling(withoutOutliers, 21, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN)); // More aggressive (was 5)
     }
     // Default fallback (shouldn't be reached)
     return [];
@@ -1213,8 +1230,8 @@ function EffortsViewerMapbox({
               <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.05" />
             </linearGradient>
             <linearGradient id="elevGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#10b981" stopOpacity="0.05" />
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0.4" />
             </linearGradient>
             <linearGradient id="vamGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.4" />
@@ -1230,7 +1247,7 @@ function EffortsViewerMapbox({
           {yTicks.map((v, i) => (
             <g key={i}>
               <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#e5e7eb" strokeWidth="1" />
-              <text x={pl - 8} y={yFromValue(v) + 4} fill="#6b7280" fontSize={11} fontWeight={500} textAnchor="end">
+              <text x={pl - 8} y={yFromValue(v) + 4} fill="#6b7280" fontSize={13} fontWeight={500} textAnchor="end">
                 {fmtYAxis(v, tab, workoutData?.type || 'run', useMiles, useFeet)}
               </text>
             </g>
