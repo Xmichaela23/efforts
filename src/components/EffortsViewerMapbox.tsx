@@ -951,7 +951,7 @@ function EffortsViewerMapbox({
                     : (tab === 'cad') ? 0.05
                     : (tab === 'pwr') ? 0.06
                     : (tab === 'elev') ? 0.04
-                    : (tab === 'spd' || tab === 'speed') ? 0.08
+                    : (tab === 'spd' || tab === 'speed') ? 0.15  // Extra padding to show full range including peaks
                     : (tab === 'vam') ? 0.08
                     : (isOutdoorGlobal ? 0.03 : 0.02);
     const pad = Math.max((hi - lo) * padFrac, 1);
