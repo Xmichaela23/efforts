@@ -159,8 +159,14 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         body: { workout_id: completedId, planned_id: String(planned?.id || '') } as any 
       });
       console.log('[associate] auto-attach-planned response:', data, error);
-      if (error || !(data as any)?.success) {
-        throw new Error('Failed to attach workout to planned session');
+      if (error) {
+        throw new Error(`Server error: ${error.message}`);
+      }
+      if (!(data as any)?.success) {
+        throw new Error(`Attachment failed: ${(data as any)?.reason || 'unknown reason'}`);
+      }
+      if (!(data as any)?.attached) {
+        throw new Error(`Not attached: ${(data as any)?.reason || 'unknown reason'}`);
       }
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
