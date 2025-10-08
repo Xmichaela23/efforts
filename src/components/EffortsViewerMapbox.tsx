@@ -76,6 +76,16 @@ const fmtYAxis = (value: number, metric: string, workoutType: string = 'run', us
         return `${Math.round(speed)} ${useMiles ? "mph" : "km/h"}`;
       }
       return fmtPaceYAxis(value, useMiles);
+    case 'speed':
+    case 'spd':
+      // Value is in m/s, convert to mph or km/h
+      const speedInMph = value * 2.237;
+      const speedInKmh = value * 3.6;
+      if (useMiles) {
+        return `${Math.round(speedInMph)} mph`;
+      } else {
+        return `${Math.round(speedInKmh)} km/h`;
+      }
     case 'bpm':
       return `${Math.round(value)}`;
     case 'cad':
