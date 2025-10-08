@@ -786,16 +786,33 @@ function EffortsViewerMapbox({
         });
       };
       
+      // Smart smoothing based on workout type and indoor/outdoor detection
+      const getPowerSmoothingWindow = (workoutType: string, isIndoor: boolean): number => {
+        if (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') {
+          return isIndoor ? 71 : 31;  // Heavy for indoor trainer (ERG mode noise), moderate for outdoor
+        }
+        if (workoutType === 'run' || workoutType === 'running') {
+          return isIndoor ? 41 : 21;  // Moderate for treadmill, lighter for outdoor terrain
+        }
+        return 25; // Default fallback
+      };
+      
+      // Detect if indoor (heuristic: missing GPS track or very short)
+      const hasGPSTrack = ((workoutData as any)?.gps_data?.length || 0) > 10;
+      const isIndoor = !hasGPSTrack;
+      const workoutType = String((workoutData as any)?.type || 'run').toLowerCase();
+      const smoothingWindow = getPowerSmoothingWindow(workoutType, isIndoor);
+      
       if (isOutdoorGlobal) {
         // Remove zeros, impossible spikes, and outliers
         const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 50 && v <= 2000 ? v : NaN));
-        const withoutOutliers = removeOutliers(cleaned, 2.0); // More aggressive outlier removal (was 2.5)
-        const ma = nanAwareMovAvg(withoutOutliers, 49); // VERY aggressive smoothing for trainer data (was 35)
+        const withoutOutliers = removeOutliers(cleaned, 2.0);
+        const ma = nanAwareMovAvg(withoutOutliers, smoothingWindow);
         return ma.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
       }
       const wins = winsorize(pwr as number[], 5, 99);
-      const withoutOutliers = removeOutliers(wins, 2.0); // More aggressive outlier removal
-      return smoothWithOutlierHandling(withoutOutliers, 49, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN)); // VERY aggressive (was 35)
+      const withoutOutliers = removeOutliers(wins, 2.0);
+      return smoothWithOutlierHandling(withoutOutliers, smoothingWindow, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
     }
     // Default fallback (shouldn't be reached)
     return [];
