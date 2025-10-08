@@ -1258,8 +1258,8 @@ function EffortsViewerMapbox({
             <>
               <defs>
                 <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity={0.1} />
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.1} />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0.4} />
                 </linearGradient>
               </defs>
               <path d={elevArea} fill="url(#elevGrad)" opacity={1} />
