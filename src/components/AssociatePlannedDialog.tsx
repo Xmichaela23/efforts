@@ -155,41 +155,12 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
       }
 
       // Server attach path (explicit planned) → materialize → attach → compute
-      let attached = false;
-      try {
-        const { data, error } = await supabase.functions.invoke('auto-attach-planned', { body: { workout_id: completedId, planned_id: String(planned?.id || '') } as any });
-        console.log('[associate] auto-attach-planned response:', data, error);
-        if (!error && (data as any)?.success) {
-          attached = true;
-        }
-      } catch (e) {
-        console.error('[associate] auto-attach-planned failed:', e);
-      }
-
-      // Deterministic direct attach fallback (no heuristics): link both sides, materialize, compute
-      if (!attached) {
-        try {
-          const pid = String(planned?.id || '');
-          if (!pid) throw new Error('planned id missing');
-          await supabase.from('workouts').update({ planned_id: pid }).eq('id', completedId);
-          // Only set completed_workout_id if column exists in this schema; always set status
-          let updateObj: any = { workout_status: 'completed' };
-          try {
-            const { data: probe } = await supabase.from('planned_workouts').select('id,completed_workout_id').eq('id', pid).maybeSingle();
-            if (probe && Object.prototype.hasOwnProperty.call(probe, 'completed_workout_id')) {
-              updateObj.completed_workout_id = completedId;
-            }
-          } catch {}
-          await supabase.from('planned_workouts').update(updateObj).eq('id', pid);
-          try {
-            await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } as any } as any);
-          } catch {}
-          try {
-            await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: completedId } as any } as any);
-          } catch {}
-        } catch (e) {
-          console.error('[associate] direct attach fallback failed:', e);
-        }
+      const { data, error } = await supabase.functions.invoke('auto-attach-planned', { 
+        body: { workout_id: completedId, planned_id: String(planned?.id || '') } as any 
+      });
+      console.log('[associate] auto-attach-planned response:', data, error);
+      if (error || !(data as any)?.success) {
+        throw new Error('Failed to attach workout to planned session');
       }
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}

@@ -496,10 +496,28 @@ Deno.serve(async (req) => {
     const items = workouts.map(unify);
 
     // Include planned-only items (no workout row yet)
+    // ALSO include planned items when workout exists but is NOT linked (planned_id=NULL)
     const byKey = new Map<string, any>();
-    for (const it of items) byKey.set(`${it.date}|${it.type}`, it);
+    const linkedPlannedIds = new Set<string>();
+    
+    // Track which planned IDs are actually linked to workouts
+    for (const it of items) {
+      if (it.planned_id) {
+        linkedPlannedIds.add(String(it.planned_id));
+      }
+      byKey.set(`${it.date}|${it.type}`, it);
+    }
+    
     for (const p of Array.isArray(plannedRows) ? plannedRows : []) {
       const key = `${String(p.date)}|${String(p.type).toLowerCase()}`;
+      const plannedId = String(p.id);
+      
+      // Skip if this planned row is already linked (will show as completed item)
+      if (linkedPlannedIds.has(plannedId)) {
+        continue;
+      }
+      
+      // If no workout on this date+type, add planned-only item
       if (!byKey.has(key)) {
         // If this planned row is already linked to a completed workout, prefer emitting the completed item
         const cw = (p as any)?.completed_workout_id ? String((p as any).completed_workout_id) : null;
@@ -561,6 +579,29 @@ Deno.serve(async (req) => {
         const it = { id: String(p.id), date: String(p.date).slice(0,10), type: String(p.type).toLowerCase(), status: 'planned', planned, executed: null };
         items.push(it);
         byKey.set(key, it);
+      } else {
+        // Workout exists on this date+type but is NOT linked to this planned row
+        // Add the planned row as a separate item so UI shows both
+        const planned = {
+          id: p.id,
+          steps: Array.isArray(p?.computed?.steps) ? p.computed.steps : null,
+          total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
+          description: p?.description || p?.rendered_description || null,
+          tags: p?.tags || null,
+          steps_preset: (p as any)?.steps_preset ?? null,
+          strength_exercises: (p as any)?.strength_exercises ?? null,
+          mobility_exercises: (p as any)?.mobility_exercises ?? null,
+          training_plan_id: (p as any)?.training_plan_id ?? null,
+          export_hints: (p as any)?.export_hints ?? null,
+          workout_structure: (p as any)?.workout_structure ?? null,
+          friendly_summary: (p as any)?.friendly_summary ?? null,
+          rendered_description: (p as any)?.rendered_description ?? null,
+          brick_group_id: (brickMetaByPlannedId.get(String(p.id))||null)?.group_id || null,
+          brick_order: (brickMetaByPlannedId.get(String(p.id))||null)?.order || null,
+        } as any;
+        const it = { id: String(p.id), date: String(p.date).slice(0,10), type: String(p.type).toLowerCase(), status: 'planned', planned, executed: null };
+        items.push(it);
+        // Don't update byKey - keep the completed workout as the primary item for this date+type
       }
     }
 

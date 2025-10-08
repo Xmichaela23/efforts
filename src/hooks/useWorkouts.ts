@@ -704,8 +704,10 @@ export const useWorkouts = () => {
     try {
       const wid = (completed as any)?.id as string | undefined;
       if (!wid) return;
+      const pid = (completed as any)?.planned_id as string | undefined;
+      const body = pid ? { workout_id: wid, planned_id: pid } : { workout_id: wid };
       try {
-        await supabase.functions.invoke('auto-attach-planned', { body: { workout_id: wid } });
+        await supabase.functions.invoke('auto-attach-planned', { body });
       } catch {}
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}

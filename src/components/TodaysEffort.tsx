@@ -112,43 +112,42 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const dateWorkoutsMemo = useMemo(() => {
     const items = Array.isArray(unifiedItems) ? unifiedItems : [];
-    // Completed → only use unified.executed as the source of truth
-    const completed = items
-      .filter((it:any) => String(it?.status||'').toLowerCase()==='completed')
-      .map((it:any) => ({
-        id: it.id,
-        date: it.date,
-        type: it.type,
-        workout_status: 'completed',
-        // For display/renderers, surface executed as computed-like
-        computed: it.executed || null,
-        // Surface discipline-specific executed payloads for simple summaries
-        strength_exercises: Array.isArray((it?.executed as any)?.strength_exercises) ? (it.executed as any).strength_exercises : undefined,
-        mobility_exercises: Array.isArray((it?.executed as any)?.mobility_exercises) ? (it.executed as any).mobility_exercises : undefined,
-      }));
-    // Planned → only use unified.planned
-    const planned = items
-      .filter((it:any) => !!it?.planned && String(it?.status||'').toLowerCase()!=='completed')
-      .map((it:any) => ({
-        id: it.planned?.id || it.id,
-        date: it.date,
-        type: it.type,
-        workout_status: 'planned',
-        description: it.planned?.description || null,
-        rendered_description: it.planned?.rendered_description || it.planned?.description || null,
-        computed: (Array.isArray(it.planned?.steps) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null),
-        tags: it.planned?.tags || [],
-        steps_preset: (it as any)?.planned?.steps_preset ?? null,
-        strength_exercises: (it as any)?.planned?.strength_exercises ?? null,
-        mobility_exercises: (it as any)?.planned?.mobility_exercises ?? null,
-        export_hints: (it as any)?.planned?.export_hints ?? null,
-        workout_structure: (it as any)?.planned?.workout_structure ?? null,
-        friendly_summary: (it as any)?.planned?.friendly_summary ?? null,
-      }));
-    const typeKey = (w:any)=> `${String(w.type||'').toLowerCase()}|${w.date}`;
-    const completedTypes = new Set(completed.map(typeKey));
-    const plannedKept = planned.filter((w:any)=> !completedTypes.has(typeKey(w)));
-    return [...completed, ...plannedKept];
+    
+    // Trust get-week completely - it already figured out what to show
+    // If status='completed', show executed data
+    // If status='planned', show planned data
+    return items.map((it:any) => {
+      const isCompleted = String(it?.status||'').toLowerCase()==='completed';
+      
+      if (isCompleted) {
+        // Spread all executed data to preserve distance, duration, metrics, etc.
+        return {
+          id: it.id,
+          date: it.date,
+          type: it.type,
+          workout_status: 'completed',
+          ...it.executed,  // All the metrics, distance, duration, pace, power, HR, etc.
+          computed: it.executed || null,
+        };
+      } else {
+        return {
+          id: it.planned?.id || it.id,
+          date: it.date,
+          type: it.type,
+          workout_status: 'planned',
+          description: it.planned?.description || null,
+          rendered_description: it.planned?.rendered_description || it.planned?.description || null,
+          computed: (Array.isArray(it.planned?.steps) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null),
+          tags: it.planned?.tags || [],
+          steps_preset: (it as any)?.planned?.steps_preset ?? null,
+          strength_exercises: (it as any)?.planned?.strength_exercises ?? null,
+          mobility_exercises: (it as any)?.planned?.mobility_exercises ?? null,
+          export_hints: (it as any)?.planned?.export_hints ?? null,
+          workout_structure: (it as any)?.planned?.workout_structure ?? null,
+          friendly_summary: (it as any)?.planned?.friendly_summary ?? null,
+        };
+      }
+    });
   }, [unifiedItems, activeDate]);
 
   // FIXED: React to selectedDate prop changes properly

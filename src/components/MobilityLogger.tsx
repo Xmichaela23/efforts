@@ -211,9 +211,16 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
 
+    // Determine if editing existing completed workout or creating from planned
+    const isEditingCompleted = Boolean(scheduledWorkout?.id) && 
+      String((scheduledWorkout as any)?.workout_status || '').toLowerCase() === 'completed';
+    const sourcePlannedId = !isEditingCompleted && scheduledWorkout?.id 
+      ? String(scheduledWorkout.id) 
+      : null;
+    
     // Prepare the workout data - using 'mobility' type and persisting mobility_exercises
     const completedWorkout = {
-      id: scheduledWorkout?.id || Date.now().toString(),
+      id: isEditingCompleted ? scheduledWorkout.id : Date.now().toString(),
       name: scheduledWorkout?.name || `Mobility - ${new Date().toLocaleDateString()}`,
       type: 'mobility' as const,
       date: scheduledWorkout?.date || new Date().toISOString().split('T')[0],
@@ -223,7 +230,8 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
       duration: durationMinutes,
       mobility_exercises: validExercises,
       workout_status: 'completed' as const,
-      completedManually: true
+      completedManually: true,
+      planned_id: sourcePlannedId || undefined
     };
 
     console.log('🔍 Saving completed mobility workout:', completedWorkout);

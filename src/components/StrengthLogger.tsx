@@ -1412,7 +1412,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       completedManually: true,
       notes: extra?.notes,
       rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
-      addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence }))
+      addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence })),
+      planned_id: sourcePlannedId || undefined
     } : {
       id: scheduledWorkout?.id || Date.now().toString(),
       name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
@@ -1427,30 +1428,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       completedManually: true,
       notes: extra?.notes,
       rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
-      addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence }))
+      addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence })),
+      planned_id: sourcePlannedId || undefined
     };
 
     console.log('🔍 Saving completed workout:', completedWorkout);
-
-    // If sourced from a planned row, attach and mark completed
-    (async ()=>{
-      try{
-        if (sourcePlannedId){
-          try { await supabase.from('workouts').update({ planned_id: sourcePlannedId }).eq('id', (saved as any)?.id || completedWorkout.id); } catch {}
-          let updateObj: any = { workout_status: 'completed' };
-          try {
-            const { data: probe } = await supabase.from('planned_workouts').select('id,completed_workout_id').eq('id', sourcePlannedId).maybeSingle();
-            if (probe && Object.prototype.hasOwnProperty.call(probe, 'completed_workout_id')) {
-              updateObj.completed_workout_id = (saved as any)?.id || completedWorkout.id;
-            }
-          } catch {}
-          await supabase.from('planned_workouts').update(updateObj).eq('id', sourcePlannedId);
-          if (sourcePlannedDate && sourcePlannedDate !== workoutDate){
-            try { await supabase.from('planned_workouts').update({ date: workoutDate }).eq('id', sourcePlannedId); } catch {}
-          }
-        }
-      } catch {}
-    })();
 
     // Save: update in place when editing an existing workout id; otherwise create new
     let saved: any = null;
