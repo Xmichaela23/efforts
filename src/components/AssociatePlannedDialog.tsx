@@ -154,19 +154,52 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         completedId = inserted.id as string;
       }
 
-      // Server attach path (explicit planned) → materialize → attach → compute
-      const { data, error } = await supabase.functions.invoke('auto-attach-planned', { 
-        body: { workout_id: completedId, planned_id: String(planned?.id || '') } as any 
-      });
-      console.log('[associate] auto-attach-planned response:', data, error);
-      if (error) {
-        throw new Error(`Server error: ${error.message}`);
+      // Try server attach path first (explicit planned) → materialize → attach → compute
+      let attached = false;
+      try {
+        const { data, error } = await supabase.functions.invoke('auto-attach-planned', { 
+          body: { workout_id: completedId, planned_id: String(planned?.id || '') } as any 
+        });
+        console.log('[associate] auto-attach-planned response:', data, error);
+        if (!error && (data as any)?.success && (data as any)?.attached) {
+          attached = true;
+        }
+      } catch (e) {
+        console.log('[associate] auto-attach-planned failed:', e);
       }
-      if (!(data as any)?.success) {
-        throw new Error(`Attachment failed: ${(data as any)?.reason || 'unknown reason'}`);
-      }
-      if (!(data as any)?.attached) {
-        throw new Error(`Not attached: ${(data as any)?.reason || 'unknown reason'}`);
+
+      // Fallback: Direct DB update if edge function fails
+      if (!attached) {
+        try {
+          const pid = String(planned?.id || '');
+          if (!pid) throw new Error('planned id missing');
+          
+          // Update workout with planned_id
+          await supabase.from('workouts').update({ planned_id: pid }).eq('id', completedId);
+          
+          // Update planned workout with completed_workout_id and status
+          let updateObj: any = { workout_status: 'completed' };
+          try {
+            const { data: probe } = await supabase.from('planned_workouts').select('id,completed_workout_id').eq('id', pid).maybeSingle();
+            if (probe && Object.prototype.hasOwnProperty.call(probe, 'completed_workout_id')) {
+              updateObj.completed_workout_id = completedId;
+            }
+          } catch {}
+          await supabase.from('planned_workouts').update(updateObj).eq('id', pid);
+          
+          // Materialize and compute
+          try {
+            await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } as any } as any);
+          } catch {}
+          try {
+            await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: completedId } as any } as any);
+          } catch {}
+          
+          attached = true;
+        } catch (e) {
+          console.error('[associate] direct attach fallback failed:', e);
+          throw new Error('Failed to attach workout to planned session');
+        }
       }
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}

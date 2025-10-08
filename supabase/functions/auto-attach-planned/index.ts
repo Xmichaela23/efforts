@@ -47,20 +47,28 @@ Deno.serve(async (req) => {
   } as Record<string,string>;
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
+  
+  console.log('[auto-attach-planned] Starting request');
   try {
     const payload = await req.json();
+    console.log('[auto-attach-planned] Payload:', payload);
     const workout_id = payload?.workout_id;
     const explicitPlannedId = payload?.planned_id || payload?.plannedId || null;
+    console.log('[auto-attach-planned] workout_id:', workout_id, 'explicitPlannedId:', explicitPlannedId);
     if (!workout_id) return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
 
+    console.log('[auto-attach-planned] Creating Supabase client...');
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    console.log('[auto-attach-planned] Supabase client created');
 
     // Load workout
+    console.log('[auto-attach-planned] Loading workout...');
     const { data: w } = await supabase
       .from('workouts')
       .select('id,user_id,type,provider_sport,date,timestamp,distance,moving_time,avg_heart_rate,tss,intensity_factor,metrics,normalization_version,computed')
       .eq('id', workout_id)
       .maybeSingle();
+    console.log('[auto-attach-planned] Workout loaded:', w ? 'found' : 'not found');
     if (!w) return new Response(JSON.stringify({ error: 'workout not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
 
     // Already linked → recompute summary and return
@@ -103,13 +111,17 @@ Deno.serve(async (req) => {
 
     // ===== EXPLICIT ATTACH PATH (user-chosen planned) =====
     if (explicitPlannedId) {
+      console.log('[auto-attach-planned] Explicit attach path, planned_id:', explicitPlannedId);
       // Validate same user and fetch planned row
+      console.log('[auto-attach-planned] Loading planned workout...');
       const { data: plannedRow } = await supabase
         .from('planned_workouts')
         .select('id,user_id,type,date,computed,export_hints,pool_length_m,pool_unit,pool_label,environment,workout_status,completed_workout_id')
         .eq('id', String(explicitPlannedId))
         .maybeSingle();
+      console.log('[auto-attach-planned] Planned workout loaded:', plannedRow ? 'found' : 'not found');
       if (!plannedRow || String(plannedRow.user_id) !== String(w.user_id)) {
+        console.log('[auto-attach-planned] Planned workout validation failed:', { plannedRow: !!plannedRow, userIdMatch: plannedRow ? String(plannedRow.user_id) === String(w.user_id) : false });
         return new Response(JSON.stringify({ success: false, attached: false, reason: 'planned_not_found_or_wrong_user' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       }
       // Materialize steps if missing to ensure mapping later
@@ -290,7 +302,8 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+    console.error('[auto-attach-planned] Error:', e);
+    return new Response(JSON.stringify({ error: String(e), stack: e?.stack }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 });
 
