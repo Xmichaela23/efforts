@@ -805,7 +805,9 @@ Deno.serve(async (req) => {
           // Assign stable planned_index per step
           const withIndex = steps.map((st:any, idx:number)=> ({ ...st, planned_index: idx }));
           const v3 = withIndex.map(toV3Step);
-          const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: total_s }, total_duration_seconds: total_s, duration: Math.max(1, Math.round(total_s/60)) };
+          // Recalculate total from v3 steps (which have calculated durations for distance-based steps)
+          const actualTotal = v3.reduce((sum:number, st:any) => sum + (Number(st?.seconds) || 0), 0);
+          const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: actualTotal }, total_duration_seconds: actualTotal, duration: Math.max(1, Math.round(actualTotal/60)) };
           await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
           count += 1;
         }

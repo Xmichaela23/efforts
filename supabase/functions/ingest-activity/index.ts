@@ -256,6 +256,7 @@ function computeComputedFromActivity(activity) {
       const d = typeof s.totalDistanceInMeters === 'number' ? s.totalDistanceInMeters : typeof s.distanceInMeters === 'number' ? s.distanceInMeters : typeof s.cumulativeDistanceInMeters === 'number' ? s.cumulativeDistanceInMeters : typeof s.totalDistance === 'number' ? s.totalDistance : typeof s.distance === 'number' ? s.distance : undefined;
       const elev = typeof s.elevationInMeters === 'number' ? s.elevationInMeters : typeof s.elevation === 'number' ? s.elevation : typeof s.altitude === 'number' ? s.altitude : typeof s.enhancedElevation === 'number' ? s.enhancedElevation : undefined;
       const cad = typeof s.stepsPerMinute === 'number' ? s.stepsPerMinute : typeof s.runCadence === 'number' ? s.runCadence : typeof s.bikeCadenceInRPM === 'number' ? s.bikeCadenceInRPM : typeof s.swimCadenceInStrokesPerMinute === 'number' ? s.swimCadenceInStrokesPerMinute : typeof s.cadence === 'number' ? s.cadence : undefined;
+      const pwr = typeof s.powerInWatts === 'number' ? s.powerInWatts : typeof s.power === 'number' ? s.power : undefined;
       normalized.push({
         ts,
         t: Number.isFinite(t) ? t : i,
@@ -263,7 +264,8 @@ function computeComputedFromActivity(activity) {
         v,
         d,
         elev,
-        cad
+        cad,
+        pwr
       });
     }
     // Ensure ordered by ts
@@ -348,6 +350,20 @@ function computeComputedFromActivity(activity) {
         max
       };
     })();
+    // Overall power (avg/max)
+    const powerStats = (()=>{
+      const pwrs = normalized.map((s)=>typeof s.pwr === 'number' ? s.pwr : NaN).filter(Number.isFinite);
+      if (!pwrs.length) return {
+        avg: null,
+        max: null
+      };
+      const avg = Math.round(pwrs.reduce((a, b)=>a + b, 0) / pwrs.length);
+      const max = Math.max(...pwrs);
+      return {
+        avg,
+        max
+      };
+    })();
     // GAP overall (grade-adjusted pace) — Minetti, moving-only, smoothed elevation
     const gapPaceSecPerMi = computeGAPSecPerMi(normalized);
     // Segment by laps if provided
@@ -423,7 +439,9 @@ function computeComputedFromActivity(activity) {
         gap_pace_s_per_mi: gapPaceSecPerMi != null ? Math.round(gapPaceSecPerMi) : null,
         avg_hr: avgHr,
         avg_cadence_spm: cadStats.avg,
-        max_cadence_spm: cadStats.max
+        max_cadence_spm: cadStats.max,
+        avg_power_w: powerStats.avg,
+        max_power_w: powerStats.max
       },
       analysis: {
         events: {
@@ -558,7 +576,7 @@ async function mapGarminToWorkout(activity, userId) {
     avg_cadence: (()=>{
       // Prioritize enriched data, then fall back to activity data
       const enriched = enrichedData.avg_bike_cadence ?? enrichedData.avg_run_cadence;
-      const actCad = activity.avg_swim_cadence ?? activity.avg_running_cadence ?? activity.avg_run_cadence ?? activity.avg_bike_cadence;
+      const actCad = activity.avg_swim_cadence ?? activity.avg_run_cadence ?? activity.avg_bike_cadence;
       const v = enriched ?? actCad;
       return roundInt(v);
     })(),
@@ -573,7 +591,7 @@ async function mapGarminToWorkout(activity, userId) {
     max_cadence: (()=>{
       // Prioritize enriched data, then fall back to activity data
       const enriched = enrichedData.max_bike_cadence ?? enrichedData.max_run_cadence;
-      const actMaxCad = activity.max_running_cadence ?? activity.max_run_cadence ?? activity.max_bike_cadence;
+      const actMaxCad = activity.max_run_cadence ?? activity.max_bike_cadence;
       const v = enriched ?? actMaxCad;
       return roundInt(v);
     })(),
