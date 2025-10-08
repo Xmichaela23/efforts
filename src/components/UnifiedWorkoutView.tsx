@@ -813,7 +813,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             open={assocOpen}
             onClose={()=>setAssocOpen(false)}
             onAssociated={async(pid)=>{ 
-              // Just refresh the data - AssociatePlannedDialog handles the attachment
+              // Update local workout object with new planned_id
+              (workout as any).planned_id = pid;
+              setAssocOpen(false);
+              // Refetch the linked planned workout
+              try {
+                const { data: freshPlanned } = await supabase
+                  .from('planned_workouts')
+                  .select('*')
+                  .eq('id', pid)
+                  .maybeSingle();
+                if (freshPlanned) {
+                  setLinkedPlanned(freshPlanned);
+                  setHydratedPlanned(freshPlanned);
+                }
+              } catch {}
+              // Dispatch invalidation for other components
               try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
               try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
             }}
@@ -953,7 +968,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         open={assocOpen}
                         onClose={()=>setAssocOpen(false)}
                         onAssociated={async(pid)=>{ 
-                          // Just refresh the data - AssociatePlannedDialog handles the attachment
+                          // Update local workout object with new planned_id
+                          (workout as any).planned_id = pid;
+                          setAssocOpen(false);
+                          // Refetch the linked planned workout
+                          try {
+                            const { data: freshPlanned } = await supabase
+                              .from('planned_workouts')
+                              .select('*')
+                              .eq('id', pid)
+                              .maybeSingle();
+                            if (freshPlanned) {
+                              setLinkedPlanned(freshPlanned);
+                              setHydratedPlanned(freshPlanned);
+                            }
+                          } catch {}
+                          // Dispatch invalidation for other components
                           try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                           try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                         }}
