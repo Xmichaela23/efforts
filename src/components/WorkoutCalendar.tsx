@@ -387,12 +387,31 @@ export default function WorkoutCalendar({
         const milesText = miles != null ? formatMilesShort(miles, 1) : '';
         const plannedLabel = derivePlannedCellLabel(w);
         const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '');
-        const labelBase = plannedLabel || [t, milesText].filter(Boolean).join(' ');
         const isCompleted = String(w?.workout_status||'').toLowerCase()==='completed';
         const isPlannedLinked = isCompleted && !!(w as any)?.planned_id;
+        
+        // For linked completed workouts, try to find the planned workout's label
+        let labelBase = plannedLabel || [t, milesText].filter(Boolean).join(' ');
+        if (isPlannedLinked && !(w as any)?._plannedLabelUsed) {
+          // Try to find the linked planned workout to use its label instead
+          const plannedId = String((w as any)?.planned_id || '');
+          if (plannedId) {
+            const linkedPlanned = allFiltered.find((p: any) => 
+              String(p?.id) === plannedId && p?.workout_status === 'planned'
+            );
+            if (linkedPlanned) {
+              const plannedLabelForCompleted = derivePlannedCellLabel(linkedPlanned);
+              if (plannedLabelForCompleted) {
+                labelBase = plannedLabelForCompleted;
+                (w as any)._plannedLabelUsed = true;
+              }
+            }
+          }
+        }
+        
         return {
           date: w.date,
-          label: `${labelBase}${isCompleted ? (isPlannedLinked ? ' P✓' : ' ✓') : ''}`,
+          label: `${labelBase}${isCompleted ? ' ✓' : ''}`,
           href: `#${w.id}`,
           provider: w.provider || deriveProvider(w),
           _sigType: t,
