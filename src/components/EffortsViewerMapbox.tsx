@@ -975,14 +975,20 @@ function EffortsViewerMapbox({
           />
           <Pill 
             label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} 
-            value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} 
+            value={(() => {
+              const cadVal = normalizedSamples[idx]?.cad_rpm ?? normalizedSamples[idx]?.cad_spm;
+              return Number.isFinite(cadVal) ? `${Math.round(cadVal)}${workoutData?.type==='ride'?' rpm':' spm'}` : '—';
+            })()} 
             active={tab==="cad"} 
             width={54}
             onClick={() => setTab("cad")}
           />
           <Pill 
             label="Power" 
-            value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} 
+            value={(() => {
+              const pwrVal = normalizedSamples[idx]?.power_w;
+              return Number.isFinite(pwrVal) ? `${Math.round(pwrVal)} W` : '—';
+            })()} 
             active={tab==="pwr"} 
             width={54}
             onClick={() => setTab("pwr")}

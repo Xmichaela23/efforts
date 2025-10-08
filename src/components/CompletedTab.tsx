@@ -1321,13 +1321,12 @@ const formatMovingTime = () => {
              </div>
            );
          }
-        // GOLDEN RULE: Wait for server to provide complete series data before rendering charts
+        // GOLDEN RULE: Wait for server to provide series data
+        // For historical workouts: render with whatever data exists (graceful degradation)
         const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
-        const hasSeries = !!series;
-        const seriesKeys = series ? Object.keys(series) : [];
-        const hasCompleteData = hasSeries && seriesKeys.length === 10;
-
-        if (!hasCompleteData) {
+        
+        // If no series at all, show loading (shouldn't happen for valid workouts)
+        if (!series) {
           return (
             <div className="mt-6 mb-6 mx-[-16px] flex items-center justify-center" style={{ minHeight: 700 }}>
               <div className="text-center text-gray-500">
@@ -1337,6 +1336,9 @@ const formatMovingTime = () => {
             </div>
           );
         }
+        
+        // If series exists (even old format with only 'sampling' key), proceed
+        // EffortsViewerMapbox will handle empty arrays gracefully
 
          const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
          const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
