@@ -586,10 +586,56 @@ function EffortsViewerMapbox({
   const gainPillText = useMemo(() => fmtAlt(totalGain_m, useFeet), [totalGain_m, useFeet]);
 
   // Optional cadence/power series derived from sensor_data and resampled to chart times
+  // TODO: MIGRATION CODE - Remove after backfill of all historical workouts
+  // FALLBACK for historical workouts that don't have data in computed.analysis.series
+  // Once all workouts have been reprocessed with compute-workout-analysis, this entire block can be deleted
   const targetTimes = useMemo(() => normalizedSamples.map(s => Number(s.t_s) || 0), [normalizedSamples]);
-  // REMOVED: Duplicate cadence/power extraction from sensor_data
-  // GOLDEN RULE: Single source of truth = series data from compute-workout-analysis
-  // All cadence/power data comes from normalizedSamples (which reads from series)
+  const cadSeriesRaw = useMemo(() => {
+    try {
+      const sd = Array.isArray((workoutData as any)?.sensor_data?.samples)
+        ? (workoutData as any).sensor_data.samples
+        : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
+      const times: number[] = []; const vals: number[] = [];
+      for (let i=0;i<sd.length;i++){
+        const s:any = sd[i]||{};
+        const t = Number(
+          s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsedDurationInSeconds ?? s.sumDurationInSeconds ??
+          s.offsetInSeconds ?? s.startTimeInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds ?? i
+        );
+        const cad = (s.runCadence ?? s.cadence ?? s.bikeCadence);
+        if (Number.isFinite(t) && Number.isFinite(cad)) { times.push(Number(t)); vals.push(Number(cad)); }
+      }
+      return { times, vals };
+    } catch { return { times: [], vals: [] }; }
+  }, [workoutData]);
+  const pwrSeriesRaw = useMemo(() => {
+    try {
+      const sd = Array.isArray((workoutData as any)?.sensor_data?.samples)
+        ? (workoutData as any).sensor_data.samples
+        : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
+      const times: number[] = []; const vals: number[] = [];
+      for (let i=0;i<sd.length;i++){
+        const s:any = sd[i]||{};
+        const t = Number(
+          s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsedDurationInSeconds ?? s.sumDurationInSeconds ??
+          s.offsetInSeconds ?? s.startTimeInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds ?? i
+        );
+        const pw = (s.power ?? s.power_w ?? s.watts);
+        if (Number.isFinite(t) && Number.isFinite(pw)) { times.push(Number(t)); vals.push(Number(pw)); }
+      }
+      return { times, vals };
+    } catch { return { times: [], vals: [] }; }
+  }, [workoutData]);
+  const cadSeries = useMemo(() => {
+    if (!targetTimes.length || !cadSeriesRaw.times.length) return new Array(targetTimes.length).fill(NaN);
+    const vals = resampleToGrid(cadSeriesRaw.times, cadSeriesRaw.vals, targetTimes);
+    return vals;
+  }, [cadSeriesRaw, targetTimes]);
+  const pwrSeries = useMemo(() => {
+    if (!targetTimes.length || !pwrSeriesRaw.times.length) return new Array(targetTimes.length).fill(NaN);
+    const vals = resampleToGrid(pwrSeriesRaw.times, pwrSeriesRaw.vals, targetTimes);
+    return vals;
+  }, [pwrSeriesRaw, targetTimes]);
 
   // Outdoor detection (global)
   const isOutdoorGlobal = useMemo(() => {
@@ -663,13 +709,16 @@ function EffortsViewerMapbox({
       const winsorized = winsorize(hr, 5, 95);
       return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
-    // Cadence (derive from normalizedSamples)
+    // Cadence (prefer normalizedSamples, fallback to cadSeries for historical workouts)
     if (tab === "cad") {
-      const cad = normalizedSamples.map(s => {
+      const cadFromSamples = normalizedSamples.map(s => {
         if (Number.isFinite(s.cad_rpm as any)) return Number(s.cad_rpm);
         if (Number.isFinite(s.cad_spm as any)) return Number(s.cad_spm);
         return NaN;
       });
+      const hasDataInSamples = cadFromSamples.some(v => Number.isFinite(v));
+      // TODO: MIGRATION CODE - Remove cadSeries fallback after backfill
+      const cad = hasDataInSamples ? cadFromSamples : (cadSeries && cadSeries.length ? cadSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN));
       if (isOutdoorGlobal) {
         // Remove impossible cadence outliers (< 40 or > 220) and smooth lightly
         const clamped = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
@@ -679,9 +728,12 @@ function EffortsViewerMapbox({
       const wins = winsorize(cad as number[], 5, 95);
       return smoothWithOutlierHandling(wins, 5, 2.0).map(v => (Number.isFinite(v) ? v : NaN));
     }
-    // Power (from normalizedSamples.power_w - single source of truth)
+    // Power (prefer normalizedSamples, fallback to pwrSeries for historical workouts)
     if (tab === "pwr") {
-      const pwr = normalizedSamples.map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
+      const pwrFromSamples = normalizedSamples.map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
+      const hasDataInSamples = pwrFromSamples.some(v => Number.isFinite(v));
+      // TODO: MIGRATION CODE - Remove pwrSeries fallback after backfill
+      const pwr = hasDataInSamples ? pwrFromSamples : (pwrSeries && pwrSeries.length ? pwrSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN));
       if (isOutdoorGlobal) {
         // Light smoothing; remove zeros and impossible spikes (< 50 or > 2000)
         const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 50 && v <= 2000 ? v : NaN));
@@ -973,22 +1025,18 @@ function EffortsViewerMapbox({
             width={54}
             onClick={() => setTab("bpm")}
           />
+          {/* TODO: MIGRATION CODE - After backfill, read from normalizedSamples instead of cadSeries */}
           <Pill 
             label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} 
-            value={(() => {
-              const cadVal = normalizedSamples[idx]?.cad_rpm ?? normalizedSamples[idx]?.cad_spm;
-              return Number.isFinite(cadVal) ? `${Math.round(cadVal)}${workoutData?.type==='ride'?' rpm':' spm'}` : '—';
-            })()} 
+            value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} 
             active={tab==="cad"} 
             width={54}
             onClick={() => setTab("cad")}
           />
+          {/* TODO: MIGRATION CODE - After backfill, read from normalizedSamples instead of pwrSeries */}
           <Pill 
             label="Power" 
-            value={(() => {
-              const pwrVal = normalizedSamples[idx]?.power_w;
-              return Number.isFinite(pwrVal) ? `${Math.round(pwrVal)} W` : '—';
-            })()} 
+            value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} 
             active={tab==="pwr"} 
             width={54}
             onClick={() => setTab("pwr")}
