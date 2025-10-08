@@ -2017,30 +2017,16 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               }
             }
             const pct = (hasServerComputed && shouldShowPercentage(st)) ? calculateExecutionPercentage(st, row?.executed) : null;
-            // Planned label: prioritize server-computed label, fallback to client-side generation
+            // Planned label: prioritize server-computed label, fallback to simple client-side generation
             const plannedLabel = (() => {
               // Priority 1: Use server-computed planned_label if available
               if (row?.planned_label && typeof row.planned_label === 'string' && row.planned_label.trim()) {
                 return row.planned_label;
               }
               
-              // Priority 2: Fallback to client-side label generation (backwards compatibility)
-              const base = plannedLabelStrict(st);
-              const dur = (() => {
-                const sec = [ (st as any)?.seconds, (st as any)?.duration, (st as any)?.duration_sec, (st as any)?.durationSeconds, (st as any)?.time_sec, (st as any)?.timeSeconds ]
-                  .map((v:any)=>Number(v)).find((n:number)=>Number.isFinite(n) && n>0) as number | undefined;
-                if (!Number.isFinite(sec)) return null as string | null;
-                const m = Math.floor((sec as number)/60); const s = (sec as number)%60; return `${m}:${String(s).padStart(2,'0')}`;
-              })();
-              const paceTxt = (() => {
-                const txt = String((st as any)?.paceTarget || (st as any)?.target_pace || (st as any)?.pace || '').trim();
-                if (/\d+:\d{2}\s*\/(mi|km)/i.test(txt)) return txt;
-                const p = Number((st as any)?.pace_sec_per_mi);
-                if (Number.isFinite(p) && p>0) { const m=Math.floor(p/60), s=Math.round(p%60); return `${m}:${String(s).padStart(2,'0')}/mi`; }
-                return null as string | null;
-              })();
-              const detail = [dur, paceTxt].filter(Boolean).join(' • ');
-              return detail ? `${base}  —  ${detail}` : base;
+              // Priority 2: Simple fallback - just use plannedLabelStrict (no extra concatenation)
+              // Server should be computing everything, this is just for backwards compatibility
+              return plannedLabelStrict(st);
             })();
 
             const execCell = (() => {

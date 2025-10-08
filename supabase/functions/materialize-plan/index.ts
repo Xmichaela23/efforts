@@ -699,7 +699,36 @@ function mmss(sec: number): string {
 
 function toV3Step(st: any): any {
   const out: any = { id: st?.id || uid() };
-  if (typeof st?.duration_s === 'number') out.seconds = Math.max(1, Math.round(st.duration_s));
+  
+  // Duration: explicit or calculated from distance + pace
+  if (typeof st?.duration_s === 'number') {
+    out.seconds = Math.max(1, Math.round(st.duration_s));
+  } else if (typeof st?.distance_m === 'number' && st.distance_m > 0) {
+    // Calculate duration from distance and pace for distance-based steps
+    const distM = st.distance_m;
+    let paceSecPerMi: number | null = null;
+    
+    // Try to get pace from pace_range (use midpoint)
+    if (Array.isArray(st?.pace_range) && st.pace_range.length === 2) {
+      const a = Number(st.pace_range[0]);
+      const b = Number(st.pace_range[1]);
+      if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
+        paceSecPerMi = (a + b) / 2;
+      }
+    }
+    // Fallback to single pace target
+    if (!paceSecPerMi && typeof st?.pace_sec_per_mi === 'number' && st.pace_sec_per_mi > 0) {
+      paceSecPerMi = st.pace_sec_per_mi;
+    }
+    
+    // Calculate duration: distance (meters) / 1609.34 * pace (sec/mi)
+    if (paceSecPerMi && paceSecPerMi > 0) {
+      const miles = distM / 1609.34;
+      const durationSec = miles * paceSecPerMi;
+      out.seconds = Math.max(1, Math.round(durationSec));
+    }
+  }
+  
   if (typeof st?.distance_m === 'number') out.distanceMeters = Math.max(1, Math.round(st.distance_m));
   if (typeof st?.pace_sec_per_mi === 'number') out.paceTarget = `${mmss(st.pace_sec_per_mi)}/mi`;
   if (Array.isArray(st?.pace_range) && st.pace_range.length===2) {
