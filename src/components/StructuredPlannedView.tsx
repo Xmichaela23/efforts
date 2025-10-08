@@ -110,14 +110,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           if (displayYards) { const yd = Math.round(x / 0.9144); return `${yd} yd`; }
           return `${x} m`;
         }
-        // For runs/bikes: use user's imperial/metric preference
-        if (useImperial) {
-          const mi = x / 1609.34;
-          return mi < 1 ? `${mi.toFixed(2)} mi` : `${mi.toFixed(1)} mi`;
-        }
-        // Metric: show km for runs/bikes
-        const km = x / 1000;
-        return km < 1 ? `${Math.round(x)} m` : `${km.toFixed(1)} km`;
+        // For runs/bikes: show as authored (meters), no conversion
+        // Plans are authored in meters and should display as authored
+        return `${Math.round(x)} m`;
       };
       const niceKind = (k:string)=>{
         const t = String(k||'').toLowerCase();

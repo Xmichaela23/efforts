@@ -257,52 +257,112 @@ function stepRole(st:any): 'warmup'|'cooldown'|'recovery'|'work' {
   return 'work';
 }
 
-function formatPlannedLabel(st: any): string | null {
+function formatPlannedLabel(st: any, sport?: string): string | null {
   if (!st) return null;
   
-  // Priority 1: Explicit label/name/description
-  const explicitLabel = String(st?.label || st?.name || st?.description || '').trim();
-  if (explicitLabel) return explicitLabel;
+  const isRun = sport === 'run' || sport === 'walk';
+  const isRide = sport === 'ride' || sport === 'cycling' || sport === 'bike';
+  const isSwim = sport === 'swim' || sport === 'lap_swimming' || sport === 'open_water_swimming';
   
-  // Priority 2: Construct from distance/duration + kind
-  const meters = deriveMetersFromPlannedStep(st);
-  const seconds = deriveSecondsFromPlannedStep(st);
-  const kind = String(st?.kind || st?.type || '').trim();
-  const reps = Number(st?.reps || st?.repeat || st?.repetitions || 1);
-  
-  // Format distance-based label
-  if (meters && meters > 0) {
-    // Convert to most appropriate unit
-    let distStr = '';
-    if (meters >= 1000 && meters % 1000 === 0) {
-      distStr = `${meters / 1000}km`;
-    } else if (meters >= 900) {
-      distStr = `${Math.round(meters)}m`;
-    } else {
-      // Try yards for swim
-      const yards = Math.round(meters / 0.9144);
-      if (Math.abs(yards * 0.9144 - meters) < 1) {
-        distStr = `${yards}yd`;
-      } else {
-        distStr = `${Math.round(meters)}m`;
+  // For RUNS: Show duration for time-based steps, pace for distance-based steps
+  if (isRun) {
+    const meters = deriveMetersFromPlannedStep(st);
+    const seconds = deriveSecondsFromPlannedStep(st);
+    
+    // Priority 1: If it's a DISTANCE-based step (has distance), show pace
+    if (meters && meters > 0) {
+      // Check for pace_range object {lower, upper}
+      const prng = (st as any)?.pace_range || (st as any)?.paceRange;
+      if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
+        return `${prng.lower}–${prng.upper}`;
+      }
+      // Check for pace_range array [lower, upper]
+      if (Array.isArray(prng) && prng.length === 2 && prng[0] && prng[1]) {
+        return `${prng[0]}–${prng[1]}`;
+      }
+      // Single pace target
+      const paceTarget = st?.paceTarget || st?.target_pace || st?.pace;
+      if (typeof paceTarget === 'string' && /\d+:\d{2}\s*\/\s*(mi|km)/i.test(paceTarget)) {
+        return paceTarget;
+      }
+      // Derive from pace_sec_per_mi
+      const paceSecPerMi = derivePlannedPaceSecPerMi(st);
+      if (paceSecPerMi && paceSecPerMi > 0) {
+        const mins = Math.floor(paceSecPerMi / 60);
+        const secs = Math.round(paceSecPerMi % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}/mi`;
       }
     }
     
-    const repPrefix = (reps && reps > 1) ? `${reps}×` : '';
-    const suffix = kind ? ` — ${kind}` : '';
-    return `${repPrefix}${distStr}${suffix}`;
+    // Priority 2: If it's a TIME-based step (has duration but no distance), show duration
+    if (seconds && seconds > 0) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
+    }
+    
+    return '—';
   }
   
-  // Format time-based label
-  if (seconds && seconds > 0) {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    const timeStr = secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
-    const suffix = kind ? ` — ${kind}` : '';
-    return `${timeStr}${suffix}`;
+  // For RIDES: Show only power range or target
+  if (isRide) {
+    // Priority 1: Power range
+    const pr = (st as any)?.power_range || (st as any)?.powerRange || (st as any)?.power?.range;
+    const prLower = Number(pr?.lower);
+    const prUpper = Number(pr?.upper);
+    if (Number.isFinite(prLower) && prLower > 0 && Number.isFinite(prUpper) && prUpper > 0) {
+      return `${Math.round(prLower)}–${Math.round(prUpper)} W`;
+    }
+    // Priority 2: Single power target
+    const pw = Number((st as any)?.power_target_watts ?? (st as any)?.powerTargetWatts ?? (st as any)?.target_watts ?? (st as any)?.watts);
+    if (Number.isFinite(pw) && pw > 0) {
+      return `${Math.round(pw)} W`;
+    }
+    // Fallback: show duration if no power available
+    const seconds = deriveSecondsFromPlannedStep(st);
+    if (seconds && seconds > 0) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
+    }
+    return '—';
   }
   
-  // Fallback to kind or role
+  // For SWIMS: Show distance (yards or meters) without type suffix
+  if (isSwim) {
+    const meters = deriveMetersFromPlannedStep(st);
+    const reps = Number(st?.reps || st?.repeat || st?.repetitions || 1);
+    
+    if (meters && meters > 0) {
+      let distStr = '';
+      if (meters >= 1000 && meters % 1000 === 0) {
+        distStr = `${meters / 1000}km`;
+      } else if (meters >= 900) {
+        distStr = `${Math.round(meters)}m`;
+      } else {
+        // Try yards for swim
+        const yards = Math.round(meters / 0.9144);
+        if (Math.abs(yards * 0.9144 - meters) < 1) {
+          distStr = `${yards}yd`;
+        } else {
+          distStr = `${Math.round(meters)}m`;
+        }
+      }
+      const repPrefix = (reps && reps > 1) ? `${reps}×` : '';
+      return `${repPrefix}${distStr}`;
+    }
+    
+    // Fallback: show duration
+    const seconds = deriveSecondsFromPlannedStep(st);
+    if (seconds && seconds > 0) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
+    }
+  }
+  
+  // Generic fallback for other sports
+  const kind = String(st?.kind || st?.type || '').trim();
   if (kind) return kind;
   const role = stepRole(st);
   return role.charAt(0).toUpperCase() + role.slice(1);
@@ -831,7 +891,7 @@ Deno.serve(async (req) => {
       const confident = (pctMoving ?? 100) >= 70 && (overlap ?? 1) >= 0.6;
       return {
         planned_step_id: (st?.id ?? null),
-        planned_label: formatPlannedLabel(st),
+        planned_label: formatPlannedLabel(st, sport),
         kind: st?.type || st?.kind || null,
         role: (sport === 'swim' && role === 'recovery') ? 'rest' : role,
         planned: {
@@ -1429,7 +1489,7 @@ Deno.serve(async (req) => {
 
       outIntervals.push({
         planned_step_id: st?.id ?? null,
-        planned_label: formatPlannedLabel(st),
+        planned_label: formatPlannedLabel(st, sport),
         kind: st?.type || st?.kind || null,
         role: info.role || (info.measured ? 'work' : null),
         planned: {

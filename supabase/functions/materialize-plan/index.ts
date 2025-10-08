@@ -704,7 +704,10 @@ function toV3Step(st: any): any {
   if (typeof st?.pace_sec_per_mi === 'number') out.paceTarget = `${mmss(st.pace_sec_per_mi)}/mi`;
   if (Array.isArray(st?.pace_range) && st.pace_range.length===2) {
     const a = Number(st.pace_range[0]); const b = Number(st.pace_range[1]);
-    if (Number.isFinite(a) && Number.isFinite(b) && a>0 && b>0) out.pace_range = [Math.round(a), Math.round(b)];
+    if (Number.isFinite(a) && Number.isFinite(b) && a>0 && b>0) {
+      // Store as formatted strings for display (e.g., ["8:02/mi", "8:42/mi"])
+      out.pace_range = [`${mmss(a)}/mi`, `${mmss(b)}/mi`];
+    }
   }
   if (st?.power_range && typeof st.power_range.lower === 'number' && typeof st.power_range.upper === 'number') {
     const lo = Math.round(st.power_range.lower);
