@@ -1,6 +1,15 @@
 // @ts-nocheck
 // Edge function: get-week
-// Returns minimal planned + workouts for a date range, scoped by the caller's auth (RLS).
+// 
+// *** THE UNIFIED VIEW - SINGLE SOURCE OF TRUTH FOR DISPLAY ***
+// 
+// Reads from two sources of truth:
+//   1. planned_workouts table (what's planned)
+//   2. workouts table (what was completed)
+// 
+// Returns unified items: { planned, executed } per day/type
+// Client NEVER queries these tables directly - only calls this endpoint
+// 
 // Input (POST JSON): { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';

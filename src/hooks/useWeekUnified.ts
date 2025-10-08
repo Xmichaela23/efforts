@@ -1,3 +1,12 @@
+/**
+ * useWeekUnified - DUMB CLIENT hook
+ * 
+ * Architecture:
+ * - Calls get-week endpoint (smart server)
+ * - Returns unified items with { planned, executed }
+ * - NO client-side merging, matching, or computation
+ * - Just renders what the server returns
+ */
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
