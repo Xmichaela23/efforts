@@ -155,8 +155,10 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
       }
 
       // Server attach path (explicit planned) → materialize → attach → compute
+      const payload = { workout_id: completedId, planned_id: String(planned?.id || '') };
+      console.log('[associate] Sending payload to auto-attach-planned:', payload);
       const { data, error } = await supabase.functions.invoke('auto-attach-planned', { 
-        body: { workout_id: completedId, planned_id: String(planned?.id || '') } as any 
+        body: payload as any 
       });
       console.log('[associate] auto-attach-planned response:', data, error);
       if (error) {
