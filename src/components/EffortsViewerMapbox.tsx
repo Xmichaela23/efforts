@@ -49,11 +49,54 @@ const fmtPace = (secPerKm: number | null, useMi = true) => {
   if (s === 60) { m += 1; s = 0; }
   return `${m}:${String(s).padStart(2, "0")}/${useMi ? "mi" : "km"}`;
 };
+// Y-axis formatter (no units suffix for cleaner labels)
+const fmtPaceYAxis = (secPerKm: number | null, useMi = true) => {
+  if (secPerKm == null || !Number.isFinite(secPerKm) || secPerKm <= 0) return "—";
+  let spU = toSecPerUnit(secPerKm, useMi);
+  let m = Math.floor(spU / 60);
+  let s = Math.round(spU % 60);
+  if (s === 60) { m += 1; s = 0; }
+  return `${m}:${String(s).padStart(2, "0")}`;
+};
 const fmtSpeed = (secPerKm: number | null, useMi = true) => {
   if (secPerKm == null || !Number.isFinite(secPerKm) || secPerKm <= 0) return "—";
   const kmPerH = 3600 / secPerKm;
   const speed = useMi ? kmPerH * 0.621371 : kmPerH;
   return `${speed.toFixed(1)} ${useMi ? "mph" : "km/h"}`;
+};
+// Y-axis formatters with units (for chart labels)
+const fmtYAxis = (value: number, metric: string, workoutType: string = 'run', useMiles: boolean = true, useFeet: boolean = true): string => {
+  if (!Number.isFinite(value)) return "—";
+  
+  switch (metric) {
+    case 'pace':
+      if (workoutType === 'ride') {
+        const kmPerH = 3600 / value;
+        const speed = useMiles ? kmPerH * 0.621371 : kmPerH;
+        return `${Math.round(speed)} ${useMiles ? "mph" : "km/h"}`;
+      }
+      return fmtPaceYAxis(value, useMiles);
+    case 'bpm':
+      return `${Math.round(value)}`;
+    case 'cad':
+      const unit = workoutType === 'ride' ? 'rpm' : 'spm';
+      return `${Math.round(value)} ${unit}`;
+    case 'pwr':
+      return `${Math.round(value)} W`;
+    case 'elev':
+      const altM = value;
+      if (useFeet) {
+        return `${Math.round(altM * 3.28084)} ft`;
+      }
+      return `${Math.round(altM)} m`;
+    case 'vam':
+      if (useFeet) {
+        return `${Math.round(value * 3.28084)} ft/h`;
+      }
+      return `${Math.round(value)} m/h`;
+    default:
+      return `${Math.round(value)}`;
+  }
 };
 const fmtDist = (m: number, useMi = true) => (useMi ? `${(m / 1609.34).toFixed(1)} mi` : `${(m / 1000).toFixed(2)} km`);
 const fmtAlt = (m: number, useFeet = true) => (useFeet ? `${Math.round(m * 3.28084)} ft` : `${Math.round(m)} m`);
@@ -833,9 +876,13 @@ function EffortsViewerMapbox({
       hi += 3;
     }
     
-    // Minimal padding (wider for pace to avoid hitting edges)
-    const padFrac = (tab === 'pace') ? (isOutdoorGlobal ? 0.12 : 0.08)
-                    : (tab === 'bpm') ? 0.06
+    // Refined padding for better use of vertical space (tighter than before)
+    const padFrac = (tab === 'pace') ? (isOutdoorGlobal ? 0.08 : 0.05)
+                    : (tab === 'bpm') ? 0.04
+                    : (tab === 'cad') ? 0.05
+                    : (tab === 'pwr') ? 0.06
+                    : (tab === 'elev') ? 0.04
+                    : (tab === 'vam') ? 0.08
                     : (isOutdoorGlobal ? 0.03 : 0.02);
     const pad = Math.max((hi - lo) * padFrac, 1);
     return [lo - pad, hi + pad];
@@ -897,6 +944,40 @@ function EffortsViewerMapbox({
     
     return d;
   }, [normalizedSamples, metricRaw, yDomain, distCalc, pl, pr]);
+
+  // Build area path (for gradient fill under line) - close to bottom of chart
+  const areaPath = useMemo(() => {
+    if (normalizedSamples.length < 2 || tab === 'elev' || tab === 'vam') return ""; // elev/vam have custom fills
+    const n = normalizedSamples.length;
+    const useIndex = (distCalc.dN - distCalc.d0) < 5;
+    const xFromIndex = (i: number) => pl + (i / Math.max(1, n - 1)) * (W - pl - pr);
+    const x0 = useIndex ? xFromIndex(0) : xFromDist(distCalc.distMono[0]);
+    const y0 = Number.isFinite(metricRaw[0]) ? (metricRaw[0] as number) : 0;
+    let d = `M ${x0} ${yFromValue(y0)}`;
+    for (let i = 1; i < n; i++) {
+      const xv = useIndex ? xFromIndex(i) : xFromDist(distCalc.distMono[i]);
+      const yv = Number.isFinite(metricRaw[i]) ? (metricRaw[i] as number) : 0;
+      d += ` L ${xv} ${yFromValue(yv)}`;
+    }
+    // Close the path to the bottom
+    const xLast = useIndex ? xFromIndex(n - 1) : xFromDist(distCalc.distMono[n - 1]);
+    const bottomY = H - P; // Bottom of chart area
+    d += ` L ${xLast} ${bottomY} L ${x0} ${bottomY} Z`;
+    return d;
+  }, [metricRaw, normalizedSamples, distCalc, pl, pr, W, H, P, yDomain, xFromDist, tab]);
+
+  // Chart-specific colors
+  const chartConfig = useMemo(() => {
+    const configs: Record<string, { color: string; gradient: string }> = {
+      pace: { color: '#3b82f6', gradient: 'paceGradient' },
+      bpm: { color: '#ef4444', gradient: 'bpmGradient' },
+      cad: { color: '#8b5cf6', gradient: 'cadGradient' },
+      pwr: { color: '#f59e0b', gradient: 'pwrGradient' },
+      elev: { color: '#10b981', gradient: 'elevGradient' },
+      vam: { color: '#06b6d4', gradient: 'vamGradient' }
+    };
+    return configs[tab] || { color: '#64748b', gradient: 'paceGradient' };
+  }, [tab]);
 
   // Elevation fill
   const elevArea = useMemo(() => {
@@ -1113,27 +1194,44 @@ function EffortsViewerMapbox({
           onDoubleClick={() => setLocked((l) => !l)}
           style={{ display: "block", borderRadius: 12, background: "#fff", touchAction: "none", cursor: "crosshair", border: "1px solid #eef2f7" }}
         >
+          {/* Gradient definitions */}
+          <defs>
+            <linearGradient id="paceGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
+            </linearGradient>
+            <linearGradient id="bpmGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="#ef4444" stopOpacity="0.05" />
+            </linearGradient>
+            <linearGradient id="cadGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.05" />
+            </linearGradient>
+            <linearGradient id="pwrGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.05" />
+            </linearGradient>
+            <linearGradient id="elevGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0.05" />
+            </linearGradient>
+            <linearGradient id="vamGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.05" />
+            </linearGradient>
+          </defs>
           {/* vertical grid */}
           {[0, 1, 2, 3, 4].map((i) => {
             const x = pl + i * ((W - pl - pr) / 4);
-            return <line key={i} x1={x} x2={x} y1={P} y2={H - P} stroke="#eef2f7" strokeDasharray="4 4" />;
+            return <line key={i} x1={x} x2={x} y1={P} y2={H - P} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4 4" />;
           })}
           {/* horizontal ticks */}
           {yTicks.map((v, i) => (
             <g key={i}>
-              <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
-              <text x={pl - 8} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700} textAnchor="end">
-                {
-                  tab === "elev"
-                    ? fmtAlt(v, useFeet)
-                    : tab === "spd"
-                      ? formatSpeed(v, useMiles)
-                    : tab === "pace"
-                      ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles))
-                      : tab === "vam"
-                        ? `${Math.round(v)} m/h`
-                        : `${Math.round(v)}`
-                }
+              <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#e5e7eb" strokeWidth="1" />
+              <text x={pl - 8} y={yFromValue(v) + 4} fill="#6b7280" fontSize={11} fontWeight={500} textAnchor="end">
+                {fmtYAxis(v, tab, workoutData?.type || 'run', useMiles, useFeet)}
               </text>
             </g>
           ))}
@@ -1169,9 +1267,14 @@ function EffortsViewerMapbox({
             return <path d={d} fill="none" stroke="#e2e8f0" strokeWidth={1} />;
           })()}
 
+          {/* Area fill under line (gradient) */}
+          {tab !== "vam" && tab !== "elev" && areaPath && (
+            <path d={areaPath} fill={`url(#${chartConfig.gradient})`} opacity={1} />
+          )}
+
           {/* metric line (smoothed) or VAM threshold-colored segments */}
           {tab !== "vam" ? (
-            <path d={linePath} fill="none" stroke="#64748b" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
+            <path d={linePath} fill="none" stroke={chartConfig.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
           ) : (() => {
             const buildSegPath = (loR:number, hiR:number) => {
               let d = ""; let pen = false; const n = normalizedSamples.length;
@@ -1198,9 +1301,9 @@ function EffortsViewerMapbox({
                 )}
                 {anyFinite && (
                   <>
-                    <path d={green} fill="none" stroke="#10b981" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-                    <path d={yellow} fill="none" stroke="#f59e0b" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-                    <path d={red} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                    <path d={green} fill="none" stroke="#10b981" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+                    <path d={yellow} fill="none" stroke="#f59e0b" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+                    <path d={red} fill="none" stroke="#ef4444" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
                   </>
                 )}
               </>
