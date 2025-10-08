@@ -837,6 +837,16 @@ function EffortsViewerMapbox({
       lo = pct(winsorized, isOutdoorGlobal ? 10 : 2);
       hi = pct(winsorized, isOutdoorGlobal ? 90 : 98);
     }
+    // ELEV domain: use actual elevation values, not relative changes
+    if (tab === 'elev') {
+      const finite = metricRaw.filter(Number.isFinite) as number[];
+      if (finite.length) {
+        lo = Math.min(...finite);
+        hi = Math.max(...finite);
+      } else {
+        lo = 0; hi = 100;
+      }
+    }
     // VAM domain: [0 .. max], floor at 450 m/h for visibility
     if (tab === 'vam') {
       const finite = metricRaw.filter(Number.isFinite) as number[];
@@ -1258,8 +1268,8 @@ function EffortsViewerMapbox({
             <>
               <defs>
                 <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.1} />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity={0.4} />
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.05} />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0.15} />
                 </linearGradient>
               </defs>
               <path d={elevArea} fill="url(#elevGrad)" opacity={1} />
