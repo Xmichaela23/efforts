@@ -77,40 +77,28 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         return; 
       }
 
-      // 1) If workout already has planned_id, try to resolve from unified items
+      // 1) If workout has planned_id, fetch it directly from the database (single source of truth)
       const pid = (workout as any)?.planned_id as string | undefined;
       if (pid) {
-        const fromUnified = (Array.isArray(unifiedItems)?unifiedItems:[]).find((it:any)=> String(it?.planned?.id||'') === String(pid));
-        if (fromUnified && fromUnified.planned) {
-          setLinkedPlanned({ id: fromUnified.planned.id, date: fromUnified.date, type: fromUnified.type, computed: fromUnified.planned.steps ? { steps: fromUnified.planned.steps, total_duration_seconds: fromUnified.planned.total_duration_seconds } : null, description: fromUnified.planned.description, tags: fromUnified.planned.tags, workout_status: 'planned' });
-          return;
-        }
-        // If we have a planned_id but it's not in unifiedItems yet, keep the current linkedPlanned
-        // This prevents clearing the state during refetch after manual attachment
+        try {
+          const { data: plannedRow } = await supabase
+            .from('planned_workouts')
+            .select('*')
+            .eq('id', pid)
+            .maybeSingle();
+          if (plannedRow) {
+            setLinkedPlanned(plannedRow);
+            return;
+          }
+        } catch {}
+        // If fetch failed but we have planned_id, keep current state
         return;
       }
 
-      // 2) Skip legacy reverse-id path (completed_workout_id) – single-link model uses workouts.planned_id only
-
-      // 3) Fallback: look for a same-day planned of same type in the context
-      //    Skip this if we just explicitly unattached (to avoid immediate re-link UX)
-      if (suppressRelinkUntil.current > Date.now()) {
-        setLinkedPlanned(null);
-        return;
-      }
-      
-      // 2) Fallback: same-day planned via unified feed
-      if ((workout as any).date && (workout as any).type) {
-        const plannedUnified = (Array.isArray(unifiedItems)?unifiedItems:[]).find((it:any)=> String(it.date) === String((workout as any).date).slice(0,10) && String(it.type).toLowerCase() === String((workout as any).type).toLowerCase() && !!it.planned);
-        if (plannedUnified && plannedUnified.planned) {
-          setLinkedPlanned({ id: plannedUnified.planned.id, date: plannedUnified.date, type: plannedUnified.type, computed: plannedUnified.planned.steps ? { steps: plannedUnified.planned.steps, total_duration_seconds: plannedUnified.planned.total_duration_seconds } : null, description: plannedUnified.planned.description, tags: plannedUnified.planned.tags, workout_status: 'planned' });
-          return;
-        }
-      }
-
+      // 2) No planned_id - clear linked state
       setLinkedPlanned(null);
     })();
-  }, [isCompleted, workout?.id, (workout as any)?.planned_id, (workout as any)?.date, (workout as any)?.type]);
+  }, [isCompleted, workout?.id, (workout as any)?.planned_id]);
 
   // Auto-materialize planned row if Summary is opened and computed steps are missing
   useEffect(() => {
@@ -817,24 +805,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             onClose={()=>setAssocOpen(false)}
             onAssociated={async(pid)=>{ 
               setAssocOpen(false);
-              // Dispatch invalidation FIRST so useWeekUnified refetches before useEffect runs
+              // Just dispatch invalidation - AppLayout and useEffects will handle the rest
               try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
               try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
               try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-              // Update local workout object with new planned_id
-              (workout as any).planned_id = pid;
-              // Refetch the linked planned workout directly
-              try {
-                const { data: freshPlanned } = await supabase
-                  .from('planned_workouts')
-                  .select('*')
-                  .eq('id', pid)
-                  .maybeSingle();
-                if (freshPlanned) {
-                  setLinkedPlanned(freshPlanned);
-                  setHydratedPlanned(freshPlanned);
-                }
-              } catch {}
             }}
           />
         )}
@@ -973,24 +947,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         onClose={()=>setAssocOpen(false)}
                         onAssociated={async(pid)=>{ 
                           setAssocOpen(false);
-                          // Dispatch invalidation FIRST so useWeekUnified refetches before useEffect runs
+                          // Just dispatch invalidation - AppLayout and useEffects will handle the rest
                           try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                           try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                           try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-                          // Update local workout object with new planned_id
-                          (workout as any).planned_id = pid;
-                          // Refetch the linked planned workout directly
-                          try {
-                            const { data: freshPlanned } = await supabase
-                              .from('planned_workouts')
-                              .select('*')
-                              .eq('id', pid)
-                              .maybeSingle();
-                            if (freshPlanned) {
-                              setLinkedPlanned(freshPlanned);
-                              setHydratedPlanned(freshPlanned);
-                            }
-                          } catch {}
                         }}
                       />
                     )}
