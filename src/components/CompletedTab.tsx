@@ -1321,13 +1321,29 @@ const formatMovingTime = () => {
              </div>
            );
          }
+        // GOLDEN RULE: Wait for server to provide complete series data before rendering charts
         const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
+        const hasSeries = !!series;
+        const seriesKeys = series ? Object.keys(series) : [];
+        const hasCompleteData = hasSeries && seriesKeys.length === 10;
+
+        if (!hasCompleteData) {
+          return (
+            <div className="mt-6 mb-6 mx-[-16px] flex items-center justify-center" style={{ minHeight: 700 }}>
+              <div className="text-center text-gray-500">
+                <div className="text-lg font-semibold mb-2">Processing workout data...</div>
+                <div className="text-sm">Charts will appear automatically when ready</div>
+              </div>
+            </div>
+          );
+        }
+
          const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
          const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
          const elev = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
          const pace = Array.isArray(series?.pace_s_per_km) ? series.pace_s_per_km : [];
          const hr = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
-        // Proceed even if series is missing; map will still render from gps_track
+        // Trust server-provided series as single source of truth (no client-side fallbacks)
          const len = Math.min(distance_m.length, time_s.length || distance_m.length);
          const samples = (()=>{
            const out:any[] = [];

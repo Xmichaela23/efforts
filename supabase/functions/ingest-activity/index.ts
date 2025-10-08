@@ -888,11 +888,13 @@ Deno.serve(async (req)=>{
               workout_id: wid
             })
           });
-        } catch  {}
+        } catch (summaryErr) {
+          console.error('[ingest-activity] compute-workout-summary failed:', summaryErr);
+        }
         // Ensure provider-agnostic analysis (series/splits) computes date correction too
         try {
           const anUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
-          await fetch(anUrl, {
+          const analysisResp = await fetch(anUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -903,7 +905,15 @@ Deno.serve(async (req)=>{
               workout_id: wid
             })
           });
-        } catch  {}
+          if (!analysisResp.ok) {
+            const errText = await analysisResp.text();
+            console.error('[ingest-activity] compute-workout-analysis returned non-OK status:', analysisResp.status, errText);
+          } else {
+            console.log('[ingest-activity] compute-workout-analysis succeeded for workout:', wid);
+          }
+        } catch (analysisErr) {
+          console.error('[ingest-activity] compute-workout-analysis failed:', analysisErr);
+        }
       }
     } catch  {}
     return new Response(JSON.stringify({

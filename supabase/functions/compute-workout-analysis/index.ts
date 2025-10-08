@@ -396,7 +396,19 @@ Deno.serve(async (req) => {
       version: ANALYSIS_VERSION,
       computedAt: new Date().toISOString(),
       input,
-    series: hasRows ? { time_s, distance_m, elevation_m: elevation_sm, pace_s_per_km: pace_sm, speed_mps: speed_sm, hr_bpm, cadence_spm, cadence_rpm, power_watts, grade_percent: grade_sm } : { sampling: { strategy: 'empty', targetPoints: 0 } },
+    // Always return consistent series structure with all 10 fields (even if empty)
+    series: {
+      time_s: hasRows ? time_s : [],
+      distance_m: hasRows ? distance_m : [],
+      elevation_m: hasRows ? elevation_sm : [],
+      pace_s_per_km: hasRows ? pace_sm : [],
+      speed_mps: hasRows ? speed_sm : [],
+      hr_bpm: hasRows ? hr_bpm : [],
+      cadence_spm: hasRows ? cadence_spm : [],
+      cadence_rpm: hasRows ? cadence_rpm : [],
+      power_watts: hasRows ? power_watts : [],
+      grade_percent: hasRows ? grade_sm : []
+    },
       events: {
         laps: Array.isArray(laps) ? laps.slice(0, 50) : [],
         splits: { km: computeSplits(1000), mi: computeSplits(1609.34) }

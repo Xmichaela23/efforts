@@ -587,52 +587,9 @@ function EffortsViewerMapbox({
 
   // Optional cadence/power series derived from sensor_data and resampled to chart times
   const targetTimes = useMemo(() => normalizedSamples.map(s => Number(s.t_s) || 0), [normalizedSamples]);
-  const cadSeriesRaw = useMemo(() => {
-    try {
-      const sd = Array.isArray((workoutData as any)?.sensor_data?.samples)
-        ? (workoutData as any).sensor_data.samples
-        : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
-      const times: number[] = []; const vals: number[] = [];
-      for (let i=0;i<sd.length;i++){
-        const s:any = sd[i]||{};
-        const t = Number(
-          s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsedDurationInSeconds ?? s.sumDurationInSeconds ??
-          s.offsetInSeconds ?? s.startTimeInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds ?? i
-        );
-        const cad = (s.runCadence ?? s.cadence ?? s.bikeCadence);
-        if (Number.isFinite(t) && Number.isFinite(cad)) { times.push(Number(t)); vals.push(Number(cad)); }
-      }
-      return { times, vals };
-    } catch { return { times: [], vals: [] }; }
-  }, [workoutData]);
-  const pwrSeriesRaw = useMemo(() => {
-    try {
-      const sd = Array.isArray((workoutData as any)?.sensor_data?.samples)
-        ? (workoutData as any).sensor_data.samples
-        : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
-      const times: number[] = []; const vals: number[] = [];
-      for (let i=0;i<sd.length;i++){
-        const s:any = sd[i]||{};
-        const t = Number(
-          s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsedDurationInSeconds ?? s.sumDurationInSeconds ??
-          s.offsetInSeconds ?? s.startTimeInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds ?? i
-        );
-        const pw = (s.power ?? s.power_w ?? s.watts);
-        if (Number.isFinite(t) && Number.isFinite(pw)) { times.push(Number(t)); vals.push(Number(pw)); }
-      }
-      return { times, vals };
-    } catch { return { times: [], vals: [] }; }
-  }, [workoutData]);
-  const cadSeries = useMemo(() => {
-    if (!targetTimes.length || !cadSeriesRaw.times.length) return new Array(targetTimes.length).fill(NaN);
-    const vals = resampleToGrid(cadSeriesRaw.times, cadSeriesRaw.vals, targetTimes);
-    return vals;
-  }, [cadSeriesRaw, targetTimes]);
-  const pwrSeries = useMemo(() => {
-    if (!targetTimes.length || !pwrSeriesRaw.times.length) return new Array(targetTimes.length).fill(NaN);
-    const vals = resampleToGrid(pwrSeriesRaw.times, pwrSeriesRaw.vals, targetTimes);
-    return vals;
-  }, [pwrSeriesRaw, targetTimes]);
+  // REMOVED: Duplicate cadence/power extraction from sensor_data
+  // GOLDEN RULE: Single source of truth = series data from compute-workout-analysis
+  // All cadence/power data comes from normalizedSamples (which reads from series)
 
   // Outdoor detection (global)
   const isOutdoorGlobal = useMemo(() => {
@@ -722,9 +679,9 @@ function EffortsViewerMapbox({
       const wins = winsorize(cad as number[], 5, 95);
       return smoothWithOutlierHandling(wins, 5, 2.0).map(v => (Number.isFinite(v) ? v : NaN));
     }
-    // Power (if present)
+    // Power (from normalizedSamples.power_w - single source of truth)
     if (tab === "pwr") {
-      const pwr = pwrSeries && pwrSeries.length ? pwrSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN);
+      const pwr = normalizedSamples.map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
       if (isOutdoorGlobal) {
         // Light smoothing; remove zeros and impossible spikes (< 50 or > 2000)
         const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 50 && v <= 2000 ? v : NaN));
