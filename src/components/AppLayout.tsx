@@ -225,6 +225,50 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setSelectedWorkout(workout);
   };
 
+  // Listen for workout updates and refresh selectedWorkout if it's still selected
+  useEffect(() => {
+    const refreshSelectedWorkout = async () => {
+      if (!selectedWorkout?.id) return;
+      const wid = String(selectedWorkout.id);
+      const isCompleted = String(selectedWorkout.workout_status || '').toLowerCase() === 'completed';
+      
+      if (isCompleted) {
+        // Refresh from workouts table
+        try {
+          const { data } = await supabase
+            .from('workouts')
+            .select('*')
+            .eq('id', wid)
+            .maybeSingle();
+          if (data) {
+            setSelectedWorkout(data);
+          }
+        } catch {}
+      } else {
+        // Refresh from planned_workouts table
+        try {
+          const { data } = await supabase
+            .from('planned_workouts')
+            .select('*')
+            .eq('id', wid)
+            .maybeSingle();
+          if (data) {
+            setSelectedWorkout(data);
+          }
+        } catch {}
+      }
+    };
+
+    const handleInvalidate = () => refreshSelectedWorkout();
+    window.addEventListener('workouts:invalidate', handleInvalidate);
+    window.addEventListener('planned:invalidate', handleInvalidate);
+    
+    return () => {
+      window.removeEventListener('workouts:invalidate', handleInvalidate);
+      window.removeEventListener('planned:invalidate', handleInvalidate);
+    };
+  }, [selectedWorkout?.id, selectedWorkout?.workout_status]);
+
   const handleUpdateWorkout = async (workoutId: string, updates: any) => {
   };
 
