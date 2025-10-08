@@ -714,12 +714,18 @@ function EffortsViewerMapbox({
       const sm = nanAwareMovAvg(vam as any, 5);
       return sm.map(v => (Number.isFinite(v) ? v : NaN));
     }
-    // Speed (m/s → present directly)
+    // Speed (m/s → present directly with smoothing for GPS noise)
     if (tab === "spd") {
       const spd = normalizedSamples.map(s => Number.isFinite(s.speed_mps as any) ? (s.speed_mps as number) : NaN);
       if (import.meta.env?.DEV) console.log('[viewer] plotting SPEED points', spd.filter(Number.isFinite).length);
+      
+      // Detect if indoor (for adaptive smoothing)
+      const hasGPSTrack = ((workoutData as any)?.gps_data?.length || 0) > 10;
+      const isIndoor = !hasGPSTrack;
+      const speedSmoothingWindow = isIndoor ? 7 : 19; // More aggressive for outdoor GPS noise
+      
       const wins = winsorize(spd as number[], 5, 99);
-      return smoothWithOutlierHandling(wins, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
+      return smoothWithOutlierHandling(wins, speedSmoothingWindow, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Pace - enhanced smoothing with outlier handling
       if (tab === "pace") {
@@ -868,6 +874,16 @@ function EffortsViewerMapbox({
         lo = 0; hi = 100;
       }
     }
+    // SPEED domain: use actual speed values with proper min/max
+    if (tab === 'spd' || tab === 'speed') {
+      const finite = metricRaw.filter(Number.isFinite) as number[];
+      if (finite.length) {
+        lo = Math.max(0, Math.min(...finite)); // Speed can't be negative
+        hi = Math.max(...finite);
+      } else {
+        lo = 0; hi = 10; // Default fallback
+      }
+    }
     // VAM domain: [0 .. max], floor at 450 m/h for visibility
     if (tab === 'vam') {
       const finite = metricRaw.filter(Number.isFinite) as number[];
@@ -912,6 +928,7 @@ function EffortsViewerMapbox({
     if (tab === 'pwr') ensureMinSpan(50);
     if (tab === 'vam') ensureMinSpan(200);
     if (tab === 'cad') ensureMinSpan(10);
+    if (tab === 'spd' || tab === 'speed') ensureMinSpan(2); // Min 2 m/s span (~4.5 mph)
     if (tab === 'elev') ensureMinSpan(isOutdoorGlobal ? (useFeet ? 20/3.28084 : 6) : (useFeet ? 10/3.28084 : 3));
     
     // special handling (tick rounding)
@@ -930,6 +947,7 @@ function EffortsViewerMapbox({
                     : (tab === 'cad') ? 0.05
                     : (tab === 'pwr') ? 0.06
                     : (tab === 'elev') ? 0.04
+                    : (tab === 'spd' || tab === 'speed') ? 0.08
                     : (tab === 'vam') ? 0.08
                     : (isOutdoorGlobal ? 0.03 : 0.02);
     const pad = Math.max((hi - lo) * padFrac, 1);
