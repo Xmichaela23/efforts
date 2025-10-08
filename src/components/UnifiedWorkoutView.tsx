@@ -85,6 +85,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           setLinkedPlanned({ id: fromUnified.planned.id, date: fromUnified.date, type: fromUnified.type, computed: fromUnified.planned.steps ? { steps: fromUnified.planned.steps, total_duration_seconds: fromUnified.planned.total_duration_seconds } : null, description: fromUnified.planned.description, tags: fromUnified.planned.tags, workout_status: 'planned' });
           return;
         }
+        // If we have a planned_id but it's not in unifiedItems yet, keep the current linkedPlanned
+        // This prevents clearing the state during refetch after manual attachment
+        return;
       }
 
       // 2) Skip legacy reverse-id path (completed_workout_id) – single-link model uses workouts.planned_id only
@@ -813,10 +816,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             open={assocOpen}
             onClose={()=>setAssocOpen(false)}
             onAssociated={async(pid)=>{ 
+              setAssocOpen(false);
+              // Dispatch invalidation FIRST so useWeekUnified refetches before useEffect runs
+              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+              try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+              try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
               // Update local workout object with new planned_id
               (workout as any).planned_id = pid;
-              setAssocOpen(false);
-              // Refetch the linked planned workout
+              // Refetch the linked planned workout directly
               try {
                 const { data: freshPlanned } = await supabase
                   .from('planned_workouts')
@@ -828,9 +835,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   setHydratedPlanned(freshPlanned);
                 }
               } catch {}
-              // Dispatch invalidation for other components
-              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-              try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
             }}
           />
         )}
@@ -968,10 +972,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         open={assocOpen}
                         onClose={()=>setAssocOpen(false)}
                         onAssociated={async(pid)=>{ 
+                          setAssocOpen(false);
+                          // Dispatch invalidation FIRST so useWeekUnified refetches before useEffect runs
+                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                          try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
                           // Update local workout object with new planned_id
                           (workout as any).planned_id = pid;
-                          setAssocOpen(false);
-                          // Refetch the linked planned workout
+                          // Refetch the linked planned workout directly
                           try {
                             const { data: freshPlanned } = await supabase
                               .from('planned_workouts')
@@ -983,9 +991,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                               setHydratedPlanned(freshPlanned);
                             }
                           } catch {}
-                          // Dispatch invalidation for other components
-                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                         }}
                       />
                     )}

@@ -179,6 +179,12 @@ Deno.serve(async (req) => {
           throw new Error(`Failed to link workout: ${workoutUpdateErr.message}`);
         }
         
+        // Verify the database state before computing summary
+        console.log('[auto-attach-planned] Verifying database linkage...');
+        const { data: verifyWorkout } = await supabase.from('workouts').select('id,planned_id').eq('id', w.id).maybeSingle();
+        const { data: verifyPlanned } = await supabase.from('planned_workouts').select('id,completed_workout_id,workout_status').eq('id', String(plannedRow.id)).maybeSingle();
+        console.log('[auto-attach-planned] Verification - workout.planned_id:', verifyWorkout?.planned_id, 'planned.completed_workout_id:', verifyPlanned?.completed_workout_id, 'planned.workout_status:', verifyPlanned?.workout_status);
+        
         // Compute summary
         console.log('[auto-attach-planned] Computing workout summary');
         const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
