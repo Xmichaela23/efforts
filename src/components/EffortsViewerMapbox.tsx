@@ -260,6 +260,73 @@ const fmtAlt = (m: number, useFeet = true) => (useFeet ? `${Math.round(m * 3.280
 const fmtPct = (x: number | null) => (x == null || !Number.isFinite(x) ? "—" : `${(x * 100).toFixed(1)}%`);
 const fmtVAM = (mPerH: number | null, useFeet = true) => (mPerH == null || !Number.isFinite(mPerH) ? "—" : useFeet ? `${Math.round(mPerH * 3.28084)} ft/h` : `${Math.round(mPerH)} m/h`);
 
+/** ---------- Map Enhancement Helpers ---------- */
+// Format metric value for map overlay based on current tab
+function formatMetricValue(value: number | null, tab: MetricTab, useMi = true, useFeet = true): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  
+  switch (tab) {
+    case "pace":
+      return fmtPace(value, useMi);
+    case "spd":
+      const speedMph = value * 2.23694;
+      const speedKmh = value * 3.6;
+      return useMi ? `${speedMph.toFixed(1)} mph` : `${speedKmh.toFixed(1)} km/h`;
+    case "bpm":
+      return `${Math.round(value)} bpm`;
+    case "cad":
+      return `${Math.round(value)} spm`;
+    case "pwr":
+      return `${Math.round(value)} W`;
+    case "elev":
+      return fmtAlt(value, useFeet);
+    case "vam":
+      return fmtVAM(value, useFeet);
+    default:
+      return String(Math.round(value));
+  }
+}
+
+// Get human-readable label for current tab
+function getMetricLabel(tab: MetricTab, workoutType?: string): string {
+  switch (tab) {
+    case "pace":
+      return "PACE";
+    case "spd":
+      return workoutType === 'ride' ? "SPEED" : "PACE";
+    case "bpm":
+      return "HEART RATE";
+    case "cad":
+      return "CADENCE";
+    case "pwr":
+      return "POWER";
+    case "elev":
+      return "ELEVATION";
+    case "vam":
+      return "VAM";
+    default:
+      return "METRIC";
+  }
+}
+
+// Find nearest index in array that matches target value
+function findNearestIndex(arr: (number | null)[], target: number): number {
+  if (!arr || arr.length === 0) return 0;
+  let minDiff = Infinity;
+  let nearestIdx = 0;
+  for (let i = 0; i < arr.length; i++) {
+    const val = arr[i];
+    if (typeof val === 'number' && Number.isFinite(val)) {
+      const diff = Math.abs(val - target);
+      if (diff < minDiff) {
+        minDiff = diff;
+        nearestIdx = i;
+      }
+    }
+  }
+  return nearestIdx;
+}
+
 /** ---------- Geometry helpers removed (handled in MapEffort) ---------- */
 /** ---------- Downsampling helpers (chart + map) ---------- */
 // Evenly sample indices to a maximum count, preserving provided mustKeep indices
@@ -1313,6 +1380,29 @@ function EffortsViewerMapbox({
         totalDist_m={dTotal}
         theme={theme}
         height={200}
+        
+        // Enhancement 4: Pass current metric data for overlay
+        currentMetric={{
+          value: formatMetricValue(
+            metricRaw[Math.min(idx, metricRaw.length - 1)] as number | null,
+            tab,
+            useMiles,
+            useFeet
+          ),
+          label: getMetricLabel(tab, workoutData?.type)
+        }}
+        currentTime={fmtTime(s?.t_s ?? 0)}
+        
+        // Enhancement 6: Click-to-jump callback
+        onRouteClick={(distance_m) => {
+          // Find index in normalizedSamples that matches this distance
+          const distances = normalizedSamples.map(sample => sample.d_m);
+          const newIdx = findNearestIndex(distances, distance_m);
+          setIdx(newIdx);
+        }}
+        
+        // Pass active tab for future enhancements (color-coded routes)
+        activeMetricTab={tab}
       />
 
       {/* Data pills above chart */}
