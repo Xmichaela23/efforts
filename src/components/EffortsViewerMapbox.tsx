@@ -1403,6 +1403,9 @@ function EffortsViewerMapbox({
         
         // Pass active tab for future enhancements (color-coded routes)
         activeMetricTab={tab}
+        
+        // Pass imperial/metric preference
+        useMiles={useMiles}
       />
 
       {/* Data pills above chart */}

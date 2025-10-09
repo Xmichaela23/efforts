@@ -17,6 +17,7 @@ export type MapEffortProps = {
   currentTime?: string;
   activeMetricTab?: string;
   onRouteClick?: (distance_m: number) => void;
+  useMiles?: boolean; // For imperial/metric preference
 };
 
 // Layer IDs
@@ -50,6 +51,7 @@ export default function MapEffort({
   currentTime,
   activeMetricTab,
   onRouteClick,
+  useMiles = true,
 }: MapEffortProps) {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const divRef = useRef<HTMLDivElement>(null);
@@ -65,9 +67,13 @@ export default function MapEffort({
   // Compute effective height
   const effectiveHeight = expanded ? 600 : height;
 
+  console.log('[MapEffort] Component rendered, trackLngLat points:', trackLngLat?.length);
+  
   const coords = useMemo(() => sanitizeLngLat(trackLngLat), [trackLngLat]);
   const lineCum = useMemo(() => cumulativeMeters(coords), [coords]);
   const dTotal = useMemo(() => (typeof totalDist_m === 'number' && totalDist_m > 0 ? totalDist_m : (lineCum[lineCum.length - 1] || 1)), [totalDist_m, lineCum]);
+  
+  console.log('[MapEffort] coords.length:', coords.length, 'ready:', ready, 'expanded:', expanded);
 
   // Prefetch both styles for smoother switching
   useEffect(() => {
@@ -103,13 +109,17 @@ export default function MapEffort({
 
 
     const attachLayers = () => {
+      console.log('[MapEffort] attachLayers called');
+      
       // Route source
       if (!map.getSource(ROUTE_SRC)) {
+        console.log('[MapEffort] Adding route source');
         map.addSource(ROUTE_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} } as any });
       }
       
       // Enhancement 1: Visual depth - Shadow layer (bottom)
       if (!map.getLayer(ROUTE_SHADOW)) {
+        console.log('[MapEffort] Adding shadow layer');
         map.addLayer({ 
           id: ROUTE_SHADOW, 
           type: 'line', 
@@ -122,6 +132,8 @@ export default function MapEffort({
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
+      } else {
+        console.log('[MapEffort] Shadow layer already exists');
       }
       
       // Enhancement 1: Route outline (dark blue, middle layer)
@@ -229,7 +241,9 @@ export default function MapEffort({
     (map as any).__attachEffortLayers = attachLayers;
 
     map.on('load', () => {
+      console.log('[MapEffort] Map loaded, calling attachLayers');
       attachLayers();
+      console.log('[MapEffort] Layers attached, configuring map interactions');
       // Keep zoom centered at the pinch midpoint to avoid horizontal "slide"
       // @ts-ignore – MapLibre supports this option
       map.touchZoomRotate.enable({ around: 'pinch' });
@@ -239,6 +253,7 @@ export default function MapEffort({
       const container = map.getCanvasContainer();
       container.style.touchAction = 'pan-y';
       map.getCanvas().style.touchAction = 'pan-y';
+      console.log('[MapEffort] Setting ready=true');
       setReady(true);
       onMapReady?.();
     });
@@ -246,7 +261,11 @@ export default function MapEffort({
 
     // When style changes (theme), re-attach layers
     map.on('styledata', () => {
-      if (!layersAttachedRef.current) attachLayers();
+      console.log('[MapEffort] styledata event, layersAttached:', layersAttachedRef.current);
+      if (!layersAttachedRef.current) {
+        console.log('[MapEffort] Layers not attached, calling attachLayers from styledata');
+        attachLayers();
+      }
     });
 
     const onResize = () => {
@@ -491,7 +510,10 @@ export default function MapEffort({
               </div>
             )}
             <div style={{ fontSize: 11, color: '#9ca3af' }}>
-              {(cursorDist_m / 1000).toFixed(2)} km
+              {useMiles 
+                ? `${(cursorDist_m / 1609.34).toFixed(2)} mi`
+                : `${(cursorDist_m / 1000).toFixed(2)} km`
+              }
             </div>
           </div>
         </div>
