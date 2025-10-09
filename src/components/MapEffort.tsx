@@ -453,7 +453,7 @@ export default function MapEffort({
     };
   }, [coords, ready, onRouteClick, lineCum]);
 
-  // Cursor updates
+  // Cursor updates (disabled during expansion to prevent zoom cancellation)
   useEffect(() => {
     const map = mapRef.current; if (!map || !ready) return;
     const src = map.getSource(CURSOR_SRC) as maplibregl.GeoJSONSource | undefined;
@@ -461,14 +461,17 @@ export default function MapEffort({
     const total = dTotal || 1;
     const p = pointAtDistance(coords, lineCum, Math.max(0, Math.min(cursorDist_m, total)));
     src.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: p } } as any);
-    if (followCursor && fittedRef.current) {
+    // Don't follow cursor during expansion - it cancels zoom animation!
+    if (followCursor && fittedRef.current && !expanded) {
       try { map.easeTo({ center: p as any, duration: 250 }); } catch {}
     }
-  }, [cursorDist_m, dTotal, coords, lineCum, followCursor, ready]);
+  }, [cursorDist_m, dTotal, coords, lineCum, followCursor, ready, expanded]);
 
-  // Theme switching
+  // Theme switching (disabled during expansion to prevent zoom cancellation)
   useEffect(() => {
-    const map = mapRef.current; if (!map || !ready) return;
+    const map = mapRef.current; 
+    if (!map || !ready || expanded) return; // Skip during expansion!
+    
     layersAttachedRef.current = false;
     try {
       const cached = styleCacheRef.current[theme];
@@ -507,7 +510,7 @@ export default function MapEffort({
     map.once('styledata', onStyleData);
     map.once('idle', onIdle);
     return () => { try { map.off('styledata', onStyleData); map.off('idle', onIdle); } catch {} };
-  }, [theme, ready, coords]);
+  }, [theme, ready, coords, expanded]);
 
   // Simple SVG fallback when no coords
   if ((coords?.length ?? 0) < 2) {
