@@ -134,11 +134,19 @@ function evenSampleIndices(length: number, maxPoints: number, mustKeep: Set<numb
 }
 
 // Simple distance-based downsampling for chart series using cumulative distance
-function downsampleSeriesByDistance(distance_m: number[], targetMax: number, splitMeters: number) {
+function downsampleSeriesByDistance(distance_m: number[], targetMax: number, splitMeters: number, peakIndices?: Set<number>) {
   const n = distance_m.length;
   if (n <= targetMax) return Array.from({ length: n }, (_, i) => i);
   const keep = new Set<number>();
   keep.add(0); keep.add(n - 1);
+  
+  // Always preserve peak indices (max speed, min pace, max HR, max power)
+  if (peakIndices) {
+    peakIndices.forEach(idx => {
+      if (idx >= 0 && idx < n) keep.add(idx);
+    });
+  }
+  
   if (splitMeters > 0) {
     let nextMark = splitMeters;
     for (let i = 1; i < n - 1; i++) {
@@ -423,9 +431,40 @@ function EffortsViewerMapbox({
     const power_w: (number|null)[] = Array.isArray(s.power_watts) ? s.power_watts : [];
     const len = Math.min(distance_m.length, time_s.length || distance_m.length);
     
-    // Downsample indices to ~2000 pts while preserving 1 km/1 mi split boundaries
+    // Find peak indices BEFORE downsampling to ensure they're preserved
+    const peakIndices = new Set<number>();
+    
+    // Max speed index
+    if (speed_mps.length > 0) {
+      const validSpeeds = speed_mps.map((v, i) => ({ v: Number.isFinite(v) ? (v as number) : -Infinity, i }));
+      const maxSpeedEntry = validSpeeds.reduce((max, curr) => curr.v > max.v ? curr : max, validSpeeds[0]);
+      if (Number.isFinite(maxSpeedEntry.v)) peakIndices.add(maxSpeedEntry.i);
+    }
+    
+    // Min pace index (fastest pace = lowest number)
+    if (pace_s_per_km.length > 0) {
+      const validPaces = pace_s_per_km.map((v, i) => ({ v: Number.isFinite(v) && (v as number) > 0 ? (v as number) : Infinity, i }));
+      const minPaceEntry = validPaces.reduce((min, curr) => curr.v < min.v ? curr : min, validPaces[0]);
+      if (Number.isFinite(minPaceEntry.v)) peakIndices.add(minPaceEntry.i);
+    }
+    
+    // Max HR index
+    if (hr_bpm.length > 0) {
+      const validHR = hr_bpm.map((v, i) => ({ v: Number.isFinite(v) ? (v as number) : -Infinity, i }));
+      const maxHREntry = validHR.reduce((max, curr) => curr.v > max.v ? curr : max, validHR[0]);
+      if (Number.isFinite(maxHREntry.v)) peakIndices.add(maxHREntry.i);
+    }
+    
+    // Max power index
+    if (power_w.length > 0) {
+      const validPower = power_w.map((v, i) => ({ v: Number.isFinite(v) ? (v as number) : -Infinity, i }));
+      const maxPowerEntry = validPower.reduce((max, curr) => curr.v > max.v ? curr : max, validPower[0]);
+      if (Number.isFinite(maxPowerEntry.v)) peakIndices.add(maxPowerEntry.i);
+    }
+    
+    // Downsample indices to ~2000 pts while preserving 1 km/1 mi split boundaries AND peak values
     const splitMeters = useMiles ? 1609.34 : 1000;
-    const idxs = downsampleSeriesByDistance(distance_m as number[], 2000, splitMeters);
+    const idxs = downsampleSeriesByDistance(distance_m as number[], 2000, splitMeters, peakIndices);
     const out: Sample[] = [];
     let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
     const a = 0.18; // elevation EMA factor (outdoor-friendly)
