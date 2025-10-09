@@ -914,6 +914,19 @@ function EffortsViewerMapbox({
       const maxV = finite.length ? Math.max(...finite) : 0;
       lo = 0; hi = Math.max(450, maxV);
     }
+    // POWER domain: use RAW power values (before smoothing/outlier removal) to show full range
+    if (tab === 'pwr') {
+      const rawPowerValues = normalizedSamples
+        .map(s => Number.isFinite(s.power_w as any) ? (s.power_w as number) : NaN)
+        .filter(Number.isFinite) as number[];
+      
+      if (rawPowerValues.length) {
+        lo = 0; // Power starts at 0
+        hi = Math.max(...rawPowerValues); // Use raw max, not smoothed max
+      } else {
+        lo = 0; hi = 200; // Default fallback
+      }
+    }
     // Specific ranges for cadence/power to avoid super-narrow domains
     if (tab === 'cad') {
       const minC = Math.min(...winsorized);
@@ -925,13 +938,7 @@ function EffortsViewerMapbox({
         hi = Math.max(baseHi, (workoutData?.type === 'ride' ? 120 : 200));
       }
     }
-    if (tab === 'pwr') {
-      const minP = Math.min(...winsorized);
-      const maxP = Math.max(...winsorized);
-      if (!Number.isFinite(lo) || !Number.isFinite(hi) || (hi - lo) < 50) {
-        lo = 0; hi = Math.max(200, Math.ceil((maxP || 200) / 50) * 50);
-      }
-    }
+    // NOTE: Power domain is now handled above using raw values (lines 917-929)
     
     // Ensure minimum span by metric
     const ensureMinSpan = (spanMin: number) => {
