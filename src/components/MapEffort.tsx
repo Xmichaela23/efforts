@@ -387,9 +387,9 @@ export default function MapEffort({
         console.log('[MapEffort] Bounds:', b.getSouthWest(), 'to', b.getNorthEast());
         
         if (expanded) {
-          // Zoom to route midpoint at street level
-          console.log('[MapEffort] EXPANDING - zoom to route midpoint at level 17');
-          map.jumpTo({ center: routeCenter, zoom: 17 });
+          // Zoom to route midpoint (15 = good balance for mobile)
+          console.log('[MapEffort] EXPANDING - zoom to route midpoint at level 15');
+          map.jumpTo({ center: routeCenter, zoom: 15 });
         } else {
           // Collapse - show full route
           console.log('[MapEffort] COLLAPSING - fit full route');
@@ -505,7 +505,7 @@ export default function MapEffort({
     map.once('styledata', onStyleData);
     map.once('idle', onIdle);
     return () => { try { map.off('styledata', onStyleData); map.off('idle', onIdle); } catch {} };
-  }, [theme, ready, coords, expanded]);
+  }, [theme, ready, coords]);
 
   // Simple SVG fallback when no coords
   if ((coords?.length ?? 0) < 2) {
