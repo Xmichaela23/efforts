@@ -60,17 +60,20 @@ Deno.serve(async (req) => {
           .select('performance_numbers')
           .eq('user_id', w.user_id)
           .maybeSingle();
+        console.log('[FTP] Baseline data:', baseline);
         if (baseline?.performance_numbers) {
           const perfNumbers = typeof baseline.performance_numbers === 'string' 
             ? JSON.parse(baseline.performance_numbers) 
             : baseline.performance_numbers;
+          console.log('[FTP] Parsed performance_numbers:', perfNumbers);
           if (perfNumbers?.ftp) {
             userFtp = Number(perfNumbers.ftp);
+            console.log('[FTP] Extracted FTP:', userFtp);
           }
         }
       }
     } catch (e) {
-      // FTP is optional
+      console.error('[FTP] Error fetching FTP:', e);
     }
 
     // Parse JSON columns if stringified
@@ -490,18 +493,20 @@ Deno.serve(async (req) => {
     const hrZones = binsFor(hr_bpm, time_s, 5);
     if (hrZones) analysis.zones.hr = hrZones as any;
     
-    // Power zones: FTP-based (get FTP from baselines or default to 200W)
-    const userFTP = (baselines as any)?.ftp || 200;
+    // Power zones: FTP-based (using userFtp variable extracted earlier)
+    const ftpForZones = userFtp || 200;
+    console.log('[POWER ZONES] Using FTP:', ftpForZones, '(userFtp was:', userFtp, ')');
     const powerZoneBoundaries = [
       0,
-      userFTP * 0.55,   // Z1 max: Active Recovery
-      userFTP * 0.75,   // Z2 max: Endurance
-      userFTP * 0.90,   // Z3 max: Tempo
-      userFTP * 1.05,   // Z4 max: Threshold
-      userFTP * 1.20,   // Z5 max: VO2 Max
-      userFTP * 1.50,   // Z6 max: Anaerobic
-      Infinity          // Z6+ (anything above)
+      ftpForZones * 0.55,   // Z1 max: Active Recovery
+      ftpForZones * 0.75,   // Z2 max: Endurance
+      ftpForZones * 0.90,   // Z3 max: Tempo
+      ftpForZones * 1.05,   // Z4 max: Threshold
+      ftpForZones * 1.20,   // Z5 max: VO2 Max
+      ftpForZones * 1.50,   // Z6 max: Anaerobic
+      Infinity              // Z6+ (anything above)
     ];
+    console.log('[POWER ZONES] Boundaries:', powerZoneBoundaries.slice(0, -1)); // Omit Infinity
     const pwrZones = binsForBoundaries(power_watts, time_s, powerZoneBoundaries);
     if (pwrZones) analysis.zones.power = pwrZones as any;
   } catch {}
