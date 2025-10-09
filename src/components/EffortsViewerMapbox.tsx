@@ -763,15 +763,11 @@ function EffortsViewerMapbox({
       // This preserves actual max speed peaks (e.g., 34.5 mph sprints)
       return spd;
     }
-    // Pace - MINIMAL smoothing to preserve actual peaks
-      if (tab === "pace") {
+    // Pace - NO smoothing to preserve actual peaks (downsampling already preserves min pace)
+    if (tab === "pace") {
       const raw = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
-      if (isOutdoorGlobal) {
-        // Outdoor: Light median filter only to remove GPS spikes
-        const med = medianFilter(raw as any, 5) as (number|null)[];
-        return med.map(v => (Number.isFinite(v) ? (v as number) : NaN));
-      }
-      // Indoor: Use raw data
+      // Return RAW pace data - downsampling already preserved the min (fastest) pace index
+      // Any smoothing here would hide actual peak performance
       return raw;
     }
     // Heart rate - enhanced smoothing with outlier handling
