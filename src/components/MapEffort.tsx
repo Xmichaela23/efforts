@@ -382,16 +382,11 @@ export default function MapEffort({
         console.log('[MapEffort] Bounds:', b.getSouthWest(), 'to', b.getNorthEast());
         
         if (expanded) {
-          // When expanding: zoom IN to a FIXED close zoom level
-          // Force zoom to 17 for street-level detail (current: ~12)
-          console.log('[MapEffort] EXPANDING - forcing zoom from', currentZoom, 'to 17 at center:', center);
-          map.easeTo({ 
-            center: [center.lng, center.lat],
-            zoom: 17,
-            duration: 600,
-            essential: true
-          });
-          console.log('[MapEffort] easeTo called, zoom should animate to 17');
+          // NUCLEAR OPTION: Directly set zoom level (no animation, just works)
+          console.log('[MapEffort] EXPANDING - directly setting zoom from', currentZoom, 'to 17');
+          map.setCenter([center.lng, center.lat]);
+          map.setZoom(17);
+          console.log('[MapEffort] Zoom and center set directly');
         } else {
           // When collapsing: use fitBounds to show full route
           console.log('[MapEffort] COLLAPSING - fitting bounds with padding 60');
