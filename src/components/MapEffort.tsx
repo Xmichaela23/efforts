@@ -532,10 +532,16 @@ export default function MapEffort({
         {/* Expand button when collapsed (inside container) */}
         {!expanded && (
           <button
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('[MapEffort] Expand button touched (onTouchEnd)!');
+              setExpanded(true);
+            }}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              console.log('[MapEffort] Expand button clicked!');
+              console.log('[MapEffort] Expand button clicked (onClick)!');
               setExpanded(true);
             }}
             style={{
@@ -556,7 +562,8 @@ export default function MapEffort({
               color: '#475569',
               zIndex: 10,
               touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
+              WebkitTapHighlightColor: 'transparent',
+              pointerEvents: 'auto'
             }}
             aria-label="Expand map"
           >
@@ -611,10 +618,16 @@ export default function MapEffort({
       {/* Enhancement 3: Shrink button - OUTSIDE map container, ABOVE MapLibre overlays */}
       {expanded && (
         <button
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[MapEffort] Shrink button touched (onTouchEnd)! expanded:', expanded);
+            setExpanded(false);
+          }}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('[MapEffort] Shrink button clicked! expanded:', expanded);
+            console.log('[MapEffort] Shrink button clicked (onClick)! expanded:', expanded);
             setExpanded(false);
           }}
           style={{
@@ -624,24 +637,26 @@ export default function MapEffort({
             background: '#FF5722',
             border: 'none',
             borderRadius: 12,
-            padding: '12px 16px',
+            padding: '14px 18px',
             cursor: 'pointer',
-            boxShadow: '0 4px 16px rgba(255, 87, 34, 0.4)',
+            boxShadow: '0 4px 16px rgba(255, 87, 34, 0.5)',
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            fontSize: 16,
+            fontSize: 17,
             fontWeight: 700,
             color: '#fff',
-            zIndex: 99999,
+            zIndex: 999999,
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
             userSelect: 'none',
-            pointerEvents: 'auto'
+            pointerEvents: 'auto',
+            WebkitUserSelect: 'none',
+            msUserSelect: 'none'
           }}
-          aria-label="Shrink map"
+          aria-label="Close map"
         >
-          <Minimize2 size={20} strokeWidth={3} />
+          <Minimize2 size={22} strokeWidth={3} />
           <span>Close</span>
         </button>
       )}
