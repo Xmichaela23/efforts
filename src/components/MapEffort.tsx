@@ -286,37 +286,6 @@ export default function MapEffort({
     };
     applyData();
     
-    // Enhancement 6: Click-to-jump on route
-    if (onRouteClick && has) {
-      const handleRouteClick = (e: maplibregl.MapMouseEvent) => {
-        const features = map.queryRenderedFeatures(e.point, { layers: [ROUTE_LINE] });
-        if (features.length > 0) {
-          const clickedLngLat = e.lngLat;
-          // Find closest point on route to click
-          let minDist = Infinity;
-          let closestIdx = 0;
-          for (let i = 0; i < valid.length; i++) {
-            const dx = valid[i][0] - clickedLngLat.lng;
-            const dy = valid[i][1] - clickedLngLat.lat;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < minDist) {
-              minDist = dist;
-              closestIdx = i;
-            }
-          }
-          const distance_m = lineCum[closestIdx] || 0;
-          onRouteClick(distance_m);
-        }
-      };
-      
-      map.on('click', ROUTE_LINE, handleRouteClick);
-      map.getCanvas().style.cursor = 'pointer';
-      
-      return () => {
-        map.off('click', ROUTE_LINE, handleRouteClick);
-      };
-    }
-    
     if (!fittedRef.current && has) {
       const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
       for (const c of valid) b.extend(c);
@@ -329,7 +298,53 @@ export default function MapEffort({
         requestAnimationFrame(() => setVisible(true));
       });
     }
-  }, [coords, ready, theme, onRouteClick, lineCum]);
+  }, [coords, ready, theme]);
+
+  // Enhancement 6: Click-to-jump on route (separate useEffect to avoid interfering with route fitting)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !onRouteClick) return;
+    
+    const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
+    if (valid.length < 2) return;
+    
+    const handleRouteClick = (e: maplibregl.MapMouseEvent) => {
+      const features = map.queryRenderedFeatures(e.point, { layers: [ROUTE_LINE] });
+      if (features.length > 0) {
+        const clickedLngLat = e.lngLat;
+        // Find closest point on route to click
+        let minDist = Infinity;
+        let closestIdx = 0;
+        for (let i = 0; i < valid.length; i++) {
+          const dx = valid[i][0] - clickedLngLat.lng;
+          const dy = valid[i][1] - clickedLngLat.lat;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < minDist) {
+            minDist = dist;
+            closestIdx = i;
+          }
+        }
+        const distance_m = lineCum[closestIdx] || 0;
+        onRouteClick(distance_m);
+      }
+    };
+    
+    map.on('click', ROUTE_LINE, handleRouteClick);
+    
+    // Make cursor pointer when hovering over route
+    map.on('mouseenter', ROUTE_LINE, () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', ROUTE_LINE, () => {
+      map.getCanvas().style.cursor = '';
+    });
+    
+    return () => {
+      map.off('click', ROUTE_LINE, handleRouteClick);
+      map.off('mouseenter', ROUTE_LINE);
+      map.off('mouseleave', ROUTE_LINE);
+    };
+  }, [coords, ready, onRouteClick, lineCum]);
 
   // Cursor updates
   useEffect(() => {
@@ -360,8 +375,20 @@ export default function MapEffort({
         const reattach = (map as any).__attachEffortLayers as (() => void) | undefined;
         if (reattach) reattach();
         const valid = (coords.length > 1 ? coords : lastNonEmptyRef.current);
+        const has = valid.length > 1;
+        
+        // Reapply route data
         const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
-        if (src && valid.length > 1) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+        if (src && has) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+        
+        // Reapply start/finish markers
+        if (has) {
+          const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
+          if (startSrc) startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
+          
+          const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
+          if (finishSrc) finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
+        }
       } catch {}
     };
     const onIdle = () => {
