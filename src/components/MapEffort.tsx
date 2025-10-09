@@ -367,7 +367,7 @@ export default function MapEffort({
     
     console.log('[MapEffort] Zoom effect will execute in 320ms, coords:', valid.length);
     
-    // Trigger resize FIRST, then fit bounds
+    // Trigger resize FIRST, then zoom
     setTimeout(() => {
       try {
         console.log('[MapEffort] Executing zoom/resize now');
@@ -376,12 +376,29 @@ export default function MapEffort({
         const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
         for (const c of valid) b.extend(c);
         
-        // SMALLER padding = CLOSER zoom (more zoomed in)
-        // LARGER padding = FARTHER zoom (more zoomed out)
-        const padding = expanded ? 20 : 60;
-        const maxZoom = expanded ? 17 : 16; // Allow closer zoom when expanded
-        console.log('[MapEffort] Fitting bounds with padding:', padding, 'maxZoom:', maxZoom, 'expanded:', expanded, 'bounds:', b);
-        map.fitBounds(b, { padding, maxZoom, duration: 500 });
+        const currentZoom = map.getZoom();
+        const center = b.getCenter();
+        console.log('[MapEffort] Current zoom level:', currentZoom, 'center:', center);
+        console.log('[MapEffort] Bounds:', b.getSouthWest(), 'to', b.getNorthEast());
+        
+        if (expanded) {
+          // When expanding: zoom IN to a FIXED close zoom level
+          // Don't use fitBounds, it's too conservative. Force zoom to 16.
+          console.log('[MapEffort] EXPANDING - forcing zoom to 16 at center');
+          map.easeTo({ 
+            center: center,
+            zoom: 16,
+            duration: 500
+          });
+        } else {
+          // When collapsing: use fitBounds to show full route
+          console.log('[MapEffort] COLLAPSING - fitting bounds with padding 60');
+          map.fitBounds(b, { 
+            padding: 60,
+            maxZoom: 15,
+            duration: 500
+          });
+        }
       } catch (e) {
         console.error('[MapEffort] Error fitting bounds on expand:', e);
       }
@@ -632,27 +649,28 @@ export default function MapEffort({
           }}
           style={{
             position: 'fixed',
-            top: 60,
-            right: 10,
+            top: 70,
+            right: 16,
             background: '#FF5722',
-            border: 'none',
-            borderRadius: 12,
-            padding: '14px 18px',
+            border: '3px solid #fff',
+            borderRadius: 16,
+            padding: '16px 20px',
             cursor: 'pointer',
-            boxShadow: '0 4px 16px rgba(255, 87, 34, 0.5)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0,0,0,0.1)',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            fontSize: 17,
-            fontWeight: 700,
+            gap: 10,
+            fontSize: 18,
+            fontWeight: 800,
             color: '#fff',
-            zIndex: 999999,
+            zIndex: 2147483647,
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
             userSelect: 'none',
             pointerEvents: 'auto',
             WebkitUserSelect: 'none',
-            msUserSelect: 'none'
+            msUserSelect: 'none',
+            isolation: 'isolate'
           }}
           aria-label="Close map"
         >
