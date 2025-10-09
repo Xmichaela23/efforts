@@ -7,6 +7,153 @@ import WeatherDisplay from "./WeatherDisplay";
 import { useWeather } from "../hooks/useWeather";
 import { formatSpeed } from "../utils/workoutFormatting";
 
+/** ---------- Route Simplification (Douglas-Peucker Algorithm) ---------- */
+
+/**
+ * Calculates perpendicular distance from a point to a line
+ */
+function perpendicularDistance(
+  point: { lng: number; lat: number },
+  lineStart: { lng: number; lat: number },
+  lineEnd: { lng: number; lat: number }
+): number {
+  const dx = lineEnd.lng - lineStart.lng;
+  const dy = lineEnd.lat - lineStart.lat;
+  const norm = Math.sqrt(dx * dx + dy * dy);
+
+  if (norm === 0) {
+    return Math.sqrt(
+      Math.pow(point.lng - lineStart.lng, 2) +
+        Math.pow(point.lat - lineStart.lat, 2)
+    );
+  }
+
+  const u =
+    ((point.lng - lineStart.lng) * dx + (point.lat - lineStart.lat) * dy) /
+    (norm * norm);
+
+  if (u < 0) {
+    return Math.sqrt(
+      Math.pow(point.lng - lineStart.lng, 2) +
+        Math.pow(point.lat - lineStart.lat, 2)
+    );
+  } else if (u > 1) {
+    return Math.sqrt(
+      Math.pow(point.lng - lineEnd.lng, 2) +
+        Math.pow(point.lat - lineEnd.lat, 2)
+    );
+  }
+
+  const intersectLng = lineStart.lng + u * dx;
+  const intersectLat = lineStart.lat + u * dy;
+
+  return Math.sqrt(
+    Math.pow(point.lng - intersectLng, 2) +
+      Math.pow(point.lat - intersectLat, 2)
+  );
+}
+
+/**
+ * Simplifies a route using the Douglas-Peucker algorithm
+ * Keeps important points (corners, turns) while removing redundant straight-line points
+ */
+function douglasPeucker(
+  points: Array<{ lng: number; lat: number }>,
+  tolerance: number
+): Array<{ lng: number; lat: number }> {
+  if (points.length <= 2) return points;
+
+  // Find point with maximum distance from line between first and last
+  let maxDistance = 0;
+  let maxIndex = 0;
+
+  const first = points[0];
+  const last = points[points.length - 1];
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const distance = perpendicularDistance(points[i], first, last);
+    if (distance > maxDistance) {
+      maxDistance = distance;
+      maxIndex = i;
+    }
+  }
+
+  // If max distance is greater than tolerance, recursively simplify
+  if (maxDistance > tolerance) {
+    const left = douglasPeucker(points.slice(0, maxIndex + 1), tolerance);
+    const right = douglasPeucker(points.slice(maxIndex), tolerance);
+    return [...left.slice(0, -1), ...right];
+  } else {
+    return [first, last];
+  }
+}
+
+/**
+ * Calculates total distance of route in kilometers using Haversine formula
+ */
+function calculateRouteDistance(
+  points: Array<{ lng: number; lat: number }>
+): number {
+  let totalDistance = 0;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const R = 6371; // Earth's radius in km
+    const lat1 = (points[i].lat * Math.PI) / 180;
+    const lat2 = (points[i + 1].lat * Math.PI) / 180;
+    const deltaLat = ((points[i + 1].lat - points[i].lat) * Math.PI) / 180;
+    const deltaLng = ((points[i + 1].lng - points[i].lng) * Math.PI) / 180;
+
+    const a =
+      Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+      Math.cos(lat1) *
+        Math.cos(lat2) *
+        Math.sin(deltaLng / 2) *
+        Math.sin(deltaLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    totalDistance += R * c;
+  }
+
+  return totalDistance;
+}
+
+/**
+ * Simplifies route for map display using adaptive tolerance based on route length
+ */
+function simplifyRouteForMap(
+  points: Array<[number, number]>
+): Array<[number, number]> {
+  if (!points || points.length === 0) return [];
+
+  // Convert to {lng, lat} format for algorithm
+  const pointsObj = points.map(([lng, lat]) => ({ lng, lat }));
+
+  const distanceKm = calculateRouteDistance(pointsObj);
+
+  // Choose tolerance based on route length
+  let tolerance: number;
+  if (distanceKm < 10) {
+    tolerance = 0.00001; // Very detailed for short routes (< 10km)
+  } else if (distanceKm < 30) {
+    tolerance = 0.00003; // Detailed for medium routes (10-30km)
+  } else if (distanceKm < 50) {
+    tolerance = 0.00005; // Balanced for long routes (30-50km)
+  } else {
+    tolerance = 0.0001; // Simplified for very long routes (50km+)
+  }
+
+  const simplified = douglasPeucker(pointsObj, tolerance);
+
+  if (import.meta.env?.DEV) {
+    console.log(
+      `Route simplified: ${points.length} points → ${simplified.length} points (${Math.round((simplified.length / points.length) * 100)}% retained)`
+    );
+  }
+
+  // Convert back to [lng, lat] tuples
+  return simplified.map((p) => [p.lng, p.lat]);
+}
+
 /** ---------- Types ---------- */
 type Sample = {
   t_s: number;              // seconds from start
@@ -1158,7 +1305,8 @@ function EffortsViewerMapbox({
         trackLngLat={useMemo(() => {
           try {
             const raw = Array.isArray(trackLngLat) ? trackLngLat : [];
-            return downsampleTrackLngLat(raw, 7, 2000);
+            // Use Douglas-Peucker algorithm for intelligent route simplification
+            return simplifyRouteForMap(raw);
           } catch { return Array.isArray(trackLngLat) ? trackLngLat : []; }
         }, [trackLngLat]) as any}
         cursorDist_m={distNow}
