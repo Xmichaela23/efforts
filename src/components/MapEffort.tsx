@@ -63,6 +63,7 @@ export default function MapEffort({
   const styleCacheRef = useRef<Record<string, any>>({});
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const zoomingRef = useRef(false); // Flag to block onResize during zoom operation
   
   // Debug expanded state changes
   useEffect(() => {
@@ -288,8 +289,13 @@ export default function MapEffort({
     });
 
     const onResize = () => {
-      // Avoid calling map.resize() from the map's own 'resize' event to prevent recursion
+      // Don't restore camera if we're actively zooming!
+      if (zoomingRef.current) {
+        console.log('[MapEffort] onResize blocked - zooming in progress');
+        return;
+      }
       if (savedCameraRef.current) {
+        console.log('[MapEffort] onResize - restoring saved camera');
         const { center, zoom } = savedCameraRef.current;
         try { map.jumpTo({ center, zoom }); } catch {}
       }
@@ -367,11 +373,13 @@ export default function MapEffort({
     
     console.log('[MapEffort] Zoom effect will execute in 320ms, coords:', valid.length);
     
-    // Trigger resize FIRST, then zoom
+    // Wait for CSS height transition, then zoom (don't call resize - MapLibre auto-detects)
     setTimeout(() => {
       try {
-        console.log('[MapEffort] Executing zoom/resize now');
-        map.resize();
+        console.log('[MapEffort] Executing zoom now (no manual resize - auto-detected)');
+        
+        // Block onResize from interfering
+        zoomingRef.current = true;
         
         const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
         for (const c of valid) b.extend(c);
@@ -384,19 +392,39 @@ export default function MapEffort({
         
         console.log('[MapEffort] Current zoom level:', currentZoom);
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
-        console.log('[MapEffort] Bounds:', b.getSouthWest(), 'to', b.getNorthEast());
         
         if (expanded) {
           // Zoom to route midpoint (15 = good balance for mobile)
           console.log('[MapEffort] EXPANDING - zoom to route midpoint at level 15');
+          
+          // Listen for ANY camera changes to catch interference
+          const moveHandler = () => console.log('[MapEffort] MOVE event - something moved camera!');
+          const zoomHandler = () => console.log('[MapEffort] ZOOM event - something changed zoom!');
+          map.once('move', moveHandler);
+          map.once('zoom', zoomHandler);
+          
+          // Zoom to route center
+          console.log('[MapEffort] Calling jumpTo: center', routeCenter, 'zoom 15');
           map.jumpTo({ center: routeCenter, zoom: 15 });
+          
+          // Verify and unblock after zoom completes
+          setTimeout(() => {
+            const actualZoom = map.getZoom();
+            const actualCenter = map.getCenter();
+            console.log('[MapEffort] Post-zoom verification: zoom is', actualZoom, 'center:', actualCenter);
+            zoomingRef.current = false;
+            map.off('move', moveHandler);
+            map.off('zoom', zoomHandler);
+          }, 500); // Increased timeout to catch delayed interference
         } else {
           // Collapse - show full route
           console.log('[MapEffort] COLLAPSING - fit full route');
           map.fitBounds(b, { padding: 60, maxZoom: 15, duration: 500 });
+          setTimeout(() => { zoomingRef.current = false; }, 600);
         }
       } catch (e) {
         console.error('[MapEffort] Error fitting bounds on expand:', e);
+        zoomingRef.current = false;
       }
     }, 320); // Wait for height transition to complete
   }, [expanded, ready]); // Removed 'coords' to prevent re-triggering during zoom animation
