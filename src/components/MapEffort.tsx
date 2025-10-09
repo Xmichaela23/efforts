@@ -497,7 +497,8 @@ export default function MapEffort({
     };
     const onIdle = () => {
       try {
-        if (savedCameraRef.current) map.jumpTo(savedCameraRef.current as any);
+        // Don't restore camera during expansion - it would cancel our zoom!
+        if (savedCameraRef.current && !expanded) map.jumpTo(savedCameraRef.current as any);
       } catch {}
       requestAnimationFrame(() => setVisible(true));
     };
