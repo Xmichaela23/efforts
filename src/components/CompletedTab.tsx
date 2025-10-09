@@ -6,6 +6,7 @@ import { useWorkouts } from '@/hooks/useWorkouts';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
+import PowerZoneChart from './PowerZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 import { computeDistanceKm } from '@/utils/workoutDataDerivation';
@@ -1406,13 +1407,20 @@ const formatMovingTime = () => {
         );
       })()}
 
-      {/* Zones section (HR only) - render once */}
+      {/* Zones section (HR and Power) - render once */}
       {(() => {
         const zonesHr = (hydrated||workoutData)?.computed?.analysis?.zones?.hr;
-        if (!(zonesHr?.bins?.length)) return null;
+        const zonesPower = (hydrated||workoutData)?.computed?.analysis?.zones?.power;
+        const hasHRZones = zonesHr?.bins?.length;
+        const hasPowerZones = zonesPower?.bins?.length;
+        const isRide = String(workoutData?.type || '').toLowerCase().includes('ride') || String(workoutData?.type || '').toLowerCase().includes('bike');
+        
+        if (!hasHRZones && !hasPowerZones) return null;
+        
         return (
           <div className="mt-6 mx-[-16px] px-3 py-3 space-y-4">
-            {zonesHr?.bins?.length ? (
+            {/* HR Zones */}
+            {hasHRZones && (
               <div className="my-4">
                 <HRZoneChart 
                   zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)} 
@@ -1421,7 +1429,20 @@ const formatMovingTime = () => {
                   title="Heart Rate Zones" 
                 />
               </div>
-            ) : null}
+            )}
+            
+            {/* Power Zones - only for rides with power data */}
+            {hasPowerZones && isRide && (
+              <div className="my-4">
+                <PowerZoneChart 
+                  zoneDurationsSeconds={zonesPower.bins.map((b:any)=> Number(b.t_s)||0)}
+                  zoneRanges={zonesPower.bins.map((b:any)=> ({ min: b.min, max: b.max }))}
+                  avgPower={norm.avg_power ?? undefined}
+                  maxPower={norm.max_power ?? undefined}
+                  title="Power Distribution" 
+                />
+              </div>
+            )}
           </div>
         );
       })()}
