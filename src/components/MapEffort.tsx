@@ -354,8 +354,8 @@ export default function MapEffort({
     console.log('[MapEffort] Zoom effect triggered - expanded:', expanded, 'ready:', ready, 'fitted:', fittedRef.current);
     
     const map = mapRef.current;
-    if (!map || !ready || !fittedRef.current) {
-      console.log('[MapEffort] Zoom effect skipped - map:', !!map, 'ready:', ready, 'fitted:', fittedRef.current);
+    if (!map || !ready) {
+      console.log('[MapEffort] Zoom effect skipped - map:', !!map, 'ready:', ready);
       return;
     }
     
@@ -383,13 +383,15 @@ export default function MapEffort({
         
         if (expanded) {
           // When expanding: zoom IN to a FIXED close zoom level
-          // Don't use fitBounds, it's too conservative. Force zoom to 16.
-          console.log('[MapEffort] EXPANDING - forcing zoom to 16 at center');
+          // Force zoom to 17 for street-level detail (current: ~12)
+          console.log('[MapEffort] EXPANDING - forcing zoom from', currentZoom, 'to 17 at center:', center);
           map.easeTo({ 
-            center: center,
-            zoom: 16,
-            duration: 500
+            center: [center.lng, center.lat],
+            zoom: 17,
+            duration: 600,
+            essential: true
           });
+          console.log('[MapEffort] easeTo called, zoom should animate to 17');
         } else {
           // When collapsing: use fitBounds to show full route
           console.log('[MapEffort] COLLAPSING - fitting bounds with padding 60');
@@ -649,19 +651,19 @@ export default function MapEffort({
           }}
           style={{
             position: 'fixed',
-            top: 70,
-            right: 16,
+            top: 60,
+            right: 12,
             background: '#FF5722',
-            border: '3px solid #fff',
-            borderRadius: 16,
-            padding: '16px 20px',
+            border: '2px solid #fff',
+            borderRadius: 10,
+            padding: '10px 16px',
             cursor: 'pointer',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0,0,0,0.1)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
-            fontSize: 18,
-            fontWeight: 800,
+            gap: 6,
+            fontSize: 15,
+            fontWeight: 700,
             color: '#fff',
             zIndex: 2147483647,
             touchAction: 'manipulation',
