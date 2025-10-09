@@ -714,46 +714,25 @@ function EffortsViewerMapbox({
       const sm = nanAwareMovAvg(vam as any, 5);
       return sm.map(v => (Number.isFinite(v) ? v : NaN));
     }
-    // Speed (m/s → present directly with smoothing for GPS noise)
+    // Speed (m/s → present directly, NO smoothing to preserve actual peaks)
     if (tab === "spd") {
       const spd = normalizedSamples.map(s => Number.isFinite(s.speed_mps as any) ? (s.speed_mps as number) : NaN);
       if (import.meta.env?.DEV) console.log('[viewer] plotting SPEED points', spd.filter(Number.isFinite).length);
       
-      // Detect if indoor (for adaptive smoothing)
-      const hasGPSTrack = ((workoutData as any)?.gps_data?.length || 0) > 10;
-      const isIndoor = !hasGPSTrack;
-      const speedSmoothingWindow = isIndoor ? 5 : 7; // Very light smoothing - preserves peaks
-      
-      const wins = winsorize(spd as number[], 5, 99);
-      return smoothWithOutlierHandling(wins, speedSmoothingWindow, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
+      // Return RAW speed data - no smoothing, no outlier removal
+      // This preserves actual max speed peaks (e.g., 34.5 mph sprints)
+      return spd;
     }
-    // Pace - enhanced smoothing with outlier handling
+    // Pace - MINIMAL smoothing to preserve actual peaks
       if (tab === "pace") {
       const raw = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
       if (isOutdoorGlobal) {
-        // Outdoor GPS: strong smoothing for pace
-        // median(5) -> nanAwareMA(17) -> nanAwareMA(17) -> winsorize(5,95) -> final EMA (alpha 0.25)
+        // Outdoor: Light median filter only to remove GPS spikes
         const med = medianFilter(raw as any, 5) as (number|null)[];
-        const ma1 = nanAwareMovAvg(med, 17);
-        const ma2 = nanAwareMovAvg(ma1 as any, 17);
-        const wins = winsorize(ma2.map(v => (Number.isFinite(v) ? v : NaN)), 5, 95);
-        // Final low-pass EMA
-        const out: number[] = new Array(wins.length).fill(NaN);
-        let ema: number | null = null; const alpha = 0.25;
-        for (let i = 0; i < wins.length; i++) {
-          const v = Number.isFinite(wins[i]) ? (wins[i] as number) : NaN;
-          if (Number.isFinite(v)) {
-            ema = ema == null ? (v as number) : (alpha * (v as number) + (1 - alpha) * (ema as number));
-            out[i] = ema as number;
-          } else {
-            out[i] = (ema as any);
-          }
-        }
-        return out.map(v => (Number.isFinite(v) ? v : NaN));
+        return med.map(v => (Number.isFinite(v) ? (v as number) : NaN));
       }
-      // Indoor: keep existing gentle smoothing
-      const winsorized = winsorize(raw, 5, 95);
-      return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
+      // Indoor: Use raw data
+      return raw;
     }
     // Heart rate - enhanced smoothing with outlier handling
     if (tab === "bpm") {
