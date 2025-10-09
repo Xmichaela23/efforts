@@ -346,15 +346,26 @@ export default function MapEffort({
 
   // Handle zoom when expanding/collapsing (Strava-style)
   useEffect(() => {
+    console.log('[MapEffort] Zoom effect triggered - expanded:', expanded, 'ready:', ready, 'fitted:', fittedRef.current);
+    
     const map = mapRef.current;
-    if (!map || !ready || !fittedRef.current) return;
+    if (!map || !ready || !fittedRef.current) {
+      console.log('[MapEffort] Zoom effect skipped - map:', !!map, 'ready:', ready, 'fitted:', fittedRef.current);
+      return;
+    }
     
     const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
-    if (valid.length < 2) return;
+    if (valid.length < 2) {
+      console.log('[MapEffort] Zoom effect skipped - no valid coords');
+      return;
+    }
+    
+    console.log('[MapEffort] Zoom effect will execute in 320ms, coords:', valid.length);
     
     // Trigger resize FIRST, then fit bounds
     setTimeout(() => {
       try {
+        console.log('[MapEffort] Executing zoom/resize now');
         map.resize();
         
         const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
@@ -364,7 +375,7 @@ export default function MapEffort({
         // LARGER padding = FARTHER zoom (more zoomed out)
         const padding = expanded ? 20 : 60;
         const maxZoom = expanded ? 17 : 16; // Allow closer zoom when expanded
-        console.log('[MapEffort] Fitting bounds with padding:', padding, 'maxZoom:', maxZoom, 'expanded:', expanded);
+        console.log('[MapEffort] Fitting bounds with padding:', padding, 'maxZoom:', maxZoom, 'expanded:', expanded, 'bounds:', b);
         map.fitBounds(b, { padding, maxZoom, duration: 500 });
       } catch (e) {
         console.error('[MapEffort] Error fitting bounds on expand:', e);
@@ -511,31 +522,38 @@ export default function MapEffort({
         }} 
       />
       
-      {/* Enhancement 3: Expansion toggle button */}
+      {/* Enhancement 3: Expansion toggle button - always visible */}
       {coords.length > 1 && (
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[MapEffort] Toggle expand, current:', expanded, 'new:', !expanded);
+            setExpanded(prev => !prev);
+          }}
           style={{
-            position: 'absolute',
-            top: 10,
+            position: expanded ? 'fixed' : 'absolute',
+            top: expanded ? 'env(safe-area-inset-top, 10px)' : 10,
             right: 10,
             background: '#fff',
             border: '1px solid #e5e7eb',
             borderRadius: 8,
-            padding: '6px 8px',
+            padding: '8px 12px',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             display: 'flex',
             alignItems: 'center',
-            gap: 4,
-            fontSize: 12,
+            gap: 6,
+            fontSize: 13,
             fontWeight: 600,
             color: '#475569',
-            zIndex: 10
+            zIndex: 1001,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent'
           }}
           aria-label={expanded ? 'Shrink map' : 'Expand map'}
         >
-          {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           {expanded ? 'Shrink' : 'Expand'}
         </button>
       )}
@@ -544,8 +562,8 @@ export default function MapEffort({
       {coords.length > 1 && currentMetric && (
         <div
           style={{
-            position: 'absolute',
-            bottom: 10,
+            position: expanded ? 'fixed' : 'absolute',
+            bottom: expanded ? 'calc(env(safe-area-inset-bottom, 10px) + 10px)' : 10,
             left: 10,
             background: 'rgba(255,255,255,0.95)',
             backdropFilter: 'blur(8px)',
@@ -556,7 +574,7 @@ export default function MapEffort({
             fontSize: 12,
             fontWeight: 500,
             color: '#1f2937',
-            zIndex: 10,
+            zIndex: 1000,
             minWidth: 120
           }}
         >
