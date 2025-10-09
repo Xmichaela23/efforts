@@ -786,11 +786,11 @@ function EffortsViewerMapbox({
   const [showVam, setShowVam] = useState(false);
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
-  const [theme, setTheme] = useState<'streets' | 'hybrid'>(() => {
+  const [theme, setTheme] = useState<'outdoor' | 'hybrid'>(() => {
     try {
       const v = typeof window !== 'undefined' ? window.localStorage.getItem('map_theme') : null;
-      return (v === 'hybrid' || v === 'streets') ? (v as any) : 'streets';
-    } catch { return 'streets'; }
+      return (v === 'hybrid' || v === 'outdoor') ? (v as any) : 'outdoor';
+    } catch { return 'outdoor'; }
   });
   useEffect(() => { try { window.localStorage.setItem('map_theme', theme); } catch {} }, [theme]);
 
@@ -1359,11 +1359,11 @@ function EffortsViewerMapbox({
           fallbackTemperature={workoutData?.avg_temperature ? Number(workoutData.avg_temperature) : undefined}
         />
         <button
-          onClick={() => setTheme(theme === 'streets' ? 'hybrid' : 'streets')}
+          onClick={() => setTheme(theme === 'outdoor' ? 'hybrid' : 'outdoor')}
           style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
           aria-label="Toggle map style"
         >
-          {theme === 'streets' ? 'Satellite' : 'Streets'}
+          {theme === 'outdoor' ? 'Satellite' : 'Map'}
         </button>
       </div>
 

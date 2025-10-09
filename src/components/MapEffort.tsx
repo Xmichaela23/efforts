@@ -7,7 +7,7 @@ export type MapEffortProps = {
   trackLngLat: [number, number][];
   cursorDist_m: number;
   totalDist_m?: number;
-  theme?: 'streets' | 'hybrid';
+  theme?: 'outdoor' | 'hybrid';
   followCursor?: boolean;
   height?: number;
   className?: string;
@@ -32,9 +32,9 @@ const ROUTE_HALO = 'route-halo';
 const CURSOR_HALO = 'cursor-halo';
 const CURSOR_PT = 'cursor-pt';
 
-function styleUrl(theme: 'streets' | 'hybrid') {
+function styleUrl(theme: 'outdoor' | 'hybrid') {
   const key = import.meta.env.VITE_MAPTILER_KEY as string | undefined;
-  const base = theme === 'hybrid' ? 'hybrid' : 'streets';
+  const base = theme === 'hybrid' ? 'hybrid' : 'outdoor';
   return `https://api.maptiler.com/maps/${base}/style.json?key=${key || ''}`;
 }
 
@@ -42,7 +42,7 @@ export default function MapEffort({
   trackLngLat,
   cursorDist_m,
   totalDist_m,
-  theme = 'streets',
+  theme = 'outdoor',
   followCursor = false,
   height = 160,
   className,
@@ -64,8 +64,8 @@ export default function MapEffort({
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
   
-  // Compute effective height
-  const effectiveHeight = expanded ? 600 : height;
+  // Compute effective height - full viewport when expanded (Strava-style)
+  const effectiveHeight = expanded ? 'calc(100vh - 120px)' : height;
 
   console.log('[MapEffort] Component rendered, trackLngLat points:', trackLngLat?.length);
   
@@ -79,10 +79,10 @@ export default function MapEffort({
   useEffect(() => {
     const key = (import.meta as any).env?.VITE_MAPTILER_KEY as string | undefined;
     const urls: Record<string, string> = {
-      streets: `https://api.maptiler.com/maps/streets/style.json?key=${key || ''}`,
+      outdoor: `https://api.maptiler.com/maps/outdoor/style.json?key=${key || ''}`,
       hybrid: `https://api.maptiler.com/maps/hybrid/style.json?key=${key || ''}`,
     };
-    const needed = ["streets", "hybrid"].filter((k) => !styleCacheRef.current[k]);
+    const needed = ["outdoor", "hybrid"].filter((k) => !styleCacheRef.current[k]);
     needed.forEach(async (k) => {
       try { const r = await fetch(urls[k]); if (r.ok) styleCacheRef.current[k] = await r.json(); } catch {}
     });
@@ -117,7 +117,7 @@ export default function MapEffort({
         map.addSource(ROUTE_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} } as any });
       }
       
-      // Enhancement 1: Visual depth - Shadow layer (bottom)
+      // Enhancement 1: Visual depth - Shadow layer (bottom) - Strava-style orange
       if (!map.getLayer(ROUTE_SHADOW)) {
         console.log('[MapEffort] Adding shadow layer');
         map.addLayer({ 
@@ -125,10 +125,10 @@ export default function MapEffort({
           type: 'line', 
           source: ROUTE_SRC, 
           paint: { 
-            'line-color': '#000000', 
-            'line-width': 8, 
-            'line-opacity': 0.25,
-            'line-blur': 4
+            'line-color': '#D84315', 
+            'line-width': 10, 
+            'line-opacity': 0.3,
+            'line-blur': 3
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
@@ -136,7 +136,7 @@ export default function MapEffort({
         console.log('[MapEffort] Shadow layer already exists');
       }
       
-      // Enhancement 1: Route outline (dark blue, middle layer)
+      // Enhancement 1: Route outline (medium orange, middle layer)
       if (!map.getLayer(ROUTE_OUTLINE)) {
         console.log('[MapEffort] Adding outline layer');
         map.addLayer({ 
@@ -144,8 +144,9 @@ export default function MapEffort({
           type: 'line', 
           source: ROUTE_SRC, 
           paint: { 
-            'line-color': '#1e40af', 
-            'line-width': 5
+            'line-color': '#F4511E', 
+            'line-width': 6,
+            'line-opacity': 0.9
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
@@ -153,7 +154,7 @@ export default function MapEffort({
         console.log('[MapEffort] Outline layer already exists');
       }
       
-      // Main route line (bright blue, top layer)
+      // Main route line (Strava bright orange, top layer)
       if (!map.getLayer(ROUTE_LINE)) {
         console.log('[MapEffort] Adding main route line');
         map.addLayer({ 
@@ -161,8 +162,8 @@ export default function MapEffort({
           type: 'line', 
           source: ROUTE_SRC, 
           paint: { 
-            'line-color': '#3b82f6', 
-            'line-width': 3
+            'line-color': '#FF5722', 
+            'line-width': 4
           }, 
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
@@ -211,7 +212,7 @@ export default function MapEffort({
         map.addSource(CURSOR_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] } } as any });
       }
       
-      // Enhancement 2: Animated pulsing halo for cursor
+      // Enhancement 2: Animated pulsing halo for cursor (orange to match route)
       if (!map.getLayer(CURSOR_HALO)) {
         console.log('[MapEffort] Adding cursor halo');
         map.addLayer({ 
@@ -220,7 +221,7 @@ export default function MapEffort({
           source: CURSOR_SRC, 
           paint: { 
             'circle-radius': 16, 
-            'circle-color': '#3b82f6', 
+            'circle-color': '#FF5722', 
             'circle-opacity': 0.3,
             'circle-blur': 0.8
           } 
@@ -229,7 +230,7 @@ export default function MapEffort({
         console.log('[MapEffort] Cursor halo already exists');
       }
       
-      // Enhancement 2: Enhanced cursor point
+      // Enhancement 2: Enhanced cursor point (orange border)
       if (!map.getLayer(CURSOR_PT)) {
         console.log('[MapEffort] Adding cursor point');
         map.addLayer({ 
@@ -239,7 +240,7 @@ export default function MapEffort({
           paint: { 
             'circle-radius': 8, 
             'circle-color': '#fff', 
-            'circle-stroke-color': '#3b82f6', 
+            'circle-stroke-color': '#FF5722', 
             'circle-stroke-width': 3
           } 
         });
@@ -321,8 +322,8 @@ export default function MapEffort({
     if (!fittedRef.current && has) {
       const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
       for (const c of valid) b.extend(c);
-      // Tighter framing: smaller padding and allow slightly higher max zoom
-      map.fitBounds(b, { padding: 14, maxZoom: 16, duration: 0 });
+      // Normal padding for initial fit
+      map.fitBounds(b, { padding: 60, maxZoom: 16, duration: 0 });
       map.once('idle', () => {
         try { const c = map.getCenter(); savedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any; } catch {}
         fittedRef.current = true;
@@ -331,6 +332,27 @@ export default function MapEffort({
       });
     }
   }, [coords, ready, theme]);
+
+  // Handle zoom when expanding/collapsing (Strava-style)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !fittedRef.current) return;
+    
+    const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
+    if (valid.length < 2) return;
+    
+    const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
+    for (const c of valid) b.extend(c);
+    
+    // Zoom closer when expanded, zoom out when collapsed
+    const padding = expanded ? 20 : 60;
+    map.fitBounds(b, { padding, maxZoom: 16, duration: 500 });
+    
+    // Trigger resize after height change completes
+    setTimeout(() => {
+      map.resize();
+    }, 300);
+  }, [expanded, coords, ready]);
 
   // Enhancement 6: Click-to-jump on route (separate useEffect to avoid interfering with route fitting)
   useEffect(() => {
@@ -511,7 +533,7 @@ export default function MapEffort({
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#3b82f6' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#FF5722' }}>
               {currentMetric.value}
             </div>
             <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>
