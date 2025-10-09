@@ -840,11 +840,10 @@ function EffortsViewerMapbox({
       const smoothingWindow = getPowerSmoothingWindow(workoutType, isIndoor);
       
       if (isOutdoorGlobal) {
-        // Remove zeros and impossible spikes only (don't remove high power peaks as "outliers")
+        // Return RAW power data - no smoothing to preserve actual peaks (sprints, attacks)
+        // Downsampling already preserved the max power index
         const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 0 && v <= 2000 ? v : NaN));
-        // Light smoothing only - preserve actual power peaks (sprints, attacks)
-        const ma = nanAwareMovAvg(cleaned, 11);  // Reduced from 31 to 11 to preserve peaks
-        return ma.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
+        return cleaned;
       }
       const wins = winsorize(pwr as number[], 5, 99);
       const withoutOutliers = removeOutliers(wins, 2.0);
