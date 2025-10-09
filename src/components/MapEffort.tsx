@@ -64,6 +64,11 @@ export default function MapEffort({
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
   
+  // Debug expanded state changes
+  useEffect(() => {
+    console.log('[MapEffort] EXPANDED STATE CHANGED TO:', expanded);
+  }, [expanded]);
+  
   // Compute effective height - full viewport when expanded (Strava-style)
   const effectiveHeight = expanded ? 'calc(100vh - 120px)' : height;
 
@@ -603,42 +608,43 @@ export default function MapEffort({
         )}
       </div>
       
-      {/* Enhancement 3: Expansion toggle button - OUTSIDE map container */}
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('[MapEffort] Button clicked! Current expanded:', expanded);
-          const newExpanded = !expanded;
-          console.log('[MapEffort] Setting expanded to:', newExpanded);
-          setExpanded(newExpanded);
-        }}
-        style={{
-          position: 'fixed',
-          top: expanded ? 10 : 'auto',
-          right: 10,
-          background: '#fff',
-          border: '2px solid #FF5722',
-          borderRadius: 8,
-          padding: '10px 14px',
-          cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          display: expanded ? 'flex' : 'none',
-          alignItems: 'center',
-          gap: 6,
-          fontSize: 15,
-          fontWeight: 700,
-          color: '#FF5722',
-          zIndex: 10000,
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-          userSelect: 'none'
-        }}
-        aria-label="Shrink map"
-      >
-        <Minimize2 size={20} />
-        <span>Shrink</span>
-      </button>
+      {/* Enhancement 3: Shrink button - OUTSIDE map container, ABOVE MapLibre overlays */}
+      {expanded && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[MapEffort] Shrink button clicked! expanded:', expanded);
+            setExpanded(false);
+          }}
+          style={{
+            position: 'fixed',
+            top: 60,
+            right: 10,
+            background: '#FF5722',
+            border: 'none',
+            borderRadius: 12,
+            padding: '12px 16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(255, 87, 34, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 16,
+            fontWeight: 700,
+            color: '#fff',
+            zIndex: 99999,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
+            pointerEvents: 'auto'
+          }}
+          aria-label="Shrink map"
+        >
+          <Minimize2 size={20} strokeWidth={3} />
+          <span>Close</span>
+        </button>
+      )}
     </>
   );
 }
