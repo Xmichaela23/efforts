@@ -436,24 +436,36 @@ function EffortsViewerMapbox({
     
     // Find indices of peak values for all metrics to preserve them during downsampling
     if (speed_mps.length) {
-      const maxSpeed = Math.max(...speed_mps.filter(v => Number.isFinite(v)) as number[]);
-      const maxSpeedIdx = speed_mps.findIndex(v => v === maxSpeed);
-      if (maxSpeedIdx >= 0) peakIndices.add(maxSpeedIdx);
+      const validSpeeds = speed_mps.filter(v => Number.isFinite(v)) as number[];
+      if (validSpeeds.length > 0) {
+        const maxSpeed = Math.max(...validSpeeds);
+        const maxSpeedIdx = speed_mps.findIndex(v => v === maxSpeed);
+        if (maxSpeedIdx >= 0) peakIndices.add(maxSpeedIdx);
+      }
     }
     if (pace_s_per_km.length) {
-      const minPace = Math.min(...pace_s_per_km.filter(v => Number.isFinite(v) && (v as number) > 0) as number[]);
-      const minPaceIdx = pace_s_per_km.findIndex(v => v === minPace);
-      if (minPaceIdx >= 0) peakIndices.add(minPaceIdx);
+      const validPaces = pace_s_per_km.filter(v => Number.isFinite(v) && (v as number) > 0) as number[];
+      if (validPaces.length > 0) {
+        const minPace = Math.min(...validPaces);
+        const minPaceIdx = pace_s_per_km.findIndex(v => v === minPace);
+        if (minPaceIdx >= 0) peakIndices.add(minPaceIdx);
+      }
     }
     if (hr_bpm.length) {
-      const maxHr = Math.max(...hr_bpm.filter(v => Number.isFinite(v)) as number[]);
-      const maxHrIdx = hr_bpm.findIndex(v => v === maxHr);
-      if (maxHrIdx >= 0) peakIndices.add(maxHrIdx);
+      const validHr = hr_bpm.filter(v => Number.isFinite(v)) as number[];
+      if (validHr.length > 0) {
+        const maxHr = Math.max(...validHr);
+        const maxHrIdx = hr_bpm.findIndex(v => v === maxHr);
+        if (maxHrIdx >= 0) peakIndices.add(maxHrIdx);
+      }
     }
     if (power_w.length) {
-      const maxPwr = Math.max(...power_w.filter(v => Number.isFinite(v)) as number[]);
-      const maxPwrIdx = power_w.findIndex(v => v === maxPwr);
-      if (maxPwrIdx >= 0) peakIndices.add(maxPwrIdx);
+      const validPwr = power_w.filter(v => Number.isFinite(v)) as number[];
+      if (validPwr.length > 0) {
+        const maxPwr = Math.max(...validPwr);
+        const maxPwrIdx = power_w.findIndex(v => v === maxPwr);
+        if (maxPwrIdx >= 0) peakIndices.add(maxPwrIdx);
+      }
     }
     
     const idxs = downsampleSeriesByDistance(distance_m as number[], 2000, splitMeters, peakIndices);
