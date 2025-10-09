@@ -445,7 +445,12 @@ function EffortsViewerMapbox({
     if (pace_s_per_km.length > 0) {
       const validPaces = pace_s_per_km.map((v, i) => ({ v: Number.isFinite(v) && (v as number) > 0 ? (v as number) : Infinity, i }));
       const minPaceEntry = validPaces.reduce((min, curr) => curr.v < min.v ? curr : min, validPaces[0]);
-      if (Number.isFinite(minPaceEntry.v)) peakIndices.add(minPaceEntry.i);
+      if (Number.isFinite(minPaceEntry.v)) {
+        peakIndices.add(minPaceEntry.i);
+        if (import.meta.env?.DEV) {
+          console.log('[PEAK] Min pace (s/km):', minPaceEntry.v, 'at index:', minPaceEntry.i, 'total samples:', pace_s_per_km.length);
+        }
+      }
     }
     
     // Max HR index
@@ -507,12 +512,12 @@ function EffortsViewerMapbox({
       }
       // Only use server pace; no client derivation
       const paceVal: number | null = Number.isFinite(pace_s_per_km?.[i] as any) ? Number(pace_s_per_km[i]) : null;
-      if (paceVal != null) paceEma = paceEma == null ? paceVal : ap * paceVal + (1 - ap) * paceEma;
+      // Don't apply EMA to pace - use raw values to preserve peaks
       out.push({
         t_s: t,
         d_m: d,
         elev_m_sm: es,
-        pace_s_per_km: paceEma ?? null,
+        pace_s_per_km: paceVal,
         speed_mps: Number.isFinite(speed_mps?.[i] as any) ? Number(speed_mps[i]) : null,
         hr_bpm: Number.isFinite(hr_bpm?.[i]) ? Number(hr_bpm[i]) : null,
         grade,
