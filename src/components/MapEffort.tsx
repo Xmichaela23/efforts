@@ -498,31 +498,112 @@ export default function MapEffort({
 
   // Enhancement 3 & 4: Render with expansion button and metric overlay
   return (
-    <div style={{ 
-      position: 'relative',
-      ...(expanded ? {
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 999,
-        background: '#fff'
-      } : {})
-    }}>
-      <div 
-        ref={divRef} 
-        className={className} 
-        style={{ 
-          height: effectiveHeight, 
-          borderRadius: expanded ? 0 : 12, 
-          overflow: 'hidden', 
-          boxShadow: '0 2px 10px rgba(0,0,0,.06)', 
-          opacity: visible ? 1 : 0, 
-          transition: 'opacity 180ms ease, height 300ms ease, border-radius 300ms ease' 
-        }} 
-      />
+    <>
+      {/* Map container */}
+      <div style={{ 
+        position: expanded ? 'fixed' : 'relative',
+        ...(expanded ? {
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 999,
+          background: '#fff'
+        } : {})
+      }}>
+        <div 
+          ref={divRef} 
+          className={className} 
+          style={{ 
+            height: effectiveHeight, 
+            borderRadius: expanded ? 0 : 12, 
+            overflow: 'hidden', 
+            boxShadow: '0 2px 10px rgba(0,0,0,.06)', 
+            opacity: visible ? 1 : 0, 
+            transition: 'opacity 180ms ease, height 300ms ease, border-radius 300ms ease' 
+          }} 
+        />
+        
+        {/* Expand button when collapsed (inside container) */}
+        {!expanded && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('[MapEffort] Expand button clicked!');
+              setExpanded(true);
+            }}
+            style={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
+              background: '#fff',
+              border: '1px solid #e5e7eb',
+              borderRadius: 8,
+              padding: '6px 10px',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#475569',
+              zIndex: 10,
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+            aria-label="Expand map"
+          >
+            <Maximize2 size={14} />
+            Expand
+          </button>
+        )}
+        
+        {/* Enhancement 4: Metric overlay */}
+        {coords.length > 1 && currentMetric && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 10,
+              left: 10,
+              background: 'rgba(255,255,255,0.95)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid #e5e7eb',
+              borderRadius: 8,
+              padding: '8px 12px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              fontSize: 12,
+              fontWeight: 500,
+              color: '#1f2937',
+              zIndex: 10,
+              minWidth: 120
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#FF5722' }}>
+                {currentMetric.value}
+              </div>
+              <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>
+                {currentMetric.label}
+              </div>
+              {currentTime && (
+                <div style={{ fontSize: 11, color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: 4, marginTop: 2 }}>
+                  {currentTime}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                {useMiles 
+                  ? `${(cursorDist_m / 1609.34).toFixed(2)} mi`
+                  : `${(cursorDist_m / 1000).toFixed(2)} km`
+                }
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
       
-      {/* Enhancement 3: Expansion toggle button - ALWAYS at top right */}
+      {/* Enhancement 3: Expansion toggle button - OUTSIDE map container */}
       <button
         onClick={(e) => {
           e.preventDefault();
@@ -533,74 +614,32 @@ export default function MapEffort({
           setExpanded(newExpanded);
         }}
         style={{
-          position: 'absolute',
-          top: 10,
+          position: 'fixed',
+          top: expanded ? 10 : 'auto',
           right: 10,
           background: '#fff',
           border: '2px solid #FF5722',
           borderRadius: 8,
-          padding: '8px 12px',
+          padding: '10px 14px',
           cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-          display: 'flex',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          display: expanded ? 'flex' : 'none',
           alignItems: 'center',
           gap: 6,
-          fontSize: 14,
+          fontSize: 15,
           fontWeight: 700,
           color: '#FF5722',
-          zIndex: 9999,
+          zIndex: 10000,
           touchAction: 'manipulation',
           WebkitTapHighlightColor: 'transparent',
           userSelect: 'none'
         }}
-        aria-label={expanded ? 'Shrink map' : 'Expand map'}
+        aria-label="Shrink map"
       >
-        {expanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-        <span>{expanded ? 'Shrink' : 'Expand'}</span>
+        <Minimize2 size={20} />
+        <span>Shrink</span>
       </button>
-      
-      {/* Enhancement 4: Metric overlay */}
-      {coords.length > 1 && currentMetric && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 10,
-            left: 10,
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid #e5e7eb',
-            borderRadius: 8,
-            padding: '8px 12px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            fontSize: 12,
-            fontWeight: 500,
-            color: '#1f2937',
-            zIndex: 9998,
-            minWidth: 120
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#FF5722' }}>
-              {currentMetric.value}
-            </div>
-            <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>
-              {currentMetric.label}
-            </div>
-            {currentTime && (
-              <div style={{ fontSize: 11, color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: 4, marginTop: 2 }}>
-                {currentTime}
-              </div>
-            )}
-            <div style={{ fontSize: 11, color: '#9ca3af' }}>
-              {useMiles 
-                ? `${(cursorDist_m / 1609.34).toFixed(2)} mi`
-                : `${(cursorDist_m / 1000).toFixed(2)} km`
-              }
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
 
