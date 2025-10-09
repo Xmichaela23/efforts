@@ -955,7 +955,10 @@ function EffortsViewerMapbox({
       lo = Math.min(lo, minVal);
       hi = Math.max(hi, maxVal);
     }
-    if (tab === 'pwr') ensureMinSpan(50);
+    if (tab === 'pwr') {
+      ensureMinSpan(50);
+      lo = Math.max(0, lo); // Force power minimum to 0 (can't have negative watts)
+    }
     if (tab === 'vam') ensureMinSpan(200);
     if (tab === 'cad') ensureMinSpan(10);
     if (tab === 'spd' || tab === 'speed') ensureMinSpan(2); // Min 2 m/s span (~4.5 mph)

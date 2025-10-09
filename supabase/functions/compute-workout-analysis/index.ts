@@ -423,8 +423,9 @@ Deno.serve(async (req) => {
       ui: { footnote: `Computed at ${ANALYSIS_VERSION}`, renderHints: { preferPace: sport === 'run' } }
     };
 
-  // Zones histograms (auto-range, time-weighted)
+  // Zones histograms (auto-range for HR, FTP-based for power)
   try {
+    // Auto-range bins for HR (works well with natural HR ranges)
     const binsFor = (values: (number|null)[], times: number[], n: number) => {
       const vals: number[] = [];
       for (let i=0;i<values.length;i++) if (typeof values[i] === 'number' && Number.isFinite(values[i] as number)) vals.push(values[i] as number);
@@ -444,9 +445,64 @@ Deno.serve(async (req) => {
       }
       return { bins: bins.map((t_s:number, i:number)=>({ i, t_s, min: Math.round(min + i*step), max: Math.round(min + (i+1)*step) })), schema: 'auto-range' };
     };
+    
+    // FTP-based bins for power (uses custom boundaries)
+    const binsForBoundaries = (values: (number|null)[], times: number[], boundaries: number[]) => {
+      const vals: number[] = [];
+      for (let i=0;i<values.length;i++) if (typeof values[i] === 'number' && Number.isFinite(values[i] as number)) vals.push(values[i] as number);
+      if (vals.length < 10) return null;
+      
+      const bins = new Array(boundaries.length - 1).fill(0);
+      for (let i=1;i<times.length && i<values.length;i++) {
+        const v = values[i];
+        if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) continue;
+        const dt = Math.max(0, times[i] - times[i-1]);
+        
+        // Find which zone this value falls into
+        let zoneIdx = -1;
+        for (let z=0; z<boundaries.length-1; z++) {
+          if (v >= boundaries[z] && v < boundaries[z+1]) {
+            zoneIdx = z;
+            break;
+          }
+        }
+        // Handle edge case: value equals max boundary
+        if (zoneIdx === -1 && v >= boundaries[boundaries.length-2]) {
+          zoneIdx = boundaries.length - 2;
+        }
+        
+        if (zoneIdx >= 0 && zoneIdx < bins.length) {
+          bins[zoneIdx] += dt;
+        }
+      }
+      
+      return { 
+        bins: bins.map((t_s:number, i:number)=>({ 
+          i, 
+          t_s, 
+          min: Math.round(boundaries[i]), 
+          max: i === bins.length-1 ? Math.round(boundaries[i+1]) : Math.round(boundaries[i+1]) 
+        })), 
+        schema: 'ftp-based' 
+      };
+    };
+    
     const hrZones = binsFor(hr_bpm, time_s, 5);
     if (hrZones) analysis.zones.hr = hrZones as any;
-    const pwrZones = binsFor(power_watts, time_s, 6);
+    
+    // Power zones: FTP-based (get FTP from baselines or default to 200W)
+    const userFTP = (baselines as any)?.ftp || 200;
+    const powerZoneBoundaries = [
+      0,
+      userFTP * 0.55,   // Z1 max: Active Recovery
+      userFTP * 0.75,   // Z2 max: Endurance
+      userFTP * 0.90,   // Z3 max: Tempo
+      userFTP * 1.05,   // Z4 max: Threshold
+      userFTP * 1.20,   // Z5 max: VO2 Max
+      userFTP * 1.50,   // Z6 max: Anaerobic
+      Infinity          // Z6+ (anything above)
+    ];
+    const pwrZones = binsForBoundaries(power_watts, time_s, powerZoneBoundaries);
     if (pwrZones) analysis.zones.power = pwrZones as any;
   } catch {}
 
