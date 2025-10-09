@@ -382,11 +382,20 @@ export default function MapEffort({
         console.log('[MapEffort] Bounds:', b.getSouthWest(), 'to', b.getNorthEast());
         
         if (expanded) {
-          // NUCLEAR OPTION: Directly set zoom level (no animation, just works)
+          // NUCLEAR OPTION: Directly set zoom level with verification
           console.log('[MapEffort] EXPANDING - directly setting zoom from', currentZoom, 'to 17');
           map.setCenter([center.lng, center.lat]);
           map.setZoom(17);
-          console.log('[MapEffort] Zoom and center set directly');
+          
+          // Verify zoom was set
+          setTimeout(() => {
+            const actualZoom = map.getZoom();
+            console.log('[MapEffort] Verification: zoom is now', actualZoom, '(expected 17)');
+            if (actualZoom < 15) {
+              console.error('[MapEffort] ZOOM FAILED! Trying again with flyTo...');
+              map.flyTo({ center: [center.lng, center.lat], zoom: 17, duration: 0 });
+            }
+          }, 100);
         } else {
           // When collapsing: use fitBounds to show full route
           console.log('[MapEffort] COLLAPSING - fitting bounds with padding 60');
