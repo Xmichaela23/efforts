@@ -362,8 +362,10 @@ export default function MapEffort({
         
         // SMALLER padding = CLOSER zoom (more zoomed in)
         // LARGER padding = FARTHER zoom (more zoomed out)
-        const padding = expanded ? 40 : 60;
-        map.fitBounds(b, { padding, duration: 500 });
+        const padding = expanded ? 20 : 60;
+        const maxZoom = expanded ? 17 : 16; // Allow closer zoom when expanded
+        console.log('[MapEffort] Fitting bounds with padding:', padding, 'maxZoom:', maxZoom, 'expanded:', expanded);
+        map.fitBounds(b, { padding, maxZoom, duration: 500 });
       } catch (e) {
         console.error('[MapEffort] Error fitting bounds on expand:', e);
       }
