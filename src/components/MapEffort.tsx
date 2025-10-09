@@ -306,15 +306,26 @@ export default function MapEffort({
     const has = valid.length > 1;
     const applyData = () => {
       const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
-      if (src && has) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+      if (src && has) {
+        console.log('[MapEffort] Setting route data, points:', valid.length);
+        src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+      } else {
+        console.log('[MapEffort] Cannot set route data - src:', !!src, 'has:', has);
+      }
       
       // Enhancement 1: Update start/finish markers
       if (has) {
         const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
-        if (startSrc) startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
+        if (startSrc) {
+          console.log('[MapEffort] Setting start marker:', valid[0]);
+          startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
+        }
         
         const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
-        if (finishSrc) finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
+        if (finishSrc) {
+          console.log('[MapEffort] Setting finish marker:', valid[valid.length - 1]);
+          finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
+        }
       }
     };
     applyData();
@@ -341,17 +352,22 @@ export default function MapEffort({
     const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
     if (valid.length < 2) return;
     
-    const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
-    for (const c of valid) b.extend(c);
-    
-    // Zoom closer when expanded, zoom out when collapsed
-    const padding = expanded ? 20 : 60;
-    map.fitBounds(b, { padding, maxZoom: 16, duration: 500 });
-    
-    // Trigger resize after height change completes
+    // Trigger resize FIRST, then fit bounds
     setTimeout(() => {
-      map.resize();
-    }, 300);
+      try {
+        map.resize();
+        
+        const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
+        for (const c of valid) b.extend(c);
+        
+        // SMALLER padding = CLOSER zoom (more zoomed in)
+        // LARGER padding = FARTHER zoom (more zoomed out)
+        const padding = expanded ? 40 : 60;
+        map.fitBounds(b, { padding, duration: 500 });
+      } catch (e) {
+        console.error('[MapEffort] Error fitting bounds on expand:', e);
+      }
+    }, 320); // Wait for height transition to complete
   }, [expanded, coords, ready]);
 
   // Enhancement 6: Click-to-jump on route (separate useEffect to avoid interfering with route fitting)
@@ -469,17 +485,27 @@ export default function MapEffort({
 
   // Enhancement 3 & 4: Render with expansion button and metric overlay
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ 
+      position: 'relative',
+      ...(expanded ? {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 999,
+        background: '#fff'
+      } : {})
+    }}>
       <div 
         ref={divRef} 
         className={className} 
         style={{ 
           height: effectiveHeight, 
-          borderRadius: 12, 
+          borderRadius: expanded ? 0 : 12, 
           overflow: 'hidden', 
           boxShadow: '0 2px 10px rgba(0,0,0,.06)', 
           opacity: visible ? 1 : 0, 
-          transition: 'opacity 180ms ease, height 300ms ease' 
+          transition: 'opacity 180ms ease, height 300ms ease, border-radius 300ms ease' 
         }} 
       />
       
