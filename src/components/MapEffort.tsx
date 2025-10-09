@@ -405,7 +405,7 @@ export default function MapEffort({
         console.error('[MapEffort] Error fitting bounds on expand:', e);
       }
     }, 320); // Wait for height transition to complete
-  }, [expanded, coords, ready]);
+  }, [expanded, ready]); // Removed 'coords' to prevent re-triggering during zoom animation
 
   // Enhancement 6: Click-to-jump on route (separate useEffect to avoid interfering with route fitting)
   useEffect(() => {
