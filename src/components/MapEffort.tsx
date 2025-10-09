@@ -100,10 +100,10 @@ export default function MapEffort({
       container: divRef.current,
       style: styleUrl(theme),
       interactive: true,
-      cooperativeGestures: true,   // 1 finger scroll page, 2 fingers for map
-      pitchWithRotate: false,      // don't pitch while rotating
-      dragRotate: false,           // no drag rotation
-      doubleClickZoom: false,
+      cooperativeGestures: false,   // DISABLED - was blocking programmatic zoom!
+      pitchWithRotate: false,
+      dragRotate: false,
+      doubleClickZoom: true,        // Enable double-click zoom as alternative
       renderWorldCopies: false,
       fadeDuration: 0,
       attributionControl: false,
@@ -377,33 +377,23 @@ export default function MapEffort({
         for (const c of valid) b.extend(c);
         
         const currentZoom = map.getZoom();
-        const center = b.getCenter();
-        console.log('[MapEffort] Current zoom level:', currentZoom, 'center:', center);
+        
+        // Use actual route midpoint, not bounds center
+        const midIdx = Math.floor(valid.length / 2);
+        const routeCenter = valid[midIdx];
+        
+        console.log('[MapEffort] Current zoom level:', currentZoom);
+        console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         console.log('[MapEffort] Bounds:', b.getSouthWest(), 'to', b.getNorthEast());
         
         if (expanded) {
-          // NUCLEAR OPTION: Directly set zoom level with verification
-          console.log('[MapEffort] EXPANDING - directly setting zoom from', currentZoom, 'to 17');
-          map.setCenter([center.lng, center.lat]);
-          map.setZoom(17);
-          
-          // Verify zoom was set
-          setTimeout(() => {
-            const actualZoom = map.getZoom();
-            console.log('[MapEffort] Verification: zoom is now', actualZoom, '(expected 17)');
-            if (actualZoom < 15) {
-              console.error('[MapEffort] ZOOM FAILED! Trying again with flyTo...');
-              map.flyTo({ center: [center.lng, center.lat], zoom: 17, duration: 0 });
-            }
-          }, 100);
+          // Zoom to route midpoint at street level
+          console.log('[MapEffort] EXPANDING - zoom to route midpoint at level 17');
+          map.jumpTo({ center: routeCenter, zoom: 17 });
         } else {
-          // When collapsing: use fitBounds to show full route
-          console.log('[MapEffort] COLLAPSING - fitting bounds with padding 60');
-          map.fitBounds(b, { 
-            padding: 60,
-            maxZoom: 15,
-            duration: 500
-          });
+          // Collapse - show full route
+          console.log('[MapEffort] COLLAPSING - fit full route');
+          map.fitBounds(b, { padding: 60, maxZoom: 15, duration: 500 });
         }
       } catch (e) {
         console.error('[MapEffort] Error fitting bounds on expand:', e);
