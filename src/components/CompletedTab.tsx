@@ -221,7 +221,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
     return (
       <>
         {/* Strava Header */}
-        <div className="flex items-center justify-between -mt-4">
+        <div className="flex items-center justify-between -mt-6">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
             <span className="text-lg font-semibold text-gray-900">Strava Activity</span>
@@ -976,7 +976,7 @@ const formatMovingTime = () => {
   <>
      {/* 🏠 ALL METRICS - 3-column grid with tighter spacing */}
      {workoutData.swim_data ? (
-       <div className="grid grid-cols-3 gap-1 px-2 -mt-4">
+       <div className="grid grid-cols-3 gap-1 px-2 -mt-6">
          {/* Distance */}
          <div className="px-2 pb-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -1073,7 +1073,7 @@ const formatMovingTime = () => {
          </div>
        </div>
      ) : (
-       <div className="grid grid-cols-3 gap-1 px-2 -mt-4">
+       <div className="grid grid-cols-3 gap-1 px-2 -mt-6">
        {/* General metrics - For runs/walks */}
        {(workoutData.type === 'run' || workoutData.type === 'walk' || norm.sport === 'run' || norm.sport === 'walk') && (
          <>
