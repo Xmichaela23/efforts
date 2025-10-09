@@ -522,48 +522,49 @@ export default function MapEffort({
         }} 
       />
       
-      {/* Enhancement 3: Expansion toggle button - always visible */}
-      {coords.length > 1 && (
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('[MapEffort] Toggle expand, current:', expanded, 'new:', !expanded);
-            setExpanded(prev => !prev);
-          }}
-          style={{
-            position: expanded ? 'fixed' : 'absolute',
-            top: expanded ? 'env(safe-area-inset-top, 10px)' : 10,
-            right: 10,
-            background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 8,
-            padding: '8px 12px',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 13,
-            fontWeight: 600,
-            color: '#475569',
-            zIndex: 1001,
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
-          }}
-          aria-label={expanded ? 'Shrink map' : 'Expand map'}
-        >
-          {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          {expanded ? 'Shrink' : 'Expand'}
-        </button>
-      )}
+      {/* Enhancement 3: Expansion toggle button - ALWAYS at top right */}
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('[MapEffort] Button clicked! Current expanded:', expanded);
+          const newExpanded = !expanded;
+          console.log('[MapEffort] Setting expanded to:', newExpanded);
+          setExpanded(newExpanded);
+        }}
+        style={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          background: '#fff',
+          border: '2px solid #FF5722',
+          borderRadius: 8,
+          padding: '8px 12px',
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 14,
+          fontWeight: 700,
+          color: '#FF5722',
+          zIndex: 9999,
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+          userSelect: 'none'
+        }}
+        aria-label={expanded ? 'Shrink map' : 'Expand map'}
+      >
+        {expanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+        <span>{expanded ? 'Shrink' : 'Expand'}</span>
+      </button>
       
       {/* Enhancement 4: Metric overlay */}
       {coords.length > 1 && currentMetric && (
         <div
           style={{
-            position: expanded ? 'fixed' : 'absolute',
-            bottom: expanded ? 'calc(env(safe-area-inset-bottom, 10px) + 10px)' : 10,
+            position: 'absolute',
+            bottom: 10,
             left: 10,
             background: 'rgba(255,255,255,0.95)',
             backdropFilter: 'blur(8px)',
@@ -574,7 +575,7 @@ export default function MapEffort({
             fontSize: 12,
             fontWeight: 500,
             color: '#1f2937',
-            zIndex: 1000,
+            zIndex: 9998,
             minWidth: 120
           }}
         >
