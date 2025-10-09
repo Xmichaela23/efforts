@@ -138,6 +138,7 @@ export default function MapEffort({
       
       // Enhancement 1: Route outline (dark blue, middle layer)
       if (!map.getLayer(ROUTE_OUTLINE)) {
+        console.log('[MapEffort] Adding outline layer');
         map.addLayer({ 
           id: ROUTE_OUTLINE, 
           type: 'line', 
@@ -148,10 +149,13 @@ export default function MapEffort({
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
+      } else {
+        console.log('[MapEffort] Outline layer already exists');
       }
       
       // Main route line (bright blue, top layer)
       if (!map.getLayer(ROUTE_LINE)) {
+        console.log('[MapEffort] Adding main route line');
         map.addLayer({ 
           id: ROUTE_LINE, 
           type: 'line', 
@@ -162,6 +166,8 @@ export default function MapEffort({
           }, 
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
+      } else {
+        console.log('[MapEffort] Main route line already exists');
       }
       
       // Enhancement 1: Start marker (green pin)
@@ -207,6 +213,7 @@ export default function MapEffort({
       
       // Enhancement 2: Animated pulsing halo for cursor
       if (!map.getLayer(CURSOR_HALO)) {
+        console.log('[MapEffort] Adding cursor halo');
         map.addLayer({ 
           id: CURSOR_HALO, 
           type: 'circle', 
@@ -218,10 +225,13 @@ export default function MapEffort({
             'circle-blur': 0.8
           } 
         });
+      } else {
+        console.log('[MapEffort] Cursor halo already exists');
       }
       
       // Enhancement 2: Enhanced cursor point
       if (!map.getLayer(CURSOR_PT)) {
+        console.log('[MapEffort] Adding cursor point');
         map.addLayer({ 
           id: CURSOR_PT, 
           type: 'circle', 
@@ -233,9 +243,12 @@ export default function MapEffort({
             'circle-stroke-width': 3
           } 
         });
+      } else {
+        console.log('[MapEffort] Cursor point already exists');
       }
       
       layersAttachedRef.current = true;
+      console.log('[MapEffort] All layers processed, layersAttached set to true');
     };
     // Expose a safe reattach for later effects
     (map as any).__attachEffortLayers = attachLayers;
