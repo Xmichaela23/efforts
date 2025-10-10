@@ -406,16 +406,20 @@ export default function MapEffort({
             padding: padding,
             duration: 0 
           });
-          
-          setTimeout(() => {
-            zoomingRef.current = false;
-          }, 100);
         } else {
-          // Collapse - show full route
-          console.log('[MapEffort] COLLAPSING - fit full route');
-          map.fitBounds(b, { padding: 60, maxZoom: 15, duration: 500 });
-          setTimeout(() => { zoomingRef.current = false; }, 600);
+          // Initial render - zoom in much closer for better route visibility
+          const isMobile = window.innerWidth < 768;
+          const padding = isMobile ? 10 : 20;  // Very tight padding for initial render
+          console.log('[MapEffort] INITIAL RENDER - fitting with mobile:', isMobile, `padding:${padding}`);
+          map.fitBounds(b, { 
+            padding: padding,
+            duration: 0 
+          });
         }
+        
+        setTimeout(() => {
+          zoomingRef.current = false;
+        }, 100);
       } catch (e) {
         console.error('[MapEffort] Error fitting bounds on expand:', e);
         zoomingRef.current = false;
@@ -611,8 +615,8 @@ export default function MapEffort({
           </button>
         )}
         
-        {/* Enhancement 4: Metric overlay */}
-        {coords.length > 1 && currentMetric && (
+        {/* Enhancement 4: Metric overlay - Only show when expanded */}
+        {expanded && coords.length > 1 && currentMetric && (
           <div
             style={{
               position: 'absolute',
