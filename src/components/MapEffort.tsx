@@ -406,25 +406,40 @@ export default function MapEffort({
         const container = map.getContainer();
         const containerWidth = container.offsetWidth;
         const containerHeight = container.offsetHeight;
+        const isMobile = containerWidth < 768;
         
-        console.log('[MapEffort] Container size:', containerWidth, 'x', containerHeight, 'expanded:', expanded);
+        console.log('[MapEffort] Fitting bounds - mobile:', isMobile, 'size:', containerWidth, 'x', containerHeight);
         
         if (expanded) {
-          // EXPANDED: More screen space, can use more padding and zoom closer
-          map.fitBounds(b, { 
-            padding: {
-              top: 80,
-              bottom: 100,
-              left: 60,
-              right: 60
-            },
-            maxZoom: 16,
-            duration: 300
-          });
+          // EXPANDED: Account for UI elements on mobile
+          if (isMobile) {
+            // Mobile expanded needs asymmetric padding for UI chrome
+            map.fitBounds(b, { 
+              padding: {
+                top: 140,     // Account for navbar at top
+                bottom: 120,  // Account for metric overlay at bottom
+                left: 40,
+                right: 40
+              },
+              maxZoom: 15.5,
+              duration: 300
+            });
+          } else {
+            // Desktop expanded - more symmetric
+            map.fitBounds(b, { 
+              padding: {
+                top: 80,
+                bottom: 100,
+                left: 60,
+                right: 60
+              },
+              maxZoom: 16,
+              duration: 300
+            });
+          }
         } else {
-          // COLLAPSED: Small container, minimal padding to fill the space
-          // Use proportional padding based on container size
-          const paddingPercent = 0.08; // 8% of container dimensions
+          // COLLAPSED: Tight padding to fill small container
+          const paddingPercent = 0.08;
           map.fitBounds(b, { 
             padding: {
               top: Math.max(10, containerHeight * paddingPercent),
@@ -432,7 +447,7 @@ export default function MapEffort({
               left: Math.max(10, containerWidth * paddingPercent),
               right: Math.max(10, containerWidth * paddingPercent)
             },
-            maxZoom: 14.5, // Slightly lower to prevent over-zoom in small space
+            maxZoom: 14.5,
             duration: 300
           });
         }
@@ -478,32 +493,51 @@ export default function MapEffort({
     
     map.on('click', ROUTE_LINE, handleRouteClick);
     
-    // Make cursor pointer when hovering over route
-    map.on('mouseenter', ROUTE_LINE, () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-    map.on('mouseleave', ROUTE_LINE, () => {
-      map.getCanvas().style.cursor = '';
-    });
-    
     return () => {
       map.off('click', ROUTE_LINE, handleRouteClick);
-      map.off('mouseenter', ROUTE_LINE);
-      map.off('mouseleave', ROUTE_LINE);
     };
   }, [coords, ready, onRouteClick, lineCum]);
 
-  // Cursor updates (disabled during expansion to prevent zoom cancellation)
+  // Cursor updates with mobile-aware following
   useEffect(() => {
-    const map = mapRef.current; if (!map || !ready) return;
+    const map = mapRef.current; 
+    if (!map || !ready) return;
+    
     const src = map.getSource(CURSOR_SRC) as maplibregl.GeoJSONSource | undefined;
     if (!src) return;
+    
     const total = dTotal || 1;
     const p = pointAtDistance(coords, lineCum, Math.max(0, Math.min(cursorDist_m, total)));
     src.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: p } } as any);
-    // Don't follow cursor during expansion - it cancels zoom animation!
+    
     if (followCursor && fittedRef.current && !expanded) {
-      try { map.easeTo({ center: p as any, duration: 250 }); } catch {}
+      try { 
+        map.easeTo({ center: p as any, duration: 250 }); 
+      } catch {}
+    }
+    
+    // When expanded on mobile, pan with offset to keep cursor visible above overlay
+    if (followCursor && expanded) {
+      const container = map.getContainer();
+      const isMobile = container.offsetWidth < 768;
+      
+      if (isMobile) {
+        try {
+          // Pan to cursor but with vertical offset to account for bottom overlay
+          const point = map.project(p as any);
+          point.y -= 60; // Shift viewport down 60px so cursor isn't hidden by overlay
+          const offsetCenter = map.unproject(point);
+          map.easeTo({ 
+            center: offsetCenter as any, 
+            duration: 250 
+          });
+        } catch {}
+      } else {
+        // Desktop: normal centering
+        try { 
+          map.easeTo({ center: p as any, duration: 250 }); 
+        } catch {}
+      }
     }
   }, [cursorDist_m, dTotal, coords, lineCum, followCursor, ready, expanded]);
 
