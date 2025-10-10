@@ -394,10 +394,10 @@ export default function MapEffort({
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
         if (expanded) {
-          // Fit full route with asymmetric padding to account for header
-          console.log('[MapEffort] EXPANDING - fitting with top:140, sides:80, bottom:80');
+          // Fit full route with balanced padding for optimal centering
+          console.log('[MapEffort] EXPANDING - fitting with top:130, bottom:100, sides:80');
           map.fitBounds(b, { 
-            padding: { top: 140, bottom: 80, left: 80, right: 80 },
+            padding: { top: 130, bottom: 100, left: 80, right: 80 },
             duration: 0 
           });
           
