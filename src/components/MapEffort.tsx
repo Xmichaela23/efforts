@@ -294,16 +294,21 @@ export default function MapEffort({
     });
 
     const onResize = () => {
-      // Don't restore camera if we're actively zooming!
+      // Ignore resize events during expansion/collapse
       if (zoomingRef.current) {
         console.log('[MapEffort] onResize blocked - zooming in progress');
         return;
       }
-      if (savedCameraRef.current) {
-        console.log('[MapEffort] onResize - restoring saved camera');
-        const { center, zoom } = savedCameraRef.current;
-        try { map.jumpTo({ center, zoom }); } catch {}
+      
+      // Don't restore camera during transitions
+      if (!savedCameraRef.current || !fittedRef.current) {
+        return;
       }
+      
+      const { center, zoom } = savedCameraRef.current;
+      try { 
+        map.jumpTo({ center, zoom }); 
+      } catch {}
     };
     map.on('resize', onResize);
 
@@ -397,23 +402,25 @@ export default function MapEffort({
         console.log('[MapEffort] Current zoom level:', currentZoom);
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
+        const isMobile = window.innerWidth < 768;
+        
         if (expanded) {
-          // Platform-specific padding for expanded state
-          const isMobile = window.innerWidth < 768;
-          const padding = isMobile ? 100 : 40;  // Mobile: MORE padding = LESS zoomed in, Desktop: normal
+          // EXPANDED: Zoom IN closer (LESS padding)
+          const padding = isMobile ? 20 : 40;
           console.log('[MapEffort] EXPANDING - fitting with mobile:', isMobile, `padding:${padding}`);
           map.fitBounds(b, { 
             padding: padding,
-            duration: 0 
+            maxZoom: 16,
+            duration: 300
           });
         } else {
-          // Initial render - zoom in much closer for better route visibility
-          const isMobile = window.innerWidth < 768;
-          const padding = isMobile ? 10 : 20;  // Very tight padding for initial render
-          console.log('[MapEffort] INITIAL RENDER - fitting with mobile:', isMobile, `padding:${padding}`);
+          // COLLAPSED: Show overview (MORE padding)
+          const padding = isMobile ? 60 : 80;
+          console.log('[MapEffort] COLLAPSED - fitting with mobile:', isMobile, `padding:${padding}`);
           map.fitBounds(b, { 
             padding: padding,
-            duration: 0 
+            maxZoom: 14,
+            duration: 300
           });
         }
         
