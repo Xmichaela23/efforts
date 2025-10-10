@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import maplibregl from 'maplibre-gl';
 import { cumulativeMeters, pointAtDistance, sanitizeLngLat, type LngLat } from '../lib/geo';
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -397,10 +398,10 @@ export default function MapEffort({
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
         if (expanded) {
-          // Fit full route with mobile-specific centering
+          // Fit full route with platform-specific centering
           const isMobile = window.innerWidth < 768;
-          const topPadding = isMobile ? 300 : 100;  // MUCH MORE space above = route pushed DOWN
-          const bottomPadding = isMobile ? 40 : 160;  // MUCH LESS space below = route pushed DOWN
+          const topPadding = isMobile ? 300 : 80;   // Mobile: push down, Desktop: normal
+          const bottomPadding = isMobile ? 40 : 80;  // Mobile: minimal, Desktop: normal
           console.log('[MapEffort] EXPANDING - fitting with mobile:', isMobile, `top:${topPadding}, bottom:${bottomPadding}, sides:80`);
           map.fitBounds(b, { 
             padding: { top: topPadding, bottom: bottomPadding, left: 80, right: 80 },
@@ -654,6 +655,48 @@ export default function MapEffort({
         )}
       </div>
       
+      {/* Close button - LOWERED for mobile */}
+      {expanded && createPortal(
+        <button
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setExpanded(false);
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setExpanded(false);
+          }}
+          style={{
+            position: 'fixed',
+            top: window.innerWidth < 768 ? 120 : 60, // LOWERED on mobile
+            right: 12,
+            background: '#FF5722',
+            border: '2px solid #fff',
+            borderRadius: 8,
+            padding: '8px 14px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 14,
+            fontWeight: 700,
+            color: '#fff',
+            zIndex: 2147483647,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
+            pointerEvents: 'auto'
+          }}
+          aria-label="Close map"
+        >
+          <Minimize2 size={18} strokeWidth={2.5} />
+          <span>Close</span>
+        </button>,
+        document.body
+      )}
     </>
   );
 }
