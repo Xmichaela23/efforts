@@ -394,9 +394,9 @@ export default function MapEffort({
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
         if (expanded) {
-          // Fit full route with tight padding - always shows complete route
-          console.log('[MapEffort] EXPANDING - fitting full route with padding 30');
-          map.fitBounds(b, { padding: 30, duration: 0 });
+          // Fit full route with comfortable padding - shows route plus context
+          console.log('[MapEffort] EXPANDING - fitting full route with padding 50');
+          map.fitBounds(b, { padding: 50, duration: 0 });
           
           setTimeout(() => {
             zoomingRef.current = false;
