@@ -398,9 +398,9 @@ export default function MapEffort({
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
         if (expanded) {
-          // Use much smaller padding to zoom IN properly
+          // Platform-specific padding for expanded state
           const isMobile = window.innerWidth < 768;
-          const padding = isMobile ? 20 : 40;  // Much smaller padding = more zoomed in
+          const padding = isMobile ? 80 : 40;  // Mobile: more padding = less zoomed in, Desktop: normal
           console.log('[MapEffort] EXPANDING - fitting with mobile:', isMobile, `padding:${padding}`);
           map.fitBounds(b, { 
             padding: padding,
