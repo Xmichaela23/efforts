@@ -387,9 +387,10 @@ export default function MapEffort({
         
         const currentZoom = map.getZoom();
         
-        // Use actual route midpoint, not bounds center
-        const midIdx = Math.floor(valid.length / 2);
-        const routeCenter = valid[midIdx];
+        // Use distance-based midpoint for better centering
+        const totalDist = lineCum[lineCum.length - 1] || 1;
+        const midDist = totalDist / 2;
+        const routeCenter = pointAtDistance(valid, lineCum, midDist);
         
         console.log('[MapEffort] Current zoom level:', currentZoom);
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
@@ -678,19 +679,19 @@ export default function MapEffort({
           }}
           style={{
             position: 'fixed',
-            top: 70,
-            right: 16,
+            top: 60,
+            right: 12,
             background: '#FF5722',
-            border: '3px solid #fff',
-            borderRadius: 12,
-            padding: '12px 18px',
+            border: '2px solid #fff',
+            borderRadius: 8,
+            padding: '8px 14px',
             cursor: 'pointer',
-            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            fontSize: 16,
-            fontWeight: 800,
+            gap: 6,
+            fontSize: 14,
+            fontWeight: 700,
             color: '#fff',
             zIndex: 2147483647,
             touchAction: 'manipulation',
@@ -700,7 +701,7 @@ export default function MapEffort({
           }}
           aria-label="Close map"
         >
-          <Minimize2 size={24} strokeWidth={3} />
+          <Minimize2 size={18} strokeWidth={2.5} />
           <span>Close</span>
         </button>,
         document.body
