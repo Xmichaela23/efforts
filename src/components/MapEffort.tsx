@@ -400,8 +400,8 @@ export default function MapEffort({
         if (expanded) {
           // Fit full route with mobile-specific centering
           const isMobile = window.innerWidth < 768;
-          const topPadding = isMobile ? 60 : 100;
-          const bottomPadding = isMobile ? 200 : 160;
+          const topPadding = isMobile ? 200 : 100;  // MORE space above = route pushed DOWN
+          const bottomPadding = isMobile ? 60 : 160;  // LESS space below = route pushed DOWN
           console.log('[MapEffort] EXPANDING - fitting with mobile:', isMobile, `top:${topPadding}, bottom:${bottomPadding}, sides:80`);
           map.fitBounds(b, { 
             padding: { top: topPadding, bottom: bottomPadding, left: 80, right: 80 },
