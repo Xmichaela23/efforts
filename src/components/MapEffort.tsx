@@ -493,6 +493,10 @@ export default function MapEffort({
         }
         
         setTimeout(() => {
+          // Force map resize after height change to prevent clipping
+          if (mapRef.current) {
+            mapRef.current.resize();
+          }
           zoomingRef.current = false;
         }, 100);
       } catch (e) {
@@ -500,6 +504,13 @@ export default function MapEffort({
         zoomingRef.current = false;
       }
     }, 320); // Wait for height transition to complete
+    
+    // Additional resize after transition to ensure no clipping
+    setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.resize();
+      }
+    }, 400);
   }, [expanded, ready]); // Removed 'coords' to prevent re-triggering during zoom animation
 
   // Enhancement 6: Click-to-jump on route (separate useEffect to avoid interfering with route fitting)
