@@ -394,10 +394,10 @@ export default function MapEffort({
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
         if (expanded) {
-          // Fit full route with more aggressive centering
-          console.log('[MapEffort] EXPANDING - fitting with top:120, bottom:120, sides:80');
+          // Fit full route with dramatic centering adjustment
+          console.log('[MapEffort] EXPANDING - fitting with top:100, bottom:160, sides:80');
           map.fitBounds(b, { 
-            padding: { top: 120, bottom: 120, left: 80, right: 80 },
+            padding: { top: 100, bottom: 160, left: 80, right: 80 },
             duration: 0 
           });
           
