@@ -402,24 +402,37 @@ export default function MapEffort({
         console.log('[MapEffort] Current zoom level:', currentZoom);
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
-        const isMobile = window.innerWidth < 768;
+        // Get actual container dimensions
+        const container = map.getContainer();
+        const containerWidth = container.offsetWidth;
+        const containerHeight = container.offsetHeight;
+        
+        console.log('[MapEffort] Container size:', containerWidth, 'x', containerHeight, 'expanded:', expanded);
         
         if (expanded) {
-          // EXPANDED: Zoom IN closer (LESS padding)
-          const padding = isMobile ? 20 : 40;
-          console.log('[MapEffort] EXPANDING - fitting with mobile:', isMobile, `padding:${padding}`);
+          // EXPANDED: More screen space, can use more padding and zoom closer
           map.fitBounds(b, { 
-            padding: padding,
+            padding: {
+              top: 80,
+              bottom: 100,
+              left: 60,
+              right: 60
+            },
             maxZoom: 16,
             duration: 300
           });
         } else {
-          // COLLAPSED: Show overview (MORE padding)
-          const padding = isMobile ? 60 : 80;
-          console.log('[MapEffort] COLLAPSED - fitting with mobile:', isMobile, `padding:${padding}`);
+          // COLLAPSED: Small container, minimal padding to fill the space
+          // Use proportional padding based on container size
+          const paddingPercent = 0.08; // 8% of container dimensions
           map.fitBounds(b, { 
-            padding: padding,
-            maxZoom: 14,
+            padding: {
+              top: Math.max(10, containerHeight * paddingPercent),
+              bottom: Math.max(10, containerHeight * paddingPercent),
+              left: Math.max(10, containerWidth * paddingPercent),
+              right: Math.max(10, containerWidth * paddingPercent)
+            },
+            maxZoom: 14.5, // Slightly lower to prevent over-zoom in small space
             duration: 300
           });
         }
