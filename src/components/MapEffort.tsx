@@ -398,13 +398,12 @@ export default function MapEffort({
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
         if (expanded) {
-          // Fit full route with platform-specific centering
+          // Use much smaller padding to zoom IN properly
           const isMobile = window.innerWidth < 768;
-          const topPadding = isMobile ? 300 : 80;   // Mobile: push down, Desktop: normal
-          const bottomPadding = isMobile ? 40 : 80;  // Mobile: minimal, Desktop: normal
-          console.log('[MapEffort] EXPANDING - fitting with mobile:', isMobile, `top:${topPadding}, bottom:${bottomPadding}, sides:80`);
+          const padding = isMobile ? 20 : 40;  // Much smaller padding = more zoomed in
+          console.log('[MapEffort] EXPANDING - fitting with mobile:', isMobile, `padding:${padding}`);
           map.fitBounds(b, { 
-            padding: { top: topPadding, bottom: bottomPadding, left: 80, right: 80 },
+            padding: padding,
             duration: 0 
           });
           
