@@ -224,7 +224,7 @@ export const usePlannedWorkouts = () => {
       const { data, error } = await supabase
         .from('planned_workouts')
         .insert([toSave])
-        .select()
+        .select('id,name,type,date,description,duration,intervals,strength_exercises,mobility_exercises,workout_status,source,training_plan_id,week_number,day_number')
         .single();
 
       if (error) {
@@ -274,7 +274,7 @@ export const usePlannedWorkouts = () => {
         .update(updates)
         .eq('id', id)
         .eq('user_id', user.id)
-        .select()
+        .select('id,name,type,date,description,duration,intervals,strength_exercises,mobility_exercises,workout_status,source,training_plan_id,week_number,day_number')
         .single();
 
       if (error) {

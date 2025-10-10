@@ -174,7 +174,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         const { data: inserted, error: insErr } = await supabase
           .from('workouts')
           .insert([toSave])
-          .select()
+          .select('id,user_id,name,type,date,workout_status,duration,distance,computed,metrics')
           .single();
         if (insErr) throw insErr;
         completedId = inserted.id as string;

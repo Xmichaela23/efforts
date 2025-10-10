@@ -260,7 +260,7 @@ export const useWorkouts = () => {
           // Quiet logs in production
           const { data: garminActivities, error: garminError } = await supabase
             .from("garmin_activities")
-            .select("*")
+            .select("garmin_activity_id,start_time,activity_type,distance_in_meters,duration_in_seconds,average_heart_rate_in_beats_per_minute,max_heart_rate_in_beats_per_minute,average_speed_in_meters_per_second,calories,user_id,garmin_user_id")
             .or(`user_id.eq.${user.id},garmin_user_id.eq.${garminUserId}`)
             .order("start_time", { ascending: false })
             .limit(50);
@@ -1214,7 +1214,7 @@ export const useWorkouts = () => {
       const { data, error } = await supabase
         .from("workouts")
         .insert([toSave])
-        .select()
+        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,created_at,updated_at')
         .single();
 
       if (error) {
@@ -1461,7 +1461,7 @@ export const useWorkouts = () => {
         .update(updateObject)
         .eq("id", id)
         .eq("user_id", user.id)
-        .select()
+        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,created_at,updated_at')
         .single();
 
       if (error) throw error;
