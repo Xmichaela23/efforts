@@ -416,7 +416,7 @@ export default function MapEffort({
             // Mobile expanded needs asymmetric padding for UI chrome
             map.fitBounds(b, { 
               padding: {
-                top: 140,     // Account for navbar at top
+                top: 180,     // Increased for more breathing room at top
                 bottom: 120,  // Account for metric overlay at bottom
                 left: 40,
                 right: 40
