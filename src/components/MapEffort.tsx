@@ -400,7 +400,7 @@ export default function MapEffort({
         if (expanded) {
           // Platform-specific padding for expanded state
           const isMobile = window.innerWidth < 768;
-          const padding = isMobile ? 80 : 40;  // Mobile: more padding = less zoomed in, Desktop: normal
+          const padding = isMobile ? 20 : 40;  // Mobile: tight padding = zoomed IN, Desktop: normal
           console.log('[MapEffort] EXPANDING - fitting with mobile:', isMobile, `padding:${padding}`);
           map.fitBounds(b, { 
             padding: padding,
