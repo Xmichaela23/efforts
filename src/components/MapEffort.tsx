@@ -716,7 +716,7 @@ export default function MapEffort({
           <div
             style={{
               position: 'absolute',
-              bottom: 10,
+              bottom: 60, // Raised from 10 to 60 to be more visible
               left: 10,
               background: 'rgba(255,255,255,0.95)',
               backdropFilter: 'blur(8px)',
@@ -771,18 +771,18 @@ export default function MapEffort({
             position: 'fixed',
             top: window.innerWidth < 768 ? 120 : 60, // LOWERED on mobile
             right: 12,
-            background: '#3b82f6', // Deep blue to match route theme
-            border: '2px solid #fff',
+            background: '#fff', // White background to match expand button
+            border: '1px solid #e5e7eb',
             borderRadius: 8,
-            padding: '8px 14px',
+            padding: '8px 12px',
             cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
             display: 'flex',
             alignItems: 'center',
             gap: 6,
             fontSize: 14,
-            fontWeight: 700,
-            color: '#fff',
+            fontWeight: 500,
+            color: '#374151', // Dark gray text
             zIndex: 2147483647,
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
