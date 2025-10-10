@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import maplibregl from 'maplibre-gl';
 import { cumulativeMeters, pointAtDistance, sanitizeLngLat, type LngLat } from '../lib/geo';
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -403,9 +404,9 @@ export default function MapEffort({
           map.once('move', moveHandler);
           map.once('zoom', zoomHandler);
           
-          // Zoom to route center
-          console.log('[MapEffort] Calling jumpTo: center', routeCenter, 'zoom 15');
-          map.jumpTo({ center: routeCenter, zoom: 15 });
+          // Zoom to route center (14 = good balance - not too close)
+          console.log('[MapEffort] Calling jumpTo: center', routeCenter, 'zoom 14');
+          map.jumpTo({ center: routeCenter, zoom: 14 });
           
           // Verify and unblock after zoom completes
           setTimeout(() => {
@@ -660,51 +661,49 @@ export default function MapEffort({
         )}
       </div>
       
-      {/* Enhancement 3: Shrink button - OUTSIDE map container, ABOVE MapLibre overlays */}
-      {expanded && (
+      {/* Enhancement 3: Close button - Rendered via Portal to escape all z-index issues */}
+      {expanded && createPortal(
         <button
           onTouchEnd={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('[MapEffort] Shrink button touched (onTouchEnd)! expanded:', expanded);
+            console.log('[MapEffort] Close button touched!');
             setExpanded(false);
           }}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('[MapEffort] Shrink button clicked (onClick)! expanded:', expanded);
+            console.log('[MapEffort] Close button clicked!');
             setExpanded(false);
           }}
           style={{
             position: 'fixed',
-            top: 60,
-            right: 12,
+            top: 70,
+            right: 16,
             background: '#FF5722',
-            border: '2px solid #fff',
-            borderRadius: 10,
-            padding: '10px 16px',
+            border: '3px solid #fff',
+            borderRadius: 12,
+            padding: '12px 18px',
             cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
-            fontSize: 15,
-            fontWeight: 700,
+            gap: 8,
+            fontSize: 16,
+            fontWeight: 800,
             color: '#fff',
             zIndex: 2147483647,
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
             userSelect: 'none',
-            pointerEvents: 'auto',
-            WebkitUserSelect: 'none',
-            msUserSelect: 'none',
-            isolation: 'isolate'
+            pointerEvents: 'auto'
           }}
           aria-label="Close map"
         >
-          <Minimize2 size={22} strokeWidth={3} />
+          <Minimize2 size={24} strokeWidth={3} />
           <span>Close</span>
-        </button>
+        </button>,
+        document.body
       )}
     </>
   );
