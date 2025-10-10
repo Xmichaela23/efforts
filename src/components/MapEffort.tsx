@@ -115,6 +115,8 @@ export default function MapEffort({
       attributionControl: false,
       minZoom: 3,
       maxZoom: 18,
+      // Quality improvements
+      pixelRatio: Math.min(window.devicePixelRatio, 2),
     });
     mapRef.current = map;
 
@@ -125,10 +127,19 @@ export default function MapEffort({
       // Route source
       if (!map.getSource(ROUTE_SRC)) {
         console.log('[MapEffort] Adding route source');
-        map.addSource(ROUTE_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} } as any });
+        map.addSource(ROUTE_SRC, { 
+          type: 'geojson', 
+          data: { 
+            type: 'Feature', 
+            geometry: { type: 'LineString', coordinates: [] }, 
+            properties: {} 
+          } as any 
+        });
       }
       
-      // Enhancement 1: Visual depth - Shadow layer (bottom) - Strava-style orange
+      // DEEP BLUE ROUTE LAYERS
+      
+      // Shadow layer (bottom) - Navy blue glow
       if (!map.getLayer(ROUTE_SHADOW)) {
         console.log('[MapEffort] Adding shadow layer');
         map.addLayer({ 
@@ -136,10 +147,10 @@ export default function MapEffort({
           type: 'line', 
           source: ROUTE_SRC, 
           paint: { 
-            'line-color': '#D84315', 
-            'line-width': 10, 
-            'line-opacity': 0.3,
-            'line-blur': 3
+            'line-color': '#1e40af',  // Navy blue
+            'line-width': 8, 
+            'line-opacity': 0.35,
+            'line-blur': 4
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
@@ -147,7 +158,7 @@ export default function MapEffort({
         console.log('[MapEffort] Shadow layer already exists');
       }
       
-      // Enhancement 1: Route outline (medium orange, middle layer)
+      // Outline layer (middle) - Royal blue
       if (!map.getLayer(ROUTE_OUTLINE)) {
         console.log('[MapEffort] Adding outline layer');
         map.addLayer({ 
@@ -155,9 +166,9 @@ export default function MapEffort({
           type: 'line', 
           source: ROUTE_SRC, 
           paint: { 
-            'line-color': '#F4511E', 
-            'line-width': 6,
-            'line-opacity': 0.9
+            'line-color': '#3b82f6',  // Royal blue
+            'line-width': 5,
+            'line-opacity': 0.8
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
@@ -165,7 +176,7 @@ export default function MapEffort({
         console.log('[MapEffort] Outline layer already exists');
       }
       
-      // Main route line (Strava bright orange, top layer)
+      // Main route line (top) - Bright blue
       if (!map.getLayer(ROUTE_LINE)) {
         console.log('[MapEffort] Adding main route line');
         map.addLayer({ 
@@ -173,8 +184,9 @@ export default function MapEffort({
           type: 'line', 
           source: ROUTE_SRC, 
           paint: { 
-            'line-color': '#FF5722', 
-            'line-width': 4
+            'line-color': '#60a5fa',  // Bright blue (main color)
+            'line-width': 3.5,
+            'line-opacity': 1
           }, 
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
@@ -182,9 +194,16 @@ export default function MapEffort({
         console.log('[MapEffort] Main route line already exists');
       }
       
-      // Enhancement 1: Start marker (green pin)
+      // Start marker (green pin)
       if (!map.getSource(START_MARKER_SRC)) {
-        map.addSource(START_MARKER_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} } as any });
+        map.addSource(START_MARKER_SRC, { 
+          type: 'geojson', 
+          data: { 
+            type: 'Feature', 
+            geometry: { type: 'Point', coordinates: [0, 0] }, 
+            properties: {} 
+          } as any 
+        });
       }
       if (!map.getLayer('start-marker')) {
         map.addLayer({
@@ -193,16 +212,23 @@ export default function MapEffort({
           source: START_MARKER_SRC,
           paint: {
             'circle-radius': 8,
-            'circle-color': '#10b981',
+            'circle-color': '#10b981',  // Green for start
             'circle-stroke-color': '#fff',
             'circle-stroke-width': 2
           }
         });
       }
       
-      // Enhancement 1: Finish marker (red pin)
+      // Finish marker (red pin)
       if (!map.getSource(FINISH_MARKER_SRC)) {
-        map.addSource(FINISH_MARKER_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} } as any });
+        map.addSource(FINISH_MARKER_SRC, { 
+          type: 'geojson', 
+          data: { 
+            type: 'Feature', 
+            geometry: { type: 'Point', coordinates: [0, 0] }, 
+            properties: {} 
+          } as any 
+        });
       }
       if (!map.getLayer('finish-marker')) {
         map.addLayer({
@@ -211,19 +237,27 @@ export default function MapEffort({
           source: FINISH_MARKER_SRC,
           paint: {
             'circle-radius': 8,
-            'circle-color': '#ef4444',
+            'circle-color': '#ef4444',  // Red for finish
             'circle-stroke-color': '#fff',
             'circle-stroke-width': 2
           }
         });
       }
       
+      // DEEP BLUE CURSOR LAYERS (MATCHING ROUTE)
+      
       // Cursor source
       if (!map.getSource(CURSOR_SRC)) {
-        map.addSource(CURSOR_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] } } as any });
+        map.addSource(CURSOR_SRC, { 
+          type: 'geojson', 
+          data: { 
+            type: 'Feature', 
+            geometry: { type: 'Point', coordinates: [0, 0] } 
+          } as any 
+        });
       }
       
-      // Enhancement 2: Animated pulsing halo for cursor (orange to match route)
+      // Animated pulsing halo - BLUE to match route
       if (!map.getLayer(CURSOR_HALO)) {
         console.log('[MapEffort] Adding cursor halo');
         map.addLayer({ 
@@ -231,17 +265,17 @@ export default function MapEffort({
           type: 'circle', 
           source: CURSOR_SRC, 
           paint: { 
-            'circle-radius': 16, 
-            'circle-color': '#FF5722', 
-            'circle-opacity': 0.3,
-            'circle-blur': 0.8
+            'circle-radius': 18,
+            'circle-color': '#60a5fa',  // Match bright blue
+            'circle-opacity': 0.25,
+            'circle-blur': 1
           } 
         });
       } else {
         console.log('[MapEffort] Cursor halo already exists');
       }
       
-      // Enhancement 2: Enhanced cursor point (orange border)
+      // Cursor point - White center with BLUE border
       if (!map.getLayer(CURSOR_PT)) {
         console.log('[MapEffort] Adding cursor point');
         map.addLayer({ 
@@ -249,10 +283,10 @@ export default function MapEffort({
           type: 'circle', 
           source: CURSOR_SRC, 
           paint: { 
-            'circle-radius': 8, 
+            'circle-radius': 9,
             'circle-color': '#fff', 
-            'circle-stroke-color': '#FF5722', 
-            'circle-stroke-width': 3
+            'circle-stroke-color': '#60a5fa',  // Match bright blue
+            'circle-stroke-width': 3.5
           } 
         });
       } else {
@@ -729,7 +763,7 @@ export default function MapEffort({
             position: 'fixed',
             top: window.innerWidth < 768 ? 120 : 60, // LOWERED on mobile
             right: 12,
-            background: '#FF5722',
+            background: '#3b82f6', // Deep blue to match route theme
             border: '2px solid #fff',
             borderRadius: 8,
             padding: '8px 14px',
