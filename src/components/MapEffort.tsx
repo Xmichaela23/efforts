@@ -72,7 +72,11 @@ export default function MapEffort({
   }, [expanded]);
   
   // Compute effective height - full viewport when expanded (Strava-style)
-  const effectiveHeight = expanded ? 'calc(100vh - 120px)' : height;
+  // Use different calculations for mobile vs desktop
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const effectiveHeight = expanded 
+    ? (isMobile ? 'calc(100vh - 100px)' : 'calc(100vh - 120px)')
+    : height;
 
   console.log('[MapEffort] Component rendered, trackLngLat points:', trackLngLat?.length);
   
@@ -394,10 +398,13 @@ export default function MapEffort({
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
         if (expanded) {
-          // Fit full route with dramatic centering adjustment
-          console.log('[MapEffort] EXPANDING - fitting with top:100, bottom:160, sides:80');
+          // Fit full route with mobile-specific centering
+          const isMobile = window.innerWidth < 768;
+          const topPadding = isMobile ? 80 : 100;
+          const bottomPadding = isMobile ? 120 : 160;
+          console.log('[MapEffort] EXPANDING - fitting with mobile:', isMobile, `top:${topPadding}, bottom:${bottomPadding}, sides:80`);
           map.fitBounds(b, { 
-            padding: { top: 100, bottom: 160, left: 80, right: 80 },
+            padding: { top: topPadding, bottom: bottomPadding, left: 80, right: 80 },
             duration: 0 
           });
           
