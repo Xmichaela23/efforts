@@ -769,7 +769,7 @@ export default function MapEffort({
           }}
           style={{
             position: 'fixed',
-            top: window.innerWidth < 768 ? 120 : 60, // LOWERED on mobile
+            top: window.innerWidth < 768 ? 140 : 80, // Dropped down a bit more
             right: 12,
             background: '#fff', // White background to match expand button
             border: '1px solid #e5e7eb',
