@@ -8,7 +8,7 @@ export type MapEffortProps = {
   trackLngLat: [number, number][];
   cursorDist_m: number;
   totalDist_m?: number;
-  theme?: 'outdoor' | 'hybrid';
+  theme?: 'outdoor' | 'hybrid' | 'topo';
   followCursor?: boolean;
   height?: number;
   className?: string;
@@ -33,17 +33,23 @@ const ROUTE_HALO = 'route-halo';
 const CURSOR_HALO = 'cursor-halo';
 const CURSOR_PT = 'cursor-pt';
 
-function styleUrl(theme: 'outdoor' | 'hybrid') {
+function styleUrl(theme: 'outdoor' | 'hybrid' | 'topo') {
   const key = import.meta.env.VITE_MAPTILER_KEY as string | undefined;
-  const base = theme === 'hybrid' ? 'hybrid' : 'outdoor';
-  return `https://api.maptiler.com/maps/${base}/style.json?key=${key || ''}`;
+  
+  const styleMap = {
+    outdoor: 'outdoor-v2',
+    hybrid: 'hybrid',
+    topo: 'topo-v2'
+  };
+  
+  return `https://api.maptiler.com/maps/${styleMap[theme]}/style.json?key=${key || ''}`;
 }
 
 export default function MapEffort({
   trackLngLat,
   cursorDist_m,
   totalDist_m,
-  theme = 'outdoor',
+  theme = 'topo',
   followCursor = false,
   height = 160,
   className,
@@ -656,7 +662,9 @@ export default function MapEffort({
             overflow: 'hidden', 
             boxShadow: '0 2px 10px rgba(0,0,0,.06)', 
             opacity: visible ? 1 : 0, 
-            transition: 'opacity 180ms ease, height 300ms ease, border-radius 300ms ease' 
+            transition: 'opacity 180ms ease, height 300ms ease, border-radius 300ms ease',
+            filter: 'contrast(1.12) saturate(1.3) brightness(1.05)',
+            WebkitFilter: 'contrast(1.12) saturate(1.3) brightness(1.05)'
           }} 
         />
         
