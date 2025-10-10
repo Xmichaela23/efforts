@@ -397,25 +397,13 @@ export default function MapEffort({
         console.log('[MapEffort] Current zoom level:', currentZoom);
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
-        if (expanded) {
-          // Platform-specific padding for expanded state
-          const isMobile = window.innerWidth < 768;
-          const padding = isMobile ? 20 : 40;  // Mobile: tight padding = zoomed IN, Desktop: normal
-          console.log('[MapEffort] EXPANDING - fitting with mobile:', isMobile, `padding:${padding}`);
-          map.fitBounds(b, { 
-            padding: padding,
-            duration: 0 
-          });
-        } else {
-          // Initial render - zoom in much closer for better route visibility
-          const isMobile = window.innerWidth < 768;
-          const padding = isMobile ? 10 : 20;  // Very tight padding for initial render
-          console.log('[MapEffort] INITIAL RENDER - fitting with mobile:', isMobile, `padding:${padding}`);
-          map.fitBounds(b, { 
-            padding: padding,
-            duration: 0 
-          });
-        }
+        // Auto-fit the route properly - let MapLibre handle it intelligently
+        console.log('[MapEffort] Auto-fitting route bounds');
+        map.fitBounds(b, { 
+          padding: 50,  // Simple, consistent padding
+          maxZoom: 16,  // Prevent over-zooming
+          duration: 0 
+        });
         
         setTimeout(() => {
           zoomingRef.current = false;
