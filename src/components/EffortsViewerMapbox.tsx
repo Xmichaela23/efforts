@@ -327,6 +327,60 @@ function findNearestIndex(arr: (number | null)[], target: number): number {
   return nearestIdx;
 }
 
+// Thumb scrubbing helper functions
+function getCurrentSample(normalizedSamples: any[], distance: number) {
+  const distances = normalizedSamples.map(sample => sample.d_m);
+  const sampleIdx = findNearestIndex(distances, distance);
+  return normalizedSamples[Math.min(sampleIdx, normalizedSamples.length - 1)];
+}
+
+function formatSpeedForScrub(speed_mps: number | null, isRide: boolean, useMiles: boolean): string {
+  if (!Number.isFinite(speed_mps)) return '--';
+  if (isRide) {
+    return useMiles 
+      ? `${(speed_mps * 2.237).toFixed(1)} mph`
+      : `${(speed_mps * 3.6).toFixed(1)} km/h`;
+  } else {
+    // Running pace
+    const pacePerKm = speed_mps > 0 ? 1000 / speed_mps : 0;
+    const pacePerMile = pacePerKm * 1.609;
+    if (useMiles) {
+      const minutes = Math.floor(pacePerMile / 60);
+      const seconds = Math.floor(pacePerMile % 60);
+      return `${minutes}:${seconds.toString().padStart(2, '0')} /mi`;
+    } else {
+      const minutes = Math.floor(pacePerKm / 60);
+      const seconds = Math.floor(pacePerKm % 60);
+      return `${minutes}:${seconds.toString().padStart(2, '0')} /km`;
+    }
+  }
+}
+
+function formatPowerForScrub(power_w: number | null): string {
+  if (!Number.isFinite(power_w)) return '--';
+  return `${Math.round(power_w)} W`;
+}
+
+function formatHRForScrub(hr_bpm: number | null): string {
+  if (!Number.isFinite(hr_bpm)) return '--';
+  return `${Math.round(hr_bpm)} bpm`;
+}
+
+function formatGradeForScrub(grade_pct: number | null): string {
+  if (!Number.isFinite(grade_pct)) return '--';
+  return `${grade_pct > 0 ? '+' : ''}${grade_pct.toFixed(1)}%`;
+}
+
+function formatDistanceForScrub(distance_m: number, useMiles: boolean): string {
+  if (useMiles) {
+    const miles = distance_m / 1609.34;
+    return `Mile ${miles.toFixed(1)}`;
+  } else {
+    const km = distance_m / 1000;
+    return `Km ${km.toFixed(1)}`;
+  }
+}
+
 /** ---------- Geometry helpers removed (handled in MapEffort) ---------- */
 /** ---------- Downsampling helpers (chart + map) ---------- */
 // Evenly sample indices to a maximum count, preserving provided mustKeep indices
@@ -786,11 +840,22 @@ function EffortsViewerMapbox({
   const [showVam, setShowVam] = useState(false);
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
-  const [theme, setTheme] = useState<'outdoor' | 'hybrid'>(() => {
+  const [scrubDistance, setScrubDistance] = useState<number | null>(null);
+  
+  // Handle thumb scrubbing
+  const handleScrub = (distance_m: number) => {
+    setScrubDistance(distance_m);
+    // Update the main chart index to match scrubbed position
+    const distances = normalizedSamples.map(sample => sample.d_m);
+    const newIdx = findNearestIndex(distances, distance_m);
+    setIdx(newIdx);
+  };
+
+  const [theme, setTheme] = useState<'outdoor' | 'hybrid' | 'topo'>(() => {
     try {
       const v = typeof window !== 'undefined' ? window.localStorage.getItem('map_theme') : null;
-      return (v === 'hybrid' || v === 'outdoor') ? (v as any) : 'outdoor';
-    } catch { return 'outdoor'; }
+      return (v === 'hybrid' || v === 'outdoor' || v === 'topo') ? (v as any) : 'topo';
+    } catch { return 'topo'; }
   });
   useEffect(() => { try { window.localStorage.setItem('map_theme', theme); } catch {} }, [theme]);
 
@@ -826,6 +891,18 @@ function EffortsViewerMapbox({
     const nearEndByDist = Math.abs((dTotal ?? 0) - (distNow ?? 0)) <= 25; // within 25 m of finish
     return nearEndByIdx || nearEndByDist;
   }, [idx, normalizedSamples.length, dTotal, distNow]);
+
+  // Thumb scrubbing metrics (use scrubbed distance if available, otherwise current)
+  const currentDistance = scrubDistance !== null ? scrubDistance : distNow;
+  const currentSample = getCurrentSample(normalizedSamples, currentDistance);
+  const isRide = workoutData?.type === 'ride';
+  
+  // Format metrics for thumb scrubbing
+  const currentSpeed = formatSpeedForScrub(currentSample?.speed_mps, isRide, useMiles);
+  const currentPower = formatPowerForScrub(currentSample?.power_w);
+  const currentHR = formatHRForScrub(currentSample?.hr_bpm);
+  const currentGrade = formatGradeForScrub(currentSample?.grade_pct);
+  const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
 
   /** ----- Chart prep ----- */
   const W = 700, H = 260;           // overall SVG size (in SVG units)
@@ -1359,11 +1436,11 @@ function EffortsViewerMapbox({
           fallbackTemperature={workoutData?.avg_temperature ? Number(workoutData.avg_temperature) : undefined}
         />
         <button
-          onClick={() => setTheme(theme === 'outdoor' ? 'hybrid' : 'outdoor')}
+          onClick={() => setTheme(theme === 'outdoor' ? 'hybrid' : theme === 'hybrid' ? 'topo' : 'outdoor')}
           style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
           aria-label="Toggle map style"
         >
-          {theme === 'outdoor' ? 'Satellite' : 'Map'}
+          {theme === 'outdoor' ? 'Hybrid' : theme === 'hybrid' ? 'Topo' : 'Outdoor'}
         </button>
       </div>
 
@@ -1406,6 +1483,15 @@ function EffortsViewerMapbox({
         
         // Pass imperial/metric preference
         useMiles={useMiles}
+        
+        // Thumb scrubbing props
+        discipline={isRide ? 'bike' : 'run'}
+        currentSpeed={currentSpeed}
+        currentPower={currentPower}
+        currentHR={currentHR}
+        currentGrade={currentGrade}
+        currentDistance={currentDistanceFormatted}
+        onScrub={handleScrub}
       />
 
       {/* Data pills above chart */}
