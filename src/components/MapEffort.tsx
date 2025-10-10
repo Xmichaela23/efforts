@@ -387,37 +387,20 @@ export default function MapEffort({
         
         const currentZoom = map.getZoom();
         
-        // Use distance-based midpoint for better centering
-        const totalDist = lineCum[lineCum.length - 1] || 1;
-        const midDist = totalDist / 2;
-        const routeCenter = pointAtDistance(valid, lineCum, midDist);
+        // Use geographic bounds center (works for loops and out-and-backs)
+        const routeCenter = b.getCenter();
         
         console.log('[MapEffort] Current zoom level:', currentZoom);
         console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
         
         if (expanded) {
-          // Zoom to route midpoint (15 = good balance for mobile)
-          console.log('[MapEffort] EXPANDING - zoom to route midpoint at level 15');
+          // Fit full route with tight padding - always shows complete route
+          console.log('[MapEffort] EXPANDING - fitting full route with padding 30');
+          map.fitBounds(b, { padding: 30, duration: 0 });
           
-          // Listen for ANY camera changes to catch interference
-          const moveHandler = () => console.log('[MapEffort] MOVE event - something moved camera!');
-          const zoomHandler = () => console.log('[MapEffort] ZOOM event - something changed zoom!');
-          map.once('move', moveHandler);
-          map.once('zoom', zoomHandler);
-          
-          // Zoom to route center (14 = good balance - not too close)
-          console.log('[MapEffort] Calling jumpTo: center', routeCenter, 'zoom 14');
-          map.jumpTo({ center: routeCenter, zoom: 14 });
-          
-          // Verify and unblock after zoom completes
           setTimeout(() => {
-            const actualZoom = map.getZoom();
-            const actualCenter = map.getCenter();
-            console.log('[MapEffort] Post-zoom verification: zoom is', actualZoom, 'center:', actualCenter);
             zoomingRef.current = false;
-            map.off('move', moveHandler);
-            map.off('zoom', zoomHandler);
-          }, 500); // Increased timeout to catch delayed interference
+          }, 100);
         } else {
           // Collapse - show full route
           console.log('[MapEffort] COLLAPSING - fit full route');
