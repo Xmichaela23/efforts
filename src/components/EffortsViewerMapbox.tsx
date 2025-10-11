@@ -1464,9 +1464,27 @@ function EffortsViewerMapbox({
         trackLngLat={useMemo(() => {
           try {
             const raw = Array.isArray(trackLngLat) ? trackLngLat : [];
+            console.log('[EffortsViewerMapbox] Raw trackLngLat points:', raw.length);
+            
+            if (raw.length === 0) {
+              console.warn('[EffortsViewerMapbox] No GPS data available');
+              return [];
+            }
+            
             // Use Douglas-Peucker algorithm for intelligent route simplification
-            return simplifyRouteForMap(raw);
-          } catch { return Array.isArray(trackLngLat) ? trackLngLat : []; }
+            const simplified = simplifyRouteForMap(raw);
+            console.log('[EffortsViewerMapbox] Simplified points:', simplified.length, 'from', raw.length);
+            
+            if (simplified.length === 0) {
+              console.error('[EffortsViewerMapbox] Route simplification resulted in empty array!');
+              return raw; // Fallback to original
+            }
+            
+            return simplified;
+          } catch (e) {
+            console.error('[EffortsViewerMapbox] Error in route processing:', e);
+            return Array.isArray(trackLngLat) ? trackLngLat : [];
+          }
         }, [trackLngLat]) as any}
         cursorDist_m={distNow}
         totalDist_m={dTotal}

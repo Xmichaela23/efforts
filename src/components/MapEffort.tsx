@@ -103,7 +103,17 @@ export default function MapEffort({
 
   console.log('[MapEffort] Component rendered, trackLngLat points:', trackLngLat?.length);
   
-  const coords = useMemo(() => sanitizeLngLat(trackLngLat), [trackLngLat]);
+  // Use trackLngLat directly - it's already been processed and validated by CompletedTab
+  const coords = useMemo(() => {
+    if (!Array.isArray(trackLngLat) || trackLngLat.length === 0) return [];
+    // Basic validation only - the data is already processed
+    return trackLngLat.filter((p: any) => 
+      Array.isArray(p) && p.length === 2 && 
+      Number.isFinite(p[0]) && Number.isFinite(p[1]) &&
+      p[0] >= -180 && p[0] <= 180 && p[1] >= -90 && p[1] <= 90
+    ) as LngLat[];
+  }, [trackLngLat]);
+  
   const lineCum = useMemo(() => cumulativeMeters(coords), [coords]);
   const dTotal = useMemo(() => (typeof totalDist_m === 'number' && totalDist_m > 0 ? totalDist_m : (lineCum[lineCum.length - 1] || 1)), [totalDist_m, lineCum]);
   
@@ -384,9 +394,19 @@ export default function MapEffort({
     const has = valid.length > 1;
     const applyData = () => {
       const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
+      console.log('[MapEffort] applyData called:', {
+        hasSource: !!src,
+        hasValidData: has,
+        validLength: valid.length,
+        firstPoint: valid[0],
+        lastPoint: valid[valid.length - 1]
+      });
+      
       if (src && has) {
         console.log('[MapEffort] Setting route data, points:', valid.length);
-        src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+        const geoJsonData = { type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any;
+        console.log('[MapEffort] Initial GeoJSON data:', JSON.stringify(geoJsonData).substring(0, 200) + '...');
+        src.setData(geoJsonData);
       } else {
         console.log('[MapEffort] Cannot set route data - src:', !!src, 'has:', has);
       }
@@ -700,6 +720,15 @@ export default function MapEffort({
         const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
         const hasValidData = valid.length > 1;
         
+        console.log('[MapEffort] Theme switch data check:', {
+          coordsLength: coords.length,
+          lastNonEmptyLength: lastNonEmptyRef.current.length,
+          validLength: valid.length,
+          hasValidData,
+          firstPoint: valid[0],
+          lastPoint: valid[valid.length - 1]
+        });
+        
         if (!hasValidData) {
           console.warn('[MapEffort] No valid GPS data for theme switch');
           return;
@@ -726,17 +755,31 @@ export default function MapEffort({
               // Reapply route data with retry logic
               const applyRouteData = () => {
                 const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+                console.log('[MapEffort] applyRouteData called:', {
+                  hasSource: !!src,
+                  hasValidData,
+                  validLength: valid.length,
+                  firstPoint: valid[0],
+                  lastPoint: valid[valid.length - 1]
+                });
+                
                 if (src && hasValidData) {
                   console.log('[MapEffort] Applying route data:', valid.length, 'points');
-                  src.setData({ 
+                  
+                  const geoJsonData = { 
                     type: 'Feature', 
                     geometry: { type: 'LineString', coordinates: valid }, 
                     properties: {} 
-                  } as any);
+                  } as any;
+                  
+                  console.log('[MapEffort] GeoJSON data:', JSON.stringify(geoJsonData).substring(0, 200) + '...');
+                  
+                  src.setData(geoJsonData);
                   
                   // Apply markers
                   const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource;
                   if (startSrc) {
+                    console.log('[MapEffort] Applying start marker:', valid[0]);
                     startSrc.setData({ 
                       type: 'Feature', 
                       geometry: { type: 'Point', coordinates: valid[0] }, 
@@ -746,6 +789,7 @@ export default function MapEffort({
                   
                   const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource;
                   if (finishSrc) {
+                    console.log('[MapEffort] Applying finish marker:', valid[valid.length - 1]);
                     finishSrc.setData({ 
                       type: 'Feature', 
                       geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, 
