@@ -418,6 +418,29 @@ export default function MapEffort({
           console.log('[MapEffort] Route source recreated in applyData:', !!src);
         } catch (e) {
           console.error('[MapEffort] Failed to recreate route source in applyData:', e);
+          // If style is not ready, wait for it
+          if (e.message?.includes('Style is not done loading')) {
+            console.log('[MapEffort] Style not ready, waiting for styledata event...');
+            const onStyleReady = () => {
+              try {
+                map.addSource(ROUTE_SRC, { 
+                  type: 'geojson', 
+                  data: { 
+                    type: 'Feature', 
+                    geometry: { type: 'LineString', coordinates: valid }, 
+                    properties: {} 
+                  } as any 
+                });
+                console.log('[MapEffort] Route source created after style ready');
+                map.off('styledata', onStyleReady);
+              } catch (retryError) {
+                console.error('[MapEffort] Failed to create source after style ready:', retryError);
+                map.off('styledata', onStyleReady);
+              }
+            };
+            map.once('styledata', onStyleReady);
+            return;
+          }
         }
       }
       
@@ -798,6 +821,29 @@ export default function MapEffort({
                     console.log('[MapEffort] Route source recreated:', !!src);
                   } catch (e) {
                     console.error('[MapEffort] Failed to recreate route source:', e);
+                    // If style is not ready, wait for it
+                    if (e.message?.includes('Style is not done loading')) {
+                      console.log('[MapEffort] Style not ready during theme switch, waiting...');
+                      const onStyleReady = () => {
+                        try {
+                          map.addSource(ROUTE_SRC, { 
+                            type: 'geojson', 
+                            data: { 
+                              type: 'Feature', 
+                              geometry: { type: 'LineString', coordinates: valid }, 
+                              properties: {} 
+                            } as any 
+                          });
+                          console.log('[MapEffort] Route source created after theme switch style ready');
+                          map.off('styledata', onStyleReady);
+                        } catch (retryError) {
+                          console.error('[MapEffort] Failed to create source after theme switch style ready:', retryError);
+                          map.off('styledata', onStyleReady);
+                        }
+                      };
+                      map.once('styledata', onStyleReady);
+                      return;
+                    }
                   }
                 }
                 
