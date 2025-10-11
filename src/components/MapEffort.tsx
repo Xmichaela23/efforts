@@ -150,7 +150,15 @@ export default function MapEffort({
       
       // Route source - always recreate with current data
       if (map.getSource(ROUTE_SRC)) {
-        console.log('[MapEffort] Removing existing route source');
+        console.log('[MapEffort] Removing existing route layers and source');
+        
+        // Remove layers first
+        if (map.getLayer(ROUTE_SHADOW)) map.removeLayer(ROUTE_SHADOW);
+        if (map.getLayer(ROUTE_OUTLINE)) map.removeLayer(ROUTE_OUTLINE);
+        if (map.getLayer(ROUTE_LINE)) map.removeLayer(ROUTE_LINE);
+        if (map.getLayer(ROUTE_HALO)) map.removeLayer(ROUTE_HALO);
+        
+        // Then remove source
         map.removeSource(ROUTE_SRC);
       }
       
@@ -279,8 +287,22 @@ export default function MapEffort({
         });
       }
       
-      // Start marker (green pin)
-      if (!map.getSource(START_MARKER_SRC)) {
+      // Start marker (green pin) - always recreate with current data
+      if (map.getSource(START_MARKER_SRC)) {
+        if (map.getLayer('start-marker')) map.removeLayer('start-marker');
+        map.removeSource(START_MARKER_SRC);
+      }
+      
+      if (hasValidData) {
+        map.addSource(START_MARKER_SRC, { 
+          type: 'geojson', 
+          data: { 
+            type: 'Feature', 
+            geometry: { type: 'Point', coordinates: valid[0] }, 
+            properties: {} 
+          } as any 
+        });
+      } else {
         map.addSource(START_MARKER_SRC, { 
           type: 'geojson', 
           data: { 
@@ -304,8 +326,22 @@ export default function MapEffort({
         });
       }
       
-      // Finish marker (red pin)
-      if (!map.getSource(FINISH_MARKER_SRC)) {
+      // Finish marker (red pin) - always recreate with current data
+      if (map.getSource(FINISH_MARKER_SRC)) {
+        if (map.getLayer('finish-marker')) map.removeLayer('finish-marker');
+        map.removeSource(FINISH_MARKER_SRC);
+      }
+      
+      if (hasValidData) {
+        map.addSource(FINISH_MARKER_SRC, { 
+          type: 'geojson', 
+          data: { 
+            type: 'Feature', 
+            geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, 
+            properties: {} 
+          } as any 
+        });
+      } else {
         map.addSource(FINISH_MARKER_SRC, { 
           type: 'geojson', 
           data: { 
@@ -451,20 +487,7 @@ export default function MapEffort({
     const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
     if (coords.length > 1) lastNonEmptyRef.current = coords;
     const has = valid.length > 1;
-    // Update markers only - source data is now handled in attachLayers
-    if (has) {
-      const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
-      if (startSrc) {
-        console.log('[MapEffort] Setting start marker:', valid[0]);
-        startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
-      }
-      
-      const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
-      if (finishSrc) {
-        console.log('[MapEffort] Setting finish marker:', valid[valid.length - 1]);
-        finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
-      }
-    }
+    // Markers are now handled in attachLayers - no separate update needed
     
     if (!fittedRef.current && has) {
       const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
