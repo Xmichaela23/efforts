@@ -393,7 +393,7 @@ export default function MapEffort({
     if (coords.length > 1) lastNonEmptyRef.current = coords;
     const has = valid.length > 1;
     const applyData = () => {
-      const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
+      let src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
       console.log('[MapEffort] applyData called:', {
         hasSource: !!src,
         hasValidData: has,
@@ -401,6 +401,25 @@ export default function MapEffort({
         firstPoint: valid[0],
         lastPoint: valid[valid.length - 1]
       });
+      
+      // If source is missing, recreate it
+      if (!src && has) {
+        console.log('[MapEffort] Route source missing in applyData, recreating...');
+        try {
+          map.addSource(ROUTE_SRC, { 
+            type: 'geojson', 
+            data: { 
+              type: 'Feature', 
+              geometry: { type: 'LineString', coordinates: [] }, 
+              properties: {} 
+            } as any 
+          });
+          src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+          console.log('[MapEffort] Route source recreated in applyData:', !!src);
+        } catch (e) {
+          console.error('[MapEffort] Failed to recreate route source in applyData:', e);
+        }
+      }
       
       if (src && has) {
         console.log('[MapEffort] Setting route data, points:', valid.length);
@@ -754,7 +773,7 @@ export default function MapEffort({
               
               // Reapply route data with retry logic
               const applyRouteData = () => {
-                const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+                let src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
                 console.log('[MapEffort] applyRouteData called:', {
                   hasSource: !!src,
                   hasValidData,
@@ -762,6 +781,25 @@ export default function MapEffort({
                   firstPoint: valid[0],
                   lastPoint: valid[valid.length - 1]
                 });
+                
+                // If source is missing, recreate it
+                if (!src && hasValidData) {
+                  console.log('[MapEffort] Route source missing, recreating...');
+                  try {
+                    map.addSource(ROUTE_SRC, { 
+                      type: 'geojson', 
+                      data: { 
+                        type: 'Feature', 
+                        geometry: { type: 'LineString', coordinates: [] }, 
+                        properties: {} 
+                      } as any 
+                    });
+                    src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+                    console.log('[MapEffort] Route source recreated:', !!src);
+                  } catch (e) {
+                    console.error('[MapEffort] Failed to recreate route source:', e);
+                  }
+                }
                 
                 if (src && hasValidData) {
                   console.log('[MapEffort] Applying route data:', valid.length, 'points');
