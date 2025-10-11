@@ -686,24 +686,29 @@ export default function MapEffort({
     const map = mapRef.current; 
     if (!map || !ready || expanded) return; // Skip during expansion!
     
-    layersAttachedRef.current = false;
-    try {
-      const cached = styleCacheRef.current[theme];
-      if (cached) map.setStyle(cached as any, { diff: true });
-      else map.setStyle(styleUrl(theme));
-    } catch {}
-    // Reattach quickly on styledata, then finalize on idle (smoother)
+    console.log('[MapEffort] Theme switching to:', theme);
     setVisible(false);
+    
     const onStyleData = () => {
+      console.log('[MapEffort] Style data loaded, reattaching layers');
       try {
+        // Reset the flag and reattach layers
+        layersAttachedRef.current = false;
         const reattach = (map as any).__attachEffortLayers as (() => void) | undefined;
-        if (reattach) reattach();
+        if (reattach) {
+          reattach();
+          console.log('[MapEffort] Layers reattached successfully');
+        }
+        
         const valid = (coords.length > 1 ? coords : lastNonEmptyRef.current);
         const has = valid.length > 1;
         
         // Reapply route data
         const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
-        if (src && has) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+        if (src && has) {
+          console.log('[MapEffort] Reapplying route data, points:', valid.length);
+          src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+        }
         
         // Reapply start/finish markers
         if (has) {
@@ -713,15 +718,33 @@ export default function MapEffort({
           const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
           if (finishSrc) finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
         }
-      } catch {}
+      } catch (e) {
+        console.error('[MapEffort] Error during style data reattachment:', e);
+      }
     };
+    
     const onIdle = () => {
+      console.log('[MapEffort] Map idle after theme change');
       try {
         // Don't restore camera during expansion - it would cancel our zoom!
         if (savedCameraRef.current && !expanded) map.jumpTo(savedCameraRef.current as any);
       } catch {}
       requestAnimationFrame(() => setVisible(true));
     };
+    
+    try {
+      const cached = styleCacheRef.current[theme];
+      if (cached) {
+        console.log('[MapEffort] Using cached style for theme:', theme);
+        map.setStyle(cached as any, { diff: true });
+      } else {
+        console.log('[MapEffort] Loading new style for theme:', theme);
+        map.setStyle(styleUrl(theme));
+      }
+    } catch (e) {
+      console.error('[MapEffort] Error setting style:', e);
+    }
+    
     map.once('styledata', onStyleData);
     map.once('idle', onIdle);
     return () => { try { map.off('styledata', onStyleData); map.off('idle', onIdle); } catch {} };
