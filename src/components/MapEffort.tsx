@@ -386,8 +386,231 @@ export default function MapEffort({
     };
   }, [theme, onMapReady]);
 
-  // Seed/fit route once and update data on changes
+  // Theme switching and initial data application - bulletproof approach
   useEffect(() => {
+    const map = mapRef.current; 
+    if (!map || !ready || expanded) return;
+    
+    // Store current data
+    const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
+    const hasValidData = valid.length > 1;
+    
+    // Check if we need to apply data (either theme change or initial load)
+    const currentStyle = map.getStyle();
+    const isThemeChange = !(currentStyle?.name === theme || (currentStyle?.sources as any)?.['maptiler']?.url?.includes(theme));
+    const needsDataApplication = isThemeChange || !map.getSource(ROUTE_SRC);
+    
+    if (!needsDataApplication) {
+      console.log('[MapEffort] No theme change or data application needed');
+      return;
+    }
+    
+    console.log('[MapEffort] Applying route data - theme change:', isThemeChange, 'needs data:', needsDataApplication);
+    
+    const applyRouteData = async () => {
+      try {
+        console.log('[MapEffort] Route data application check:', {
+          coordsLength: coords.length,
+          lastNonEmptyLength: lastNonEmptyRef.current.length,
+          validLength: valid.length,
+          hasValidData,
+          firstPoint: valid[0],
+          lastPoint: valid[valid.length - 1],
+          isThemeChange
+        });
+        
+        if (!hasValidData) {
+          console.warn('[MapEffort] No valid GPS data for route application');
+          return;
+        }
+        
+        // If theme change, set new style and wait for complete load
+        if (isThemeChange) {
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error('Theme switch timeout'));
+            }, 5000);
+            
+            const onStyleLoad = () => {
+              try {
+                console.log('[MapEffort] Style loaded, reattaching layers');
+                
+                // Force layer reattachment
+                layersAttachedRef.current = false;
+                const reattach = (map as any).__attachEffortLayers;
+                if (reattach) {
+                  reattach();
+                  console.log('[MapEffort] Layers reattached');
+                }
+                
+                // Reapply route data with retry logic
+                const applyRouteData = () => {
+                  let src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+                  console.log('[MapEffort] applyRouteData called:', {
+                    hasSource: !!src,
+                    hasValidData,
+                    validLength: valid.length,
+                    firstPoint: valid[0],
+                    lastPoint: valid[valid.length - 1]
+                  });
+                  
+                  // If source is missing, recreate it
+                  if (!src && hasValidData) {
+                    console.log('[MapEffort] Route source missing, recreating...');
+                    try {
+                      map.addSource(ROUTE_SRC, { 
+                        type: 'geojson', 
+                        data: { 
+                          type: 'Feature', 
+                          geometry: { type: 'LineString', coordinates: [] }, 
+                          properties: {} 
+                        } as any 
+                      });
+                      src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+                      console.log('[MapEffort] Route source recreated:', !!src);
+                    } catch (e) {
+                      console.error('[MapEffort] Failed to recreate route source:', e);
+                      // If style is not ready, wait for it
+                      if (e.message?.includes('Style is not done loading')) {
+                        console.log('[MapEffort] Style not ready during theme switch, waiting...');
+                        const onStyleReady = () => {
+                          try {
+                            map.addSource(ROUTE_SRC, { 
+                              type: 'geojson', 
+                              data: { 
+                                type: 'Feature', 
+                                geometry: { type: 'LineString', coordinates: valid }, 
+                                properties: {} 
+                              } as any 
+                            });
+                            console.log('[MapEffort] Route source created after theme switch style ready');
+                            map.off('styledata', onStyleReady);
+                          } catch (retryError) {
+                            console.error('[MapEffort] Failed to create source after theme switch style ready:', retryError);
+                            map.off('styledata', onStyleReady);
+                          }
+                        };
+                        map.once('styledata', onStyleReady);
+                        return;
+                      }
+                    }
+                  }
+                  
+                  if (src && hasValidData) {
+                    console.log('[MapEffort] Applying route data:', valid.length, 'points');
+                    
+                    const geoJsonData = { 
+                      type: 'Feature', 
+                      geometry: { type: 'LineString', coordinates: valid }, 
+                      properties: {} 
+                    } as any;
+                    
+                    console.log('[MapEffort] GeoJSON data:', JSON.stringify(geoJsonData).substring(0, 200) + '...');
+                    
+                    src.setData(geoJsonData);
+                    
+                    // Apply markers
+                    const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource;
+                    if (startSrc) {
+                      console.log('[MapEffort] Applying start marker:', valid[0]);
+                      startSrc.setData({ 
+                        type: 'Feature', 
+                        geometry: { type: 'Point', coordinates: valid[0] }, 
+                        properties: {} 
+                      } as any);
+                    }
+                    
+                    const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource;
+                    if (finishSrc) {
+                      console.log('[MapEffort] Applying finish marker:', valid[valid.length - 1]);
+                      finishSrc.setData({ 
+                        type: 'Feature', 
+                        geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, 
+                        properties: {} 
+                      } as any);
+                    }
+                    
+                    console.log('[MapEffort] Route data applied successfully');
+                  } else {
+                    console.error('[MapEffort] Failed to apply route data - src:', !!src, 'hasValidData:', hasValidData);
+                  }
+                };
+                
+                // Apply data immediately and also on next frame for safety
+                applyRouteData();
+                requestAnimationFrame(applyRouteData);
+                
+                clearTimeout(timeout);
+                map.off('styledata', onStyleLoad);
+                resolve();
+              } catch (e) {
+                clearTimeout(timeout);
+                map.off('styledata', onStyleLoad);
+                reject(e);
+              }
+            };
+            
+            map.once('styledata', onStyleLoad);
+            map.setStyle(styleUrl(theme));
+          });
+          
+          // Restore camera and show
+          if (savedCameraRef.current && !expanded) {
+            map.jumpTo(savedCameraRef.current as any);
+          }
+          setVisible(true);
+          console.log('[MapEffort] Theme switch completed successfully');
+        } else {
+          // Initial data application (no theme change)
+          console.log('[MapEffort] Applying initial route data');
+          
+          // Ensure source exists
+          let src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+          if (!src) {
+            try {
+              map.addSource(ROUTE_SRC, { 
+                type: 'geojson', 
+                data: { 
+                  type: 'Feature', 
+                  geometry: { type: 'LineString', coordinates: valid }, 
+                  properties: {} 
+                } as any 
+              });
+              src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+              console.log('[MapEffort] Initial route source created');
+            } catch (e) {
+              console.error('[MapEffort] Failed to create initial route source:', e);
+              return;
+            }
+          }
+          
+          // Apply route data
+          if (src && hasValidData) {
+            console.log('[MapEffort] Applying initial route data:', valid.length, 'points');
+            src.setData({ 
+              type: 'Feature', 
+              geometry: { type: 'LineString', coordinates: valid }, 
+              properties: {} 
+            } as any);
+            console.log('[MapEffort] Initial route data applied successfully');
+          }
+        }
+      } catch (e) {
+        console.error('[MapEffort] Route data application error:', e);
+        setVisible(true); // Show anyway
+      }
+    };
+    
+    applyRouteData();
+  }, [theme, ready, coords, expanded]);
+
+  // Seed/fit route once and update data on changes
+  // DISABLED: Regular data application conflicts with theme switching
+  // Theme switching system handles all route data management
+  useEffect(() => {
+    console.log('[MapEffort] Regular applyData disabled - theme switching handles route data');
+    return;
+    
     const map = mapRef.current; if (!map || !ready) return;
     const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
     if (coords.length > 1) lastNonEmptyRef.current = coords;
@@ -743,182 +966,6 @@ export default function MapEffort({
     };
   }, [expanded, onScrub, coords.length, dTotal, cursorDist_m]);
 
-  // Theme switching - bulletproof approach
-  useEffect(() => {
-    const map = mapRef.current; 
-    if (!map || !ready || expanded) return;
-    
-    // Don't change theme if it's already the same
-    const currentStyle = map.getStyle();
-    if (currentStyle?.name === theme || currentStyle?.sources?.['maptiler']?.url?.includes(theme)) {
-      return;
-    }
-    
-    console.log('[MapEffort] Switching theme to:', theme);
-    
-    const switchTheme = async () => {
-      try {
-        // Store current data before theme change
-        const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
-        const hasValidData = valid.length > 1;
-        
-        console.log('[MapEffort] Theme switch data check:', {
-          coordsLength: coords.length,
-          lastNonEmptyLength: lastNonEmptyRef.current.length,
-          validLength: valid.length,
-          hasValidData,
-          firstPoint: valid[0],
-          lastPoint: valid[valid.length - 1]
-        });
-        
-        if (!hasValidData) {
-          console.warn('[MapEffort] No valid GPS data for theme switch');
-          return;
-        }
-        
-        // Set style and wait for complete load
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Theme switch timeout'));
-          }, 5000);
-          
-          const onStyleLoad = () => {
-            try {
-              console.log('[MapEffort] Style loaded, reattaching layers');
-              
-              // Force layer reattachment
-              layersAttachedRef.current = false;
-              const reattach = (map as any).__attachEffortLayers;
-              if (reattach) {
-                reattach();
-                console.log('[MapEffort] Layers reattached');
-              }
-              
-              // Reapply route data with retry logic
-              const applyRouteData = () => {
-                let src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
-                console.log('[MapEffort] applyRouteData called:', {
-                  hasSource: !!src,
-                  hasValidData,
-                  validLength: valid.length,
-                  firstPoint: valid[0],
-                  lastPoint: valid[valid.length - 1]
-                });
-                
-                // If source is missing, recreate it
-                if (!src && hasValidData) {
-                  console.log('[MapEffort] Route source missing, recreating...');
-                  try {
-                    map.addSource(ROUTE_SRC, { 
-                      type: 'geojson', 
-                      data: { 
-                        type: 'Feature', 
-                        geometry: { type: 'LineString', coordinates: [] }, 
-                        properties: {} 
-                      } as any 
-                    });
-                    src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
-                    console.log('[MapEffort] Route source recreated:', !!src);
-                  } catch (e) {
-                    console.error('[MapEffort] Failed to recreate route source:', e);
-                    // If style is not ready, wait for it
-                    if (e.message?.includes('Style is not done loading')) {
-                      console.log('[MapEffort] Style not ready during theme switch, waiting...');
-                      const onStyleReady = () => {
-                        try {
-                          map.addSource(ROUTE_SRC, { 
-                            type: 'geojson', 
-                            data: { 
-                              type: 'Feature', 
-                              geometry: { type: 'LineString', coordinates: valid }, 
-                              properties: {} 
-                            } as any 
-                          });
-                          console.log('[MapEffort] Route source created after theme switch style ready');
-                          map.off('styledata', onStyleReady);
-                        } catch (retryError) {
-                          console.error('[MapEffort] Failed to create source after theme switch style ready:', retryError);
-                          map.off('styledata', onStyleReady);
-                        }
-                      };
-                      map.once('styledata', onStyleReady);
-                      return;
-                    }
-                  }
-                }
-                
-                if (src && hasValidData) {
-                  console.log('[MapEffort] Applying route data:', valid.length, 'points');
-                  
-                  const geoJsonData = { 
-                    type: 'Feature', 
-                    geometry: { type: 'LineString', coordinates: valid }, 
-                    properties: {} 
-                  } as any;
-                  
-                  console.log('[MapEffort] GeoJSON data:', JSON.stringify(geoJsonData).substring(0, 200) + '...');
-                  
-                  src.setData(geoJsonData);
-                  
-                  // Apply markers
-                  const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource;
-                  if (startSrc) {
-                    console.log('[MapEffort] Applying start marker:', valid[0]);
-                    startSrc.setData({ 
-                      type: 'Feature', 
-                      geometry: { type: 'Point', coordinates: valid[0] }, 
-                      properties: {} 
-                    } as any);
-                  }
-                  
-                  const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource;
-                  if (finishSrc) {
-                    console.log('[MapEffort] Applying finish marker:', valid[valid.length - 1]);
-                    finishSrc.setData({ 
-                      type: 'Feature', 
-                      geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, 
-                      properties: {} 
-                    } as any);
-                  }
-                  
-                  console.log('[MapEffort] Route data applied successfully');
-                } else {
-                  console.error('[MapEffort] Failed to apply route data - src:', !!src, 'hasValidData:', hasValidData);
-                }
-              };
-              
-              // Apply data immediately and also on next frame for safety
-              applyRouteData();
-              requestAnimationFrame(applyRouteData);
-              
-              clearTimeout(timeout);
-              map.off('styledata', onStyleLoad);
-              resolve();
-            } catch (e) {
-              clearTimeout(timeout);
-              map.off('styledata', onStyleLoad);
-              reject(e);
-            }
-          };
-          
-          map.once('styledata', onStyleLoad);
-          map.setStyle(styleUrl(theme));
-        });
-        
-        // Restore camera and show
-        if (savedCameraRef.current && !expanded) {
-          map.jumpTo(savedCameraRef.current as any);
-        }
-        setVisible(true);
-        console.log('[MapEffort] Theme switch completed successfully');
-      } catch (e) {
-        console.error('[MapEffort] Theme switch error:', e);
-        setVisible(true); // Show anyway
-      }
-    };
-    
-    switchTheme();
-  }, [theme, ready, coords, expanded]);
 
   // Simple SVG fallback when no coords
   if ((coords?.length ?? 0) < 2) {
