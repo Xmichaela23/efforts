@@ -415,6 +415,25 @@ export default function MapEffort({
                   } as any 
                 });
                 console.log('[MapEffort] Route source created after style ready');
+                
+                // Apply data to the newly created source
+                const newSrc = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+                if (newSrc && has) {
+                  console.log('[MapEffort] Setting route data after retry, points:', valid.length);
+                  newSrc.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+                  
+                  // Also update markers
+                  const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
+                  if (startSrc) {
+                    startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
+                  }
+                  
+                  const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
+                  if (finishSrc) {
+                    finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
+                  }
+                }
+                
                 map.off('styledata', onStyleReady);
               } catch (retryError) {
                 console.error('[MapEffort] Failed to create source after style ready:', retryError);
