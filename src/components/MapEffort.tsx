@@ -474,16 +474,24 @@ export default function MapEffort({
       
       if (src && has) {
         console.log('[MapEffort] Setting route data, points:', valid.length);
-        src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
-        
-        // Verify the data was set
-        const sourceData = src.getData();
-        console.log('[MapEffort] Route source data after setting:', {
-          type: sourceData?.type,
-          geometryType: sourceData?.geometry?.type,
-          coordinatesLength: sourceData?.geometry?.coordinates?.length,
-          hasValidData: sourceData?.geometry?.coordinates?.length > 0
-        });
+        try {
+          src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+          
+          // Verify the data was set
+          const sourceData = src.getData();
+          console.log('[MapEffort] Route source data after setting:', {
+            type: sourceData?.type,
+            geometryType: sourceData?.geometry?.type,
+            coordinatesLength: sourceData?.geometry?.coordinates?.length,
+            hasValidData: sourceData?.geometry?.coordinates?.length > 0
+          });
+          
+          if (!sourceData?.geometry?.coordinates?.length) {
+            console.error('[MapEffort] CRITICAL: Route data was not set successfully!');
+          }
+        } catch (setDataError) {
+          console.error('[MapEffort] Failed to set route data:', setDataError);
+        }
       } else {
         console.log('[MapEffort] Cannot set route data - src:', !!src, 'has:', has);
       }
@@ -825,8 +833,42 @@ export default function MapEffort({
                 console.log('[MapEffort] Layers reattached');
               }
               
-              // Let the original data application system handle route data
-              console.log('[MapEffort] Theme switch complete - original system will handle data');
+              // Apply route data immediately after layers are reattached
+              console.log('[MapEffort] Applying route data after theme switch');
+              const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
+              const hasValidData = valid.length > 1;
+              
+              if (hasValidData) {
+                const routeSrc = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
+                if (routeSrc) {
+                  console.log('[MapEffort] Setting route data after theme switch, points:', valid.length);
+                  routeSrc.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+                  
+                  // Verify the data was set
+                  const sourceData = routeSrc.getData();
+                  console.log('[MapEffort] Theme switch route source data after setting:', {
+                    type: sourceData?.type,
+                    geometryType: sourceData?.geometry?.type,
+                    coordinatesLength: sourceData?.geometry?.coordinates?.length,
+                    hasValidData: sourceData?.geometry?.coordinates?.length > 0
+                  });
+                  
+                  // Update markers
+                  const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
+                  if (startSrc) {
+                    startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
+                  }
+                  
+                  const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
+                  if (finishSrc) {
+                    finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
+                  }
+                } else {
+                  console.error('[MapEffort] Route source not found after theme switch');
+                }
+              }
+              
+              console.log('[MapEffort] Theme switch complete - data applied');
               
               clearTimeout(timeout);
               map.off('styledata', onStyleLoad);
