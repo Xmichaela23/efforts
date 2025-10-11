@@ -145,7 +145,7 @@ export default function MapEffort({
 
 
     const attachLayers = () => {
-      console.log('[MapEffort] attachLayers called');
+      console.log('[MapEffort] attachLayers called - current theme:', theme);
       
       // Route source
       if (!map.getSource(ROUTE_SRC)) {
@@ -158,6 +158,8 @@ export default function MapEffort({
             properties: {} 
           } as any 
         });
+      } else {
+        console.log('[MapEffort] Route source already exists');
       }
       
       // DEEP BLUE ROUTE LAYERS
@@ -165,18 +167,23 @@ export default function MapEffort({
       // Shadow layer (bottom) - Navy blue glow
       if (!map.getLayer(ROUTE_SHADOW)) {
         console.log('[MapEffort] Adding shadow layer');
-        map.addLayer({ 
-          id: ROUTE_SHADOW, 
-          type: 'line', 
-          source: ROUTE_SRC, 
-          paint: { 
-            'line-color': '#1e40af',  // Navy blue
-            'line-width': 8, 
-            'line-opacity': 0.35,
-            'line-blur': 4
-          },
-          layout: { 'line-cap': 'round', 'line-join': 'round' }
-        });
+        try {
+          map.addLayer({ 
+            id: ROUTE_SHADOW, 
+            type: 'line', 
+            source: ROUTE_SRC, 
+            paint: { 
+              'line-color': '#1e40af',  // Navy blue
+              'line-width': 8, 
+              'line-opacity': 0.35,
+              'line-blur': 4
+            },
+            layout: { 'line-cap': 'round', 'line-join': 'round' }
+          });
+          console.log('[MapEffort] Shadow layer added successfully');
+        } catch (error) {
+          console.log('[MapEffort] Error adding shadow layer:', error);
+        }
       } else {
         console.log('[MapEffort] Shadow layer already exists');
       }
@@ -202,17 +209,22 @@ export default function MapEffort({
       // Main route line (top) - Bright blue
       if (!map.getLayer(ROUTE_LINE)) {
         console.log('[MapEffort] Adding main route line');
-        map.addLayer({ 
-          id: ROUTE_LINE, 
-          type: 'line', 
-          source: ROUTE_SRC, 
-          paint: { 
-            'line-color': '#60a5fa',  // Bright blue (main color)
-            'line-width': 3.5,
-            'line-opacity': 1
-          }, 
-          layout: { 'line-cap': 'round', 'line-join': 'round' }
-        });
+        try {
+          map.addLayer({ 
+            id: ROUTE_LINE, 
+            type: 'line', 
+            source: ROUTE_SRC, 
+            paint: { 
+              'line-color': '#60a5fa',  // Bright blue (main color)
+              'line-width': 3.5,
+              'line-opacity': 1
+            }, 
+            layout: { 'line-cap': 'round', 'line-join': 'round' }
+          });
+          console.log('[MapEffort] Main route line added successfully');
+        } catch (error) {
+          console.log('[MapEffort] Error adding main route line:', error);
+        }
       } else {
         console.log('[MapEffort] Main route line already exists');
       }
@@ -343,10 +355,12 @@ export default function MapEffort({
 
     // When style changes (theme), re-attach layers
     map.on('styledata', () => {
-      console.log('[MapEffort] styledata event, layersAttached:', layersAttachedRef.current);
+      console.log('[MapEffort] GLOBAL styledata event, layersAttached:', layersAttachedRef.current);
       if (!layersAttachedRef.current) {
-        console.log('[MapEffort] Layers not attached, calling attachLayers from styledata');
+        console.log('[MapEffort] GLOBAL styledata - Layers not attached, calling attachLayers from styledata');
         attachLayers();
+      } else {
+        console.log('[MapEffort] GLOBAL styledata - Layers already attached, skipping');
       }
     });
 
@@ -686,34 +700,69 @@ export default function MapEffort({
     const map = mapRef.current; 
     if (!map || !ready || expanded) return; // Skip during expansion!
     
+    console.log('[MapEffort] THEME SWITCHING - Theme changed to:', theme);
     layersAttachedRef.current = false;
     try {
       const cached = styleCacheRef.current[theme];
-      if (cached) map.setStyle(cached as any, { diff: true });
-      else map.setStyle(styleUrl(theme));
-    } catch {}
+      if (cached) {
+        console.log('[MapEffort] THEME SWITCHING - Using cached style for:', theme);
+        map.setStyle(cached as any, { diff: true });
+      } else {
+        console.log('[MapEffort] THEME SWITCHING - Loading new style for:', theme);
+        map.setStyle(styleUrl(theme));
+      }
+    } catch (error) {
+      console.log('[MapEffort] THEME SWITCHING - Error setting style:', error);
+    }
     // Reattach quickly on styledata, then finalize on idle (smoother)
     setVisible(false);
     const onStyleData = () => {
+      console.log('[MapEffort] THEME SWITCHING - onStyleData called for theme:', theme);
       try {
         const reattach = (map as any).__attachEffortLayers as (() => void) | undefined;
-        if (reattach) reattach();
+        if (reattach) {
+          console.log('[MapEffort] THEME SWITCHING - Calling reattach function');
+          reattach();
+        } else {
+          console.log('[MapEffort] THEME SWITCHING - No reattach function available');
+        }
         const valid = (coords.length > 1 ? coords : lastNonEmptyRef.current);
         const has = valid.length > 1;
+        console.log('[MapEffort] THEME SWITCHING - Route data check - has:', has, 'coords:', valid.length);
         
         // Reapply route data
         const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
-        if (src && has) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+        if (src && has) {
+          console.log('[MapEffort] THEME SWITCHING - Setting route data for theme:', theme);
+          src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+        } else {
+          console.log('[MapEffort] THEME SWITCHING - Cannot set route data - src:', !!src, 'has:', has);
+        }
         
         // Reapply start/finish markers
         if (has) {
           const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
-          if (startSrc) startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
+          if (startSrc) {
+            console.log('[MapEffort] THEME SWITCHING - Setting start marker for theme:', theme);
+            startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
+          }
           
           const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
-          if (finishSrc) finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
+          if (finishSrc) {
+            console.log('[MapEffort] THEME SWITCHING - Setting finish marker for theme:', theme);
+            finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
+          }
         }
-      } catch {}
+        
+        // Check if layers exist after reattachment
+        console.log('[MapEffort] THEME SWITCHING - Layer check after reattachment:');
+        console.log('[MapEffort] THEME SWITCHING - ROUTE_SHADOW exists:', !!map.getLayer(ROUTE_SHADOW));
+        console.log('[MapEffort] THEME SWITCHING - ROUTE_OUTLINE exists:', !!map.getLayer(ROUTE_OUTLINE));
+        console.log('[MapEffort] THEME SWITCHING - ROUTE_LINE exists:', !!map.getLayer(ROUTE_LINE));
+        console.log('[MapEffort] THEME SWITCHING - ROUTE_SRC exists:', !!map.getSource(ROUTE_SRC));
+      } catch (error) {
+        console.log('[MapEffort] THEME SWITCHING - Error in onStyleData:', error);
+      }
     };
     const onIdle = () => {
       try {
