@@ -82,6 +82,7 @@ export default function MapEffort({
   const fittedRef = useRef(false);
   const savedCameraRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
   const lastNonEmptyRef = useRef<LngLat[]>([]);
+  const themeSwitchingRef = useRef(false);
   const [ready, setReady] = useState(false);
   const styleCacheRef = useRef<Record<string, any>>({});
   const [visible, setVisible] = useState(false);
@@ -379,6 +380,13 @@ export default function MapEffort({
   // Seed/fit route once and update data on changes
   useEffect(() => {
     const map = mapRef.current; if (!map || !ready) return;
+    
+    // Don't run during theme switches - let theme system handle it
+    if (themeSwitchingRef.current) {
+      console.log('[MapEffort] Skipping original data application - theme switch in progress');
+      return;
+    }
+    
     const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
     if (coords.length > 1) lastNonEmptyRef.current = coords;
     const has = valid.length > 1;
@@ -758,12 +766,17 @@ export default function MapEffort({
     
     const switchTheme = async () => {
       try {
+        // Set theme switching flag to prevent original system interference
+        themeSwitchingRef.current = true;
+        console.log('[MapEffort] Theme switching flag set to true');
+        
         // Store current data before theme change
         const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
         const hasValidData = valid.length > 1;
         
         if (!hasValidData) {
           console.warn('[MapEffort] No valid GPS data for theme switch');
+          themeSwitchingRef.current = false; // Reset flag
           return;
         }
         
@@ -811,6 +824,10 @@ export default function MapEffort({
       } catch (e) {
         console.error('[MapEffort] Theme switch error:', e);
         setVisible(true); // Show anyway
+      } finally {
+        // Always reset the theme switching flag
+        themeSwitchingRef.current = false;
+        console.log('[MapEffort] Theme switching flag reset to false');
       }
     };
     
