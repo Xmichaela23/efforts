@@ -743,45 +743,8 @@ export default function MapEffort({
                 console.log('[MapEffort] Layers reattached');
               }
               
-              // Reapply route data with retry logic
-              const applyRouteData = () => {
-                const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
-                if (src && hasValidData) {
-                  console.log('[MapEffort] Applying route data:', valid.length, 'points');
-                  src.setData({ 
-                    type: 'Feature', 
-                    geometry: { type: 'LineString', coordinates: valid }, 
-                    properties: {} 
-                  } as any);
-                  
-                  // Apply markers
-                  const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource;
-                  if (startSrc) {
-                    startSrc.setData({ 
-                      type: 'Feature', 
-                      geometry: { type: 'Point', coordinates: valid[0] }, 
-                      properties: {} 
-                    } as any);
-                  }
-                  
-                  const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource;
-                  if (finishSrc) {
-                    finishSrc.setData({ 
-                      type: 'Feature', 
-                      geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, 
-                      properties: {} 
-                    } as any);
-                  }
-                  
-                  console.log('[MapEffort] Route data applied successfully');
-                } else {
-                  console.error('[MapEffort] Failed to apply route data - src:', !!src, 'hasValidData:', hasValidData);
-                }
-              };
-              
-              // Apply data immediately and also on next frame for safety
-              applyRouteData();
-              requestAnimationFrame(applyRouteData);
+              // Let the original data application system handle route data
+              console.log('[MapEffort] Theme switch complete - original system will handle data');
               
               clearTimeout(timeout);
               map.off('styledata', onStyleLoad);
