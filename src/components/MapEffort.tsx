@@ -681,74 +681,58 @@ export default function MapEffort({
     };
   }, [expanded, onScrub, coords.length, dTotal, cursorDist_m]);
 
-  // Theme switching (disabled during expansion to prevent zoom cancellation)
+  // Theme switching - simplified and more robust
   useEffect(() => {
     const map = mapRef.current; 
-    if (!map || !ready || expanded) return; // Skip during expansion!
+    if (!map || !ready || expanded) return;
     
-    console.log('[MapEffort] Theme switching to:', theme);
-    setVisible(false);
+    // Don't change theme if it's already the same
+    if (map.getStyle()?.name === theme) return;
     
-    const onStyleData = () => {
-      console.log('[MapEffort] Style data loaded, reattaching layers');
+    const switchTheme = async () => {
       try {
-        // Reset the flag and reattach layers
-        layersAttachedRef.current = false;
-        const reattach = (map as any).__attachEffortLayers as (() => void) | undefined;
-        if (reattach) {
-          reattach();
-          console.log('[MapEffort] Layers reattached successfully');
-        }
-        
-        const valid = (coords.length > 1 ? coords : lastNonEmptyRef.current);
-        const has = valid.length > 1;
-        
-        // Reapply route data
-        const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
-        if (src && has) {
-          console.log('[MapEffort] Reapplying route data, points:', valid.length);
-          src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
-        }
-        
-        // Reapply start/finish markers
-        if (has) {
-          const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
-          if (startSrc) startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
+        // Set style and wait for it to load completely
+        await new Promise<void>((resolve) => {
+          const onStyleLoad = () => {
+            // Force reattach all layers
+            layersAttachedRef.current = false;
+            const reattach = (map as any).__attachEffortLayers;
+            if (reattach) reattach();
+            
+            // Reapply all data
+            const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
+            if (valid.length > 1) {
+              const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+              if (src) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+              
+              const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource;
+              if (startSrc) startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
+              
+              const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource;
+              if (finishSrc) finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
+            }
+            
+            map.off('styledata', onStyleLoad);
+            resolve();
+          };
           
-          const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
-          if (finishSrc) finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
+          map.once('styledata', onStyleLoad);
+          map.setStyle(styleUrl(theme));
+        });
+        
+        // Restore camera and show
+        if (savedCameraRef.current && !expanded) {
+          map.jumpTo(savedCameraRef.current as any);
         }
+        setVisible(true);
       } catch (e) {
-        console.error('[MapEffort] Error during style data reattachment:', e);
+        console.error('[MapEffort] Theme switch error:', e);
+        setVisible(true); // Show anyway
       }
     };
     
-    const onIdle = () => {
-      console.log('[MapEffort] Map idle after theme change');
-      try {
-        // Don't restore camera during expansion - it would cancel our zoom!
-        if (savedCameraRef.current && !expanded) map.jumpTo(savedCameraRef.current as any);
-      } catch {}
-      requestAnimationFrame(() => setVisible(true));
-    };
-    
-    try {
-      const cached = styleCacheRef.current[theme];
-      if (cached) {
-        console.log('[MapEffort] Using cached style for theme:', theme);
-        map.setStyle(cached as any, { diff: true });
-      } else {
-        console.log('[MapEffort] Loading new style for theme:', theme);
-        map.setStyle(styleUrl(theme));
-      }
-    } catch (e) {
-      console.error('[MapEffort] Error setting style:', e);
-    }
-    
-    map.once('styledata', onStyleData);
-    map.once('idle', onIdle);
-    return () => { try { map.off('styledata', onStyleData); map.off('idle', onIdle); } catch {} };
-  }, [theme, ready, coords]);
+    switchTheme();
+  }, [theme, ready, coords, expanded]);
 
   // Simple SVG fallback when no coords
   if ((coords?.length ?? 0) < 2) {
