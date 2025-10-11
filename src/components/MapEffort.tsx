@@ -437,16 +437,41 @@ export default function MapEffort({
                 const newSrc = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
                 if (newSrc && has) {
                   console.log('[MapEffort] Setting route data after retry, points:', valid.length);
-                  newSrc.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
                   
-                  // Verify the retry data was set
-                  const retrySourceData = newSrc.getData();
-                  console.log('[MapEffort] Retry route source data after setting:', {
-                    type: retrySourceData?.type,
-                    geometryType: retrySourceData?.geometry?.type,
-                    coordinatesLength: retrySourceData?.geometry?.coordinates?.length,
-                    hasValidData: retrySourceData?.geometry?.coordinates?.length > 0
+                  // Create proper GeoJSON format
+                  const geoJsonData = {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: valid
+                    },
+                    properties: {}
+                  };
+                  
+                  console.log('[MapEffort] Retry GeoJSON data:', {
+                    type: geoJsonData.type,
+                    geometryType: geoJsonData.geometry.type,
+                    coordinatesLength: geoJsonData.geometry.coordinates.length,
+                    firstCoord: geoJsonData.geometry.coordinates[0],
+                    lastCoord: geoJsonData.geometry.coordinates[geoJsonData.geometry.coordinates.length - 1]
                   });
+                  
+                  newSrc.setData(geoJsonData);
+                  
+                  // Wait a bit for the data to be processed
+                  setTimeout(() => {
+                    const retrySourceData = newSrc.getData();
+                    console.log('[MapEffort] Retry route source data after setting (delayed check):', {
+                      type: retrySourceData?.type,
+                      geometryType: retrySourceData?.geometry?.type,
+                      coordinatesLength: retrySourceData?.geometry?.coordinates?.length,
+                      hasValidData: retrySourceData?.geometry?.coordinates?.length > 0
+                    });
+                    
+                    if (!retrySourceData?.geometry?.coordinates?.length) {
+                      console.error('[MapEffort] CRITICAL: Retry route data was not set successfully after delay!');
+                    }
+                  }, 100);
                   
                   // Also update markers
                   const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
@@ -475,20 +500,41 @@ export default function MapEffort({
       if (src && has) {
         console.log('[MapEffort] Setting route data, points:', valid.length);
         try {
-          src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+          // Create proper GeoJSON format
+          const geoJsonData = {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: valid
+            },
+            properties: {}
+          };
           
-          // Verify the data was set
-          const sourceData = src.getData();
-          console.log('[MapEffort] Route source data after setting:', {
-            type: sourceData?.type,
-            geometryType: sourceData?.geometry?.type,
-            coordinatesLength: sourceData?.geometry?.coordinates?.length,
-            hasValidData: sourceData?.geometry?.coordinates?.length > 0
+          console.log('[MapEffort] Attempting to set route data with GeoJSON:', {
+            type: geoJsonData.type,
+            geometryType: geoJsonData.geometry.type,
+            coordinatesLength: geoJsonData.geometry.coordinates.length,
+            firstCoord: geoJsonData.geometry.coordinates[0],
+            lastCoord: geoJsonData.geometry.coordinates[geoJsonData.geometry.coordinates.length - 1]
           });
           
-          if (!sourceData?.geometry?.coordinates?.length) {
-            console.error('[MapEffort] CRITICAL: Route data was not set successfully!');
-          }
+          src.setData(geoJsonData);
+          
+          // Wait a bit for the data to be processed
+          setTimeout(() => {
+            const sourceData = src.getData();
+            console.log('[MapEffort] Route source data after setting (delayed check):', {
+              type: sourceData?.type,
+              geometryType: sourceData?.geometry?.type,
+              coordinatesLength: sourceData?.geometry?.coordinates?.length,
+              hasValidData: sourceData?.geometry?.coordinates?.length > 0
+            });
+            
+            if (!sourceData?.geometry?.coordinates?.length) {
+              console.error('[MapEffort] CRITICAL: Route data was not set successfully after delay!');
+            }
+          }, 100);
+          
         } catch (setDataError) {
           console.error('[MapEffort] Failed to set route data:', setDataError);
         }
@@ -842,16 +888,41 @@ export default function MapEffort({
                 const routeSrc = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
                 if (routeSrc) {
                   console.log('[MapEffort] Setting route data after theme switch, points:', valid.length);
-                  routeSrc.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
                   
-                  // Verify the data was set
-                  const sourceData = routeSrc.getData();
-                  console.log('[MapEffort] Theme switch route source data after setting:', {
-                    type: sourceData?.type,
-                    geometryType: sourceData?.geometry?.type,
-                    coordinatesLength: sourceData?.geometry?.coordinates?.length,
-                    hasValidData: sourceData?.geometry?.coordinates?.length > 0
+                  // Create proper GeoJSON format
+                  const geoJsonData = {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: valid
+                    },
+                    properties: {}
+                  };
+                  
+                  console.log('[MapEffort] Theme switch GeoJSON data:', {
+                    type: geoJsonData.type,
+                    geometryType: geoJsonData.geometry.type,
+                    coordinatesLength: geoJsonData.geometry.coordinates.length,
+                    firstCoord: geoJsonData.geometry.coordinates[0],
+                    lastCoord: geoJsonData.geometry.coordinates[geoJsonData.geometry.coordinates.length - 1]
                   });
+                  
+                  routeSrc.setData(geoJsonData);
+                  
+                  // Wait a bit for the data to be processed
+                  setTimeout(() => {
+                    const sourceData = routeSrc.getData();
+                    console.log('[MapEffort] Theme switch route source data after setting (delayed check):', {
+                      type: sourceData?.type,
+                      geometryType: sourceData?.geometry?.type,
+                      coordinatesLength: sourceData?.geometry?.coordinates?.length,
+                      hasValidData: sourceData?.geometry?.coordinates?.length > 0
+                    });
+                    
+                    if (!sourceData?.geometry?.coordinates?.length) {
+                      console.error('[MapEffort] CRITICAL: Theme switch route data was not set successfully after delay!');
+                    }
+                  }, 100);
                   
                   // Update markers
                   const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
