@@ -1376,14 +1376,38 @@ const formatMovingTime = () => {
          })();
          // Build GPS-derived track once (for route and optional elevation fallback)
          const gpsRaw = (hydrated||workoutData)?.gps_track;
+         // Robust GPS data extraction with comprehensive field name support
          const gps = Array.isArray(gpsRaw)
            ? gpsRaw
            : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
+         
          const track = gps
            .map((p:any)=>{
-             const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
-             const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
-             if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
+             // Handle both array format [lat, lng] and object format {lat, lng}
+             let lng: number | null = null;
+             let lat: number | null = null;
+             
+             if (Array.isArray(p) && p.length >= 2) {
+               // Array format: could be [lat, lng] or [lng, lat]
+               // Check if first value looks like longitude (typically larger absolute value)
+               const [first, second] = p;
+               if (Math.abs(first) > Math.abs(second)) {
+                 lng = first; lat = second; // [lng, lat]
+               } else {
+                 lat = first; lng = second; // [lat, lng]
+               }
+             } else if (typeof p === 'object' && p !== null) {
+               // Object format: try all possible field names
+               lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon ?? p.x ?? null;
+               lat = p.lat ?? p.latitudeInDegree ?? p.latitude ?? p.y ?? null;
+             }
+             
+             // Validate coordinates are within reasonable bounds
+             if (lng !== null && lat !== null && 
+                 Number.isFinite(lng) && Number.isFinite(lat) &&
+                 lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90) {
+               return [Number(lng), Number(lat)] as [number,number];
+             }
              return null;
            })
            .filter(Boolean) as [number,number][];

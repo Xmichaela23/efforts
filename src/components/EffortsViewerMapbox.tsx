@@ -119,30 +119,45 @@ function calculateRouteDistance(
 
 /**
  * Simplifies route for map display using adaptive tolerance based on route length
+ * More conservative approach to prevent route disappearing
  */
 function simplifyRouteForMap(
   points: Array<[number, number]>
 ): Array<[number, number]> {
   if (!points || points.length === 0) return [];
+  
+  // For very short routes, don't simplify at all
+  if (points.length <= 10) {
+    return points;
+  }
 
   // Convert to {lng, lat} format for algorithm
   const pointsObj = points.map(([lng, lat]) => ({ lng, lat }));
 
   const distanceKm = calculateRouteDistance(pointsObj);
 
-  // Choose tolerance based on route length
+  // More conservative tolerance to prevent route loss
   let tolerance: number;
-  if (distanceKm < 10) {
-    tolerance = 0.00001; // Very detailed for short routes (< 10km)
+  if (distanceKm < 5) {
+    tolerance = 0.000005; // Very conservative for short routes
+  } else if (distanceKm < 10) {
+    tolerance = 0.00001; // Conservative for short routes
   } else if (distanceKm < 30) {
-    tolerance = 0.00003; // Detailed for medium routes (10-30km)
+    tolerance = 0.00002; // Moderate for medium routes
   } else if (distanceKm < 50) {
-    tolerance = 0.00005; // Balanced for long routes (30-50km)
+    tolerance = 0.00003; // Balanced for long routes
   } else {
-    tolerance = 0.0001; // Simplified for very long routes (50km+)
+    tolerance = 0.00005; // Simplified for very long routes
   }
 
   const simplified = douglasPeucker(pointsObj, tolerance);
+  
+  // Safety check: if simplification removed too many points, use original
+  const retentionRatio = simplified.length / points.length;
+  if (retentionRatio < 0.1) { // Less than 10% retained
+    console.warn(`Route simplification too aggressive (${Math.round(retentionRatio * 100)}% retained), using original`);
+    return points;
+  }
 
   if (import.meta.env?.DEV) {
     console.log(
