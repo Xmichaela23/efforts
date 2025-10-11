@@ -214,8 +214,17 @@ export default function MapEffort({
           }, 
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
+        console.log('[MapEffort] Main route line added successfully');
       } else {
         console.log('[MapEffort] Main route line already exists');
+        // Check if layer is visible
+        const layer = map.getLayer(ROUTE_LINE);
+        console.log('[MapEffort] Main route line layer state:', {
+          id: layer?.id,
+          type: layer?.type,
+          source: layer?.source,
+          paint: layer?.paint
+        });
       }
       
       // Start marker (green pin)
@@ -430,6 +439,15 @@ export default function MapEffort({
                   console.log('[MapEffort] Setting route data after retry, points:', valid.length);
                   newSrc.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
                   
+                  // Verify the retry data was set
+                  const retrySourceData = newSrc.getData();
+                  console.log('[MapEffort] Retry route source data after setting:', {
+                    type: retrySourceData?.type,
+                    geometryType: retrySourceData?.geometry?.type,
+                    coordinatesLength: retrySourceData?.geometry?.coordinates?.length,
+                    hasValidData: retrySourceData?.geometry?.coordinates?.length > 0
+                  });
+                  
                   // Also update markers
                   const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
                   if (startSrc) {
@@ -457,6 +475,15 @@ export default function MapEffort({
       if (src && has) {
         console.log('[MapEffort] Setting route data, points:', valid.length);
         src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+        
+        // Verify the data was set
+        const sourceData = src.getData();
+        console.log('[MapEffort] Route source data after setting:', {
+          type: sourceData?.type,
+          geometryType: sourceData?.geometry?.type,
+          coordinatesLength: sourceData?.geometry?.coordinates?.length,
+          hasValidData: sourceData?.geometry?.coordinates?.length > 0
+        });
       } else {
         console.log('[MapEffort] Cannot set route data - src:', !!src, 'has:', has);
       }
