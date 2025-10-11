@@ -383,7 +383,27 @@ export default function MapEffort({
     if (coords.length > 1) lastNonEmptyRef.current = coords;
     const has = valid.length > 1;
     const applyData = () => {
-      const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
+      let src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
+      
+      // If source is missing, recreate it
+      if (!src && has) {
+        console.log('[MapEffort] Route source missing, recreating...');
+        try {
+          map.addSource(ROUTE_SRC, { 
+            type: 'geojson', 
+            data: { 
+              type: 'Feature', 
+              geometry: { type: 'LineString', coordinates: valid }, 
+              properties: {} 
+            } as any 
+          });
+          src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource;
+          console.log('[MapEffort] Route source recreated:', !!src);
+        } catch (e) {
+          console.error('[MapEffort] Failed to recreate route source:', e);
+        }
+      }
+      
       if (src && has) {
         console.log('[MapEffort] Setting route data, points:', valid.length);
         src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
@@ -688,7 +708,7 @@ export default function MapEffort({
     
     // Don't change theme if it's already the same
     const currentStyle = map.getStyle();
-    if (currentStyle?.name === theme || currentStyle?.sources?.['maptiler']?.url?.includes(theme)) {
+    if (currentStyle?.name === theme || (currentStyle?.sources as any)?.['maptiler']?.url?.includes(theme)) {
       return;
     }
     
