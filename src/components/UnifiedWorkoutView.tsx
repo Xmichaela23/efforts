@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { useExecutionScore } from '@/hooks/useExecutionScore';
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 
+
 interface UnifiedWorkoutViewProps {
   workout: any;
   onClose: () => void;

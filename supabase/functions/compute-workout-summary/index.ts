@@ -257,6 +257,7 @@ function stepRole(st:any): 'warmup'|'cooldown'|'recovery'|'work' {
   return 'work';
 }
 
+
 function formatPlannedLabel(st: any, sport?: string): string | null {
   if (!st) return null;
   
@@ -294,11 +295,42 @@ function formatPlannedLabel(st: any, sport?: string): string | null {
       }
     }
     
-    // Priority 2: If it's a TIME-based step (has duration but no distance), show duration
+    // Priority 2: If it's a TIME-based step (has duration but no distance), show duration + pace when available
     if (seconds && seconds > 0) {
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
-      return secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
+      const durationStr = secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
+      
+      // Try to include pace information for time-based steps
+      let paceText: string | null = null;
+      
+      // Check for pace_range object {lower, upper}
+      const prng = (st as any)?.pace_range || (st as any)?.paceRange;
+      if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
+        paceText = `${prng.lower}–${prng.upper}`;
+      }
+      // Check for pace_range array [lower, upper]
+      else if (Array.isArray(prng) && prng.length === 2 && prng[0] && prng[1]) {
+        paceText = `${prng[0]}–${prng[1]}`;
+      }
+      // Single pace target
+      else {
+        const paceTarget = st?.paceTarget || st?.target_pace || st?.pace;
+        if (typeof paceTarget === 'string' && /\d+:\d{2}\s*\/\s*(mi|km)/i.test(paceTarget)) {
+          paceText = paceTarget;
+        }
+        // Derive from pace_sec_per_mi
+        else {
+          const paceSecPerMi = derivePlannedPaceSecPerMi(st);
+          if (paceSecPerMi && paceSecPerMi > 0) {
+            const paceMins = Math.floor(paceSecPerMi / 60);
+            const paceSecs = Math.round(paceSecPerMi % 60);
+            paceText = `${paceMins}:${paceSecs.toString().padStart(2, '0')}/mi`;
+          }
+        }
+      }
+      
+      return paceText ? `${durationStr} @ ${paceText}` : durationStr;
     }
     
     return '—';
