@@ -717,11 +717,12 @@ export default function MapEffort({
     } catch (error) {
       console.log('[MapEffort] THEME SWITCHING - Error setting style:', error);
     }
-    // Reattach quickly on styledata, then finalize on idle (smoother)
+    // Wait for complete render cycle to avoid race condition
     setVisible(false);
-    const onStyleData = () => {
-      console.log('[MapEffort] THEME SWITCHING - onStyleData called for theme:', theme);
+    const onIdle = () => {
+      console.log('[MapEffort] THEME SWITCHING - onIdle called for theme:', theme);
       try {
+        // Reattach layers first
         const reattach = (map as any).__attachEffortLayers as (() => void) | undefined;
         if (reattach) {
           console.log('[MapEffort] THEME SWITCHING - Calling reattach function');
@@ -729,6 +730,8 @@ export default function MapEffort({
         } else {
           console.log('[MapEffort] THEME SWITCHING - No reattach function available');
         }
+        
+        // Set route data
         const valid = (coords.length > 1 ? coords : lastNonEmptyRef.current);
         const has = valid.length > 1;
         console.log('[MapEffort] THEME SWITCHING - Route data check - has:', has, 'coords:', valid.length);
@@ -774,20 +777,17 @@ export default function MapEffort({
           const paint = map.getPaintProperty(ROUTE_LINE, 'line-color');
           console.log('[MapEffort] THEME SWITCHING - Route visibility:', visibility, 'color:', paint);
         }
+        
+        // Restore camera and fade in
+        if (savedCameraRef.current && !expanded) map.jumpTo(savedCameraRef.current as any);
+        requestAnimationFrame(() => setVisible(true));
       } catch (error) {
-        console.log('[MapEffort] THEME SWITCHING - Error in onStyleData:', error);
+        console.log('[MapEffort] THEME SWITCHING - Error in onIdle:', error);
+        requestAnimationFrame(() => setVisible(true));
       }
     };
-    const onIdle = () => {
-      try {
-        // Don't restore camera during expansion - it would cancel our zoom!
-        if (savedCameraRef.current && !expanded) map.jumpTo(savedCameraRef.current as any);
-      } catch {}
-      requestAnimationFrame(() => setVisible(true));
-    };
-    map.once('styledata', onStyleData);
     map.once('idle', onIdle);
-    return () => { try { map.off('styledata', onStyleData); map.off('idle', onIdle); } catch {} };
+    return () => { try { map.off('idle', onIdle); } catch {} };
   }, [theme, ready, coords]);
 
   // Simple SVG fallback when no coords
