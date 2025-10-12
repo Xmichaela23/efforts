@@ -391,7 +391,17 @@ export default function WorkoutCalendar({
         const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '');
         const isCompleted = String(w?.workout_status||'').toLowerCase()==='completed';
         const isPlannedLinked = isCompleted && !!(w as any)?.planned_id;
-        const showCheckmark = isCompleted && isPlannedLinked; // Only show checkmark if actually linked
+        
+        // Determine checkmark based on status and linkage
+        let checkmark = '';
+        if (isCompleted) {
+          if (isPlannedLinked) {
+            checkmark = ' ✓✓'; // Double checkmark for completed + attached
+          } else {
+            checkmark = ' ✓'; // Single checkmark for completed but not attached
+          }
+        }
+        // No checkmark for planned workouts
         
         // For linked completed workouts, try to find the planned workout's label
         let labelBase = plannedLabel || [t, milesText].filter(Boolean).join(' ');
@@ -414,7 +424,7 @@ export default function WorkoutCalendar({
         
         return {
           date: w.date,
-          label: `${labelBase}${showCheckmark ? ' ✓' : ''}`,
+          label: `${labelBase}${checkmark}`,
           href: `#${w.id}`,
           provider: w.provider || deriveProvider(w),
           _sigType: t,
@@ -430,8 +440,8 @@ export default function WorkoutCalendar({
       if (!id) { byId.set(`${ev.date}|${ev.label}|${Math.random()}`, ev); continue; }
       const existing = byId.get(id);
       if (!existing) { byId.set(id, ev); continue; }
-      const exCompleted = /✓\s*$/.test(String(existing.label||'')) || String((existing as any)?._src?.workout_status||'').toLowerCase()==='completed';
-      const curCompleted = /✓\s*$/.test(String(ev.label||'')) || String((ev as any)?._src?.workout_status||'').toLowerCase()==='completed';
+      const exCompleted = /✓+$/.test(String(existing.label||'')) || String((existing as any)?._src?.workout_status||'').toLowerCase()==='completed';
+      const curCompleted = /✓+$/.test(String(ev.label||'')) || String((ev as any)?._src?.workout_status||'').toLowerCase()==='completed';
       if (curCompleted && !exCompleted) byId.set(id, ev);
     }
     const raw = Array.from(byId.values());
