@@ -247,7 +247,7 @@ export default function MapEffort({
           type: 'circle',
           source: START_MARKER_SRC,
           paint: {
-            'circle-radius': 8,
+            'circle-radius': 6,
             'circle-color': '#10b981',  // Green for start
             'circle-stroke-color': '#fff',
             'circle-stroke-width': 2
@@ -272,7 +272,7 @@ export default function MapEffort({
           type: 'circle',
           source: FINISH_MARKER_SRC,
           paint: {
-            'circle-radius': 8,
+            'circle-radius': 6,
             'circle-color': '#ef4444',  // Red for finish
             'circle-stroke-color': '#fff',
             'circle-stroke-width': 2
@@ -301,7 +301,7 @@ export default function MapEffort({
           type: 'circle', 
           source: CURSOR_SRC, 
           paint: { 
-            'circle-radius': 18,
+            'circle-radius': 14,
             'circle-color': '#60a5fa',  // Match bright blue
             'circle-opacity': 0.25,
             'circle-blur': 1
@@ -319,10 +319,10 @@ export default function MapEffort({
           type: 'circle', 
           source: CURSOR_SRC, 
           paint: { 
-            'circle-radius': 9,
+            'circle-radius': 7,
             'circle-color': '#fff', 
             'circle-stroke-color': '#60a5fa',  // Match bright blue
-            'circle-stroke-width': 3.5
+            'circle-stroke-width': 2.5
           } 
         });
       } else {
