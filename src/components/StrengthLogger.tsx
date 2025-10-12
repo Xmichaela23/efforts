@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import { calculateWorkload } from '@/utils/workloadCalculator';
 
 interface LoggedSet {
   reps: number;
@@ -1401,13 +1400,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         });
       } catch { return []; }
     };
-    // Calculate actual workload for completed workout
-    const actualWorkload = calculateWorkload({
-      type: isMobilityMode ? 'strength' : 'strength', // mobility uses strength calculation
-      duration: durationMinutes,
-      strength_exercises: isMobilityMode ? mobilityFromSets() : validExercises
-    });
-
     const completedWorkout = isMobilityMode ? {
       id: scheduledWorkout?.id || Date.now().toString(),
       name: scheduledWorkout?.name || `Mobility - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
@@ -1421,8 +1413,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       notes: extra?.notes,
       rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
       addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence })),
-      planned_id: sourcePlannedId || undefined,
-      workload_actual: actualWorkload
+      planned_id: sourcePlannedId || undefined
     } : {
       id: scheduledWorkout?.id || Date.now().toString(),
       name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
@@ -1438,8 +1429,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       notes: extra?.notes,
       rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
       addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence })),
-      planned_id: sourcePlannedId || undefined,
-      workload_actual: actualWorkload
+      planned_id: sourcePlannedId || undefined
     };
 
     console.log('🔍 Saving completed workout:', completedWorkout);

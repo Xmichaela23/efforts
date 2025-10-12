@@ -615,24 +615,6 @@ export default function WorkoutCalendar({
           );
         })}
       </div>
-      
-      {/* Weekly workload total */}
-      <div className="flex justify-end items-center mt-2 pr-2">
-        <div className="text-right">
-          <div className="text-lg font-medium text-gray-900">
-            {(() => {
-              const allItems = Array.from(map.values()).flat();
-              const weeklyTotal = allItems.reduce((sum, item) => {
-                const workload = item.workload_actual || item.workload_planned || 0;
-                return sum + workload;
-              }, 0);
-              return weeklyTotal;
-            })()}
-          </div>
-          <div className="text-xs text-gray-500">this week</div>
-        </div>
-      </div>
-      
       {/* Hidden background prefetchers */}
       {prefetchNeighbors && (
         <>

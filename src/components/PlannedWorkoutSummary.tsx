@@ -424,9 +424,6 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             {(typeof yards === 'number') ? (
               <span className="px-2 py-0.5 text-xs rounded bg-blue-50 border border-blue-200 text-blue-800">{yards} yd</span>
             ) : null}
-            {(workout as any)?.workload_planned ? (
-              <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-600">{(workout as any).workload_planned}</span>
-            ) : null}
           </span>
         </div>
         {!hideLines && !isStrength && (
