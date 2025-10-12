@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import PlanJSONImport from '@/components/PlanJSONImport';
+import WorkloadAdmin from '@/components/WorkloadAdmin';
 
 export default function PlansAdminImport() {
   const navigate = useNavigate();
@@ -33,7 +34,8 @@ export default function PlansAdminImport() {
       </header>
 
       <main className="mobile-main-content">
-        <div className="w-full max-w-3xl mx-auto px-4 py-4">
+        <div className="w-full max-w-3xl mx-auto px-4 py-4 space-y-8">
+          <WorkloadAdmin />
           <PlanJSONImport />
         </div>
       </main>
