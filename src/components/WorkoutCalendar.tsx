@@ -562,7 +562,7 @@ export default function WorkoutCalendar({
       </div>
 
       {/* 3-column week grid filling remaining height with min cell size */}
-      <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full flex-1" style={{ rowGap: 0, columnGap: 0, alignContent: 'stretch', alignItems: 'stretch' }}>
+      <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full flex-1 relative" style={{ rowGap: 0, columnGap: 0, alignContent: 'stretch', alignItems: 'stretch' }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -678,10 +678,10 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
   }, [weekStart]);
 
   return (
-    <div className="flex justify-center items-center mt-4 mb-2">
-      <div className="text-center bg-gray-50 px-4 py-2 rounded-lg border">
-        <div className="text-sm text-gray-600 mb-1">Total Workload</div>
-        <div className="text-xl font-bold text-gray-900">
+    <div className="absolute bottom-2 right-2 p-2">
+      <div className="text-right">
+        <div className="text-xs text-gray-500">Total Workload</div>
+        <div className="text-sm font-medium text-gray-700">
           {loading ? '...' : `${completedWorkload} / ${plannedWorkload}`}
         </div>
         <div className="text-xs text-gray-500">completed / planned</div>

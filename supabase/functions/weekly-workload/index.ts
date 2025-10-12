@@ -124,8 +124,13 @@ serve(async (req) => {
         const planned = workout.workload_planned || 0;
         const actual = workout.workload_actual || 0;
         
+        // Add to planned total (original week target)
         weeklyStats.total_planned += planned;
-        weeklyStats.total_actual += actual;
+        
+        // Add to actual total ONLY for completed workouts
+        if (workout.workout_status === 'completed') {
+          weeklyStats.total_actual += actual;
+        }
         
         if (workout.workout_status === 'planned') {
           weeklyStats.sessions_planned++;
