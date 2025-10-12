@@ -3,6 +3,7 @@ import { normalizePlannedSession, normalizeStructuredSession } from '@/services/
 import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';
 import { expand } from './expander';
 import { resolveTargets, totalDurationSeconds } from './targets';
+import { calculateWorkload } from '@/utils/workloadCalculator';
 
 type PlannedRow = {
   user_id: string;
@@ -17,6 +18,7 @@ type PlannedRow = {
   duration: number;
   workout_status: 'planned';
   source: 'training_plan';
+  workload_planned?: number;
   steps_preset?: string[] | null;
   export_hints?: any;
   rendered_description?: string;
@@ -2016,6 +2018,15 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       } catch {}
     }
 
+    // Calculate workload for this session
+    const sessionDuration = totalDurSeconds > 0 ? Math.round(totalDurSeconds/60) : durationVal;
+    const workloadPlanned = calculateWorkload({
+      type: mappedType as 'run' | 'bike' | 'swim' | 'strength',
+      duration: sessionDuration,
+      steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : undefined,
+      strength_exercises: strengthExercises
+    });
+
     // PoC: do not fail if computed steps are missing; we'll insert minimal computed with duration only
     // Only include columns that exist in planned_workouts
     rows.push({
@@ -2028,9 +2039,10 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       type: mappedType,
       name: nameFromDiscipline,
       description: s.description || '',
-      duration: totalDurSeconds>0 ? Math.round(totalDurSeconds/60) : durationVal,
+      duration: sessionDuration,
       workout_status: 'planned' as any,
       source: 'training_plan',
+      workload_planned: workloadPlanned,
       // tags stored in DB via a separate column in some deployments; omit from typed row here
       steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
       export_hints: exportHints || null,

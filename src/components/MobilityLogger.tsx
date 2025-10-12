@@ -18,6 +18,7 @@ import {
   Search
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
+import { calculateWorkload } from '@/utils/workloadCalculator';
 import { ExerciseLibraryService } from '@/services/ExerciseLibrary';
 
 interface LoggedMobilityExercise {
@@ -218,6 +219,18 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
       ? String(scheduledWorkout.id) 
       : null;
     
+    // Calculate actual workload for completed workout
+    const actualWorkload = calculateWorkload({
+      type: 'strength', // mobility uses strength calculation
+      duration: durationMinutes,
+      strength_exercises: validExercises.map(ex => ({
+        name: ex.name,
+        sets: 1,
+        reps: ex.completed ? 1 : 0,
+        weight: 'bodyweight'
+      }))
+    });
+
     // Prepare the workout data - using 'mobility' type and persisting mobility_exercises
     const completedWorkout = {
       id: isEditingCompleted ? scheduledWorkout.id : Date.now().toString(),
@@ -231,7 +244,8 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
       mobility_exercises: validExercises,
       workout_status: 'completed' as const,
       completedManually: true,
-      planned_id: sourcePlannedId || undefined
+      planned_id: sourcePlannedId || undefined,
+      workload_actual: actualWorkload
     };
 
     console.log('🔍 Saving completed mobility workout:', completedWorkout);
