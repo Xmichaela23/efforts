@@ -632,7 +632,8 @@ export default function WorkoutCalendar({
 
 // Weekly Workload Total Component
 function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
-  const [weeklyTotal, setWeeklyTotal] = useState<number>(0);
+  const [completedWorkload, setCompletedWorkload] = useState<number>(0);
+  const [plannedWorkload, setPlannedWorkload] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -647,13 +648,16 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
 
         if (error) {
           console.error('Error fetching weekly workload:', error);
-          setWeeklyTotal(0);
+          setCompletedWorkload(0);
+          setPlannedWorkload(0);
         } else {
-          setWeeklyTotal(data?.hybrid_total || 0);
+          setCompletedWorkload(data?.total_actual || 0);
+          setPlannedWorkload(data?.total_planned || 0);
         }
       } catch (error) {
         console.error('Error fetching weekly workload:', error);
-        setWeeklyTotal(0);
+        setCompletedWorkload(0);
+        setPlannedWorkload(0);
       } finally {
         setLoading(false);
       }
@@ -666,9 +670,9 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
     <div className="flex justify-end items-center mt-2 pr-2">
       <div className="text-right">
         <div className="text-lg font-medium text-gray-900">
-          {loading ? '...' : weeklyTotal}
+          {loading ? '...' : `${completedWorkload} / ${plannedWorkload}`}
         </div>
-        <div className="text-xs text-gray-500">this week</div>
+        <div className="text-xs text-gray-500">done / plan</div>
       </div>
     </div>
   );

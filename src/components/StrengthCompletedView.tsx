@@ -217,6 +217,11 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
         </div>
         <div className="flex items-center gap-4 text-sm text-gray-600">
           <span className="font-medium">{workoutStats.actual.volume.toLocaleString()} lbs total</span>
+          {(workoutData as any).workload_actual || (workoutData as any).workload_planned ? (
+            <span className="workload-line">
+              Workload: {(workoutData as any).workload_actual || (workoutData as any).workload_planned}
+            </span>
+          ) : null}
         </div>
         
         {/* Compare to Plan button */}

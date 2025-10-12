@@ -486,7 +486,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           return [distText, durText, per100];
         }
         
-        return [distance, paceSpeed, powerText, hrDisplay, elevationFt].filter(Boolean) as any;
+        // Add workload if available
+        const workload = (workout as any).workload_actual || (workout as any).workload_planned;
+        const workloadText = workload ? `${workload}` : undefined;
+        
+        return [distance, paceSpeed, powerText, hrDisplay, elevationFt, workloadText].filter(Boolean) as any;
       }
     };
     

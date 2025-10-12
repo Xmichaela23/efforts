@@ -1,24 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Calculator, History, BarChart3 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import { 
   calculateWorkloadForWorkout, 
   sweepUserHistory, 
   getWorkloadStats,
   getWeeklyWorkloadSummary 
 } from '@/services/workloadService';
-import { useAppContext } from '@/contexts/AppContext';
 
 export default function WorkloadAdmin() {
-  const { user } = useAppContext();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
   const [batchSize, setBatchSize] = useState(100);
   const [dryRun, setDryRun] = useState(true);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
 
   const handleSweepHistory = async () => {
     if (!user?.id) return;
@@ -80,7 +88,7 @@ export default function WorkloadAdmin() {
         <h1 className="text-2xl font-bold">Workload Administration</h1>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="max-w-md">
         {/* Historical Sweep */}
         <Card>
           <CardHeader>
@@ -126,43 +134,6 @@ export default function WorkloadAdmin() {
           </CardContent>
         </Card>
 
-        {/* Statistics */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Statistics
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button 
-              onClick={handleGetStats} 
-              disabled={loading}
-              className="w-full"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <BarChart3 className="h-4 w-4 mr-2" />
-              )}
-              Get Workload Stats
-            </Button>
-
-            <Button 
-              onClick={handleGetWeeklySummary} 
-              disabled={loading}
-              variant="outline"
-              className="w-full"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Calculator className="h-4 w-4 mr-2" />
-              )}
-              Weekly Summary
-            </Button>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Results */}
