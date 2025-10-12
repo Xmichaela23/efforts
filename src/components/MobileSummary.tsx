@@ -698,6 +698,34 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     return '—';
   };
 
+  // --- Universal power selection logic ---
+  const isMultiIntervalWorkout = (intervals: any[]): boolean => {
+    if (!Array.isArray(intervals) || intervals.length <= 1) return false;
+    
+    // Check for different power targets across intervals
+    const powerTargets = intervals.map(i => {
+      const pr = i.planned?.power_range;
+      const target = i.planned?.power_target_watts;
+      return pr ? `${pr.lower}-${pr.upper}` : target;
+    }).filter(Boolean);
+    
+    const uniqueTargets = [...new Set(powerTargets)];
+    return uniqueTargets.length > 1;
+  };
+
+  const getDisplayPower = (workout: any, interval: any): number | null => {
+    const intervals = workout?.computed?.intervals || [];
+    const isMultiInterval = isMultiIntervalWorkout(intervals);
+    
+    if (isMultiInterval && interval?.executed?.avg_power_w) {
+      // Use interval-specific power for structured workouts
+      return Number(interval.executed.avg_power_w);
+    } else {
+      // Use overall workout power for simple rides/runs
+      return Number(workout?.avg_power ?? workout?.metrics?.avg_power ?? workout?.average_watts);
+    }
+  };
+
   // --- Execution percentage helpers (strict, server-computed only) ---
   const shouldShowPercentage = (st: any): boolean => {
     const t = String((st?.type || st?.kind || '')).toLowerCase();
@@ -708,11 +736,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     try {
       if (!executedStep) return null;
 
-      // Power-based intervals
+      // Power-based intervals - use universal power selection
       const pr = (plannedStep as any)?.power_range || (plannedStep as any)?.powerRange || (plannedStep as any)?.power?.range;
       const lo = Number(pr?.lower);
       const hi = Number(pr?.upper);
-      const ew = Number((executedStep as any)?.avg_power_w ?? (executedStep as any)?.avg_watts ?? (executedStep as any)?.power);
+      // Use universal power selection logic
+      const ew = getDisplayPower(hydratedCompleted || completed, executedStep);
       if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi > 0 && Number.isFinite(ew) && ew > 0) {
         const mid = (lo + hi) / 2;
         if (mid > 0) return Math.round((ew / mid) * 100);
@@ -1999,17 +2028,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             })();
 
             const execCell = (() => {
-              // Strict: only show when server mapping provides a matched executed interval
-              if (!hasServerComputed || !row) return '—';
+              // For rides, use universal power selection logic
               if (isRideSport) {
-                const pw = row?.executed?.avg_power_w as number | undefined;
-                if (typeof pw === 'number' && Number.isFinite(pw)) return `${Math.round(pw)} W`;
-                const spd = row?.executed?.avg_speed_mps as number | undefined;
-                if (typeof spd === 'number' && Number.isFinite(spd) && spd > 0.2) {
-                  const mph = spd * 2.236936; return `${mph.toFixed(1)} mph`;
-                }
+                const power = getDisplayPower(hydratedCompleted || completed, row?.executed);
+                if (Number.isFinite(power) && power > 0) return `${Math.round(power)} W`;
                 return '—';
               }
+              // For other sports, use server-computed interval data
+              if (!hasServerComputed || !row) return '—';
               const secPerMi = row?.executed?.avg_pace_s_per_mi as number | undefined;
               return secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—';
             })();
