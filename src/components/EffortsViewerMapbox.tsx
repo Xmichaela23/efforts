@@ -1449,10 +1449,16 @@ function EffortsViewerMapbox({
         trackLngLat={useMemo(() => {
           try {
             const raw = Array.isArray(trackLngLat) ? trackLngLat : [];
+            console.log('[EffortsViewerMapbox] ROUTE DATA - Raw trackLngLat length:', raw.length, 'theme:', theme);
             // Use Douglas-Peucker algorithm for intelligent route simplification
-            return simplifyRouteForMap(raw);
-          } catch { return Array.isArray(trackLngLat) ? trackLngLat : []; }
-        }, [trackLngLat]) as any}
+            const simplified = simplifyRouteForMap(raw);
+            console.log('[EffortsViewerMapbox] ROUTE DATA - Simplified length:', simplified.length, 'theme:', theme);
+            return simplified;
+          } catch (error) {
+            console.log('[EffortsViewerMapbox] ROUTE DATA - Error in simplification:', error, 'theme:', theme);
+            return Array.isArray(trackLngLat) ? trackLngLat : [];
+          }
+        }, [trackLngLat, theme]) as any}
         cursorDist_m={distNow}
         totalDist_m={dTotal}
         theme={theme}
