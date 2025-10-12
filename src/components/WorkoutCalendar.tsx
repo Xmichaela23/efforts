@@ -619,14 +619,12 @@ export default function WorkoutCalendar({
         {/* Fill remaining cells to complete 3x3 grid */}
         {Array.from({ length: 9 - weekDays.length }).map((_, index) => (
           <div key={`empty-${index}`} className="mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-gray-200 p-2 flex flex-col justify-end items-end">
-            {/* Keep this cell open for other data */}
+            {/* Weekly workload total in the last cell (9th cell) */}
+            {index === (9 - weekDays.length - 1) && (
+              <WeeklyWorkloadTotal weekStart={weekStart.toISOString().split('T')[0]} />
+            )}
           </div>
         ))}
-        
-        {/* Weekly workload total - positioned outside grid, higher and closer to Sunday */}
-        <div className="absolute bottom-2 right-2 z-10">
-          <WeeklyWorkloadTotal weekStart={weekStart.toISOString().split('T')[0]} />
-        </div>
       </div>
       
       {/* Hidden background prefetchers */}
@@ -687,7 +685,7 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
   }, [weekStart]);
 
   return (
-    <div className="bg-white/90 rounded shadow-sm p-2 text-right">
+    <div className="text-right">
       <div className="text-xs text-gray-500">Total Workload</div>
       <div className="text-sm font-medium text-gray-700">
         {loading ? '...' : `${completedWorkload} / ${plannedWorkload}`}
