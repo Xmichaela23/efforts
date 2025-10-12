@@ -657,8 +657,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     if (!paceText && prng && prng.length===2) {
       const lo = Number(prng[0]); const hi = Number(prng[1]);
       if (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) {
-        const mid = Math.round((lo + hi) / 2);
-        paceText = fmtPace(mid);
+        // Show full pace range like "9:00–10:00/mi"
+        paceText = `${fmtPace(lo)}–${fmtPace(hi)}/mi`;
       }
     }
     // derive pace from distance + duration if present
