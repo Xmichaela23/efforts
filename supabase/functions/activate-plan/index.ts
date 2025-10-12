@@ -371,9 +371,38 @@ Deno.serve(async (req) => {
 
     let inserted = 0
     if (rows.length) {
-      const { error } = await supabase.from('planned_workouts').insert(rows as any)
+      const { data: insertedRows, error } = await supabase.from('planned_workouts').insert(rows as any).select('id, type, duration, steps_preset, strength_exercises, mobility_exercises')
       if (error) throw error
       inserted = rows.length
+      
+      // Calculate workload for each inserted planned workout (now with actual IDs)
+      const insertedWorkouts = Array.isArray(insertedRows) ? insertedRows : []
+      for (const workout of insertedWorkouts) {
+        try {
+          console.log('🔧 Calculating workload for planned workout:', workout.id, workout.type);
+          const { data, error } = await supabase.functions.invoke('calculate-workload', {
+            body: {
+              workout_id: workout.id,
+              workout_data: {
+                type: workout.type,
+                duration: workout.duration,
+                steps_preset: workout.steps_preset,
+                strength_exercises: workout.strength_exercises,
+                mobility_exercises: workout.mobility_exercises,
+                workout_status: 'planned'
+              }
+            }
+          });
+          
+          if (error) {
+            console.error('❌ Edge Function error for planned workout:', workout.id, error);
+          } else {
+            console.log('✅ Workload calculated for planned workout:', workout.id, data);
+          }
+        } catch (error) {
+          console.error('❌ Failed to calculate workload for planned workout:', workout.id, error);
+        }
+      }
     }
 
     // Materialize steps for the whole plan (server-side expansion)
@@ -394,6 +423,51 @@ Deno.serve(async (req) => {
     } catch (e) {
       try { await supabase.from('planned_workouts').delete().eq('training_plan_id', planId) } catch {}
       return new Response(JSON.stringify({ success:false, error:'materialize_exception', details: String(e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type':'application/json' } })
+    }
+
+    // Auto-attach completed workouts to planned workouts
+    try {
+      console.log('🔗 Starting auto-attachment for plan:', planId);
+      
+      // Get all completed workouts for this user in a broader date range
+      // Look back 30 days and forward 1 year to catch workouts from previous plan iterations
+      const lookbackDate = addDaysISO(startDate, -30);
+      const lookforwardDate = addDaysISO(startDate, 365);
+      
+      const { data: completedWorkouts } = await supabase
+        .from('workouts')
+        .select('id, type, date, user_id')
+        .eq('user_id', userId)
+        .eq('workout_status', 'completed')
+        .gte('date', lookbackDate)
+        .lte('date', lookforwardDate)
+        .is('planned_id', null); // Only unattached workouts
+      
+      const workoutsToAttach = Array.isArray(completedWorkouts) ? completedWorkouts : [];
+      console.log('🔗 Found', workoutsToAttach.length, 'unattached completed workouts in date range', lookbackDate, 'to', lookforwardDate);
+      
+      // Auto-attach each completed workout
+      for (const workout of workoutsToAttach) {
+        try {
+          console.log('🔗 Auto-attaching workout:', workout.id, workout.type, workout.date);
+          const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
+            body: { workout_id: workout.id }
+          });
+          
+          if (error) {
+            console.error('❌ Auto-attach failed for workout:', workout.id, error);
+          } else {
+            console.log('✅ Auto-attached workout:', workout.id, data);
+          }
+        } catch (attachError) {
+          console.error('❌ Auto-attach error for workout:', workout.id, attachError);
+        }
+      }
+      
+      console.log('🔗 Auto-attachment completed for plan:', planId);
+    } catch (autoAttachError) {
+      console.error('❌ Auto-attachment failed for plan:', planId, autoAttachError);
+      // Don't fail the plan import if auto-attachment fails
     }
 
     // Verify (warn-only): log any rows without computed steps/total but do not block activation

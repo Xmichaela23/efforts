@@ -1466,6 +1466,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       } catch (workloadError) {
         console.error('❌ Failed to calculate workload:', workloadError);
       }
+
+      // Auto-attach to planned workout if possible
+      try {
+        console.log('🔗 Attempting auto-attachment for completed workout:', saved?.id || completedWorkout.id);
+        const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
+          body: { workout_id: saved?.id || completedWorkout.id }
+        });
+        
+        if (error) {
+          console.error('❌ Auto-attach failed for workout:', saved?.id || completedWorkout.id, error);
+        } else {
+          console.log('✅ Auto-attached workout:', saved?.id || completedWorkout.id, data);
+        }
+      } catch (attachError) {
+        console.error('❌ Auto-attach error for workout:', saved?.id || completedWorkout.id, attachError);
+      }
     } catch (e) {
       console.error('❌ Save failed with error:', e);
       console.error('❌ Error details:', {

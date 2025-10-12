@@ -260,6 +260,22 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
       console.error('❌ Failed to calculate workload:', workloadError);
     }
 
+    // Auto-attach to planned workout if possible
+    try {
+      console.log('🔗 Attempting auto-attachment for completed mobility workout:', completedWorkout.id);
+      const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
+        body: { workout_id: completedWorkout.id }
+      });
+      
+      if (error) {
+        console.error('❌ Auto-attach failed for mobility workout:', completedWorkout.id, error);
+      } else {
+        console.log('✅ Auto-attached mobility workout:', completedWorkout.id, data);
+      }
+    } catch (attachError) {
+      console.error('❌ Auto-attach error for mobility workout:', completedWorkout.id, attachError);
+    }
+
     // Navigate to completed view
     if (onWorkoutSaved) {
       onWorkoutSaved(completedWorkout);

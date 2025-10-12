@@ -406,7 +406,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           metrics: workout.metrics
         };
 
-        await addWorkout(workoutToSave);
+        const savedWorkout = await addWorkout(workoutToSave);
+        
+        // Auto-attach to planned workout if possible
+        try {
+          console.log('🔗 Attempting auto-attachment for imported workout:', savedWorkout?.id);
+          const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
+            body: { workout_id: savedWorkout?.id }
+          });
+          
+          if (error) {
+            console.error('❌ Auto-attach failed for imported workout:', savedWorkout?.id, error);
+          } else {
+            console.log('✅ Auto-attached imported workout:', savedWorkout?.id, data);
+          }
+        } catch (attachError) {
+          console.error('❌ Auto-attach error for imported workout:', savedWorkout?.id, attachError);
+        }
       } catch (error) {
         console.error('❌ Error importing workout:', error);
       }

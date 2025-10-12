@@ -228,9 +228,12 @@ serve(async (req) => {
     const workload = calculateWorkload(workout_data)
     const intensity = getSessionIntensity(workout_data)
 
+    // Determine which table to update based on workout status
+    const tableName = workout_data.workout_status === 'planned' ? 'planned_workouts' : 'workouts'
+    
     // Update the workout in the database
     const { error } = await supabaseClient
-      .from('workouts')
+      .from(tableName)
       .update({
         workload_planned: workout_data.workout_status === 'planned' ? workload : null,
         workload_actual: workout_data.workout_status === 'completed' ? workload : null,
