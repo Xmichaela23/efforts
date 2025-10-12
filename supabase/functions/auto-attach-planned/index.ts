@@ -15,6 +15,8 @@ function sportSubtype(s: string | null | undefined): { sport: string; subtype: s
   if (t.includes('ride') || t.includes('bike') || t.includes('cycl')) return { sport: 'ride', subtype: null };
   if (t.includes('run') || t.includes('jog')) return { sport: 'run', subtype: null };
   if (t.includes('walk') || t.includes('hike')) return { sport: 'walk', subtype: null };
+  if (t.includes('strength') || t.includes('weight')) return { sport: 'strength', subtype: null };
+  if (t.includes('mobility') || t.includes('pt')) return { sport: 'mobility', subtype: null };
   return { sport: t || 'run', subtype: null };
 }
 
@@ -220,7 +222,11 @@ Deno.serve(async (req) => {
       .in('workout_status', ['planned','in_progress','completed']);
 
     let candidates = Array.isArray(plannedList) ? plannedList : [];
-    if (!candidates.length) return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    console.log('[auto-attach-planned] Found candidates:', candidates.length, 'for sport:', sport, 'day:', day);
+    if (!candidates.length) {
+      console.log('[auto-attach-planned] No candidates found for sport:', sport, 'day:', day);
+      return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
 
     // Compute workout stats (moving time and meters)
     const wSec = Number(w.moving_time ? (typeof w.moving_time==='number' ? w.moving_time : 0) : 0);
@@ -256,10 +262,19 @@ Deno.serve(async (req) => {
 
     for (const p of candidates) {
       const pdate = String((p as any).date || '').slice(0,10);
-      if (pdate !== day || String((p as any).type||'').toLowerCase() !== sport) continue;
+      console.log('[auto-attach-planned] Checking candidate:', p.id, 'date:', pdate, 'type:', (p as any).type, 'sport:', sport);
+      if (pdate !== day || String((p as any).type||'').toLowerCase() !== sport) {
+        console.log('[auto-attach-planned] Skipping candidate - date or type mismatch');
+        continue;
+      }
       const pSec = await ensureSeconds(p);
-      if (!Number.isFinite(pSec) || pSec <= 0 || !Number.isFinite(wSec) || wSec <= 0) continue;
+      console.log('[auto-attach-planned] Planned seconds:', pSec, 'Workout seconds:', wSec);
+      if (!Number.isFinite(pSec) || pSec <= 0 || !Number.isFinite(wSec) || wSec <= 0) {
+        console.log('[auto-attach-planned] Skipping candidate - invalid duration');
+        continue;
+      }
       const pct = Math.abs(wSec - pSec) / Math.max(1, pSec);
+      console.log('[auto-attach-planned] Duration difference:', pct, 'best so far:', bestPct);
       if (pct < bestPct) { bestPct = pct; best = p; bestSec = pSec; }
     }
     if (!best) {
