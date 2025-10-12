@@ -1740,40 +1740,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               return null;
             })();
 
-            // Executed watts
+            // Executed watts - use server-calculated power only
             const executedWatts = (() => {
-              // Prefer duration-weighted executed watts only across executed intervals that correspond to planned work steps with power targets
-              const steps = Array.isArray(plannedStepsFull) && plannedStepsFull.length ? plannedStepsFull : (Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : []);
-              const isWorkStep = (st:any) => { const k = String(st?.type || st?.kind || st?.name || '').toLowerCase(); return !(k.includes('warm') || k.includes('cool') || k.includes('rest') || k.includes('recovery') || k.includes('jog')); };
-              const hasPowerTarget = (st:any) => {
-                const pr = (st as any)?.power_range; const lo=Number(pr?.lower), hi=Number(pr?.upper);
-                const pw = Number((st as any)?.power_target_watts ?? (st as any)?.target_watts ?? (st as any)?.watts);
-                return (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) || (Number.isFinite(pw) && pw>0);
-              };
-              let sum = 0; let w = 0;
-              for (let idx=0; idx<steps.length; idx+=1) {
-                const st = steps[idx];
-                if (!isWorkStep(st) || !hasPowerTarget(st)) continue;
-                const pid = String((st as any)?.id || '');
-                let row: any = pid ? intervalByPlannedId.get(pid) : null;
-                if (!row) { const ix = Number((st as any)?.planned_index ?? idx); if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null; }
-                const pw = Number(row?.executed?.avg_power_w ?? row?.executed?.avg_watts);
-                const dur = Number(row?.executed?.duration_s);
-                if (Number.isFinite(pw) && pw>0 && Number.isFinite(dur) && dur>0) { sum += pw*dur; w += dur; }
-              }
-              // Fallback: if we didn't match via ids/indexes but intervals exist, use intervals with kind 'work'
-              if (!(w>0)) {
-                const intervals: any[] = Array.isArray((hydratedCompleted || completed)?.computed?.intervals) ? (hydratedCompleted || completed).computed.intervals : [];
-                for (const it of intervals) {
-                  const k = String((it as any)?.kind || '').toLowerCase();
-                  if (k !== 'work') continue;
-                  const pw = Number((it as any)?.executed?.avg_power_w ?? (it as any)?.executed?.avg_watts);
-                  const dur = Number((it as any)?.executed?.duration_s);
-                  if (Number.isFinite(pw) && pw>0 && Number.isFinite(dur) && dur>0) { sum += pw*dur; w += dur; }
-                }
-              }
-              if (w>0) return Math.round(sum/w);
-              // Fallback to overall average if interval mapping is missing
+              // Use server-calculated average power from ingest-activity function
               const v = Number((hydratedCompleted || completed)?.avg_power ?? (hydratedCompleted || completed)?.metrics?.avg_power ?? (hydratedCompleted || completed)?.average_watts);
               return (Number.isFinite(v) && v>0) ? Math.round(v) : null;
             })();
