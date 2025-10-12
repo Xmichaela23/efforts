@@ -640,8 +640,19 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
     const fetchWeeklyWorkload = async () => {
       try {
         setLoading(true);
+        
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setCompletedWorkload(0);
+          setPlannedWorkload(0);
+          setLoading(false);
+          return;
+        }
+        
         const { data, error } = await supabase.functions.invoke('weekly-workload', {
           body: {
+            user_id: user.id,
             week_start_date: weekStart
           }
         });
