@@ -262,20 +262,33 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
       const activitiesData = await activitiesResponse.json();
       
       // Process and save workouts
-      const workouts = activitiesData.map((activity: any) => ({
-        name: activity.activityName || 'Garmin Activity',
-        type: 'endurance',
-        date: activity.startTimeLocal,
-        duration: Math.round(activity.duration / 60), // Convert to minutes
-        distance: activity.distance ? activity.distance / 1000 : null, // Convert to km
-        avg_heart_rate: activity.averageHR,
-        max_heart_rate: activity.maxHR,
-        calories: activity.calories,
-        avg_pace: activity.averageSpeed ? (1000 / activity.averageSpeed) : null, // Convert to seconds per km
-        elevation_gain: activity.elevationGain,
-        source: 'garmin',
-        created_at: new Date().toISOString()
-      }));
+      const workouts = activitiesData.map((activity: any) => {
+        // Map activity type from Garmin to our workout types
+        const getWorkoutType = (activityType: string): "run" | "ride" | "swim" | "strength" | "walk" => {
+          const type = activityType?.toLowerCase() || '';
+          if (type.includes('walk') || type.includes('hiking')) return 'walk';
+          if (type.includes('swim')) return 'swim';
+          if (type.includes('bike') || type.includes('cycling') || type.includes('cycle')) return 'ride';
+          if (type.includes('strength') || type.includes('weight')) return 'strength';
+          if (type.includes('run') || type.includes('jog')) return 'run';
+          return 'run'; // Default to run for endurance activities
+        };
+
+        return {
+          name: activity.activityName || 'Garmin Activity',
+          type: getWorkoutType(activity.activityType || ''),
+          date: activity.startTimeLocal,
+          duration: Math.round(activity.duration / 60), // Convert to minutes
+          distance: activity.distance ? activity.distance / 1000 : null, // Convert to km
+          avg_heart_rate: activity.averageHR,
+          max_heart_rate: activity.maxHR,
+          calories: activity.calories,
+          avg_pace: activity.averageSpeed ? (1000 / activity.averageSpeed) : null, // Convert to seconds per km
+          elevation_gain: activity.elevationGain,
+          source: 'garmin',
+          created_at: new Date().toISOString()
+        };
+      });
       
       // Save to database
       for (const workout of workouts) {

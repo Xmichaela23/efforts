@@ -7,6 +7,10 @@ function pctDiff(a: number, b: number): number { if (!(a>0) || !(b>0)) return In
 
 function sportSubtype(s: string | null | undefined): { sport: string; subtype: string | null } {
   const t = String(s||'').toLowerCase();
+  if (!t || t === 'null' || t === 'undefined') {
+    console.log('[auto-attach-planned] sportSubtype received null/empty type, defaulting to run');
+    return { sport: 'run', subtype: null };
+  }
   if (t.includes('swim')) {
     if (t.includes('open') || t.includes('ows') || t.includes('open_water')) return { sport: 'swim', subtype: 'ows' };
     if (t.includes('lap') || t.includes('pool')) return { sport: 'swim', subtype: 'pool' };
@@ -17,7 +21,8 @@ function sportSubtype(s: string | null | undefined): { sport: string; subtype: s
   if (t.includes('walk') || t.includes('hike')) return { sport: 'walk', subtype: null };
   if (t.includes('strength') || t.includes('weight')) return { sport: 'strength', subtype: null };
   if (t.includes('mobility') || t.includes('pt')) return { sport: 'mobility', subtype: null };
-  return { sport: t || 'run', subtype: null };
+  console.log('[auto-attach-planned] sportSubtype unknown type:', t, 'defaulting to run');
+  return { sport: 'run', subtype: null };
 }
 
 function isSameDayLocal(dateIsoA: string, dateIsoB: string): boolean { return String(dateIsoA).slice(0,10) === String(dateIsoB).slice(0,10); }
