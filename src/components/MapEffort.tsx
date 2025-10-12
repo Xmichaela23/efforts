@@ -390,7 +390,7 @@ export default function MapEffort({
       map.remove();
       mapRef.current = null;
     };
-  }, [theme, onMapReady]);
+  }, [onMapReady]);
 
   // Seed/fit route once and update data on changes
   useEffect(() => {
