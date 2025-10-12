@@ -615,10 +615,10 @@ export default function WorkoutCalendar({
             </button>
           );
         })}
+        
+        {/* Weekly workload total - positioned in bottom right of calendar grid */}
+        <WeeklyWorkloadTotal weekStart={weekStart.toISOString().split('T')[0]} />
       </div>
-      
-      {/* Weekly workload total */}
-      <WeeklyWorkloadTotal weekStart={weekStart.toISOString().split('T')[0]} />
       
       {/* Hidden background prefetchers */}
       {prefetchNeighbors && (
@@ -662,6 +662,7 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
           setCompletedWorkload(0);
           setPlannedWorkload(0);
         } else {
+          console.log('WeeklyWorkloadTotal - received data:', data);
           setCompletedWorkload(data?.total_actual || 0);
           setPlannedWorkload(data?.total_planned || 0);
         }
@@ -678,7 +679,7 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
   }, [weekStart]);
 
   return (
-    <div className="absolute bottom-2 right-2 p-2">
+    <div className="absolute bottom-1 right-1 p-1 bg-white/90 rounded shadow-sm">
       <div className="text-right">
         <div className="text-xs text-gray-500">Total Workload</div>
         <div className="text-sm font-medium text-gray-700">

@@ -39,6 +39,15 @@ interface WorkoutMetricsProps {
 }
 
 const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({ workout }) => {
+  // Debug: Log workout data to see if workload is present
+  console.log('WorkoutMetrics - workout data:', {
+    id: workout.id,
+    type: workout.type,
+    workload_actual: (workout as any).workload_actual,
+    workload_planned: (workout as any).workload_planned,
+    intensity_factor: (workout as any).intensity_factor
+  });
+
   const formatTime = (seconds?: number) => {
     if (!seconds) return 'N/A';
     const hours = Math.floor(seconds / 3600);
