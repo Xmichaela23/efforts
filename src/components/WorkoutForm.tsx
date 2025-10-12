@@ -87,7 +87,7 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="basic">Basic Info</TabsTrigger>
           <TabsTrigger value="swim">Swim Details</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
+          <TabsTrigger value="completed">Details</TabsTrigger>
           <TabsTrigger value="export">Export</TabsTrigger>
         </TabsList>
       );
@@ -96,7 +96,7 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
       <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="basic">Basic Info</TabsTrigger>
         <TabsTrigger value="intervals">Details</TabsTrigger>
-        <TabsTrigger value="completed">Completed</TabsTrigger>
+        <TabsTrigger value="completed">Details</TabsTrigger>
         <TabsTrigger value="export">Export</TabsTrigger>
       </TabsList>
     );

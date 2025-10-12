@@ -828,7 +828,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsTrigger>
           <TabsTrigger value="completed" className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700">
             <CheckCircle className="h-4 w-4" />
-            Completed
+            Details
           </TabsTrigger>
         </TabsList>
 
