@@ -124,6 +124,7 @@ export default function MapEffort({
 
   // Create map once
   useEffect(() => {
+    console.log('[MapEffort] MAP CREATION EFFECT - theme:', theme, 'divRef:', !!divRef.current, 'mapRef:', !!mapRef.current);
     if (!divRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: divRef.current,
@@ -384,6 +385,7 @@ export default function MapEffort({
     map.on('resize', onResize);
 
     return () => {
+      console.log('[MapEffort] MAP DESTRUCTION - removing map for theme:', theme);
       map.off('resize', onResize);
       map.remove();
       mapRef.current = null;
@@ -392,6 +394,7 @@ export default function MapEffort({
 
   // Seed/fit route once and update data on changes
   useEffect(() => {
+    console.log('[MapEffort] DATA UPDATE EFFECT - coords.length:', coords.length, 'ready:', ready);
     const map = mapRef.current; if (!map || !ready) return;
     const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
     if (coords.length > 1) lastNonEmptyRef.current = coords;
@@ -402,7 +405,7 @@ export default function MapEffort({
         console.log('[MapEffort] Setting route data, points:', valid.length);
         src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
       } else {
-        console.log('[MapEffort] Cannot set route data - src:', !!src, 'has:', has);
+        console.log('[MapEffort] DATA UPDATE - Cannot set route data - src:', !!src, 'has:', has, 'coords.length:', coords.length);
       }
       
       // Enhancement 1: Update start/finish markers
