@@ -738,6 +738,9 @@ export default function MapEffort({
         if (src && has) {
           console.log('[MapEffort] THEME SWITCHING - Setting route data for theme:', theme);
           src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+          // Check if data was actually set
+          const data = src.getData();
+          console.log('[MapEffort] THEME SWITCHING - Route data after setData:', data ? 'HAS_DATA' : 'NO_DATA', 'coords:', data?.geometry?.coordinates?.length || 0);
         } else {
           console.log('[MapEffort] THEME SWITCHING - Cannot set route data - src:', !!src, 'has:', has);
         }
@@ -763,6 +766,14 @@ export default function MapEffort({
         console.log('[MapEffort] THEME SWITCHING - ROUTE_OUTLINE exists:', !!map.getLayer(ROUTE_OUTLINE));
         console.log('[MapEffort] THEME SWITCHING - ROUTE_LINE exists:', !!map.getLayer(ROUTE_LINE));
         console.log('[MapEffort] THEME SWITCHING - ROUTE_SRC exists:', !!map.getSource(ROUTE_SRC));
+        
+        // Check if route is actually visible
+        const routeLayer = map.getLayer(ROUTE_LINE);
+        if (routeLayer) {
+          const visibility = map.getLayoutProperty(ROUTE_LINE, 'visibility');
+          const paint = map.getPaintProperty(ROUTE_LINE, 'line-color');
+          console.log('[MapEffort] THEME SWITCHING - Route visibility:', visibility, 'color:', paint);
+        }
       } catch (error) {
         console.log('[MapEffort] THEME SWITCHING - Error in onStyleData:', error);
       }
