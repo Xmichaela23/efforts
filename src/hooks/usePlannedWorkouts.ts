@@ -208,6 +208,7 @@ export const usePlannedWorkouts = () => {
         intervals: workoutData.intervals || [],
         strength_exercises: workoutData.strength_exercises || [],
         mobility_exercises: (workoutData as any).mobility_exercises || [],
+        steps_preset: (workoutData as any).steps_preset || null,
         workout_status: workoutData.workout_status || 'planned',
         source: workoutData.source || 'manual',
         training_plan_id: workoutData.training_plan_id,
@@ -230,6 +231,26 @@ export const usePlannedWorkouts = () => {
       if (error) {
         console.error('❌ Error saving planned workout:', error);
         throw error;
+      }
+
+      // Calculate workload for the new planned workout
+      try {
+        await supabase.functions.invoke('calculate-workload', {
+          body: {
+            workout_id: data.id,
+            workout_data: {
+              type: toSave.type,
+              duration: toSave.duration,
+              steps_preset: toSave.steps_preset,
+              strength_exercises: toSave.strength_exercises,
+              mobility_exercises: toSave.mobility_exercises,
+              workout_status: 'planned'
+            }
+          }
+        });
+        console.log('✅ Workload calculated for planned workout:', data.id);
+      } catch (workloadError) {
+        console.error('❌ Failed to calculate workload for planned workout:', data.id, workloadError);
       }
 
       const newWorkout: PlannedWorkout = {

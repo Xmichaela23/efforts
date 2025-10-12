@@ -662,7 +662,6 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
           setCompletedWorkload(0);
           setPlannedWorkload(0);
         } else {
-          console.log('WeeklyWorkloadTotal - received data:', data);
           setCompletedWorkload(data?.total_actual || 0);
           setPlannedWorkload(data?.total_planned || 0);
         }

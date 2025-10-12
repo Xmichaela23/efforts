@@ -229,15 +229,6 @@ export const useWorkouts = () => {
         .limit(150);
 
       if (manualError) { throw manualError; }
-      
-      // Debug: Log first few workouts to see if workload data is present
-      console.log('useWorkouts - manualWorkouts sample:', manualWorkouts?.slice(0, 3).map(w => ({
-        id: w.id,
-        type: w.type,
-        workload_actual: w.workload_actual,
-        workload_planned: w.workload_planned,
-        intensity_factor: w.intensity_factor
-      })));
 
       // Manual workouts found
 

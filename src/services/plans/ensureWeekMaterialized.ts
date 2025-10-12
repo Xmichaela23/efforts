@@ -2096,7 +2096,30 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   } catch (_e) {
     // As a last resort, attempt a blind insert; if it fails due to constraint, ignore
     const { error } = await supabase.from('planned_workouts').insert(rows as any);
-    if (!error) insertedCount += rows.length;
+    if (!error) {
+      insertedCount += rows.length;
+      
+      // Calculate workload for each inserted workout
+      for (const workout of rows) {
+        try {
+          await supabase.functions.invoke('calculate-workload', {
+            body: {
+              workout_id: workout.id,
+              workout_data: {
+                type: workout.type,
+                duration: workout.duration,
+                steps_preset: workout.steps_preset,
+                strength_exercises: workout.strength_exercises,
+                mobility_exercises: workout.mobility_exercises,
+                workout_status: 'planned'
+              }
+            }
+          });
+        } catch (error) {
+          console.error('Failed to calculate workload for planned workout:', workout.id, error);
+        }
+      }
+    }
   }
   return { inserted: insertedCount };
 }
