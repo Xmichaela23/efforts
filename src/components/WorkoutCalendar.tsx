@@ -391,6 +391,7 @@ export default function WorkoutCalendar({
         const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '');
         const isCompleted = String(w?.workout_status||'').toLowerCase()==='completed';
         const isPlannedLinked = isCompleted && !!(w as any)?.planned_id;
+        const showCheckmark = isCompleted && isPlannedLinked; // Only show checkmark if actually linked
         
         // For linked completed workouts, try to find the planned workout's label
         let labelBase = plannedLabel || [t, milesText].filter(Boolean).join(' ');
@@ -413,7 +414,7 @@ export default function WorkoutCalendar({
         
         return {
           date: w.date,
-          label: `${labelBase}${isCompleted ? ' ✓' : ''}`,
+          label: `${labelBase}${showCheckmark ? ' ✓' : ''}`,
           href: `#${w.id}`,
           provider: w.provider || deriveProvider(w),
           _sigType: t,
