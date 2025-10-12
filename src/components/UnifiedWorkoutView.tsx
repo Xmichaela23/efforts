@@ -73,9 +73,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (!error && data) {
           console.log('🔍 Setting currentPlannedId to:', data.planned_id);
           setCurrentPlannedId(data.planned_id);
+        } else {
+          console.log('🔍 No data or error, setting currentPlannedId to null');
+          setCurrentPlannedId(null);
         }
       } catch (error) {
         console.error('Failed to fetch current planned_id:', error);
+        setCurrentPlannedId(null);
       }
     };
 
