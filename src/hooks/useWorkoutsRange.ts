@@ -63,7 +63,7 @@ export function useWorkoutsRange(fromISO: string, toISO: string) {
       }
       const { data, error } = await supabase
         .from('workouts')
-        .select('id,type,date,distance,workout_status,planned_id,strength_exercises')
+        .select('id,type,date,distance,workout_status,planned_id,strength_exercises,workload_planned,workload_actual,intensity_factor')
         .eq('user_id', userId)
         .gte('date', fromISO)
         .lte('date', toISO)

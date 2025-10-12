@@ -29,14 +29,21 @@ serve(async (req) => {
     if (!user_id) {
       return new Response(
         JSON.stringify({ error: 'user_id is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { 
+          status: 400, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+          } 
+        }
       )
     }
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service role key for database operations
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
         global: {
           headers: { Authorization: req.headers.get('Authorization')! },
@@ -62,8 +69,8 @@ serve(async (req) => {
     weekEndDate.setDate(weekStartDate.getDate() + 6);
     const weekEnd = weekEndDate.toISOString().split('T')[0];
 
-    // Get workouts for the week
-    const { data: workouts, error: fetchError } = await supabaseClient
+    // Get workouts for the week from both tables
+    const { data: completedWorkouts, error: completedError } = await supabaseClient
       .from('workouts')
       .select('id, type, name, date, workout_status, workload_planned, workload_actual, duration')
       .eq('user_id', user_id)
@@ -71,13 +78,35 @@ serve(async (req) => {
       .lte('date', weekEnd)
       .order('date', { ascending: true })
 
-    if (fetchError) {
-      console.error('Fetch error:', fetchError)
+    if (completedError) {
+      console.error('Fetch error for completed workouts:', completedError)
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch workouts' }),
+        JSON.stringify({ error: 'Failed to fetch completed workouts' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
     }
+
+    const { data: plannedWorkouts, error: plannedError } = await supabaseClient
+      .from('planned_workouts')
+      .select('id, type, name, date, workout_status, workload_planned, workload_actual, duration')
+      .eq('user_id', user_id)
+      .gte('date', weekStart)
+      .lte('date', weekEnd)
+      .order('date', { ascending: true })
+
+    if (plannedError) {
+      console.error('Fetch error for planned workouts:', plannedError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch planned workouts' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Combine both datasets
+    const workouts = [
+      ...(completedWorkouts || []).map(w => ({ ...w, source: 'completed' })),
+      ...(plannedWorkouts || []).map(w => ({ ...w, source: 'planned' }))
+    ]
 
     // Calculate weekly totals
     const weeklyStats = {
@@ -192,7 +221,14 @@ serve(async (req) => {
     console.error('Function error:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        } 
+      }
     )
   }
 })

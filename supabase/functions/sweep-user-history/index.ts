@@ -75,10 +75,11 @@ interface WorkoutData {
   id: string;
   type: string;
   duration: number;
-  steps_preset?: string[];
+  workout_status?: string;
   strength_exercises?: any[];
   mobility_exercises?: any[];
-  workout_status?: string;
+  steps_preset?: any[];
+  source?: string;
 }
 
 /**
@@ -97,19 +98,33 @@ function calculateWorkload(workout: WorkoutData): number {
  * Get average intensity for a workout session
  */
 function getSessionIntensity(workout: WorkoutData): number {
+  // Handle strength exercises from both tables
   if (workout.type === 'strength' && workout.strength_exercises) {
     return getStrengthIntensity(workout.strength_exercises);
   }
   
+  // Handle mobility exercises (only in planned_workouts)
   if (workout.type === 'mobility' && workout.mobility_exercises) {
     return getMobilityIntensity(workout.mobility_exercises);
   }
   
+  // Handle steps preset (only in planned_workouts)
   if (workout.steps_preset && workout.steps_preset.length > 0) {
     return getStepsIntensity(workout.steps_preset, workout.type);
   }
   
-  return 0.75; // default moderate intensity
+  // Fallback to basic intensity based on workout type
+  const typeIntensities: { [key: string]: number } = {
+    'run': 0.75,
+    'ride': 0.70,
+    'bike': 0.70,
+    'swim': 0.80,
+    'strength': 0.85,
+    'mobility': 0.50,
+    'walk': 0.40
+  };
+  
+  return typeIntensities[workout.type] || 0.75;
 }
 
 /**
@@ -191,14 +206,21 @@ serve(async (req) => {
     if (!user_id) {
       return new Response(
         JSON.stringify({ error: 'user_id is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { 
+          status: 400, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+          } 
+        }
       )
     }
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service role key for database operations
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
         global: {
           headers: { Authorization: req.headers.get('Authorization')! },
@@ -215,21 +237,67 @@ serve(async (req) => {
     console.log(`Starting workload sweep for user ${user_id}, batch_size: ${batch_size}, dry_run: ${dry_run}`)
 
     while (true) {
-      // Fetch batch of workouts
-      const { data: workouts, error: fetchError } = await supabaseClient
+      // Fetch batch of workouts from both tables
+      const { data: completedWorkouts, error: completedError } = await supabaseClient
         .from('workouts')
-        .select('id, type, duration, steps_preset, strength_exercises, mobility_exercises, workout_status')
+        .select('id, type, duration, workout_status, strength_exercises')
         .eq('user_id', user_id)
         .range(offset, offset + batch_size - 1)
         .order('created_at', { ascending: true })
 
-      if (fetchError) {
-        console.error('Fetch error:', fetchError)
+      if (completedError) {
+        console.error('Fetch error for completed workouts:', completedError)
         return new Response(
-          JSON.stringify({ error: 'Failed to fetch workouts' }),
-          { status: 500, headers: { 'Content-Type': 'application/json' } }
+          JSON.stringify({ 
+            error: 'Failed to fetch completed workouts', 
+            details: completedError.message,
+            user_id: user_id,
+            offset: offset
+          }),
+          { 
+            status: 500, 
+            headers: { 
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+            } 
+          }
         )
       }
+
+      const { data: plannedWorkouts, error: plannedError } = await supabaseClient
+        .from('planned_workouts')
+        .select('id, type, duration, workout_status, strength_exercises, steps_preset, mobility_exercises')
+        .eq('user_id', user_id)
+        .range(offset, offset + batch_size - 1)
+        .order('created_at', { ascending: true })
+
+      if (plannedError) {
+        console.error('Fetch error for planned workouts:', plannedError)
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to fetch planned workouts', 
+            details: plannedError.message,
+            user_id: user_id,
+            offset: offset
+          }),
+          { 
+            status: 500, 
+            headers: { 
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+            } 
+          }
+        )
+      }
+
+      // Combine both datasets
+      const workouts = [
+        ...(completedWorkouts || []).map(w => ({ ...w, source: 'completed' })),
+        ...(plannedWorkouts || []).map(w => ({ ...w, source: 'planned' }))
+      ]
+
 
       if (!workouts || workouts.length === 0) {
         break // No more workouts to process
@@ -246,9 +314,10 @@ serve(async (req) => {
           const intensity = getSessionIntensity(workout)
           
           if (!dry_run) {
-            // Update the workout
+            // Update the appropriate table based on source
+            const tableName = workout.source === 'completed' ? 'workouts' : 'planned_workouts';
             const { error: updateError } = await supabaseClient
-              .from('workouts')
+              .from(tableName)
               .update({
                 workload_planned: workout.workout_status === 'planned' ? workload : null,
                 workload_actual: workout.workout_status === 'completed' ? workload : null,
@@ -310,7 +379,14 @@ serve(async (req) => {
     console.error('Function error:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        } 
+      }
     )
   }
 })

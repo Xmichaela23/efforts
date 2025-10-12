@@ -218,6 +218,8 @@ export const useWorkouts = () => {
           'computed','metrics',
           // strength and mobility exercise data (matches get-week selection)
           'strength_exercises','mobility_exercises',
+          // workload data
+          'workload_planned','workload_actual','intensity_factor',
           'created_at','updated_at'
         ].join(','))
         .eq("user_id", user.id)
