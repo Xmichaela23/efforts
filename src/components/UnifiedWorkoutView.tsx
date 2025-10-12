@@ -42,7 +42,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // plannedWorkouts context removed; rely on server unified data/routes
   const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
-  const hasLink = Boolean((workout as any)?.planned_id);
+  const [currentPlannedId, setCurrentPlannedId] = useState<string | null>((workout as any)?.planned_id || null);
+  const hasLink = Boolean(currentPlannedId);
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? (hasLink ? 'summary' : 'completed') : 'planned'));
   const [editingInline, setEditingInline] = useState(false);
   const [assocOpen, setAssocOpen] = useState(false);
@@ -56,6 +57,29 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // Unified week data for the workout's date (single-day window)
   const dateIso = String((workout as any)?.date || '').slice(0,10);
   const { items: unifiedItems = [] } = useWeekUnified(dateIso, dateIso);
+
+  // Fetch current planned_id from database to ensure we have the latest state
+  useEffect(() => {
+    const fetchCurrentPlannedId = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('workouts')
+          .select('planned_id')
+          .eq('id', (workout as any)?.id)
+          .single();
+        
+        if (!error && data) {
+          setCurrentPlannedId(data.planned_id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch current planned_id:', error);
+      }
+    };
+
+    if ((workout as any)?.id) {
+      fetchCurrentPlannedId();
+    }
+  }, [(workout as any)?.id]);
 
   // Phase 1: On-demand completed detail hydration (gps/sensors) with fallback to context object
   const wid = String((workout as any)?.id || '');
@@ -763,7 +787,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         </div>
         <div className="flex items-center gap-2">
           {isCompleted && (
-            (!workout.planned_id && !linkedPlanned) ? (
+            (!currentPlannedId && !linkedPlanned) ? (
               <Button
                 variant="ghost"
                 size="sm"
@@ -775,7 +799,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 size="sm"
                 onClick={async()=>{
                   try {
-                    const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
+                    const pid = String(currentPlannedId || (linkedPlanned as any)?.id || '');
                     const wid = String((workout as any)?.id || '');
                     if (!pid || !wid) return;
                     // disable re-link noise then detach
@@ -786,7 +810,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       await supabase.from('planned_workouts').update({ workout_status: 'planned' } as any).eq('id', pid);
                     } catch {}
                     // Clear local state
-                    (workout as any).planned_id = null;
+                    setCurrentPlannedId(null);
                     setLinkedPlanned(null);
                     setHydratedPlanned(null); // Also clear hydratedPlanned
                     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
