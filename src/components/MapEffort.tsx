@@ -631,7 +631,7 @@ export default function MapEffort({
 
   // Thumb scrubbing touch handlers (expanded only)
   useEffect(() => {
-    if (!expanded || !onScrub || !coords.length) return;
+    if (true || !expanded || !onScrub || !coords.length) return;
 
     let lastTouchY = 0;
     let isScrubbing = false;
@@ -875,7 +875,7 @@ export default function MapEffort({
         )}
         
         {/* Enhancement 4: Metrics card - Only show when expanded */}
-        {expanded && coords.length > 1 && (
+        {false && expanded && coords.length > 1 && (
           <div
             style={{
               position: 'absolute',
