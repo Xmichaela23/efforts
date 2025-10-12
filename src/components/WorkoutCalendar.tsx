@@ -616,8 +616,15 @@ export default function WorkoutCalendar({
           );
         })}
         
-        {/* Weekly workload total - positioned in bottom right of calendar grid */}
-        <WeeklyWorkloadTotal weekStart={weekStart.toISOString().split('T')[0]} />
+        {/* Fill remaining cells to complete 3x3 grid */}
+        {Array.from({ length: 9 - weekDays.length }).map((_, index) => (
+          <div key={`empty-${index}`} className="mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-gray-200 p-2 flex flex-col justify-end items-end">
+            {/* Weekly workload total in the last cell (bottom-right corner) */}
+            {index === (9 - weekDays.length - 1) && (
+              <WeeklyWorkloadTotal weekStart={weekStart.toISOString().split('T')[0]} />
+            )}
+          </div>
+        ))}
       </div>
       
       {/* Hidden background prefetchers */}
@@ -678,14 +685,12 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
   }, [weekStart]);
 
   return (
-    <div className="absolute bottom-1 right-1 p-1 bg-white/90 rounded shadow-sm">
-      <div className="text-right">
-        <div className="text-xs text-gray-500">Total Workload</div>
-        <div className="text-sm font-medium text-gray-700">
-          {loading ? '...' : `${completedWorkload} / ${plannedWorkload}`}
-        </div>
-        <div className="text-xs text-gray-500">completed / planned</div>
+    <div className="text-right">
+      <div className="text-xs text-gray-500">Total Workload</div>
+      <div className="text-sm font-medium text-gray-700">
+        {loading ? '...' : `${completedWorkload} / ${plannedWorkload}`}
       </div>
+      <div className="text-xs text-gray-500">completed / planned</div>
     </div>
   );
 }
