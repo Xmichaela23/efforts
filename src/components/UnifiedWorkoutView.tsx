@@ -62,13 +62,16 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   useEffect(() => {
     const fetchCurrentPlannedId = async () => {
       try {
+        console.log('🔍 Fetching current planned_id for workout:', (workout as any)?.id);
         const { data, error } = await supabase
           .from('workouts')
           .select('planned_id')
           .eq('id', (workout as any)?.id)
           .single();
         
+        console.log('🔍 Database response:', { data, error });
         if (!error && data) {
+          console.log('🔍 Setting currentPlannedId to:', data.planned_id);
           setCurrentPlannedId(data.planned_id);
         }
       } catch (error) {
@@ -787,13 +790,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         </div>
         <div className="flex items-center gap-2">
           {isCompleted && (
-            (!currentPlannedId && !linkedPlanned) ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={()=>setAssocOpen(true)}
-              >Attach</Button>
-            ) : (
+            (() => {
+              console.log('🔍 Button logic - currentPlannedId:', currentPlannedId, 'linkedPlanned:', linkedPlanned);
+              return (!currentPlannedId && !linkedPlanned) ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={()=>setAssocOpen(true)}
+                >Attach</Button>
+              ) : (
               <Button
                 variant="ghost"
                 size="sm"
@@ -819,7 +824,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   } catch {}
                 }}
               >Unattach</Button>
-            )
+              );
+            })()
           )}
         </div>
         {assocOpen && (
