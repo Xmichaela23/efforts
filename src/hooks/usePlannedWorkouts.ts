@@ -234,8 +234,9 @@ export const usePlannedWorkouts = () => {
       }
 
       // Calculate workload for the new planned workout
+      console.log('🔧 Calculating workload for new planned workout:', data.id, toSave.type);
       try {
-        await supabase.functions.invoke('calculate-workload', {
+        const { data: workloadData, error: workloadError } = await supabase.functions.invoke('calculate-workload', {
           body: {
             workout_id: data.id,
             workout_data: {
@@ -248,7 +249,12 @@ export const usePlannedWorkouts = () => {
             }
           }
         });
-        console.log('✅ Workload calculated for planned workout:', data.id);
+        
+        if (workloadError) {
+          console.error('❌ Edge Function error for planned workout:', data.id, workloadError);
+        } else {
+          console.log('✅ Workload calculated for planned workout:', data.id, workloadData);
+        }
       } catch (workloadError) {
         console.error('❌ Failed to calculate workload for planned workout:', data.id, workloadError);
       }

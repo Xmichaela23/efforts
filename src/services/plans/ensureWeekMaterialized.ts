@@ -2074,8 +2074,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       
       // Calculate workload for each inserted workout
       for (const workout of filtered) {
+        console.log('🔧 Calculating workload for planned workout:', workout.id, workout.type);
         try {
-          await supabase.functions.invoke('calculate-workload', {
+          const { data, error } = await supabase.functions.invoke('calculate-workload', {
             body: {
               workout_id: workout.id,
               workout_data: {
@@ -2088,8 +2089,14 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
               }
             }
           });
+          
+          if (error) {
+            console.error('❌ Edge Function error for workout:', workout.id, error);
+          } else {
+            console.log('✅ Workload calculated for workout:', workout.id, data);
+          }
         } catch (error) {
-          console.error('Failed to calculate workload for workout:', workout.id, error);
+          console.error('❌ Failed to calculate workload for workout:', workout.id, error);
         }
       }
     }
@@ -2101,8 +2108,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       
       // Calculate workload for each inserted workout
       for (const workout of rows) {
+        console.log('🔧 Calculating workload for planned workout (fallback):', workout.id, workout.type);
         try {
-          await supabase.functions.invoke('calculate-workload', {
+          const { data, error } = await supabase.functions.invoke('calculate-workload', {
             body: {
               workout_id: workout.id,
               workout_data: {
@@ -2115,8 +2123,14 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
               }
             }
           });
+          
+          if (error) {
+            console.error('❌ Edge Function error for workout (fallback):', workout.id, error);
+          } else {
+            console.log('✅ Workload calculated for workout (fallback):', workout.id, data);
+          }
         } catch (error) {
-          console.error('Failed to calculate workload for planned workout:', workout.id, error);
+          console.error('❌ Failed to calculate workload for planned workout (fallback):', workout.id, error);
         }
       }
     }
