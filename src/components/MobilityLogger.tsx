@@ -263,14 +263,25 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Auto-attach to planned workout if possible
     try {
       console.log('🔗 Attempting auto-attachment for completed mobility workout:', completedWorkout.id);
+      console.log('🔗 Workout details:', {
+        id: completedWorkout.id,
+        type: completedWorkout.type,
+        date: completedWorkout.date,
+        duration: completedWorkout.duration
+      });
+      
       const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
         body: { workout_id: completedWorkout.id }
       });
       
+      console.log('🔗 Auto-attach response:', { data, error });
+      
       if (error) {
         console.error('❌ Auto-attach failed for mobility workout:', completedWorkout.id, error);
-      } else {
+      } else if (data?.attached) {
         console.log('✅ Auto-attached mobility workout:', completedWorkout.id, data);
+      } else {
+        console.log('ℹ️ No planned workout found to attach:', completedWorkout.id, data?.reason || 'unknown');
       }
     } catch (attachError) {
       console.error('❌ Auto-attach error for mobility workout:', completedWorkout.id, attachError);

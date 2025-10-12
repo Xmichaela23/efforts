@@ -411,14 +411,25 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         // Auto-attach to planned workout if possible
         try {
           console.log('🔗 Attempting auto-attachment for imported workout:', savedWorkout?.id);
+          console.log('🔗 Workout details:', {
+            id: savedWorkout?.id,
+            type: workoutToSave.type,
+            date: workoutToSave.date,
+            duration: workoutToSave.duration
+          });
+          
           const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
             body: { workout_id: savedWorkout?.id }
           });
           
+          console.log('🔗 Auto-attach response:', { data, error });
+          
           if (error) {
             console.error('❌ Auto-attach failed for imported workout:', savedWorkout?.id, error);
-          } else {
+          } else if (data?.attached) {
             console.log('✅ Auto-attached imported workout:', savedWorkout?.id, data);
+          } else {
+            console.log('ℹ️ No planned workout found to attach:', savedWorkout?.id, data?.reason || 'unknown');
           }
         } catch (attachError) {
           console.error('❌ Auto-attach error for imported workout:', savedWorkout?.id, attachError);

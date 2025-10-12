@@ -1469,15 +1469,27 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
       // Auto-attach to planned workout if possible
       try {
-        console.log('🔗 Attempting auto-attachment for completed workout:', saved?.id || completedWorkout.id);
-        const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
-          body: { workout_id: saved?.id || completedWorkout.id }
+        const workoutId = saved?.id || completedWorkout.id;
+        console.log('🔗 Attempting auto-attachment for completed workout:', workoutId);
+        console.log('🔗 Workout details:', {
+          id: workoutId,
+          type: completedWorkout.type,
+          date: completedWorkout.date,
+          duration: completedWorkout.duration
         });
         
+        const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
+          body: { workout_id: workoutId }
+        });
+        
+        console.log('🔗 Auto-attach response:', { data, error });
+        
         if (error) {
-          console.error('❌ Auto-attach failed for workout:', saved?.id || completedWorkout.id, error);
+          console.error('❌ Auto-attach failed for workout:', workoutId, error);
+        } else if (data?.attached) {
+          console.log('✅ Auto-attached workout:', workoutId, data);
         } else {
-          console.log('✅ Auto-attached workout:', saved?.id || completedWorkout.id, data);
+          console.log('ℹ️ No planned workout found to attach:', workoutId, data?.reason || 'unknown');
         }
       } catch (attachError) {
         console.error('❌ Auto-attach error for workout:', saved?.id || completedWorkout.id, attachError);

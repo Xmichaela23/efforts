@@ -1069,7 +1069,34 @@ export const useWorkouts = () => {
         };
 
           // Use existing addWorkout function to save the data
-          await addWorkout(workoutData as Omit<Workout, "id">);
+          const savedWorkout = await addWorkout(workoutData as Omit<Workout, "id">);
+          
+          // Auto-attach to planned workout if possible
+          try {
+            console.log('🔗 Attempting auto-attachment for Garmin workout:', savedWorkout?.id);
+            console.log('🔗 Workout details:', {
+              id: savedWorkout?.id,
+              type: workoutData.type,
+              date: workoutData.date,
+              duration: workoutData.duration
+            });
+            
+            const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
+              body: { workout_id: savedWorkout?.id }
+            });
+            
+            console.log('🔗 Auto-attach response:', { data, error });
+            
+            if (error) {
+              console.error('❌ Auto-attach failed for Garmin workout:', savedWorkout?.id, error);
+            } else if (data?.attached) {
+              console.log('✅ Auto-attached Garmin workout:', savedWorkout?.id, data);
+            } else {
+              console.log('ℹ️ No planned workout found to attach:', savedWorkout?.id, data?.reason || 'unknown');
+            }
+          } catch (attachError) {
+            console.error('❌ Auto-attach error for Garmin workout:', savedWorkout?.id, attachError);
+          }
           
           console.log(`✅ Imported Garmin activity: ${activity.garmin_activity_id} - ${workoutData.name}`);
           imported++;
