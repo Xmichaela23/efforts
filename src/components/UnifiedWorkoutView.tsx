@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { X, Calendar, BarChart3, ListChevronsUpDown } from 'lucide-react';
+import { X, Calendar, ListCollapse, ListChevronsUpDown } from 'lucide-react';
 import CompletedTab from './CompletedTab';
 import StrengthLogger from './StrengthLogger';
 import AssociatePlannedDialog from './AssociatePlannedDialog';
@@ -823,7 +823,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             Planned
           </TabsTrigger>
           <TabsTrigger value="summary" className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700">
-            <BarChart3 className="h-4 w-4" />
+            <ListCollapse className="h-4 w-4" />
             Summary
           </TabsTrigger>
           <TabsTrigger value="completed" className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700">
