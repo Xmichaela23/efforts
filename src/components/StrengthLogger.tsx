@@ -1468,9 +1468,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }
 
       // Auto-attach to planned workout if possible
-      // TEMPORARILY DISABLED TO TEST IF THIS IS BLOCKING NEW WORKOUTS
-      console.log('🔗 Auto-attachment temporarily disabled for testing');
-      /*
       try {
         const workoutId = saved?.id || completedWorkout.id;
         console.log('🔗 Attempting auto-attachment for completed workout:', workoutId);
@@ -1497,7 +1494,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       } catch (attachError) {
         console.error('❌ Auto-attach error for workout:', saved?.id || completedWorkout.id, attachError);
       }
-      */
     } catch (e) {
       console.error('❌ Save failed with error:', e);
       console.error('❌ Error details:', {
