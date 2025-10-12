@@ -9,6 +9,7 @@ export type CalendarEvent = {
   label: string;
   href?: string;
   provider?: string;
+  _src?: any;
 };
 // Prefetcher removed to avoid extra fetches on cell click
 
@@ -615,12 +616,60 @@ export default function WorkoutCalendar({
           );
         })}
       </div>
+      
+      {/* Weekly workload total */}
+      <WeeklyWorkloadTotal weekStart={weekStart.toISOString().split('T')[0]} />
+      
       {/* Hidden background prefetchers */}
       {prefetchNeighbors && (
         <>
           {/* Prefetch disabled for performance */}
         </>
       )}
+    </div>
+  );
+}
+
+// Weekly Workload Total Component
+function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
+  const [weeklyTotal, setWeeklyTotal] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchWeeklyWorkload = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.functions.invoke('weekly-workload', {
+          body: {
+            week_start_date: weekStart
+          }
+        });
+
+        if (error) {
+          console.error('Error fetching weekly workload:', error);
+          setWeeklyTotal(0);
+        } else {
+          setWeeklyTotal(data?.hybrid_total || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching weekly workload:', error);
+        setWeeklyTotal(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWeeklyWorkload();
+  }, [weekStart]);
+
+  return (
+    <div className="flex justify-end items-center mt-2 pr-2">
+      <div className="text-right">
+        <div className="text-lg font-medium text-gray-900">
+          {loading ? '...' : weeklyTotal}
+        </div>
+        <div className="text-xs text-gray-500">this week</div>
+      </div>
     </div>
   );
 }

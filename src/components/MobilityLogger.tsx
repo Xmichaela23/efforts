@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { ExerciseLibraryService } from '@/services/ExerciseLibrary';
+import { supabase } from '@/lib/supabase';
 
 interface LoggedMobilityExercise {
   id: string;
@@ -238,6 +239,26 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
 
     // Use the app context to save
     addWorkout(completedWorkout);
+
+    // Calculate workload for completed workout
+    try {
+      await supabase.functions.invoke('calculate-workload', {
+        body: {
+          workout_id: completedWorkout.id,
+          workout_data: {
+            type: completedWorkout.type,
+            duration: completedWorkout.duration,
+            steps_preset: completedWorkout.steps_preset,
+            strength_exercises: completedWorkout.strength_exercises,
+            mobility_exercises: completedWorkout.mobility_exercises,
+            workout_status: 'completed'
+          }
+        }
+      });
+      console.log('✅ Workload calculated for completed mobility workout');
+    } catch (workloadError) {
+      console.error('❌ Failed to calculate workload:', workloadError);
+    }
 
     // Navigate to completed view
     if (onWorkoutSaved) {
