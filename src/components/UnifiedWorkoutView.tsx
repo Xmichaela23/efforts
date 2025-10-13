@@ -136,8 +136,17 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       };
     }
     
-    // Fallback to original workout if not found in unified data
-    return workout;
+    // No fallback - if we can't find the planned workout in unified data, throw an error
+    console.error('❌ Planned workout not found in unified data:', {
+      plannedId,
+      availableItems: unifiedItems.map((item: any) => ({
+        id: item.id,
+        plannedId: item.planned?.id,
+        status: item.status,
+        type: item.type
+      }))
+    });
+    throw new Error(`Planned workout ${plannedId} not found in unified data`);
   })();
 
   // Fetch current planned_id from database to ensure we have the latest state
