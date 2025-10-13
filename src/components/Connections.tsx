@@ -598,6 +598,7 @@ const Connections: React.FC = () => {
         await supabase
           .from('user_connections')
           .upsert({
+            user_id: session.user.id,
             provider: 'garmin',
             access_token: tokenData.access_token,
             refresh_token: tokenData.refresh_token,
