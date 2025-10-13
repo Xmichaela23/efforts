@@ -23,7 +23,8 @@ import {
   Watch,
   Menu,
   User,
-  Upload
+  Upload,
+  Link
 } from 'lucide-react';
 import { useToast } from './ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
