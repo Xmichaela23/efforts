@@ -38,12 +38,12 @@ interface ConnectionStatus {
 const Connections: React.FC = () => {
   const [connections, setConnections] = useState<ConnectionStatus[]>([
     {
-      provider: 'strava',
+      provider: 'garmin',
       connected: false,
       syncStatus: 'idle'
     },
     {
-      provider: 'garmin',
+      provider: 'strava',
       connected: false,
       syncStatus: 'idle'
     }
@@ -517,9 +517,21 @@ const Connections: React.FC = () => {
   const getProviderIcon = (provider: string) => {
     switch (provider) {
       case 'strava':
-        return <Activity className="h-5 w-5" />;
+        return (
+          <div className="flex items-center justify-center w-5 h-5">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 text-orange-500">
+              <path fill="currentColor" d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.599h4.172L10.463 0l-7.13 14.828h4.169"/>
+            </svg>
+          </div>
+        );
       case 'garmin':
-        return <Settings className="h-5 w-5" />;
+        return (
+          <div className="flex items-center justify-center w-5 h-5">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 text-blue-600">
+              <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+            </svg>
+          </div>
+        );
       default:
         return <Link2 className="h-5 w-5" />;
     }
@@ -800,7 +812,13 @@ const Connections: React.FC = () => {
                     <CardTitle className="flex items-center space-x-2">
                       {getProviderName(connection.provider)}
                       {connection.connected && (
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <div className={`w-2 h-2 rounded-full animate-pulse ${
+                          connection.provider === 'garmin' 
+                            ? 'bg-blue-500' 
+                            : connection.provider === 'strava'
+                            ? 'bg-orange-500'
+                            : 'bg-green-500'
+                        }`}></div>
                       )}
                     </CardTitle>
                     <CardDescription>
@@ -849,10 +867,28 @@ const Connections: React.FC = () => {
               {connection.connected ? (
                 <div className="space-y-4">
                   {/* Connected Status Indicator */}
-                  <div className="p-3 bg-green-50 rounded-md border border-green-200">
+                  <div className={`p-3 rounded-md border ${
+                    connection.provider === 'garmin' 
+                      ? 'bg-blue-50 border-blue-200' 
+                      : connection.provider === 'strava'
+                      ? 'bg-orange-50 border-orange-200'
+                      : 'bg-green-50 border-green-200'
+                  }`}>
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm text-green-800 font-medium">
+                      <div className={`w-2 h-2 rounded-full ${
+                        connection.provider === 'garmin' 
+                          ? 'bg-blue-500' 
+                          : connection.provider === 'strava'
+                          ? 'bg-orange-500'
+                          : 'bg-green-500'
+                      }`}></div>
+                      <span className={`text-sm font-medium ${
+                        connection.provider === 'garmin' 
+                          ? 'text-blue-800' 
+                          : connection.provider === 'strava'
+                          ? 'text-orange-800'
+                          : 'text-green-800'
+                      }`}>
                         ✓ Connected to {getProviderName(connection.provider)}
                       </span>
                     </div>
@@ -1004,12 +1040,13 @@ const Connections: React.FC = () => {
                           size="sm"
                           onClick={testGarminApi}
                           disabled={loading || !garminAccessToken}
+                          className="border-blue-300 text-blue-700 hover:bg-blue-50"
                         >
                           <Zap className="h-4 w-4 mr-2" />
                           Test API
                         </Button>
                         {garminMessage && (
-                          <div className="p-2 bg-gray-50 rounded text-xs text-gray-700">
+                          <div className="p-2 bg-blue-50 rounded text-xs text-blue-700 border border-blue-200">
                             {garminMessage}
                           </div>
                         )}
@@ -1038,7 +1075,13 @@ const Connections: React.FC = () => {
                       }
                     }}
                     disabled={loading}
-                    className="w-full"
+                    className={`w-full ${
+                      connection.provider === 'garmin' 
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                        : connection.provider === 'strava'
+                        ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                        : ''
+                    }`}
                   >
                     <Link2 className="h-4 w-4 mr-2" />
                     Connect {getProviderName(connection.provider)}
