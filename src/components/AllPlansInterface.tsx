@@ -388,18 +388,26 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
           const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
           const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
-          const paceStrWithRange = (paceTarget?: string, kind?: string) => {
+          // Use server-processed pace ranges instead of client-side calculations
+          const paceStrWithRange = (paceTarget?: string, kind?: string, paceRange?: any) => {
             try {
-              if (!paceTarget) return undefined;
-              const m = String(paceTarget).match(/(\d+):(\d{2})\/(mi|km)/i);
-              if (!m) return undefined;
-              const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-              const unit = m[3].toLowerCase();
-              const tol = (String(kind||'').toLowerCase()==='recovery' || String(kind||'').toLowerCase()==='warmup' || String(kind||'').toLowerCase()==='cooldown') ? tolEasy : tolQual;
-              const lo = Math.round(sec*(1 - tol));
-              const hi = Math.round(sec*(1 + tol));
-              const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
-              return `${mmss(lo)}–${mmss(hi)}/${unit}`;
+              // Priority 1: Use server-processed pace_range object
+              if (paceRange && typeof paceRange === 'object' && paceRange.lower && paceRange.upper) {
+                const formatPace = (sec: number) => {
+                  const mins = Math.floor(sec / 60);
+                  const secs = Math.round(sec % 60);
+                  return `${mins}:${secs.toString().padStart(2, '0')}`;
+                };
+                return `${formatPace(paceRange.lower)}–${formatPace(paceRange.upper)}/mi`;
+              }
+              
+              // Priority 2: Use server-processed pace_range array
+              if (Array.isArray(paceRange) && paceRange.length === 2 && paceRange[0] && paceRange[1]) {
+                return `${paceRange[0]}–${paceRange[1]}`;
+              }
+              
+              // Priority 3: Fall back to single pace target (no range calculation)
+              return paceTarget || undefined;
             } catch { return undefined; }
           };
           const powerStr = (st:any) => (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
@@ -408,12 +416,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const st:any = steps[i];
             const kind = String(st?.kind||'').toLowerCase();
             if (kind==='warmup' && typeof st?.seconds==='number') {
-              const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'warmup');
+              const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'warmup', st?.pace_range);
               out.push(`1 × Warm‑up ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
               i += 1; continue;
             }
             if (kind==='cooldown' && typeof st?.seconds==='number') {
-              const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'cooldown');
+              const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'cooldown', st?.pace_range);
               out.push(`1 × Cool‑down ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
               i += 1; continue;
             }
@@ -425,7 +433,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 if (typeof st?.seconds==='number' && st.seconds>0) return fmtTime(st.seconds);
                 return 'interval';
               })();
-              const workPace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined, st?.kind);
+              const workPace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined, st?.kind, st?.pace_range);
               const workPower = powerStr(st);
               const next = steps[i+1];
               const hasRec = next && isRec(next);
@@ -434,17 +442,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 if (typeof next?.distanceMeters==='number' && next.distanceMeters>0) return `${Math.round(next.distanceMeters)} m`;
                 return 'rest';
               })() : undefined;
-              const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery') : undefined;
+              const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery', next?.pace_range) : undefined;
               const restPower = hasRec ? powerStr(next) : undefined;
               let count = 0; let j = i;
               while (j < steps.length) {
                 const a = steps[j]; const b = steps[j+1];
                 if (!isWork(a)) break;
                 const aLabel = (typeof a?.distanceMeters==='number' && a.distanceMeters>0) ? `${Math.round(a.distanceMeters)} m` : (typeof a?.seconds==='number' ? fmtTime(a.seconds) : 'interval');
-                const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind);
+                const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind, a?.pace_range);
                 const aPow = powerStr(a);
                 const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? `${Math.round(b.distanceMeters)} m` : 'rest')) : undefined;
-                const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery') : undefined;
+                const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery', b?.pace_range) : undefined;
                 const bPow = (b && isRec(b)) ? powerStr(b) : undefined;
                 const sameWork = (aLabel===workLabel) && (aPace===workPace) && (aPow===workPower);
                 const sameRest = (!hasRec && !b) || (!!hasRec && !!b && isRec(b) && bLabel===restLabel && bPace===restPace && bPow===restPower);

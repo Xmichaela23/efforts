@@ -304,17 +304,27 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     }
     return undefined;
   };
-  const buildPaceWithRange = (pTxt?: string, tol: number = tolQual): string => {
+  // Use server-processed pace ranges instead of client-side calculations
+  const buildPaceWithRange = (pTxt?: string, tol: number = tolQual, paceRange?: any): string => {
     if (!pTxt) return '';
-    const m = String(pTxt).match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i);
-    if (!m) return ` @ ${pTxt}`;
-    const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-    const unit = m[3].toLowerCase();
-    const loS = Math.round(sec * (1 - tol));
-    const hiS = Math.round(sec * (1 + tol));
-    const lo = `${Math.floor(loS/60)}:${String(loS%60).padStart(2,'0')}/${unit}`;
-    const hi = `${Math.floor(hiS/60)}:${String(hiS%60).padStart(2,'0')}/${unit}`;
-    return ` @ ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}/${unit} (${lo}–${hi})`;
+    
+    // Priority 1: Use server-processed pace_range object
+    if (paceRange && typeof paceRange === 'object' && paceRange.lower && paceRange.upper) {
+      const formatPace = (sec: number) => {
+        const mins = Math.floor(sec / 60);
+        const secs = Math.round(sec % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      };
+      return ` @ ${formatPace(paceRange.lower)}–${formatPace(paceRange.upper)}/mi`;
+    }
+    
+    // Priority 2: Use server-processed pace_range array
+    if (Array.isArray(paceRange) && paceRange.length === 2 && paceRange[0] && paceRange[1]) {
+      return ` @ ${paceRange[0]}–${paceRange[1]}`;
+    }
+    
+    // Priority 3: Fall back to single pace target (no range calculation)
+    return ` @ ${pTxt}`;
   };
   const type = String(ws?.type||'').toLowerCase();
   const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
@@ -340,7 +350,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const pTxt = typeof seg?.target_pace==='string' && /^user\./i.test(seg.target_pace)
           ? (pn[seg.target_pace.replace(/^user\./i,'')] || seg.target_pace)
           : seg?.target_pace;
-        lines.push(`Run 1 × ${Math.floor(s/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolQual):''}`);
+        lines.push(`Run 1 × ${Math.floor(s/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolQual, seg?.pace_range):''}`);
         continue;
       }
       if (k==='transition') {
@@ -357,13 +367,13 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       if (dist) {
         const yd = /yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144);
         if (parentDisc==='swim' && Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd;
-        const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy) : '';
+        const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy, undefined) : '';
         // Power ranges now provided by server - no client-side FTP calculation needed
         lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd${addPace ? addPace : ''}`);
       }
       const s = toSec(String(seg?.duration||''));
       if (s>0) {
-        const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy) : '';
+        const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy, undefined) : '';
         // Power ranges now provided by server - no client-side FTP calculation needed
         lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${addPace ? addPace : ''}`);
       }
@@ -376,15 +386,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       if (typeof paceTxt==='string' && /^user\./i.test(paceTxt)) { const key = paceTxt.replace(/^user\./i,''); paceTxt = pn[key] || paceTxt; }
       const label = /mi\b/i.test(distTxt) ? `${parseFloat(distTxt)} mi` : /m\b/i.test(distTxt) ? `${distTxt}` : (work?.duration? `${Math.floor(toSec(String(work.duration))/60)} min` : 'interval');
       for (let r=0;r<Math.max(1,reps);r+=1){
-        lines.push(`1 × ${label}${paceTxt?buildPaceWithRange(String(paceTxt), tolQual):''}`);
-        if (r<reps-1 && restS>0) lines.push(`Rest ${mmss(restS)}${easy?buildPaceWithRange(easy, tolEasy):''}`);
+        lines.push(`1 × ${label}${paceTxt?buildPaceWithRange(String(paceTxt), tolQual, work?.pace_range):''}`);
+        if (r<reps-1 && restS>0) lines.push(`Rest ${mmss(restS)}${easy?buildPaceWithRange(easy, tolEasy, undefined):''}`);
       }
       continue;
     }
     if (type==='tempo_session' && k==='main_set') {
       const durS = toSec(String(seg?.work_segment?.duration||''));
       const pTxt = resolvePaceRef(seg?.work_segment?.target_pace);
-      if (durS>0) lines.push(`1 × ${Math.floor(durS/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolQual):''}`);
+      if (durS>0) lines.push(`1 × ${Math.floor(durS/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolQual, seg?.work_segment?.pace_range):''}`);
       continue;
     }
     if (type==='bike_intervals' && k==='main_set') {
@@ -406,7 +416,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     if (type==='endurance_session' && (k==='main_effort' || k==='main')) {
       const sDur=toSec(String(seg?.duration||''));
       const pTxt = parentDisc==='run' ? (easy || resolvePaceRef('user.easyPace')) : undefined;
-      if (sDur>0) lines.push(`1 × ${Math.floor(sDur/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolEasy):''}`);
+      if (sDur>0) lines.push(`1 × ${Math.floor(sDur/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolEasy, undefined):''}`);
       continue;
     }
     if (type==='swim_session') {

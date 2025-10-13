@@ -503,13 +503,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
   // No animation: render values immediately on association
 
-  // Planned pace extractor (tight label) - prefer computed pace_sec_per_mi or pace_range
+  // Planned pace extractor - use server-processed data only
   const plannedPaceFor = (st: any): string => {
     try {
-      const kindStr = String(st.kind || st.type || st.name || '').toLowerCase();
-      const isWarm = /warm|wu/.test(kindStr);
-      const isCool = /cool|cd/.test(kindStr);
-      const isRest = /rest|recover|recovery|jog/.test(kindStr);
       // Rides: prefer power targets if present
       if (isRideSport) {
         const pr = (st as any)?.power_range;
@@ -519,59 +515,36 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
         }
         if (Number.isFinite(pw) && pw>0) return `${Math.round(pw)}W`;
       }
+      
+      // Priority 1: Use server-processed pace_range object
+      const prng = (st as any)?.pace_range || (st as any)?.paceRange;
+      if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
+        const formatPace = (sec: number) => {
+          const mins = Math.floor(sec / 60);
+          const secs = Math.round(sec % 60);
+          return `${mins}:${secs.toString().padStart(2, '0')}`;
+        };
+        return `${formatPace(prng.lower)}–${formatPace(prng.upper)}/mi`;
+      }
+      
+      // Priority 2: Use server-processed pace_range array
+      if (Array.isArray(prng) && prng.length === 2 && prng[0] && prng[1]) {
+        return `${prng[0]}–${prng[1]}`;
+      }
+      
+      // Priority 3: Single pace target (no client-side calculation)
       const direct = st.paceTarget || st.target_pace || st.pace;
       if (direct && String(direct).includes('/')) return String(direct);
+      
+      // Priority 4: pace_sec_per_mi
       const p = Number(st.pace_sec_per_mi);
       if (Number.isFinite(p) && p > 0) {
         const m = Math.floor(p / 60);
         const s = Math.round(p % 60);
         return `${m}:${String(s).padStart(2,'0')}/mi`;
       }
-      // If pace_range is [low, high] seconds per mile
-      if (Array.isArray(st.pace_range) && st.pace_range.length === 2) {
-        const lo = Number(st.pace_range[0]);
-        const hi = Number(st.pace_range[1]);
-        if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi > 0) {
-          const fm = (sec:number)=>`${Math.floor(sec/60)}:${String(Math.round(sec%60)).padStart(2,'0')}`;
-          return `${fm(lo)}–${fm(hi)}/mi`;
-        }
-      }
-      // Derive from distance+time only for explicit work/interval steps (avoid fabricating WU/CD paces)
-      const isWorky = /(work|interval|rep|effort)/.test(kindStr);
-      if (!isWorky) return '—';
-      const meters = (() => {
-        if (Number.isFinite(Number(st.distanceMeters))) return Number(st.distanceMeters);
-        if (Number.isFinite(Number(st.distance_m))) return Number(st.distance_m);
-        if (Number.isFinite(Number(st.meters))) return Number(st.meters);
-        if (Number.isFinite(Number(st.m))) return Number(st.m);
-        const ov = Number(st.original_val);
-        const ou = String(st.original_units || '').toLowerCase();
-        if (Number.isFinite(ov) && ov > 0) {
-          if (ou === 'mi') return ov * 1609.34;
-          if (ou === 'km') return ov * 1000;
-          if (ou === 'yd') return ov * 0.9144;
-          if (ou === 'm') return ov;
-        }
-        return undefined;
-      })();
-
-      const sec = (() => {
-        const cands = [st.duration, st.seconds, st.duration_sec, st.durationSeconds, st.time_sec, st.timeSeconds];
-        for (const v of cands) { const n = Number(v); if (Number.isFinite(n) && n > 0) return n; }
-        // Parse 'mm:ss' strings
-        const ts = String(st.time || '').trim();
-        if (/^\d{1,2}:\d{2}$/.test(ts)) { const [m,s] = ts.split(':').map((x:string)=>parseInt(x,10)); return m*60 + s; }
-        return undefined;
-      })();
-      if (meters && sec) {
-        const miles = meters / 1609.34;
-        if (miles > 0) {
-          const paceMinPerMile = (sec / 60) / miles;
-          const m = Math.floor(paceMinPerMile);
-          const s = Math.round((paceMinPerMile - m) * 60);
-          return `${m}:${String(s).padStart(2,'0')}/mi`;
-        }
-      }
+      
+      // No client-side calculations - server handles all pace processing
     } catch {}
     return '—';
   };
@@ -599,36 +572,35 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     }
     // run/walk → show "duration @ pace" when possible
     let paceText: string | null = null;
-    // Prefer explicit textual target first (e.g., "6:30/mi", "4:10/km")
-    const directTxt = (st as any)?.paceTarget || (st as any)?.target_pace || (st as any)?.pace;
-    if (typeof directTxt === 'string' && /\d+:\d{2}\s*\/(mi|km)/i.test(directTxt)) {
-      paceText = String(directTxt).trim();
+    
+    // Priority 1: Use server-processed pace_range object
+    const prng = (st as any)?.pace_range || (st as any)?.paceRange;
+    if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
+      const formatPace = (sec: number) => {
+        const mins = Math.floor(sec / 60);
+        const secs = Math.round(sec % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      };
+      paceText = `${formatPace(prng.lower)}–${formatPace(prng.upper)}/mi`;
     }
-    const p = Number((st as any)?.pace_sec_per_mi);
-    if (!paceText && Number.isFinite(p) && p>0) paceText = fmtPace(p);
-    const prng = Array.isArray((st as any)?.pace_range) ? (st as any).pace_range : null;
-    if (!paceText && prng && prng.length===2) {
-      const lo = Number(prng[0]); const hi = Number(prng[1]);
-      if (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) {
-        // Show full pace range like "9:00–10:00/mi"
-        paceText = `${fmtPace(lo)}–${fmtPace(hi)}/mi`;
+    // Priority 2: Use server-processed pace_range array
+    else if (Array.isArray(prng) && prng.length === 2 && prng[0] && prng[1]) {
+      paceText = `${prng[0]}–${prng[1]}`;
+    }
+    // Priority 3: Single pace target
+    else {
+      const directTxt = (st as any)?.paceTarget || (st as any)?.target_pace || (st as any)?.pace;
+      if (typeof directTxt === 'string' && /\d+:\d{2}\s*\/(mi|km)/i.test(directTxt)) {
+        paceText = String(directTxt).trim();
+      }
+      // Priority 4: pace_sec_per_mi
+      else {
+        const p = Number((st as any)?.pace_sec_per_mi);
+        if (Number.isFinite(p) && p>0) paceText = fmtPace(p);
       }
     }
-    // derive pace from distance + duration if present
-    try {
-      if (!paceText) {
-        const meters = Number((st as any)?.distanceMeters ?? (st as any)?.distance_m ?? (st as any)?.m ?? (st as any)?.meters);
-        const sec = [ (st as any)?.seconds, (st as any)?.duration, (st as any)?.duration_sec, (st as any)?.durationSeconds, (st as any)?.time_sec, (st as any)?.timeSeconds ]
-          .map((v:any)=>Number(v)).find((n:number)=>Number.isFinite(n) && n>0) as number | undefined;
-        if (Number.isFinite(meters) && meters>0 && Number.isFinite(sec) && (sec as number)>0) {
-          const miles = meters/1609.34; if (miles>0) paceText = fmtPace((sec as number)/miles);
-        }
-      }
-    } catch {}
-    if (!paceText) {
-      const txt = String((st as any)?.pace || '').trim();
-      if (/\d+:\d{2}\s*\/(mi|km)/i.test(txt)) paceText = txt;
-    }
+    
+    // No client-side calculations - server handles all pace processing
     // Planned duration
     let plannedSec: number | null = null;
     try {
