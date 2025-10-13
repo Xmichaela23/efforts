@@ -635,7 +635,7 @@ export default function WorkoutCalendar({
           return (
             <div 
               key={`empty-${index}`}
-              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-gray-200 p-2 flex flex-col justify-end items-end ${
+              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-gray-200 p-2 flex flex-col justify-start items-start ${
                 isLastCell ? 'col-span-2' : ''
               }`}
             >
@@ -706,7 +706,7 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
   }, [weekStart]);
 
   return (
-    <div className="w-full text-center">
+    <div className="w-full text-left">
       <div className="text-xs text-gray-500">Total Workload</div>
       <div className="text-sm font-medium text-gray-700">
         {loading ? '...' : `${completedWorkload} / ${plannedWorkload}`}
