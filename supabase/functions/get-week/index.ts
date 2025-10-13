@@ -464,6 +464,15 @@ Deno.serve(async (req) => {
             brick_group_id: (brickMetaByPlannedId.get(String(p.id))||null)?.group_id || null,
             brick_order: (brickMetaByPlannedId.get(String(p.id))||null)?.order || null,
           };
+          
+          // Debug: Log the processed planned data
+          console.log('get-week: Processed planned data:', {
+            id: planned.id,
+            steps: planned.steps?.map((s: any) => ({
+              paceTarget: s.paceTarget,
+              pace_range: s.pace_range
+            }))
+          });
         }
       }
       // executed snapshot from columns that exist
@@ -606,9 +615,44 @@ Deno.serve(async (req) => {
       } else {
         // Workout exists on this date+type but is NOT linked to this planned row
         // Add the planned row as a separate item so UI shows both
+        
+        // Process steps to convert paceTarget strings to pace_range objects (same as above)
+        const processedSteps = Array.isArray(p?.computed?.steps) ? p.computed.steps.map((step: any) => {
+          // If step already has pace_range, keep it
+          if (step.pace_range) {
+            return step;
+          }
+
+          // If step has paceTarget but no pace_range, convert it
+          if (step.paceTarget && typeof step.paceTarget === 'string') {
+            const paceMatch = step.paceTarget.match(/(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
+            if (paceMatch) {
+              const minutes = parseInt(paceMatch[1], 10);
+              const seconds = parseInt(paceMatch[2], 10);
+              const unit = paceMatch[3].toLowerCase();
+              const totalSeconds = minutes * 60 + seconds;
+              
+              // Convert to seconds per mile for consistency
+              const secPerMi = unit === 'km' ? totalSeconds * 1.60934 : totalSeconds;
+              
+              // Create pace range with ±5% tolerance (same as ensureWeekMaterialized)
+              const tolerance = 0.05;
+              const lower = Math.round(secPerMi * (1 - tolerance));
+              const upper = Math.round(secPerMi * (1 + tolerance));
+              
+              return {
+                ...step,
+                pace_range: { lower, upper, unit: 'mi' }
+              };
+            }
+          }
+
+          return step;
+        }) : null;
+
         const planned = {
           id: p.id,
-          steps: Array.isArray(p?.computed?.steps) ? p.computed.steps : null,
+          steps: processedSteps,
           total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
           description: p?.description || p?.rendered_description || null,
           tags: p?.tags || null,

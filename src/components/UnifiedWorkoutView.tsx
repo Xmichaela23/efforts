@@ -82,9 +82,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     
     // For planned workouts, find the matching item in unified data
     const plannedId = (workout as any)?.id;
+    console.log('🔍 Looking for planned workout:', {
+      plannedId,
+      unifiedItems: unifiedItems.map((item: any) => ({
+        id: item.id,
+        plannedId: item.planned?.id,
+        status: item.status,
+        type: item.type
+      }))
+    });
+    
     const unifiedPlanned = unifiedItems.find((item: any) => 
       item.planned?.id === plannedId || item.id === plannedId
     );
+    
+    console.log('🔍 Found unified planned:', unifiedPlanned);
     
     if (unifiedPlanned?.planned) {
       // Debug: Log the unified planned data to see if pace ranges are processed
