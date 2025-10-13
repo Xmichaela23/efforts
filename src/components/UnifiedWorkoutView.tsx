@@ -87,6 +87,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     );
     
     if (unifiedPlanned?.planned) {
+      // Debug: Log the unified planned data to see if pace ranges are processed
+      console.log('🔍 Unified planned data:', {
+        steps: unifiedPlanned.planned.steps?.map((s: any) => ({
+          paceTarget: s.paceTarget,
+          pace_range: s.pace_range,
+          paceRange: s.paceRange
+        }))
+      });
+      
       // Return the processed planned data from unified API
       return {
         id: unifiedPlanned.planned.id,
