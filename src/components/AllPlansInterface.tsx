@@ -688,12 +688,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             return out;
           };
           const round = (w: number) => Math.round(w / 5) * 5;
-          const resolveStrength = (text: string) => {
-            const pn = bl?.performanceNumbers || {};
-            const oneRMs = { squat: pn.squat, bench: pn.bench, deadlift: pn.deadlift, overhead: pn.overheadPress1RM } as any;
-            return String(text||'').replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => {
-              const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; });
-          };
+          // Client-side strength calculations removed - server handles all 1RM calculations
           // Power ranges now provided by server - no client-side FTP calculation needed
           const mapBike = (text: string) => text;
 
@@ -732,7 +727,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               id: w.id,
               name: w.name || 'Session',
               type: (String((w as any).type).toLowerCase() === 'bike' ? 'ride' : (w as any).type) as any,
-              description: renderedDesc || resolveStrength(mapBike(resolvePaces(w.description || ''))),
+              description: renderedDesc || mapBike(resolvePaces(w.description || '')),
               duration,
               intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
               day: dayName,
@@ -795,30 +790,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 return out;
               };
               const round = (w: number) => Math.round(w / 5) * 5;
-              const resolveStrength = (text: string) => {
-                const pn = bl?.performanceNumbers || {};
-                const oneRMs = { squat: pn.squat, bench: pn.bench, deadlift: pn.deadlift, overhead: pn.overheadPress1RM } as any;
-                let out = String(text||'');
-                // Main lifts with percent
-                out = out.replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => {
-                  const key = String(lift).toLowerCase();
-                  let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined;
-                  if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`;
-                });
-                // Accessory Rows without percent
-                out = out.replace(/\b(Barbell Row|BB Row|Row|DB Row|Dumbbell Row)\b(?![^—]*\blb\b)/gi, (m, label) => {
-                  const bench = typeof oneRMs.bench === 'number' ? oneRMs.bench as number : undefined;
-                  const dead = typeof oneRMs.deadlift === 'number' ? oneRMs.deadlift as number : undefined;
-                  const est = bench ? bench * 0.95 : (dead ? dead * 0.55 : undefined);
-                  if (typeof est !== 'number') return m;
-                  return `${label} — ${round(est)} lb`;
-                });
-                return out;
-              };
+              // Client-side strength calculations removed - server handles all 1RM calculations
               // Power ranges now provided by server - no client-side FTP calculation needed
               const mapBike = (text: string) => text;
               const description = (() => {
-                const base = resolveStrength(mapBike(resolvePaces(cleanSessionDescription(rawDesc))));
+                const base = mapBike(resolvePaces(cleanSessionDescription(rawDesc)));
                 // If the session is optional, keep the authored context alongside summary
                 if (Array.isArray((s as any).tags) && (s as any).tags.includes('optional')) {
                   const authored = cleanSessionDescription(rawDesc);
