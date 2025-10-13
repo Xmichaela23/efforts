@@ -135,10 +135,26 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         })();
         // Check for pace range first, then fall back to single pace target
         const pTxt = ((): string | undefined => {
+          // Debug: Log the step data to see what we're getting
+          if (st?.paceTarget || st?.pace_range) {
+            console.log('StructuredPlannedView step data:', {
+              paceTarget: st.paceTarget,
+              pace_range: st.pace_range,
+              paceRange: st.paceRange,
+              step: st
+            });
+          }
+          
           // Priority 1: Check for pace_range object with lower/upper bounds
           const prng = (st as any)?.pace_range || (st as any)?.paceRange;
           if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
-            return `${prng.lower}–${prng.upper}`;
+            // Convert seconds to mm:ss format
+            const formatPace = (sec: number) => {
+              const mins = Math.floor(sec / 60);
+              const secs = Math.round(sec % 60);
+              return `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
+            return `${formatPace(prng.lower)}–${formatPace(prng.upper)}/mi`;
           }
           // Priority 2: Check for pace_range array [lower, upper]
           if (Array.isArray(prng) && prng.length === 2 && prng[0] && prng[1]) {

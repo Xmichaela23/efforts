@@ -24,6 +24,18 @@ const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPl
   
   // For planned workouts, the workout should already be from unified API with processed data
   // Server-side get-week function now processes paceTarget → pace_range objects
+  
+  // Debug: Log the workout data structure
+  if (workout?.computed?.steps) {
+    console.log('getUnifiedPlannedWorkout - workout data:', {
+      steps: workout.computed.steps.map((s: any) => ({
+        paceTarget: s.paceTarget,
+        pace_range: s.pace_range,
+        paceRange: s.paceRange
+      }))
+    });
+  }
+  
   return workout;
 };
 
