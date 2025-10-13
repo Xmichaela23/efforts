@@ -82,6 +82,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     
     // For planned workouts, find the matching item in unified data and use the same structure as Today's Efforts
     const plannedId = (workout as any)?.id;
+    console.log('🔍 Looking for planned workout ID:', plannedId);
+    console.log('🔍 Available unified items:', unifiedItems.map((item: any) => ({
+      id: item.id,
+      plannedId: item.planned?.id,
+      status: item.status,
+      type: item.type,
+      hasSteps: !!item.planned?.steps?.length
+    })));
+    
     const unifiedPlanned = unifiedItems.find((item: any) => 
       item.planned?.id === plannedId || item.id === plannedId
     );

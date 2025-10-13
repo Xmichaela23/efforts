@@ -473,6 +473,9 @@ Deno.serve(async (req) => {
               pace_range: s.pace_range
             }))
           });
+          
+          // Debug: Log the full planned object structure
+          console.log('get-week: Full planned object:', JSON.stringify(planned, null, 2));
         }
       }
       // executed snapshot from columns that exist
