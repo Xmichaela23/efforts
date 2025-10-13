@@ -686,7 +686,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             return String(text||'').replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => {
               const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; });
           };
-          const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (center: number, tol: number) => `${text} — target ${Math.round((center*(1-tol))*ftp)}–${Math.round((center*(1+tol))*ftp)} W`; if (t.includes('vo2')) return add(1.10, pTolVO2); if (t.includes('threshold')) return add(0.98, pTolSS); if (t.includes('sweet spot')) return add(0.91, pTolSS); if (t.includes('zone 2') || t.includes('endurance')) return add(0.68, 0.05); return text; };
+          // Power ranges now provided by server - no client-side FTP calculation needed
+          const mapBike = (text: string) => text;
 
           const parseMaybeJson = (v: any) => {
             if (v == null) return v;
@@ -806,7 +807,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 });
                 return out;
               };
-              const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
+              // Power ranges now provided by server - no client-side FTP calculation needed
+              const mapBike = (text: string) => text;
               const description = (() => {
                 const base = resolveStrength(mapBike(resolvePaces(cleanSessionDescription(rawDesc))));
                 // If the session is optional, keep the authored context alongside summary

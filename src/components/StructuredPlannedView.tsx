@@ -358,16 +358,14 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const yd = /yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144);
         if (parentDisc==='swim' && Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd;
         const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy) : '';
-        const ftpNum = typeof (pn as any)?.ftp === 'number' ? (pn as any).ftp : undefined;
-        const addPower = (parentDisc==='ride' && typeof ftpNum==='number' && isFinite(ftpNum)) ? ` @ ${Math.round(ftpNum*0.60)}–${Math.round(ftpNum*0.65)} W` : '';
-        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd${addPace || addPower ? (addPace||addPower) : ''}`);
+        // Power ranges now provided by server - no client-side FTP calculation needed
+        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd${addPace ? addPace : ''}`);
       }
       const s = toSec(String(seg?.duration||''));
       if (s>0) {
         const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy) : '';
-        const ftpNum = typeof (pn as any)?.ftp === 'number' ? (pn as any).ftp : undefined;
-        const addPower = (parentDisc==='ride' && typeof ftpNum==='number' && isFinite(ftpNum)) ? ` @ ${Math.round(ftpNum*0.60)}–${Math.round(ftpNum*0.65)} W` : '';
-        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${addPace || addPower ? (addPace||addPower) : ''}`);
+        // Power ranges now provided by server - no client-side FTP calculation needed
+        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${addPace ? addPace : ''}`);
       }
       continue;
     }
@@ -393,20 +391,14 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const reps = Number(seg?.repetitions)||0; const wsS = toSec(String(seg?.work_segment?.duration||'')); const rsS = toSec(String(seg?.recovery_segment?.duration||''));
       const rangeTxt = String(seg?.work_segment?.target_power?.range||'');
       const powerLabel = (()=>{
-        const m = rangeTxt.match(/(\d{1,3})\s*[-–]\s*(\d{1,3})%/);
-        if (m && typeof (pn as any)?.ftp === 'number' && isFinite((pn as any).ftp)) {
-          const lo = Math.round((pn as any).ftp * (parseInt(m[1],10)/100));
-          const hi = Math.round((pn as any).ftp * (parseInt(m[2],10)/100));
-          return ` @ ${lo}–${hi} W`;
-        }
+        // Server now provides processed power ranges - no client-side FTP calculation needed
         return rangeTxt ? ` @ ${rangeTxt}` : '';
       })();
       for (let r=0;r<Math.max(1,reps);r+=1){
         lines.push(`1 × ${Math.floor(wsS/60)} min${powerLabel}`);
         if (r<reps-1 && rsS>0) {
-          const ftpNum = typeof (pn as any)?.ftp === 'number' ? (pn as any).ftp : undefined;
-          const restLabel = (typeof ftpNum==='number' && isFinite(ftpNum)) ? ` @ ${Math.round(ftpNum*0.60)}–${Math.round(ftpNum*0.65)} W` : '';
-          lines.push(`Rest ${Math.floor(rsS/60)} min${restLabel}`);
+          // Power ranges now provided by server - no client-side FTP calculation needed
+          lines.push(`Rest ${Math.floor(rsS/60)} min`);
         }
       }
       continue;

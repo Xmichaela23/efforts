@@ -471,62 +471,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     ? serverPlannedLight.map((s:any)=> ({ id: s.planned_step_id || undefined, planned_index: s.planned_index, distanceMeters: s.meters, duration: s.seconds }))
     : [];
   // Derive compact pace-only rows from the same source the Planned tab renders
-  const [ftp, setFtp] = useState<number | null>(null);
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!isRidePlanned) return;
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).maybeSingle();
-        const f = Number((data as any)?.performance_numbers?.ftp);
-        if (Number.isFinite(f) && f>0) setFtp(f);
-      } catch {}
-    })();
-  }, [isRidePlanned]);
-
-  const descPaceSteps: any[] = useMemo(() => {
-    const txt = String((planned as any)?.rendered_description || '');
-    if (!txt) return [];
-    const lines = txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-    const out: any[] = [];
-    const paceRe = /(\d{1,2}):(\d{2})\s*\/mi/i;
-    const pctRe = /(\d{2,3})\s*[%]\s*(?:ftp)?/i;
-    const pctRangeRe = /(\d{2,3})\s*[-–]\s*(\d{2,3})\s*%\s*(?:ftp)?/i;
-    for (const ln of lines) {
-      if (isRidePlanned) {
-        let watts: number | null = null;
-        const r = ln.match(pctRangeRe);
-        if (r) {
-          const lo = parseInt(r[1],10); const hi = parseInt(r[2],10);
-          const mid = Math.round((lo+hi)/2);
-          if (ftp && ftp>0) watts = Math.round(ftp * (mid/100));
-        } else {
-          const m = ln.match(pctRe);
-          if (m) {
-            const p = parseInt(m[1],10);
-            if (ftp && ftp>0) watts = Math.round(ftp * (p/100));
-          }
-        }
-        out.push(watts && watts>0 ? { power_target_watts: watts } : {});
-      } else {
-        const m = ln.match(paceRe);
-        if (m) {
-          const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-          out.push({ pace_sec_per_mi: sec });
-        }
-      }
-    }
-    return out;
-  }, [ (planned as any)?.rendered_description, isRidePlanned, ftp ]);
-  // Prefer structured steps when present; otherwise prefill from description so the ledger is always populated
-  // Display steps come from full planned steps when available, else light, else description-derived
-  // For long runs, a single description line is valid → accept desc-derived even if length === 1
-  // Always render at least one row so simple Plan vs Actual is visible immediately
+  // Client-side FTP calculations removed - now handled by server
+  // Server processes power ranges and provides them in planned.steps
+  // Prefer structured steps when present; otherwise use light steps
+  // Display steps come from full planned steps when available, else light
+  // Server now handles all power/pace calculations, so no client-side description parsing needed
   const steps: any[] = (
     plannedStepsFull.length > 0
       ? plannedStepsFull
-      : (plannedStepsLight.length > 0 ? plannedStepsLight : (descPaceSteps.length ? descPaceSteps : []))
+      : plannedStepsLight
   );
   if (!steps.length) {
     steps.push({ kind: 'steady', id: 'overall', planned_index: 0, seconds: (planned as any)?.computed?.total_duration_seconds || undefined });
@@ -1736,9 +1689,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               return s > 0 ? s : null;
             })();
 
-            // Duration-weighted planned watts from steps; fall back to description-derived with FTP
+            // Duration-weighted planned watts from server-processed steps
             const plannedWatts = (() => {
-              const ftpNum = Number(ftp);
+              // FTP calculations removed - server now handles this
               const steps = Array.isArray(plannedStepsFull) && plannedStepsFull.length ? plannedStepsFull : (Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : []);
               const isWorkStep = (st:any) => {
                 const k = String(st?.type || st?.kind || st?.name || '').toLowerCase();
@@ -1752,20 +1705,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                 const pr = (st as any)?.power_range;
                 const lo = Number(pr?.lower); const hi = Number(pr?.upper);
                 if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi > 0) {
-                  if (lo < 3 && hi < 3 && Number.isFinite(ftpNum) && ftpNum > 0) center = Math.round(ftpNum * ((lo + hi) / 2));
-                  else center = Math.round((lo + hi) / 2);
+                  // Server already converted FTP percentages to absolute watts
+                  center = Math.round((lo + hi) / 2);
                 }
                 const pw = Number((st as any)?.power_target_watts ?? (st as any)?.target_watts ?? (st as any)?.watts);
                 if (center == null && Number.isFinite(pw) && pw > 0) center = Math.round(pw);
                 if (center != null && Number.isFinite(dur) && dur > 0) { sum += (center as number) * dur; w += dur; }
               }
               if (w > 0) return Math.round(sum / w);
-              // Fallback to description-derived targets
-              try {
-                const arr = Array.isArray(descPaceSteps) ? descPaceSteps : [];
-                const vals = arr.map((x:any)=> Number(x?.power_target_watts)).filter((n:number)=> Number.isFinite(n) && n>0);
-                if (vals.length) return Math.round(vals.reduce((a:number,b:number)=>a+b,0) / vals.length);
-              } catch {}
+              // No fallback needed - server handles all power calculations
               return null;
             })();
 

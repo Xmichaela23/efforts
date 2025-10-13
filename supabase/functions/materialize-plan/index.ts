@@ -606,11 +606,37 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       return [Math.min(aMi,bMi), Math.max(aMi,bMi)];
     };
     const parsePowerRange = (s:string): {lower:number, upper:number} | null => {
-      const m = s.match(/(\d{2,4})\s*[–-]\s*(\d{2,4})\s*w/i);
-      if (!m) return null;
-      const lo = parseInt(m[1],10); const hi = parseInt(m[2],10);
-      if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo<=0 || hi<=0) return null;
-      return { lower: Math.min(lo,hi), upper: Math.max(lo,hi) };
+      // Handle absolute watt ranges like "200-250W"
+      let m = s.match(/(\d{2,4})\s*[–-]\s*(\d{2,4})\s*w/i);
+      if (m) {
+        const lo = parseInt(m[1],10); const hi = parseInt(m[2],10);
+        if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo<=0 || hi<=0) return null;
+        return { lower: Math.min(lo,hi), upper: Math.max(lo,hi) };
+      }
+      
+      // Handle FTP percentage ranges like "85-95% FTP" or "90% FTP"
+      const ftp = baselines?.ftp;
+      if (typeof ftp === 'number' && ftp > 0) {
+        // Range format: "85-95% FTP"
+        m = s.match(/(\d{1,3})\s*[–-]\s*(\d{1,3})\s*%\s*(?:ftp)?/i);
+        if (m) {
+          const lo = parseInt(m[1],10); const hi = parseInt(m[2],10);
+          if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo<=0 || hi<=0) return null;
+          return { lower: Math.round(ftp * (lo/100)), upper: Math.round(ftp * (hi/100)) };
+        }
+        
+        // Single percentage format: "90% FTP"
+        m = s.match(/(\d{1,3})\s*%\s*(?:ftp)?/i);
+        if (m) {
+          const pct = parseInt(m[1],10);
+          if (!Number.isFinite(pct) || pct<=0) return null;
+          const center = Math.round(ftp * (pct/100));
+          const tolerance = 0.05; // ±5% tolerance
+          return { lower: Math.round(center * (1-tolerance)), upper: Math.round(center * (1+tolerance)) };
+        }
+      }
+      
+      return null;
     };
     const pr = parsePaceRange(desc);
     const pow = parsePowerRange(desc);

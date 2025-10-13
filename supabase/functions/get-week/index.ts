@@ -277,6 +277,18 @@ Deno.serve(async (req) => {
 
     const workouts = Array.isArray(wkRaw) ? wkRaw : [];
 
+    // Fetch user FTP for power range calculations
+    let userFtp: number | null = null;
+    try {
+      const { data: baselines } = await supabase
+        .from('user_baselines')
+        .select('performance_numbers')
+        .eq('user_id', userId)
+        .maybeSingle();
+      userFtp = Number((baselines as any)?.performance_numbers?.ftp);
+      if (!Number.isFinite(userFtp) || userFtp <= 0) userFtp = null;
+    } catch {}
+
     // Transitional fill: for rows missing planned_data/executed_data, derive from legacy tables
     // 1) Preload planned rows for range keyed by (date|type)
     let plannedRows: any[] | null = null; let pErr: any = null;
@@ -421,16 +433,13 @@ Deno.serve(async (req) => {
             stepsCount: p?.computed?.steps?.length || 0
           });
           
-          // Process steps to convert paceTarget strings to pace_range objects (single source of truth)
+          // Process steps to convert paceTarget strings to pace_range objects and power percentages to power_range objects (single source of truth)
           const processedSteps = Array.isArray(p?.computed?.steps) ? p.computed.steps.map((step: any) => {
-            // If step already has pace_range, keep it
-            if (step.pace_range) {
-              return step;
-            }
+            let processedStep = { ...step };
 
-            // If step has paceTarget but no pace_range, convert it
-            if (step.paceTarget && typeof step.paceTarget === 'string') {
-              const paceMatch = step.paceTarget.match(/(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
+            // Process pace ranges for running workouts
+            if (!processedStep.pace_range && processedStep.paceTarget && typeof processedStep.paceTarget === 'string') {
+              const paceMatch = processedStep.paceTarget.match(/(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
               if (paceMatch) {
                 const minutes = parseInt(paceMatch[1], 10);
                 const seconds = parseInt(paceMatch[2], 10);
@@ -445,14 +454,33 @@ Deno.serve(async (req) => {
                 const lower = Math.round(secPerMi * (1 - tolerance));
                 const upper = Math.round(secPerMi * (1 + tolerance));
                 
-                return {
-                  ...step,
-                  pace_range: { lower, upper, unit: 'mi' }
-                };
+                processedStep.pace_range = { lower, upper, unit: 'mi' };
               }
             }
 
-            return step;
+            // Process power ranges for cycling workouts
+            if (userFtp && !processedStep.power_range && processedStep.powerTarget && typeof processedStep.powerTarget === 'string') {
+              // Handle percentage ranges like "85-95% FTP" or "90% FTP"
+              const pctRangeMatch = processedStep.powerTarget.match(/(\d{1,3})\s*[-–]\s*(\d{1,3})\s*%\s*(?:ftp)?/i);
+              const pctSingleMatch = processedStep.powerTarget.match(/(\d{1,3})\s*%\s*(?:ftp)?/i);
+              
+              if (pctRangeMatch) {
+                const lo = parseInt(pctRangeMatch[1], 10);
+                const hi = parseInt(pctRangeMatch[2], 10);
+                const lower = Math.round(userFtp * (lo / 100));
+                const upper = Math.round(userFtp * (hi / 100));
+                processedStep.power_range = { lower, upper };
+              } else if (pctSingleMatch) {
+                const pct = parseInt(pctSingleMatch[1], 10);
+                const center = Math.round(userFtp * (pct / 100));
+                const tolerance = 0.05; // ±5% tolerance
+                const lower = Math.round(center * (1 - tolerance));
+                const upper = Math.round(center * (1 + tolerance));
+                processedStep.power_range = { lower, upper };
+              }
+            }
+
+            return processedStep;
           }) : null;
 
           planned = {
@@ -601,9 +629,59 @@ Deno.serve(async (req) => {
             continue;
           }
         }
+        // Process steps for standalone planned workouts (same logic as linked workouts)
+        const processedSteps = Array.isArray(p?.computed?.steps) ? p.computed.steps.map((step: any) => {
+          let processedStep = { ...step };
+
+          // Process pace ranges for running workouts
+          if (!processedStep.pace_range && processedStep.paceTarget && typeof processedStep.paceTarget === 'string') {
+            const paceMatch = processedStep.paceTarget.match(/(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
+            if (paceMatch) {
+              const minutes = parseInt(paceMatch[1], 10);
+              const seconds = parseInt(paceMatch[2], 10);
+              const unit = paceMatch[3].toLowerCase();
+              const totalSeconds = minutes * 60 + seconds;
+              
+              // Convert to seconds per mile for consistency
+              const secPerMi = unit === 'km' ? totalSeconds * 1.60934 : totalSeconds;
+              
+              // Create pace range with ±5% tolerance (same as ensureWeekMaterialized)
+              const tolerance = 0.05;
+              const lower = Math.round(secPerMi * (1 - tolerance));
+              const upper = Math.round(secPerMi * (1 + tolerance));
+              
+              processedStep.pace_range = { lower, upper, unit: 'mi' };
+            }
+          }
+
+          // Process power ranges for cycling workouts
+          if (userFtp && !processedStep.power_range && processedStep.powerTarget && typeof processedStep.powerTarget === 'string') {
+            // Handle percentage ranges like "85-95% FTP" or "90% FTP"
+            const pctRangeMatch = processedStep.powerTarget.match(/(\d{1,3})\s*[-–]\s*(\d{1,3})\s*%\s*(?:ftp)?/i);
+            const pctSingleMatch = processedStep.powerTarget.match(/(\d{1,3})\s*%\s*(?:ftp)?/i);
+            
+            if (pctRangeMatch) {
+              const lo = parseInt(pctRangeMatch[1], 10);
+              const hi = parseInt(pctRangeMatch[2], 10);
+              const lower = Math.round(userFtp * (lo / 100));
+              const upper = Math.round(userFtp * (hi / 100));
+              processedStep.power_range = { lower, upper };
+            } else if (pctSingleMatch) {
+              const pct = parseInt(pctSingleMatch[1], 10);
+              const center = Math.round(userFtp * (pct / 100));
+              const tolerance = 0.05; // ±5% tolerance
+              const lower = Math.round(center * (1 - tolerance));
+              const upper = Math.round(center * (1 + tolerance));
+              processedStep.power_range = { lower, upper };
+            }
+          }
+
+          return processedStep;
+        }) : null;
+
         const planned = {
           id: p.id,
-          steps: Array.isArray(p?.computed?.steps) ? p.computed.steps : null,
+          steps: processedSteps,
           total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
           description: p?.description || p?.rendered_description || null,
           tags: p?.tags || null,
