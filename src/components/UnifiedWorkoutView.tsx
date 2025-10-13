@@ -25,16 +25,6 @@ const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPl
   // For planned workouts, the workout should already be from unified API with processed data
   // Server-side get-week function now processes paceTarget → pace_range objects
   
-  // Debug: Log the workout data structure
-  if (workout?.computed?.steps) {
-    console.log('getUnifiedPlannedWorkout - workout data:', {
-      steps: workout.computed.steps.map((s: any) => ({
-        paceTarget: s.paceTarget,
-        pace_range: s.pace_range,
-        paceRange: s.paceRange
-      }))
-    });
-  }
   
   return workout;
 };
@@ -82,14 +72,55 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // Unified week data for the workout's date (single-day window)
   const dateIso = String((workout as any)?.date || '').slice(0,10);
   const { items: unifiedItems = [] } = useWeekUnified(dateIso, dateIso);
+  
+  // For planned workouts, use unified data instead of raw workout prop
+  const unifiedWorkout = (() => {
+    if (isCompleted) {
+      // For completed workouts, use the original workout data
+      return workout;
+    }
+    
+    // For planned workouts, find the matching item in unified data
+    const plannedId = (workout as any)?.id;
+    const unifiedPlanned = unifiedItems.find((item: any) => 
+      item.planned?.id === plannedId || item.id === plannedId
+    );
+    
+    if (unifiedPlanned?.planned) {
+      // Return the processed planned data from unified API
+      return {
+        id: unifiedPlanned.planned.id,
+        date: unifiedPlanned.date,
+        type: unifiedPlanned.type,
+        workout_status: 'planned',
+        description: unifiedPlanned.planned.description,
+        rendered_description: unifiedPlanned.planned.rendered_description,
+        computed: {
+          steps: unifiedPlanned.planned.steps,
+          total_duration_seconds: unifiedPlanned.planned.total_duration_seconds
+        },
+        tags: unifiedPlanned.planned.tags,
+        steps_preset: unifiedPlanned.planned.steps_preset,
+        strength_exercises: unifiedPlanned.planned.strength_exercises,
+        mobility_exercises: unifiedPlanned.planned.mobility_exercises,
+        export_hints: unifiedPlanned.planned.export_hints,
+        workout_structure: unifiedPlanned.planned.workout_structure,
+        friendly_summary: unifiedPlanned.planned.friendly_summary,
+        planned_id: unifiedPlanned.planned.id
+      };
+    }
+    
+    // Fallback to original workout if not found in unified data
+    return workout;
+  })();
 
   // Fetch current planned_id from database to ensure we have the latest state
   // Use planned_id from unified API data instead of direct database query
   useEffect(() => {
-    const plannedId = (workout as any)?.planned_id || null;
+    const plannedId = (unifiedWorkout as any)?.planned_id || null;
     console.log('🔍 Using planned_id from unified API:', plannedId);
     setCurrentPlannedId(plannedId);
-  }, [(workout as any)?.planned_id]);
+  }, [(unifiedWorkout as any)?.planned_id]);
 
   // Phase 1: On-demand completed detail hydration (gps/sensors) with fallback to context object
   const wid = String((workout as any)?.id || '');
@@ -873,12 +904,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-1">
             <StructuredPlannedView 
-              workout={getUnifiedPlannedWorkout(workout, isCompleted, hydratedPlanned, linkedPlanned)}
+              workout={getUnifiedPlannedWorkout(unifiedWorkout, isCompleted, hydratedPlanned, linkedPlanned)}
               showHeader={true}
             />
             {(() => {
               // Show inline launcher for planned sessions (strength and mobility)
-              const row = isCompleted ? (linkedPlanned || null) : workout;
+              const row = isCompleted ? (linkedPlanned || null) : unifiedWorkout;
               const isPlanned = String((row as any)?.workout_status || '').toLowerCase() === 'planned';
               const type = String((row as any)?.type || '').toLowerCase();
               if (!row || !isPlanned || (type!=='strength' && type!=='mobility')) return null;
