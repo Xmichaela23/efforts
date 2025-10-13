@@ -92,7 +92,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         steps: unifiedPlanned.planned.steps?.map((s: any) => ({
           paceTarget: s.paceTarget,
           pace_range: s.pace_range,
-          paceRange: s.paceRange
+          paceRange: s.paceRange,
+          fullStep: s
         }))
       });
       
