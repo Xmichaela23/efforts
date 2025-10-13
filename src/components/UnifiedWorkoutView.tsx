@@ -87,6 +87,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     );
     
     if (unifiedPlanned?.planned) {
+      console.log('🔍 Found unified planned data with steps:', unifiedPlanned.planned.steps?.map((s: any) => ({
+        paceTarget: s.paceTarget,
+        pace_range: s.pace_range
+      })));
+      
       // Use the same data structure as Today's Efforts (lines 133-148 in TodaysEffort.tsx)
       return {
         id: unifiedPlanned.planned.id || unifiedPlanned.id,
@@ -109,6 +114,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         planned_id: unifiedPlanned.planned.id
       };
     }
+    
+    console.log('🔍 No unified planned data found, using original workout');
     
     // If not found in unified data, use the original workout (this should not happen in normal flow)
     return workout;
