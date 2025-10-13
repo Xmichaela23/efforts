@@ -478,17 +478,34 @@ const Connections: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Dashboard Navigation */}
-      <button
-        onClick={goToDashboard}
-        className="text-gray-700 hover:text-gray-900 text-sm flex items-center gap-1 mb-6"
-      >
-        Dashboard
-      </button>
+    <div className="mobile-app-container">
+      <header className="mobile-header">
+        <div className="w-full">
+          <div className="flex items-center justify-between h-16 w-full px-4">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} 
+                className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                ← Back
+              </button>
+              <h1 className="text-2xl font-bold">Connections</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={goToDashboard} 
+                className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+      <main className="mobile-main-content">
+        <div className="max-w-4xl mx-auto p-6">
       
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold">Connections</h1>
         <p className="text-gray-600">
           Connect your fitness services to automatically sync data and enable real-time updates.
         </p>
@@ -723,6 +740,8 @@ const Connections: React.FC = () => {
           Historical import is for bringing in your past activities. This may take a few minutes.
         </p>
       </div>
+        </div>
+      </main>
     </div>
   );
 };

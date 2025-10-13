@@ -841,7 +841,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               </DropdownMenu>
 
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
-              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder) && !showSummary && (
+              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage) && !showSummary && (
                 <div className="flex items-center gap-3">
                   <Button
                     onClick={handleHeaderBack}

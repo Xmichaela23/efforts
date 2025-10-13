@@ -718,18 +718,33 @@ const getPerformanceNumbers = (disciplineId: string) => {
 const hasInjuries = data.injuryHistory && data.injuryHistory !== "No current injuries or limitations";
 
 return (
-  <div className="min-h-screen bg-white">
-    <main className="max-w-4xl mx-auto px-3 py-2">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <button
-          onClick={onClose}
-          className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-black transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </button>
+  <div className="mobile-app-container">
+    <header className="mobile-header">
+      <div className="w-full">
+        <div className="flex items-center justify-between h-16 w-full px-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+            <h1 className="text-2xl font-bold">Training Baselines</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="text-sm font-medium text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
+            >
+              Dashboard
+            </button>
+          </div>
+        </div>
       </div>
+    </header>
+    <main className="mobile-main-content">
+      <div className="max-w-4xl mx-auto px-3 py-2">
 
       <div className="max-w-2xl mx-auto space-y-8">
         {loading ? (
@@ -739,7 +754,6 @@ return (
         ) : (
           <>
             <div className="text-center">
-              <h1 className="text-2xl font-medium mb-2">Training Baselines</h1>
               <p className="text-gray-600">
                 Your fitness data for personalized training plans
               </p>
@@ -1748,6 +1762,7 @@ return (
             </div>
           </>
         )}
+      </div>
       </div>
     </main>
   </div>
