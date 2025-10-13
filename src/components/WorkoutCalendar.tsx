@@ -236,22 +236,6 @@ export default function WorkoutCalendar({
 
   // No legacy backstop: unified feed is authoritative
 
-  // Dev-only diagnostics to verify unified feed → calendar mapping
-  if (import.meta.env?.DEV) {
-    try {
-      // eslint-disable-next-line no-console
-      console.debug('[calendar:unified]', {
-        fromISO,
-        toISO,
-        items: unifiedItems?.length || 0,
-        plannedCount: unifiedPlanned?.length || 0,
-        completedCount: unifiedWorkouts?.length || 0,
-        legacyCompleted: 0,
-        samplePlanned: unifiedPlanned?.[0] || null,
-        sampleCompleted: unifiedWorkouts?.[0] || null,
-      });
-    } catch {}
-  }
 
   const plannedWeekRows = unifiedPlanned;
   const workoutsWeekRows = [...unifiedWorkouts];
@@ -496,10 +480,6 @@ export default function WorkoutCalendar({
     map.get(key)!.push(evt);
   }
 
-  if (import.meta.env?.DEV) {
-    console.log('WorkoutCalendar - events:', events);
-    console.log('WorkoutCalendar - map:', map);
-  }
 
   const weekdayFmt = new Intl.DateTimeFormat('en-US', { weekday: "short" });
   const monthFmt = new Intl.DateTimeFormat('en-US', { month: "short" });

@@ -148,15 +148,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         };
       }
     });
-  }, [unifiedItems, activeDate]);
+  }, [unifiedItems]);
 
-  // FIXED: React to selectedDate prop changes properly
+  // FIXED: React to selectedDate prop changes properly - use a stable dependency
   useEffect(() => {
     // Split into activated (no 'optional') and optional
     const activated = dateWorkoutsMemo.filter((w:any)=> !(Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')));
     const optionals = dateWorkoutsMemo.filter((w:any)=> Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional'));
     setDisplayWorkouts([...activated, ...optionals]);
-  }, [dateWorkoutsMemo]);
+  }, [unifiedItems.length, activeDate]); // Use stable dependencies - length and date
   // Helper to clean authored codes from text (mirrors PlannedWorkoutView)
   const stripCodes = (text?: string) => String(text || '')
     .replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '')
@@ -282,13 +282,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           return b;
         })();
         try {
-          if (import.meta.env?.DEV) {
-            const lenExec = Array.isArray((workout as any)?.computed?.strength_exercises) ? (workout as any).computed.strength_exercises.length : 0;
-            const lenCtx = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises.length : 0;
-            const lenComp = Array.isArray((workout as any)?.completed_exercises) ? (workout as any).completed_exercises.length : 0;
-            // eslint-disable-next-line no-console
-            console.debug('[today:strength] sources', { id: String((workout as any)?.id||''), lenExec, lenCtx, lenComp, chosen: Array.isArray(exercises) ? exercises.length : 0 });
-          }
+          // Debug logging removed to prevent infinite re-renders
         } catch {}
         
         if (exercises.length > 0) {
@@ -704,8 +698,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
                         <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={!expanded[String(workout.id)]} />
-                        <button
-                          className="text-xs text-blue-600 hover:underline ml-2"
+                        <span
+                          className="text-xs text-blue-600 hover:underline ml-2 cursor-pointer"
                           onClick={(e)=>{ 
                             e.preventDefault(); e.stopPropagation(); 
                             const key = String(workout.id);
@@ -727,7 +721,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           }}
                         >
                           {expanded[String(workout.id)] ? 'Hide details' : 'Show details'}
-                        </button>
+                        </span>
                       </div>
                       {(() => { 
                         if (!expanded[String(workout.id)]) return null;
