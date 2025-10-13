@@ -15,6 +15,18 @@ import { supabase } from '@/lib/supabase';
 import { useExecutionScore } from '@/hooks/useExecutionScore';
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 
+// Get unified planned workout data with pace ranges (same as Today's Effort and Weekly)
+const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPlanned: any, linkedPlanned: any) => {
+  // For completed workouts, use the linked planned workout
+  if (isCompleted && (hydratedPlanned || linkedPlanned)) {
+    return hydratedPlanned || linkedPlanned || workout;
+  }
+  
+  // For planned workouts, the workout should already be from unified API with processed data
+  // Server-side get-week function now processes paceTarget → pace_range objects
+  return workout;
+};
+
 
 interface UnifiedWorkoutViewProps {
   workout: any;
@@ -871,7 +883,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-1">
             <StructuredPlannedView 
-              workout={isCompleted ? (hydratedPlanned || linkedPlanned || workout) : (hydratedPlanned || workout)}
+              workout={getUnifiedPlannedWorkout(workout, isCompleted, hydratedPlanned, linkedPlanned)}
               showHeader={true}
             />
             {(() => {

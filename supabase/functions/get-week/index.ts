@@ -413,22 +413,58 @@ Deno.serve(async (req) => {
           p = (Array.isArray(plannedRows) ? plannedRows : []).find((x:any)=> String(x.id) === String(w.planned_id)) || null;
         }
         if (!p) p = plannedByKey.get(`${date}|${type}`) || null;
-        if (p) planned = {
-          id: p.id,
-          steps: Array.isArray(p?.computed?.steps) ? p.computed.steps : null,
-          total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
-          description: p?.description || p?.rendered_description || null,
-          tags: p?.tags || null,
-          steps_preset: (p as any)?.steps_preset ?? null,
-          strength_exercises: (p as any)?.strength_exercises ?? null,
-          mobility_exercises: (p as any)?.mobility_exercises ?? null,
-          export_hints: (p as any)?.export_hints ?? null,
-          workout_structure: (p as any)?.workout_structure ?? null,
-          friendly_summary: (p as any)?.friendly_summary ?? null,
-          rendered_description: (p as any)?.rendered_description ?? null,
-          brick_group_id: (brickMetaByPlannedId.get(String(p.id))||null)?.group_id || null,
-          brick_order: (brickMetaByPlannedId.get(String(p.id))||null)?.order || null,
-        };
+        if (p) {
+          // Process steps to convert paceTarget strings to pace_range objects (single source of truth)
+          const processedSteps = Array.isArray(p?.computed?.steps) ? p.computed.steps.map((step: any) => {
+            // If step already has pace_range, keep it
+            if (step.pace_range) {
+              return step;
+            }
+
+            // If step has paceTarget but no pace_range, convert it
+            if (step.paceTarget && typeof step.paceTarget === 'string') {
+              const paceMatch = step.paceTarget.match(/(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
+              if (paceMatch) {
+                const minutes = parseInt(paceMatch[1], 10);
+                const seconds = parseInt(paceMatch[2], 10);
+                const unit = paceMatch[3].toLowerCase();
+                const totalSeconds = minutes * 60 + seconds;
+                
+                // Convert to seconds per mile for consistency
+                const secPerMi = unit === 'km' ? totalSeconds * 1.60934 : totalSeconds;
+                
+                // Create pace range with ±5% tolerance (same as ensureWeekMaterialized)
+                const tolerance = 0.05;
+                const lower = Math.round(secPerMi * (1 - tolerance));
+                const upper = Math.round(secPerMi * (1 + tolerance));
+                
+                return {
+                  ...step,
+                  pace_range: { lower, upper, unit: 'mi' }
+                };
+              }
+            }
+
+            return step;
+          }) : null;
+
+          planned = {
+            id: p.id,
+            steps: processedSteps,
+            total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
+            description: p?.description || p?.rendered_description || null,
+            tags: p?.tags || null,
+            steps_preset: (p as any)?.steps_preset ?? null,
+            strength_exercises: (p as any)?.strength_exercises ?? null,
+            mobility_exercises: (p as any)?.mobility_exercises ?? null,
+            export_hints: (p as any)?.export_hints ?? null,
+            workout_structure: (p as any)?.workout_structure ?? null,
+            friendly_summary: (p as any)?.friendly_summary ?? null,
+            rendered_description: (p as any)?.rendered_description ?? null,
+            brick_group_id: (brickMetaByPlannedId.get(String(p.id))||null)?.group_id || null,
+            brick_order: (brickMetaByPlannedId.get(String(p.id))||null)?.order || null,
+          };
+        }
       }
       // executed snapshot from columns that exist
       let executed: any = {};
@@ -519,42 +555,30 @@ Deno.serve(async (req) => {
       
       // If no workout on this date+type, add planned-only item
       if (!byKey.has(key)) {
-        // If this planned row is already linked to a completed workout, prefer emitting the completed item
+        // If this planned row is already linked to a completed workout, check if it's from a different date
         const cw = (p as any)?.completed_workout_id ? String((p as any).completed_workout_id) : null;
         if (cw) {
-          // Try to hydrate from prefetched workouts in-range; else emit minimal completed item
+          // Try to hydrate from prefetched workouts in-range
           const w = (workouts as any[]).find((x:any)=> String(x.id)===cw);
           if (w) {
-            const it = unify(w);
-            byKey.set(key, it);
-            items.push(it);
-            continue;
+            // Check if the completed workout is from a different date than the planned workout
+            const completedDate = String(w.date).slice(0,10);
+            const plannedDate = String(p.date).slice(0,10);
+            
+            if (completedDate === plannedDate) {
+              // Same date: show the completed workout with planned data
+              const it = unify(w);
+              byKey.set(key, it);
+              items.push(it);
+              continue;
+            } else {
+              // Different date: skip showing anything on the planned workout's date
+              // The completed workout will show on its actual completion date
+              continue;
+            }
           } else {
-            const minimalCompleted = {
-              id: cw,
-              date: String(p.date).slice(0,10),
-              type: String(p.type).toLowerCase(),
-              status: 'completed',
-              planned: {
-                id: p.id,
-                steps: Array.isArray(p?.computed?.steps) ? p.computed.steps : null,
-                total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
-                description: p?.description || p?.rendered_description || null,
-                tags: p?.tags || null,
-                steps_preset: (p as any)?.steps_preset ?? null,
-                strength_exercises: (p as any)?.strength_exercises ?? null,
-                mobility_exercises: (p as any)?.mobility_exercises ?? null,
-                training_plan_id: (p as any)?.training_plan_id ?? null,
-                export_hints: (p as any)?.export_hints ?? null,
-                workout_structure: (p as any)?.workout_structure ?? null,
-                friendly_summary: (p as any)?.friendly_summary ?? null,
-                rendered_description: (p as any)?.rendered_description ?? null,
-              },
-              executed: null,
-              planned_id: p.id,
-            } as any;
-            items.push(minimalCompleted);
-            byKey.set(key, minimalCompleted);
+            // Completed workout not in range: skip showing anything on planned date
+            // This prevents showing "N/A" entries for workouts completed on different dates
             continue;
           }
         }
