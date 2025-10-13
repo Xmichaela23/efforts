@@ -18,7 +18,8 @@ import {
   Settings,
   Link2,
   Unlink,
-  Calendar
+  Calendar,
+  Watch
 } from 'lucide-react';
 import { useToast } from './ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -61,13 +62,59 @@ const Connections: React.FC = () => {
   const [showDateControls, setShowDateControls] = useState(false);
   const navigate = useNavigate();
 
+  // Garmin connection state
+  const [garminConnected, setGarminConnected] = useState(false);
+  const [garminMessage, setGarminMessage] = useState('');
+  const [garminAccessToken, setGarminAccessToken] = useState<string | null>(null);
+
   useEffect(() => {
     // On desktop, show controls by default; on mobile, keep them collapsed
     setShowDateControls(!isMobile);
   }, [isMobile]);
 
+  // Listen for Garmin OAuth callback messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data.type === 'garmin-oauth-success') {
+        handleGarminOAuthSuccess(event.data.code);
+      } else if (event.data.type === 'garmin-oauth-error') {
+        setGarminMessage(`Error: ${event.data.error}`);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // Check for existing Garmin token on mount
+  useEffect(() => {
+    const existingToken = localStorage.getItem('garmin_access_token');
+    if (existingToken) {
+      setGarminAccessToken(existingToken);
+      setGarminConnected(true);
+    }
+  }, []);
+
   const goToDashboard = () => {
     navigate('/');
+  };
+
+  // PKCE helper function for Garmin OAuth
+  const generatePKCE = async () => {
+    const codeVerifier = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+    
+    const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
+    const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+    
+    return { codeVerifier, codeChallenge };
   };
 
   useEffect(() => {
@@ -78,6 +125,18 @@ const Connections: React.FC = () => {
     if (stravaConnected && stravaToken) {
       setConnections(prev => prev.map(conn => 
         conn.provider === 'strava' 
+          ? { ...conn, connected: true }
+          : conn
+      ));
+    }
+
+    // Check localStorage for Garmin connection status
+    const garminToken = localStorage.getItem('garmin_access_token');
+    if (garminToken) {
+      setGarminConnected(true);
+      setGarminAccessToken(garminToken);
+      setConnections(prev => prev.map(conn => 
+        conn.provider === 'garmin' 
           ? { ...conn, connected: true }
           : conn
       ));
@@ -94,6 +153,17 @@ const Connections: React.FC = () => {
         if (currentStravaConnected && currentStravaToken) {
           setConnections(prev => prev.map(conn => 
             conn.provider === 'strava' 
+              ? { ...conn, connected: true }
+              : conn
+          ));
+        }
+
+        const currentGarminToken = localStorage.getItem('garmin_access_token');
+        if (currentGarminToken) {
+          setGarminConnected(true);
+          setGarminAccessToken(currentGarminToken);
+          setConnections(prev => prev.map(conn => 
+            conn.provider === 'garmin' 
               ? { ...conn, connected: true }
               : conn
           ));
@@ -466,6 +536,214 @@ const Connections: React.FC = () => {
     }
   };
 
+  // Handle Garmin OAuth success
+  const handleGarminOAuthSuccess = async (code: string) => {
+    try {
+      const codeVerifier = sessionStorage.getItem('garmin_code_verifier');
+      if (!codeVerifier) {
+        throw new Error('Code verifier not found');
+      }
+
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('User must be logged in');
+      }
+
+      // Exchange code for access token using Supabase function
+      const tokenResponse = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/bright-service', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          code: code,
+          codeVerifier: codeVerifier,
+          redirectUri: 'https://efforts.work/auth/garmin/callback'
+        })
+      });
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        console.error('🔍 GARMIN DEBUG: Token exchange failed:', errorText);
+        throw new Error(`Token exchange failed: ${tokenResponse.status}`);
+      }
+
+      const tokenData = await tokenResponse.json();
+      
+      // Persist Garmin OAuth tokens to user_connections
+      try {
+        await supabase
+          .from('user_connections')
+          .upsert({
+            provider: 'garmin',
+            access_token: tokenData.access_token,
+            refresh_token: tokenData.refresh_token,
+            expires_at: tokenData.expires_at || new Date(Date.now() + (Number(tokenData.expires_in || 0) * 1000)).toISOString(),
+            connection_data: {
+              ...(typeof tokenData.scope === 'string' ? { scope: tokenData.scope } : {}),
+              token_type: tokenData.token_type || 'bearer'
+            }
+          });
+
+        // Try to enrich with Garmin user_id (non-fatal)
+        try {
+          const path = '/wellness-api/rest/user/id';
+          const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${tokenData.access_token}`;
+          const respUser = await fetch(url, { headers: { 'Authorization': `Bearer ${session.access_token}` } });
+          if (respUser.ok) {
+            const body = await respUser.json();
+            const garminUserId = body?.userId;
+            if (garminUserId) {
+              await supabase
+                .from('user_connections')
+                .update({ connection_data: { scope: tokenData.scope, token_type: tokenData.token_type || 'bearer', user_id: garminUserId, access_token: tokenData.access_token } })
+                .eq('provider', 'garmin');
+            }
+          }
+        } catch {}
+      } catch (_) {}
+
+      // Set both state and localStorage with the new token
+      setGarminAccessToken(tokenData.access_token);
+      setGarminConnected(true);
+      localStorage.setItem('garmin_access_token', tokenData.access_token);
+      setGarminMessage('Successfully connected to Garmin!');
+
+      // Clean up
+      sessionStorage.removeItem('garmin_code_verifier');
+
+      // Update connections state
+      setConnections(prev => prev.map(conn =>
+        conn.provider === 'garmin' 
+          ? { ...conn, connected: true, lastSync: new Date().toISOString() }
+          : conn
+      ));
+
+    } catch (error) {
+      console.error('🔍 GARMIN DEBUG: OAuth error:', error);
+      setGarminMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      sessionStorage.removeItem('garmin_code_verifier');
+    }
+  };
+
+  // Garmin connection functions
+  const connectGarmin = async () => {
+    localStorage.removeItem('garmin_access_token');
+    setGarminMessage('Connecting to Garmin...');
+    
+    try {
+      const { codeVerifier, codeChallenge } = await generatePKCE();
+      
+      // Store code verifier for later use
+      sessionStorage.setItem('garmin_code_verifier', codeVerifier);
+      
+      const authUrl = 'https://connect.garmin.com/oauth2Confirm';
+      const clientId = (import.meta as any).env?.VITE_GARMIN_CLIENT_ID || '';
+      const redirectUri = 'https://efforts.work/auth/garmin/callback';
+      
+      const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: clientId,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        redirect_uri: redirectUri,
+        state: Math.random().toString(36).substring(2, 15)
+      });
+      
+      const fullAuthUrl = `${authUrl}?${params.toString()}`;
+      
+      // Open popup for OAuth
+      const popup = window.open(fullAuthUrl, 'garmin-auth', 'width=600,height=600');
+      
+      // Check if popup was blocked
+      if (!popup) {
+        setGarminMessage('Popup was blocked. Please allow popups for this site and try again.');
+        sessionStorage.removeItem('garmin_code_verifier');
+        return;
+      }
+      
+    } catch (error) {
+      setGarminMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      sessionStorage.removeItem('garmin_code_verifier');
+    }
+  };
+
+  const disconnectGarmin = async () => {
+    try {
+      setLoading(true);
+      
+      // Clear localStorage tokens
+      localStorage.removeItem('garmin_access_token');
+      
+      // Get authenticated user
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser?.id) {
+        throw new Error('Not authenticated');
+      }
+
+      // Delete from user_connections
+      const { error } = await supabase
+        .from('user_connections')
+        .delete()
+        .eq('user_id', authUser.id)
+        .filter('provider', 'eq', 'garmin');
+
+      if (error) throw error;
+
+      // Update UI state
+      setGarminConnected(false);
+      setGarminAccessToken(null);
+      setGarminMessage('Disconnected from Garmin');
+      
+      setConnections(prev => prev.map(conn =>
+        conn.provider === 'garmin' ? { ...conn, connected: false } : conn
+      ));
+
+      toast({
+        title: "Garmin Disconnected",
+        description: "Your Garmin account has been disconnected.",
+      });
+
+    } catch (error) {
+      console.error('Error disconnecting Garmin:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: `${error instanceof Error ? error.message : 'Failed to disconnect from Garmin.'}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testGarminApi = async () => {
+    if (!garminAccessToken) return;
+
+    try {
+      setGarminMessage('Testing API call...');
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const path = '/wellness-api/rest/user/id';
+      const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${garminAccessToken}`;
+      const response = await fetch(url, { 
+        headers: { 'Authorization': `Bearer ${session.access_token}` } 
+      });
+
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setGarminMessage(`API test successful! User ID: ${data.userId || 'Unknown'}`);
+    } catch (error) {
+      setGarminMessage(`API test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const getProviderDescription = (provider: string) => {
     switch (provider) {
       case 'strava':
@@ -553,7 +831,13 @@ const Connections: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => connection.provider === 'strava' ? disconnectStrava() : null}
+                      onClick={() => {
+                        if (connection.provider === 'strava') {
+                          disconnectStrava();
+                        } else if (connection.provider === 'garmin') {
+                          disconnectGarmin();
+                        }
+                      }}
                       disabled={loading}
                     >
                       <Unlink className="h-4 w-4 mr-2" />
@@ -705,6 +989,26 @@ const Connections: React.FC = () => {
                       </div>
                     )}
                     
+                    {/* Garmin-specific testing and message display */}
+                    {connection.provider === 'garmin' && garminConnected && (
+                      <div className="space-y-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={testGarminApi}
+                          disabled={loading || !garminAccessToken}
+                        >
+                          <Zap className="h-4 w-4 mr-2" />
+                          Test API
+                        </Button>
+                        {garminMessage && (
+                          <div className="p-2 bg-gray-50 rounded text-xs text-gray-700">
+                            {garminMessage}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <Button
                       variant="outline"
                       size="sm"
@@ -719,7 +1023,13 @@ const Connections: React.FC = () => {
               ) : (
                 <div className="text-center py-6">
                   <Button
-                    onClick={() => connection.provider === 'strava' ? connectStrava() : null}
+                    onClick={() => {
+                      if (connection.provider === 'strava') {
+                        connectStrava();
+                      } else if (connection.provider === 'garmin') {
+                        connectGarmin();
+                      }
+                    }}
                     disabled={loading}
                     className="w-full"
                   >

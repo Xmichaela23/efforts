@@ -42,7 +42,7 @@ const GarminCallback: React.FC = () => {
         if (window.opener) {
           // This is a popup - send message to parent
           window.opener.postMessage({
-            type: 'GARMIN_AUTH_SUCCESS',
+            type: 'garmin-oauth-success',
             code: code
           }, window.location.origin);
 
@@ -67,7 +67,7 @@ const GarminCallback: React.FC = () => {
         // Send error back to parent window if popup, otherwise show error
         if (window.opener) {
           window.opener.postMessage({
-            type: 'GARMIN_AUTH_ERROR',
+            type: 'garmin-oauth-error',
             error: error instanceof Error ? error.message : 'Unknown error'
           }, window.location.origin);
 
