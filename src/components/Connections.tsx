@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 import { Separator } from './ui/separator';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { 
   Activity, 
   Wifi, 
@@ -19,7 +20,10 @@ import {
   Link2,
   Unlink,
   Calendar,
-  Watch
+  Watch,
+  Menu,
+  User,
+  Upload
 } from 'lucide-react';
 import { useToast } from './ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -66,6 +70,10 @@ const Connections: React.FC = () => {
   const [garminConnected, setGarminConnected] = useState(false);
   const [garminMessage, setGarminMessage] = useState('');
   const [garminAccessToken, setGarminAccessToken] = useState<string | null>(null);
+
+  // Placeholder state for dropdown menu (would normally come from context)
+  const [currentPlans] = useState<any[]>([]);
+  const repairPlan = null;
 
   useEffect(() => {
     // On desktop, show controls by default; on mobile, keep them collapsed
@@ -773,13 +781,65 @@ const Connections: React.FC = () => {
         <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full px-4">
             <div className="flex items-center gap-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="p-0.5">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {currentPlans && currentPlans.length > 0 && (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        try {
+                          const active = currentPlans[0];
+                          if (!active?.id || !repairPlan) return;
+                          const res = await repairPlan(String(active.id));
+                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                          alert(`Plan repaired: ${res.repaired} item(s) updated`);
+                        } catch (e: any) {
+                          alert(`Repair failed: ${e?.message || 'unknown error'}`);
+                        }
+                      }}
+                    >
+                      Repair Active Plan
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => navigate('/')}>
+                    <Activity className="mr-2 h-4 w-4" />
+                    Training Baselines
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/connections')}>
+                    <Link className="mr-2 h-4 w-4" />
+                    Connections
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/')}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Import
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Export Data
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    Help & Support
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/')}>
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <h1 className="text-2xl font-bold text-primary">efforts</h1>
               <button 
                 onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} 
                 className="text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 ← Back
               </button>
-              <h1 className="text-2xl font-bold">Connections</h1>
             </div>
             <div className="flex items-center gap-2">
               <button 
@@ -789,6 +849,9 @@ const Connections: React.FC = () => {
                 Dashboard
               </button>
             </div>
+          </div>
+          <div className="px-4 pb-2">
+            <h2 className="text-2xl font-bold">Connections</h2>
           </div>
         </div>
       </header>
