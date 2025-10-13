@@ -780,8 +780,8 @@ const Connections: React.FC = () => {
           </div>
         </div>
       </header>
-      <main className="mobile-main-content">
-        <div className="max-w-4xl mx-auto p-6">
+      <main className="mobile-main-content overflow-y-auto overflow-x-hidden">
+        <div className="max-w-4xl mx-auto p-6 min-h-0">
       
       <div className="text-center space-y-2">
         <p className="text-gray-600">
@@ -800,10 +800,7 @@ const Connections: React.FC = () => {
                     <CardTitle className="flex items-center space-x-2">
                       {getProviderName(connection.provider)}
                       {connection.connected && (
-                        <Badge variant="secondary" className="ml-2">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Connected
-                        </Badge>
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                       )}
                     </CardTitle>
                     <CardDescription>
@@ -851,6 +848,16 @@ const Connections: React.FC = () => {
             <CardContent>
               {connection.connected ? (
                 <div className="space-y-4">
+                  {/* Connected Status Indicator */}
+                  <div className="p-3 bg-green-50 rounded-md border border-green-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-sm text-green-800 font-medium">
+                        ✓ Connected to {getProviderName(connection.provider)}
+                      </span>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Last Sync:</span>
                     <span className="flex items-center space-x-1">
