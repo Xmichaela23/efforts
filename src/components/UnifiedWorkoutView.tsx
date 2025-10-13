@@ -72,34 +72,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const { items: unifiedItems = [] } = useWeekUnified(dateIso, dateIso);
 
   // Fetch current planned_id from database to ensure we have the latest state
+  // Use planned_id from unified API data instead of direct database query
   useEffect(() => {
-    const fetchCurrentPlannedId = async () => {
-      try {
-        console.log('🔍 Fetching current planned_id for workout:', (workout as any)?.id);
-        const { data, error } = await supabase
-          .from('workouts')
-          .select('planned_id')
-          .eq('id', (workout as any)?.id)
-          .single();
-        
-        console.log('🔍 Database response:', { data, error });
-        if (!error && data) {
-          console.log('🔍 Setting currentPlannedId to:', data.planned_id);
-          setCurrentPlannedId(data.planned_id);
-        } else {
-          console.log('🔍 No data or error, setting currentPlannedId to null');
-          setCurrentPlannedId(null);
-        }
-      } catch (error) {
-        console.error('Failed to fetch current planned_id:', error);
-        setCurrentPlannedId(null);
-      }
-    };
-
-    if ((workout as any)?.id) {
-      fetchCurrentPlannedId();
-    }
-  }, [(workout as any)?.id]);
+    const plannedId = (workout as any)?.planned_id || null;
+    console.log('🔍 Using planned_id from unified API:', plannedId);
+    setCurrentPlannedId(plannedId);
+  }, [(workout as any)?.planned_id]);
 
   // Phase 1: On-demand completed detail hydration (gps/sensors) with fallback to context object
   const wid = String((workout as any)?.id || '');
