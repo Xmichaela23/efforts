@@ -632,6 +632,9 @@ export default function WorkoutCalendar({
           const isLastCell = index === (9 - weekDays.length - 1);
           const isSecondLastCell = index === (9 - weekDays.length - 2);
           
+          // Skip the second-to-last cell since we're merging it with the last cell
+          if (isSecondLastCell) return null;
+          
           return (
             <div 
               key={`empty-${index}`}
