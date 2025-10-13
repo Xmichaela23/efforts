@@ -414,6 +414,13 @@ Deno.serve(async (req) => {
         }
         if (!p) p = plannedByKey.get(`${date}|${type}`) || null;
         if (p) {
+          console.log('get-week: Processing planned workout:', {
+            id: p.id,
+            date: p.date,
+            type: p.type,
+            stepsCount: p?.computed?.steps?.length || 0
+          });
+          
           // Process steps to convert paceTarget strings to pace_range objects (single source of truth)
           const processedSteps = Array.isArray(p?.computed?.steps) ? p.computed.steps.map((step: any) => {
             // If step already has pace_range, keep it
