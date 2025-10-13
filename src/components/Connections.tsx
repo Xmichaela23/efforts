@@ -761,7 +761,7 @@ const Connections: React.FC = () => {
       case 'strava':
         return 'Connect your Strava account to automatically sync activities and enable real-time updates via webhooks.';
       case 'garmin':
-        return 'Connect your Garmin device to sync activities and training data.';
+        return 'Connect your Garmin account for basic integration and API testing.';
       default:
         return `Connect your ${provider} account to sync data.`;
     }
@@ -829,7 +829,7 @@ const Connections: React.FC = () => {
                 
                 {connection.connected && (
                   <div className="flex items-center space-x-4">
-                    {connection.provider !== 'strava' && (
+                    {connection.provider === 'strava' && (
                       <div className="flex items-center space-x-2">
                         <Label htmlFor={`webhook-${connection.provider}`} className="text-sm">
                           Real-time Sync
@@ -979,11 +979,11 @@ const Connections: React.FC = () => {
                       </div>
                     )}
                     
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (connection.provider === 'strava') {
+                    {connection.provider === 'strava' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
                           let start = stravaStartDate;
                           let end = stravaEndDate;
                           if (isMobile && !start && !end) {
@@ -994,14 +994,13 @@ const Connections: React.FC = () => {
                             end = endD.toISOString().split('T')[0];
                           }
                           return importHistoricalData(connection.provider, start, end);
-                        }
-                        return importHistoricalData(connection.provider);
-                      }}
-                      disabled={loading}
-                    >
-                      <Zap className="h-4 w-4 mr-2" />
-                      {isMobile ? 'Import' : 'Import History'}
-                    </Button>
+                        }}
+                        disabled={loading}
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        {isMobile ? 'Import' : 'Import History'}
+                      </Button>
+                    )}
 
                     {/* Mobile-only: quick toggle to reveal date range controls */}
                     {connection.provider === 'strava' && isMobile && (
@@ -1016,7 +1015,7 @@ const Connections: React.FC = () => {
                       </Button>
                     )}
                     
-                    {/* Progress Bar for Import */}
+                    {/* Progress Bar for Import - Strava only */}
                     {importProgress.importing && connection.provider === 'strava' && (
                       <div className="w-full mt-2">
                         <div className="flex justify-between text-xs text-gray-600 mb-1">
