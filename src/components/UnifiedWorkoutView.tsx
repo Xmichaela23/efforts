@@ -73,80 +73,45 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const dateIso = String((workout as any)?.date || '').slice(0,10);
   const { items: unifiedItems = [] } = useWeekUnified(dateIso, dateIso);
   
-  // For planned workouts, use unified data instead of raw workout prop
+  // For planned workouts, use the same data structure as Today's Efforts
   const unifiedWorkout = (() => {
     if (isCompleted) {
       // For completed workouts, use the original workout data
       return workout;
     }
     
-    // For planned workouts, find the matching item in unified data
+    // For planned workouts, find the matching item in unified data and use the same structure as Today's Efforts
     const plannedId = (workout as any)?.id;
-    console.log('🔍 Looking for planned workout:', {
-      plannedId,
-      unifiedItems: unifiedItems.map((item: any) => ({
-        id: item.id,
-        plannedId: item.planned?.id,
-        status: item.status,
-        type: item.type
-      }))
-    });
-    
     const unifiedPlanned = unifiedItems.find((item: any) => 
       item.planned?.id === plannedId || item.id === plannedId
     );
     
-    console.log('🔍 Found unified planned:', unifiedPlanned);
-    
     if (unifiedPlanned?.planned) {
-      // Debug: Log the unified planned data to see if pace ranges are processed
-      console.log('🔍 Unified planned data steps:', unifiedPlanned.planned.steps?.map((s: any, i: number) => {
-        console.log(`Step ${i}:`, {
-          paceTarget: s.paceTarget,
-          pace_range: s.pace_range,
-          paceRange: s.paceRange
-        });
-        return {
-          paceTarget: s.paceTarget,
-          pace_range: s.pace_range,
-          paceRange: s.paceRange
-        };
-      }));
-      
-      // Return the processed planned data from unified API
+      // Use the same data structure as Today's Efforts (lines 133-148 in TodaysEffort.tsx)
       return {
-        id: unifiedPlanned.planned.id,
+        id: unifiedPlanned.planned.id || unifiedPlanned.id,
         date: unifiedPlanned.date,
         type: unifiedPlanned.type,
         workout_status: 'planned',
-        description: unifiedPlanned.planned.description,
-        rendered_description: unifiedPlanned.planned.rendered_description,
-        computed: {
-          steps: unifiedPlanned.planned.steps,
-          total_duration_seconds: unifiedPlanned.planned.total_duration_seconds
-        },
-        tags: unifiedPlanned.planned.tags,
-        steps_preset: unifiedPlanned.planned.steps_preset,
-        strength_exercises: unifiedPlanned.planned.strength_exercises,
-        mobility_exercises: unifiedPlanned.planned.mobility_exercises,
-        export_hints: unifiedPlanned.planned.export_hints,
-        workout_structure: unifiedPlanned.planned.workout_structure,
-        friendly_summary: unifiedPlanned.planned.friendly_summary,
+        description: unifiedPlanned.planned.description || null,
+        rendered_description: unifiedPlanned.planned.rendered_description || unifiedPlanned.planned.description || null,
+        computed: (Array.isArray(unifiedPlanned.planned.steps) ? { 
+          steps: unifiedPlanned.planned.steps, 
+          total_duration_seconds: unifiedPlanned.planned.total_duration_seconds 
+        } : null),
+        tags: unifiedPlanned.planned.tags || [],
+        steps_preset: (unifiedPlanned as any)?.planned?.steps_preset ?? null,
+        strength_exercises: (unifiedPlanned as any)?.planned?.strength_exercises ?? null,
+        mobility_exercises: (unifiedPlanned as any)?.planned?.mobility_exercises ?? null,
+        export_hints: (unifiedPlanned as any)?.planned?.export_hints ?? null,
+        workout_structure: (unifiedPlanned as any)?.planned?.workout_structure ?? null,
+        friendly_summary: (unifiedPlanned as any)?.planned?.friendly_summary ?? null,
         planned_id: unifiedPlanned.planned.id
       };
     }
     
-    // No fallback - if we can't find the planned workout in unified data, throw an error
-    console.error('❌ Planned workout not found in unified data:', {
-      plannedId,
-      availableItems: unifiedItems.map((item: any) => ({
-        id: item.id,
-        plannedId: item.planned?.id,
-        status: item.status,
-        type: item.type
-      }))
-    });
-    throw new Error(`Planned workout ${plannedId} not found in unified data`);
+    // If not found in unified data, use the original workout (this should not happen in normal flow)
+    return workout;
   })();
 
   // Fetch current planned_id from database to ensure we have the latest state
