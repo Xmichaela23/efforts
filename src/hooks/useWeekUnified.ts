@@ -78,7 +78,11 @@ export function useWeekUnified(fromISO: string, toISO: string) {
   }, [queryClient]);
 
   const items: UnifiedItem[] = (query.data as any)?.items || [];
-  return { items, loading: query.isFetching || query.isPending, error: (query.error as any)?.message || null };
+  const weeklyAI = (query.data as any)?.weekly_ai || null;
+  const weeklyStats = (query.data as any)?.weekly_stats || { planned: 0, completed: 0 };
+  const trainingPlanContext = (query.data as any)?.training_plan_context || null;
+  const dailyContext = (query.data as any)?.daily_context || '';
+  return { items, weeklyAI, weeklyStats, trainingPlanContext, dailyContext, loading: query.isFetching || query.isPending, error: (query.error as any)?.message || null };
 }
 
 

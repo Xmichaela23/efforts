@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
+import { Calendar, CheckCircle } from 'lucide-react';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -193,7 +194,7 @@ export default function WorkoutCalendar({
   const weekEnd = addDays(weekStart, 6);
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
-  const { items: unifiedItems, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
+  const { items: unifiedItems, weeklyStats, trainingPlanContext, dailyContext, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
   // Adapt unified items → planned + workouts shapes expected below
   const unifiedPlanned = unifiedItems.filter((it:any)=> !!it?.planned).map((it:any)=> ({
     id: it.id,
@@ -613,6 +614,8 @@ export default function WorkoutCalendar({
                     </span>
                   ))
                 )}
+                
+                
                 {items.length === 0 && loadingDebounced && (
                   <>
                     <span className="h-[18px] rounded w-full bg-gray-100" />
@@ -642,9 +645,30 @@ export default function WorkoutCalendar({
                 isLastCell ? 'col-span-2' : ''
               }`}
             >
-              {/* Weekly workload total spans the last two cells */}
+              {/* Weekly context and workload spans the last two cells */}
               {isLastCell && (
-                <WeeklyWorkloadTotal weekStart={weekStart.toISOString().split('T')[0]} />
+                <div className="space-y-2">
+                  {/* Total Workload with counts */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Total Workload</span>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      <span className="text-sm">{weeklyStats.planned}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      <span className="text-sm">{weeklyStats.completed}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Context paragraph that updates daily */}
+                  <div className="text-xs text-gray-700">
+                    {dailyContext || `${new Date().toLocaleDateString('en-US', { weekday: 'long' })} - ${trainingPlanContext ? 
+                      `week ${trainingPlanContext.currentWeek} of ${trainingPlanContext.focus || 'training'}` : 
+                      'week 2 of build yadayada yada'
+                    }. [Context paragraph that updates daily]`}
+                  </div>
+                </div>
               )}
             </div>
           );

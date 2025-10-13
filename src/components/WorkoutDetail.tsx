@@ -22,6 +22,7 @@ import CompletedTab from './CompletedTab';
 import StrengthExerciseBuilder from './StrengthExerciseBuilder';
 import StrengthCompletedView from './StrengthCompletedView';
 import StrengthSummaryView from './StrengthSummaryView';
+import WorkoutAIDisplay from './WorkoutAIDisplay';
 import { useAppContext } from '@/contexts/AppContext';
 
 interface WorkoutDetailProps {
@@ -243,6 +244,9 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               ) : (
                 <WorkoutMetrics workout={workout} />
               )}
+              
+              {/* AI Analysis */}
+              <WorkoutAIDisplay aiAnalysis={workout.ai_analysis} />
               
               <Card>
                 <CardHeader>

@@ -26,6 +26,234 @@ function isISO(dateStr?: string | null): boolean {
   return !!dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 }
 
+// AI Analysis Functions (Server-side only)
+async function generateWorkoutAIAnalysis(workout: any, userId: string, supabaseClient: any): Promise<any> {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) {
+    return getFallbackWorkoutAnalysis(workout);
+  }
+
+  try {
+    const sport = workout.type || 'run';
+    const executed = workout.executed?.overall || {};
+    const duration = executed.duration_s_moving || executed.duration_s || 0;
+    const distance = executed.distance_m ? executed.distance_m / 1000 : 0; // Convert to km
+    const avgHR = executed.avg_hr;
+    const maxHR = executed.max_hr;
+    const avgPower = executed.avg_power_w;
+    const normalizedPower = executed.normalized_power_w;
+    const avgPace = executed.pace_s_per_km ? executed.pace_s_per_km / 60 : null; // Convert to min/km
+    const elevation = executed.elevation_gain_m || 0;
+    const workload = executed.workload_actual || 0;
+
+    const prompt = `Analyze this ${sport} workout and provide insights:
+
+WORKOUT DATA:
+- Duration: ${duration} minutes
+- Distance: ${distance} km
+- Average Heart Rate: ${avgHR || 'N/A'} bpm
+- Max Heart Rate: ${maxHR || 'N/A'} bpm
+- Average Power: ${avgPower || 'N/A'} watts
+- Normalized Power: ${normalizedPower || 'N/A'} watts
+- Average Pace: ${avgPace || 'N/A'} min/km
+- Elevation Gain: ${elevation} meters
+- Workload Score: ${workload}
+
+Please provide a concise analysis in JSON format:
+{
+  "performanceScore": number (0-100),
+  "effortLevel": "easy|moderate|hard|very_hard|maximal",
+  "keyInsight": "One sentence summary",
+  "recommendation": "One actionable recommendation"
+}`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert triathlon coach. Provide concise, actionable insights. Be encouraging and specific.'
+          },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 500,
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content;
+    return JSON.parse(aiResponse);
+
+  } catch (error) {
+    console.error('OpenAI API error:', error);
+    return getFallbackWorkoutAnalysis(workout);
+  }
+}
+
+async function generateWeeklyAIAnalysis(items: any[], fromISO: string, toISO: string, userId: string, supabaseClient: any): Promise<any> {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) {
+    return getFallbackWeeklyAnalysis(items);
+  }
+
+  try {
+    // Calculate weekly stats
+    const completedWorkouts = items.filter(item => item.executed && item.executed.overall);
+    const plannedWorkouts = items.filter(item => item.status === 'planned');
+    
+    const totalPlanned = plannedWorkouts.length;
+    const totalCompleted = completedWorkouts.length;
+    const adherence = totalPlanned > 0 ? totalCompleted / totalPlanned : 0;
+    
+    const totalWorkload = completedWorkouts.reduce((sum, item) => 
+      sum + (item.executed?.overall?.workload_actual || 0), 0);
+    
+    const plannedWorkload = plannedWorkouts.reduce((sum, item) => 
+      sum + (item.planned?.workload_planned || 0), 0);
+
+    const prompt = `Analyze this week's training (${fromISO} to ${toISO}):
+
+WEEKLY DATA:
+- Planned Workouts: ${totalPlanned}
+- Completed Workouts: ${totalCompleted}
+- Adherence: ${(adherence * 100).toFixed(1)}%
+- Actual Workload: ${totalWorkload}
+- Planned Workload: ${plannedWorkload}
+
+Please provide a concise weekly analysis in JSON format:
+{
+  "overallScore": number (0-100),
+  "adherenceScore": number (0-100),
+  "keyInsight": "One sentence summary of the week",
+  "recommendation": "One actionable recommendation for next week"
+}`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert triathlon coach. Analyze weekly training patterns and provide actionable insights.'
+          },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 500,
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content;
+    return JSON.parse(aiResponse);
+
+  } catch (error) {
+    console.error('OpenAI API error:', error);
+    return getFallbackWeeklyAnalysis(items);
+  }
+}
+
+function getFallbackWorkoutAnalysis(workout: any): any {
+  return {
+    performanceScore: 75,
+    effortLevel: 'moderate',
+    keyInsight: 'Good workout completed successfully.',
+    recommendation: 'Keep up the consistent training!'
+  };
+}
+
+function getFallbackWeeklyAnalysis(items: any[]): any {
+  const completed = items.filter(item => item.executed && item.executed.overall).length;
+  const planned = items.filter(item => item.status === 'planned').length;
+  const adherence = planned > 0 ? completed / planned : 0;
+  
+  return {
+    overallScore: Math.round(adherence * 100),
+    adherenceScore: Math.round(adherence * 100),
+    keyInsight: `Completed ${completed} of ${planned} planned workouts this week.`,
+    recommendation: adherence >= 0.8 ? 'Great consistency! Keep it up.' : 'Focus on completing more planned workouts next week.'
+  };
+}
+
+function generateDailyContext(items: any[], trainingPlanContext: any, fromISO: string, toISO: string, weeklyAI: any): string {
+  const today = new Date().toISOString().split('T')[0];
+  const todayItems = items.filter(item => item.date === today);
+  
+  // Get today's completed workouts
+  const completedToday = todayItems.filter(item => item.executed && item.executed.overall);
+  const plannedToday = todayItems.filter(item => item.status === 'planned');
+  
+  // Get week progress
+  const weekItems = items;
+  const completedThisWeek = weekItems.filter(item => item.executed && item.executed.overall);
+  const plannedThisWeek = weekItems.filter(item => item.status === 'planned');
+  
+  // Build context based on what happened today
+  let context = '';
+  
+  if (completedToday.length > 0) {
+    const workoutTypes = completedToday.map(w => w.type.toUpperCase()).join(', ');
+    context += `Completed ${workoutTypes} session${completedToday.length > 1 ? 's' : ''} today. `;
+    
+    // Add AI insights from today's workouts
+    const aiInsights = completedToday
+      .filter(w => w.ai_analysis)
+      .map(w => w.ai_analysis.keyInsight)
+      .filter(insight => insight && insight.trim().length > 0);
+    
+    if (aiInsights.length > 0) {
+      context += aiInsights[0] + ' ';
+    }
+  } else if (plannedToday.length > 0) {
+    const workoutTypes = plannedToday.map(w => w.type.toUpperCase()).join(', ');
+    context += `Planned ${workoutTypes} session${plannedToday.length > 1 ? 's' : ''} for today. `;
+  } else {
+    context += 'Rest day today. ';
+  }
+  
+  // Add week progress
+  const weekProgress = completedThisWeek.length;
+  const weekTotal = plannedThisWeek.length;
+  context += `Week progress: ${weekProgress}/${weekTotal} completed. `;
+  
+  // Add training phase context
+  if (trainingPlanContext) {
+    if (trainingPlanContext.focus) {
+      context += `Focus: ${trainingPlanContext.focus}. `;
+    }
+    if (trainingPlanContext.notes) {
+      context += trainingPlanContext.notes;
+    }
+  }
+  
+  // Add weekly AI insight if available
+  if (weeklyAI && weeklyAI.keyInsight) {
+    context += weeklyAI.keyInsight;
+  }
+  
+  return context.trim();
+}
+
 Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -782,11 +1010,91 @@ Deno.serve(async (req) => {
       for (const it of withIndex) { delete (it as any).__i; (items as any[]).push(it); }
     } catch {}
 
-    const warningsOut = errors.concat(debugNotes);
-    if (warningsOut.length) {
-      return new Response(JSON.stringify({ items, warnings: warningsOut }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Add AI analysis to each workout item
+    const itemsWithAI = await Promise.all(items.map(async (item: any) => {
+      if (item.executed && item.executed.overall) {
+        try {
+          // Add AI analysis for completed workouts
+          const aiAnalysis = await generateWorkoutAIAnalysis(item, userId, supabaseClient);
+          if (aiAnalysis) {
+            item.ai_analysis = aiAnalysis;
+          }
+        } catch (error) {
+          console.error('AI analysis failed for workout:', item.id, error);
+          // Continue without AI analysis
+        }
+      }
+      return item;
+    }));
+
+    // Add weekly AI analysis
+    let weeklyAI = null;
+    try {
+      weeklyAI = await generateWeeklyAIAnalysis(itemsWithAI, fromISO, toISO, userId, supabaseClient);
+    } catch (error) {
+      console.error('Weekly AI analysis failed:', error);
+      // Continue without weekly analysis
     }
-    return new Response(JSON.stringify({ items }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+    // Calculate weekly stats for the merged cell
+    const completedWorkouts = itemsWithAI.filter(item => item.executed && item.executed.overall);
+    const plannedWorkouts = itemsWithAI.filter(item => item.status === 'planned');
+    const totalPlanned = plannedWorkouts.length;
+    const totalCompleted = completedWorkouts.length;
+
+    // Get training plan context
+    let trainingPlanContext = null;
+    const trainingPlanId = plannedWorkouts.find(p => p.planned?.training_plan_id)?.planned?.training_plan_id;
+    if (trainingPlanId) {
+      try {
+        const { data: planData } = await supabase
+          .from('plans')
+          .select('config, name')
+          .eq('id', trainingPlanId)
+          .single();
+        
+        if (planData?.config) {
+          const config = planData.config;
+          const weeklySummaries = config.weekly_summaries || {};
+          
+          // Calculate current week number
+          const weekStartDate = new Date(fromISO);
+          const today = new Date();
+          const diffTime = today.getTime() - weekStartDate.getTime();
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          const currentWeek = Math.max(1, Math.floor(diffDays / 7) + 1);
+          
+          const weekSummary = weeklySummaries[String(currentWeek)] || {};
+          trainingPlanContext = {
+            planName: planData.name,
+            currentWeek,
+            focus: weekSummary.focus,
+            notes: weekSummary.notes,
+            keyWorkouts: weekSummary.key_workouts || []
+          };
+        }
+      } catch (error) {
+        console.error('Failed to fetch training plan context:', error);
+      }
+    }
+
+    // Generate daily context
+    const dailyContext = generateDailyContext(itemsWithAI, trainingPlanContext, fromISO, toISO, weeklyAI);
+
+    const warningsOut = errors.concat(debugNotes);
+    const responseData: any = { 
+      items: itemsWithAI,
+      weekly_stats: {
+        planned: totalPlanned,
+        completed: totalCompleted
+      },
+      daily_context: dailyContext
+    };
+    if (weeklyAI) responseData.weekly_ai = weeklyAI;
+    if (trainingPlanContext) responseData.training_plan_context = trainingPlanContext;
+    if (warningsOut.length) responseData.warnings = warningsOut;
+    
+    return new Response(JSON.stringify(responseData), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     const msg = (e && (e.message || e.msg)) ? (e.message || e.msg) : String(e);
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
