@@ -641,13 +641,6 @@ export default function WorkoutCalendar({
                     </div>
                   </div>
                   
-                  {/* Training plan context */}
-                  <div className="text-xs text-gray-700">
-                    {trainingPlanContext ? 
-                      `Week ${trainingPlanContext.currentWeek} of ${trainingPlanContext.focus || 'training'}. ${trainingPlanContext.notes || ''}` : 
-                      'Week 2 of build phase'
-                    }
-                  </div>
                   
                 </div>
               )}
