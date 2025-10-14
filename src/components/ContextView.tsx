@@ -180,14 +180,6 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
-              style={{ fontFamily: 'Inter, sans-serif' }}
-            >
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </button>
             {onClose && (
               <button
                 onClick={onClose}
@@ -197,6 +189,9 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
                 ← Back
               </button>
             )}
+            <button className="text-gray-600 hover:text-gray-900 text-sm font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Dashboard
+            </button>
           </div>
         </div>
       </div>
@@ -212,6 +207,14 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
               9/15 - 10/15
             </p>
           </div>
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
       </div>
 

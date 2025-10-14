@@ -1191,34 +1191,57 @@ Deno.serve(async (req) => {
       // Calculate overall execution score (weighted average of interval adherence percentages)
       const overallExecutionScore = ((): number | null => {
         try {
+          console.log(`🔍 [SERVER EXECUTION SCORE] Starting calculation with ${outIntervals.length} total intervals`);
+          
           const workIntervals = outIntervals.filter((interval: any) => {
             const kind = String(interval?.kind || '').toLowerCase();
             return !(kind.includes('rest') || kind.includes('recovery'));
           });
           
-          if (workIntervals.length === 0) return null;
+          console.log(`🔍 [SERVER EXECUTION SCORE] Found ${workIntervals.length} work intervals out of ${outIntervals.length} total`);
+          
+          if (workIntervals.length === 0) {
+            console.log(`🔍 [SERVER EXECUTION SCORE] No work intervals found, returning null`);
+            return null;
+          }
           
           let totalWeighted = 0;
           let totalWeight = 0;
           
           for (const interval of workIntervals) {
             const adherencePct = interval?.executed?.adherence_percentage;
-            if (typeof adherencePct !== 'number' || !Number.isFinite(adherencePct)) continue;
+            console.log(`🔍 [SERVER EXECUTION SCORE] Interval ${interval?.kind}: adherence=${adherencePct}`);
+            
+            if (typeof adherencePct !== 'number' || !Number.isFinite(adherencePct)) {
+              console.log(`🔍 [SERVER EXECUTION SCORE] Skipping interval ${interval?.kind} - no valid adherence percentage`);
+              continue;
+            }
             
             // Weight by duration (longer intervals matter more)
             const duration = Number(interval?.executed?.duration_s || interval?.planned?.duration_s || 60);
             const weight = Math.max(1, duration);
             
+            console.log(`🔍 [SERVER EXECUTION SCORE] Added: ${adherencePct}% * ${weight}s = ${adherencePct * weight}, totalWeighted=${totalWeighted}, totalWeight=${totalWeight}`);
+            
             totalWeighted += adherencePct * weight;
             totalWeight += weight;
           }
           
-          return totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
+          const result = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
+          console.log(`🔍 [SERVER EXECUTION SCORE] Final result: ${result}% (${totalWeighted}/${totalWeight})`);
+          
+          return result;
         } catch (error) {
           console.error('Error calculating overall execution score:', error);
           return null;
         }
       })();
+
+      console.log('🔍 [SERVER EXECUTION SCORE] About to store computed data:', {
+        hasExecutionScore: !!overallExecutionScore,
+        executionScore: overallExecutionScore,
+        overallKeys: ['duration_s_moving', 'distance_m', 'avg_pace_s_per_mi', 'gap_pace_s_per_mi', 'execution_score']
+      });
 
       const computed = {
         version: COMPUTED_VERSION,
@@ -1324,6 +1347,38 @@ Deno.serve(async (req) => {
         }
       } catch {}
       const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
+      
+      // Calculate overall execution score for snap-to-laps
+      const overallExecutionScore = ((): number | null => {
+        try {
+          const workIntervals = snapped.filter((interval: any) => {
+            const kind = String(interval?.kind || '').toLowerCase();
+            return !(kind.includes('rest') || kind.includes('recovery'));
+          });
+          
+          if (workIntervals.length === 0) return null;
+          
+          let totalWeighted = 0;
+          let totalWeight = 0;
+          
+          for (const interval of workIntervals) {
+            const adherencePct = interval?.executed?.adherence_percentage;
+            if (typeof adherencePct !== 'number' || !Number.isFinite(adherencePct)) continue;
+            
+            const duration = Number(interval?.executed?.duration_s || interval?.planned?.duration_s || 60);
+            const weight = Math.max(1, duration);
+            
+            totalWeighted += adherencePct * weight;
+            totalWeight += weight;
+          }
+          
+          return totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
+        } catch (error) {
+          console.error('Error calculating overall execution score (snap-to-laps):', error);
+          return null;
+        }
+      })();
+      
       const computed = {
         version: COMPUTED_VERSION,
         intervals: snapped,
@@ -1331,7 +1386,8 @@ Deno.serve(async (req) => {
           duration_s_moving: overallSec,
           distance_m: Math.round(overallMeters),
           avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
-          gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
+          gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null,
+          execution_score: overallExecutionScore
         }
       };
       try { console.error('[compute] mode=snap-to-laps intervals:', snapped.length); } catch {}
@@ -1706,6 +1762,62 @@ Deno.serve(async (req) => {
     } catch {}
 
     const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
+    
+    // Calculate overall execution score (weighted average of interval adherence percentages)
+    const overallExecutionScore = ((): number | null => {
+      try {
+        console.log(`🔍 [SERVER EXECUTION SCORE] Starting calculation with ${outIntervals.length} total intervals`);
+        
+        const workIntervals = outIntervals.filter((interval: any) => {
+          const kind = String(interval?.kind || '').toLowerCase();
+          return !(kind.includes('rest') || kind.includes('recovery'));
+        });
+        
+        console.log(`🔍 [SERVER EXECUTION SCORE] Found ${workIntervals.length} work intervals out of ${outIntervals.length} total`);
+        
+        if (workIntervals.length === 0) {
+          console.log(`🔍 [SERVER EXECUTION SCORE] No work intervals found, returning null`);
+          return null;
+        }
+        
+        let totalWeighted = 0;
+        let totalWeight = 0;
+        
+        for (const interval of workIntervals) {
+          const adherencePct = interval?.executed?.adherence_percentage;
+          console.log(`🔍 [SERVER EXECUTION SCORE] Interval ${interval?.kind}: adherence=${adherencePct}`);
+          
+          if (typeof adherencePct !== 'number' || !Number.isFinite(adherencePct)) {
+            console.log(`🔍 [SERVER EXECUTION SCORE] Skipping interval ${interval?.kind} - no valid adherence percentage`);
+            continue;
+          }
+          
+          // Weight by duration (longer intervals matter more)
+          const duration = Number(interval?.executed?.duration_s || interval?.planned?.duration_s || 60);
+          const weight = Math.max(1, duration);
+          
+          console.log(`🔍 [SERVER EXECUTION SCORE] Added: ${adherencePct}% * ${weight}s = ${adherencePct * weight}, totalWeighted=${totalWeighted}, totalWeight=${totalWeight}`);
+          
+          totalWeighted += adherencePct * weight;
+          totalWeight += weight;
+        }
+        
+        const result = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
+        console.log(`🔍 [SERVER EXECUTION SCORE] Final result: ${result}% (${totalWeighted}/${totalWeight})`);
+        
+        return result;
+      } catch (error) {
+        console.error('Error calculating overall execution score:', error);
+        return null;
+      }
+    })();
+
+    console.log('🔍 [SERVER EXECUTION SCORE] About to store computed data:', {
+      hasExecutionScore: !!overallExecutionScore,
+      executionScore: overallExecutionScore,
+      overallKeys: ['duration_s_moving', 'distance_m', 'avg_pace_s_per_mi', 'gap_pace_s_per_mi', 'execution_score']
+    });
+
     const computed = {
       version: COMPUTED_VERSION,
       intervals: outIntervals,
@@ -1714,7 +1826,8 @@ Deno.serve(async (req) => {
         duration_s_moving: overallSec,
         distance_m: Math.round(overallMeters),
         avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
-        gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
+        gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null,
+        execution_score: overallExecutionScore
       }
     };
 
