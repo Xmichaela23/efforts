@@ -1393,6 +1393,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const executionScore = (completed as any)?.computed?.overall?.execution_score;
           
           // Debug: Check what we're getting from the server
+          console.log('🚨 [EXECUTION DEBUG] MOBILE SUMMARY RENDERING - RUNNING UPDATED CODE');
           console.log('🔍 [EXECUTION DEBUG] completed:', completed);
           console.log('🔍 [EXECUTION DEBUG] computed:', (completed as any)?.computed);
           console.log('🔍 [EXECUTION DEBUG] overall:', (completed as any)?.computed?.overall);
