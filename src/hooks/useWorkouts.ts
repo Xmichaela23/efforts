@@ -1399,6 +1399,19 @@ export const useWorkouts = () => {
         console.log('ℹ️ Auto-attach skipped:', e);
       }
 
+      // Generate context for completed workouts
+      try {
+        if (newWorkout.workout_status === 'completed') {
+          await supabase.functions.invoke('analyze-workout', {
+            body: { workout_id: newWorkout.id }
+          });
+          console.log('✅ Context generated for workout:', newWorkout.id);
+        }
+      } catch (contextError) {
+        console.error('❌ Failed to generate context:', contextError);
+        // Don't throw - context generation is not critical
+      }
+
       // Compute summary (fire-and-forget) so computed.overall is available to unified/Today
       try {
         (supabase.functions.invoke as any)?.('compute-workout-summary', { body: { workout_id: data.id } } as any)

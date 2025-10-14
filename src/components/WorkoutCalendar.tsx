@@ -641,13 +641,20 @@ export default function WorkoutCalendar({
                     </div>
                   </div>
                   
-                  {/* Context paragraph that updates daily */}
+                  {/* Training plan context */}
                   <div className="text-xs text-gray-700">
-                    {dailyContext || `${new Date().toLocaleDateString('en-US', { weekday: 'long' })} - ${trainingPlanContext ? 
-                      `week ${trainingPlanContext.currentWeek} of ${trainingPlanContext.focus || 'training'}` : 
-                      'week 2 of build yadayada yada'
-                    }. [Context paragraph that updates daily]`}
+                    {trainingPlanContext ? 
+                      `Week ${trainingPlanContext.currentWeek} of ${trainingPlanContext.focus || 'training'}. ${trainingPlanContext.notes || ''}` : 
+                      'Week 2 of build phase'
+                    }
                   </div>
+                  
+                  {/* AI Context section */}
+                  {dailyContext && (
+                    <div className="mt-2 text-xs text-gray-600">
+                      {dailyContext}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
