@@ -480,6 +480,58 @@ function gapSecPerMi(rows:any[], sIdx:number, eIdx:number) {
   }
 }
 
+// ---------- Adherence calculation function ----------
+function calculateExecutionPercentage(plannedStep: any, executedStep: any): number | null {
+  if (!executedStep) return null;
+
+  try {
+    // Power adherence (cycling)
+    const powerRange = (plannedStep?.power_range || plannedStep?.powerRange) as { lower?: number; upper?: number } | undefined;
+    const lower = Number(powerRange?.lower);
+    const upper = Number(powerRange?.upper);
+    if (Number.isFinite(lower) && Number.isFinite(upper) && lower > 0 && upper > 0) {
+      const targetMidpoint = (lower + upper) / 2;
+      const executedWatts = Number((executedStep as any)?.avg_power_w || (executedStep as any)?.avg_watts || (executedStep as any)?.power);
+      if (Number.isFinite(executedWatts) && executedWatts > 0 && targetMidpoint > 0) {
+        const percentage = Math.round((executedWatts / targetMidpoint) * 100);
+        console.log(`🔍 [SERVER ADHERENCE] Power: ${executedWatts}W vs ${lower}-${upper}W (midpoint: ${targetMidpoint}W) = ${percentage}%`);
+        return percentage;
+      }
+    }
+
+    // Pace adherence (run/swim)
+    const plannedPace = Number((plannedStep as any)?.target_pace_s_per_mi || (plannedStep as any)?.pace_sec_per_mi);
+    const executedPace = Number((executedStep as any)?.avg_pace_s_per_mi);
+    if (Number.isFinite(plannedPace) && plannedPace > 0 && Number.isFinite(executedPace) && executedPace > 0) {
+      const percentage = Math.round((plannedPace / executedPace) * 100);
+      console.log(`🔍 [SERVER ADHERENCE] Pace: ${plannedPace}s/mi vs ${executedPace}s/mi = ${percentage}%`);
+      return percentage;
+    }
+
+    // Duration adherence
+    const plannedDuration = Number((plannedStep as any)?.duration_s || (plannedStep as any)?.seconds);
+    const executedDuration = Number((executedStep as any)?.duration_s);
+    if (Number.isFinite(plannedDuration) && plannedDuration > 0 && Number.isFinite(executedDuration) && executedDuration > 0) {
+      const percentage = Math.round((executedDuration / plannedDuration) * 100);
+      console.log(`🔍 [SERVER ADHERENCE] Duration: ${executedDuration}s vs ${plannedDuration}s = ${percentage}%`);
+      return percentage;
+    }
+
+    // Distance adherence
+    const plannedDistance = Number((plannedStep as any)?.distance_m);
+    const executedDistance = Number((executedStep as any)?.distance_m);
+    if (Number.isFinite(plannedDistance) && plannedDistance > 0 && Number.isFinite(executedDistance) && executedDistance > 0) {
+      const percentage = Math.round((executedDistance / plannedDistance) * 100);
+      console.log(`🔍 [SERVER ADHERENCE] Distance: ${executedDistance}m vs ${plannedDistance}m = ${percentage}%`);
+      return percentage;
+    }
+  } catch (error) {
+    console.error('Error calculating adherence percentage:', error);
+  }
+  
+  return null;
+}
+
 // ---------- main handler ----------
 Deno.serve(async (req) => {
   try { console.error('FUNCTION ENTRY'); } catch {}
@@ -1519,24 +1571,34 @@ Deno.serve(async (req) => {
       const segCad = cads.length ? Math.round(avg(cads)!) : null;
       const segPwr = (sport==='ride' && pw.length) ? Math.round(avg(pw)!) : null;
 
+      // Calculate adherence percentage
+      const executedData = {
+        duration_s: segSec != null ? Math.round(segSec) : null,
+        distance_m: segSec != null ? Math.round(segMetersMeasured) : null,
+        avg_pace_s_per_mi: segPace != null ? Math.round(segPace) : null,
+        avg_hr: segHr,
+        avg_cadence_spm: segCad,
+        avg_power_w: segPwr
+      };
+
+      const plannedData = {
+        duration_s: deriveSecondsFromPlannedStep(st),
+        distance_m: deriveMetersFromPlannedStep(st),
+        target_pace_s_per_mi: derivePlannedPaceSecPerMi(st),
+        power_range: (st as any)?.power_range || (st as any)?.powerRange
+      };
+
+      const adherencePercentage = calculateExecutionPercentage(plannedData, executedData);
+
       outIntervals.push({
         planned_step_id: st?.id ?? null,
         planned_label: formatPlannedLabel(st, sport),
         kind: st?.type || st?.kind || null,
         role: info.role || (info.measured ? 'work' : null),
-        planned: {
-          duration_s: deriveSecondsFromPlannedStep(st),
-          distance_m: deriveMetersFromPlannedStep(st),
-          target_pace_s_per_mi: derivePlannedPaceSecPerMi(st)
-        },
+        planned: plannedData,
         executed: {
-          duration_s: segSec != null ? Math.round(segSec) : null,
-          distance_m: segSec != null ? Math.round(segMetersMeasured) : null,
-          avg_pace_s_per_mi: segPace != null ? Math.round(segPace) : null,
-          gap_pace_s_per_mi: segGap != null ? Math.round(segGap) : null,
-          avg_hr: segHr,
-          avg_cadence_spm: segCad,
-          avg_power_w: segPwr
+          ...executedData,
+          adherence_percentage: adherencePercentage
         },
         pass_state: passStateFor(sport, info.role, deriveMetersFromPlannedStep(st), deriveSecondsFromPlannedStep(st), segMetersMeasured, segSec),
         sample_idx_start: sIdx,

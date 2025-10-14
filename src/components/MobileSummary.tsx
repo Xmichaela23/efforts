@@ -654,80 +654,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     return !(t === 'interval_rest' || t === 'rest');
   };
 
-  const calculateExecutionPercentage = (plannedStep: any, executedStep: any): number | null => {
-    try {
-      if (!executedStep) return null;
-
-      // Power-based intervals - use universal power selection
-      const pr = (plannedStep as any)?.power_range || (plannedStep as any)?.powerRange || (plannedStep as any)?.power?.range;
-      const lo = Number(pr?.lower);
-      const hi = Number(pr?.upper);
-      // Use universal power selection logic
-      const ew = getDisplayPower(hydratedCompleted || completed, executedStep);
-      if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi > 0 && Number.isFinite(ew) && ew > 0) {
-        const mid = (lo + hi) / 2;
-        if (mid > 0) return Math.round((ew / mid) * 100);
-      }
-
-      // Pace-based intervals (runs/swims) with decisecond normalization
-      const parsePaceTextToSecPerMeter = (txt?: string | null): number | null => {
-        if (!txt) return null;
-        const s = String(txt).trim().toLowerCase();
-        let m = s.match(/(\d{1,2}):(\d{2})\s*\/(mi|mile)/i);
-        if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec / 1609.34; }
-        m = s.match(/(\d{1,2}):(\d{2})\s*\/km/i);
-        if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec / 1000; }
-        m = s.match(/(\d{1,2}):(\d{2})\s*\/100m/i);
-        if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec / 100; }
-        m = s.match(/(\d{1,2}):(\d{2})\s*\/100yd/i);
-        if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec / (100 * 0.9144); }
-        m = s.match(/(\d{1,2}):(\d{2})\s*\/m/i);
-        if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec; }
-        return null;
-      };
-
-      const paceRange = Array.isArray((plannedStep as any)?.pace_range) ? (plannedStep as any).pace_range : null;
-      const paceMidSecPerMi = paceRange && paceRange.length===2
-        ? (()=>{ const a=Number(paceRange[0]); const b=Number(paceRange[1]); return (Number.isFinite(a)&&Number.isFinite(b)) ? Math.round((a+b)/2) : null; })()
-        : (Number((plannedStep as any)?.pace_sec_per_mi) || null);
-      let plannedSecPerMeter: number | null = null;
-      if (Number.isFinite(paceMidSecPerMi)) plannedSecPerMeter = (paceMidSecPerMi as number) / 1609.34;
-      if (plannedSecPerMeter == null) plannedSecPerMeter = parsePaceTextToSecPerMeter((plannedStep as any)?.paceTarget || (plannedStep as any)?.target_pace || (plannedStep as any)?.pace);
-
-      if (plannedSecPerMeter != null) {
-        // Executed pace: prefer executed.avg_pace_s_per_mi; normalize deciseconds; else derive from distance/time
-        let execPaceMi = Number((executedStep as any)?.avg_pace_s_per_mi);
-        if (Number.isFinite(execPaceMi) && execPaceMi > 1200) execPaceMi = execPaceMi / 10;
-        let execSecPerMeter: number | null = null;
-        if (Number.isFinite(execPaceMi) && execPaceMi > 0) execSecPerMeter = execPaceMi / 1609.34;
-        if (execSecPerMeter == null) {
-          const dM = Number((executedStep as any)?.distance_m);
-          const tS = Number((executedStep as any)?.duration_s);
-          if (Number.isFinite(dM) && dM > 0 && Number.isFinite(tS) && tS > 0) execSecPerMeter = tS / dM;
-        }
-        if (execSecPerMeter != null && execSecPerMeter > 0) {
-          // Faster pace => lower seconds per meter; adherence is target/actual * 100
-          return Math.round((plannedSecPerMeter / execSecPerMeter) * 100);
-        }
-      }
-
-      // Time-based efforts
-      const plannedSeconds = [ (plannedStep as any)?.seconds, (plannedStep as any)?.duration, (plannedStep as any)?.duration_sec, (plannedStep as any)?.durationSeconds, (plannedStep as any)?.time_sec, (plannedStep as any)?.timeSeconds ]
-        .map((v:any)=>Number(v)).find((n:number)=>Number.isFinite(n) && n>0) as number | undefined;
-      const execSeconds = Number((executedStep as any)?.duration_s);
-      if (Number.isFinite(plannedSeconds) && (plannedSeconds as number) > 0 && Number.isFinite(execSeconds) && execSeconds > 0) {
-        return Math.round((execSeconds / (plannedSeconds as number)) * 100);
-      }
-
-      // Distance-based efforts
-      const plannedMeters = Number((plannedStep as any)?.distanceMeters ?? (plannedStep as any)?.distance_m ?? (plannedStep as any)?.m ?? (plannedStep as any)?.meters);
-      const execMeters = Number((executedStep as any)?.distance_m);
-      if (Number.isFinite(plannedMeters) && plannedMeters > 0 && Number.isFinite(execMeters) && execMeters > 0) {
-        return Math.round((execMeters / plannedMeters) * 100);
-      }
-    } catch {}
-    return null;
-  };
+  // REMOVED: Client-side adherence calculation logic
+  // Adherence percentages are now computed server-side and stored in the database
+  // Client should only display server-computed values
 
   // ========== RULE-BASED COLOR CODING ==========
   
@@ -1067,7 +996,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
       let totalWeighted = 0; let totalWeight = 0;
       for (const { planned, executed } of pairs) {
         if (!executed) continue;
-        const pct = calculateExecutionPercentage(planned, executed);
+        // Use server-computed adherence percentage
+        const pct = (executed as any)?.adherence_percentage ? Number((executed as any).adherence_percentage) : null;
         if (pct == null) continue;
         let weight = 1;
         if (t === 'swim') {
@@ -1931,7 +1861,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                 if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null;
               }
             }
-            const pct = (hasServerComputed && shouldShowPercentage(st)) ? calculateExecutionPercentage(st, row?.executed) : null;
+            // Use server-computed adherence percentage from database
+            const pct = (hasServerComputed && shouldShowPercentage(st) && row?.executed?.adherence_percentage) 
+              ? Number(row.executed.adherence_percentage) 
+              : null;
             // Planned label: prioritize server-computed label, fallback to simple client-side generation
             const plannedLabel = (() => {
               // Priority 1: Use server-computed planned_label if available
