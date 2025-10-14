@@ -152,15 +152,19 @@ function getStepsIntensity(steps: string[], type: string): number {
  * Get intensity for strength session
  */
 function getStrengthIntensity(exercises: any[]): number {
+  if (!Array.isArray(exercises) || exercises.length === 0) {
+    return 0.75; // Default intensity if no exercises
+  }
+  
   const intensities = exercises.map(ex => {
     let base = 0.75;
     
-    if (ex.weight && ex.weight.includes('% 1RM')) {
-      const pct = parseInt(ex.weight);
+    if (ex.weight && String(ex.weight).includes('% 1RM')) {
+      const pct = parseInt(String(ex.weight));
       const roundedPct = Math.floor(pct / 5) * 5;
       const key = `@pct${roundedPct}` as keyof typeof INTENSITY_FACTORS.strength;
       base = INTENSITY_FACTORS.strength[key] || 0.75;
-    } else if (ex.weight && ex.weight.toLowerCase().includes('bodyweight')) {
+    } else if (ex.weight && String(ex.weight).toLowerCase().includes('bodyweight')) {
       base = INTENSITY_FACTORS.strength.bodyweight;
     }
     
@@ -178,6 +182,10 @@ function getStrengthIntensity(exercises: any[]): number {
  * Get intensity for mobility session
  */
 function getMobilityIntensity(exercises: any[]): number {
+  if (!Array.isArray(exercises) || exercises.length === 0) {
+    return 0.60; // Default intensity if no exercises
+  }
+  
   const completedCount = exercises.filter(ex => ex.completed).length;
   const totalCount = exercises.length;
   
@@ -356,6 +364,7 @@ serve(async (req) => {
     const duration = Date.now() - startTime
 
     console.log(`Sweep completed: processed ${processed}, updated ${updated}, errors ${errors}, duration ${duration}ms`)
+
 
     return new Response(
       JSON.stringify({

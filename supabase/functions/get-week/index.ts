@@ -1142,24 +1142,39 @@ Deno.serve(async (req)=>{
         console.error('Failed to fetch training plan context:', error);
       }
     }
-    // Get workload totals from weekly_workload table
+    // Calculate workload totals directly from workouts table
     let workloadPlanned = 0;
     let workloadCompleted = 0;
     try {
-      const { data: weeklyWorkloadData } = await supabase
-        .from('weekly_workload')
-        .select('workload_planned, workload_actual')
+      // Get completed workouts with workload data
+      const { data: completedWorkouts } = await supabase
+        .from('workouts')
+        .select('workload_actual')
         .eq('user_id', userId)
-        .eq('week_start_date', fromISO)
-        .single();
+        .gte('date', fromISO)
+        .lte('date', toISO)
+        .not('workload_actual', 'is', null);
       
-      if (weeklyWorkloadData) {
-        workloadPlanned = weeklyWorkloadData.workload_planned || 0;
-        workloadCompleted = weeklyWorkloadData.workload_actual || 0;
+      // Get planned workouts with workload data  
+      const { data: plannedWorkouts } = await supabase
+        .from('planned_workouts')
+        .select('workload_planned')
+        .eq('user_id', userId)
+        .gte('date', fromISO)
+        .lte('date', toISO)
+        .not('workload_planned', 'is', null);
+      
+      // Sum up the totals
+      if (completedWorkouts) {
+        workloadCompleted = completedWorkouts.reduce((sum, workout) => sum + (workout.workload_actual || 0), 0);
+      }
+      
+      if (plannedWorkouts) {
+        workloadPlanned = plannedWorkouts.reduce((sum, workout) => sum + (workout.workload_planned || 0), 0);
       }
     } catch (error) {
-      console.error('Failed to fetch weekly workload data:', error);
-      // Fallback to counts if weekly_workload table doesn't have data
+      console.error('Failed to calculate workload totals:', error);
+      // Fallback to counts if calculation fails
       workloadPlanned = totalPlanned;
       workloadCompleted = totalCompleted;
     }
