@@ -1392,6 +1392,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           // Use server-computed overall execution score
           const executionScore = (completed as any)?.computed?.overall?.execution_score;
           
+          // Debug: Check what we're getting from the server
+          console.log('🔍 [EXECUTION DEBUG] completed:', completed);
+          console.log('🔍 [EXECUTION DEBUG] computed:', (completed as any)?.computed);
+          console.log('🔍 [EXECUTION DEBUG] overall:', (completed as any)?.computed?.overall);
+          console.log('🔍 [EXECUTION DEBUG] execution_score:', executionScore);
+          
           // If nothing to show, skip
           const anyVal = (pacePct!=null) || (durationPct!=null) || (distPct!=null) || (executionScore!=null);
           if (!anyVal) return null;
