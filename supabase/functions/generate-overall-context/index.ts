@@ -7,9 +7,10 @@
  * - Receives user_id and weeks_back from frontend Context tab
  * - Queries last N weeks of completed workouts and planned workouts
  * - Aggregates data by week and discipline (runs, bikes, swims, strength)
+ * - Tracks strength lift progression and compares to 1RM baselines
  * - Calculates performance trends and plan adherence metrics
  * - Calls GPT-4 to generate three-section analysis:
- *   1. Performance Trends (pace/power progression over time)
+ *   1. Performance Trends (pace/power/strength progression over time)
  *   2. Plan Adherence (completion rates and consistency)
  *   3. Weekly Summary (most recent week performance vs plan)
  * - Returns structured analysis for Context tab display
@@ -27,7 +28,8 @@
  * Data Sources:
  * - workouts table: completed workout metrics and performance data
  * - planned_workouts table: planned sessions and targets
- * - training_plans table: current training phase context
+ * - user_baselines table: 1RM baselines for strength lifts
+ * - plans table: current training phase context
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -85,18 +87,23 @@ Deno.serve(async (req) => {
 
     console.log(`Generating overall context for user ${user_id}, ${weeks_back} weeks (${startDateISO} to ${endDateISO})`);
 
-    // Step 2: Query planned workouts and completed workouts separately, then join manually
-    const [plannedResult, workoutsResult, trainingPhaseResult] = await Promise.all([
-      // Get planned workouts
+    // Use yesterday in UTC to avoid timezone issues
+    const yesterday = new Date();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayISO = yesterday.toISOString().split('T')[0];
+    console.log(`Using yesterday in UTC (${yesterdayISO}) to avoid timezone issues`);
+    
+    const [plannedResult, workoutsResult, trainingPhaseResult, baselinesResult] = await Promise.all([
+      // Get planned workouts (only up to yesterday)
       supabase
         .from('planned_workouts')
         .select('*')
         .eq('user_id', user_id)
         .gte('date', startDateISO)
-        .lte('date', endDateISO)
+        .lte('date', yesterdayISO)
         .order('date', { ascending: true }),
       
-      // Get completed workouts with planned_id
+      // Get ALL completed workouts in the date range
       supabase
         .from('workouts')
         .select('*')
@@ -104,14 +111,23 @@ Deno.serve(async (req) => {
         .eq('workout_status', 'completed')
         .gte('date', startDateISO)
         .lte('date', endDateISO)
-        .not('planned_id', 'is', null)
         .order('date', { ascending: true }),
       
       supabase
         .from('plans')
-        .select('current_week, status')
+        .select('current_week, status, config')
         .eq('user_id', user_id)
         .eq('status', 'active')
+        .not('config->weekly_summaries', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single(),
+      
+      // Get user's 1RM baselines
+      supabase
+        .from('user_baselines')
+        .select('baselines')
+        .eq('user_id', user_id)
         .single()
     ]);
 
@@ -127,47 +143,79 @@ Deno.serve(async (req) => {
 
     const planned = plannedResult.data || [];
     const completedWorkouts = workoutsResult.data || [];
+    const userBaselines = baselinesResult.data?.baselines || {};
+    const planConfig = trainingPhaseResult.data?.config;
+    const currentWeek = trainingPhaseResult.data?.current_week || 1;
+    
+    console.log('Raw plan data:', JSON.stringify(trainingPhaseResult.data, null, 2));
+    console.log('Plan config:', JSON.stringify(planConfig, null, 2));
+    
+    console.log(`📊 Planned workouts: ${planned.length} total`);
+    console.log(`📊 User baselines:`, userBaselines);
+    console.log(`📊 Current week: ${currentWeek}`);
     
     // Manually join planned workouts with their completions
     const plannedWithCompletions = planned.map(plannedWorkout => {
-      const completed = completedWorkouts.filter(workout => 
+      // First, try to find by planned_id (exact match)
+      let completed = completedWorkouts.filter(workout => 
         workout.planned_id === plannedWorkout.id
       );
+      
+      // If no exact match found, try to find by type and date proximity (for moved workouts)
+      if (completed.length === 0) {
+        const plannedDate = new Date(plannedWorkout.date);
+        const plannedType = plannedWorkout.type.toLowerCase();
+        
+        completed = completedWorkouts.filter(workout => {
+          const workoutType = workout.type.toLowerCase();
+          const workoutDate = new Date(workout.date);
+          
+          // Match type and date within 7 days (for moved workouts)
+          const daysDiff = Math.abs((workoutDate.getTime() - plannedDate.getTime()) / (1000 * 60 * 60 * 24));
+          const isMatch = workoutType === plannedType && daysDiff <= 7 && !workout.planned_id;
+          
+          if (isMatch) {
+            console.log(`🔗 Matched moved workout: planned ${plannedType} on ${plannedWorkout.date} with completed ${workoutType} on ${workout.date}`);
+          }
+          
+          return isMatch;
+        });
+      }
+      
       return {
         ...plannedWorkout,
         completed: completed
       };
     });
     
-    // Determine training phase from current week or default to 'base'
-    let trainingPhase = 'base';
-    if (trainingPhaseResult.data?.current_week) {
-      const currentWeek = trainingPhaseResult.data.current_week;
-      if (currentWeek <= 4) {
-        trainingPhase = 'base';
-      } else if (currentWeek <= 8) {
-        trainingPhase = 'build';
-      } else if (currentWeek <= 10) {
-        trainingPhase = 'peak';
-      } else {
-        trainingPhase = 'taper';
-      }
-    }
+    // Identify recovery weeks from plan metadata
+    const recoveryWeeks = identifyRecoveryWeeksFromPlan(planConfig, currentWeek);
+    
+    // Get training phase from plan metadata (more accurate)
+    const trainingPhase = getCurrentPhaseFromPlan(planConfig, currentWeek);
 
-    // Step 3: Categorize planned workouts based on completion
+    // Categorize planned workouts based on completion
     const completed = plannedWithCompletions.filter(p => p.completed && p.completed.length > 0);
     const missed = plannedWithCompletions.filter(p => !p.completed || p.completed.length === 0);
     
     console.log(`Found ${plannedWithCompletions.length} planned workouts: ${completed.length} completed, ${missed.length} missed`);
 
-    // Step 4: Pre-processing - Aggregate by week and discipline using attachment data
+    // Aggregate by week and discipline
     const weeklyAggregates = aggregateByWeekWithAttachments(plannedWithCompletions, weeks_back);
 
-    // Step 5: Calculate trend metrics
-    const trends = extractTrends(weeklyAggregates);
+    // Calculate trend metrics (excluding recovery weeks)
+    const trends = extractTrends(weeklyAggregates, recoveryWeeks);
 
-    // Step 6: Generate GPT-4 analysis with accurate adherence data
-    const analysis = await generateOverallAnalysis(weeklyAggregates, trends, trainingPhase, completed, missed);
+    // Generate GPT-4 analysis
+    const analysis = await generateOverallAnalysis(
+      weeklyAggregates, 
+      trends, 
+      trainingPhase, 
+      completed, 
+      missed,
+      userBaselines,
+      recoveryWeeks
+    );
 
     return new Response(JSON.stringify(analysis), {
       headers: {
@@ -189,6 +237,284 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+/**
+ * Identify recovery/deload weeks from plan metadata
+ */
+function identifyRecoveryWeeksFromPlan(planConfig: any, currentWeek: number): Set<number> {
+  const recoveryWeeks = new Set<number>();
+  
+  console.log('Plan config received:', JSON.stringify(planConfig, null, 2));
+  
+  if (!planConfig?.weekly_summaries) {
+    console.log('No weekly summaries found in plan config');
+    return recoveryWeeks;
+  }
+  
+  // Check each week's metadata
+  Object.entries(planConfig.weekly_summaries).forEach(([weekNum, summary]: [string, any]) => {
+    const weekIndex = parseInt(weekNum) - 1; // Convert to 0-based index
+    
+    // Only analyze weeks we have data for
+    if (weekIndex >= currentWeek - 4 && weekIndex < currentWeek) {
+      // Check for recovery indicators in focus/notes
+      const focusLower = (summary.focus || '').toLowerCase();
+      const notesLower = (summary.notes || '').toLowerCase();
+      
+      const isRecoveryWeek = 
+        focusLower.includes('recovery') ||
+        focusLower.includes('deload') ||
+        focusLower.includes('adaptation') ||
+        notesLower.includes('volume reduction') ||
+        notesLower.includes('reduced volume') ||
+        notesLower.includes('recovery week');
+      
+      if (isRecoveryWeek) {
+        recoveryWeeks.add(weekIndex);
+        console.log(`Week ${weekNum} marked as recovery from plan metadata`);
+      }
+    }
+  });
+  
+  return recoveryWeeks;
+}
+
+/**
+ * Get current training phase from plan
+ */
+function getCurrentPhaseFromPlan(planConfig: any, currentWeek: number): string {
+  if (!planConfig?.weekly_summaries?.[currentWeek]) {
+    return 'base'; // default fallback
+  }
+  
+  const weekSummary = planConfig.weekly_summaries[currentWeek];
+  const focus = (weekSummary.focus || '').toLowerCase();
+  
+  // Extract phase from focus text
+  if (focus.includes('taper')) return 'taper';
+  if (focus.includes('peak')) return 'peak';
+  if (focus.includes('build')) return 'build';
+  if (focus.includes('base')) return 'base';
+  
+  // Fallback to week number heuristic
+  if (currentWeek <= 4) return 'base';
+  if (currentWeek <= 8) return 'build';
+  if (currentWeek <= 10) return 'peak';
+  return 'taper';
+}
+
+/**
+ * Parse strength_exercises from database (handles both string and array formats)
+ */
+function parseStrengthExercises(raw: any): any[] {
+  try {
+    if (Array.isArray(raw)) {
+      return raw;
+    }
+    if (typeof raw === 'string' && raw.trim()) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.debug('Failed to parse strength_exercises:', error);
+  }
+  return [];
+}
+
+/**
+ * Extract max working weight for primary lifts from a strength workout
+ */
+function extractPrimaryLiftWeights(strengthWorkout: any): Record<string, number> {
+  const exercises = parseStrengthExercises(strengthWorkout.strength_exercises);
+  const liftWeights: Record<string, number> = {};
+  
+  // Primary lift patterns
+  const liftPatterns: Record<string, string[]> = {
+    'bench_press': ['bench press', 'bench', 'bp'],
+    'back_squat': ['back squat', 'squat', 'bs'],
+    'deadlift': ['deadlift', 'dl'],
+    'overhead_press': ['overhead press', 'ohp', 'press']
+  };
+  
+  exercises.forEach((ex: any) => {
+    const nameLower = ex.name.toLowerCase().trim();
+    
+    // Match to primary lift
+    let primaryLift: string | null = null;
+    for (const [lift, patterns] of Object.entries(liftPatterns)) {
+      if (patterns.some(pattern => nameLower.includes(pattern))) {
+        primaryLift = lift;
+        break;
+      }
+    }
+    
+    if (primaryLift && ex.sets) {
+      // Get max weight from completed sets
+      const completedSets = ex.sets.filter((s: any) => s.completed);
+      if (completedSets.length > 0) {
+        const maxWeight = Math.max(...completedSets.map((s: any) => s.weight || 0));
+        if (maxWeight > 0) {
+          liftWeights[primaryLift] = Math.max(liftWeights[primaryLift] || 0, maxWeight);
+        }
+      }
+    }
+  });
+  
+  return liftWeights;
+}
+
+/**
+ * Aggregate primary lift max weights for a week
+ */
+function aggregateStrengthLifts(strengthWorkouts: any[]): Record<string, number> {
+  const allLifts: Record<string, number[]> = {};
+  
+  strengthWorkouts.forEach(workout => {
+    const liftWeights = extractPrimaryLiftWeights(workout);
+    Object.entries(liftWeights).forEach(([lift, weight]) => {
+      if (!allLifts[lift]) allLifts[lift] = [];
+      allLifts[lift].push(weight);
+    });
+  });
+  
+  // Return max weight per lift for the week
+  const weekMaxes: Record<string, number> = {};
+  Object.entries(allLifts).forEach(([lift, weights]) => {
+    weekMaxes[lift] = Math.max(...weights);
+  });
+  
+  return weekMaxes;
+}
+
+/**
+ * Compare run performance to 5K pace baseline
+ */
+function compareRunToBaseline(trends: any, userBaselines: any): string[] {
+  const insights: string[] = [];
+  
+  if (!trends.run_pace || trends.run_pace.length === 0 || !userBaselines.fiveK_pace) {
+    return insights;
+  }
+  
+  // Parse baseline 5K pace (format: "6:45/mi" or "6:45")
+  const baselinePace = userBaselines.fiveK_pace;
+  const baselineSeconds = paceToSeconds(baselinePace);
+  
+  if (baselineSeconds === 0) return insights;
+  
+  // Get recent average pace
+  const recentPaces = trends.run_pace.slice(-2); // Last 2 weeks
+  const avgRecentSeconds = recentPaces.reduce((sum: number, p: string) => sum + paceToSeconds(p), 0) / recentPaces.length;
+  
+  const percentOfBaseline = (baselineSeconds / avgRecentSeconds) * 100;
+  
+  if (avgRecentSeconds <= baselineSeconds) {
+    // Running at or faster than 5K baseline
+    const recentPace = secondsToPace(avgRecentSeconds);
+    insights.push(`Run pace: Recent average ${recentPace} equals or exceeds 5K baseline (${baselinePace}). Consider updating 5K baseline.`);
+  } else if (percentOfBaseline >= 95) {
+    // Within 5% of baseline (getting close)
+    const recentPace = secondsToPace(avgRecentSeconds);
+    const pctFaster = Math.round(percentOfBaseline);
+    insights.push(`Run pace: Recent average ${recentPace} at ${pctFaster}% of 5K baseline. Approaching threshold.`);
+  }
+  
+  return insights;
+}
+
+/**
+ * Compare bike power to FTP baseline
+ */
+function compareBikeToBaseline(trends: any, userBaselines: any): string[] {
+  const insights: string[] = [];
+  
+  if (!trends.bike_power || trends.bike_power.length === 0 || !userBaselines.ftp) {
+    return insights;
+  }
+  
+  const baselineFTP = userBaselines.ftp;
+  
+  if (baselineFTP === 0) return insights;
+  
+  // Get recent average power
+  const recentPower = trends.bike_power.slice(-2); // Last 2 weeks
+  const avgRecentPower = recentPower.reduce((sum: number, p: number) => sum + p, 0) / recentPower.length;
+  
+  const percentOfFTP = Math.round((avgRecentPower / baselineFTP) * 100);
+  
+  if (avgRecentPower >= baselineFTP) {
+    // Averaging at or above FTP
+    insights.push(`Bike power: Recent average ${Math.round(avgRecentPower)}W equals or exceeds FTP baseline (${baselineFTP}W). Consider FTP retest.`);
+  } else if (percentOfFTP >= 95) {
+    // Within 5% of FTP
+    insights.push(`Bike power: Recent average ${Math.round(avgRecentPower)}W at ${percentOfFTP}% of FTP. Approaching threshold.`);
+  }
+  
+  return insights;
+}
+
+/**
+ * Generate baseline insights across all disciplines
+ */
+function generateBaselineInsights(trends: any, userBaselines: any): string[] {
+  const insights: string[] = [];
+  
+  // Strength baselines
+  if (trends.strength_lifts && userBaselines) {
+    const baselineMap: Record<string, string> = {
+      'bench_press': 'bench',
+      'back_squat': 'squat',
+      'deadlift': 'deadlift',
+      'overhead_press': 'overheadPress1RM'
+    };
+    
+    Object.entries(trends.strength_lifts).forEach(([lift, weights]: [string, any]) => {
+      if (!Array.isArray(weights) || weights.length === 0) return;
+      
+      const baselineKey = baselineMap[lift];
+      const baseline1RM = userBaselines[baselineKey];
+      
+      if (baseline1RM && baseline1RM > 0) {
+        const currentMax = Math.max(...weights);
+        const percentOf1RM = Math.round((currentMax / baseline1RM) * 100);
+        
+        const liftName = lift.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        
+        if (currentMax >= baseline1RM) {
+          insights.push(`${liftName}: Working at ${currentMax} lb (${percentOf1RM}% of ${baseline1RM} lb baseline). Consider retesting 1RM.`);
+        } else if (percentOf1RM >= 90) {
+          insights.push(`${liftName}: Working at ${currentMax} lb (${percentOf1RM}% of ${baseline1RM} lb baseline). Approaching max.`);
+        }
+      }
+    });
+  }
+  
+  // Run baseline
+  insights.push(...compareRunToBaseline(trends, userBaselines));
+  
+  // Bike baseline
+  insights.push(...compareBikeToBaseline(trends, userBaselines));
+  
+  return insights;
+}
+
+/**
+ * Helper: Parse pace string to seconds
+ */
+function paceToSeconds(pace: string | number): number {
+  if (typeof pace === 'number') return pace;
+  if (typeof pace === 'string') {
+    // Remove "/mi" or "/km" suffix if present
+    const cleanPace = pace.replace(/\/mi|\/km/g, '').trim();
+    const parts = cleanPace.split(':');
+    if (parts.length === 2) {
+      return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+    }
+  }
+  return 0;
+}
 
 /**
  * Aggregate planned workouts with their completions by week and discipline
@@ -258,10 +584,25 @@ function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack
         total_distance: swims.reduce((sum, s) => sum + (s.distance || 0), 0)
       },
       strength: {
-        count: strength.length
+        count: strength.length,
+        avg_duration: strength.length > 0 ? calculateAverageDuration(strength) : null,
+        avg_heart_rate: strength.length > 0 ? calculateAverageHeartRate(strength) : null,
+        total_calories: strength.reduce((sum, s) => sum + (s.calories || 0), 0),
+        total_exercises: strength.reduce((sum, s) => {
+          const exercises = parseStrengthExercises(s.strength_exercises);
+          return sum + exercises.length;
+        }, 0),
+        total_sets: strength.reduce((sum, s) => {
+          const exercises = parseStrengthExercises(s.strength_exercises);
+          return sum + exercises.reduce((exerciseSum: number, ex: any) => exerciseSum + (ex.sets?.length || 0), 0);
+        }, 0),
+        lifts: aggregateStrengthLifts(strength)
       },
       mobility: {
-        count: mobility.length
+        count: mobility.length,
+        avg_duration: mobility.length > 0 ? calculateAverageDuration(mobility) : null,
+        avg_heart_rate: mobility.length > 0 ? calculateAverageHeartRate(mobility) : null,
+        total_calories: mobility.reduce((sum, m) => sum + (m.calories || 0), 0)
       },
       planned_count: weekPlanned.length,
       completed_count: completed.length,
@@ -300,101 +641,272 @@ function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack
 /**
  * Extract trend arrays for key metrics
  */
-function extractTrends(weeklyAggregates: any[]) {
+function extractTrends(weeklyAggregates: any[], recoveryWeeks: Set<number> = new Set()) {
+  // Build lift progression arrays, excluding recovery weeks
+  const strengthLifts: Record<string, number[]> = {};
+  
+  weeklyAggregates.forEach((week, index) => {
+    // Skip recovery weeks for performance trends
+    if (recoveryWeeks.has(index)) {
+      console.log(`Excluding week ${index + 1} from trends (recovery week)`);
+      return;
+    }
+    
+    if (week.strength.lifts) {
+      Object.entries(week.strength.lifts).forEach(([lift, weight]) => {
+        if (!strengthLifts[lift]) strengthLifts[lift] = [];
+        strengthLifts[lift].push(weight as number);
+      });
+    }
+  });
+  
   return {
-    run_pace: weeklyAggregates.map(w => w.runs.avg_pace).filter(p => p !== null),
-    run_speed: weeklyAggregates.map(w => w.runs.avg_speed).filter(s => s !== null),
-    run_heart_rate: weeklyAggregates.map(w => w.runs.avg_heart_rate).filter(hr => hr !== null),
-    bike_power: weeklyAggregates.map(w => w.bikes.avg_power).filter(p => p !== null),
-    bike_speed: weeklyAggregates.map(w => w.bikes.avg_speed).filter(s => s !== null),
-    bike_heart_rate: weeklyAggregates.map(w => w.bikes.avg_heart_rate).filter(hr => hr !== null),
-    swim_pace: weeklyAggregates.map(w => w.swims.avg_pace).filter(p => p !== null),
-    swim_speed: weeklyAggregates.map(w => w.swims.avg_speed).filter(s => s !== null),
-    swim_heart_rate: weeklyAggregates.map(w => w.swims.avg_heart_rate).filter(hr => hr !== null),
-    completion_rate: weeklyAggregates.map(w => w.completion_rate)
+    run_pace: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.runs.avg_pace)
+      .filter(p => p !== null),
+    run_speed: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.runs.avg_speed)
+      .filter(s => s !== null),
+    run_heart_rate: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.runs.avg_heart_rate)
+      .filter(hr => hr !== null),
+    bike_power: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.bikes.avg_power)
+      .filter(p => p !== null),
+    bike_speed: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.bikes.avg_speed)
+      .filter(s => s !== null),
+    bike_heart_rate: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.bikes.avg_heart_rate)
+      .filter(hr => hr !== null),
+    swim_pace: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.swims.avg_pace)
+      .filter(p => p !== null),
+    swim_speed: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.swims.avg_speed)
+      .filter(s => s !== null),
+    swim_heart_rate: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.swims.avg_heart_rate)
+      .filter(hr => hr !== null),
+    completion_rate: weeklyAggregates.map(w => w.completion_rate), // Keep all weeks for adherence
+    strength_lifts: strengthLifts
   };
+}
+
+/**
+ * Generate discipline breakdown showing what athlete actually trains
+ */
+function generateDisciplineBreakdown(weeks: any[]): string {
+  const totals: Record<string, { planned: number, completed: number }> = {};
+  
+  weeks.forEach(week => {
+    ['runs', 'bikes', 'swims', 'strength'].forEach(discipline => {
+      const planned = week.planned_by_type[discipline] || 0;
+      const completed = week.completed_by_type[discipline] || 0;
+      
+      if (planned > 0) {
+        if (!totals[discipline]) {
+          totals[discipline] = { planned: 0, completed: 0 };
+        }
+        totals[discipline].planned += planned;
+        totals[discipline].completed += completed;
+      }
+    });
+  });
+  
+  return Object.entries(totals)
+    .filter(([_, data]) => data.planned > 0)
+    .map(([discipline, data]) => {
+      const rate = Math.round((data.completed / data.planned) * 100);
+      return `- ${discipline}: ${data.completed}/${data.planned} (${rate}%)`;
+    })
+    .join('\n');
+}
+
+/**
+ * Generate performance summary for disciplines with data
+ */
+function generatePerformanceSummary(weeks: any[], trends: any): string {
+  const lines: string[] = [];
+  
+  // Run metrics
+  if (trends.run_pace && trends.run_pace.length > 1) {
+    lines.push(`Run pace: ${trends.run_pace[0]} → ${trends.run_pace[trends.run_pace.length - 1]}`);
+  }
+  if (trends.run_heart_rate && trends.run_heart_rate.length > 1) {
+    lines.push(`Run HR: ${trends.run_heart_rate[0]} → ${trends.run_heart_rate[trends.run_heart_rate.length - 1]} bpm`);
+  }
+  
+  // Bike metrics
+  if (trends.bike_power && trends.bike_power.length > 1) {
+    lines.push(`Bike power: ${trends.bike_power[0]}W → ${trends.bike_power[trends.bike_power.length - 1]}W`);
+  }
+  if (trends.bike_heart_rate && trends.bike_heart_rate.length > 1) {
+    lines.push(`Bike HR: ${trends.bike_heart_rate[0]} → ${trends.bike_heart_rate[trends.bike_heart_rate.length - 1]} bpm`);
+  }
+  
+  // Swim metrics
+  if (trends.swim_pace && trends.swim_pace.length > 1) {
+    lines.push(`Swim pace: ${trends.swim_pace[0]} → ${trends.swim_pace[trends.swim_pace.length - 1]} per 100yd`);
+  }
+  
+  // Strength lift progression
+  if (trends.strength_lifts) {
+    Object.entries(trends.strength_lifts).forEach(([lift, weights]: [string, any]) => {
+      if (Array.isArray(weights) && weights.length > 0) {
+        const first = weights[0];
+        const last = weights[weights.length - 1];
+        
+        if (first > 0 && last > 0) {
+          const liftName = lift
+            .split('_')
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+          
+          if (weights.length > 1) {
+            lines.push(`${liftName}: ${first} lb → ${last} lb`);
+          } else {
+            lines.push(`${liftName}: ${first} lb`);
+          }
+        }
+      }
+    });
+  }
+  
+  return lines.length > 0 ? lines.join('\n') : 'No performance data available';
+}
+
+/**
+ * Format missed sessions by discipline
+ */
+function formatMissedByDiscipline(missed: any[]): string {
+  const missedByType: Record<string, number> = {};
+  missed.forEach(m => {
+    missedByType[m.type] = (missedByType[m.type] || 0) + 1;
+  });
+  
+  return Object.entries(missedByType)
+    .filter(([discipline, count]) => discipline !== 'mobility' && count > 0)
+    .map(([discipline, count]) => `${count} ${discipline}`)
+    .join(', ') || 'none';
 }
 
 /**
  * Generate overall analysis using GPT-4
  */
-async function generateOverallAnalysis(weeklyAggregates: any[], trends: any, trainingPhase: string, completed: any[], missed: any[]) {
+async function generateOverallAnalysis(
+  weeklyAggregates: any[], 
+  trends: any, 
+  trainingPhase: string, 
+  completed: any[], 
+  missed: any[],
+  userBaselines: any,
+  recoveryWeeks: Set<number>
+) {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
     throw new Error('OpenAI API key not configured');
   }
 
   try {
-    // Build compact prompt
-    const weeklyDataText = weeklyAggregates.map(week => {
-      const runs = week.runs.avg_pace ? `Runs: ${week.runs.count} completed, avg pace ${week.runs.avg_pace}, total ${week.runs.total_distance.toFixed(1)} miles` : `Runs: ${week.runs.count} completed`;
-      const bikes = week.bikes.avg_power ? `Bikes: ${week.bikes.count} completed, avg power ${week.bikes.avg_power}W, total ${(week.bikes.total_duration / 60).toFixed(1)} hours` : `Bikes: ${week.bikes.count} completed`;
-      const swims = week.swims.avg_pace ? `Swims: ${week.swims.count} completed, avg pace ${week.swims.avg_pace}, total ${week.swims.total_distance} yd` : `Swims: ${week.swims.count} completed`;
-      const strength = `Strength: ${week.strength.count} completed`;
-      const completion = `Planned: ${week.planned_count} sessions, Completed: ${week.completed_count} (${week.completion_rate}%)`;
-      
-      return `${week.week_label}: ${runs}. ${bikes}. ${swims}. ${strength}. ${completion}`;
-    }).join('\n\n');
-
-    const trendsText = [
-      trends.run_pace.length > 0 ? `Run pace: ${trends.run_pace.join(' → ')}` : null,
-      trends.bike_power.length > 0 ? `Bike power: ${trends.bike_power.join('W → ')}W` : null,
-      trends.swim_pace.length > 0 ? `Swim pace: ${trends.swim_pace.join(' → ')}` : null,
-      `Completion rate: ${trends.completion_rate.join('% → ')}%`
-    ].filter(Boolean).join('\n');
-
-    // Calculate overall adherence statistics
-    const totalPlanned = completed.length + missed.length;
-    const totalCompleted = completed.length;
-    const totalMissed = missed.length;
+    // Calculate overall completion rate
+    const totalPlanned = weeklyAggregates.reduce((sum, week) => sum + week.planned_count, 0);
+    const totalCompleted = weeklyAggregates.reduce((sum, week) => sum + week.completed_count, 0);
     const overallCompletionRate = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 0;
 
     // Get most recent week data
     const mostRecentWeek = weeklyAggregates[weeklyAggregates.length - 1];
-    const recentWeekMissed = mostRecentWeek?.missed_by_type || {};
+    const recentWeekMissed = missed.filter(m => {
+      const missedDate = new Date(m.date);
+      const weekStart = new Date(mostRecentWeek.week_label.split('(')[1].split(' to ')[0]);
+      const weekEnd = new Date(mostRecentWeek.week_label.split(' to ')[1].split(')')[0]);
+      return missedDate >= weekStart && missedDate <= weekEnd;
+    });
 
-    const prompt = `Analyze ${weeklyAggregates.length} weeks of training data.
+    // Generate baseline insights
+    const baselineInsights = generateBaselineInsights(trends, userBaselines);
 
-Weekly Aggregates:
-${weeklyDataText}
+    const prompt = `Analyze ${weeklyAggregates.length} weeks of training.
 
-Key Metric Trends:
-${trendsText}
+PLAN CONTEXT:
+Current phase: ${trainingPhase}
+${recoveryWeeks.size > 0 ? `Recovery weeks: ${Array.from(recoveryWeeks).map(i => i + 1).join(', ')}` : ''}
 
-Current training phase: ${trainingPhase}
+ADHERENCE SUMMARY:
+Overall: ${totalCompleted}/${totalPlanned} sessions completed (${overallCompletionRate}%)
 
-ACCURATE ADHERENCE DATA:
-- Total planned workouts: ${totalPlanned}
-- Total completed (with attachment): ${totalCompleted}
-- Total missed (no attachment): ${totalMissed}
-- Overall completion rate: ${overallCompletionRate}%
+Discipline breakdown:
+${generateDisciplineBreakdown(weeklyAggregates)}
 
-Most recent week missed sessions:
-- Runs: ${recentWeekMissed.runs || 0} missed
-- Bikes: ${recentWeekMissed.bikes || 0} missed
-- Swims: ${recentWeekMissed.swims || 0} missed
-- Strength: ${recentWeekMissed.strength || 0} missed
-- Mobility: ${recentWeekMissed.mobility || 0} missed
+Most recent week: ${mostRecentWeek.completed_count}/${mostRecentWeek.planned_count} completed
+Missed in recent week: ${formatMissedByDiscipline(recentWeekMissed)}
 
-Generate analysis with these three sections:
-1. Performance Trends: How key metrics changed. Use specific numbers. 2-3 sentences.
-2. Plan Adherence: Overall completion rate and consistency. Identify patterns in missed workouts - which session types are consistently skipped? What's the completion rate per discipline? 2-3 sentences.
-3. This Week Summary: Most recent week performance vs planned. Specifically mention which sessions were missed and any patterns. 2-3 sentences.
+PERFORMANCE DATA:
+${generatePerformanceSummary(weeklyAggregates, trends)}
 
-IMPORTANT: Call out under-execution areas directly:
-- Which session types are consistently skipped?
-- What's the completion rate per discipline (run, bike, swim, strength, mobility)?
-- What did the user miss this week specifically?
-- Are there patterns in missed sessions?
+${baselineInsights.length > 0 ? `\nSTRENGTH BASELINE ALERTS:\n${baselineInsights.join('\n')}` : ''}
 
-Return ONLY valid JSON in this exact format:
+IMPORTANT: Performance trends exclude recovery/deload weeks. Compare loading weeks only.
+Week ${weeklyAggregates.length} ${recoveryWeeks.has(weeklyAggregates.length - 1) ? 'was a planned recovery week with intentionally reduced loads' : 'was a loading week'}.
+
+Generate analysis with these DISTINCT sections. Only report on disciplines the athlete actually trains:
+
+1. Performance Trends (4-week progression):
+   - How metrics CHANGED from week 1 to week 4
+   - Report ONLY on disciplines with data (run pace, bike power, swim pace, strength lifts, etc.)
+   - For strength: mention lift progression if meaningful change occurred
+   - Focus on direction of change, not final numbers
+   - If baseline alerts exist, acknowledge approaching/exceeding 1RM
+   - DO NOT mention current week specifics
+   - 2-3 sentences maximum
+
+   Example: "Run pace improved 16 seconds over 4 weeks. Bike power increased 14W. Bench Press: 110 lb → 125 lb (+15 lb)."
+
+2. Plan Adherence (overall pattern):
+   - Overall completion rate for all ${weeklyAggregates.length} weeks
+   - List EACH discipline explicitly with its completion rate
+   - DO NOT say "all other disciplines" - name them: run, bike, swim, strength
+   - Identify patterns: "X discipline consistently skipped" or "All disciplines completed consistently"
+   - DO NOT mention specific week numbers
+   - 2-3 sentences maximum
+
+   Example: "97% overall completion (41/42). Runs: 90% (9/10). Bikes: 100% (8/8). Swims: 100% (10/10). Strength: 100% (14/14)."
+
+3. This Week (most recent week only):
+   - Session count for THIS week: X of Y completed
+   - Specifically which sessions were missed (by discipline)
+   - DO NOT repeat pace/power/strength numbers from Performance Trends
+   - 2 sentences maximum
+
+   Example: "9 of 10 sessions completed. Missed: 1 run session."
+
+CRITICAL RULES:
+- Each section serves different purpose - NO overlap
+- Performance Trends = progression over time
+- Plan Adherence = completion patterns
+- This Week = what happened this week
+- Only report on disciplines with actual data
+- Exclude mobility from analysis
+- Use athlete's actual disciplines, don't assume triathlon
+- Treat strength lifts like any other performance metric
+
+Return ONLY valid JSON:
 {
-  "performance_trends": "your analysis here",
-  "plan_adherence": "your analysis here", 
-  "weekly_summary": "your analysis here"
+  "performance_trends": "your analysis",
+  "plan_adherence": "your analysis",
+  "weekly_summary": "your analysis"
 }
 
-Be factual. Use specific numbers. Mention what was actually missed, not just percentages. No JSON markdown formatting.`;
+No markdown formatting. Direct JSON only.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -438,7 +950,7 @@ Be factual. Use specific numbers. Mention what was actually missed, not just per
 
   } catch (error) {
     console.error('GPT-4 error:', error);
-    throw error; // Don't return fallback, re-throw
+    throw error;
   }
 }
 
@@ -448,19 +960,17 @@ Be factual. Use specific numbers. Mention what was actually missed, not just per
 function calculateAveragePaceFromComputed(runs: any[]): string | null {
   const paces = runs
     .map(r => {
-      // Use server-computed pace first
       const computed = typeof r.computed === 'string' ? JSON.parse(r.computed) : r.computed;
       if (computed?.overall?.avg_pace_s_per_mi) {
         return computed.overall.avg_pace_s_per_mi;
       }
       
-      // Fallback to distance/duration calculation
       const distanceM = r.distance || r.distance_meters || 0;
       const durationS = r.duration || r.duration_s || r.duration_s_moving || 0;
       
       if (distanceM > 0 && durationS > 0) {
         const miles = distanceM / 1609.34;
-        if (miles > 0.05) { // minimum distance threshold
+        if (miles > 0.05) {
           const paceSecondsPerMile = durationS / miles;
           return paceSecondsPerMile;
         }
@@ -495,6 +1005,16 @@ function calculateAverageHeartRate(workouts: any[]): number | null {
   return Math.round(heartRates.reduce((sum, hr) => sum + hr, 0) / heartRates.length);
 }
 
+function calculateAverageDuration(workouts: any[]): number | null {
+  const durations = workouts
+    .map(w => w.duration)
+    .filter(d => d && d > 0);
+  
+  if (durations.length === 0) return null;
+  
+  return Math.round(durations.reduce((sum, d) => sum + d, 0) / durations.length);
+}
+
 function calculateAveragePower(bikes: any[]): number | null {
   const powers = bikes
     .map(b => b.avg_power)
@@ -508,22 +1028,19 @@ function calculateAveragePower(bikes: any[]): number | null {
 function calculateAverageSwimPaceFromComputed(swims: any[]): string | null {
   const paces = swims
     .map(s => {
-      // Use server-computed pace first
       const computed = typeof s.computed === 'string' ? JSON.parse(s.computed) : s.computed;
       if (computed?.overall?.avg_pace_s_per_mi) {
-        // Convert pace per mile to pace per 100 yards for swims
         const pacePerMile = computed.overall.avg_pace_s_per_mi;
-        const pacePer100Yards = (pacePerMile / 1760) * 100; // 1760 yards per mile
+        const pacePer100Yards = (pacePerMile / 1760) * 100;
         return pacePer100Yards;
       }
       
-      // Fallback to distance/duration calculation
       const distanceM = s.distance || s.distance_meters || 0;
       const durationS = s.duration || s.duration_s || s.duration_s_moving || 0;
       
       if (distanceM > 0 && durationS > 0) {
-        const yards = distanceM / 0.9144; // convert meters to yards
-        if (yards > 50) { // minimum distance threshold
+        const yards = distanceM / 0.9144;
+        if (yards > 50) {
           const paceSecondsPer100Yards = (durationS / yards) * 100;
           return paceSecondsPer100Yards;
         }
@@ -536,17 +1053,6 @@ function calculateAverageSwimPaceFromComputed(swims: any[]): string | null {
   
   const avgPaceSeconds = paces.reduce((sum, p) => sum + p, 0) / paces.length;
   return secondsToPace(avgPaceSeconds);
-}
-
-function paceToSeconds(pace: string | number): number {
-  if (typeof pace === 'number') return pace;
-  if (typeof pace === 'string') {
-    const parts = pace.split(':');
-    if (parts.length === 2) {
-      return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-    }
-  }
-  return 0;
 }
 
 function secondsToPace(seconds: number): string {

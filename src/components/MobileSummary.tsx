@@ -639,16 +639,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
   };
 
   const getDisplayPower = (workout: any, interval: any): number | null => {
-    const intervals = workout?.computed?.intervals || [];
-    const isMultiInterval = isMultiIntervalWorkout(intervals);
-    
-    if (isMultiInterval && interval?.executed?.avg_power_w) {
-      // Use interval-specific power for structured workouts
+    // Always prefer interval-specific power when available
+    if (interval?.executed?.avg_power_w) {
       return Number(interval.executed.avg_power_w);
-    } else {
-      // Use overall workout power for simple rides/runs
-      return Number(workout?.avg_power ?? workout?.metrics?.avg_power ?? workout?.average_watts);
     }
+    
+    // Fallback to overall workout power
+    return Number(workout?.avg_power ?? workout?.metrics?.avg_power ?? workout?.average_watts);
   };
 
   // --- Execution percentage helpers (strict, server-computed only) ---
