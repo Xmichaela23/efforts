@@ -963,15 +963,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 />
               </div>
             )}
-            {isCompleted && !isLinked ? (
-              <div className="px-3 py-2 text-sm text-gray-600">Attach this workout to a planned session to see planned vs actual.</div>
-            ) : (
-              <MobileSummary 
-                planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
-                completed={isCompleted ? completedData : null}
-                hideTopAdherence
-              />
-            )}
+            {(() => {
+              console.log('🔍 [UNIFIED DEBUG] isCompleted:', isCompleted, 'isLinked:', isLinked, 'linkedPlanned:', linkedPlanned);
+              return isCompleted && !isLinked ? (
+                <div className="px-3 py-2 text-sm text-gray-600">Attach this workout to a planned session to see planned vs actual.</div>
+              ) : (
+                <MobileSummary 
+                  planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
+                  completed={isCompleted ? completedData : null}
+                  hideTopAdherence
+                />
+              );
+            })()}
             {onDelete && workout?.id && (
               <Button
                 variant="ghost"
