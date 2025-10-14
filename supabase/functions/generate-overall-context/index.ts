@@ -85,23 +85,26 @@ Deno.serve(async (req) => {
 
     console.log(`Generating overall context for user ${user_id}, ${weeks_back} weeks (${startDateISO} to ${endDateISO})`);
 
-    // Step 2: Query database directly in parallel
-    const [workoutsResult, plannedResult, trainingPhaseResult] = await Promise.all([
-      supabase
-        .from('workouts')
-        .select('*, computed')
-        .eq('user_id', user_id)
-        .eq('workout_status', 'completed')
-        .gte('date', startDateISO)
-        .lte('date', endDateISO)
-        .order('date', { ascending: true }),
-      
+    // Step 2: Query planned workouts and completed workouts separately, then join manually
+    const [plannedResult, workoutsResult, trainingPhaseResult] = await Promise.all([
+      // Get planned workouts
       supabase
         .from('planned_workouts')
         .select('*')
         .eq('user_id', user_id)
         .gte('date', startDateISO)
         .lte('date', endDateISO)
+        .order('date', { ascending: true }),
+      
+      // Get completed workouts with planned_id
+      supabase
+        .from('workouts')
+        .select('*')
+        .eq('user_id', user_id)
+        .eq('workout_status', 'completed')
+        .gte('date', startDateISO)
+        .lte('date', endDateISO)
+        .not('planned_id', 'is', null)
         .order('date', { ascending: true }),
       
       supabase
@@ -112,18 +115,29 @@ Deno.serve(async (req) => {
         .single()
     ]);
 
-    if (workoutsResult.error) {
-      console.error('Error fetching workouts:', workoutsResult.error);
-      throw new Error(`Failed to fetch workouts: ${workoutsResult.error.message}`);
-    }
-
     if (plannedResult.error) {
       console.error('Error fetching planned workouts:', plannedResult.error);
       throw new Error(`Failed to fetch planned workouts: ${plannedResult.error.message}`);
     }
 
-    const workouts = workoutsResult.data || [];
+    if (workoutsResult.error) {
+      console.error('Error fetching workouts:', workoutsResult.error);
+      throw new Error(`Failed to fetch workouts: ${workoutsResult.error.message}`);
+    }
+
     const planned = plannedResult.data || [];
+    const completedWorkouts = workoutsResult.data || [];
+    
+    // Manually join planned workouts with their completions
+    const plannedWithCompletions = planned.map(plannedWorkout => {
+      const completed = completedWorkouts.filter(workout => 
+        workout.planned_id === plannedWorkout.id
+      );
+      return {
+        ...plannedWorkout,
+        completed: completed
+      };
+    });
     
     // Determine training phase from current week or default to 'base'
     let trainingPhase = 'base';
@@ -140,16 +154,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Found ${workouts.length} completed workouts and ${planned.length} planned workouts`);
+    // Step 3: Categorize planned workouts based on completion
+    const completed = plannedWithCompletions.filter(p => p.completed && p.completed.length > 0);
+    const missed = plannedWithCompletions.filter(p => !p.completed || p.completed.length === 0);
+    
+    console.log(`Found ${plannedWithCompletions.length} planned workouts: ${completed.length} completed, ${missed.length} missed`);
 
-    // Step 3: Pre-processing - Aggregate by week and discipline
-    const weeklyAggregates = aggregateByWeek(workouts, planned, weeks_back);
+    // Step 4: Pre-processing - Aggregate by week and discipline using attachment data
+    const weeklyAggregates = aggregateByWeekWithAttachments(plannedWithCompletions, weeks_back);
 
-    // Step 4: Calculate trend metrics
+    // Step 5: Calculate trend metrics
     const trends = extractTrends(weeklyAggregates);
 
-    // Step 5: Generate GPT-4 analysis
-    const analysis = await generateOverallAnalysis(weeklyAggregates, trends, trainingPhase);
+    // Step 6: Generate GPT-4 analysis with accurate adherence data
+    const analysis = await generateOverallAnalysis(weeklyAggregates, trends, trainingPhase, completed, missed);
 
     return new Response(JSON.stringify(analysis), {
       headers: {
@@ -173,9 +191,9 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Aggregate workouts and planned sessions by week and discipline
+ * Aggregate planned workouts with their completions by week and discipline
  */
-function aggregateByWeek(workouts: any[], planned: any[], weeksBack: number) {
+function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack: number) {
   const weeklyData: any[] = [];
   
   // Generate week ranges
@@ -188,23 +206,32 @@ function aggregateByWeek(workouts: any[], planned: any[], weeksBack: number) {
     const weekStartISO = weekStart.toISOString().split('T')[0];
     const weekEndISO = weekEnd.toISOString().split('T')[0];
     
-    // Filter workouts for this week
-    const weekWorkouts = workouts.filter(w => {
-      const workoutDate = new Date(w.date);
-      return workoutDate >= weekStart && workoutDate <= weekEnd;
-    });
-    
-    // Filter planned for this week
-    const weekPlanned = planned.filter(p => {
+    // Filter planned workouts for this week
+    const weekPlanned = plannedWithCompletions.filter(p => {
       const plannedDate = new Date(p.date);
       return plannedDate >= weekStart && plannedDate <= weekEnd;
     });
     
-    // Group by discipline
-    const runs = weekWorkouts.filter(w => w.type === 'run' || w.type === 'running');
-    const bikes = weekWorkouts.filter(w => w.type === 'ride' || w.type === 'cycling' || w.type === 'bike');
-    const swims = weekWorkouts.filter(w => w.type === 'swim' || w.type === 'swimming');
-    const strength = weekWorkouts.filter(w => w.type === 'strength');
+    // Separate completed vs missed based on attachment
+    const completed = weekPlanned.filter(p => p.completed && p.completed.length > 0);
+    const missed = weekPlanned.filter(p => !p.completed || p.completed.length === 0);
+    
+    // Extract completed workout data for analysis
+    const completedWorkouts = completed.map(p => p.completed[0]).filter(w => w);
+    
+    // Group completed workouts by discipline
+    const runs = completedWorkouts.filter(w => w.type === 'run' || w.type === 'running');
+    const bikes = completedWorkouts.filter(w => w.type === 'ride' || w.type === 'cycling' || w.type === 'bike');
+    const swims = completedWorkouts.filter(w => w.type === 'swim' || w.type === 'swimming');
+    const strength = completedWorkouts.filter(w => w.type === 'strength');
+    const mobility = completedWorkouts.filter(w => w.type === 'mobility');
+    
+    // Group planned by discipline for adherence analysis
+    const plannedRuns = weekPlanned.filter(p => p.type === 'run' || p.type === 'running');
+    const plannedBikes = weekPlanned.filter(p => p.type === 'ride' || p.type === 'cycling' || p.type === 'bike');
+    const plannedSwims = weekPlanned.filter(p => p.type === 'swim' || p.type === 'swimming');
+    const plannedStrength = weekPlanned.filter(p => p.type === 'strength');
+    const plannedMobility = weekPlanned.filter(p => p.type === 'mobility');
     
     // Calculate averages and totals
     const weekData = {
@@ -234,25 +261,33 @@ function aggregateByWeek(workouts: any[], planned: any[], weeksBack: number) {
         count: strength.length
       },
       mobility: {
-        count: weekWorkouts.filter(w => w.type === 'mobility').length
+        count: mobility.length
       },
       planned_count: weekPlanned.length,
-      completed_count: weekWorkouts.length,
-      completion_rate: weekPlanned.length > 0 ? Math.round((weekWorkouts.length / weekPlanned.length) * 100) : 0,
-      // Add detailed breakdown for missed sessions analysis
+      completed_count: completed.length,
+      missed_count: missed.length,
+      completion_rate: weekPlanned.length > 0 ? Math.round((completed.length / weekPlanned.length) * 100) : 0,
+      // Detailed breakdown for adherence analysis
       planned_by_type: {
-        runs: weekPlanned.filter(p => p.type === 'run' || p.type === 'running').length,
-        bikes: weekPlanned.filter(p => p.type === 'ride' || p.type === 'cycling' || p.type === 'bike').length,
-        swims: weekPlanned.filter(p => p.type === 'swim' || p.type === 'swimming').length,
-        strength: weekPlanned.filter(p => p.type === 'strength').length,
-        mobility: weekPlanned.filter(p => p.type === 'mobility').length
+        runs: plannedRuns.length,
+        bikes: plannedBikes.length,
+        swims: plannedSwims.length,
+        strength: plannedStrength.length,
+        mobility: plannedMobility.length
       },
       completed_by_type: {
         runs: runs.length,
         bikes: bikes.length,
         swims: swims.length,
         strength: strength.length,
-        mobility: weekWorkouts.filter(w => w.type === 'mobility').length
+        mobility: mobility.length
+      },
+      missed_by_type: {
+        runs: plannedRuns.filter(p => !p.completed || p.completed.length === 0).length,
+        bikes: plannedBikes.filter(p => !p.completed || p.completed.length === 0).length,
+        swims: plannedSwims.filter(p => !p.completed || p.completed.length === 0).length,
+        strength: plannedStrength.filter(p => !p.completed || p.completed.length === 0).length,
+        mobility: plannedMobility.filter(p => !p.completed || p.completed.length === 0).length
       }
     };
     
@@ -283,7 +318,7 @@ function extractTrends(weeklyAggregates: any[]) {
 /**
  * Generate overall analysis using GPT-4
  */
-async function generateOverallAnalysis(weeklyAggregates: any[], trends: any, trainingPhase: string) {
+async function generateOverallAnalysis(weeklyAggregates: any[], trends: any, trainingPhase: string, completed: any[], missed: any[]) {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
     throw new Error('OpenAI API key not configured');
@@ -308,6 +343,16 @@ async function generateOverallAnalysis(weeklyAggregates: any[], trends: any, tra
       `Completion rate: ${trends.completion_rate.join('% → ')}%`
     ].filter(Boolean).join('\n');
 
+    // Calculate overall adherence statistics
+    const totalPlanned = completed.length + missed.length;
+    const totalCompleted = completed.length;
+    const totalMissed = missed.length;
+    const overallCompletionRate = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 0;
+
+    // Get most recent week data
+    const mostRecentWeek = weeklyAggregates[weeklyAggregates.length - 1];
+    const recentWeekMissed = mostRecentWeek?.missed_by_type || {};
+
     const prompt = `Analyze ${weeklyAggregates.length} weeks of training data.
 
 Weekly Aggregates:
@@ -317,6 +362,19 @@ Key Metric Trends:
 ${trendsText}
 
 Current training phase: ${trainingPhase}
+
+ACCURATE ADHERENCE DATA:
+- Total planned workouts: ${totalPlanned}
+- Total completed (with attachment): ${totalCompleted}
+- Total missed (no attachment): ${totalMissed}
+- Overall completion rate: ${overallCompletionRate}%
+
+Most recent week missed sessions:
+- Runs: ${recentWeekMissed.runs || 0} missed
+- Bikes: ${recentWeekMissed.bikes || 0} missed
+- Swims: ${recentWeekMissed.swims || 0} missed
+- Strength: ${recentWeekMissed.strength || 0} missed
+- Mobility: ${recentWeekMissed.mobility || 0} missed
 
 Generate analysis with these three sections:
 1. Performance Trends: How key metrics changed. Use specific numbers. 2-3 sentences.
@@ -387,7 +445,7 @@ Be factual. Use specific numbers. Mention what was actually missed, not just per
 /**
  * Helper functions for calculating averages
  */
-function calculateAveragePaceFromComputed(runs: any[]): string {
+function calculateAveragePaceFromComputed(runs: any[]): string | null {
   const paces = runs
     .map(r => {
       // Use server-computed pace first
@@ -417,7 +475,7 @@ function calculateAveragePaceFromComputed(runs: any[]): string {
   return secondsToPace(avgPaceSeconds);
 }
 
-function calculateAverageSpeed(workouts: any[]): number {
+function calculateAverageSpeed(workouts: any[]): number | null {
   const speeds = workouts
     .map(w => w.avg_speed)
     .filter(s => s && s > 0);
@@ -427,7 +485,7 @@ function calculateAverageSpeed(workouts: any[]): number {
   return Math.round((speeds.reduce((sum, s) => sum + s, 0) / speeds.length) * 100) / 100;
 }
 
-function calculateAverageHeartRate(workouts: any[]): number {
+function calculateAverageHeartRate(workouts: any[]): number | null {
   const heartRates = workouts
     .map(w => w.avg_heart_rate)
     .filter(hr => hr && hr > 0);
@@ -437,7 +495,7 @@ function calculateAverageHeartRate(workouts: any[]): number {
   return Math.round(heartRates.reduce((sum, hr) => sum + hr, 0) / heartRates.length);
 }
 
-function calculateAveragePower(bikes: any[]): number {
+function calculateAveragePower(bikes: any[]): number | null {
   const powers = bikes
     .map(b => b.avg_power)
     .filter(p => p && p > 0);
@@ -447,7 +505,7 @@ function calculateAveragePower(bikes: any[]): number {
   return Math.round(powers.reduce((sum, p) => sum + p, 0) / powers.length);
 }
 
-function calculateAverageSwimPaceFromComputed(swims: any[]): string {
+function calculateAverageSwimPaceFromComputed(swims: any[]): string | null {
   const paces = swims
     .map(s => {
       // Use server-computed pace first

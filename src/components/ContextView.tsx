@@ -201,6 +201,20 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
         </div>
       </div>
 
+      {/* Context Title Section - matching "Swim — Technique" style */}
+      <div className="px-4 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Context
+            </h2>
+            <p className="text-sm text-gray-600 mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+              9/15 - 10/15
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="p-4">
 
         {/* Content - no cards, flat design */}
