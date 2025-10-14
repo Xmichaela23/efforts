@@ -16,30 +16,26 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
 
   if (loading && !data) {
     return (
-      <div className="min-h-screen bg-white">
-        {/* Header matching efforts style */}
-        <div className="px-4 py-3 border-b border-gray-100">
+      <div className="w-full">
+        {/* Context Title Section */}
+        <div className="px-4 py-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* Hamburger menu icon */}
-              <button className="text-black hover:text-gray-600">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
-                efforts
-              </h1>
+            <div>
+              <h2 className="text-2xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Context
+              </h2>
+              <p className="text-sm text-gray-600 mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                9/15 - 10/15
+              </p>
             </div>
-            {onClose && (
-              <button
-                onClick={onClose}
-                className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-                style={{ fontFamily: 'Inter, sans-serif' }}
-              >
-                ← Back
-              </button>
-            )}
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
         </div>
         <div className="p-4">
@@ -64,40 +60,26 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-white">
-        {/* Header matching efforts style */}
-        <div className="px-4 py-3 border-b border-gray-100">
+      <div className="w-full">
+        {/* Context Title Section */}
+        <div className="px-4 py-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* Hamburger menu icon */}
-              <button className="text-black hover:text-gray-600">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
-                efforts
-              </h1>
+            <div>
+              <h2 className="text-2xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Context
+              </h2>
+              <p className="text-sm text-gray-600 mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                9/15 - 10/15
+              </p>
             </div>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleRefresh}
-                disabled={loading}
-                className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
-                style={{ fontFamily: 'Inter, sans-serif' }}
-              >
-                {loading ? 'Refreshing...' : 'Try Again'}
-              </button>
-              {onClose && (
-                <button
-                  onClick={onClose}
-                  className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-                  style={{ fontFamily: 'Inter, sans-serif' }}
-                >
-                  ← Back
-                </button>
-              )}
-            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              {loading ? 'Refreshing...' : 'Try Again'}
+            </button>
           </div>
         </div>
         <div className="p-4">
@@ -116,35 +98,26 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-white">
-        {/* Header matching efforts style */}
-        <div className="px-4 py-3 border-b border-gray-100">
+      <div className="w-full">
+        {/* Context Title Section */}
+        <div className="px-4 py-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* Hamburger menu icon */}
-              <button className="text-black hover:text-gray-600">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
-                efforts
-              </h1>
+            <div>
+              <h2 className="text-2xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Context
+              </h2>
+              <p className="text-sm text-gray-600 mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                9/15 - 10/15
+              </p>
             </div>
-            <div className="flex items-center gap-4">
-              {onClose && (
-                <button
-                  onClick={onClose}
-                  className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-                  style={{ fontFamily: 'Inter, sans-serif' }}
-                >
-                  ← Back
-                </button>
-              )}
-              <button className="text-gray-600 hover:text-gray-900 text-sm font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
-                Dashboard
-              </button>
-            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
         </div>
         <div className="p-4">
@@ -159,7 +132,7 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="w-full">
 
       {/* Context Title Section - matching "Swim — Technique" style */}
       <div className="px-4 py-4 border-b border-gray-100">

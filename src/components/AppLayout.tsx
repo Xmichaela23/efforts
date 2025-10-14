@@ -783,13 +783,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     );
   }
 
-  if (showContext) {
-    return (
-      <ContextView
-        onClose={handleCloseContext}
-      />
-    );
-  }
 
   if (loading) {
     return (
@@ -880,7 +873,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               </DropdownMenu>
 
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
-              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage) && !showSummary && (
+              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
                   <Button
                     onClick={handleHeaderBack}
@@ -958,6 +951,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   setLoggerScheduledWorkout(null);
                 }}
                 targetDate={(loggerScheduledWorkout as any)?.date || selectedDate}
+              />
+            </div>
+          ) : showContext ? (
+            <div className="pt-4">
+              <ContextView
+                onClose={handleCloseContext}
               />
             </div>
           ) : showBuilder ? (
