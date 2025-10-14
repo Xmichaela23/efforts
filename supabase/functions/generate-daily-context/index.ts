@@ -67,7 +67,8 @@ Deno.serve(async (req) => {
       .from('planned_workouts')
       .select('*')
       .eq('user_id', user_id)
-      .eq('date', date);
+      .eq('date', date)
+      .eq('workout_status', 'planned');
 
     // Fetch tomorrow's planned workouts
     const tomorrow = new Date(date);
@@ -78,7 +79,28 @@ Deno.serve(async (req) => {
       .from('planned_workouts')
       .select('*')
       .eq('user_id', user_id)
-      .eq('date', tomorrowStr);
+      .eq('date', tomorrowStr)
+      .eq('workout_status', 'planned');
+
+    // Debug logging
+    console.log('=== DAILY CONTEXT DEBUG ===');
+    console.log('User ID:', user_id);
+    console.log('Date:', date);
+    console.log('Completed workouts:', completedWorkouts?.length || 0);
+    console.log('Planned workouts:', plannedWorkouts?.length || 0);
+    console.log('Tomorrow workouts:', tomorrowWorkouts?.length || 0);
+    console.log('Completed workout types:', completedWorkouts?.map(w => w.type) || []);
+    console.log('Planned workout types:', plannedWorkouts?.map(w => w.type) || []);
+    console.log('Tomorrow workout types:', tomorrowWorkouts?.map(w => w.type) || []);
+    
+    // Show actual workout data
+    if (completedWorkouts?.length > 0) {
+      console.log('COMPLETED WORKOUTS DATA:', JSON.stringify(completedWorkouts, null, 2));
+    }
+    if (plannedWorkouts?.length > 0) {
+      console.log('PLANNED WORKOUTS DATA:', JSON.stringify(plannedWorkouts, null, 2));
+    }
+    console.log('=== END DEBUG ===');
 
     // Generate context based on state
     const contextText = await generateDailyContextText(
@@ -123,10 +145,9 @@ async function generateDailyContextText(
   try {
     // Build workout summaries
     const completedSummaries = completedWorkouts.map(w => {
-      const executed = w.executed?.overall || {};
-      const distance = executed.distance_m ? (executed.distance_m / 1000).toFixed(1) + 'km' : '';
-      const duration = executed.duration_s ? Math.round(executed.duration_s / 60) + 'min' : '';
-      const pace = executed.pace_s_per_km ? (executed.pace_s_per_km / 60).toFixed(1) + 'min/km' : '';
+      const distance = w.distance ? (w.distance / 1000).toFixed(1) + 'km' : '';
+      const duration = w.duration ? Math.round(w.duration / 60) + 'min' : '';
+      const pace = w.avg_pace ? (w.avg_pace / 60).toFixed(1) + 'min/km' : '';
       return `${w.type.toUpperCase()}${distance ? ' ' + distance : ''}${duration ? ' ' + duration : ''}${pace ? ' at ' + pace : ''}`;
     });
 
@@ -148,10 +169,20 @@ async function generateDailyContextText(
       state = 'rest';
     }
 
+    // If no data found, throw error - no fallbacks!
+    if (completedWorkouts.length === 0 && plannedWorkouts.length === 0) {
+      throw new Error('No workout data found for today - check database queries');
+    }
+
+    // Don't generate context if no real data
+    if (completedSummaries.length === 0 && remainingTypes.length === 0 && tomorrowTypes.length === 0) {
+      throw new Error('No workout data found - cannot generate context');
+    }
+
     const prompt = `Generate daily context for calendar.
 
-Completed today: ${completedSummaries.join(', ') || 'None'}
-Remaining today: ${remainingTypes.join(', ') || 'None'}
+Completed today: ${completedSummaries.join(', ')}
+Remaining today: ${remainingTypes.join(', ')}
 Tomorrow (only if today complete): ${state === 'complete' ? tomorrowTypes.join(', ') : 'N/A'}
 
 Be brief. One key insight per completed workout.`;
@@ -188,6 +219,6 @@ Be brief. One key insight per completed workout.`;
 
   } catch (error) {
     console.error('GPT-4 error:', error);
-    return 'Context unavailable';
+    throw error; // Don't hide errors with fallbacks
   }
 }

@@ -31,8 +31,15 @@ function isISO(dateStr) {
 }
 async function getOrGenerateDailyContext(userId, fromISO, toISO, supabase) {
   try {
-    // Check if context exists for today
-    const today = new Date().toISOString().split('T')[0];
+    console.log('=== GET-WEEK CONTEXT DEBUG ===');
+    console.log('User ID:', userId);
+    console.log('From ISO:', fromISO);
+    console.log('To ISO:', toISO);
+    
+    // Use the start date from the frontend request (already in local timezone)
+    const today = fromISO; // Frontend sends local date range, use start date
+    console.log('Today (from frontend):', today);
+    
     const { data: existingContext } = await supabase
       .from('daily_context')
       .select('*')
@@ -40,16 +47,21 @@ async function getOrGenerateDailyContext(userId, fromISO, toISO, supabase) {
       .eq('date', today)
       .single();
 
+    console.log('Existing context found:', !!existingContext);
+
     // Check if context is fresh
     if (existingContext && await isContextFresh(existingContext, userId, supabase)) {
+      console.log('Context is fresh, returning existing');
       return existingContext.context_text;
     }
 
+    console.log('Generating new context...');
     // Generate new context
     const { data } = await supabase.functions.invoke('generate-daily-context', {
       body: { user_id: userId, date: today }
     });
 
+    console.log('Generated context result:', data);
     return data?.context || 'Context unavailable';
 
   } catch (error) {
@@ -60,16 +72,24 @@ async function getOrGenerateDailyContext(userId, fromISO, toISO, supabase) {
 
 async function isContextFresh(context, userId, supabase) {
   try {
+    console.log('=== FRESHNESS CHECK ===');
+    console.log('Context last updated:', context.last_updated);
+    
     // Check if any workout was completed after context was last updated
     const { data: recentWorkouts } = await supabase
       .from('workouts')
-      .select('context_generated_at')
+      .select('updated_at, workout_status')
       .eq('user_id', userId)
       .eq('workout_status', 'completed')
-      .gte('context_generated_at', context.last_updated)
+      .gte('updated_at', context.last_updated)
       .limit(1);
 
-    return !recentWorkouts || recentWorkouts.length === 0;
+    console.log('Recent workouts found:', recentWorkouts?.length || 0);
+    
+    // TEMPORARY: Always regenerate to fix the bad context
+    console.log('FORCING REGENERATION - context is stale');
+    return false; // Always regenerate for now
+    
   } catch (error) {
     console.error('Context freshness check failed:', error);
     return false; // Regenerate if we can't check

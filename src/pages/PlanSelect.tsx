@@ -945,7 +945,18 @@ export default function PlanSelect() {
       // Direct insert to ensure reliability
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('You must be signed in to save a plan.');
-      const insertPayload: any = { ...payload, user_id: user.id };
+      
+      // Calculate current_week based on start date
+      const chosenStart = (startDate && startDate.trim().length>0) ? startDate : (payload?.config?.user_selected_start_date || '');
+      let currentWeek = 1;
+      if (chosenStart) {
+        const startDateObj = new Date(chosenStart);
+        const today = new Date();
+        const weeksDiff = Math.floor((today.getTime() - startDateObj.getTime()) / (7 * 24 * 60 * 60 * 1000));
+        currentWeek = Math.max(1, Math.min(payload.duration_weeks, weeksDiff + 1));
+      }
+      
+      const insertPayload: any = { ...payload, user_id: user.id, current_week: currentWeek };
       delete insertPayload.export_hints;
       const planInsert = await supabase
         .from('plans')
