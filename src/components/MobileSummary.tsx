@@ -1569,6 +1569,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
           // ------------ BIKE/RIDE (session-average power vs planned + duration) ------------
           if (isRide) {
+            // Debug: Check what we're getting from the server
+            console.log('🚨 [EXECUTION DEBUG] MOBILE SUMMARY RENDERING - RUNNING UPDATED CODE (BIKE)');
+            console.log('🔍 [EXECUTION DEBUG] completed:', completed);
+            console.log('🔍 [EXECUTION DEBUG] computed:', (completed as any)?.computed);
+            console.log('🔍 [EXECUTION DEBUG] overall:', (completed as any)?.computed?.overall);
+            console.log('🔍 [EXECUTION DEBUG] execution_score:', (completed as any)?.computed?.overall?.execution_score);
+            
             const plannedSecondsTotal = (() => {
               const t = Number((planned as any)?.computed?.total_duration_seconds);
               if (Number.isFinite(t) && t > 0) return t;
