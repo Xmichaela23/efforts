@@ -434,6 +434,26 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         } catch (attachError) {
           console.error('❌ Auto-attach error for imported workout:', savedWorkout?.id, attachError);
         }
+
+        // Calculate workload for completed workout
+        try {
+          await supabase.functions.invoke('calculate-workload', {
+            body: {
+              workout_id: savedWorkout?.id,
+              workout_data: {
+                type: workoutToSave.type,
+                duration: workoutToSave.duration,
+                steps_preset: workoutToSave.steps_preset,
+                strength_exercises: workoutToSave.strength_exercises,
+                mobility_exercises: workoutToSave.mobility_exercises,
+                workout_status: 'completed'
+              }
+            }
+          });
+          console.log('✅ Workload calculated for imported workout');
+        } catch (workloadError) {
+          console.error('❌ Failed to calculate workload for imported workout:', workloadError);
+        }
       } catch (error) {
         console.error('❌ Error importing workout:', error);
       }

@@ -1142,14 +1142,36 @@ Deno.serve(async (req)=>{
         console.error('Failed to fetch training plan context:', error);
       }
     }
+    // Get workload totals from weekly_workload table
+    let workloadPlanned = 0;
+    let workloadCompleted = 0;
+    try {
+      const { data: weeklyWorkloadData } = await supabase
+        .from('weekly_workload')
+        .select('workload_planned, workload_actual')
+        .eq('user_id', userId)
+        .eq('week_start_date', fromISO)
+        .single();
+      
+      if (weeklyWorkloadData) {
+        workloadPlanned = weeklyWorkloadData.workload_planned || 0;
+        workloadCompleted = weeklyWorkloadData.workload_actual || 0;
+      }
+    } catch (error) {
+      console.error('Failed to fetch weekly workload data:', error);
+      // Fallback to counts if weekly_workload table doesn't have data
+      workloadPlanned = totalPlanned;
+      workloadCompleted = totalCompleted;
+    }
+
     // Generate daily context
     const dailyContext = generateDailyContext(itemsWithAI, trainingPlanContext, fromISO, toISO, weeklyAI);
     const warningsOut = errors.concat(debugNotes);
     const responseData = {
       items: itemsWithAI,
       weekly_stats: {
-        planned: totalPlanned,
-        completed: totalCompleted
+        planned: workloadPlanned,
+        completed: workloadCompleted
       },
       daily_context: dailyContext
     };
