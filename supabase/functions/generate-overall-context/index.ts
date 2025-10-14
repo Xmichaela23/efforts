@@ -233,9 +233,27 @@ function aggregateByWeek(workouts: any[], planned: any[], weeksBack: number) {
       strength: {
         count: strength.length
       },
+      mobility: {
+        count: weekWorkouts.filter(w => w.type === 'mobility').length
+      },
       planned_count: weekPlanned.length,
       completed_count: weekWorkouts.length,
-      completion_rate: weekPlanned.length > 0 ? Math.round((weekWorkouts.length / weekPlanned.length) * 100) : 0
+      completion_rate: weekPlanned.length > 0 ? Math.round((weekWorkouts.length / weekPlanned.length) * 100) : 0,
+      // Add detailed breakdown for missed sessions analysis
+      planned_by_type: {
+        runs: weekPlanned.filter(p => p.type === 'run' || p.type === 'running').length,
+        bikes: weekPlanned.filter(p => p.type === 'ride' || p.type === 'cycling' || p.type === 'bike').length,
+        swims: weekPlanned.filter(p => p.type === 'swim' || p.type === 'swimming').length,
+        strength: weekPlanned.filter(p => p.type === 'strength').length,
+        mobility: weekPlanned.filter(p => p.type === 'mobility').length
+      },
+      completed_by_type: {
+        runs: runs.length,
+        bikes: bikes.length,
+        swims: swims.length,
+        strength: strength.length,
+        mobility: weekWorkouts.filter(w => w.type === 'mobility').length
+      }
     };
     
     weeklyData.push(weekData);
@@ -302,17 +320,23 @@ Current training phase: ${trainingPhase}
 
 Generate analysis with these three sections:
 1. Performance Trends: How key metrics changed. Use specific numbers. 2-3 sentences.
-2. Plan Adherence: Overall completion rate and consistency. 2-3 sentences.
-3. This Week Summary: Most recent week performance vs planned. 2-3 sentences.
+2. Plan Adherence: Overall completion rate and consistency. Identify patterns in missed workouts - which session types are consistently skipped? What's the completion rate per discipline? 2-3 sentences.
+3. This Week Summary: Most recent week performance vs planned. Specifically mention which sessions were missed and any patterns. 2-3 sentences.
+
+IMPORTANT: Call out under-execution areas directly:
+- Which session types are consistently skipped?
+- What's the completion rate per discipline (run, bike, swim, strength, mobility)?
+- What did the user miss this week specifically?
+- Are there patterns in missed sessions?
 
 Return ONLY valid JSON in this exact format:
 {
   "performance_trends": "your analysis here",
-  "plan_adherence": "your analysis here",
+  "plan_adherence": "your analysis here", 
   "weekly_summary": "your analysis here"
 }
 
-Be factual. Use specific numbers. No JSON markdown formatting.`;
+Be factual. Use specific numbers. Mention what was actually missed, not just percentages. No JSON markdown formatting.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

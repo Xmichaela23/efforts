@@ -17,16 +17,24 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
   if (loading && !data) {
     return (
       <div className="min-h-screen bg-white">
-        {/* Clean minimal header */}
+        {/* Header matching efforts style */}
         <div className="px-4 py-3 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
-              Context
-            </h1>
+            <div className="flex items-center gap-3">
+              {/* Hamburger menu icon */}
+              <button className="text-black hover:text-gray-600">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
+                efforts
+              </h1>
+            </div>
             {onClose && (
               <button
                 onClick={onClose}
-                className="text-black hover:text-gray-600 text-sm font-medium"
+                className="text-gray-600 hover:text-gray-900 text-sm font-medium"
                 style={{ fontFamily: 'Inter, sans-serif' }}
               >
                 ← Back
@@ -57,17 +65,25 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
   if (error) {
     return (
       <div className="min-h-screen bg-white">
-        {/* Clean minimal header */}
+        {/* Header matching efforts style */}
         <div className="px-4 py-3 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
-              Context
-            </h1>
+            <div className="flex items-center gap-3">
+              {/* Hamburger menu icon */}
+              <button className="text-black hover:text-gray-600">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
+                efforts
+              </h1>
+            </div>
             <div className="flex items-center gap-4">
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="text-black hover:text-gray-600 text-sm font-medium disabled:opacity-50"
+                className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
                 style={{ fontFamily: 'Inter, sans-serif' }}
               >
                 {loading ? 'Refreshing...' : 'Try Again'}
@@ -75,7 +91,7 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="text-black hover:text-gray-600 text-sm font-medium"
+                  className="text-gray-600 hover:text-gray-900 text-sm font-medium"
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                   ← Back
@@ -101,17 +117,25 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
   if (!data) {
     return (
       <div className="min-h-screen bg-white">
-        {/* Clean minimal header */}
+        {/* Header matching efforts style */}
         <div className="px-4 py-3 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
-              Context
-            </h1>
+            <div className="flex items-center gap-3">
+              {/* Hamburger menu icon */}
+              <button className="text-black hover:text-gray-600">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
+                efforts
+              </h1>
+            </div>
             <div className="flex items-center gap-4">
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="text-black hover:text-gray-600 text-sm font-medium disabled:opacity-50"
+                className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
                 style={{ fontFamily: 'Inter, sans-serif' }}
               >
                 {loading ? 'Loading...' : 'Generate Context'}
@@ -119,7 +143,7 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="text-black hover:text-gray-600 text-sm font-medium"
+                  className="text-gray-600 hover:text-gray-900 text-sm font-medium"
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                   ← Back
@@ -141,17 +165,25 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Clean minimal header */}
+      {/* Header matching efforts style */}
       <div className="px-4 py-3 border-b border-gray-100">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
-            Context
-          </h1>
+          <div className="flex items-center gap-3">
+            {/* Hamburger menu icon */}
+            <button className="text-black hover:text-gray-600">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h1 className="text-xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
+              efforts
+            </h1>
+          </div>
           <div className="flex items-center gap-4">
             <button
               onClick={handleRefresh}
               disabled={loading}
-              className="text-black hover:text-gray-600 text-sm font-medium disabled:opacity-50"
+              className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
               style={{ fontFamily: 'Inter, sans-serif' }}
             >
               {loading ? 'Refreshing...' : 'Refresh'}
@@ -159,7 +191,7 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
             {onClose && (
               <button
                 onClick={onClose}
-                className="text-black hover:text-gray-600 text-sm font-medium"
+                className="text-gray-600 hover:text-gray-900 text-sm font-medium"
                 style={{ fontFamily: 'Inter, sans-serif' }}
               >
                 ← Back
