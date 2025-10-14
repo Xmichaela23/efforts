@@ -1196,20 +1196,13 @@ Deno.serve(async (req) => {
             return !(kind.includes('rest') || kind.includes('recovery'));
           });
           
-          console.log(`🔍 [SERVER EXECUTION SCORE] Found ${workIntervals.length} work intervals out of ${outIntervals.length} total`);
-          
-          if (workIntervals.length === 0) {
-            console.log('🔍 [SERVER EXECUTION SCORE] No work intervals found, returning null');
-            return null;
-          }
+          if (workIntervals.length === 0) return null;
           
           let totalWeighted = 0;
           let totalWeight = 0;
           
           for (const interval of workIntervals) {
             const adherencePct = interval?.executed?.adherence_percentage;
-            console.log(`🔍 [SERVER EXECUTION SCORE] Interval ${interval?.kind}: adherence=${adherencePct}`);
-            
             if (typeof adherencePct !== 'number' || !Number.isFinite(adherencePct)) continue;
             
             // Weight by duration (longer intervals matter more)
@@ -1218,13 +1211,9 @@ Deno.serve(async (req) => {
             
             totalWeighted += adherencePct * weight;
             totalWeight += weight;
-            
-            console.log(`🔍 [SERVER EXECUTION SCORE] Added: ${adherencePct}% * ${weight}s = ${adherencePct * weight}, totalWeighted=${totalWeighted}, totalWeight=${totalWeight}`);
           }
           
-          const result = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
-          console.log(`🔍 [SERVER EXECUTION SCORE] Final result: ${result}% (${totalWeighted}/${totalWeight})`);
-          return result;
+          return totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
         } catch (error) {
           console.error('Error calculating overall execution score:', error);
           return null;
@@ -1273,12 +1262,6 @@ Deno.serve(async (req) => {
           steps_total: outIntervals.length
         }
       };
-
-      console.log('🔍 [SERVER EXECUTION SCORE] About to store computed data:', {
-        hasExecutionScore: !!computed.overall.execution_score,
-        executionScore: computed.overall.execution_score,
-        overallKeys: Object.keys(computed.overall)
-      });
 
       await writeComputed(computed);
 
