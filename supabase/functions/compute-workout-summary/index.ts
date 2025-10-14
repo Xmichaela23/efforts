@@ -1188,6 +1188,38 @@ Deno.serve(async (req) => {
     } catch {}
 
       const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
+      // Calculate overall execution score (weighted average of interval adherence percentages)
+      const overallExecutionScore = ((): number | null => {
+        try {
+          const workIntervals = outIntervals.filter((interval: any) => {
+            const kind = String(interval?.kind || '').toLowerCase();
+            return !(kind.includes('rest') || kind.includes('recovery'));
+          });
+          
+          if (workIntervals.length === 0) return null;
+          
+          let totalWeighted = 0;
+          let totalWeight = 0;
+          
+          for (const interval of workIntervals) {
+            const adherencePct = interval?.executed?.adherence_percentage;
+            if (typeof adherencePct !== 'number' || !Number.isFinite(adherencePct)) continue;
+            
+            // Weight by duration (longer intervals matter more)
+            const duration = Number(interval?.executed?.duration_s || interval?.planned?.duration_s || 60);
+            const weight = Math.max(1, duration);
+            
+            totalWeighted += adherencePct * weight;
+            totalWeight += weight;
+          }
+          
+          return totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
+        } catch (error) {
+          console.error('Error calculating overall execution score:', error);
+          return null;
+        }
+      })();
+
       const computed = {
         version: COMPUTED_VERSION,
         intervals: outIntervals,
@@ -1196,6 +1228,7 @@ Deno.serve(async (req) => {
           distance_m: Math.round(overallMeters),
           avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
           gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null,
+          execution_score: overallExecutionScore,
           // Rollups
           avg_cadence_spm: ((): number | null => {
             try {

@@ -986,35 +986,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     return hasVariedDurations ? 'Duration-weighted adherence' : 'Average adherence';
   };
 
-  const calculateExecutionScore = (workoutType: string, plannedSteps: any[], executedIntervals: any[]): number | null => {
-    try {
-      if (!Array.isArray(plannedSteps) || !plannedSteps.length || !Array.isArray(executedIntervals) || !executedIntervals.length) return null;
-      const pairs = mapExecutedToPlanned(plannedSteps, executedIntervals)
-        .filter((p:any)=>{ const tp = String(p?.planned?.type || p?.planned?.kind || '').toLowerCase(); return !(tp.includes('rest') || tp.includes('recovery')); });
-      if (!pairs.length) return null;
-      const t = String(workoutType || '').toLowerCase();
-      let totalWeighted = 0; let totalWeight = 0;
-      for (const { planned, executed } of pairs) {
-        if (!executed) continue;
-        // Use server-computed adherence percentage
-        const pct = (executed as any)?.adherence_percentage ? Number((executed as any).adherence_percentage) : null;
-        if (pct == null) continue;
-        let weight = 1;
-        if (t === 'swim') {
-          weight = Number(executed?.distance_m || planned?.distance_m || planned?.distanceMeters || 1) || 1;
-        } else if (t === 'strength') {
-          const reps = Number(executed?.reps || planned?.reps || 1) || 1;
-          const sets = Number(executed?.sets || planned?.sets || 1) || 1;
-          weight = Math.max(1, reps * sets);
-        } else {
-          weight = Number(executed?.duration_s || planned?.seconds || planned?.duration || planned?.duration_sec || planned?.durationSeconds || 60) || 60;
-        }
-        totalWeighted += pct * weight;
-        totalWeight += weight;
-      }
-      return totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
-    } catch { return null; }
-  };
+  // REMOVED: Client-side execution score calculation
+  // Overall execution scores are now computed server-side and stored in the database
+  // Client should only display server-computed values
 
   const renderCompletedFor = (st: any): { paceText: string; hr: number | null; durationSec?: number } | string => {
     if (!comp || rows.length < 2) return '—' as any;
@@ -1415,8 +1389,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const distPct = (plannedDistanceMeters && executedMeters) ? Math.round((executedMeters / plannedDistanceMeters) * 100) : null;
           const distDeltaMi = (plannedDistanceMeters && executedMeters) ? ((executedMeters - plannedDistanceMeters) / 1609.34) : null; // + means longer
 
+          // Use server-computed overall execution score
+          const executionScore = (completed as any)?.computed?.overall?.execution_score;
+          
           // If nothing to show, skip
-          const anyVal = (pacePct!=null) || (durationPct!=null) || (distPct!=null);
+          const anyVal = (pacePct!=null) || (durationPct!=null) || (distPct!=null) || (executionScore!=null);
           if (!anyVal) return null;
 
           // Determine workout intent for rule-based coloring
@@ -1455,6 +1432,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             <div className="w-full pt-1 pb-2">
               <div className="flex items-center justify-center gap-6 text-center">
                 <div className="flex items-end gap-3">
+                  {chip('Execution', executionScore, 'Overall adherence', 'pace')}
                   {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—', 'pace')}
                   {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
                 </div>
@@ -1555,7 +1533,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const fmtDeltaTime = (s:number) => { const sign = s>=0 ? '+' : '−'; const v = Math.abs(Math.round(s)); const m=Math.floor(v/60); const ss=v%60; return `${sign}${m}:${String(ss).padStart(2,'0')}`; };
             const fmtDeltaPer100 = (s:number) => { const faster = s>0; const v = Math.abs(s); const m=Math.floor(v/60); const ss=Math.round(v%60); return `${m?`${m}m `:''}${ss}s/${swimUnit==='yd'?'100yd':'100m'} ${faster? 'faster' : 'slower'}`.trim(); };
 
-            const anyVal = (pacePct!=null) || (durationPct!=null);
+            // Use server-computed overall execution score
+            const executionScore = (completed as any)?.computed?.overall?.execution_score;
+            
+            const anyVal = (pacePct!=null) || (durationPct!=null) || (executionScore!=null);
             if (!anyVal) return null;
 
             // Get contextual message
@@ -1565,6 +1546,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               <div className="w-full pt-1 pb-2">
                 <div className="flex items-center justify-center gap-6 text-center">
                   <div className="flex items-end gap-3">
+                    {chip('Execution', executionScore, 'Overall adherence', 'pace')}
                     {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPer100(paceDeltaSec) : '—', 'pace')}
                     {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
                   </div>
@@ -1653,7 +1635,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const fmtDeltaTime = (s:number) => { const sign = s>=0 ? '+' : '−'; const v = Math.abs(Math.round(s)); const m=Math.floor(v/60); const ss=v%60; return `${sign}${m}:${String(ss).padStart(2,'0')}`; };
             const fmtDeltaWatts = (w:number) => { const sign = w>=0 ? '+' : '−'; return `${sign}${Math.abs(Math.round(w))} W`; };
 
-            const anyVal = (powerPct!=null) || (durationPct!=null);
+            // Use server-computed overall execution score
+            const executionScore = (completed as any)?.computed?.overall?.execution_score;
+            
+            const anyVal = (powerPct!=null) || (durationPct!=null) || (executionScore!=null);
             if (!anyVal) return null;
 
             // Get contextual message (treat power like pace for bikes)
@@ -1663,6 +1648,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               <div className="w-full pt-1 pb-2">
                 <div className="flex items-center justify-center gap-6 text-center">
                   <div className="flex items-end gap-3">
+                    {chip('Execution', executionScore, 'Overall adherence', 'pace')}
                     {chip('Watts', powerPct, powerDelta!=null ? fmtDeltaWatts(powerDelta) : '—', 'pace')}
                     {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
                   </div>
