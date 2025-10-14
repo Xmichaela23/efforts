@@ -254,12 +254,45 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
 
 function expandBikeToken(tok: string, baselines: Baselines): any[] {
   const out: any[] = []; const lower = tok.toLowerCase(); const ftp = typeof baselines.ftp==='number'? baselines.ftp: undefined;
-  const pctRange = (lo:number, hi:number)=> ftp? { lower: Math.round(lo*ftp), upper: Math.round(hi*ftp) } : undefined;
-  if (/warmup_.*_\d+min/.test(lower)) { const sec = minutesTokenToSeconds(lower) ?? 900; out.push({ id: uid(), kind:'warmup', duration_s: sec }); return out; }
-  if (/cooldown.*\d+min/.test(lower)) { const sec = minutesTokenToSeconds(lower) ?? 600; out.push({ id: uid(), kind:'cooldown', duration_s: sec }); return out; }
+  console.log(`🔍 [BIKE DEBUG] Token: ${tok}, FTP: ${ftp}`);
+  const pctRange = (lo:number, hi:number)=> {
+    if (!ftp) return undefined;
+    const result = { lower: Math.round(lo*ftp), upper: Math.round(hi*ftp) };
+    console.log(`🔍 [BIKE DEBUG] pctRange(${lo}, ${hi}) = ${result.lower}-${result.upper}W`);
+    return result;
+  };
+  
+  // Warmup tokens with proper FTP-based power ranges
+  if (/warmup_bike_quality_\d+min_fastpedal/.test(lower)) { 
+    const sec = minutesTokenToSeconds(lower) ?? 900; 
+    out.push({ id: uid(), kind:'warmup', duration_s: sec, power_range: pctRange(0.55, 0.70) }); 
+    return out; 
+  }
+  if (/warmup_.*_\d+min/.test(lower)) { 
+    const sec = minutesTokenToSeconds(lower) ?? 900; 
+    out.push({ id: uid(), kind:'warmup', duration_s: sec, power_range: pctRange(0.50, 0.65) }); 
+    return out; 
+  }
+  
+  // Cooldown tokens with proper FTP-based power ranges
+  if (/cooldown.*\d+min/.test(lower)) { 
+    const sec = minutesTokenToSeconds(lower) ?? 600; 
+    out.push({ id: uid(), kind:'cooldown', duration_s: sec, power_range: pctRange(0.40, 0.55) }); 
+    return out; 
+  }
   // SS: bike_ss_3x12min_R4min
   let m = lower.match(/bike_ss_(\d+)x(\d+)min_r(\d+)min/);
-  if (m) { const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(0.85,0.95) }); if(rest) out.push({ id: uid(), kind:'recovery', duration_s: rest }); } return out; }
+  if (m) { 
+    const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; 
+    console.log(`🔍 [BIKE DEBUG] Sweet spot match: ${reps}x${work/60}min, rest=${rest/60}min`);
+    for(let i=0;i<reps;i++){ 
+      const powerRange = pctRange(0.85,0.95);
+      console.log(`🔍 [BIKE DEBUG] Adding work step ${i+1}/${reps} with power_range:`, powerRange);
+      out.push({ id: uid(), kind:'work', duration_s: work, power_range: powerRange }); 
+      if(rest) out.push({ id: uid(), kind:'recovery', duration_s: rest }); 
+    } 
+    return out; 
+  }
   // Threshold: bike_thr_4x8min_R5min
   m = lower.match(/bike_thr_(\d+)x(\d+)min_r(\d+)min/);
   if (m) { const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(0.95,1.05) }); if(rest) out.push({ id: uid(), kind:'recovery', duration_s: rest }); } return out; }
@@ -816,7 +849,11 @@ Deno.serve(async (req) => {
     try {
       const { data: ub } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).maybeSingle();
       baselines = (ub?.performance_numbers || {}) as any;
-    } catch {}
+      console.log(`🔍 [FTP DEBUG] User ${userId} baselines:`, baselines);
+      console.log(`🔍 [FTP DEBUG] FTP value:`, baselines?.ftp);
+    } catch (e) {
+      console.error(`❌ [FTP DEBUG] Error loading baselines:`, e);
+    }
 
     let count = 0;
     for (const row of rows) {

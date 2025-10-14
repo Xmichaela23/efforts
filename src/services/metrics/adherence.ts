@@ -91,7 +91,9 @@ export const calculateExecutionPercentage = (plannedStep: any, executedStep: any
       const targetMidpoint = (lower + upper) / 2;
       const executedWatts = Number((executedStep as any)?.avg_power_w || (executedStep as any)?.avg_watts || (executedStep as any)?.power);
       if (Number.isFinite(executedWatts) && executedWatts > 0 && targetMidpoint > 0) {
-        return Math.round((executedWatts / targetMidpoint) * 100);
+        const percentage = Math.round((executedWatts / targetMidpoint) * 100);
+        console.log(`🔍 [ADHERENCE DEBUG] Power: ${executedWatts}W vs ${lower}-${upper}W (midpoint: ${targetMidpoint}W) = ${percentage}%`);
+        return percentage;
       }
     }
 
