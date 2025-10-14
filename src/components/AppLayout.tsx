@@ -16,6 +16,7 @@ import WorkoutSummary from './WorkoutSummary';
 import NewEffortDropdown from './NewEffortDropdown';
 import LogEffortDropdown from './LogEffortDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
+import ContextView from './ContextView';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
@@ -59,6 +60,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
   const [showImportPage, setShowImportPage] = useState(false);
   const [showTrainingBaselines, setShowTrainingBaselines] = useState(false);
+  const [showContext, setShowContext] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
@@ -461,6 +463,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
   };
 
+  const handleOpenContext = () => {
+    setShowContext(true);
+  };
+
+  const handleCloseContext = () => {
+    setShowContext(false);
+  };
+
   const handleBackToDashboard = () => {
     const comingFromPlanBuilder = showPlanBuilder;
     const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
@@ -472,6 +482,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowPlanBuilder(false);
     setShowImportPage(false);
     setShowTrainingBaselines(false); // NEW: Reset training baselines
+    setShowContext(false); // NEW: Reset context view
     setBuilderType('');
     setBuilderSourceContext('');
     setLoggerScheduledWorkout(null);
@@ -772,6 +783,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     );
   }
 
+  if (showContext) {
+    return (
+      <ContextView
+        onClose={handleCloseContext}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="mobile-app-container">
@@ -999,7 +1018,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       </main>
 
       {/* Bottom Navigation Tab Bar - Instagram style */}
-      {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || workoutBeingEdited) && (
+      {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
         <div className="mobile-tabbar px-3 pt-0.5 flex items-center">
           <div className="w-full">
             <div className="flex justify-around items-center">
@@ -1014,7 +1033,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 completedPlans={completedPlans}
                 onOpenPlanBuilder={handleOpenPlanBuilder}
               />
-              <AllEffortsDropdown onSelectWorkout={handleEditEffort} />
+              <Button
+                onClick={handleOpenContext}
+                className="flex items-center gap-2 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-0 focus:border-0 active:outline-none active:ring-0 active:border-0"
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  padding: '14px 12px',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  minHeight: '48px',
+                  flex: 1,
+                  maxWidth: '140px'
+                }}
+              >
+                Context
+              </Button>
             </div>
           </div>
         </div>

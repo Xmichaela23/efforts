@@ -12,12 +12,10 @@
 // 
 // Input (POST JSON): { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
 //
-// CONTEXT SYSTEM INTEGRATION:
-// - Added lazy context generation via getOrGenerateDailyContext()
-// - Checks if daily_context exists and is fresh for today
-// - If stale/missing, calls generate-daily-context function
-// - Returns daily_context in response for calendar display
-// - Removed old AI generation code (moved to separate functions)
+// UNIFIED DATA SYSTEM:
+// - Returns unified items with planned and executed workout data
+// - Provides weekly stats and training plan context
+// - No daily context generation - moved to dedicated overall context system
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,72 +26,6 @@ const corsHeaders = {
 };
 function isISO(dateStr) {
   return !!dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
-}
-async function getOrGenerateDailyContext(userId, fromISO, toISO, supabase) {
-  try {
-    console.log('=== GET-WEEK CONTEXT DEBUG ===');
-    console.log('User ID:', userId);
-    console.log('From ISO:', fromISO);
-    console.log('To ISO:', toISO);
-    
-    // Use the start date from the frontend request (already in local timezone)
-    const today = fromISO; // Frontend sends local date range, use start date
-    console.log('Today (from frontend):', today);
-    
-    const { data: existingContext } = await supabase
-      .from('daily_context')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', today)
-      .single();
-
-    console.log('Existing context found:', !!existingContext);
-
-    // Check if context is fresh
-    if (existingContext && await isContextFresh(existingContext, userId, supabase)) {
-      console.log('Context is fresh, returning existing');
-      return existingContext.context_text;
-    }
-
-    console.log('Generating new context...');
-    // Generate new context
-    const { data } = await supabase.functions.invoke('generate-daily-context', {
-      body: { user_id: userId, date: today }
-    });
-
-    console.log('Generated context result:', data);
-    return data?.context || 'Context unavailable';
-
-  } catch (error) {
-    console.error('Daily context generation failed:', error);
-    return 'Context unavailable';
-  }
-}
-
-async function isContextFresh(context, userId, supabase) {
-  try {
-    console.log('=== FRESHNESS CHECK ===');
-    console.log('Context last updated:', context.last_updated);
-    
-    // Check if any workout was completed after context was last updated
-    const { data: recentWorkouts } = await supabase
-      .from('workouts')
-      .select('updated_at, workout_status')
-      .eq('user_id', userId)
-      .eq('workout_status', 'completed')
-      .gte('updated_at', context.last_updated)
-      .limit(1);
-
-    console.log('Recent workouts found:', recentWorkouts?.length || 0);
-    
-    // TEMPORARY: Always regenerate to fix the bad context
-    console.log('FORCING REGENERATION - context is stale');
-    return false; // Always regenerate for now
-    
-  } catch (error) {
-    console.error('Context freshness check failed:', error);
-    return false; // Regenerate if we can't check
-  }
 }
 Deno.serve(async (req)=>{
   // CORS preflight
@@ -1028,16 +960,13 @@ Deno.serve(async (req)=>{
       workloadCompleted = totalCompleted;
     }
 
-    // Get or generate daily context (lazy generation)
-    const dailyContext = await getOrGenerateDailyContext(userId, fromISO, toISO, supabase);
     const warningsOut = errors.concat(debugNotes);
     const responseData = {
       items: itemsWithAI,
       weekly_stats: {
         planned: workloadPlanned,
         completed: workloadCompleted
-      },
-      daily_context: dailyContext
+      }
     };
     if (trainingPlanContext) responseData.training_plan_context = trainingPlanContext;
     if (warningsOut.length) responseData.warnings = warningsOut;

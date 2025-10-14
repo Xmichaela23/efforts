@@ -194,7 +194,7 @@ export default function WorkoutCalendar({
   const weekEnd = addDays(weekStart, 6);
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
-  const { items: unifiedItems, weeklyStats, trainingPlanContext, dailyContext, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
+  const { items: unifiedItems, weeklyStats, trainingPlanContext, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
   // Adapt unified items → planned + workouts shapes expected below
   const unifiedPlanned = unifiedItems.filter((it:any)=> !!it?.planned).map((it:any)=> ({
     id: it.id,
@@ -649,12 +649,6 @@ export default function WorkoutCalendar({
                     }
                   </div>
                   
-                  {/* AI Context section */}
-                  {dailyContext && (
-                    <div className="mt-2 text-xs text-gray-600">
-                      {dailyContext}
-                    </div>
-                  )}
                 </div>
               )}
             </div>

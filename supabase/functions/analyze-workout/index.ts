@@ -9,7 +9,7 @@
  * - Queries last 4 weeks of similar workouts for comparison
  * - Calls GPT-4 to generate factual workout analysis
  * - Stores context in workouts.context_summary field
- * - Triggers generate-daily-context to update calendar
+ * - Updates workout context summary for individual workout analysis
  * 
  * Input: { workout_id: string }
  * Output: { success: boolean, context: string }
@@ -87,10 +87,7 @@ Deno.serve(async (req) => {
       })
       .eq('id', workout_id);
 
-    // Trigger daily context regeneration
-    await supabase.functions.invoke('generate-daily-context', {
-      body: { user_id: userId, date: workout.date }
-    });
+    // Workout analysis complete - no daily context regeneration needed
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
