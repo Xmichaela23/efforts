@@ -972,16 +972,12 @@ Deno.serve(async (req)=>{
     const trainingPlanId = plannedWorkouts.find((p)=>p.planned?.training_plan_id)?.planned?.training_plan_id;
     if (trainingPlanId) {
       try {
-        const { data: planData } = await supabase.from('plans').select('config, name').eq('id', trainingPlanId).single();
+        const { data: planData } = await supabase.from('plans').select('config, name, current_week').eq('id', trainingPlanId).single();
         if (planData?.config) {
           const config = planData.config;
           const weeklySummaries = config.weekly_summaries || {};
-          // Calculate current week number
-          const weekStartDate = new Date(fromISO);
-          const today = new Date();
-          const diffTime = today.getTime() - weekStartDate.getTime();
-          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-          const currentWeek = Math.max(1, Math.floor(diffDays / 7) + 1);
+          // Use current_week from database instead of calculating
+          const currentWeek = planData.current_week || 1;
           const weekSummary = weeklySummaries[String(currentWeek)] || {};
           trainingPlanContext = {
             planName: planData.name,

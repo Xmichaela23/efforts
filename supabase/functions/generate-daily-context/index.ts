@@ -143,19 +143,17 @@ async function generateDailyContextText(
   }
 
   try {
-    // Build workout summaries
+    // Build workout summaries using workload_actual (same source as totals)
     const completedSummaries = completedWorkouts.map(w => {
-      const distance = w.distance ? (w.distance / 1000).toFixed(1) + 'km' : '';
-      const duration = w.duration ? Math.round(w.duration / 60) + 'min' : '';
-      const pace = w.avg_pace ? (w.avg_pace / 60).toFixed(1) + 'min/km' : '';
-      return `${w.type.toUpperCase()}${distance ? ' ' + distance : ''}${duration ? ' ' + duration : ''}${pace ? ' at ' + pace : ''}`;
+      const workload = w.workload_actual || 0;
+      return `${w.type.toUpperCase()} (${workload} workload)`;
     });
 
     const remainingTypes = plannedWorkouts
       .filter(p => !completedWorkouts.some(c => c.planned_workout_id === p.id))
-      .map(p => p.type.toUpperCase());
+      .map(p => `${p.type.toUpperCase()} (${p.workload_planned || 0} workload)`);
 
-    const tomorrowTypes = tomorrowWorkouts.map(w => w.type.toUpperCase());
+    const tomorrowTypes = tomorrowWorkouts.map(w => `${w.type.toUpperCase()} (${w.workload_planned || 0} workload)`);
 
     // Determine context state
     let state = '';
