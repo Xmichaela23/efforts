@@ -1947,7 +1947,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const execCell = (() => {
               // For rides, use universal power selection logic
               if (isRideSport) {
-                const power = getDisplayPower(hydratedCompleted || completed, row?.executed);
+                const power = getDisplayPower(hydratedCompleted || completed, row);
                 if (Number.isFinite(power) && power > 0) return `${Math.round(power)} W`;
                 return '—';
               }
