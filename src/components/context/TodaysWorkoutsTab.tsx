@@ -168,19 +168,24 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     
     // Get the most recent workout with analysis
     const latestWorkout = recentWorkouts.find(w => w.workout_analysis);
-    if (!latestWorkout?.workout_analysis) return null;
+    if (!latestWorkout?.workout_analysis) {
+      console.log('❌ No workout with analysis found');
+      return null;
+    }
     
     const analysis = latestWorkout.workout_analysis;
+    console.log('🔍 Analysis data structure:', JSON.stringify(analysis, null, 2));
     
-    // Only return data if we have complete analysis
-    if (!analysis.execution_grade || !analysis.key_metrics?.pace_consistency?.overall_cv || !analysis.key_metrics?.fatigue_pattern?.power_fade_percent) {
+    // Only return data if we have basic analysis
+    if (!analysis.execution_grade) {
+      console.log('❌ No execution_grade in analysis');
       return null;
     }
     
     return {
       executionGrade: analysis.execution_grade,
-      powerVariability: analysis.key_metrics.pace_consistency.overall_cv,
-      powerFade: analysis.key_metrics.fatigue_pattern.power_fade_percent,
+      powerVariability: analysis.key_metrics?.pace_consistency?.overall_cv || 'N/A',
+      powerFade: analysis.key_metrics?.fatigue_pattern?.power_fade_percent || 'N/A',
       insights: analysis.insights || []
     };
   };
