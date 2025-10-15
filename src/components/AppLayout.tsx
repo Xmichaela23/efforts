@@ -16,7 +16,7 @@ import WorkoutSummary from './WorkoutSummary';
 import NewEffortDropdown from './NewEffortDropdown';
 import LogEffortDropdown from './LogEffortDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
-import ContextView from './ContextView';
+import ContextTabs from './ContextTabs';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
@@ -955,7 +955,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             </div>
           ) : showContext ? (
             <div className="pt-4">
-              <ContextView
+              <ContextTabs
                 onClose={handleCloseContext}
               />
             </div>

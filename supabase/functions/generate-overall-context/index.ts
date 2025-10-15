@@ -143,6 +143,12 @@ Deno.serve(async (req) => {
 
     const planned = plannedResult.data || [];
     const completedWorkouts = workoutsResult.data || [];
+
+    // ADD THIS ONE LINE:
+    console.log('📊 ALL bikes from DB:', completedWorkouts
+      .filter(w => w.type === 'ride' || w.type === 'bike' || w.type === 'cycling')
+      .map(w => ({ date: w.date, power: w.avg_power, id: w.id }))
+    );
     const userBaselines = baselinesResult.data?.baselines || {};
     const planConfig = trainingPhaseResult.data?.config;
     const currentWeek = trainingPhaseResult.data?.current_week || 1;
@@ -201,7 +207,7 @@ Deno.serve(async (req) => {
     console.log(`Found ${plannedWithCompletions.length} planned workouts: ${completed.length} completed, ${missed.length} missed`);
 
     // Aggregate by week and discipline
-    const weeklyAggregates = aggregateByWeekWithAttachments(plannedWithCompletions, weeks_back);
+    const weeklyAggregates = aggregateByWeekWithAttachments(plannedWithCompletions, weeks_back, userBaselines, completedWorkouts);
 
     // Calculate trend metrics (excluding recovery weeks)
     const trends = extractTrends(weeklyAggregates, recoveryWeeks);
@@ -517,9 +523,227 @@ function paceToSeconds(pace: string | number): number {
 }
 
 /**
+ * Analyze workout intensity distribution from sample data
+ */
+function analyzeWorkoutIntensity(workout: any, userBaselines: any, allWorkouts: any[]): any {
+  const type = workout.type.toLowerCase();
+  const computed = typeof workout.computed === 'string' ? JSON.parse(workout.computed) : workout.computed;
+  
+  console.log(`📊 [ANALYZE] ${type.toUpperCase()} workout: ${workout.date}`);
+  
+  if (type === 'run' || type === 'running') {
+    return analyzeRunIntensity(workout, computed, userBaselines);
+  }
+  
+  if (type === 'ride' || type === 'cycling' || type === 'bike') {
+    return analyzeBikeIntensity(workout, computed, userBaselines);
+  }
+  
+  if (type === 'swim' || type === 'swimming') {
+    return analyzeSwimIntensity(workout, computed, userBaselines);
+  }
+  
+  return { intensity: 'unknown', analysis: 'Unsupported workout type' };
+}
+
+/**
+ * Analyze run intensity from sample data
+ */
+function analyzeRunIntensity(workout: any, computed: any, userBaselines: any): any {
+  const analysis = {
+    intensity: 'unknown',
+    pace_distribution: null,
+    hr_distribution: null,
+    intervals: [],
+    zones: {},
+    analysis: 'No data available'
+  };
+  
+  console.log(`🏃 [RUN] Analyzing run intensity`);
+  
+  // Analyze pace distribution
+  if (computed?.overall?.avg_pace_s_per_mi) {
+    const avgPace = computed.overall.avg_pace_s_per_mi;
+    analysis.pace_distribution = {
+      avg_pace_s: avgPace,
+      avg_pace_formatted: secondsToPace(avgPace)
+    };
+    console.log(`🏃 [PACE] Average: ${secondsToPace(avgPace)} (${avgPace}s)`);
+  }
+  
+  // Analyze heart rate distribution
+  if (workout.avg_heart_rate && workout.max_heart_rate) {
+    analysis.hr_distribution = {
+      avg_hr: workout.avg_heart_rate,
+      max_hr: workout.max_heart_rate,
+      hr_reserve: userBaselines.max_hr ? 
+        ((workout.avg_heart_rate - userBaselines.rest_hr) / (userBaselines.max_hr - userBaselines.rest_hr)) * 100 : null
+    };
+    console.log(`🏃 [HR] Avg: ${workout.avg_heart_rate}, Max: ${workout.max_heart_rate}`);
+  }
+  
+  // Analyze intervals if available
+  if (computed?.intervals && computed.intervals.length > 0) {
+    analysis.intervals = computed.intervals.map(interval => ({
+      type: interval.kind,
+      planned_pace: interval.planned?.target_pace_s_per_mi,
+      executed_pace: interval.executed?.avg_pace_s_per_mi,
+      duration_s: interval.executed?.duration_s,
+      distance_m: interval.executed?.distance_m
+    }));
+    console.log(`🏃 [INTERVALS] Found ${computed.intervals.length} intervals`);
+  }
+  
+  // Determine overall intensity based on analysis
+  if (analysis.pace_distribution && userBaselines.fiveK_pace) {
+    const baselineSeconds = paceToSeconds(userBaselines.fiveK_pace);
+    const pacePercent = (analysis.pace_distribution.avg_pace_s / baselineSeconds) * 100;
+    
+    if (pacePercent <= 110) {
+      analysis.intensity = 'high';
+      analysis.analysis = `High intensity (${pacePercent.toFixed(1)}% of 5K pace)`;
+    } else if (pacePercent <= 130) {
+      analysis.intensity = 'moderate';
+      analysis.analysis = `Moderate intensity (${pacePercent.toFixed(1)}% of 5K pace)`;
+    } else {
+      analysis.intensity = 'low';
+      analysis.analysis = `Low intensity (${pacePercent.toFixed(1)}% of 5K pace)`;
+    }
+  }
+  
+  return analysis;
+}
+
+/**
+ * Analyze bike intensity from sample data
+ */
+function analyzeBikeIntensity(workout: any, computed: any, userBaselines: any): any {
+  const analysis = {
+    intensity: 'unknown',
+    power_distribution: null,
+    hr_distribution: null,
+    intervals: [],
+    zones: {},
+    analysis: 'No data available'
+  };
+  
+  console.log(`🚴 [BIKE] Analyzing bike intensity`);
+  
+  // Analyze power distribution
+  if (workout.avg_power && workout.max_power) {
+    analysis.power_distribution = {
+      avg_power: workout.avg_power,
+      max_power: workout.max_power,
+      power_variability: workout.max_power / workout.avg_power,
+      normalized_power: computed?.overall?.normalized_power || null
+    };
+    console.log(`🚴 [POWER] Avg: ${workout.avg_power}W, Max: ${workout.max_power}W, Variability: ${(workout.max_power / workout.avg_power).toFixed(2)}`);
+  }
+  
+  // Analyze heart rate distribution
+  if (workout.avg_heart_rate && workout.max_heart_rate) {
+    analysis.hr_distribution = {
+      avg_hr: workout.avg_heart_rate,
+      max_hr: workout.max_heart_rate,
+      hr_reserve: userBaselines.max_hr ? 
+        ((workout.avg_heart_rate - userBaselines.rest_hr) / (userBaselines.max_hr - userBaselines.rest_hr)) * 100 : null
+    };
+    console.log(`🚴 [HR] Avg: ${workout.avg_heart_rate}, Max: ${workout.max_heart_rate}`);
+  }
+  
+  // Analyze intervals if available
+  if (computed?.intervals && computed.intervals.length > 0) {
+    analysis.intervals = computed.intervals.map(interval => ({
+      type: interval.kind,
+      planned_power_range: interval.planned?.power_range,
+      executed_power: interval.executed?.avg_power_w,
+      duration_s: interval.executed?.duration_s,
+      distance_m: interval.executed?.distance_m,
+      adherence: interval.executed?.adherence_percentage
+    }));
+    console.log(`🚴 [INTERVALS] Found ${computed.intervals.length} intervals`);
+    
+    // Analyze power zones from intervals
+    const powerZones = { endurance: 0, tempo: 0, threshold: 0, vo2max: 0 };
+    computed.intervals.forEach(interval => {
+      if (interval.planned?.power_range) {
+        const lower = interval.planned.power_range.lower;
+        const upper = interval.planned.power_range.upper;
+        const avg = (lower + upper) / 2;
+        
+        if (avg <= 120) powerZones.endurance++;
+        else if (avg <= 160) powerZones.tempo++;
+        else if (avg <= 200) powerZones.threshold++;
+        else powerZones.vo2max++;
+      }
+    });
+    analysis.zones = powerZones;
+  }
+  
+  // Determine overall intensity based on analysis
+  if (analysis.power_distribution && userBaselines.ftp) {
+    const ftpPercent = (analysis.power_distribution.avg_power / userBaselines.ftp) * 100;
+    
+    if (ftpPercent >= 90) {
+      analysis.intensity = 'high';
+      analysis.analysis = `High intensity (${ftpPercent.toFixed(1)}% of FTP)`;
+    } else if (ftpPercent >= 75) {
+      analysis.intensity = 'moderate';
+      analysis.analysis = `Moderate intensity (${ftpPercent.toFixed(1)}% of FTP)`;
+    } else {
+      analysis.intensity = 'low';
+      analysis.analysis = `Low intensity (${ftpPercent.toFixed(1)}% of FTP)`;
+    }
+  } else if (analysis.power_distribution?.power_variability >= 2.0) {
+    analysis.intensity = 'high';
+    analysis.analysis = `High intensity (power variability ${analysis.power_distribution.power_variability.toFixed(2)})`;
+  }
+  
+  return analysis;
+}
+
+/**
+ * Analyze swim intensity from sample data
+ */
+function analyzeSwimIntensity(workout: any, computed: any, userBaselines: any): any {
+  const analysis = {
+    intensity: 'unknown',
+    pace_distribution: null,
+    hr_distribution: null,
+    intervals: [],
+    analysis: 'No data available'
+  };
+  
+  console.log(`🏊 [SWIM] Analyzing swim intensity`);
+  
+  // Analyze pace distribution
+  if (computed?.overall?.avg_pace_s_per_mi) {
+    const avgPace = computed.overall.avg_pace_s_per_mi;
+    analysis.pace_distribution = {
+      avg_pace_s: avgPace,
+      avg_pace_formatted: secondsToPace(avgPace)
+    };
+    console.log(`🏊 [PACE] Average: ${secondsToPace(avgPace)} (${avgPace}s)`);
+  }
+  
+  // Analyze heart rate distribution
+  if (workout.avg_heart_rate && workout.max_heart_rate) {
+    analysis.hr_distribution = {
+      avg_hr: workout.avg_heart_rate,
+      max_hr: workout.max_heart_rate
+    };
+    console.log(`🏊 [HR] Avg: ${workout.avg_heart_rate}, Max: ${workout.max_heart_rate}`);
+  }
+  
+  return analysis;
+}
+
+/**
  * Aggregate planned workouts with their completions by week and discipline
  */
-function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack: number) {
+function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack: number, userBaselines: any, allCompletedWorkouts: any[]) {
+  // allCompletedWorkouts is now passed in from the database query
+  // This includes ALL workouts, not just ones matching planned workouts
   const weeklyData: any[] = [];
   
   // Generate week ranges
@@ -542,15 +766,27 @@ function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack
     const completed = weekPlanned.filter(p => p.completed && p.completed.length > 0);
     const missed = weekPlanned.filter(p => !p.completed || p.completed.length === 0);
     
-    // Extract completed workout data for analysis
-    const completedWorkouts = completed.map(p => p.completed[0]).filter(w => w);
+    // Get ALL workouts in this week's date range (including orphaned workouts)
+    const completedWorkoutsThisWeek = allCompletedWorkouts.filter(w => {
+      const workoutDate = new Date(w.date);
+      return workoutDate >= weekStart && workoutDate <= weekEnd;
+    });
     
-    // Group completed workouts by discipline
-    const runs = completedWorkouts.filter(w => w.type === 'run' || w.type === 'running');
-    const bikes = completedWorkouts.filter(w => w.type === 'ride' || w.type === 'cycling' || w.type === 'bike');
-    const swims = completedWorkouts.filter(w => w.type === 'swim' || w.type === 'swimming');
-    const strength = completedWorkouts.filter(w => w.type === 'strength');
-    const mobility = completedWorkouts.filter(w => w.type === 'mobility');
+    // Group completed workouts by discipline AND analyze intensity
+    const runs = completedWorkoutsThisWeek.filter(w => w.type === 'run' || w.type === 'running');
+    const runAnalyses = runs.map(r => analyzeWorkoutIntensity(r, userBaselines, allCompletedWorkouts));
+    const hardRuns = runs.filter((r, i) => runAnalyses[i]?.intensity === 'high');
+    const easyRuns = runs.filter((r, i) => runAnalyses[i]?.intensity === 'low');
+
+    const bikes = completedWorkoutsThisWeek.filter(w => w.type === 'ride' || w.type === 'cycling' || w.type === 'bike');
+    console.log(`🚴 Found ${bikes.length} bike workouts:`, bikes.map(b => ({ type: b.type, power: b.avg_power, id: b.id })));
+    const bikeAnalyses = bikes.map(b => analyzeWorkoutIntensity(b, userBaselines, allCompletedWorkouts));
+    const hardBikes = bikes.filter((b, i) => bikeAnalyses[i]?.intensity === 'high');
+    const easyBikes = bikes.filter((b, i) => bikeAnalyses[i]?.intensity === 'low');
+
+    const swims = completedWorkoutsThisWeek.filter(w => w.type === 'swim' || w.type === 'swimming');
+    const strength = completedWorkoutsThisWeek.filter(w => w.type === 'strength');
+    const mobility = completedWorkoutsThisWeek.filter(w => w.type === 'mobility');
     
     // Group planned by discipline for adherence analysis
     const plannedRuns = weekPlanned.filter(p => p.type === 'run' || p.type === 'running');
@@ -559,19 +795,27 @@ function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack
     const plannedStrength = weekPlanned.filter(p => p.type === 'strength');
     const plannedMobility = weekPlanned.filter(p => p.type === 'mobility');
     
-    // Calculate averages and totals
+    // Calculate averages and totals for HARD sessions only (key workouts)
     const weekData = {
       week_label: `Week ${weeksBack - i} (${weekStartISO} to ${weekEndISO})`,
       runs: {
         count: runs.length,
-        avg_pace: runs.length > 0 ? calculateAveragePaceFromComputed(runs) : null,
+        hard_count: hardRuns.length,
+        easy_count: easyRuns.length,
+        avg_pace: runs.length > 0 ? calculateAveragePaceFromSamples(runs) : null,
+        hard_avg_pace: hardRuns.length > 0 ? calculateAveragePaceFromComputed(hardRuns) : null,
+        best_pace: runs.length > 0 ? calculateBestPaceFromComputed(runs) : null,
         avg_speed: runs.length > 0 ? calculateAverageSpeed(runs) : null,
         avg_heart_rate: runs.length > 0 ? calculateAverageHeartRate(runs) : null,
         total_distance: runs.reduce((sum, r) => sum + (r.distance || 0), 0)
       },
       bikes: {
         count: bikes.length,
-        avg_power: bikes.length > 0 ? calculateAveragePower(bikes) : null,
+        hard_count: hardBikes.length,
+        easy_count: easyBikes.length,
+        avg_power: bikes.length > 0 ? calculateAveragePowerFromSamples(bikes) : null,
+        hard_avg_power: hardBikes.length > 0 ? calculateAveragePower(hardBikes) : null,
+        best_power: bikes.length > 0 ? calculateBestPower(bikes) : null,
         avg_speed: bikes.length > 0 ? calculateAverageSpeed(bikes) : null,
         avg_heart_rate: bikes.length > 0 ? calculateAverageHeartRate(bikes) : null,
         total_duration: bikes.reduce((sum, b) => sum + (b.duration || 0), 0)
@@ -632,6 +876,8 @@ function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack
       }
     };
     
+    console.log(`✅ Week ${weeksBack - i}: runs=${runs.length} (${hardRuns.length} hard), hard_pace=${weekData.runs.hard_avg_pace}, bikes=${bikes.length} (${hardBikes.length} hard), hard_power=${weekData.bikes.hard_avg_power}`);
+    
     weeklyData.push(weekData);
   }
   
@@ -660,7 +906,29 @@ function extractTrends(weeklyAggregates: any[], recoveryWeeks: Set<number> = new
     }
   });
   
-  return {
+  const trends = {
+    // Key workout progression (hard sessions only)
+    run_hard_pace: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.runs.hard_avg_pace)
+      .filter(p => p !== null),
+    
+    run_best_pace: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.runs.best_pace)
+      .filter(p => p !== null),
+    
+    bike_hard_power: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.bikes.hard_avg_power)
+      .filter(p => p !== null),
+    
+    bike_best_power: weeklyAggregates
+      .filter((_, i) => !recoveryWeeks.has(i))
+      .map(w => w.bikes.best_power)
+      .filter(p => p !== null),
+    
+    // Keep overall averages for context
     run_pace: weeklyAggregates
       .filter((_, i) => !recoveryWeeks.has(i))
       .map(w => w.runs.avg_pace)
@@ -700,6 +968,13 @@ function extractTrends(weeklyAggregates: any[], recoveryWeeks: Set<number> = new
     completion_rate: weeklyAggregates.map(w => w.completion_rate), // Keep all weeks for adherence
     strength_lifts: strengthLifts
   };
+  
+  // DEBUG: Log to verify order
+  console.log('📊 Run HARD pace trend (should be oldest→newest):', trends.run_hard_pace);
+  console.log('📊 Bike HARD power trend (should be oldest→newest):', trends.bike_hard_power);
+  console.log('📊 Weekly aggregates order:', weeklyAggregates.map((w, i) => `${i}: ${w.week_label}`));
+  
+  return trends;
 }
 
 /**
@@ -736,19 +1011,28 @@ function generateDisciplineBreakdown(weeks: any[]): string {
  * Generate performance summary for disciplines with data
  */
 function generatePerformanceSummary(weeks: any[], trends: any): string {
+  console.log('🏃 Run HARD pace array for GPT:', trends.run_hard_pace);
+  console.log('🚴 Bike HARD power array for GPT:', trends.bike_hard_power);
+  
   const lines: string[] = [];
   
-  // Run metrics
-  if (trends.run_pace && trends.run_pace.length > 1) {
-    lines.push(`Run pace: ${trends.run_pace[0]} → ${trends.run_pace[trends.run_pace.length - 1]}`);
+  // Run metrics - prioritize hard workout progression
+  if (trends.run_hard_pace && trends.run_hard_pace.length > 1) {
+    lines.push(`Run intervals: ${trends.run_hard_pace[0]} → ${trends.run_hard_pace[trends.run_hard_pace.length - 1]} (hard sessions)`);
+  }
+  if (trends.run_best_pace && trends.run_best_pace.length > 1) {
+    lines.push(`Run best effort: ${trends.run_best_pace[0]} → ${trends.run_best_pace[trends.run_best_pace.length - 1]}`);
   }
   if (trends.run_heart_rate && trends.run_heart_rate.length > 1) {
     lines.push(`Run HR: ${trends.run_heart_rate[0]} → ${trends.run_heart_rate[trends.run_heart_rate.length - 1]} bpm`);
   }
   
-  // Bike metrics
-  if (trends.bike_power && trends.bike_power.length > 1) {
-    lines.push(`Bike power: ${trends.bike_power[0]}W → ${trends.bike_power[trends.bike_power.length - 1]}W`);
+  // Bike metrics - prioritize hard workout progression
+  if (trends.bike_hard_power && trends.bike_hard_power.length > 1) {
+    lines.push(`Bike intervals: ${trends.bike_hard_power[0]}W → ${trends.bike_hard_power[trends.bike_hard_power.length - 1]}W (hard sessions)`);
+  }
+  if (trends.bike_best_power && trends.bike_best_power.length > 1) {
+    lines.push(`Bike best effort: ${trends.bike_best_power[0]}W → ${trends.bike_best_power[trends.bike_best_power.length - 1]}W`);
   }
   if (trends.bike_heart_rate && trends.bike_heart_rate.length > 1) {
     lines.push(`Bike HR: ${trends.bike_heart_rate[0]} → ${trends.bike_heart_rate[trends.bike_heart_rate.length - 1]} bpm`);
@@ -850,7 +1134,7 @@ ${generateDisciplineBreakdown(weeklyAggregates)}
 Most recent week: ${mostRecentWeek.completed_count}/${mostRecentWeek.planned_count} completed
 Missed in recent week: ${formatMissedByDiscipline(recentWeekMissed)}
 
-PERFORMANCE DATA:
+PERFORMANCE DATA (chronological order, week 1 = OLDEST, week ${weeklyAggregates.length} = NEWEST):
 ${generatePerformanceSummary(weeklyAggregates, trends)}
 
 ${baselineInsights.length > 0 ? `\nSTRENGTH BASELINE ALERTS:\n${baselineInsights.join('\n')}` : ''}
@@ -955,18 +1239,38 @@ No markdown formatting. Direct JSON only.`;
 }
 
 /**
- * Helper functions for calculating averages
+ * Helper functions for calculating averages from GRANULAR SAMPLE DATA
  */
-function calculateAveragePaceFromComputed(runs: any[]): string | null {
+function calculateAveragePaceFromSamples(runs: any[]): string | null {
   const paces = runs
     .map(r => {
+      // FIRST: Try to get pace from sensor data samples
+      const sensorData = r.sensor_data?.samples || [];
+      if (sensorData.length > 0) {
+        const paceSamples = sensorData
+          .map(s => {
+            if (s.speedMetersPerSecond && s.speedMetersPerSecond > 0) {
+              return (1000 / s.speedMetersPerSecond) * 60; // Convert to seconds per mile
+            }
+            return null;
+          })
+          .filter(p => p !== null);
+        
+        if (paceSamples.length > 0) {
+          const avgPace = paceSamples.reduce((sum, p) => sum + p, 0) / paceSamples.length;
+          return avgPace;
+        }
+      }
+      
+      // FALLBACK: Use computed data
       const computed = typeof r.computed === 'string' ? JSON.parse(r.computed) : r.computed;
       if (computed?.overall?.avg_pace_s_per_mi) {
         return computed.overall.avg_pace_s_per_mi;
       }
       
-      const distanceM = r.distance || r.distance_meters || 0;
-      const durationS = r.duration || r.duration_s || r.duration_s_moving || 0;
+      // FINAL FALLBACK: Calculate from distance/duration with correct units
+      const distanceM = computed?.overall?.distance_m || (r.distance * 1000) || 0; // distance column is in KM!
+      const durationS = r.moving_time || (r.duration * 60) || 0; // duration column is in MINUTES!
       
       if (distanceM > 0 && durationS > 0) {
         const miles = distanceM / 1609.34;
@@ -983,6 +1287,32 @@ function calculateAveragePaceFromComputed(runs: any[]): string | null {
   
   const avgPaceSeconds = paces.reduce((sum, p) => sum + p, 0) / paces.length;
   return secondsToPace(avgPaceSeconds);
+}
+
+function calculateAveragePowerFromSamples(bikes: any[]): number | null {
+  const powers = bikes
+    .map(b => {
+      // FIRST: Try to get power from sensor data samples
+      const sensorData = b.sensor_data?.samples || [];
+      if (sensorData.length > 0) {
+        const powerSamples = sensorData
+          .map(s => s.power || s.powerInWatts)
+          .filter(p => p && p > 0);
+        
+        if (powerSamples.length > 0) {
+          const avgPower = powerSamples.reduce((sum, p) => sum + p, 0) / powerSamples.length;
+          return avgPower;
+        }
+      }
+      
+      // FALLBACK: Use average power from workout record
+      return b.avg_power;
+    })
+    .filter(p => p && p > 0);
+  
+  if (powers.length === 0) return null;
+  
+  return Math.round(powers.reduce((sum, p) => sum + p, 0) / powers.length);
 }
 
 function calculateAverageSpeed(workouts: any[]): number | null {
@@ -1025,18 +1355,50 @@ function calculateAveragePower(bikes: any[]): number | null {
   return Math.round(powers.reduce((sum, p) => sum + p, 0) / powers.length);
 }
 
+/**
+ * Calculate best (fastest) pace from runs
+ */
+function calculateBestPaceFromComputed(runs: any[]): string | null {
+  const paces = runs
+    .map(r => {
+      const computed = typeof r.computed === 'string' ? JSON.parse(r.computed) : r.computed;
+      return computed?.overall?.avg_pace_s_per_mi || null;
+    })
+    .filter(p => p !== null);
+  
+  if (paces.length === 0) return null;
+  
+  const bestPaceSeconds = Math.min(...paces); // Fastest = lowest seconds
+  return secondsToPace(bestPaceSeconds);
+}
+
+/**
+ * Calculate best (highest) power from bikes
+ */
+function calculateBestPower(bikes: any[]): number | null {
+  const powers = bikes
+    .map(b => b.avg_power)
+    .filter(p => p && p > 0);
+  
+  if (powers.length === 0) return null;
+  
+  return Math.max(...powers); // Best = highest power
+}
+
 function calculateAverageSwimPaceFromComputed(swims: any[]): string | null {
   const paces = swims
     .map(s => {
       const computed = typeof s.computed === 'string' ? JSON.parse(s.computed) : s.computed;
+      
       if (computed?.overall?.avg_pace_s_per_mi) {
         const pacePerMile = computed.overall.avg_pace_s_per_mi;
-        const pacePer100Yards = (pacePerMile / 1760) * 100;
+        const pacePer100Yards = pacePerMile / 1760 * 100;
         return pacePer100Yards;
       }
       
-      const distanceM = s.distance || s.distance_meters || 0;
-      const durationS = s.duration || s.duration_s || s.duration_s_moving || 0;
+      // FIXED FALLBACK: Use correct units
+      const distanceM = computed?.overall?.distance_m || (s.distance * 1000) || 0; // distance column is in KM!
+      const durationS = s.moving_time || (s.duration * 60) || 0; // duration column is in MINUTES!
       
       if (distanceM > 0 && durationS > 0) {
         const yards = distanceM / 0.9144;
