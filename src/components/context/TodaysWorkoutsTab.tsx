@@ -12,17 +12,64 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const { useImperial } = useAppContext();
   const [recentWorkouts, setRecentWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [analysisTriggered, setAnalysisTriggered] = useState(false);
 
   // Use unified API instead of direct table queries
   // Use user's local timezone for date calculations
   const today = new Date().toLocaleDateString('en-CA');
   const { items: todayItems = [], loading: todayLoading } = useWeekUnified(today, today);
 
+  // Trigger analysis for existing workouts that don't have it
+  const triggerAnalysisForExistingWorkouts = async () => {
+    if (analysisTriggered || recentWorkouts.length === 0) return;
+    
+    try {
+      setAnalysisTriggered(true);
+      
+      // Find completed workouts without analysis
+      const workoutsNeedingAnalysis = recentWorkouts.filter(workout => 
+        workout.workout_status === 'completed' && 
+        !workout.workout_analysis
+      );
+      
+      if (workoutsNeedingAnalysis.length === 0) return;
+      
+      console.log(`🔍 Found ${workoutsNeedingAnalysis.length} workouts needing analysis`);
+      
+      // Trigger analysis for each workout
+      for (const workout of workoutsNeedingAnalysis) {
+        try {
+          console.log(`🚀 Triggering analysis for workout: ${workout.id}`);
+          await supabase.functions.invoke('analyze-workout', {
+            body: { workout_id: workout.id }
+          });
+        } catch (error) {
+          console.error(`❌ Failed to analyze workout ${workout.id}:`, error);
+        }
+      }
+      
+      // Wait a moment for analysis to complete, then refresh
+      setTimeout(() => {
+        fetchRecentWorkouts();
+      }, 2000);
+      
+    } catch (error) {
+      console.error('❌ Failed to trigger analysis:', error);
+    }
+  };
+
   useEffect(() => {
     if (!todayLoading) {
       loadRecentWorkouts();
     }
   }, [todayLoading]);
+
+  // Trigger analysis when recent workouts are loaded
+  useEffect(() => {
+    if (recentWorkouts.length > 0 && !analysisTriggered) {
+      triggerAnalysisForExistingWorkouts();
+    }
+  }, [recentWorkouts, analysisTriggered]);
 
   const loadRecentWorkouts = async () => {
     try {
@@ -196,7 +243,27 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
             </div>
           </div>
         )
-      ) : null}
+      ) : (
+        <div className="px-2 mt-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="text-sm font-medium text-red-800">
+              Analysis Not Available
+            </div>
+            <div className="text-xs text-red-600 mt-1">
+              No workout analysis found. 
+              <button 
+                onClick={() => {
+                  setAnalysisTriggered(false);
+                  triggerAnalysisForExistingWorkouts();
+                }}
+                className="ml-1 underline hover:no-underline"
+              >
+                Trigger analysis
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Last Workout */}
       {recentWorkouts.length > 0 && (
@@ -236,7 +303,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         </div>
       )}
 
-      {/* Today's Workouts */}
+      {/* Today's Workouts - Show Analysis Status */}
       <div className="px-2 mt-4">
         <div className="text-sm text-[#666666] font-normal">
           <div className="font-medium">Today's Workouts</div>
@@ -247,7 +314,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
               {todayItems.map((item) => (
                 <div key={item.id} className="bg-blue-50 p-3 rounded-lg">
                   <div className="font-medium text-black">
-                    {item.planned?.description || `${item.type} Workout`}
+                    {item.type.toUpperCase()} - {item.completed ? 'COMPLETED' : 'PLANNED'}
                   </div>
                   <div className="text-xs text-gray-600 mt-1">
                     {item.planned?.start_time && (
@@ -257,9 +324,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                       <span className="ml-3">Duration: {item.planned.duration_minutes} min</span>
                     )}
                   </div>
-                  <div className="text-xs text-blue-600 font-medium mt-1">
-                    Status: {item.completed ? 'Completed' : 'Planned'}
-                  </div>
+                  {item.completed && item.workout_analysis ? (
+                    <div className="text-xs text-green-600 font-medium mt-1">
+                      ✓ Analysis Complete - Grade: {item.workout_analysis.execution_grade}
+                    </div>
+                  ) : item.completed ? (
+                    <div className="text-xs text-yellow-600 font-medium mt-1">
+                      ⚠ Completed but no analysis available
+                    </div>
+                  ) : (
+                    <div className="text-xs text-blue-600 font-medium mt-1">
+                      Status: Planned
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
