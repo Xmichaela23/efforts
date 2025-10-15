@@ -68,10 +68,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         }
       }
       
-      // Wait a moment for analysis to complete, then refresh
+      // Wait for analysis to complete, then refresh
       setTimeout(() => {
+        console.log('🔄 Refreshing workout data after analysis...');
         loadRecentWorkouts();
-      }, 2000);
+      }, 5000);
       
     } catch (error) {
       console.error('❌ Failed to trigger analysis:', error);
@@ -293,6 +294,15 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                 className="ml-1 underline hover:no-underline"
               >
                 Trigger analysis
+              </button>
+              <button 
+                onClick={() => {
+                  console.log('🔄 Manual refresh triggered');
+                  loadRecentWorkouts();
+                }}
+                className="ml-2 underline hover:no-underline"
+              >
+                Refresh data
               </button>
             </div>
           </div>

@@ -292,19 +292,10 @@ Deno.serve(async (req) => {
       });
     }
     
+    // Max HR is optional - we'll use alternative methods for HR analysis
     if (!userBaselines.max_hr && !userBaselines.maxHR) {
-      console.log('Max HR missing from baselines');
-      return new Response(JSON.stringify({
-        error: 'Max HR baseline required for analysis. Please update your profile with your max heart rate.',
-        missing_baseline: 'max_hr',
-        available_baselines: Object.keys(userBaselines)
-      }), {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      });
+      console.log('Max HR not available, using alternative HR analysis methods');
+      userBaselines.max_hr = null; // Set to null so we know it's not available
     }
     
     // Normalize workout date using user's timezone
