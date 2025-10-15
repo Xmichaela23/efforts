@@ -84,12 +84,17 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
           </div>
         </div>
         <div className="p-4">
-          <div className="text-center py-12">
-            <div className="text-gray-500 mb-4" style={{ fontFamily: 'Inter, sans-serif' }}>
-              Unable to generate context
-            </div>
-            <div className="text-sm text-gray-400" style={{ fontFamily: 'Inter, sans-serif' }}>
-              {error}
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <div className="text-center">
+              <div className="text-lg font-semibold text-red-800 mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Context Generation Error
+              </div>
+              <div className="text-sm text-red-600 mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
+                {error}
+              </div>
+              <div className="text-xs text-red-500" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Check server logs and analysis function status.
+              </div>
             </div>
           </div>
         </div>
@@ -122,9 +127,14 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
           </div>
         </div>
         <div className="p-4">
-          <div className="text-center py-12">
-            <div className="text-gray-500" style={{ fontFamily: 'Inter, sans-serif' }}>
-              No context data available
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <div className="text-center">
+              <div className="text-lg font-semibold text-red-800 mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Context Generation Failed
+              </div>
+              <div className="text-sm text-red-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Unable to generate training context. Check if analysis functions are running properly.
+              </div>
             </div>
           </div>
         </div>

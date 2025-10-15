@@ -95,85 +95,139 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   }
 
   // Calculate heart rate trends from recent workouts
-  const getHeartRateTrend = () => {
-    if (recentWorkouts.length < 2) return null;
+  const getAnalysisMetrics = () => {
+    if (recentWorkouts.length === 0) return null;
     
-    const recentHR = recentWorkouts.slice(0, 3).map(w => w.avg_heart_rate).filter(hr => hr > 0);
-    if (recentHR.length < 2) return null;
+    // Get the most recent workout with analysis
+    const latestWorkout = recentWorkouts.find(w => w.workout_analysis);
+    if (!latestWorkout?.workout_analysis) return null;
     
-    const avgHR = recentHR.reduce((sum, hr) => sum + hr, 0) / recentHR.length;
-    const trend = recentHR[0] < recentHR[recentHR.length - 1] ? 'Improving' : 'Stable';
+    const analysis = latestWorkout.workout_analysis;
     
-    return { avgHR: Math.round(avgHR), trend };
+    // Only return data if we have complete analysis
+    if (!analysis.execution_grade || !analysis.key_metrics?.pace_consistency?.overall_cv || !analysis.key_metrics?.fatigue_pattern?.power_fade_percent) {
+      return null;
+    }
+    
+    return {
+      executionGrade: analysis.execution_grade,
+      powerVariability: analysis.key_metrics.pace_consistency.overall_cv,
+      powerFade: analysis.key_metrics.fatigue_pattern.power_fade_percent,
+      insights: analysis.insights || []
+    };
   };
 
-  const hrTrend = getHeartRateTrend();
+  const analysisMetrics = getAnalysisMetrics();
 
   return (
     <>
-      {/* Performance Metrics - 3-column grid like CompletedTab */}
-      {hrTrend && (
+      {/* Performance Metrics - 3-column grid with analysis data */}
+      {analysisMetrics ? (
         <div className="grid grid-cols-3 gap-1 px-2 -mt-10">
-          {/* Average Heart Rate */}
+          {/* Execution Grade */}
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {hrTrend.avgHR} bpm
+              {analysisMetrics.executionGrade}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Avg HR</div>
+              <div className="font-medium">Execution</div>
             </div>
           </div>
 
-          {/* HR Trend */}
+          {/* Power Consistency */}
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {hrTrend.trend}
+              {analysisMetrics.powerVariability}%
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">HR Trend</div>
+              <div className="font-medium">Variability</div>
             </div>
           </div>
 
-          {/* Recent Workouts */}
+          {/* Power Fade */}
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {recentWorkouts.length}
+              {analysisMetrics.powerFade}%
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Recent</div>
+              <div className="font-medium">Fade</div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="px-2 -mt-10">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="text-sm font-medium text-red-800">
+              Analysis Failed
+            </div>
+            <div className="text-xs text-red-600 mt-1">
+              No complete workout analysis available. Check if analysis is running.
             </div>
           </div>
         </div>
       )}
 
+      {/* Analysis Insights */}
+      {analysisMetrics ? (
+        analysisMetrics.insights.length > 0 ? (
+          <div className="px-2 mt-4">
+            <div className="text-sm text-[#666666] font-normal">
+              <div className="font-medium">Latest Analysis</div>
+            </div>
+            <div className="text-sm text-black mt-1 space-y-2">
+              {analysisMetrics.insights.map((insight, index) => (
+                <div key={index} className="bg-gray-50 p-3 rounded-lg">
+                  <div className="text-xs text-gray-600 font-medium mb-1">
+                    {insight}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="px-2 mt-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="text-sm font-medium text-yellow-800">
+                No Insights Generated
+              </div>
+              <div className="text-xs text-yellow-600 mt-1">
+                Analysis completed but no insights were generated.
+              </div>
+            </div>
+          </div>
+        )
+      ) : null}
+
       {/* Last Workout */}
       {recentWorkouts.length > 0 && (
         <div className="px-2 mt-4">
           <div className="text-sm text-[#666666] font-normal">
-            <div className="font-medium">Last Workout</div>
+            <div className="font-medium">Recent Workouts</div>
           </div>
           <div className="text-sm text-black mt-1 space-y-1">
-            {recentWorkouts.map((workout) => (
-              <div key={workout.id}>
-                <div className="font-medium">
-                  {workout.name || `${workout.type} Workout`}
+            {recentWorkouts.slice(0, 3).map((workout) => (
+              <div key={workout.id} className="flex justify-between items-center py-1">
+                <div>
+                  <div className="font-medium">
+                    {workout.name || `${workout.type} Workout`}
+                  </div>
+                  <div className="text-xs text-[#666666]">
+                    {new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', { 
+                      weekday: 'long', 
+                      month: 'short', 
+                      day: 'numeric' 
+                    })}
+                  </div>
                 </div>
-                <div className="text-xs text-[#666666]">
-                  {new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    month: 'short', 
-                    day: 'numeric' 
-                  })}
-                </div>
-                <div className="text-xs text-[#666666]">
-                  {workout.avg_pace && (
-                    <span>Pace: {formatPace(workout.avg_pace)}</span>
-                  )}
+                <div className="text-xs text-[#666666] text-right">
                   {workout.avg_power && (
-                    <span className="ml-3">Power: {workout.avg_power}W</span>
+                    <div>Power: {workout.avg_power}W</div>
                   )}
                   {workout.avg_heart_rate && (
-                    <span className="ml-3">HR: {workout.avg_heart_rate} bpm</span>
+                    <div>HR: {workout.avg_heart_rate} bpm</div>
+                  )}
+                  {workout.workout_analysis?.execution_grade && (
+                    <div className="font-medium text-black">Grade: {workout.workout_analysis.execution_grade}</div>
                   )}
                 </div>
               </div>
@@ -191,11 +245,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
           {todayItems.length > 0 ? (
             <div className="space-y-2">
               {todayItems.map((item) => (
-                <div key={item.id}>
-                  <div className="font-medium">
+                <div key={item.id} className="bg-blue-50 p-3 rounded-lg">
+                  <div className="font-medium text-black">
                     {item.planned?.description || `${item.type} Workout`}
                   </div>
-                  <div className="text-xs text-[#666666]">
+                  <div className="text-xs text-gray-600 mt-1">
                     {item.planned?.start_time && (
                       <span>Time: {item.planned.start_time}</span>
                     )}
@@ -203,15 +257,20 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                       <span className="ml-3">Duration: {item.planned.duration_minutes} min</span>
                     )}
                   </div>
-                  <div className="text-xs text-[#666666]">
+                  <div className="text-xs text-blue-600 font-medium mt-1">
                     Status: {item.completed ? 'Completed' : 'Planned'}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-sm text-[#666666]">
-              No workouts planned for today. Enjoy your rest day!
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="text-sm font-medium text-gray-800">
+                No Planned Workouts
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                No workouts found for today. Check if planning system is working.
+              </div>
             </div>
           )}
         </div>
