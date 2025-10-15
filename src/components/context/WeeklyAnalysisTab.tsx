@@ -9,11 +9,11 @@ const WeeklyAnalysisTab: React.FC<WeeklyAnalysisTabProps> = () => {
   const { useImperial } = useAppContext();
   const [currentWeek, setCurrentWeek] = useState(0); // 0 = current week, -1 = last week, etc.
   
-  // Calculate week start date
+  // Calculate week start date using user's local timezone
   const today = new Date();
   const weekStart = new Date(today);
   weekStart.setDate(today.getDate() - today.getDay() + (currentWeek * 7)); // Start of week (Sunday)
-  const weekStartDate = weekStart.toISOString().split('T')[0];
+  const weekStartDate = weekStart.toLocaleDateString('en-CA');
   
   const { data: weekData, loading, error, refresh } = useWeeklySummary(weekStartDate);
 

@@ -789,20 +789,28 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             <p className="text-sm text-muted-foreground leading-snug font-sans [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline">
               {(() => {
                 try {
-                  // For completed workouts, try to get timestamp for time
-                  if (workout.workout_status === 'completed' && workout.timestamp) {
-                    const d = new Date(workout.timestamp);
-                    if (!isNaN(d.getTime())) {
-                      const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-                      const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                      return (
-                        <>
-                          <span className="[font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1]">{dateStr}</span>
-                          <span className="mx-1">at</span>
-                          <span className="[font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1]">{timeStr}</span>
-                        </>
-                      );
+                  // For completed workouts, use the date field for date and timestamp for time
+                  if (workout.workout_status === 'completed' && workout.date) {
+                    // Use the date field for the date (this is already in the correct timezone)
+                    const dateStr = new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                    
+                    // Use timestamp for time if available
+                    if (workout.timestamp) {
+                      const d = new Date(workout.timestamp);
+                      if (!isNaN(d.getTime())) {
+                        const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                        return (
+                          <>
+                            <span className="[font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1]">{dateStr}</span>
+                            <span className="mx-1">at</span>
+                            <span className="[font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1]">{timeStr}</span>
+                          </>
+                        );
+                      }
                     }
+                    
+                    // Just return the date if no timestamp
+                    return <span className="[font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1]">{dateStr}</span>;
                   }
                   
                   // Fallback to date only

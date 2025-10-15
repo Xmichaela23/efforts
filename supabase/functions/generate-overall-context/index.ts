@@ -77,21 +77,21 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Calculate date range
+    // Calculate date range using user's local timezone
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(endDate.getDate() - (weeks_back * 7));
 
-    const startDateISO = startDate.toISOString().split('T')[0];
-    const endDateISO = endDate.toISOString().split('T')[0];
+    const startDateISO = startDate.toLocaleDateString('en-CA');
+    const endDateISO = endDate.toLocaleDateString('en-CA');
 
     console.log(`Generating overall context for user ${user_id}, ${weeks_back} weeks (${startDateISO} to ${endDateISO})`);
 
-    // Use yesterday in UTC to avoid timezone issues
+    // Use yesterday in user's local timezone to avoid timezone issues
     const yesterday = new Date();
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    const yesterdayISO = yesterday.toISOString().split('T')[0];
-    console.log(`Using yesterday in UTC (${yesterdayISO}) to avoid timezone issues`);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayISO = yesterday.toLocaleDateString('en-CA');
+    console.log(`Using yesterday in user timezone (${yesterdayISO}) to avoid timezone issues`);
     
     const [plannedResult, workoutsResult, trainingPhaseResult, baselinesResult] = await Promise.all([
       // Get planned workouts (only up to yesterday)

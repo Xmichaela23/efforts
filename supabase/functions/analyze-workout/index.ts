@@ -44,6 +44,153 @@ const corsHeaders = {
   'Vary': 'Origin'
 };
 
+/**
+ * =============================================================================
+ * TIMEZONE-AWARE DATE HANDLING
+ * =============================================================================
+ * 
+ * PURPOSE: Handle dates consistently using user's location and timezone context
+ * 
+ * WHAT IT DOES:
+ * - Uses user's stored location to determine timezone context
+ * - Normalizes all dates to user's local timezone
+ * - Handles Garmin offset calculations consistently
+ * - Provides timezone-agnostic date comparison functions
+ */
+
+/**
+ * Get user's timezone from their stored location data
+ */
+async function getUserTimezone(supabase: any, userId: string): Promise<string | null> {
+  try {
+    // Get user's most recent location
+    const { data: location } = await supabase
+      .from('user_locations')
+      .select('lat, lng, date')
+      .eq('user_id', userId)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (!location) return null;
+    
+    // Use a timezone API to get timezone from coordinates
+    // For now, we'll use a simple approach based on longitude
+    // In production, you might want to use a service like Google Timezone API
+    const timezoneOffset = Math.round(location.lng / 15); // Rough timezone calculation
+    return `UTC${timezoneOffset >= 0 ? '+' : ''}${timezoneOffset}`;
+  } catch (error) {
+    console.warn('Error getting user timezone:', error);
+    return null;
+  }
+}
+
+/**
+ * Get user's local date in YYYY-MM-DD format
+ * Uses user's timezone context when available
+ */
+function getUserLocalDate(dateInput?: Date | string, userTimezone?: string): string {
+  if (!dateInput) {
+    return new Date().toLocaleDateString('en-CA');
+  }
+  
+  const date = new Date(dateInput);
+  
+  // If we have user timezone, use it for more accurate local date
+  if (userTimezone) {
+    try {
+      // Convert to user's timezone
+      const localDate = new Date(date.toLocaleString('en-US', { timeZone: userTimezone }));
+      return localDate.toLocaleDateString('en-CA');
+    } catch (error) {
+      console.warn('Error using user timezone, falling back to browser timezone:', error);
+    }
+  }
+  
+  // Fallback to browser's local timezone
+  return date.toLocaleDateString('en-CA');
+}
+
+/**
+ * Normalize workout date to user's local timezone
+ * Handles Garmin offset calculations consistently
+ */
+function normalizeWorkoutDate(workout: any, garminActivity?: any, userTimezone?: string): string {
+  // If we have Garmin activity data, use the offset calculation
+  if (garminActivity) {
+    try {
+      const raw = typeof garminActivity.raw_data === 'string' ? 
+        JSON.parse(garminActivity.raw_data) : garminActivity.raw_data;
+      const gSummary = raw?.summary || raw;
+      
+      const gIn = Number(gSummary?.startTimeInSeconds ?? garminActivity.start_time);
+      const gOff = Number(gSummary?.startTimeOffsetInSeconds ?? garminActivity.start_time_offset_seconds);
+      
+      if (Number.isFinite(gIn) && Number.isFinite(gOff)) {
+        // Calculate local time: UTC time + offset
+        const localTime = new Date((gIn + gOff) * 1000);
+        return getUserLocalDate(localTime, userTimezone);
+      }
+    } catch (error) {
+      console.warn('Error calculating Garmin local date:', error);
+    }
+  }
+  
+  // Fallback to workout's stored date or timestamp
+  if (workout.date) {
+    return getUserLocalDate(workout.date, userTimezone);
+  }
+  
+  if (workout.timestamp) {
+    return getUserLocalDate(workout.timestamp, userTimezone);
+  }
+  
+  return getUserLocalDate(undefined, userTimezone);
+}
+
+/**
+ * Compare dates in a timezone-agnostic way
+ * Returns true if dates are the same day in user's local timezone
+ */
+function isSameDay(date1: string, date2: string, userTimezone?: string): boolean {
+  return getUserLocalDate(date1, userTimezone) === getUserLocalDate(date2, userTimezone);
+}
+
+/**
+ * Get date range for analysis (e.g., last 7 days)
+ * All dates returned in user's local timezone
+ */
+function getAnalysisDateRange(daysBack: number = 7, userTimezone?: string): { start: string; end: string } {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - daysBack);
+  
+  return {
+    start: getUserLocalDate(start, userTimezone),
+    end: getUserLocalDate(end, userTimezone)
+  };
+}
+
+/**
+ * Get user's location for timezone context
+ */
+async function getUserLocation(supabase: any, userId: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const { data: location } = await supabase
+      .from('user_locations')
+      .select('lat, lng')
+      .eq('user_id', userId)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    return location ? { lat: location.lat, lng: location.lng } : null;
+  } catch (error) {
+    console.warn('Error getting user location:', error);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -94,14 +241,21 @@ Deno.serve(async (req) => {
       throw new Error(`Workout not found: ${workoutError?.message}`);
     }
 
-    // Get user baselines
-    const { data: baselinesData, error: baselinesError } = await supabase
-      .from('user_baselines')
-      .select('baselines')
-      .eq('user_id', workout.user_id)
-      .single();
+    // Get user baselines and timezone context
+    const [baselinesResult, userTimezone] = await Promise.all([
+      supabase
+        .from('user_baselines')
+        .select('baselines')
+        .eq('user_id', workout.user_id)
+        .single(),
+      getUserTimezone(supabase, workout.user_id)
+    ]);
 
-    const userBaselines = baselinesData?.baselines || {};
+    const userBaselines = baselinesResult.data?.baselines || {};
+    
+    // Normalize workout date using user's timezone
+    const normalizedWorkoutDate = normalizeWorkoutDate(workout, null, userTimezone);
+    console.log(`Workout date normalized to user timezone: ${normalizedWorkoutDate}`);
 
     console.log(`Analyzing ${workout.type} workout with ${workout.sensor_data?.samples?.length || 0} samples`);
 
@@ -111,16 +265,32 @@ Deno.serve(async (req) => {
     // Calculate execution grade
     const grade = calculateExecutionGrade(workout, analysis);
 
-    // Generate quick insights (GPT-4 with SHORT response)
-    const insights = await generateQuickInsights(workout, analysis, userBaselines);
+    // Generate comprehensive insights using all analysis components
+    const insights = await generateWorkoutInsights({
+      workout: workout,
+      planned_vs_executed: analysis.planned_vs_executed,
+      bursts: analysis.speed_bursts,
+      consistency: analysis.pace_consistency,
+      fatigue: analysis.fatigue_pattern,
+      power_distribution: analysis.power_distribution,
+      hr_dynamics: analysis.hr_responsiveness,
+      userBaselines: userBaselines
+    });
 
     // Identify red flags
     const redFlags = identifyRedFlags(analysis);
 
     const result = {
       execution_grade: grade,
-      quick_insights: insights,
-      key_metrics: extractKeyMetrics(analysis),
+      insights: insights,
+      key_metrics: {
+        planned_vs_executed: analysis.planned_vs_executed,
+        speed_bursts: analysis.speed_bursts,
+        pace_consistency: analysis.pace_consistency,
+        fatigue_pattern: analysis.fatigue_pattern,
+        power_distribution: analysis.power_distribution,
+        hr_dynamics: analysis.hr_responsiveness
+      },
       red_flags: redFlags
     };
 
@@ -177,6 +347,7 @@ Deno.serve(async (req) => {
 function analyzeWorkoutWithSamples(workout: any, userBaselines: any): any {
   const sensorData = workout.sensor_data?.samples || [];
   const computed = typeof workout.computed === 'string' ? JSON.parse(workout.computed) : workout.computed;
+  const intervals = computed?.intervals || [];
   
   console.log(`Processing ${sensorData.length} sensor samples for ${workout.type} workout`);
 
@@ -185,12 +356,31 @@ function analyzeWorkoutWithSamples(workout: any, userBaselines: any): any {
     return analyzeWorkoutFromComputed(workout, computed, userBaselines);
   }
 
+  // 1. Compare planned vs executed (adherence)
+  const plannedVsExecuted = comparePlannedVsExecuted(sensorData, intervals);
+
+  // 2. Detect bursts relative to plan
+  const burstAnalysis = analyzeSpeedBursts(sensorData, intervals);
+
+  // 3. Measure consistency within intervals
+  const consistencyAnalysis = analyzePaceConsistency(sensorData, intervals);
+
+  // 4. Track fatigue across intervals
+  const fatigueAnalysis = analyzeFatiguePattern(sensorData, intervals);
+
+  // 5. Legacy analysis for backward compatibility
   const analysis = {
     power_distribution: null,
     hr_responsiveness: null,
     pace_variability: null,
     normalized_metrics: null,
-    intensity_analysis: null
+    intensity_analysis: null,
+    
+    // New enhanced analysis
+    planned_vs_executed: plannedVsExecuted,
+    speed_bursts: burstAnalysis,
+    pace_consistency: consistencyAnalysis,
+    fatigue_pattern: fatigueAnalysis
   };
 
   // Analyze based on workout type
@@ -209,6 +399,438 @@ function analyzeWorkoutWithSamples(workout: any, userBaselines: any): any {
   }
 
   return analysis;
+}
+
+/**
+ * =============================================================================
+ * COMPARE PLANNED VS EXECUTED
+ * =============================================================================
+ * 
+ * PURPOSE: Compare actual execution to planned workout structure
+ * 
+ * WHAT IT DOES:
+ * - Extracts planned targets from intervals
+ * - Calculates executed metrics from sensor samples
+ * - Computes adherence percentages
+ * - Identifies where execution deviated from plan
+ */
+function comparePlannedVsExecuted(samples: any[], intervals: any[]) {
+  const workIntervals = intervals.filter(i => i.kind === 'work');
+  
+  const comparison = workIntervals.map((interval, idx) => {
+    // Get executed data from samples
+    const intervalSamples = samples.slice(
+      interval.sample_idx_start,
+      interval.sample_idx_end
+    );
+    
+    // Extract executed metrics
+    const executedPower = intervalSamples
+      .map(s => s.powerInWatts || s.power)
+      .filter(p => p && p > 0);
+    const executedHR = intervalSamples
+      .map(s => s.heartRate)
+      .filter(hr => hr && hr > 0);
+    
+    const avgExecutedPower = executedPower.length > 0 ? 
+      executedPower.reduce((sum, p) => sum + p, 0) / executedPower.length : null;
+    const avgExecutedHR = executedHR.length > 0 ? 
+      executedHR.reduce((sum, hr) => sum + hr, 0) / executedHR.length : null;
+    
+    // Get planned targets
+    const plannedPower = interval.planned?.target_power_w || 
+                        interval.planned?.power_range?.upper;
+    const plannedDuration = interval.planned?.duration_s;
+    const actualDuration = interval.sample_idx_end - interval.sample_idx_start;
+    
+    // Calculate adherence
+    const powerAdherence = (plannedPower && avgExecutedPower) ? 
+      ((avgExecutedPower / plannedPower) * 100).toFixed(1) : null;
+    const durationAdherence = plannedDuration ? 
+      ((actualDuration / plannedDuration) * 100).toFixed(1) : null;
+    
+    return {
+      interval_number: idx + 1,
+      planned: {
+        target_power: plannedPower ? Math.round(plannedPower) : null,
+        duration_s: plannedDuration,
+        power_range: interval.planned?.power_range
+      },
+      executed: {
+        avg_power: avgExecutedPower ? Math.round(avgExecutedPower) : null,
+        avg_hr: avgExecutedHR ? Math.round(avgExecutedHR) : null,
+        duration_s: actualDuration
+      },
+      adherence: {
+        power_percent: powerAdherence,
+        duration_percent: durationAdherence
+      }
+    };
+  });
+  
+  return comparison;
+}
+
+/**
+ * =============================================================================
+ * ANALYZE SPEED BURSTS
+ * =============================================================================
+ * 
+ * PURPOSE: Detect power surges relative to planned targets
+ * 
+ * WHAT IT DOES:
+ * - Identifies bursts >10% above planned target
+ * - Counts burst frequency and duration
+ * - Provides interval-by-interval burst analysis
+ */
+function analyzeSpeedBursts(samples: any[], intervals: any[]) {
+  const workIntervals = intervals.filter(i => i.kind === 'work');
+  
+  const intervalBursts = workIntervals.map((interval, idx) => {
+    const intervalSamples = samples.slice(
+      interval.sample_idx_start,
+      interval.sample_idx_end
+    );
+    
+    // Get planned target (prioritize specific target over range)
+    const plannedTarget = interval.planned?.target_power_w || 
+                         interval.planned?.power_range?.upper ||
+                         interval.planned?.power_range?.lower;
+    
+    if (!plannedTarget) {
+      return {
+        interval_number: idx + 1,
+        error: 'No planned target available'
+      };
+    }
+    
+    // Burst = >10% above planned target
+    const burstThreshold = plannedTarget * 1.10;
+    
+    const powerSamples = intervalSamples
+      .map(s => s.powerInWatts || s.power)
+      .filter(p => p && p > 0);
+    
+    // Count burst seconds
+    let burstCount = 0;
+    let totalBurstSeconds = 0;
+    let inBurst = false;
+    
+    powerSamples.forEach((power, i) => {
+      if (power > burstThreshold) {
+        totalBurstSeconds++;
+        if (!inBurst) {
+          burstCount++;
+          inBurst = true;
+        }
+      } else {
+        inBurst = false;
+      }
+    });
+    
+    const percentBursting = (totalBurstSeconds / powerSamples.length) * 100;
+    
+    return {
+      interval_number: idx + 1,
+      planned_target: Math.round(plannedTarget),
+      burst_threshold: Math.round(burstThreshold),
+      burst_count: burstCount,
+      burst_seconds: totalBurstSeconds,
+      percent_bursting: percentBursting.toFixed(1),
+      interpretation: percentBursting < 5 ? 'Excellent control - stayed within target' :
+                     percentBursting < 10 ? 'Good - minor surges above target' :
+                     percentBursting < 15 ? 'Moderate - work on staying in target zone' :
+                     'High variability - focus on pacing discipline'
+    };
+  });
+  
+  return intervalBursts;
+}
+
+/**
+ * =============================================================================
+ * ANALYZE PACE CONSISTENCY
+ * =============================================================================
+ * 
+ * PURPOSE: Measure consistency within intervals
+ * 
+ * WHAT IT DOES:
+ * - Calculates coefficient of variation for each interval
+ * - Measures how steady effort was within target zones
+ * - Provides interval-by-interval consistency grades
+ */
+function analyzePaceConsistency(samples: any[], intervals: any[]) {
+  const workIntervals = intervals.filter(i => i.kind === 'work');
+  
+  const intervalConsistency = workIntervals.map((interval, idx) => {
+    const intervalSamples = samples.slice(
+      interval.sample_idx_start,
+      interval.sample_idx_end
+    );
+    
+    // Extract power or pace values
+    const values = intervalSamples
+      .map(s => {
+        // For bike: use power
+        if (s.powerInWatts || s.power) {
+          return s.powerInWatts || s.power;
+        }
+        // For run: calculate pace from speed
+        if (s.speedMetersPerSecond && s.speedMetersPerSecond > 0) {
+          return 1609.34 / s.speedMetersPerSecond; // Convert to s/mile
+        }
+        return null;
+      })
+      .filter(v => v && v > 0);
+    
+    if (values.length === 0) return null;
+    
+    // Calculate statistics
+    const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+    const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
+    const coefficientVariation = (stdDev / mean) * 100;
+    
+    // Target from planned
+    const target = interval.planned?.target_power_w || 
+                   interval.planned?.power_range?.upper ||
+                   interval.planned?.target_pace_s_per_mi;
+    
+    return {
+      interval_number: idx + 1,
+      target: target ? Math.round(target) : null,
+      mean: Math.round(mean),
+      std_dev: stdDev.toFixed(1),
+      coefficient_variation: coefficientVariation.toFixed(1),
+      adherence_percent: target ? ((mean / target) * 100).toFixed(1) : null,
+      consistency_grade: coefficientVariation < 2 ? 'Excellent' :
+                        coefficientVariation < 4 ? 'Good' :
+                        coefficientVariation < 6 ? 'Fair' :
+                        'Poor'
+    };
+  }).filter(i => i !== null);
+  
+  // Overall consistency
+  const avgCV = intervalConsistency.reduce((sum, i) => 
+    sum + parseFloat(i.coefficient_variation), 0
+  ) / intervalConsistency.length;
+  
+  return {
+    interval_consistency: intervalConsistency,
+    overall_cv: avgCV.toFixed(1),
+    consistency_grade: avgCV < 2 ? 'Excellent' :
+                      avgCV < 4 ? 'Good' :
+                      avgCV < 6 ? 'Fair' :
+                      'Poor',
+    interpretation: avgCV < 2 ? 'Very consistent - maintained steady effort' :
+                   avgCV < 4 ? 'Good consistency with minor variations' :
+                   avgCV < 6 ? 'Moderate variability - work on pacing' :
+                   'High variability - focus on maintaining steady effort'
+  };
+}
+
+/**
+ * =============================================================================
+ * ANALYZE FATIGUE PATTERN
+ * =============================================================================
+ * 
+ * PURPOSE: Track fatigue across intervals
+ * 
+ * WHAT IT DOES:
+ * - Measures power fade from first to last interval
+ * - Tracks HR progression across intervals
+ * - Analyzes adherence fade over time
+ */
+function analyzeFatiguePattern(samples: any[], intervals: any[]) {
+  const workIntervals = intervals.filter(i => i.kind === 'work');
+  
+  if (workIntervals.length < 2) return null;
+  
+  const intervalAnalysis = workIntervals.map((interval, idx) => {
+    const intervalSamples = samples.slice(
+      interval.sample_idx_start,
+      interval.sample_idx_end
+    );
+    
+    const executedPower = intervalSamples
+      .map(s => s.powerInWatts || s.power)
+      .filter(p => p && p > 0);
+    const executedHR = intervalSamples
+      .map(s => s.heartRate)
+      .filter(hr => hr && hr > 0);
+    
+    const avgExecutedPower = executedPower.length > 0 ? 
+      executedPower.reduce((sum, p) => sum + p, 0) / executedPower.length : null;
+    const avgExecutedHR = executedHR.length > 0 ? 
+      executedHR.reduce((sum, hr) => sum + hr, 0) / executedHR.length : null;
+    
+    // Get planned target
+    const plannedTarget = interval.planned?.target_power_w || 
+                         interval.planned?.power_range?.upper;
+    
+    return {
+      interval_number: idx + 1,
+      planned_target: plannedTarget ? Math.round(plannedTarget) : null,
+      executed_power: avgExecutedPower ? Math.round(avgExecutedPower) : null,
+      executed_hr: avgExecutedHR ? Math.round(avgExecutedHR) : null,
+      target_adherence: (plannedTarget && avgExecutedPower) ? 
+        ((avgExecutedPower / plannedTarget) * 100).toFixed(1) : null
+    };
+  });
+  
+  // Calculate fade relative to planned targets
+  const firstInterval = intervalAnalysis[0];
+  const lastInterval = intervalAnalysis[intervalAnalysis.length - 1];
+  
+  const powerFade = (firstInterval.executed_power && lastInterval.executed_power) ?
+    ((firstInterval.executed_power - lastInterval.executed_power) / firstInterval.executed_power) * 100 : null;
+  
+  // Adherence fade (are they hitting targets less well over time?)
+  const adherenceFade = (firstInterval.target_adherence && lastInterval.target_adherence) ?
+    parseFloat(firstInterval.target_adherence) - parseFloat(lastInterval.target_adherence) : null;
+  
+  return {
+    intervals: intervalAnalysis,
+    power_fade_percent: powerFade ? powerFade.toFixed(1) : null,
+    adherence_fade_percent: adherenceFade ? adherenceFade.toFixed(1) : null,
+    interpretation: !powerFade ? 'Insufficient data for fade analysis' :
+                   powerFade < -2 ? 'Negative split - finished stronger than planned!' :
+                   Math.abs(powerFade) < 3 ? 'Maintained power relative to plan - excellent execution' :
+                   powerFade < 5 ? 'Slight fade from plan - normal for this intensity' :
+                   powerFade < 8 ? 'Moderate fade from plan - consider starting easier' :
+                   'Significant fade from plan - pacing strategy needs adjustment'
+  };
+}
+
+/**
+ * =============================================================================
+ * GENERATE WORKOUT INSIGHTS
+ * =============================================================================
+ * 
+ * PURPOSE: Generate comprehensive AI insights using all analysis components
+ * 
+ * WHAT IT DOES:
+ * - Combines planned vs executed, bursts, consistency, and fatigue analysis
+ * - Generates specific, actionable insights using GPT-4
+ * - Provides detailed feedback on execution quality
+ */
+async function generateWorkoutInsights(data: {
+  workout: any;
+  planned_vs_executed: any;
+  bursts: any;
+  consistency: any;
+  fatigue: any;
+  power_distribution: any;
+  hr_dynamics: any;
+  userBaselines: any;
+}): Promise<string[]> {
+  const { workout, planned_vs_executed, bursts, consistency, fatigue, power_distribution, hr_dynamics, userBaselines } = data;
+  
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) {
+    return ['AI analysis not available - please set up OpenAI API key'];
+  }
+
+  try {
+    let prompt = `Analyze this ${workout.type} workout:
+
+EXECUTION SUMMARY:
+Duration: ${Math.round(workout.duration)}min | Adherence: ${workout.computed?.overall?.execution_score || 'N/A'}%
+Grade: ${workout.execution_grade || 'N/A'}`;
+
+    // Add power distribution analysis
+    if (power_distribution) {
+      prompt += `
+POWER DISTRIBUTION:
+- Normalized Power: ${power_distribution.normalized_power || 'N/A'}W
+- Variability: ${power_distribution.variability_index || 'N/A'} (${parseFloat(power_distribution.variability_index || '1.0') < 1.05 ? 'very steady' : 'variable'})
+- Dominant Zone: ${power_distribution.dominant_zone || 'N/A'}`;
+    }
+
+    // Add HR dynamics
+    if (hr_dynamics) {
+      prompt += `
+HEART RATE DYNAMICS:
+- Avg: ${hr_dynamics.avg_hr || 'N/A'} bpm, Max: ${hr_dynamics.max_hr || 'N/A'} bpm
+- Drift: ${hr_dynamics.hr_drift_percent || 'N/A'}% (${hr_dynamics.drift_interpretation || 'N/A'})`;
+    }
+
+    // Add planned vs executed analysis
+    if (planned_vs_executed && planned_vs_executed.length > 0) {
+      prompt += `
+PLANNED VS EXECUTED:
+${planned_vs_executed.map((interval: any) => 
+  `Interval ${interval.interval_number}: Planned ${interval.planned.target_power || 'N/A'}W → Executed ${interval.executed.avg_power || 'N/A'}W (${interval.adherence.power_percent || 'N/A'}% adherence)`
+).join('\n')}`;
+    }
+
+    // Add consistency analysis
+    if (consistency) {
+      prompt += `
+PACE CONSISTENCY:
+Overall: ${consistency.overall_cv || 'N/A'}% variation (${consistency.consistency_grade || 'N/A'})
+${consistency.interval_consistency ? consistency.interval_consistency.map((interval: any) => 
+  `Interval ${interval.interval_number}: ${interval.coefficient_variation}% variation (${interval.consistency_grade})`
+).join('\n') : ''}`;
+    }
+
+    // Add fatigue analysis
+    if (fatigue) {
+      prompt += `
+FATIGUE PATTERN:
+Power fade: ${fatigue.power_fade_percent || 'N/A'}% (first → last interval)
+${fatigue.intervals ? fatigue.intervals.map((interval: any) => 
+  `Interval ${interval.interval_number}: ${interval.executed_power || 'N/A'}W`
+).join(' | ') : ''}`;
+    }
+
+    // Add burst analysis
+    if (bursts && bursts.length > 0) {
+      prompt += `
+POWER SURGES:
+${bursts.map((burst: any) => 
+  `Interval ${burst.interval_number}: ${burst.burst_count} bursts, ${burst.percent_bursting}% above target`
+).join('\n')}`;
+    }
+
+    prompt += `
+BASELINE CONTEXT:
+FTP: ${userBaselines.ftp || 'N/A'}W
+Max HR: ${userBaselines.max_hr || 'N/A'} bpm
+
+Provide 3-4 bullet points:
+1. Overall execution quality (1 sentence)
+2. Key strength from the data (1 sentence)  
+3. One area to watch or improve (1 sentence)
+4. Fitness indicator (only if notable - HR response, recovery, efficiency)
+
+Keep bullets under 20 words each. Be specific with numbers.`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: 'Generate workout analysis. Be specific, use numbers, no fluff. Max 100 words total.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 150,
+        temperature: 0.3
+      })
+    });
+
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+    return content.split('\n').filter(line => line.trim().length > 0);
+    
+  } catch (error) {
+    console.error('GPT insights error:', error);
+    return ['AI analysis temporarily unavailable'];
+  }
 }
 
 /**

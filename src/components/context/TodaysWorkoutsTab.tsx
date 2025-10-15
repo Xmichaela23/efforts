@@ -14,7 +14,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const [loading, setLoading] = useState(true);
 
   // Use unified API instead of direct table queries
-  const today = new Date().toISOString().split('T')[0];
+  // Use user's local timezone for date calculations
+  const today = new Date().toLocaleDateString('en-CA');
   const { items: todayItems = [], loading: todayLoading } = useWeekUnified(today, today);
 
   useEffect(() => {
@@ -32,11 +33,16 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       if (!user) return;
 
       // Load most recent completed workouts (last 7 days)
+      // Use user's local timezone for date range calculation
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const sevenDaysAgoLocal = sevenDaysAgo.toLocaleDateString('en-CA');
+      
       const { data: recentData } = await supabase
         .from('workouts')
         .select('*')
         .eq('user_id', user.id)
-        .gte('date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .gte('date', sevenDaysAgoLocal)
         .order('date', { ascending: false })
         .limit(5);
 
@@ -153,7 +159,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                   {workout.name || `${workout.type} Workout`}
                 </div>
                 <div className="text-xs text-[#666666]">
-                  {new Date(workout.date).toLocaleDateString('en-US', { 
+                  {new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', { 
                     weekday: 'long', 
                     month: 'short', 
                     day: 'numeric' 

@@ -204,8 +204,9 @@ export const useWorkouts = () => {
       if (!user) { setWorkouts([]); setLoading(false); return; }
 
       // Step 1: Fetch manual/planned workouts from workouts table (bounded window, lightweight columns only)
-      const todayIso = new Date().toISOString().slice(0, 10);
-      const lookbackIso = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 45 days (reduce payload)
+      const todayIso = new Date().toLocaleDateString('en-CA');
+      const lookbackDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+      const lookbackIso = lookbackDate.toLocaleDateString('en-CA'); // last 45 days (reduce payload)
       const { data: manualWorkouts, error: manualError } = await supabase
         .from("workouts")
         .select([

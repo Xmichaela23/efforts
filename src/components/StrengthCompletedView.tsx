@@ -28,10 +28,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
 
 
-  // Normalize dates to YYYY-MM-DD format for comparison
+  // Normalize dates to YYYY-MM-DD format for comparison using user's local timezone
   const normalizeDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
+    return date.toLocaleDateString('en-CA');
   };
 
   // Find the planned workout - either the provided object if it's planned, or use passed planned workout
