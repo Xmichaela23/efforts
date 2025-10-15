@@ -241,23 +241,48 @@ Deno.serve(async (req) => {
       throw new Error(`Workout not found: ${workoutError?.message}`);
     }
 
+    console.log(`Workout user_id: ${workout.user_id}`);
+    console.log(`Workout type: ${workout.type}`);
+    console.log(`Workout date: ${workout.date}`);
+
     // Get user baselines and timezone context
+    console.log(`Looking for baselines for user_id: ${workout.user_id}`);
     const [baselinesResult, userTimezone] = await Promise.all([
       supabase
         .from('user_baselines')
-        .select('baselines')
+        .select('performance_numbers')
         .eq('user_id', workout.user_id)
         .single(),
       getUserTimezone(supabase, workout.user_id)
     ]);
 
-    const userBaselines = baselinesResult.data?.baselines || {};
+    console.log(`Baselines query result:`, JSON.stringify(baselinesResult, null, 2));
+    
+    if (baselinesResult.error) {
+      console.log(`Baselines query error: ${baselinesResult.error.message}`);
+    }
+
+    const rawBaselines = baselinesResult.data?.performance_numbers || {};
+    
+    // Normalize field names to match expected format
+    const userBaselines = {
+      ftp: rawBaselines.ftp,
+      max_hr: rawBaselines.max_hr || rawBaselines.maxHR,
+      rest_hr: rawBaselines.rest_hr || rawBaselines.restHR,
+      five_k: rawBaselines.fiveK || rawBaselines.five_k,
+      swim: rawBaselines.swim
+    };
+    
+    console.log('Raw baselines data:', JSON.stringify(baselinesResult.data, null, 2));
+    console.log('Parsed userBaselines:', JSON.stringify(userBaselines, null, 2));
     
     // Check for required baselines - NO FALLBACKS
     if (!userBaselines.ftp) {
+      console.log('FTP missing from baselines');
       return new Response(JSON.stringify({
         error: 'FTP baseline required for analysis. Please update your profile with your FTP.',
-        missing_baseline: 'ftp'
+        missing_baseline: 'ftp',
+        available_baselines: Object.keys(userBaselines)
       }), {
         status: 400,
         headers: {
@@ -267,10 +292,12 @@ Deno.serve(async (req) => {
       });
     }
     
-    if (!userBaselines.max_hr) {
+    if (!userBaselines.max_hr && !userBaselines.maxHR) {
+      console.log('Max HR missing from baselines');
       return new Response(JSON.stringify({
         error: 'Max HR baseline required for analysis. Please update your profile with your max heart rate.',
-        missing_baseline: 'max_hr'
+        missing_baseline: 'max_hr',
+        available_baselines: Object.keys(userBaselines)
       }), {
         status: 400,
         headers: {

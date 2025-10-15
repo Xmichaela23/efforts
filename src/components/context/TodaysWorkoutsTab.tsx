@@ -48,9 +48,15 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
           if (error) {
             console.error(`❌ Analysis failed for workout ${workout.id}:`, error);
             console.error(`❌ Error details:`, JSON.stringify(error, null, 2));
-            if (error.message?.includes('baseline required')) {
-              console.error(`❌ Missing baselines: ${error.message}`);
-              setBaselineError(error.message);
+            
+            // Check if it's a baseline error by looking at the error context
+            if (error.context?.body?.error?.includes('baseline required') || 
+                error.context?.body?.error?.includes('FTP') || 
+                error.context?.body?.error?.includes('Max HR')) {
+              console.error(`❌ Missing baselines: ${error.context.body.error}`);
+              setBaselineError(error.context.body.error);
+            } else {
+              console.error(`❌ Other error: ${error.message || 'Unknown error'}`);
             }
           } else {
             console.log(`✅ Analysis completed for workout ${workout.id}`);
@@ -64,7 +70,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       
       // Wait a moment for analysis to complete, then refresh
       setTimeout(() => {
-        fetchRecentWorkouts();
+        loadRecentWorkouts();
       }, 2000);
       
     } catch (error) {
