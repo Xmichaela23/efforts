@@ -41,6 +41,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
   'Vary': 'Origin'
 };
 
@@ -293,7 +295,7 @@ Deno.serve(async (req) => {
     }
     
     // Max HR is optional - we'll use alternative methods for HR analysis
-    if (!userBaselines.max_hr && !userBaselines.maxHR) {
+    if (!userBaselines.max_hr) {
       console.log('Max HR not available, using alternative HR analysis methods');
       userBaselines.max_hr = null; // Set to null so we know it's not available
     }
@@ -307,7 +309,7 @@ Deno.serve(async (req) => {
     console.log(`User baselines:`, JSON.stringify(userBaselines, null, 2));
 
     // Analyze using granular sample data
-    const analysis = analyzeWorkoutWithSamples(workout, userBaselines);
+    const analysis = await analyzeWorkoutWithSamples(workout, userBaselines, supabase);
     console.log(`Analysis result:`, JSON.stringify(analysis, null, 2));
 
     // Calculate execution grade
@@ -392,7 +394,7 @@ Deno.serve(async (req) => {
  * 
  * OUTPUT: Comprehensive analysis object with all metrics and distributions
  */
-function analyzeWorkoutWithSamples(workout: any, userBaselines: any): any {
+async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supabase: any): Promise<any> {
   const sensorData = workout.sensor_data?.samples || [];
   const computed = typeof workout.computed === 'string' ? JSON.parse(workout.computed) : workout.computed;
   const intervals = computed?.intervals || [];
@@ -400,9 +402,23 @@ function analyzeWorkoutWithSamples(workout: any, userBaselines: any): any {
   console.log(`Processing ${sensorData.length} sensor samples for ${workout.type} workout`);
 
   if (sensorData.length === 0) {
-    console.log('No sensor data available, using computed data only');
-    return analyzeWorkoutFromComputed(workout, computed, userBaselines);
+    console.log('No sensor data available, using computed data with historical trends');
+    const basicAnalysis = analyzeWorkoutFromComputed(workout, computed, userBaselines);
+    
+    // Add historical trend analysis even without sensor data
+    try {
+      console.log('Running HR trend analysis for computed data...');
+      const hrTrends = await analyzeHRTrends([], computed, workout, supabase);
+      basicAnalysis.hr_responsiveness = hrTrends;
+      console.log('HR trend analysis completed for computed data:', JSON.stringify(hrTrends, null, 2));
+    } catch (error) {
+      console.error('HR trend analysis failed for computed data:', error);
+    }
+    
+    return basicAnalysis;
   }
+
+  console.log('Running enhanced analysis with sensor data...');
 
   // 1. Compare planned vs executed (adherence)
   const plannedVsExecuted = comparePlannedVsExecuted(sensorData, intervals);
@@ -416,36 +432,46 @@ function analyzeWorkoutWithSamples(workout: any, userBaselines: any): any {
   // 4. Track fatigue across intervals
   const fatigueAnalysis = analyzeFatiguePattern(sensorData, intervals);
 
-  // 5. Legacy analysis for backward compatibility
+  // 5. Run enhanced analysis with historical context
   const analysis = {
+    // New enhanced analysis (always generated)
+    planned_vs_executed: plannedVsExecuted,
+    speed_bursts: burstAnalysis,
+    pace_consistency: consistencyAnalysis,
+    fatigue_pattern: fatigueAnalysis,
+    
+    // Type-specific analysis
     power_distribution: null,
     hr_responsiveness: null,
     pace_variability: null,
     normalized_metrics: null,
-    intensity_analysis: null,
-    
-    // New enhanced analysis
-    planned_vs_executed: plannedVsExecuted,
-    speed_bursts: burstAnalysis,
-    pace_consistency: consistencyAnalysis,
-    fatigue_pattern: fatigueAnalysis
+    intensity_analysis: null
   };
+
+  // Always run HR trend analysis regardless of workout type
+  console.log('Running HR trend analysis...');
+  try {
+    analysis.hr_responsiveness = await analyzeHRTrends(sensorData, computed, workout, supabase);
+    console.log('HR trend analysis completed:', JSON.stringify(analysis.hr_responsiveness, null, 2));
+  } catch (error) {
+    console.error('HR trend analysis failed:', error);
+    // No fallback - return error state
+    analysis.hr_responsiveness = null;
+  }
 
   // Analyze based on workout type
   if (workout.type === 'run' || workout.type === 'running') {
     analysis.pace_variability = analyzePaceVariability(sensorData, computed);
-    analysis.hr_responsiveness = analyzeHRResponsiveness(sensorData, computed);
     analysis.intensity_analysis = analyzeRunIntensity(sensorData, computed, userBaselines);
   } else if (workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike') {
     analysis.power_distribution = analyzePowerDistribution(sensorData, computed, userBaselines);
-    analysis.hr_responsiveness = analyzeHRResponsiveness(sensorData, computed);
     analysis.normalized_metrics = calculateNormalizedPower(sensorData, userBaselines);
     analysis.intensity_analysis = analyzeBikeIntensity(sensorData, computed, userBaselines);
   } else if (workout.type === 'swim' || workout.type === 'swimming') {
-    analysis.hr_responsiveness = analyzeHRResponsiveness(sensorData, computed);
     analysis.intensity_analysis = analyzeSwimIntensity(sensorData, computed, userBaselines);
   }
 
+  console.log('Final analysis structure:', JSON.stringify(analysis, null, 2));
   return analysis;
 }
 
@@ -484,6 +510,25 @@ function comparePlannedVsExecuted(samples: any[], intervals: any[]) {
       executedPower.reduce((sum, p) => sum + p, 0) / executedPower.length : null;
     const avgExecutedHR = executedHR.length > 0 ? 
       executedHR.reduce((sum, hr) => sum + hr, 0) / executedHR.length : null;
+    const maxExecutedHR = executedHR.length > 0 ? Math.max(...executedHR) : null;
+    
+    // Calculate HR response pattern within interval
+    let hrResponse: any = null;
+    if (executedHR.length > 10) {
+      const firstThird = executedHR.slice(0, Math.floor(executedHR.length / 3));
+      const lastThird = executedHR.slice(-Math.floor(executedHR.length / 3));
+      
+      const startHR = firstThird.reduce((sum, hr) => sum + hr, 0) / firstThird.length;
+      const endHR = lastThird.reduce((sum, hr) => sum + hr, 0) / lastThird.length;
+      const hrClimb = Math.round(endHR - startHR);
+      
+      hrResponse = {
+        start_hr: Math.round(startHR),
+        end_hr: Math.round(endHR),
+        hr_climb: hrClimb,
+        response_type: hrClimb > 5 ? 'rising' : hrClimb < -2 ? 'dropping' : 'stable'
+      };
+    }
     
     // Get planned targets
     const plannedPower = interval.planned?.target_power_w || 
@@ -507,7 +552,9 @@ function comparePlannedVsExecuted(samples: any[], intervals: any[]) {
       executed: {
         avg_power: avgExecutedPower ? Math.round(avgExecutedPower) : null,
         avg_hr: avgExecutedHR ? Math.round(avgExecutedHR) : null,
-        duration_s: actualDuration
+        max_hr: maxExecutedHR,
+        duration_s: actualDuration,
+        hr_response: hrResponse
       },
       adherence: {
         power_percent: powerAdherence,
@@ -783,32 +830,79 @@ async function generateWorkoutInsights(data: {
     let prompt = `Analyze this ${workout.type} workout:
 
 EXECUTION SUMMARY:
-Duration: ${Math.round(workout.duration)}min | Adherence: ${workout.computed?.overall?.execution_score || 'N/A'}%
-Grade: ${workout.execution_grade || 'N/A'}`;
+Duration: ${Math.round(workout.duration)}min | Adherence: ${workout.computed?.overall?.execution_score}%
+Grade: ${workout.execution_grade}`;
 
     // Add power distribution analysis
     if (power_distribution) {
       prompt += `
 POWER DISTRIBUTION:
-- Normalized Power: ${power_distribution.normalized_power || 'N/A'}W
-- Variability: ${power_distribution.variability_index || 'N/A'} (${parseFloat(power_distribution.variability_index || '1.0') < 1.05 ? 'very steady' : 'variable'})
-- Dominant Zone: ${power_distribution.dominant_zone || 'N/A'}`;
+- Normalized Power: ${power_distribution.normalized_power}W
+- Variability: ${power_distribution.variability_index} (${parseFloat(power_distribution.variability_index) < 1.05 ? 'very steady' : 'variable'})
+- Dominant Zone: ${power_distribution.dominant_zone}`;
     }
 
-    // Add HR dynamics
+    // Add HR as physiological response indicator
     if (hr_dynamics) {
       prompt += `
-HEART RATE DYNAMICS:
-- Avg: ${hr_dynamics.avg_hr || 'N/A'} bpm, Max: ${hr_dynamics.max_hr || 'N/A'} bpm
-- Drift: ${hr_dynamics.hr_drift_percent || 'N/A'}% (${hr_dynamics.drift_interpretation || 'N/A'})`;
+PHYSIOLOGICAL RESPONSE:
+- Avg HR: ${hr_dynamics.avg_hr} bpm, Peak: ${hr_dynamics.max_hr} bpm
+- HR Drift: ${hr_dynamics.hr_drift_percent}% (${hr_dynamics.drift_interpretation})`;
+      
+      if (hr_dynamics.trend_analysis) {
+        prompt += `
+- HR Context: ${hr_dynamics.trend_analysis.current_avg_hr_percentile}th percentile vs recent workouts`;
+      }
     }
 
-    // Add planned vs executed analysis
+    // Add interval-by-interval performance analysis
     if (planned_vs_executed && planned_vs_executed.length > 0) {
       prompt += `
-PLANNED VS EXECUTED:
-${planned_vs_executed.map((interval: any) => 
-  `Interval ${interval.interval_number}: Planned ${interval.planned.target_power || 'N/A'}W → Executed ${interval.executed.avg_power || 'N/A'}W (${interval.adherence.power_percent || 'N/A'}% adherence)`
+INTERVAL PERFORMANCE:
+${planned_vs_executed.map((interval: any, idx: number) => {
+  const power = interval.executed.avg_power;
+  const target = interval.planned.target_power;
+  const adherence = interval.adherence.power_percent;
+  const hr = interval.executed.avg_hr;
+  const hrResponse = interval.executed.hr_response;
+  
+  let hrContext = '';
+  if (hrResponse) {
+    if (hrResponse.response_type === 'rising') {
+      hrContext = ` - HR climbed ${hrResponse.hr_climb} bpm`;
+    } else if (hrResponse.response_type === 'dropping') {
+      hrContext = ` - HR dropped ${Math.abs(hrResponse.hr_climb)} bpm`;
+    } else {
+      hrContext = ` - HR stable`;
+    }
+  }
+  
+  return `Interval ${interval.interval_number}: ${power}W (${adherence}% of ${target}W) - HR: ${hr} bpm${hrContext}`;
+}).join('\n')}`;
+    }
+
+    // Add workout context
+    prompt += `
+WORKOUT CONTEXT:
+- Type: ${workout.type}
+- Date: ${workout.date}
+- Duration: ${Math.round(workout.duration || 0)}min`;
+
+    // Add burst analysis per interval
+    if (bursts && bursts.interval_bursts && bursts.interval_bursts.length > 0) {
+      prompt += `
+POWER CONTROL:
+${bursts.interval_bursts.map((burst: any) => 
+  `Interval ${burst.interval_number}: ${burst.burst_count} surges (${burst.percent_bursting}% above target)`
+).join('\n')}`;
+    }
+
+    // Add consistency analysis per interval
+    if (consistency && consistency.interval_consistency && consistency.interval_consistency.length > 0) {
+      prompt += `
+PACING CONSISTENCY:
+${consistency.interval_consistency.map((interval: any) => 
+  `Interval ${interval.interval_number}: ${interval.consistency_grade} (${interval.coefficient_variation}% variation)`
 ).join('\n')}`;
     }
 
@@ -816,7 +910,7 @@ ${planned_vs_executed.map((interval: any) =>
     if (consistency) {
       prompt += `
 PACE CONSISTENCY:
-Overall: ${consistency.overall_cv || 'N/A'}% variation (${consistency.consistency_grade || 'N/A'})
+Overall: ${consistency.overall_cv}% variation (${consistency.consistency_grade})
 ${consistency.interval_consistency ? consistency.interval_consistency.map((interval: any) => 
   `Interval ${interval.interval_number}: ${interval.coefficient_variation}% variation (${interval.consistency_grade})`
 ).join('\n') : ''}`;
@@ -826,9 +920,9 @@ ${consistency.interval_consistency ? consistency.interval_consistency.map((inter
     if (fatigue) {
       prompt += `
 FATIGUE PATTERN:
-Power fade: ${fatigue.power_fade_percent || 'N/A'}% (first → last interval)
+Power fade: ${fatigue.power_fade_percent}% (first → last interval)
 ${fatigue.intervals ? fatigue.intervals.map((interval: any) => 
-  `Interval ${interval.interval_number}: ${interval.executed_power || 'N/A'}W`
+  `Interval ${interval.interval_number}: ${interval.executed_power}W`
 ).join(' | ') : ''}`;
     }
 
@@ -843,14 +937,25 @@ ${bursts.map((burst: any) =>
 
     prompt += `
 BASELINE CONTEXT:
-FTP: ${userBaselines.ftp || 'N/A'}W
-Max HR: ${userBaselines.max_hr || 'N/A'} bpm
+FTP: ${userBaselines.ftp}W
+Max HR: ${userBaselines.max_hr} bpm
 
 Provide 3-4 bullet points:
-1. Overall execution quality (1 sentence)
-2. Key strength from the data (1 sentence)  
-3. One area to watch or improve (1 sentence)
-4. Fitness indicator (only if notable - HR response, recovery, efficiency)
+1. Overall execution quality with specific metrics (1 sentence)
+2. Key performance pattern from interval analysis (1 sentence)  
+3. One area to watch or improve based on data (1 sentence)
+4. Fitness indicator with historical context (only if notable)
+
+ANALYSIS FOCUS:
+- Lead with PERFORMANCE metrics (power, pace, execution) - use actual numbers
+- Use HR as physiological RESPONSE indicator, not primary focus
+- Describe interval-by-interval patterns: "Interval 4 showed fewer power surges"
+- Mention HR drift/response in context of performance: "HR climbed 8 bpm as power faded"
+- Include workout type, date, and duration context
+- If HR data quality is poor, mention it but focus on power/pace analysis
+- If HR is anomalously high/low vs historical data, suggest checking sensor
+- Avoid generic health warnings - focus on training insights
+- Use specific numbers from the analysis data provided
 
 Keep bullets under 20 words each. Be specific with numbers.`;
 
@@ -991,6 +1096,124 @@ function analyzePowerDistribution(sensorData: any[], computed: any, userBaseline
 /**
  * Analyze HR responsiveness from sensor data
  */
+async function analyzeHRTrends(sensorData: any[], computed: any, workout: any, supabase: any): Promise<any> {
+  const hrSamples = sensorData
+    .map(s => s.heartRate)
+    .filter(hr => hr && hr > 0);
+
+  // If no sensor data, use computed data for basic HR metrics
+  let avgHR, maxHR, hrDrift, recoveryRate;
+  
+  if (hrSamples.length === 0) {
+    // Use computed data for basic HR metrics
+    avgHR = workout.avg_heart_rate;
+    maxHR = workout.max_heart_rate;
+    hrDrift = null;
+    recoveryRate = null;
+    
+    if (!avgHR || !maxHR) {
+      return {
+        avg_hr: null,
+        max_hr: null,
+        hr_drift_percent: null,
+        recovery_rate: null,
+        trend_analysis: null,
+        data_quality: 'insufficient'
+      };
+    }
+  } else {
+    avgHR = hrSamples.reduce((sum, hr) => sum + hr, 0) / hrSamples.length;
+    maxHR = Math.max(...hrSamples);
+    hrDrift = calculateHRDrift(hrSamples);
+
+    // Calculate recovery rate (if we have enough data)
+    if (hrSamples.length > 30) {
+      const last30Seconds = hrSamples.slice(-30);
+      const first30Seconds = hrSamples.slice(0, 30);
+      const endAvg = last30Seconds.reduce((sum, hr) => sum + hr, 0) / last30Seconds.length;
+      const startAvg = first30Seconds.reduce((sum, hr) => sum + hr, 0) / first30Seconds.length;
+      recoveryRate = Math.round(startAvg - endAvg);
+    }
+  }
+
+  // Get historical HR data for trend analysis
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  console.log(`Looking for historical workouts for user ${workout.user_id} from ${thirtyDaysAgo.toISOString().split('T')[0]} to ${workout.date}`);
+  
+  const { data: historicalWorkouts, error: historicalError } = await supabase
+    .from('workouts')
+    .select('id, date, type, avg_heart_rate, max_heart_rate, workout_analysis')
+    .eq('user_id', workout.user_id)
+    .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+    .lt('date', workout.date)
+    .not('avg_heart_rate', 'is', null)
+    .order('date', { ascending: false })
+    .limit(20);
+  
+  if (historicalError) {
+    console.error('Historical data query failed:', historicalError);
+  } else {
+    console.log(`Found ${historicalWorkouts?.length || 0} historical workouts`);
+  }
+
+  // Analyze HR trends
+  let trendAnalysis: any = null;
+  if (historicalWorkouts && historicalWorkouts.length >= 3) {
+    const recentHRs = historicalWorkouts
+      .map(w => ({ 
+        avg_hr: w.avg_heart_rate, 
+        max_hr: w.max_heart_rate,
+        date: w.date,
+        type: w.type,
+        analysis: w.workout_analysis
+      }))
+      .filter(w => w.avg_hr && w.max_hr);
+
+    if (recentHRs.length >= 3) {
+      // Calculate trend patterns
+      const avgHRs = recentHRs.map(w => w.avg_hr);
+      const maxHRs = recentHRs.map(w => w.max_hr);
+      
+      const avgHRTrend = calculateTrend(avgHRs);
+      const maxHRTrend = calculateTrend(maxHRs);
+      
+      // Check for concerning patterns
+      const avgHRVariability = calculateVariability(avgHRs);
+      const maxHRVariability = calculateVariability(maxHRs);
+      
+      // Determine if current workout is within normal range
+      const avgHRPercentile = calculatePercentile(avgHR, avgHRs);
+      const maxHRPercentile = calculatePercentile(maxHR, maxHRs);
+      
+      trendAnalysis = {
+        recent_avg_hr_trend: avgHRTrend,
+        recent_max_hr_trend: maxHRTrend,
+        avg_hr_variability: avgHRVariability,
+        max_hr_variability: maxHRVariability,
+        current_avg_hr_percentile: avgHRPercentile,
+        current_max_hr_percentile: maxHRPercentile,
+        data_points: recentHRs.length,
+        trend_interpretation: interpretHRTrends(avgHR, maxHR, avgHRs, maxHRs, avgHRPercentile, maxHRPercentile)
+      };
+    }
+  }
+
+  // Assess data quality with historical context
+  const historicalAvgHRs = historicalWorkouts?.map(w => w.avg_heart_rate).filter(hr => hr) || [];
+  const dataQuality = assessHRDataQuality(hrSamples, hrDrift, historicalAvgHRs);
+
+  return {
+    avg_hr: Math.round(avgHR),
+    max_hr: maxHR,
+    hr_drift_percent: Math.round(hrDrift * 10) / 10,
+    recovery_rate: recoveryRate,
+    trend_analysis: trendAnalysis,
+    data_quality: dataQuality
+  };
+}
+
 function analyzeHRResponsiveness(sensorData: any[], computed: any): any {
   const hrSamples = sensorData
     .map(s => s.heartRate)
@@ -1028,6 +1251,164 @@ function analyzeHRResponsiveness(sensorData: any[], computed: any): any {
 }
 
 /**
+ * Calculate trend direction from array of values
+ */
+function calculateTrend(values: number[]): 'increasing' | 'decreasing' | 'stable' {
+  if (values.length < 2) return 'stable';
+  
+  const firstHalf = values.slice(0, Math.floor(values.length / 2));
+  const secondHalf = values.slice(Math.floor(values.length / 2));
+  
+  const firstAvg = firstHalf.reduce((sum, v) => sum + v, 0) / firstHalf.length;
+  const secondAvg = secondHalf.reduce((sum, v) => sum + v, 0) / secondHalf.length;
+  
+  const change = ((secondAvg - firstAvg) / firstAvg) * 100;
+  
+  if (change > 5) return 'increasing';
+  if (change < -5) return 'decreasing';
+  return 'stable';
+}
+
+/**
+ * Calculate variability (coefficient of variation)
+ */
+function calculateVariability(values: number[]): number {
+  if (values.length < 2) return 0;
+  
+  const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
+  const stdDev = Math.sqrt(variance);
+  
+  return (stdDev / mean) * 100;
+}
+
+/**
+ * Calculate percentile rank
+ */
+function calculatePercentile(value: number, values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = sorted.findIndex(v => v >= value);
+  
+  if (index === -1) return 100;
+  if (index === 0) return 0;
+  
+  return Math.round((index / sorted.length) * 100);
+}
+
+/**
+ * Interpret HR trends and provide context with anomaly detection
+ */
+function interpretHRTrends(
+  currentAvgHR: number, 
+  currentMaxHR: number, 
+  historicalAvgHRs: number[], 
+  historicalMaxHRs: number[],
+  avgHRPercentile: number,
+  maxHRPercentile: number
+): string {
+  const avgHRMean = historicalAvgHRs.reduce((sum, v) => sum + v, 0) / historicalAvgHRs.length;
+  const maxHRMean = historicalMaxHRs.reduce((sum, v) => sum + v, 0) / historicalMaxHRs.length;
+  
+  // Calculate standard deviations for anomaly detection
+  const avgHRStdDev = Math.sqrt(historicalAvgHRs.reduce((sum, v) => sum + Math.pow(v - avgHRMean, 2), 0) / historicalAvgHRs.length);
+  const maxHRStdDev = Math.sqrt(historicalMaxHRs.reduce((sum, v) => sum + Math.pow(v - maxHRMean, 2), 0) / historicalMaxHRs.length);
+  
+  // Detect anomalies (more than 2 standard deviations from mean)
+  const avgHRAnomaly = Math.abs(currentAvgHR - avgHRMean) > (2 * avgHRStdDev);
+  const maxHRAnomaly = Math.abs(currentMaxHR - maxHRMean) > (2 * maxHRStdDev);
+  
+  // Check for concerning patterns
+  if (avgHRPercentile > 95) {
+    if (avgHRAnomaly) {
+      return `Anomalously high average HR (${avgHRPercentile}th percentile, ${Math.round(currentAvgHR)} vs ${Math.round(avgHRMean)} avg) - possible sensor issue or illness`;
+    }
+    return `High average HR (${avgHRPercentile}th percentile) - monitor for overreaching or illness`;
+  }
+  
+  if (maxHRPercentile > 95) {
+    if (maxHRAnomaly) {
+      return `Anomalously high max HR (${maxHRPercentile}th percentile, ${Math.round(currentMaxHR)} vs ${Math.round(maxHRMean)} avg) - check sensor or intensity`;
+    }
+    return `High max HR (${maxHRPercentile}th percentile) - check intensity and recovery`;
+  }
+  
+  if (avgHRPercentile < 5) {
+    if (avgHRAnomaly) {
+      return `Anomalously low average HR (${avgHRPercentile}th percentile, ${Math.round(currentAvgHR)} vs ${Math.round(avgHRMean)} avg) - possible sensor issue or undertraining`;
+    }
+    return `Low average HR (${avgHRPercentile}th percentile) - may indicate good fitness or undertraining`;
+  }
+  
+  if (maxHRPercentile < 5) {
+    if (maxHRAnomaly) {
+      return `Anomalously low max HR (${maxHRPercentile}th percentile, ${Math.round(currentMaxHR)} vs ${Math.round(maxHRMean)} avg) - check sensor or intensity`;
+    }
+    return `Low max HR (${maxHRPercentile}th percentile) - check if intensity was appropriate`;
+  }
+  
+  // Check for trends
+  const avgHRTrend = calculateTrend(historicalAvgHRs);
+  const maxHRTrend = calculateTrend(historicalMaxHRs);
+  
+  if (avgHRTrend === 'increasing' && avgHRPercentile > 75) {
+    return `Rising average HR trend - monitor for fatigue or overtraining`;
+  }
+  
+  if (maxHRTrend === 'increasing' && maxHRPercentile > 75) {
+    return `Rising max HR trend - check recovery and training load`;
+  }
+  
+  if (avgHRTrend === 'decreasing' && avgHRPercentile < 25) {
+    return `Improving HR efficiency - fitness gains evident`;
+  }
+  
+  return `HR within normal range (${avgHRPercentile}th percentile avg, ${maxHRPercentile}th percentile max)`;
+}
+
+/**
+ * Assess HR data quality with historical context
+ */
+function assessHRDataQuality(hrSamples: number[], hrDrift: number, historicalHRs?: number[]): 'excellent' | 'good' | 'poor' | 'insufficient' {
+  if (hrSamples.length < 10) return 'insufficient';
+  
+  // Check for gaps in data
+  const gaps = hrSamples.filter(hr => hr === 0).length;
+  const gapPercent = (gaps / hrSamples.length) * 100;
+  
+  // Check for unrealistic values
+  const unrealistic = hrSamples.filter(hr => hr < 40 || hr > 220).length;
+  const unrealisticPercent = (unrealistic / hrSamples.length) * 100;
+  
+  // Check for excessive drift (might indicate poor data)
+  const excessiveDrift = Math.abs(hrDrift) > 20;
+  
+  // Check for suspiciously low HR (possible sensor issue)
+  const avgHR = hrSamples.reduce((sum, hr) => sum + hr, 0) / hrSamples.length;
+  const suspiciouslyLow = avgHR < 60 && hrSamples.length > 100; // Very low for a workout
+  
+  // Check against historical context if available
+  let historicalAnomaly = false;
+  if (historicalHRs && historicalHRs.length >= 3) {
+    const historicalMean = historicalHRs.reduce((sum, hr) => sum + hr, 0) / historicalHRs.length;
+    const historicalStdDev = Math.sqrt(historicalHRs.reduce((sum, hr) => sum + Math.pow(hr - historicalMean, 2), 0) / historicalHRs.length);
+    
+    // If current HR is more than 3 standard deviations from historical mean
+    historicalAnomaly = Math.abs(avgHR - historicalMean) > (3 * historicalStdDev);
+  }
+  
+  // Determine quality based on all factors
+  if (gapPercent > 30 || unrealisticPercent > 15 || excessiveDrift || suspiciouslyLow || historicalAnomaly) {
+    return 'poor';
+  }
+  
+  if (gapPercent > 15 || unrealisticPercent > 8 || Math.abs(hrDrift) > 15) {
+    return 'good';
+  }
+  
+  return 'excellent';
+}
+
+/**
  * Calculate normalized power from sensor data
  */
 function calculateNormalizedPower(sensorData: any[], userBaselines: any): any {
@@ -1044,7 +1425,7 @@ function calculateNormalizedPower(sensorData: any[], userBaselines: any): any {
   }
 
   // Calculate 30-second rolling average
-  const rollingAverages = [];
+  const rollingAverages: number[] = [];
   for (let i = 0; i < powerSamples.length - 29; i++) {
     const window = powerSamples.slice(i, i + 30);
     const avg = window.reduce((sum, p) => sum + p, 0) / window.length;
@@ -1088,8 +1469,8 @@ function analyzeRunIntensity(sensorData: any[], computed: any, userBaselines: an
     return { intensity: 'unknown', analysis: 'No data available' };
   }
 
-  let intensity = 'unknown';
-  let analysis = 'No data available';
+  let intensity: string | null = null;
+  let analysis: string | null = null;
 
   if (paceSamples.length > 0) {
     const avgPace = paceSamples.reduce((sum, p) => sum + p, 0) / paceSamples.length;
@@ -1147,8 +1528,8 @@ function analyzeBikeIntensity(sensorData: any[], computed: any, userBaselines: a
     return { intensity: 'unknown', analysis: 'No data available' };
   }
 
-  let intensity = 'unknown';
-  let analysis = 'No data available';
+  let intensity: string | null = null;
+  let analysis: string | null = null;
 
   if (powerSamples.length > 0) {
     const avgPower = powerSamples.reduce((sum, p) => sum + p, 0) / powerSamples.length;
@@ -1208,8 +1589,8 @@ function analyzeSwimIntensity(sensorData: any[], computed: any, userBaselines: a
 
   const avgHR = hrSamples.reduce((sum, hr) => sum + hr, 0) / hrSamples.length;
   
-  let intensity = 'unknown';
-  let analysis = 'No data available';
+  let intensity: string | null = null;
+  let analysis: string | null = null;
 
   if (userBaselines.max_hr) {
     const hrPercent = (avgHR / userBaselines.max_hr) * 100;
@@ -1230,36 +1611,16 @@ function analyzeSwimIntensity(sensorData: any[], computed: any, userBaselines: a
 }
 
 /**
- * Fallback analysis using computed data only
+ * Basic analysis using computed data only - NO FALLBACKS
  */
 function analyzeWorkoutFromComputed(workout: any, computed: any, userBaselines: any): any {
+  // Return minimal structure - no fallbacks
   return {
-    power_distribution: workout.avg_power ? {
-      avg_power: workout.avg_power,
-      max_power: workout.max_power,
-      power_variability: workout.max_power && workout.avg_power ? workout.max_power / workout.avg_power : null
-    } : null,
-    hr_responsiveness: workout.avg_heart_rate ? {
-      avg_hr: workout.avg_heart_rate,
-      max_hr: workout.max_heart_rate,
-      hr_drift_percent: null,
-      recovery_rate: null
-    } : null,
-    pace_variability: computed?.overall?.avg_pace_s_per_mi ? {
-      consistency_score: null,
-      variability_percent: null,
-      pace_range: {
-        avg: secondsToPace(computed.overall.avg_pace_s_per_mi),
-        fastest: null,
-        slowest: null
-      }
-    } : null,
-    normalized_metrics: workout.normalized_power ? {
-      normalized_power: workout.normalized_power,
-      intensity_factor: workout.intensity_factor,
-      training_stress_score: workout.tss
-    } : null,
-    intensity_analysis: { intensity: 'unknown', analysis: 'Limited data available' }
+    power_distribution: null,
+    hr_responsiveness: null,
+    pace_variability: null,
+    normalized_metrics: null,
+    intensity_analysis: null
   };
 }
 
@@ -1488,12 +1849,6 @@ function calculatePowerZones(powerSamples: number[], ftp: number): any {
 }
 
 // Helper functions
-function calculateVariability(values: number[]): number {
-  if (values.length < 2) return 0;
-  const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
-  const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
-  return Math.sqrt(variance);
-}
 
 function calculateHRDrift(hrSamples: number[]): number {
   if (hrSamples.length < 10) return 0;

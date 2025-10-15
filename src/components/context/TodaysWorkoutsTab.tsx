@@ -182,10 +182,16 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       return null;
     }
     
+    // Extract metrics from new analysis structure
+    const powerVariability = analysis.key_metrics?.power_distribution?.power_variability;
+    const powerFade = analysis.key_metrics?.fatigue_pattern?.power_fade_percent;
+    const hrDrift = analysis.key_metrics?.hr_dynamics?.hr_drift_percent;
+    
     return {
       executionGrade: analysis.execution_grade,
-      powerVariability: analysis.key_metrics?.pace_consistency?.overall_cv || 'N/A',
-      powerFade: analysis.key_metrics?.fatigue_pattern?.power_fade_percent || 'N/A',
+      powerVariability: powerVariability ? Math.round(powerVariability * 100) : null,
+      powerFade: powerFade ? parseFloat(powerFade) : null,
+      hrDrift: hrDrift ? parseFloat(hrDrift) : null,
       insights: analysis.insights || []
     };
   };
@@ -210,7 +216,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
           {/* Power Consistency */}
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {analysisMetrics.powerVariability}%
+              {analysisMetrics.powerVariability !== null ? `${analysisMetrics.powerVariability}%` : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Variability</div>
@@ -220,7 +226,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
           {/* Power Fade */}
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {analysisMetrics.powerFade}%
+              {analysisMetrics.powerFade !== null ? `${analysisMetrics.powerFade}%` : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Fade</div>
