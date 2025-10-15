@@ -108,7 +108,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       
       const { data: recentData } = await supabase
         .from('workouts')
-        .select('*')
+        .select('*, workout_analysis')
         .eq('user_id', user.id)
         .gte('date', sevenDaysAgoLocal)
         .order('date', { ascending: false })
