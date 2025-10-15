@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, BarChart3, TrendingUp } from 'lucide-react';
+import { Calendar, ListCollapse, List } from 'lucide-react';
 import TodaysWorkoutsTab from './context/TodaysWorkoutsTab';
 import WeeklyAnalysisTab from './context/WeeklyAnalysisTab';
 import BlockSummaryTab from './context/BlockSummaryTab';
@@ -47,21 +47,21 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose }) => {
             className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
           >
             <Calendar className="h-4 w-4" />
-            Today's Workouts
+            Daily
           </TabsTrigger>
           <TabsTrigger 
             value="weekly" 
             className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
           >
-            <BarChart3 className="h-4 w-4" />
-            Weekly Analysis
+            <ListCollapse className="h-4 w-4" />
+            Weekly
           </TabsTrigger>
           <TabsTrigger 
             value="block" 
             className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
           >
-            <TrendingUp className="h-4 w-4" />
-            Block Summary
+            <List className="h-4 w-4" />
+            Block
           </TabsTrigger>
         </TabsList>
 
