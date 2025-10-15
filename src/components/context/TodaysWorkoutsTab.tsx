@@ -6,18 +6,11 @@ import { useWeekUnified } from '@/hooks/useWeekUnified';
 
 interface TodaysWorkoutsTabProps {}
 
-interface ReadinessScore {
-  score: number;
-  factors: {
-    recovery: { status: string; value: string; color: string };
-    sleep: { status: string; value: string; color: string };
-    fatigue: { status: string; value: string; color: string };
-  };
-}
+// Removed ReadinessScore interface - focusing on real performance data only
 
 const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const { useImperial } = useAppContext();
-  const [readinessScore, setReadinessScore] = useState<ReadinessScore | null>(null);
+  const [recentWorkouts, setRecentWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Use unified API instead of direct table queries
@@ -26,11 +19,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
 
   useEffect(() => {
     if (!todayLoading) {
-      loadReadinessScore();
+      loadRecentWorkouts();
     }
   }, [todayLoading]);
 
-  const loadTodaysData = async () => {
+  const loadRecentWorkouts = async () => {
     try {
       setLoading(true);
       
@@ -38,117 +31,25 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const today = new Date().toISOString().split('T')[0];
-      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-      // Use unified API data instead of direct query
-      const todayPlanned = todayItems.filter(item => item.planned);
-
-      // Load today's completed workouts
-      const { data: todayCompleted } = await supabase
-        .from('workouts')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('date', today);
-
-      // Load most recent completed workout (last 7 days to catch any recent activity)
+      // Load most recent completed workouts (last 7 days)
       const { data: recentData } = await supabase
         .from('workouts')
         .select('*')
         .eq('user_id', user.id)
         .gte('date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-        .lt('date', today)
         .order('date', { ascending: false })
-        .limit(1);
+        .limit(5);
 
-      // Skip upcoming workouts query for now to avoid 400 errors
-      const upcomingData = [];
-
-      // Combine today's planned and completed
-      const todaysCombined = [
-        ...(todayPlanned || []).map(w => ({ ...w, status: 'planned' })),
-        ...(todayCompleted || []).map(w => ({ ...w, status: 'completed' }))
-      ];
-
-      setTodaysWorkouts(todaysCombined);
       setRecentWorkouts(recentData || []);
-      setUpcomingWorkouts(upcomingData || []);
-
-      // Calculate readiness score
-      const readiness = calculateReadinessScore(recentData || [], todayCompleted || []);
-      setReadinessScore(readiness);
 
     } catch (error) {
-      console.error('Error loading today\'s data:', error);
+      console.error('Error loading recent workouts:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateReadinessScore = (recentWorkouts: any[], todaysCompleted: any[]): ReadinessScore => {
-    // Calculate based on most recent workout and today's activity
-    const mostRecentWorkout = recentWorkouts[0];
-    const todaysLoad = todaysCompleted.length;
-    
-    let score = 85; // Base score
-    
-    // Adjust based on most recent workout intensity
-    if (mostRecentWorkout) {
-      const avgHR = mostRecentWorkout.avg_heart_rate || 0;
-      const avgPower = mostRecentWorkout.avg_power || 0;
-      
-      // High intensity workout yesterday = lower readiness today
-      if (avgHR > 160 || avgPower > 200) {
-        score -= 15;
-      } else if (avgHR > 150 || avgPower > 150) {
-        score -= 10;
-      }
-      
-      // If it was a long workout, more recovery needed
-      const duration = mostRecentWorkout.duration || 0;
-      if (duration > 90) score -= 5; // Long workout
-    }
-    
-    // If already worked out today, adjust score
-    if (todaysLoad > 0) {
-      score -= 10; // Already trained today
-    }
-    
-    // Calculate days since last workout
-    const daysSinceLastWorkout = mostRecentWorkout 
-      ? Math.floor((Date.now() - new Date(mostRecentWorkout.date).getTime()) / (1000 * 60 * 60 * 24))
-      : 7;
-    
-    // Fresh after 2+ days = higher readiness
-    if (daysSinceLastWorkout >= 2) {
-      score += 10;
-    }
-    
-    // Mock factors (in real implementation, would use HRV, sleep data, etc.)
-    const factors = {
-      recovery: {
-        status: score > 80 ? 'Good' : score > 60 ? 'Fair' : 'Poor',
-        value: mostRecentWorkout 
-          ? `${daysSinceLastWorkout} day${daysSinceLastWorkout !== 1 ? 's' : ''} since last workout`
-          : 'No recent workouts',
-        color: score > 80 ? 'text-green-600' : score > 60 ? 'text-yellow-600' : 'text-red-600'
-      },
-      sleep: {
-        status: 'Good',
-        value: `${7 + Math.random() * 1.5} hrs`,
-        color: 'text-green-600'
-      },
-      fatigue: {
-        status: todaysLoad > 0 ? 'Already trained today' : 'Fresh',
-        value: todaysLoad > 0 ? 'Training completed' : 'Ready to train',
-        color: todaysLoad > 0 ? 'text-yellow-600' : 'text-green-600'
-      }
-    };
-
-    return { score: Math.max(0, Math.min(100, Math.round(score))), factors };
-  };
+  // Removed readiness score calculation - focusing on real performance data only
 
   const getWorkoutIcon = (type: string): string => {
     switch (type.toLowerCase()) {
@@ -187,51 +88,54 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     );
   }
 
+  // Calculate heart rate trends from recent workouts
+  const getHeartRateTrend = () => {
+    if (recentWorkouts.length < 2) return null;
+    
+    const recentHR = recentWorkouts.slice(0, 3).map(w => w.avg_heart_rate).filter(hr => hr > 0);
+    if (recentHR.length < 2) return null;
+    
+    const avgHR = recentHR.reduce((sum, hr) => sum + hr, 0) / recentHR.length;
+    const trend = recentHR[0] < recentHR[recentHR.length - 1] ? 'Improving' : 'Stable';
+    
+    return { avgHR: Math.round(avgHR), trend };
+  };
+
+  const hrTrend = getHeartRateTrend();
+
   return (
     <>
-      {/* Readiness Score - 3-column grid like CompletedTab */}
-      {readinessScore && (
+      {/* Performance Metrics - 3-column grid like CompletedTab */}
+      {hrTrend && (
         <div className="grid grid-cols-3 gap-1 px-2 -mt-10">
-          {/* Readiness Score */}
+          {/* Average Heart Rate */}
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {readinessScore.score}/100
+              {hrTrend.avgHR} bpm
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Readiness</div>
+              <div className="font-medium">Avg HR</div>
             </div>
           </div>
 
-          {/* Recovery */}
+          {/* HR Trend */}
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {readinessScore.factors.recovery.status}
+              {hrTrend.trend}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Recovery</div>
+              <div className="font-medium">HR Trend</div>
             </div>
           </div>
 
-          {/* Sleep */}
+          {/* Recent Workouts */}
           <div className="px-2 pb-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {readinessScore.factors.sleep.value}
+              {recentWorkouts.length}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Sleep</div>
+              <div className="font-medium">Recent</div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recovery Details */}
-      {readinessScore && (
-        <div className="px-2 mt-2">
-          <div className="text-sm text-[#666666] font-normal">
-            <div className="font-medium">Recovery Status</div>
-          </div>
-          <div className="text-sm text-black">
-            {readinessScore.factors.recovery.value}
           </div>
         </div>
       )}
@@ -278,23 +182,23 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
           <div className="font-medium">Today's Workouts</div>
         </div>
         <div className="text-sm text-black mt-1">
-          {todaysWorkouts.length > 0 ? (
+          {todayItems.length > 0 ? (
             <div className="space-y-2">
-              {todaysWorkouts.map((workout) => (
-                <div key={workout.id}>
+              {todayItems.map((item) => (
+                <div key={item.id}>
                   <div className="font-medium">
-                    {workout.name || `${workout.type} Workout`}
+                    {item.planned?.description || `${item.type} Workout`}
                   </div>
                   <div className="text-xs text-[#666666]">
-                    {workout.scheduled_time && (
-                      <span>Time: {workout.scheduled_time}</span>
+                    {item.planned?.start_time && (
+                      <span>Time: {item.planned.start_time}</span>
                     )}
-                    {workout.duration_minutes && (
-                      <span className="ml-3">Duration: {workout.duration_minutes} min</span>
+                    {item.planned?.duration_minutes && (
+                      <span className="ml-3">Duration: {item.planned.duration_minutes} min</span>
                     )}
                   </div>
                   <div className="text-xs text-[#666666]">
-                    Status: {workout.status}
+                    Status: {item.completed ? 'Completed' : 'Planned'}
                   </div>
                 </div>
               ))}
