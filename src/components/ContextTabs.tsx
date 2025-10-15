@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, ListCollapse, List } from 'lucide-react';
+import { Calendar, CalendarCheck, CalendarDays } from 'lucide-react';
 import TodaysWorkoutsTab from './context/TodaysWorkoutsTab';
 import WeeklyAnalysisTab from './context/WeeklyAnalysisTab';
 import BlockSummaryTab from './context/BlockSummaryTab';
@@ -53,14 +53,14 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose }) => {
             value="weekly" 
             className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
           >
-            <ListCollapse className="h-4 w-4" />
+            <CalendarCheck className="h-4 w-4" />
             Weekly
           </TabsTrigger>
           <TabsTrigger 
             value="block" 
             className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
           >
-            <List className="h-4 w-4" />
+            <CalendarDays className="h-4 w-4" />
             Block
           </TabsTrigger>
         </TabsList>
