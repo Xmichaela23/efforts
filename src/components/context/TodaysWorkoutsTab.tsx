@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Target, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
-import { formatDuration, formatPace } from '@/utils/workoutFormatting';
 
 interface TodaysWorkoutsTabProps {}
 
@@ -18,22 +14,10 @@ interface ReadinessScore {
   };
 }
 
-interface TodaysWorkout {
-  id: string;
-  name: string;
-  type: string;
-  scheduled_time?: string;
-  duration_minutes?: number;
-  description?: string;
-  is_key_workout?: boolean;
-  status: 'planned' | 'completed' | 'missed';
-  completed_data?: any;
-}
-
 const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const { useImperial } = useAppContext();
   const [readinessScore, setReadinessScore] = useState<ReadinessScore | null>(null);
-  const [todaysWorkouts, setTodaysWorkouts] = useState<TodaysWorkout[]>([]);
+  const [todaysWorkouts, setTodaysWorkouts] = useState<any[]>([]);
   const [recentWorkouts, setRecentWorkouts] = useState<any[]>([]);
   const [upcomingWorkouts, setUpcomingWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,17 +37,18 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       const today = new Date().toISOString().split('T')[0];
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       // Load today's planned workouts
-      const { data: plannedWorkouts } = await supabase
+      const { data: todayPlanned } = await supabase
         .from('planned_workouts')
         .select('*')
         .eq('user_id', user.id)
         .eq('date', today)
-        .order('scheduled_time');
+        .order('start_time');
 
       // Load today's completed workouts
-      const { data: completedWorkouts } = await supabase
+      const { data: todayCompleted } = await supabase
         .from('workouts')
         .select('*')
         .eq('user_id', user.id)
@@ -85,48 +70,23 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         .select('*')
         .eq('user_id', user.id)
         .gte('date', tomorrow)
-        .lte('date', new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .lte('date', threeDaysFromNow)
         .order('date')
         .limit(5);
 
-      // Process today's workouts
-      const todaysWorkoutsList: TodaysWorkout[] = [];
-      
-      // Add planned workouts
-      plannedWorkouts?.forEach(planned => {
-        const completed = completedWorkouts?.find(c => c.planned_workout_id === planned.id);
-        todaysWorkoutsList.push({
-          id: planned.id,
-          name: planned.name || `${planned.type} Workout`,
-          type: planned.type,
-          scheduled_time: planned.scheduled_time,
-          duration_minutes: planned.duration_minutes,
-          description: planned.description,
-          is_key_workout: planned.is_key_workout,
-          status: completed ? 'completed' : 'planned',
-          completed_data: completed
-        });
-      });
+      // Combine today's planned and completed
+      const todaysCombined = [
+        ...(todayPlanned || []).map(w => ({ ...w, status: 'planned' })),
+        ...(todayCompleted || []).map(w => ({ ...w, status: 'completed' }))
+      ];
 
-      // Add any completed workouts without plans
-      completedWorkouts?.forEach(completed => {
-        if (!plannedWorkouts?.find(p => p.id === completed.planned_workout_id)) {
-          todaysWorkoutsList.push({
-            id: completed.id,
-            name: completed.name || `${completed.type} Workout`,
-            type: completed.type,
-            status: 'completed',
-            completed_data: completed
-          });
-        }
-      });
-
-      setTodaysWorkouts(todaysWorkoutsList);
+      setTodaysWorkouts(todaysCombined);
       setRecentWorkouts(recentData || []);
       setUpcomingWorkouts(upcomingData || []);
 
-      // Calculate readiness score based on most recent workout
-      setReadinessScore(calculateReadinessScore(recentData || [], completedWorkouts || []));
+      // Calculate readiness score
+      const readiness = calculateReadinessScore(recentData || [], todayCompleted || []);
+      setReadinessScore(readiness);
 
     } catch (error) {
       console.error('Error loading today\'s data:', error);
@@ -198,249 +158,189 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     return { score: Math.max(0, Math.min(100, Math.round(score))), factors };
   };
 
-  const getWorkoutIcon = (type: string) => {
+  const getWorkoutIcon = (type: string): string => {
     switch (type.toLowerCase()) {
-      case 'run': return '🏃';
-      case 'ride': case 'bike': case 'cycling': return '🚴';
-      case 'swim': return '🏊';
-      case 'strength': return '💪';
-      case 'mobility': return '🧘';
-      default: return '🏃';
+      case 'run':
+      case 'running':
+        return '🏃';
+      case 'ride':
+      case 'cycling':
+      case 'bike':
+        return '🚴';
+      case 'swim':
+      case 'swimming':
+        return '🏊';
+      case 'strength':
+        return '💪';
+      default:
+        return '🏃';
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <Badge variant="default" className="bg-green-100 text-green-800">✅ Completed</Badge>;
-      case 'planned':
-        return <Badge variant="outline" className="border-blue-200 text-blue-800">📅 Planned</Badge>;
-      case 'missed':
-        return <Badge variant="destructive">❌ Missed</Badge>;
-      default:
-        return null;
-    }
+  const formatPace = (pace: string): string => {
+    return pace || 'N/A';
   };
 
   if (loading) {
     return (
-      <div className="p-4 space-y-4">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-        </div>
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
+          </div>
+          <div className="text-gray-500 text-lg mb-2">Loading today's data...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 space-y-6 overflow-y-auto h-full">
-      {/* Today's Date Header */}
-      <div className="text-center">
-        <h3 className="text-lg font-semibold text-gray-900">
-          {new Date().toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}
-        </h3>
-      </div>
-
-      {/* Readiness Score */}
+    <>
+      {/* Readiness Score - 3-column grid like CompletedTab */}
       {readinessScore && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Readiness Score: {readinessScore.score}/100
-              <Badge variant={readinessScore.score > 80 ? "default" : readinessScore.score > 60 ? "secondary" : "destructive"}>
-                {readinessScore.score > 80 ? '✅ Ready' : readinessScore.score > 60 ? '⚠️ Fair' : '❌ Tired'}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div>
-                <div className="font-medium">Recovery</div>
-                <div className={`text-xs ${readinessScore.factors.recovery.color}`}>
-                  {readinessScore.factors.recovery.value}
-                </div>
-              </div>
-              <div>
-                <div className="font-medium">Sleep</div>
-                <div className={`text-xs ${readinessScore.factors.sleep.color}`}>
-                  {readinessScore.factors.sleep.value}
-                </div>
-              </div>
-              <div>
-                <div className="font-medium">Fatigue</div>
-                <div className={`text-xs ${readinessScore.factors.fatigue.color}`}>
-                  {readinessScore.factors.fatigue.value}
-                </div>
-              </div>
+        <div className="grid grid-cols-3 gap-1 px-2 -mt-10">
+          {/* Readiness Score */}
+          <div className="px-2 pb-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {readinessScore.score}/100
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Readiness</div>
+            </div>
+          </div>
+
+          {/* Recovery */}
+          <div className="px-2 pb-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {readinessScore.factors.recovery.status}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Recovery</div>
+            </div>
+          </div>
+
+          {/* Sleep */}
+          <div className="px-2 pb-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {readinessScore.factors.sleep.value}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Sleep</div>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Most Recent Workout - Prominent Display */}
+      {/* Recovery Details */}
+      {readinessScore && (
+        <div className="px-2 mt-2">
+          <div className="text-sm text-[#666666] font-normal">
+            <div className="font-medium">Recovery Status</div>
+          </div>
+          <div className="text-sm text-black">
+            {readinessScore.factors.recovery.value}
+          </div>
+        </div>
+      )}
+
+      {/* Last Workout */}
       {recentWorkouts.length > 0 && (
-        <Card className="border-2 border-blue-200 bg-blue-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-blue-600" />
-              Last Workout
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
+        <div className="px-2 mt-4">
+          <div className="text-sm text-[#666666] font-normal">
+            <div className="font-medium">Last Workout</div>
+          </div>
+          <div className="text-sm text-black mt-1 space-y-1">
             {recentWorkouts.map((workout) => (
-              <div key={workout.id} className="flex items-center justify-between p-4 border border-blue-200 rounded-lg bg-white">
-                <div className="flex items-center gap-4">
-                  <span className="text-3xl">{getWorkoutIcon(workout.type)}</span>
-                  <div>
-                    <div className="font-semibold text-lg">{workout.name || `${workout.type} Workout`}</div>
-                    <div className="text-sm text-gray-600">
-                      {new Date(workout.date).toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        month: 'short', 
-                        day: 'numeric' 
-                      })}
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {workout.avg_pace && (
-                        <span>Pace: {formatPace(workout.avg_pace)}</span>
-                      )}
-                      {workout.avg_power && (
-                        <span className="ml-3">Power: {workout.avg_power}W</span>
-                      )}
-                      {workout.avg_heart_rate && (
-                        <span className="ml-3">HR: {workout.avg_heart_rate} bpm</span>
-                      )}
-                    </div>
-                  </div>
+              <div key={workout.id}>
+                <div className="font-medium">
+                  {workout.name || `${workout.type} Workout`}
                 </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="default" className="bg-green-100 text-green-800 text-sm px-3 py-1">
-                    A-
-                  </Badge>
-                  <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100">
-                    View Details
-                  </Button>
+                <div className="text-xs text-[#666666]">
+                  {new Date(workout.date).toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
+                </div>
+                <div className="text-xs text-[#666666]">
+                  {workout.avg_pace && (
+                    <span>Pace: {formatPace(workout.avg_pace)}</span>
+                  )}
+                  {workout.avg_power && (
+                    <span className="ml-3">Power: {workout.avg_power}W</span>
+                  )}
+                  {workout.avg_heart_rate && (
+                    <span className="ml-3">HR: {workout.avg_heart_rate} bpm</span>
+                  )}
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Today's Workouts */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Today's Workouts
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {todaysWorkouts.length === 0 ? (
-            <div className="text-center py-4 text-gray-500">
-              <p>No workouts planned for today</p>
-              <p className="text-sm">Enjoy your rest day! 🎉</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
+      <div className="px-2 mt-4">
+        <div className="text-sm text-[#666666] font-normal">
+          <div className="font-medium">Today's Workouts</div>
+        </div>
+        <div className="text-sm text-black mt-1">
+          {todaysWorkouts.length > 0 ? (
+            <div className="space-y-2">
               {todaysWorkouts.map((workout) => (
-                <div key={workout.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{getWorkoutIcon(workout.type)}</span>
-                    <div>
-                      <div className="font-medium">{workout.name}</div>
-                      <div className="text-sm text-gray-600">
-                        {workout.scheduled_time && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {workout.scheduled_time}
-                          </span>
-                        )}
-                        {workout.duration_minutes && (
-                          <span className="ml-2">
-                            {formatDuration(workout.duration_minutes * 60)}
-                          </span>
-                        )}
-                        {workout.is_key_workout && (
-                          <Badge variant="outline" className="ml-2 text-xs">Key Workout</Badge>
-                        )}
-                      </div>
-                    </div>
+                <div key={workout.id}>
+                  <div className="font-medium">
+                    {workout.name || `${workout.type} Workout`}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(workout.status)}
-                    {workout.status === 'planned' && (
-                      <Button size="sm" variant="outline">
-                        Start
-                      </Button>
+                  <div className="text-xs text-[#666666]">
+                    {workout.scheduled_time && (
+                      <span>Time: {workout.scheduled_time}</span>
                     )}
-                    {workout.status === 'completed' && workout.completed_data && (
-                      <Button size="sm" variant="ghost">
-                        View
-                      </Button>
+                    {workout.duration_minutes && (
+                      <span className="ml-3">Duration: {workout.duration_minutes} min</span>
                     )}
+                  </div>
+                  <div className="text-xs text-[#666666]">
+                    Status: {workout.status}
                   </div>
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="text-sm text-[#666666]">
+              No workouts planned for today. Enjoy your rest day!
+            </div>
           )}
-        </CardContent>
-      </Card>
-
+        </div>
+      </div>
 
       {/* Upcoming Workouts */}
       {upcomingWorkouts.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Upcoming
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-3">
-              {upcomingWorkouts.slice(0, 3).map((workout) => (
-                <div key={workout.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{getWorkoutIcon(workout.type)}</span>
-                    <div>
-                      <div className="font-medium">{workout.name || `${workout.type} Workout`}</div>
-                      <div className="text-sm text-gray-600">
-                        {new Date(workout.date).toLocaleDateString('en-US', { 
-                          weekday: 'short', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}
-                        {workout.scheduled_time && (
-                          <span className="ml-2">at {workout.scheduled_time}</span>
-                        )}
-                        {workout.is_key_workout && (
-                          <Badge variant="outline" className="ml-2 text-xs">Key Workout</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="border-blue-200 text-blue-800">
-                    📅 Planned
-                  </Badge>
+        <div className="px-2 mt-4">
+          <div className="text-sm text-[#666666] font-normal">
+            <div className="font-medium">Upcoming Workouts</div>
+          </div>
+          <div className="text-sm text-black mt-1 space-y-1">
+            {upcomingWorkouts.slice(0, 3).map((workout) => (
+              <div key={workout.id}>
+                <div className="font-medium">
+                  {workout.name || `${workout.type} Workout`}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                <div className="text-xs text-[#666666]">
+                  {new Date(workout.date).toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
+                  {workout.scheduled_time && ` at ${workout.scheduled_time}`}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 };
 
