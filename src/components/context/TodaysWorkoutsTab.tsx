@@ -13,6 +13,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const [recentWorkouts, setRecentWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [analysisTriggered, setAnalysisTriggered] = useState(false);
+  const [baselineError, setBaselineError] = useState<string | null>(null);
 
   // Use unified API instead of direct table queries
   // Use user's local timezone for date calculations
@@ -40,9 +41,22 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       for (const workout of workoutsNeedingAnalysis) {
         try {
           console.log(`🚀 Triggering analysis for workout: ${workout.id}`);
-          await supabase.functions.invoke('analyze-workout', {
+          const { data, error } = await supabase.functions.invoke('analyze-workout', {
             body: { workout_id: workout.id }
           });
+          
+          if (error) {
+            console.error(`❌ Analysis failed for workout ${workout.id}:`, error);
+            console.error(`❌ Error details:`, JSON.stringify(error, null, 2));
+            if (error.message?.includes('baseline required')) {
+              console.error(`❌ Missing baselines: ${error.message}`);
+              setBaselineError(error.message);
+            }
+          } else {
+            console.log(`✅ Analysis completed for workout ${workout.id}`);
+            console.log(`✅ Analysis data:`, JSON.stringify(data, null, 2));
+            setBaselineError(null);
+          }
         } catch (error) {
           console.error(`❌ Failed to analyze workout ${workout.id}:`, error);
         }
@@ -243,6 +257,20 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
             </div>
           </div>
         )
+      ) : baselineError ? (
+        <div className="px-2 mt-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="text-sm font-medium text-red-800">
+              Missing Baselines
+            </div>
+            <div className="text-xs text-red-600 mt-1">
+              {baselineError}
+            </div>
+            <div className="text-xs text-red-500 mt-2">
+              Please update your profile with your FTP and Max HR to enable analysis.
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="px-2 mt-4">
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">

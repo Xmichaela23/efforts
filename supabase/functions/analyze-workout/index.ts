@@ -253,14 +253,44 @@ Deno.serve(async (req) => {
 
     const userBaselines = baselinesResult.data?.baselines || {};
     
+    // Check for required baselines - NO FALLBACKS
+    if (!userBaselines.ftp) {
+      return new Response(JSON.stringify({
+        error: 'FTP baseline required for analysis. Please update your profile with your FTP.',
+        missing_baseline: 'ftp'
+      }), {
+        status: 400,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+    
+    if (!userBaselines.max_hr) {
+      return new Response(JSON.stringify({
+        error: 'Max HR baseline required for analysis. Please update your profile with your max heart rate.',
+        missing_baseline: 'max_hr'
+      }), {
+        status: 400,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+    
     // Normalize workout date using user's timezone
     const normalizedWorkoutDate = normalizeWorkoutDate(workout, null, userTimezone);
     console.log(`Workout date normalized to user timezone: ${normalizedWorkoutDate}`);
 
     console.log(`Analyzing ${workout.type} workout with ${workout.sensor_data?.samples?.length || 0} samples`);
+    console.log(`Workout computed data:`, JSON.stringify(workout.computed, null, 2));
+    console.log(`User baselines:`, JSON.stringify(userBaselines, null, 2));
 
     // Analyze using granular sample data
     const analysis = analyzeWorkoutWithSamples(workout, userBaselines);
+    console.log(`Analysis result:`, JSON.stringify(analysis, null, 2));
 
     // Calculate execution grade
     const grade = calculateExecutionGrade(workout, analysis);
