@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, BarChart3, TrendingUp } from 'lucide-react';
+import { Calendar, CalendarCheck, CalendarDays } from 'lucide-react';
 import TodaysWorkoutsTab from './context/TodaysWorkoutsTab';
 import WeeklyAnalysisTab from './context/WeeklyAnalysisTab';
 import BlockSummaryTab from './context/BlockSummaryTab';
@@ -39,40 +39,46 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose }) => {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="px-4 py-2 border-b border-gray-100">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="today" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Today's Workouts
-            </TabsTrigger>
-            <TabsTrigger value="weekly" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Weekly Analysis
-            </TabsTrigger>
-            <TabsTrigger value="block" className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Block Summary
-            </TabsTrigger>
-          </TabsList>
+      {/* Tabs - Exact Same Design as Completed Tab */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <TabsList className="grid w-full grid-cols-3 bg-transparent border-none mb-0 py-0">
+          <TabsTrigger 
+            value="today" 
+            className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
+          >
+            <Calendar className="h-4 w-4" />
+            Today's Workouts
+          </TabsTrigger>
+          <TabsTrigger 
+            value="weekly" 
+            className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
+          >
+            <CalendarCheck className="h-4 w-4" />
+            Weekly Analysis
+          </TabsTrigger>
+          <TabsTrigger 
+            value="block" 
+            className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
+          >
+            <CalendarDays className="h-4 w-4" />
+            Block Summary
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Tab Content */}
-          <div className="flex-1 overflow-hidden">
-            <TabsContent value="today" className="h-full mt-0">
-              <TodaysWorkoutsTab />
-            </TabsContent>
-            
-            <TabsContent value="weekly" className="h-full mt-0">
-              <WeeklyAnalysisTab />
-            </TabsContent>
-            
-            <TabsContent value="block" className="h-full mt-0">
-              <BlockSummaryTab />
-            </TabsContent>
-          </div>
-        </Tabs>
-      </div>
+        <div className="flex-1 overflow-auto">
+          <TabsContent value="today" className="flex-1 p-1">
+            <TodaysWorkoutsTab />
+          </TabsContent>
+          
+          <TabsContent value="weekly" className="flex-1 p-1">
+            <WeeklyAnalysisTab />
+          </TabsContent>
+          
+          <TabsContent value="block" className="flex-1 p-1">
+            <BlockSummaryTab />
+          </TabsContent>
+        </div>
+      </Tabs>
     </div>
   );
 };
