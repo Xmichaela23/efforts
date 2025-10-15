@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, TrendingUp, Target, Calendar } from 'lucide-react';
 import { useOverallContext } from '@/hooks/useOverallContext';
+import { supabase } from '@/lib/supabase';
 
 interface ContextViewProps {
   onClose?: () => void;

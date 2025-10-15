@@ -142,7 +142,40 @@ Deno.serve(async (req) => {
     }
 
     const planned = plannedResult.data || [];
-    const completedWorkouts = workoutsResult.data || [];
+    let completedWorkouts = workoutsResult.data || [];
+
+    // Auto-trigger analysis for workouts that don't have it yet
+    const workoutsNeedingAnalysis = completedWorkouts.filter(workout => !workout.workout_analysis);
+    if (workoutsNeedingAnalysis.length > 0) {
+      console.log(`Auto-triggering analysis for ${workoutsNeedingAnalysis.length} workouts without analysis`);
+      
+      // Trigger analysis for each workout (fire and forget)
+      for (const workout of workoutsNeedingAnalysis) {
+        try {
+          await supabase.functions.invoke('analyze-workout', {
+            body: { workout_id: workout.id }
+          });
+          console.log(`✅ Analysis triggered for ${workout.type} on ${workout.date}`);
+        } catch (err) {
+          console.warn(`❌ Failed to trigger analysis for ${workout.id}:`, err);
+        }
+      }
+      
+      // Wait a moment for analysis to complete, then refetch workouts
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Refetch workouts to get the new analysis data
+      const { data: updatedWorkouts } = await supabase
+        .from('workouts')
+        .select('*')
+        .eq('user_id', user_id)
+        .eq('workout_status', 'completed')
+        .gte('date', startDateISO)
+        .lte('date', endDateISO)
+        .order('date', { ascending: true });
+      
+      completedWorkouts = updatedWorkouts || completedWorkouts;
+    }
 
     // ADD THIS ONE LINE:
     console.log('📊 ALL bikes from DB:', completedWorkouts
