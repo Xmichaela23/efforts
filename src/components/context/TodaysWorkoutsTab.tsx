@@ -14,6 +14,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const [loading, setLoading] = useState(true);
   const [analysisTriggered, setAnalysisTriggered] = useState(false);
   const [baselineError, setBaselineError] = useState<string | null>(null);
+  const [reanalyzing, setReanalyzing] = useState(false);
 
   // Use unified API instead of direct table queries
   // Use user's local timezone for date calculations
@@ -189,23 +190,40 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     );
   }
 
-  // Calculate heart rate trends from recent workouts
+  // Calculate analysis metrics from recent workouts with daily context
   const getAnalysisMetrics = () => {
     if (recentWorkouts.length === 0) return null;
     
-    // Get the most recent workout with analysis
+    // Get today's and yesterday's workouts with analysis
+    const todayWorkouts = recentWorkouts.filter(w => w.date === today && w.workout_analysis);
+    const yesterdayWorkouts = recentWorkouts.filter(w => {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      return w.date === yesterday.toLocaleDateString('en-CA') && w.workout_analysis;
+    });
+    
+    // Get the most recent workout with analysis (for fallback)
     const latestWorkout = recentWorkouts.find(w => w.workout_analysis);
-    if (!latestWorkout?.workout_analysis) {
+    
+    // Prioritize today's workout, then yesterday's, then most recent
+    const primaryWorkout = todayWorkouts[0] || yesterdayWorkouts[0] || latestWorkout;
+    
+    if (!primaryWorkout?.workout_analysis) {
       console.log('❌ No workout with analysis found');
       return null;
     }
     
-    const analysis = latestWorkout.workout_analysis;
-    console.log('🔍 Latest workout:', {
-      id: latestWorkout.id,
-      type: latestWorkout.type,
-      date: latestWorkout.date,
-      has_analysis: !!latestWorkout.workout_analysis
+    const analysis = primaryWorkout.workout_analysis;
+    console.log('🔍 Daily analysis context:', {
+      today_workouts: todayWorkouts.length,
+      yesterday_workouts: yesterdayWorkouts.length,
+      primary_workout: {
+        id: primaryWorkout.id,
+        type: primaryWorkout.type,
+        date: primaryWorkout.date,
+        is_today: primaryWorkout.date === today,
+        is_yesterday: primaryWorkout.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA')
+      }
     });
     console.log('🔍 Analysis data structure:', JSON.stringify(analysis, null, 2));
     
@@ -227,12 +245,30 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       key_metrics: analysis.key_metrics
     });
     
+    // Get comparison data from yesterday if available
+    const yesterdayWorkout = yesterdayWorkouts[0];
+    const yesterdayAnalysis = yesterdayWorkout?.workout_analysis;
+    
+    // Get target adherence percentage instead of grade
+    const targetAdherence = analysis.key_metrics?.planned_vs_executed?.[0]?.adherence?.power_percent || 
+                           analysis.key_metrics?.planned_vs_executed?.[0]?.adherence?.pace_percent || 
+                           null;
+
     return {
-      executionGrade: analysis.execution_grade,
+      executionGrade: targetAdherence ? Math.round(targetAdherence) : null,
       powerVariability: powerVariability ? Math.round(powerVariability * 100) : null,
       powerFade: powerFade ? parseFloat(powerFade) : null,
       hrDrift: hrDrift ? parseFloat(hrDrift) : null,
-      insights: analysis.insights || []
+      insights: analysis.insights || [],
+      // Daily context
+      isToday: primaryWorkout.date === today,
+      isYesterday: primaryWorkout.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA'),
+      yesterdayComparison: yesterdayAnalysis ? {
+        executionGrade: yesterdayAnalysis.key_metrics?.planned_vs_executed?.[0]?.adherence?.power_percent ? Math.round(yesterdayAnalysis.key_metrics.planned_vs_executed[0].adherence.power_percent) : null,
+        powerVariability: yesterdayAnalysis.key_metrics?.power_distribution?.power_variability ? Math.round(yesterdayAnalysis.key_metrics.power_distribution.power_variability * 100) : null,
+        powerFade: yesterdayAnalysis.key_metrics?.fatigue_pattern?.power_fade_percent ? parseFloat(yesterdayAnalysis.key_metrics.fatigue_pattern.power_fade_percent) : null,
+        hrDrift: yesterdayAnalysis.key_metrics?.hr_dynamics?.hr_drift_percent ? parseFloat(yesterdayAnalysis.key_metrics.hr_dynamics.hr_drift_percent) : null
+      } : null
     };
   };
 
@@ -240,37 +276,21 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
 
   return (
     <>
-      {/* Performance Metrics - 3-column grid with analysis data */}
+      {/* Daily Conversation - Focus on insights, not metrics */}
       {analysisMetrics ? (
-        <div className="grid grid-cols-3 gap-1 px-2 -mt-10">
-          {/* Execution Grade */}
-          <div className="px-2 pb-1">
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {analysisMetrics.executionGrade}
-            </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Execution</div>
-            </div>
+        <div className="px-2 -mt-10">
+          {/* Daily Context Header */}
+          <div className="text-sm text-[#666666] mb-3">
+            {analysisMetrics.isToday ? "Today's workout analysis:" : 
+             analysisMetrics.isYesterday ? "Yesterday's workout analysis:" : 
+             "Latest workout analysis:"}
           </div>
-
-          {/* Power Consistency */}
-          <div className="px-2 pb-1">
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {analysisMetrics.powerVariability !== null ? `${analysisMetrics.powerVariability}%` : 'N/A'}
-            </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Variability</div>
-            </div>
-          </div>
-
-          {/* Power Fade */}
-          <div className="px-2 pb-1">
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {analysisMetrics.powerFade !== null ? `${analysisMetrics.powerFade}%` : 'N/A'}
-            </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Fade</div>
-            </div>
+          
+          {/* Analysis focus - not execution metrics */}
+          <div className="text-sm text-[#666666] mb-3">
+            {analysisMetrics.isToday ? "Today's training analysis" : 
+             analysisMetrics.isYesterday ? "Yesterday's training analysis" : 
+             "Latest training analysis"}
           </div>
         </div>
       ) : (
@@ -290,13 +310,13 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       {analysisMetrics ? (
         analysisMetrics.insights.length > 0 ? (
           <div className="px-2 mt-4">
-            <div className="text-sm text-[#666666] font-normal">
-              <div className="font-medium">Latest Analysis</div>
+            <div className="text-sm text-[#666666] font-normal mb-3">
+              <div className="font-medium">Analysis:</div>
             </div>
-            <div className="text-sm text-black mt-1 space-y-2">
+            <div className="text-sm text-black space-y-3">
               {analysisMetrics.insights.map((insight, index) => (
-                <div key={index} className="bg-gray-50 p-3 rounded-lg">
-                  <div className="text-xs text-gray-600 font-medium mb-1">
+                <div key={index} className="bg-blue-50 border-l-4 border-blue-200 p-3 rounded-r-lg">
+                  <div className="text-sm text-gray-800 leading-relaxed">
                     {insight}
                   </div>
                 </div>
@@ -337,24 +357,68 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
             </div>
             <div className="text-xs text-red-600 mt-1">
               No workout analysis found. 
-              <button 
-                onClick={() => {
-                  setAnalysisTriggered(false);
-                  triggerAnalysisForExistingWorkouts();
-                }}
-                className="ml-1 underline hover:no-underline"
-              >
-                Trigger analysis
-              </button>
-              <button 
-                onClick={() => {
-                  console.log('🔄 Manual refresh triggered');
-                  loadRecentWorkouts();
-                }}
-                className="ml-2 underline hover:no-underline"
-              >
-                Refresh data
-              </button>
+              <div className="flex items-center gap-3 mt-2">
+                <button 
+                  onClick={() => {
+                    setAnalysisTriggered(false);
+                    triggerAnalysisForExistingWorkouts();
+                  }}
+                  className="hover:text-red-800 transition-colors"
+                >
+                  Analyze
+                </button>
+                <span className="text-red-300">•</span>
+                <button 
+                  onClick={() => {
+                    console.log('🔄 Manual refresh triggered');
+                    loadRecentWorkouts();
+                  }}
+                  className="hover:text-red-800 transition-colors"
+                >
+                  Refresh
+                </button>
+                <span className="text-red-300">•</span>
+                <button 
+                  onClick={async () => {
+                    if (reanalyzing) return;
+                    
+                    console.log('🔄 Clearing analysis and re-analyzing...');
+                    setReanalyzing(true);
+                    setAnalysisTriggered(false);
+                    
+                    try {
+                      // Clear existing analysis data
+                      if (recentWorkouts.length > 0) {
+                        const workoutIds = recentWorkouts
+                          .filter(w => w.workout_status === 'completed')
+                          .map(w => w.id);
+                        
+                        if (workoutIds.length > 0) {
+                          await supabase
+                            .from('workouts')
+                            .update({ workout_analysis: null })
+                            .in('id', workoutIds);
+                          console.log('✅ Cleared analysis for', workoutIds.length, 'workouts');
+                        }
+                      }
+                      
+                      // Reload data and trigger fresh analysis
+                      await loadRecentWorkouts();
+                      setTimeout(() => {
+                        triggerAnalysisForExistingWorkouts();
+                        setReanalyzing(false);
+                      }, 1000);
+                    } catch (error) {
+                      console.error('❌ Failed to clear and re-analyze:', error);
+                      setReanalyzing(false);
+                    }
+                  }}
+                  disabled={reanalyzing}
+                  className={`hover:text-red-800 transition-colors ${reanalyzing ? 'text-red-300 cursor-not-allowed' : ''}`}
+                >
+                  {reanalyzing ? 'Processing...' : 'Reset'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -388,8 +452,10 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                   {workout.avg_heart_rate && (
                     <div>HR: {workout.avg_heart_rate} bpm</div>
                   )}
-                  {workout.workout_analysis?.execution_grade && (
-                    <div className="font-medium text-black">Grade: {workout.workout_analysis.execution_grade}</div>
+                  {workout.workout_analysis && (
+                    <div className="text-xs text-green-600 font-medium">
+                      ✓ Analysis available
+                    </div>
                   )}
                 </div>
               </div>
@@ -421,7 +487,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                   </div>
                   {item.completed && item.workout_analysis ? (
                     <div className="text-xs text-green-600 font-medium mt-1">
-                      ✓ Analysis Complete - Grade: {item.workout_analysis.execution_grade}
+                      ✓ Analysis Complete
                     </div>
                   ) : item.completed ? (
                     <div className="text-xs text-yellow-600 font-medium mt-1">

@@ -472,6 +472,8 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
     analysis.intensity_analysis = analyzeBikeIntensity(sensorData, computed, userBaselines);
   } else if (workout.type === 'swim' || workout.type === 'swimming') {
     analysis.intensity_analysis = analyzeSwimIntensity(sensorData, computed, userBaselines);
+  } else if (workout.type === 'strength' || workout.type === 'strength_training') {
+    analysis.intensity_analysis = analyzeStrengthIntensity(sensorData, computed, userBaselines);
   }
 
   console.log('Final analysis structure:', JSON.stringify(analysis, null, 2));
@@ -830,9 +832,9 @@ async function generateWorkoutInsights(data: {
   }
 
   try {
-    let prompt = `Analyze this ${workout.type} workout:
+    let prompt = `You're analyzing a ${workout.type} workout to have a conversation with the athlete about their training.
 
-EXECUTION SUMMARY:
+WORKOUT OVERVIEW:
 Duration: ${Math.round(workout.duration)}min | Adherence: ${workout.computed?.overall?.execution_score}%
 Grade: ${workout.execution_grade}`;
 
@@ -855,6 +857,36 @@ PHYSIOLOGICAL RESPONSE:
       if (hr_dynamics.trend_analysis) {
         prompt += `
 - HR Context: ${hr_dynamics.trend_analysis.current_avg_hr_percentile}th percentile vs recent workouts`;
+      }
+    }
+
+    // Add strength-specific analysis
+    if (workout.type === 'strength' || workout.type === 'strength_training') {
+      const intensityAnalysis = analysis.intensity_analysis;
+      if (intensityAnalysis && intensityAnalysis.intensity) {
+        const intensity = intensityAnalysis.intensity;
+        
+        if (intensity.rir_analysis) {
+          prompt += `
+STRENGTH TRAINING ANALYSIS (RIR-based):
+- RIR Average: ${intensity.rir_analysis.avg_rir} (range: ${intensity.rir_analysis.min_rir}-${intensity.rir_analysis.max_rir})
+- RIR Consistency: ${intensity.rir_analysis.rir_consistency}% variation
+- Fatigue Pattern: ${intensity.rir_analysis.intensity_progression} (${intensity.rir_analysis.rir_fade} RIR change)
+- Total Sets: ${intensity.rir_analysis.total_sets}`;
+        }
+        
+        if (intensity.hr_analysis) {
+          prompt += `
+- HR Response: ${intensity.hr_analysis.avg_hr} bpm avg, ${intensity.hr_analysis.hr_range} bpm range
+- HR Variability: ${intensity.hr_analysis.hr_variability}%`;
+        }
+        
+        if (!intensity.rir_analysis && !intensity.hr_analysis) {
+          prompt += `
+STRENGTH TRAINING ANALYSIS:
+- No RIR or HR data available for analysis
+- Consider logging RIR for each set to enable detailed analysis`;
+        }
       }
     }
 
@@ -942,24 +974,26 @@ ${bursts.map((burst: any) =>
 BASELINE CONTEXT:
 FTP: ${userBaselines.ftp}W
 
-Provide 3-4 bullet points:
-1. Overall execution quality with specific metrics (1 sentence)
-2. Key performance pattern from interval analysis (1 sentence)  
-3. One area to watch or improve based on data (1 sentence)
-4. Fitness indicator with historical context (only if notable)
+Analyze this workout and provide 3-4 professional insights:
 
-ANALYSIS FOCUS:
-- Lead with PERFORMANCE metrics (power, pace, execution) - use actual numbers
-- Use HR as physiological RESPONSE indicator, not primary focus
-- Describe interval-by-interval patterns: "Interval 4 showed fewer power surges"
-- Mention HR drift/response in context of performance: "HR climbed 8 bpm as power faded"
-- Include workout type, date, and duration context
-- If HR data quality is poor, mention it but focus on power/pace analysis
-- If HR is anomalously high/low vs historical data, suggest checking sensor
-- Avoid generic health warnings - focus on training insights
-- Use specific numbers from the analysis data provided
+1. Overall execution assessment (1 sentence, specific metrics)
+2. Key performance observation (1 sentence, data-driven)  
+3. Area for improvement (1 sentence, actionable)
+4. Notable physiological response (only if significant)
 
-Keep bullets under 20 words each. Be specific with numbers. Focus on what the data shows, not what's missing. The system learns from your workout patterns over time.`;
+ANALYSIS STYLE:
+- Professional, analytical tone
+- Use specific numbers and metrics
+- For RUNS/RIDES: Focus on power distribution, pacing consistency, execution adherence
+- For STRENGTH: Focus on RIR progression, fatigue patterns, set consistency
+- Use HR as physiological response indicator
+- Be direct and factual, not motivational
+- Avoid hype language, energy drink marketing speak, or excessive enthusiasm
+- Focus on what the data actually shows
+- Keep insights under 20 words each
+- Sound like a sports scientist or performance analyst
+
+Example tone: "Power consistency was 2.1% variation" not "You absolutely crushed it today"`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1583,6 +1617,123 @@ function analyzeBikeIntensity(sensorData: any[], computed: any, userBaselines: a
   }
 
   return { intensity, analysis };
+}
+
+/**
+ * Analyze strength training intensity from RIR data and sensor data
+ */
+function analyzeStrengthIntensity(sensorData: any[], computed: any, userBaselines: any): any {
+  // Look for RIR data in computed or sensor data
+  const rirData = computed?.rir_data || computed?.sets || [];
+  const hrSamples = sensorData
+    .map(s => s.heartRate || s.heart_rate || s.hr)
+    .filter(hr => hr && hr > 0);
+
+  // Primary analysis based on RIR data
+  let rirAnalysis = null;
+  if (rirData && rirData.length > 0) {
+    const rirValues = rirData.map(set => set.rir || set.reps_in_reserve).filter(rir => rir !== null && rir !== undefined);
+    
+    if (rirValues.length > 0) {
+      const avgRIR = rirValues.reduce((sum, rir) => sum + rir, 0) / rirValues.length;
+      const minRIR = Math.min(...rirValues);
+      const maxRIR = Math.max(...rirValues);
+      const rirConsistency = calculateVariability(rirValues);
+      
+      // Analyze RIR progression (fatigue pattern)
+      const firstHalf = rirValues.slice(0, Math.floor(rirValues.length / 2));
+      const secondHalf = rirValues.slice(Math.floor(rirValues.length / 2));
+      const firstHalfAvg = firstHalf.reduce((sum, rir) => sum + rir, 0) / firstHalf.length;
+      const secondHalfAvg = secondHalf.reduce((sum, rir) => sum + rir, 0) / secondHalf.length;
+      const rirFade = firstHalfAvg - secondHalfAvg;
+      
+      rirAnalysis = {
+        avg_rir: avgRIR.toFixed(1),
+        min_rir: minRIR,
+        max_rir: maxRIR,
+        rir_consistency: rirConsistency.toFixed(1),
+        rir_fade: rirFade.toFixed(1),
+        total_sets: rirValues.length,
+        intensity_progression: rirFade > 1 ? 'increasing fatigue' : rirFade < -0.5 ? 'maintaining intensity' : 'slight fatigue'
+      };
+    }
+  }
+
+  // Secondary analysis from HR data (if available)
+  let hrAnalysis = null;
+  if (hrSamples.length > 0) {
+    const avgHR = hrSamples.reduce((sum, hr) => sum + hr, 0) / hrSamples.length;
+    const maxHR = Math.max(...hrSamples);
+    const minHR = Math.min(...hrSamples);
+    const hrRange = maxHR - minHR;
+    const hrVariability = calculateVariability(hrSamples);
+    
+    hrAnalysis = {
+      avg_hr: Math.round(avgHR),
+      max_hr: maxHR,
+      min_hr: minHR,
+      hr_range: hrRange,
+      hr_variability: hrVariability.toFixed(2)
+    };
+  }
+
+  // Determine data quality and focus
+  const hasRIRData = rirAnalysis !== null;
+  const hasHRData = hrAnalysis !== null;
+  
+  let dataQuality = 'insufficient';
+  let focus = 'No data available';
+  
+  if (hasRIRData && hasHRData) {
+    dataQuality = 'excellent';
+    focus = 'RIR progression with HR response';
+  } else if (hasRIRData) {
+    dataQuality = 'good';
+    focus = 'RIR progression analysis';
+  } else if (hasHRData) {
+    dataQuality = 'limited';
+    focus = 'HR patterns only';
+  }
+
+  return {
+    intensity: {
+      rir_analysis: rirAnalysis,
+      hr_analysis: hrAnalysis,
+      data_quality: dataQuality,
+      focus: focus
+    },
+    analysis: {
+      workout_type: 'strength',
+      primary_metric: hasRIRData ? 'RIR' : hasHRData ? 'HR' : 'none',
+      data_quality: dataQuality,
+      insights: generateStrengthInsights(rirAnalysis, hrAnalysis, hasRIRData, hasHRData)
+    }
+  };
+}
+
+/**
+ * Generate strength-specific insights based on available data
+ */
+function generateStrengthInsights(rirAnalysis: any, hrAnalysis: any, hasRIR: boolean, hasHR: boolean): string[] {
+  const insights = [];
+  
+  if (hasRIR) {
+    insights.push(`RIR average: ${rirAnalysis.avg_rir} (range: ${rirAnalysis.min_rir}-${rirAnalysis.max_rir})`);
+    insights.push(`RIR consistency: ${rirAnalysis.rir_consistency}% variation - ${rirAnalysis.rir_consistency < 20 ? 'very consistent' : 'some variation'}`);
+    insights.push(`Fatigue pattern: ${rirAnalysis.intensity_progression} (${rirAnalysis.rir_fade} RIR change)`);
+  }
+  
+  if (hasHR) {
+    insights.push(`HR response: ${hrAnalysis.avg_hr} bpm avg, ${hrAnalysis.hr_range} bpm range`);
+    insights.push(`HR variability: ${hrAnalysis.hr_variability}% - ${hrAnalysis.hr_variability < 15 ? 'steady' : 'variable'}`);
+  }
+  
+  if (!hasRIR && !hasHR) {
+    insights.push('No RIR or HR data available for analysis');
+    insights.push('Consider logging RIR for each set to enable detailed analysis');
+  }
+  
+  return insights;
 }
 
 /**
