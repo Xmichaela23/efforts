@@ -912,6 +912,33 @@ async function generateWorkoutInsights(data: {
   intensity_analysis: any;
   userBaselines: any;
 }): Promise<string[]> {
+  
+  // NO FALLBACKS - Check if there's meaningful data to analyze
+  let hasMeaningfulData = false;
+  
+  if (data.workout.type === 'strength' || data.workout.type === 'strength_training') {
+    // For strength workouts, only proceed if we have actual RIR/weight/reps data
+    hasMeaningfulData = data.intensity_analysis && 
+                       data.intensity_analysis.analysis && 
+                       data.intensity_analysis.analysis.insights && 
+                       data.intensity_analysis.analysis.insights.length > 0;
+  } else {
+    // For other workouts, check for meaningful analysis data
+    hasMeaningfulData = 
+      data.planned_vs_executed || 
+      data.bursts || 
+      data.consistency || 
+      data.fatigue || 
+      data.power_distribution || 
+      data.hr_dynamics || 
+      (data.intensity_analysis && data.intensity_analysis.analysis && data.intensity_analysis.analysis.insights && data.intensity_analysis.analysis.insights.length > 0);
+  }
+  
+  if (!hasMeaningfulData) {
+    console.log(`No meaningful data for ${data.workout.type} analysis - returning empty insights`);
+    return [];
+  }
+  
   const { workout, planned_vs_executed, bursts, consistency, fatigue, power_distribution, hr_dynamics, intensity_analysis, userBaselines } = data;
   
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
@@ -1111,17 +1138,21 @@ ${bursts.map((burst: any) =>
 
     // Only include relevant baselines for each workout type
     if (workout.type === 'strength' || workout.type === 'strength_training') {
+      // Only include 1RM if available - no fallback text
+      const oneRMText = userBaselines.one_rm ? `1RM Baseline: ${userBaselines.one_rm}kg` : '';
       prompt += `
 STRENGTH TRAINING CONTEXT:
 Focus on RIR progression and set consistency - no endurance metrics applicable.
-${userBaselines.one_rm ? `1RM Baseline: ${userBaselines.one_rm}kg` : 'No 1RM baseline available'}
+${oneRMText}
 
 Analyze this strength workout and provide 3-4 performance observations:
 `;
     } else {
+      // Only include FTP if available - no fallback text
+      const ftpText = userBaselines.ftp ? `FTP: ${userBaselines.ftp}W` : '';
       prompt += `
 BASELINE CONTEXT:
-FTP: ${userBaselines.ftp}W
+${ftpText}
 
 Analyze this workout and provide 3-4 performance observations:
 `;
@@ -1779,13 +1810,15 @@ function analyzeStrengthIntensity(workout: any, userBaselines: any): any {
   // Look for strength exercises data
   const strengthExercises = workout.strength_exercises || [];
   console.log(`Strength exercises available: ${strengthExercises.length} exercises`);
+  console.log(`Strength exercises data:`, JSON.stringify(strengthExercises, null, 2));
   
   // Extract all completed sets from all exercises
   const allCompletedSets = strengthExercises.flatMap(exercise => 
-    exercise.completed_sets || []
+    exercise.sets || exercise.completed_sets || []
   ).filter(set => set.completed);
   
   console.log(`Completed sets available: ${allCompletedSets.length} sets`);
+  console.log(`Completed sets data:`, JSON.stringify(allCompletedSets, null, 2));
 
   // Analysis based on RIR data
   let rirAnalysis: any = null;
@@ -1941,23 +1974,8 @@ function generateStrengthInsights(rirAnalysis: any, weightAnalysis: any, repsAna
       insights.push(`1RM baseline: ${oneRM}kg - provides context for strength progression`);
     }
   } else {
-    insights.push('No RIR data available for analysis');
-    insights.push('Consider logging RIR for each set to enable detailed analysis');
-    
-    if (weightAnalysis) {
-      insights.push(`Weight range: ${weightAnalysis.min_weight}-${weightAnalysis.max_weight}kg (avg: ${weightAnalysis.avg_weight}kg)`);
-      if (weightAnalysis.percent_of_1rm) {
-        insights.push(`Intensity: ${weightAnalysis.percent_of_1rm}% of 1RM`);
-      }
-    }
-    
-    if (repsAnalysis) {
-      insights.push(`Reps: ${repsAnalysis.total_reps} total (avg: ${repsAnalysis.avg_reps} per set)`);
-    }
-    
-    if (has1RM) {
-      insights.push(`1RM baseline: ${oneRM}kg - strength training context available`);
-    }
+    // NO FALLBACKS - return empty insights when no RIR data
+    return [];
   }
   
   return insights;
@@ -2125,7 +2143,17 @@ function analyzeWorkoutFromComputed(workout: any, computed: any, userBaselines: 
  * 
  * OUTPUT: Letter grade string ("A+", "A", "B+", "C", "F", etc.)
  */
-function calculateExecutionGrade(workout: any, analysis: any): string {
+function calculateExecutionGrade(workout: any, analysis: any): string | null {
+  // NO FALLBACKS - Return null if no meaningful data to grade
+  const hasExecutionData = workout.computed?.execution_score;
+  const hasAnalysisData = analysis.pace_variability || analysis.hr_responsiveness || analysis.power_distribution || 
+                         (analysis.intensity_analysis && analysis.intensity_analysis.analysis && analysis.intensity_analysis.analysis.insights && analysis.intensity_analysis.analysis.insights.length > 0);
+  
+  if (!hasExecutionData && !hasAnalysisData) {
+    console.log('No meaningful data for execution grade - returning null');
+    return null;
+  }
+  
   let score = 100;
 
   // Check adherence to planned workout

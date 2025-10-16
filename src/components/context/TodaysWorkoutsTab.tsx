@@ -16,6 +16,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const [baselineError, setBaselineError] = useState<string | null>(null);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [analyzingWorkout, setAnalyzingWorkout] = useState<string | null>(null);
+  const analyzingRef = useRef<Set<string>>(new Set());
 
   // Use unified API instead of direct table queries
   // Use user's local timezone for date calculations
@@ -24,7 +25,14 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
 
   // Analyze a single workout
   const analyzeSingleWorkout = async (workoutId: string) => {
+    // Prevent multiple simultaneous analysis calls
+    if (analyzingRef.current.has(workoutId)) {
+      console.log(`Already analyzing workout: ${workoutId}`);
+      return;
+    }
+    
     try {
+      analyzingRef.current.add(workoutId);
       setAnalyzingWorkout(workoutId);
       console.log(`🚀 Analyzing workout: ${workoutId}`);
       
@@ -39,12 +47,17 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
 
       console.log('Analysis completed:', data);
       
-      // Refresh the workout data to show updated analysis
-      await loadRecentWorkouts();
+      // Update the specific workout in state instead of full reload
+      setRecentWorkouts(prev => prev.map(workout => 
+        workout.id === workoutId 
+          ? { ...workout, workout_analysis: data }
+          : workout
+      ));
       
     } catch (error) {
       console.error('Failed to analyze workout:', error);
     } finally {
+      analyzingRef.current.delete(workoutId);
       setAnalyzingWorkout(null);
     }
   };
@@ -133,12 +146,12 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     }
   }, [todayLoading]);
 
-  // Trigger analysis when recent workouts are loaded
+  // Trigger analysis when recent workouts are loaded (only once)
   useEffect(() => {
-    if (recentWorkouts.length > 0 && !analysisTriggered) {
+    if (recentWorkouts.length > 0 && !analysisTriggered && !loading) {
       triggerAnalysisForExistingWorkouts();
     }
-  }, [recentWorkouts, analysisTriggered]);
+  }, [recentWorkouts.length, analysisTriggered, loading]);
 
   const loadRecentWorkouts = async () => {
     try {
