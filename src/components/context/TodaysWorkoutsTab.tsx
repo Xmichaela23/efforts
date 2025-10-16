@@ -168,10 +168,17 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
 
   // Trigger analysis when recent workouts are loaded (only once)
   useEffect(() => {
-    if (recentWorkouts.length > 0 && !analysisTriggered && !loading && analyzingWorkout === null) {
-      console.log('🔄 Auto-triggering analysis for existing workouts');
-      triggerAnalysisForExistingWorkouts();
-    }
+    // DISABLE automatic analysis entirely - only manual analysis
+    console.log('🚫 Auto-analysis disabled - only manual analysis allowed');
+    console.log('🚫 Current state:', { recentWorkoutsLength: recentWorkouts.length, analysisTriggered, loading, analyzingWorkout });
+    
+    // if (recentWorkouts.length > 0 && !analysisTriggered && !loading && analyzingWorkout === null) {
+    //   console.log('🔄 Auto-triggering analysis for existing workouts');
+    //   console.log('🔄 Current state:', { recentWorkoutsLength: recentWorkouts.length, analysisTriggered, loading, analyzingWorkout });
+    //   triggerAnalysisForExistingWorkouts();
+    // } else {
+    //   console.log('🚫 Skipping auto-analysis:', { recentWorkoutsLength: recentWorkouts.length, analysisTriggered, loading, analyzingWorkout });
+    // }
   }, [recentWorkouts.length, analysisTriggered, loading, analyzingWorkout]);
 
   const loadRecentWorkouts = async () => {
