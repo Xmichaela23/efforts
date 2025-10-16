@@ -133,6 +133,14 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         .order('date', { ascending: false })
         .limit(5);
 
+      console.log('📊 Loaded workouts:', recentData?.map(w => ({
+        id: w.id,
+        type: w.type,
+        date: w.date,
+        has_analysis: !!w.workout_analysis,
+        analysis_grade: w.workout_analysis?.execution_grade
+      })));
+      
       setRecentWorkouts(recentData || []);
 
     } catch (error) {
@@ -193,6 +201,12 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     }
     
     const analysis = latestWorkout.workout_analysis;
+    console.log('🔍 Latest workout:', {
+      id: latestWorkout.id,
+      type: latestWorkout.type,
+      date: latestWorkout.date,
+      has_analysis: !!latestWorkout.workout_analysis
+    });
     console.log('🔍 Analysis data structure:', JSON.stringify(analysis, null, 2));
     
     // Only return data if we have basic analysis
@@ -205,6 +219,13 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     const powerVariability = analysis.key_metrics?.power_distribution?.power_variability;
     const powerFade = analysis.key_metrics?.fatigue_pattern?.power_fade_percent;
     const hrDrift = analysis.key_metrics?.hr_dynamics?.hr_drift_percent;
+    
+    console.log('🔍 Analysis structure:', {
+      powerVariability,
+      powerFade, 
+      hrDrift,
+      key_metrics: analysis.key_metrics
+    });
     
     return {
       executionGrade: analysis.execution_grade,

@@ -294,11 +294,9 @@ Deno.serve(async (req) => {
       });
     }
     
-    // Max HR is optional - we'll use alternative methods for HR analysis
-    if (!userBaselines.max_hr) {
-      console.log('Max HR not available, using alternative HR analysis methods');
-      userBaselines.max_hr = null; // Set to null so we know it's not available
-    }
+    // Max HR is not required - system works without it
+    userBaselines.max_hr = null;
+    console.log('Max HR not required - using HR analysis without Max HR baselines');
     
     // Normalize workout date using user's timezone
     const normalizedWorkoutDate = normalizeWorkoutDate(workout, null, userTimezone);
@@ -943,7 +941,6 @@ ${bursts.map((burst: any) =>
     prompt += `
 BASELINE CONTEXT:
 FTP: ${userBaselines.ftp}W
-Max HR: ${userBaselines.max_hr} bpm
 
 Provide 3-4 bullet points:
 1. Overall execution quality with specific metrics (1 sentence)
@@ -962,7 +959,7 @@ ANALYSIS FOCUS:
 - Avoid generic health warnings - focus on training insights
 - Use specific numbers from the analysis data provided
 
-Keep bullets under 20 words each. Be specific with numbers.`;
+Keep bullets under 20 words each. Be specific with numbers. Focus on what the data shows, not what's missing. The system learns from your workout patterns over time.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1123,7 +1120,8 @@ async function analyzeHRTrends(sensorData: any[], computed: any, workout: any, s
     hrDrift = null;
     recoveryRate = null;
     
-    if (!avgHR || !maxHR) {
+    // Even with limited data, we can still provide basic analysis
+    if (!avgHR && !maxHR) {
       return {
         avg_hr: null,
         max_hr: null,
@@ -1170,9 +1168,9 @@ async function analyzeHRTrends(sensorData: any[], computed: any, workout: any, s
     console.log(`Found ${historicalWorkouts?.length || 0} historical workouts`);
   }
 
-  // Analyze HR trends
+  // Analyze HR trends - system learns from your patterns
   let trendAnalysis: any = null;
-  if (historicalWorkouts && historicalWorkouts.length >= 3) {
+  if (historicalWorkouts && historicalWorkouts.length >= 2) {
     const recentHRs = historicalWorkouts
       .map(w => ({ 
         avg_hr: w.avg_heart_rate, 
@@ -1374,7 +1372,7 @@ function interpretHRTrends(
     return `Improving HR efficiency - fitness gains evident`;
   }
   
-  return `HR within normal range (${avgHRPercentile}th percentile avg, ${maxHRPercentile}th percentile max)`;
+  return `HR patterns normal for your training (${avgHRPercentile}th percentile avg, ${maxHRPercentile}th percentile max) - system learning your baseline`;
 }
 
 /**
