@@ -322,6 +322,7 @@ Deno.serve(async (req) => {
       fatigue: analysis.fatigue_pattern,
       power_distribution: analysis.power_distribution,
       hr_dynamics: analysis.hr_responsiveness,
+      intensity_analysis: analysis.intensity_analysis,
       userBaselines: userBaselines
     });
 
@@ -423,17 +424,25 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
 
   console.log('Running enhanced analysis with sensor data...');
 
-  // 1. Compare planned vs executed (adherence)
-  const plannedVsExecuted = comparePlannedVsExecuted(sensorData, intervals);
+  // Only analyze runs and rides - skip everything else
+  let plannedVsExecuted: any = null;
+  let burstAnalysis: any = null;
+  let consistencyAnalysis: any = null;
+  let fatigueAnalysis: any = null;
 
-  // 2. Detect bursts relative to plan
-  const burstAnalysis = analyzeSpeedBursts(sensorData, intervals);
+  if (workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike') {
+    // 1. Compare planned vs executed (adherence)
+    plannedVsExecuted = comparePlannedVsExecuted(sensorData, intervals);
 
-  // 3. Measure consistency within intervals
-  const consistencyAnalysis = analyzePaceConsistency(sensorData, intervals);
+    // 2. Detect bursts relative to plan
+    burstAnalysis = analyzeSpeedBursts(sensorData, intervals);
 
-  // 4. Track fatigue across intervals
-  const fatigueAnalysis = analyzeFatiguePattern(sensorData, intervals);
+    // 3. Measure consistency within intervals
+    consistencyAnalysis = analyzePaceConsistency(sensorData, intervals);
+
+    // 4. Track fatigue across intervals
+    fatigueAnalysis = analyzeFatiguePattern(sensorData, intervals);
+  }
 
   // 5. Run enhanced analysis with historical context
   const analysis = {
@@ -474,6 +483,9 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
     analysis.intensity_analysis = analyzeSwimIntensity(sensorData, computed, userBaselines);
   } else if (workout.type === 'strength' || workout.type === 'strength_training') {
     analysis.intensity_analysis = analyzeStrengthIntensity(sensorData, computed, userBaselines);
+  } else if (workout.type === 'mobility' || workout.type === 'mobility_session') {
+    // Mobility workouts don't need analysis - no meaningful data
+    analysis.intensity_analysis = null;
   }
 
   console.log('Final analysis structure:', JSON.stringify(analysis, null, 2));
@@ -822,9 +834,10 @@ async function generateWorkoutInsights(data: {
   fatigue: any;
   power_distribution: any;
   hr_dynamics: any;
+  intensity_analysis: any;
   userBaselines: any;
 }): Promise<string[]> {
-  const { workout, planned_vs_executed, bursts, consistency, fatigue, power_distribution, hr_dynamics, userBaselines } = data;
+  const { workout, planned_vs_executed, bursts, consistency, fatigue, power_distribution, hr_dynamics, intensity_analysis, userBaselines } = data;
   
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
@@ -862,7 +875,7 @@ PHYSIOLOGICAL RESPONSE:
 
     // Add strength-specific analysis
     if (workout.type === 'strength' || workout.type === 'strength_training') {
-      const intensityAnalysis = analysis.intensity_analysis;
+      const intensityAnalysis = intensity_analysis;
       if (intensityAnalysis && intensityAnalysis.intensity) {
         const intensity = intensityAnalysis.intensity;
         
@@ -888,6 +901,14 @@ STRENGTH TRAINING ANALYSIS:
 - Consider logging RIR for each set to enable detailed analysis`;
         }
       }
+    }
+
+    // Only analyze runs and rides - skip everything else
+    if (workout.type !== 'run' && workout.type !== 'running' && workout.type !== 'ride' && workout.type !== 'cycling' && workout.type !== 'bike') {
+      prompt += `
+WORKOUT TYPE: ${workout.type.toUpperCase()}
+- No performance analysis available for this workout type
+- Focus on runs and rides for detailed performance metrics`;
     }
 
     // Add interval-by-interval performance analysis
@@ -986,6 +1007,7 @@ ANALYSIS STYLE:
 - Use specific numbers and metrics
 - For RUNS/RIDES: Focus on power distribution, pacing consistency, execution adherence
 - For STRENGTH: Focus on RIR progression, fatigue patterns, set consistency
+- For MOBILITY: Focus on movement quality, HR recovery response, session completion
 - Use HR as physiological response indicator
 - Be direct and factual, not motivational or coaching
 - Avoid advice, suggestions, or coaching language
@@ -1630,7 +1652,7 @@ function analyzeStrengthIntensity(sensorData: any[], computed: any, userBaseline
     .filter(hr => hr && hr > 0);
 
   // Primary analysis based on RIR data
-  let rirAnalysis = null;
+  let rirAnalysis: any = null;
   if (rirData && rirData.length > 0) {
     const rirValues = rirData.map(set => set.rir || set.reps_in_reserve).filter(rir => rir !== null && rir !== undefined);
     
@@ -1660,7 +1682,7 @@ function analyzeStrengthIntensity(sensorData: any[], computed: any, userBaseline
   }
 
   // Secondary analysis from HR data (if available)
-  let hrAnalysis = null;
+  let hrAnalysis: any = null;
   if (hrSamples.length > 0) {
     const avgHR = hrSamples.reduce((sum, hr) => sum + hr, 0) / hrSamples.length;
     const maxHR = Math.max(...hrSamples);
@@ -1715,7 +1737,7 @@ function analyzeStrengthIntensity(sensorData: any[], computed: any, userBaseline
  * Generate strength-specific insights based on available data
  */
 function generateStrengthInsights(rirAnalysis: any, hrAnalysis: any, hasRIR: boolean, hasHR: boolean): string[] {
-  const insights = [];
+  const insights: string[] = [];
   
   if (hasRIR) {
     insights.push(`RIR average: ${rirAnalysis.avg_rir} (range: ${rirAnalysis.min_rir}-${rirAnalysis.max_rir})`);
@@ -1735,6 +1757,7 @@ function generateStrengthInsights(rirAnalysis: any, hrAnalysis: any, hasRIR: boo
   
   return insights;
 }
+
 
 /**
  * Analyze swim intensity from sensor data

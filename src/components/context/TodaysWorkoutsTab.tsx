@@ -424,6 +424,75 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         </div>
       )}
 
+      {/* Debug buttons - always visible while debugging */}
+      <div className="px-2 mt-4">
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <div className="text-xs text-gray-600 mb-2">Debug Controls:</div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => {
+                setAnalysisTriggered(false);
+                triggerAnalysisForExistingWorkouts();
+              }}
+              className="hover:text-red-800 transition-colors text-sm"
+            >
+              Analyze
+            </button>
+            <span className="text-gray-300">•</span>
+            <button 
+              onClick={() => {
+                console.log('🔄 Manual refresh triggered');
+                loadRecentWorkouts();
+              }}
+              className="hover:text-red-800 transition-colors text-sm"
+            >
+              Refresh
+            </button>
+            <span className="text-gray-300">•</span>
+            <button 
+              onClick={async () => {
+                if (reanalyzing) return;
+                
+                console.log('🔄 Clearing analysis and re-analyzing...');
+                setReanalyzing(true);
+                setAnalysisTriggered(false);
+                
+                try {
+                  // Clear existing analysis data
+                  if (recentWorkouts.length > 0) {
+                    const workoutIds = recentWorkouts
+                      .filter(w => w.workout_status === 'completed')
+                      .map(w => w.id);
+                    
+                    if (workoutIds.length > 0) {
+                      await supabase
+                        .from('workouts')
+                        .update({ workout_analysis: null })
+                        .in('id', workoutIds);
+                      console.log('✅ Cleared analysis for', workoutIds.length, 'workouts');
+                    }
+                  }
+                  
+                  // Reload data and trigger fresh analysis
+                  await loadRecentWorkouts();
+                  setTimeout(() => {
+                    triggerAnalysisForExistingWorkouts();
+                    setReanalyzing(false);
+                  }, 1000);
+                } catch (error) {
+                  console.error('❌ Failed to clear and re-analyze:', error);
+                  setReanalyzing(false);
+                }
+              }}
+              disabled={reanalyzing}
+              className={`hover:text-red-800 transition-colors text-sm ${reanalyzing ? 'text-gray-400 cursor-not-allowed' : ''}`}
+            >
+              {reanalyzing ? 'Processing...' : 'Reset'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Last Workout */}
       {recentWorkouts.length > 0 && (
         <div className="px-2 mt-4">
