@@ -397,6 +397,11 @@ Deno.serve(async (req) => {
 async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supabase: any): Promise<any> {
   const sensorData = workout.sensor_data?.samples || [];
   const computed = typeof workout.computed === 'string' ? JSON.parse(workout.computed) : workout.computed;
+  
+  console.log(`Sensor data length: ${sensorData.length}`);
+  if (sensorData.length > 0) {
+    console.log('First sensor sample:', JSON.stringify(sensorData[0], null, 2));
+  }
   const intervals = computed?.intervals || [];
   
   console.log(`Processing ${sensorData.length} sensor samples for ${workout.type} workout`);
@@ -500,10 +505,10 @@ function comparePlannedVsExecuted(samples: any[], intervals: any[]) {
     
     // Extract executed metrics
     const executedPower = intervalSamples
-      .map(s => s.powerInWatts || s.power)
+      .map(s => s.powerInWatts || s.power || s.power_watts || s.powerInWatts)
       .filter(p => p && p > 0);
     const executedHR = intervalSamples
-      .map(s => s.heartRate)
+      .map(s => s.heartRate || s.heart_rate || s.hr)
       .filter(hr => hr && hr > 0);
     
     const avgExecutedPower = executedPower.length > 0 ? 
@@ -603,7 +608,7 @@ function analyzeSpeedBursts(samples: any[], intervals: any[]) {
     const burstThreshold = plannedTarget * 1.10;
     
     const powerSamples = intervalSamples
-      .map(s => s.powerInWatts || s.power)
+      .map(s => s.powerInWatts || s.power || s.power_watts || s.powerInWatts)
       .filter(p => p && p > 0);
     
     // Count burst seconds
@@ -667,8 +672,8 @@ function analyzePaceConsistency(samples: any[], intervals: any[]) {
     const values = intervalSamples
       .map(s => {
         // For bike: use power
-        if (s.powerInWatts || s.power) {
-          return s.powerInWatts || s.power;
+        if (s.powerInWatts || s.power || s.power_watts) {
+          return s.powerInWatts || s.power || s.power_watts;
         }
         // For run: calculate pace from speed
         if (s.speedMetersPerSecond && s.speedMetersPerSecond > 0) {
@@ -748,10 +753,10 @@ function analyzeFatiguePattern(samples: any[], intervals: any[]) {
     );
     
     const executedPower = intervalSamples
-      .map(s => s.powerInWatts || s.power)
+      .map(s => s.powerInWatts || s.power || s.power_watts || s.powerInWatts)
       .filter(p => p && p > 0);
     const executedHR = intervalSamples
-      .map(s => s.heartRate)
+      .map(s => s.heartRate || s.heart_rate || s.hr)
       .filter(hr => hr && hr > 0);
     
     const avgExecutedPower = executedPower.length > 0 ? 
@@ -1097,8 +1102,15 @@ function analyzePowerDistribution(sensorData: any[], computed: any, userBaseline
  * Analyze HR responsiveness from sensor data
  */
 async function analyzeHRTrends(sensorData: any[], computed: any, workout: any, supabase: any): Promise<any> {
+  console.log(`Analyzing HR trends with ${sensorData.length} sensor samples`);
+  
+  // Debug: Log sensor data structure
+  if (sensorData.length > 0) {
+    console.log('Sample sensor data structure:', JSON.stringify(sensorData[0], null, 2));
+  }
+  
   const hrSamples = sensorData
-    .map(s => s.heartRate)
+    .map(s => s.heartRate || s.heart_rate || s.hr)
     .filter(hr => hr && hr > 0);
 
   // If no sensor data, use computed data for basic HR metrics

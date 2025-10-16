@@ -41,9 +41,14 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       for (const workout of workoutsNeedingAnalysis) {
         try {
           console.log(`🚀 Triggering analysis for workout: ${workout.id}`);
+          console.log(`🔍 Supabase URL: ${supabase.supabaseUrl}`);
+          console.log(`🔍 Function URL: ${supabase.supabaseUrl}/functions/v1/analyze-workout`);
+          
           const { data, error } = await supabase.functions.invoke('analyze-workout', {
             body: { workout_id: workout.id }
           });
+          
+          console.log(`📊 Analysis response for ${workout.id}:`, { data, error });
           
           if (error) {
             console.error(`❌ Analysis failed for workout ${workout.id}:`, error);
