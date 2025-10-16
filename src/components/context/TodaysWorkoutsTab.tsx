@@ -515,10 +515,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                   </div>
                 </div>
                 <div className="text-xs text-[#666666] text-right">
-                  {workout.avg_power && (
+                  {/* Only show relevant metrics for each workout type */}
+                  {(workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike') && workout.avg_power && (
                     <div>Power: {workout.avg_power}W</div>
                   )}
-                  {workout.avg_heart_rate && (
+                  {(workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike' || workout.type === 'swim' || workout.type === 'swimming') && workout.avg_heart_rate && (
                     <div>HR: {workout.avg_heart_rate} bpm</div>
                   )}
                   {workout.workout_analysis && (

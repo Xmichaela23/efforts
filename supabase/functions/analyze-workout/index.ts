@@ -302,9 +302,39 @@ Deno.serve(async (req) => {
     const normalizedWorkoutDate = normalizeWorkoutDate(workout, null, userTimezone);
     console.log(`Workout date normalized to user timezone: ${normalizedWorkoutDate}`);
 
-    console.log(`Analyzing ${workout.type} workout with ${workout.sensor_data?.samples?.length || 0} samples`);
+    // Parse sensor data to get accurate count
+    let sensorDataCount = 0;
+    if (Array.isArray(workout.sensor_data)) {
+      sensorDataCount = workout.sensor_data.length;
+    } else if (typeof workout.sensor_data === 'string') {
+      try {
+        const parsed = JSON.parse(workout.sensor_data);
+        sensorDataCount = Array.isArray(parsed) ? parsed.length : 0;
+      } catch (e) {
+        sensorDataCount = 0;
+      }
+    } else if (workout.sensor_data?.samples && Array.isArray(workout.sensor_data.samples)) {
+      sensorDataCount = workout.sensor_data.samples.length;
+    }
+    console.log(`Analyzing ${workout.type} workout with ${sensorDataCount} samples`);
     console.log(`Workout computed data:`, JSON.stringify(workout.computed, null, 2));
     console.log(`User baselines:`, JSON.stringify(userBaselines, null, 2));
+
+    // Skip analysis entirely for mobility workouts - no meaningful performance data
+    if (workout.type === 'mobility' || workout.type === 'mobility_session') {
+      console.log('Skipping analysis for mobility workout - no performance metrics to analyze');
+      return new Response(JSON.stringify({
+        execution_grade: null,
+        insights: ['Mobility session completed - no performance analysis needed'],
+        key_metrics: null,
+        red_flags: []
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
 
     // Analyze using granular sample data
     const analysis = await analyzeWorkoutWithSamples(workout, userBaselines, supabase);
@@ -394,12 +424,47 @@ Deno.serve(async (req) => {
  * OUTPUT: Comprehensive analysis object with all metrics and distributions
  */
 async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supabase: any): Promise<any> {
-  const sensorData = workout.sensor_data?.samples || [];
+  // Parse sensor_data - Supabase stores it as JSONB (already parsed)
+  let sensorData = [];
+  console.log('DEBUG: Original sensor_data type:', typeof workout.sensor_data);
+  console.log('DEBUG: Original sensor_data is array:', Array.isArray(workout.sensor_data));
+  
+  if (Array.isArray(workout.sensor_data)) {
+    // JSONB field is already parsed as array
+    sensorData = workout.sensor_data;
+    console.log(`Using sensor_data array: ${sensorData.length} samples`);
+  } else if (typeof workout.sensor_data === 'string') {
+    // Fallback for string data (shouldn't happen with JSONB)
+    try {
+      sensorData = JSON.parse(workout.sensor_data);
+      console.log(`Parsed sensor_data string: ${sensorData.length} samples`);
+    } catch (e) {
+      console.error('Failed to parse sensor_data string:', e);
+      sensorData = [];
+    }
+  } else if (workout.sensor_data?.samples && Array.isArray(workout.sensor_data.samples)) {
+    // Object with samples property
+    sensorData = workout.sensor_data.samples;
+    console.log(`Using sensor_data.samples: ${sensorData.length} samples`);
+  } else {
+    console.log('No sensor data available - sensor_data type:', typeof workout.sensor_data, 'value:', workout.sensor_data);
+    sensorData = [];
+  }
+  
+  // Debug the parsed sensorData (not the original workout.sensor_data)
+  console.log('DEBUG: Parsed sensorData type:', typeof sensorData);
+  console.log('DEBUG: Parsed sensorData is array:', Array.isArray(sensorData));
+  console.log('DEBUG: Parsed sensorData length:', sensorData.length);
+  
   const computed = typeof workout.computed === 'string' ? JSON.parse(workout.computed) : workout.computed;
   
   console.log(`Sensor data length: ${sensorData.length}`);
   if (sensorData.length > 0) {
     console.log('First sensor sample:', JSON.stringify(sensorData[0], null, 2));
+    console.log('First 5 samples power values:', sensorData.slice(0, 5).map(s => s.power));
+    console.log('First 5 samples heartRate values:', sensorData.slice(0, 5).map(s => s.heartRate));
+    console.log('Non-null power samples:', sensorData.filter(s => s.power && s.power > 0).length);
+    console.log('Non-null heartRate samples:', sensorData.filter(s => s.heartRate && s.heartRate > 0).length);
   }
   const intervals = computed?.intervals || [];
   
@@ -431,6 +496,8 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
   let fatigueAnalysis: any = null;
 
   if (workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike') {
+    console.log(`Running power/pace analysis for ${workout.type} workout`);
+    
     // 1. Compare planned vs executed (adherence)
     plannedVsExecuted = comparePlannedVsExecuted(sensorData, intervals);
 
@@ -442,6 +509,8 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
 
     // 4. Track fatigue across intervals
     fatigueAnalysis = analyzeFatiguePattern(sensorData, intervals);
+  } else {
+    console.log(`Skipping power/pace analysis for ${workout.type} workout - not applicable`);
   }
 
   // 5. Run enhanced analysis with historical context
@@ -460,14 +529,18 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
     intensity_analysis: null
   };
 
-  // Always run HR trend analysis regardless of workout type
-  console.log('Running HR trend analysis...');
-  try {
-    analysis.hr_responsiveness = await analyzeHRTrends(sensorData, computed, workout, supabase);
-    console.log('HR trend analysis completed:', JSON.stringify(analysis.hr_responsiveness, null, 2));
-  } catch (error) {
-    console.error('HR trend analysis failed:', error);
-    // No fallback - return error state
+  // Run HR trend analysis only for workouts that have meaningful HR data
+  if (workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike' || workout.type === 'swim' || workout.type === 'swimming') {
+    console.log(`Running HR trend analysis for ${workout.type} workout...`);
+    try {
+      analysis.hr_responsiveness = await analyzeHRTrends(sensorData, computed, workout, supabase);
+      console.log('HR trend analysis completed:', JSON.stringify(analysis.hr_responsiveness, null, 2));
+    } catch (error) {
+      console.error('HR trend analysis failed:', error);
+      analysis.hr_responsiveness = null;
+    }
+  } else {
+    console.log(`Skipping HR trend analysis for ${workout.type} workout - not applicable`);
     analysis.hr_responsiveness = null;
   }
 
@@ -482,7 +555,8 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
   } else if (workout.type === 'swim' || workout.type === 'swimming') {
     analysis.intensity_analysis = analyzeSwimIntensity(sensorData, computed, userBaselines);
   } else if (workout.type === 'strength' || workout.type === 'strength_training') {
-    analysis.intensity_analysis = analyzeStrengthIntensity(sensorData, computed, userBaselines);
+    console.log(`Analyzing strength workout - checking for RIR data`);
+    analysis.intensity_analysis = analyzeStrengthIntensity(computed, userBaselines);
   } else if (workout.type === 'mobility' || workout.type === 'mobility_session') {
     // Mobility workouts don't need analysis - no meaningful data
     analysis.intensity_analysis = null;
@@ -888,26 +962,32 @@ STRENGTH TRAINING ANALYSIS (RIR-based):
 - Total Sets: ${intensity.rir_analysis.total_sets}`;
         }
         
-        if (intensity.hr_analysis) {
-          prompt += `
-- HR Response: ${intensity.hr_analysis.avg_hr} bpm avg, ${intensity.hr_analysis.hr_range} bpm range
-- HR Variability: ${intensity.hr_analysis.hr_variability}%`;
-        }
-        
-        if (!intensity.rir_analysis && !intensity.hr_analysis) {
+        if (!intensity.rir_analysis) {
           prompt += `
 STRENGTH TRAINING ANALYSIS:
-- No RIR or HR data available for analysis
+- No RIR data available for analysis
 - Consider logging RIR for each set to enable detailed analysis`;
         }
       }
     }
 
-    // Only analyze runs and rides - skip everything else
-    if (workout.type !== 'run' && workout.type !== 'running' && workout.type !== 'ride' && workout.type !== 'cycling' && workout.type !== 'bike') {
+    // Handle different workout types appropriately
+    if (workout.type === 'swim' || workout.type === 'swimming') {
+      prompt += `
+SWIM WORKOUT ANALYSIS:
+- Swim workouts focus on heart rate response and duration
+- Power analysis not applicable for swimming
+- HR data shows physiological response to swimming effort`;
+    } else if (workout.type === 'strength' || workout.type === 'strength_training') {
+      prompt += `
+STRENGTH WORKOUT ANALYSIS:
+- Strength workouts focus on RIR progression and set consistency
+- Power analysis not applicable for strength training
+- Focus on fatigue patterns and intensity progression`;
+    } else if (workout.type !== 'run' && workout.type !== 'running' && workout.type !== 'ride' && workout.type !== 'cycling' && workout.type !== 'bike') {
       prompt += `
 WORKOUT TYPE: ${workout.type.toUpperCase()}
-- No performance analysis available for this workout type
+- Limited performance analysis available for this workout type
 - Focus on runs and rides for detailed performance metrics`;
     }
 
@@ -1202,21 +1282,23 @@ async function analyzeHRTrends(sensorData: any[], computed: any, workout: any, s
     }
   }
 
-  // Get historical HR data for trend analysis
+  // Get historical HR data for trend analysis - discipline-specific
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
-  console.log(`Looking for historical workouts for user ${workout.user_id} from ${thirtyDaysAgo.toISOString().split('T')[0]} to ${workout.date}`);
+  console.log(`Looking for historical ${workout.type} workouts for user ${workout.user_id} from ${thirtyDaysAgo.toISOString().split('T')[0]} to ${workout.date}`);
   
+  // Only compare with same discipline for meaningful trends
   const { data: historicalWorkouts, error: historicalError } = await supabase
     .from('workouts')
     .select('id, date, type, avg_heart_rate, max_heart_rate, workout_analysis')
     .eq('user_id', workout.user_id)
+    .eq('type', workout.type) // Only same discipline
     .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
     .lt('date', workout.date)
     .not('avg_heart_rate', 'is', null)
     .order('date', { ascending: false })
-    .limit(20);
+    .limit(10); // Fewer samples since we're filtering by discipline
   
   if (historicalError) {
     console.error('Historical data query failed:', historicalError);
@@ -1644,19 +1726,20 @@ function analyzeBikeIntensity(sensorData: any[], computed: any, userBaselines: a
 /**
  * Analyze strength training intensity from RIR data and sensor data
  */
-function analyzeStrengthIntensity(sensorData: any[], computed: any, userBaselines: any): any {
-  // Look for RIR data in computed or sensor data
+function analyzeStrengthIntensity(computed: any, userBaselines: any): any {
+  console.log('Checking strength workout RIR data availability...');
+  
+  // Look for RIR data in computed data only
   const rirData = computed?.rir_data || computed?.sets || [];
-  const hrSamples = sensorData
-    .map(s => s.heartRate || s.heart_rate || s.hr)
-    .filter(hr => hr && hr > 0);
+  console.log(`RIR data available: ${rirData.length} sets`);
 
-  // Primary analysis based on RIR data
+  // Analysis based on RIR data only
   let rirAnalysis: any = null;
   if (rirData && rirData.length > 0) {
     const rirValues = rirData.map(set => set.rir || set.reps_in_reserve).filter(rir => rir !== null && rir !== undefined);
     
     if (rirValues.length > 0) {
+      console.log(`Valid RIR values found: ${rirValues.length}`);
       const avgRIR = rirValues.reduce((sum, rir) => sum + rir, 0) / rirValues.length;
       const minRIR = Math.min(...rirValues);
       const maxRIR = Math.max(...rirValues);
@@ -1678,57 +1761,37 @@ function analyzeStrengthIntensity(sensorData: any[], computed: any, userBaseline
         total_sets: rirValues.length,
         intensity_progression: rirFade > 1 ? 'increasing fatigue' : rirFade < -0.5 ? 'maintaining intensity' : 'slight fatigue'
       };
+    } else {
+      console.log('No valid RIR values found in sets data');
     }
+  } else {
+    console.log('No RIR data structure found');
   }
 
-  // Secondary analysis from HR data (if available)
-  let hrAnalysis: any = null;
-  if (hrSamples.length > 0) {
-    const avgHR = hrSamples.reduce((sum, hr) => sum + hr, 0) / hrSamples.length;
-    const maxHR = Math.max(...hrSamples);
-    const minHR = Math.min(...hrSamples);
-    const hrRange = maxHR - minHR;
-    const hrVariability = calculateVariability(hrSamples);
-    
-    hrAnalysis = {
-      avg_hr: Math.round(avgHR),
-      max_hr: maxHR,
-      min_hr: minHR,
-      hr_range: hrRange,
-      hr_variability: hrVariability.toFixed(2)
-    };
-  }
-
-  // Determine data quality and focus
+  // Determine data quality - RIR data is the only requirement
   const hasRIRData = rirAnalysis !== null;
-  const hasHRData = hrAnalysis !== null;
   
   let dataQuality = 'insufficient';
-  let focus = 'No data available';
+  let focus = 'No RIR data available';
   
-  if (hasRIRData && hasHRData) {
-    dataQuality = 'excellent';
-    focus = 'RIR progression with HR response';
-  } else if (hasRIRData) {
+  if (hasRIRData) {
     dataQuality = 'good';
     focus = 'RIR progression analysis';
-  } else if (hasHRData) {
-    dataQuality = 'limited';
-    focus = 'HR patterns only';
+  } else {
+    console.log('Insufficient RIR data for strength analysis - skipping detailed analysis');
   }
 
   return {
     intensity: {
       rir_analysis: rirAnalysis,
-      hr_analysis: hrAnalysis,
       data_quality: dataQuality,
       focus: focus
     },
     analysis: {
       workout_type: 'strength',
-      primary_metric: hasRIRData ? 'RIR' : hasHRData ? 'HR' : 'none',
+      primary_metric: hasRIRData ? 'RIR' : 'none',
       data_quality: dataQuality,
-      insights: generateStrengthInsights(rirAnalysis, hrAnalysis, hasRIRData, hasHRData)
+      insights: generateStrengthInsights(rirAnalysis, hasRIRData)
     }
   };
 }
@@ -1736,22 +1799,15 @@ function analyzeStrengthIntensity(sensorData: any[], computed: any, userBaseline
 /**
  * Generate strength-specific insights based on available data
  */
-function generateStrengthInsights(rirAnalysis: any, hrAnalysis: any, hasRIR: boolean, hasHR: boolean): string[] {
+function generateStrengthInsights(rirAnalysis: any, hasRIR: boolean): string[] {
   const insights: string[] = [];
   
   if (hasRIR) {
     insights.push(`RIR average: ${rirAnalysis.avg_rir} (range: ${rirAnalysis.min_rir}-${rirAnalysis.max_rir})`);
     insights.push(`RIR consistency: ${rirAnalysis.rir_consistency}% variation - ${rirAnalysis.rir_consistency < 20 ? 'very consistent' : 'some variation'}`);
     insights.push(`Fatigue pattern: ${rirAnalysis.intensity_progression} (${rirAnalysis.rir_fade} RIR change)`);
-  }
-  
-  if (hasHR) {
-    insights.push(`HR response: ${hrAnalysis.avg_hr} bpm avg, ${hrAnalysis.hr_range} bpm range`);
-    insights.push(`HR variability: ${hrAnalysis.hr_variability}% - ${hrAnalysis.hr_variability < 15 ? 'steady' : 'variable'}`);
-  }
-  
-  if (!hasRIR && !hasHR) {
-    insights.push('No RIR or HR data available for analysis');
+  } else {
+    insights.push('No RIR data available for analysis');
     insights.push('Consider logging RIR for each set to enable detailed analysis');
   }
   
