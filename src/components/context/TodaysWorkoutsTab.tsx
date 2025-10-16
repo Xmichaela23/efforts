@@ -35,7 +35,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     try {
       analyzingRef.current.add(workoutId);
       setAnalyzingWorkout(workoutId);
+      
+      // Find the workout to verify we're analyzing the right one
+      const targetWorkout = recentWorkouts.find(w => w.id === workoutId);
       console.log(`🚀 Analyzing workout: ${workoutId}`);
+      console.log(`🎯 Target workout:`, targetWorkout ? { id: targetWorkout.id, type: targetWorkout.type, name: targetWorkout.name } : 'NOT FOUND');
       
       const { data, error } = await supabase.functions.invoke('analyze-workout', {
         body: { workout_id: workoutId }

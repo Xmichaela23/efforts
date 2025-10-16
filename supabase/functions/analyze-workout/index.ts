@@ -230,7 +230,8 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    console.log(`Analyzing workout ${workout_id}`);
+    console.log(`=== WORKOUT ANALYSIS START ===`);
+    console.log(`Analyzing workout: ${workout_id}`);
 
     // Get workout with full sensor data and strength exercises
     const { data: workout, error: workoutError } = await supabase
@@ -373,6 +374,12 @@ Deno.serve(async (req) => {
       },
       red_flags: redFlags
     };
+
+    console.log('=== FINAL RESULT DEBUG ===');
+    console.log('Execution grade:', grade);
+    console.log('Insights count:', insights?.length || 0);
+    console.log('Insights:', insights);
+    console.log('Final result:', JSON.stringify(result, null, 2));
 
     // Store analysis in workout record for future reference
     await supabase
@@ -916,6 +923,16 @@ async function generateWorkoutInsights(data: {
   // NO FALLBACKS - Check if there's meaningful data to analyze
   let hasMeaningfulData = false;
   
+  console.log('=== GPT-4 INSIGHTS DEBUG ===');
+  console.log('Workout type:', data.workout.type);
+  console.log('Planned vs executed:', !!data.planned_vs_executed, data.planned_vs_executed?.length);
+  console.log('Bursts:', !!data.bursts);
+  console.log('Consistency:', !!data.consistency);
+  console.log('Fatigue:', !!data.fatigue);
+  console.log('Power distribution:', !!data.power_distribution);
+  console.log('HR dynamics:', !!data.hr_dynamics);
+  console.log('Intensity analysis:', !!data.intensity_analysis);
+  
   if (data.workout.type === 'strength' || data.workout.type === 'strength_training') {
     // For strength workouts, only proceed if we have actual RIR/weight/reps data
     hasMeaningfulData = data.intensity_analysis && 
@@ -933,6 +950,8 @@ async function generateWorkoutInsights(data: {
       data.hr_dynamics || 
       (data.intensity_analysis && data.intensity_analysis.analysis && data.intensity_analysis.analysis.insights && data.intensity_analysis.analysis.insights.length > 0);
   }
+  
+  console.log('Has meaningful data:', hasMeaningfulData);
   
   if (!hasMeaningfulData) {
     console.log(`No meaningful data for ${data.workout.type} analysis - returning empty insights`);
@@ -2150,20 +2169,37 @@ function calculateExecutionGrade(workout: any, analysis: any): string | null {
   // Check for meaningful analysis data (not just existence of objects)
   const hasPaceData = analysis.pace_variability?.consistency_score && analysis.pace_variability.consistency_score > 0;
   const hasHRData = analysis.hr_responsiveness?.avg_hr && analysis.hr_responsiveness.avg_hr > 0;
-  const hasPowerData = analysis.power_distribution?.avg_power && analysis.power_distribution.avg_power > 0;
+  
+  // Check power data in the correct location (planned_vs_executed)
+  const hasPowerData = analysis.planned_vs_executed?.[0]?.executed?.avg_power && analysis.planned_vs_executed[0].executed.avg_power > 0;
+  
+  // Check for any meaningful analysis data (broader check)
+  const hasAnyAnalysisData = analysis.planned_vs_executed?.length > 0 || 
+                            analysis.speed_bursts || 
+                            analysis.pace_consistency || 
+                            analysis.fatigue_pattern || 
+                            analysis.power_distribution || 
+                            analysis.hr_responsiveness || 
+                            analysis.pace_variability;
+  
   const hasStrengthData = analysis.intensity_analysis?.analysis?.insights && analysis.intensity_analysis.analysis.insights.length > 0;
   
-  const hasAnalysisData = hasPaceData || hasHRData || hasPowerData || hasStrengthData;
+  const hasAnalysisData = hasPaceData || hasHRData || hasPowerData || hasStrengthData || hasAnyAnalysisData;
   
   console.log('=== EXECUTION GRADE DEBUG ===');
   console.log('Workout type:', workout.type);
   console.log('Execution data:', hasExecutionData, 'Analysis data:', hasAnalysisData);
   console.log('Pace data:', hasPaceData, 'HR data:', hasHRData, 'Power data:', hasPowerData, 'Strength data:', hasStrengthData);
+  console.log('Any analysis data:', hasAnyAnalysisData);
   console.log('Analysis object keys:', Object.keys(analysis));
-  console.log('Pace variability:', analysis.pace_variability);
-  console.log('HR responsiveness:', analysis.hr_responsiveness);
-  console.log('Power distribution:', analysis.power_distribution);
-  console.log('Intensity analysis:', analysis.intensity_analysis);
+  console.log('Planned vs executed:', analysis.planned_vs_executed?.length, 'items');
+  console.log('Speed bursts:', !!analysis.speed_bursts);
+  console.log('Pace consistency:', !!analysis.pace_consistency);
+  console.log('Fatigue pattern:', !!analysis.fatigue_pattern);
+  console.log('Power distribution:', !!analysis.power_distribution);
+  console.log('HR responsiveness:', !!analysis.hr_responsiveness);
+  console.log('Pace variability:', !!analysis.pace_variability);
+  console.log('Planned vs executed power:', analysis.planned_vs_executed?.[0]?.executed?.avg_power);
   
   if (!hasExecutionData && !hasAnalysisData) {
     console.log('No meaningful data for execution grade - returning null');
