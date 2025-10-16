@@ -44,6 +44,20 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
           console.log(`🔍 Supabase URL: ${supabase.supabaseUrl}`);
           console.log(`🔍 Function URL: ${supabase.supabaseUrl}/functions/v1/analyze-workout`);
           
+          // Test if function is accessible
+          try {
+            const testResponse = await fetch(`${supabase.supabaseUrl}/functions/v1/analyze-workout`, {
+              method: 'OPTIONS',
+              headers: {
+                'Authorization': `Bearer ${supabase.supabaseKey}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            console.log(`🔍 Function accessibility test:`, testResponse.status, testResponse.statusText);
+          } catch (testError) {
+            console.error(`🔍 Function accessibility test failed:`, testError);
+          }
+          
           const { data, error } = await supabase.functions.invoke('analyze-workout', {
             body: { workout_id: workout.id }
           });
