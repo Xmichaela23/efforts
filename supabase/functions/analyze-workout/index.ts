@@ -2145,15 +2145,32 @@ function analyzeWorkoutFromComputed(workout: any, computed: any, userBaselines: 
  */
 function calculateExecutionGrade(workout: any, analysis: any): string | null {
   // NO FALLBACKS - Return null if no meaningful data to grade
-  const hasExecutionData = workout.computed?.execution_score;
-  const hasAnalysisData = analysis.pace_variability || analysis.hr_responsiveness || analysis.power_distribution || 
-                         (analysis.intensity_analysis && analysis.intensity_analysis.analysis && analysis.intensity_analysis.analysis.insights && analysis.intensity_analysis.analysis.insights.length > 0);
+  const hasExecutionData = workout.computed?.execution_score && workout.computed.execution_score > 0;
+  
+  // Check for meaningful analysis data (not just existence of objects)
+  const hasPaceData = analysis.pace_variability?.consistency_score && analysis.pace_variability.consistency_score > 0;
+  const hasHRData = analysis.hr_responsiveness?.avg_hr && analysis.hr_responsiveness.avg_hr > 0;
+  const hasPowerData = analysis.power_distribution?.avg_power && analysis.power_distribution.avg_power > 0;
+  const hasStrengthData = analysis.intensity_analysis?.analysis?.insights && analysis.intensity_analysis.analysis.insights.length > 0;
+  
+  const hasAnalysisData = hasPaceData || hasHRData || hasPowerData || hasStrengthData;
+  
+  console.log('=== EXECUTION GRADE DEBUG ===');
+  console.log('Workout type:', workout.type);
+  console.log('Execution data:', hasExecutionData, 'Analysis data:', hasAnalysisData);
+  console.log('Pace data:', hasPaceData, 'HR data:', hasHRData, 'Power data:', hasPowerData, 'Strength data:', hasStrengthData);
+  console.log('Analysis object keys:', Object.keys(analysis));
+  console.log('Pace variability:', analysis.pace_variability);
+  console.log('HR responsiveness:', analysis.hr_responsiveness);
+  console.log('Power distribution:', analysis.power_distribution);
+  console.log('Intensity analysis:', analysis.intensity_analysis);
   
   if (!hasExecutionData && !hasAnalysisData) {
     console.log('No meaningful data for execution grade - returning null');
     return null;
   }
   
+  // Only start scoring if we have meaningful data
   let score = 100;
 
   // Check adherence to planned workout

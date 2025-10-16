@@ -272,9 +272,20 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     console.log('🔍 Analysis data structure:', JSON.stringify(analysis, null, 2));
     
     // Only return data if we have basic analysis
-    if (!analysis.execution_grade) {
+    if (analysis.execution_grade === undefined) {
       console.log('❌ No execution_grade in analysis');
       return null;
+    }
+    
+    // Handle null grade (no meaningful data to grade)
+    if (analysis.execution_grade === null) {
+      console.log('⚠️ Analysis completed but no meaningful data to grade');
+      return {
+        execution_grade: null,
+        insights: analysis.insights || [],
+        key_metrics: analysis.key_metrics || {},
+        red_flags: analysis.red_flags || []
+      };
     }
     
     // Extract metrics from new analysis structure
