@@ -49,11 +49,16 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       console.log('Analysis completed:', data);
       
       // Update the specific workout in state
-      setRecentWorkouts(prev => prev.map(workout => 
-        workout.id === workoutId 
-          ? { ...workout, workout_analysis: data }
-          : workout
-      ));
+      setRecentWorkouts(prev => {
+        const updated = prev.map(workout => 
+          workout.id === workoutId 
+            ? { ...workout, workout_analysis: data }
+            : workout
+        );
+        console.log('🔄 Updated workout state for:', workoutId);
+        console.log('🔄 Updated workout analysis:', updated.find(w => w.id === workoutId)?.workout_analysis);
+        return updated;
+      });
       
     } catch (error) {
       console.error('Failed to analyze workout:', error);
@@ -67,20 +72,28 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
 
   // Trigger analysis for existing workouts that don't have it
   const triggerAnalysisForExistingWorkouts = async () => {
-    if (analysisTriggered || recentWorkouts.length === 0) return;
+    if (analysisTriggered || recentWorkouts.length === 0) {
+      console.log('🚫 Skipping auto-analysis - already triggered or no workouts');
+      return;
+    }
     
     try {
       setAnalysisTriggered(true);
+      console.log('🔄 Starting auto-analysis for existing workouts');
       
-      // Find completed workouts without analysis
+      // Find completed workouts without analysis (excluding currently analyzing ones)
       const workoutsNeedingAnalysis = recentWorkouts.filter(workout => 
         workout.workout_status === 'completed' && 
-        !workout.workout_analysis
+        !workout.workout_analysis &&
+        analyzingWorkout !== workout.id
       );
       
-      if (workoutsNeedingAnalysis.length === 0) return;
+      if (workoutsNeedingAnalysis.length === 0) {
+        console.log('✅ No workouts need analysis');
+        return;
+      }
       
-      console.log(`🔍 Found ${workoutsNeedingAnalysis.length} workouts needing analysis`);
+      console.log(`🔍 Found ${workoutsNeedingAnalysis.length} workouts needing analysis:`, workoutsNeedingAnalysis.map(w => ({ id: w.id, type: w.type, has_analysis: !!w.workout_analysis })));
       
       // Trigger analysis for each workout
       for (const workout of workoutsNeedingAnalysis) {
@@ -151,10 +164,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
 
   // Trigger analysis when recent workouts are loaded (only once)
   useEffect(() => {
-    if (recentWorkouts.length > 0 && !analysisTriggered && !loading) {
+    if (recentWorkouts.length > 0 && !analysisTriggered && !loading && analyzingWorkout === null) {
+      console.log('🔄 Auto-triggering analysis for existing workouts');
       triggerAnalysisForExistingWorkouts();
     }
-  }, [recentWorkouts.length, analysisTriggered, loading]);
+  }, [recentWorkouts.length, analysisTriggered, loading, analyzingWorkout]);
 
   const loadRecentWorkouts = async () => {
     try {
