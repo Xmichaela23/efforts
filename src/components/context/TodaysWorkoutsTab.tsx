@@ -23,8 +23,9 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const today = new Date().toLocaleDateString('en-CA');
   const { items: todayItems = [], loading: todayLoading } = useWeekUnified(today, today);
 
-  // Analyze a single workout
-  const analyzeSingleWorkout = async (workoutId: string) => {
+
+  // Analyze a workout (always fresh analysis)
+  const analyzeWorkout = async (workoutId: string) => {
     // Prevent multiple simultaneous analysis calls
     if (analyzingRef.current.has(workoutId)) {
       console.log(`Already analyzing workout: ${workoutId}`);
@@ -47,7 +48,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
 
       console.log('Analysis completed:', data);
       
-      // Update the specific workout in state instead of full reload
+      // Update the specific workout in state
       setRecentWorkouts(prev => prev.map(workout => 
         workout.id === workoutId 
           ? { ...workout, workout_analysis: data }
@@ -61,6 +62,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       setAnalyzingWorkout(null);
     }
   };
+
+
 
   // Trigger analysis for existing workouts that don't have it
   const triggerAnalysisForExistingWorkouts = async () => {
@@ -551,7 +554,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                 }`}
                 onClick={() => {
                   if (analyzingWorkout !== workout.id) {
-                    analyzeSingleWorkout(workout.id);
+                    // Always run fresh analysis - no cache confusion
+                    analyzeWorkout(workout.id);
                   }
                 }}
               >
@@ -578,10 +582,6 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                   {analyzingWorkout === workout.id ? (
                     <div className="text-xs text-orange-600 font-medium">
                       Analyzing...
-                    </div>
-                  ) : workout.workout_analysis ? (
-                    <div className="text-xs text-green-600 font-medium">
-                      ✓ Analysis available
                     </div>
                   ) : (
                     <div className="text-xs text-blue-600 font-medium">
