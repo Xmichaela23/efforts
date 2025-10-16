@@ -232,10 +232,10 @@ Deno.serve(async (req) => {
 
     console.log(`Analyzing workout ${workout_id}`);
 
-    // Get workout with full sensor data
+    // Get workout with full sensor data and strength exercises
     const { data: workout, error: workoutError } = await supabase
       .from('workouts')
-      .select('*, sensor_data, computed')
+      .select('*, sensor_data, computed, strength_exercises')
       .eq('id', workout_id)
       .single();
 
@@ -272,14 +272,15 @@ Deno.serve(async (req) => {
       max_hr: rawBaselines.max_hr || rawBaselines.maxHR,
       rest_hr: rawBaselines.rest_hr || rawBaselines.restHR,
       five_k: rawBaselines.fiveK || rawBaselines.five_k,
-      swim: rawBaselines.swim
+      swim: rawBaselines.swim,
+      one_rm: rawBaselines.one_rm || rawBaselines.oneRM || rawBaselines.max_strength
     };
     
     console.log('Raw baselines data:', JSON.stringify(baselinesResult.data, null, 2));
     console.log('Parsed userBaselines:', JSON.stringify(userBaselines, null, 2));
     
-    // Check for required baselines - NO FALLBACKS
-    if (!userBaselines.ftp) {
+    // Check for required baselines - NO FALLBACKS (except for strength workouts)
+    if (!userBaselines.ftp && workout.type !== 'strength' && workout.type !== 'strength_training') {
       console.log('FTP missing from baselines');
       return new Response(JSON.stringify({
         error: 'FTP baseline required for analysis. Please update your profile with your FTP.',
@@ -553,10 +554,10 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
     analysis.normalized_metrics = calculateNormalizedPower(sensorData, userBaselines);
     analysis.intensity_analysis = analyzeBikeIntensity(sensorData, computed, userBaselines);
   } else if (workout.type === 'swim' || workout.type === 'swimming') {
-    analysis.intensity_analysis = analyzeSwimIntensity(sensorData, computed, userBaselines);
+    analysis.intensity_analysis = analyzeSwimIntensity(sensorData, computed, userBaselines, workout);
   } else if (workout.type === 'strength' || workout.type === 'strength_training') {
     console.log(`Analyzing strength workout - checking for RIR data`);
-    analysis.intensity_analysis = analyzeStrengthIntensity(computed, userBaselines);
+    analysis.intensity_analysis = analyzeStrengthIntensity(workout, userBaselines);
   } else if (workout.type === 'mobility' || workout.type === 'mobility_session') {
     // Mobility workouts don't need analysis - no meaningful data
     analysis.intensity_analysis = null;
@@ -922,7 +923,9 @@ async function generateWorkoutInsights(data: {
     let prompt = `You're analyzing a ${workout.type} workout to have a conversation with the athlete about their training.
 
 WORKOUT OVERVIEW:
-Duration: ${Math.round(workout.duration)}min | Adherence: ${workout.computed?.overall?.execution_score}%
+${workout.type === 'strength' || workout.type === 'strength_training' ? 
+  `Strength Training Session | Adherence: ${workout.computed?.overall?.execution_score}%` : 
+  `Duration: ${Math.round(workout.duration)}min | Adherence: ${workout.computed?.overall?.execution_score}%`}
 Grade: ${workout.execution_grade}`;
 
     // Add power distribution analysis
@@ -934,8 +937,8 @@ POWER DISTRIBUTION:
 - Dominant Zone: ${power_distribution.dominant_zone}`;
     }
 
-    // Add HR as physiological response indicator
-    if (hr_dynamics) {
+    // Add HR as physiological response indicator (not for strength workouts)
+    if (hr_dynamics && workout.type !== 'strength' && workout.type !== 'strength_training') {
       prompt += `
 PHYSIOLOGICAL RESPONSE:
 - Avg HR: ${hr_dynamics.avg_hr} bpm, Peak: ${hr_dynamics.max_hr} bpm
@@ -947,27 +950,61 @@ PHYSIOLOGICAL RESPONSE:
       }
     }
 
-    // Add strength-specific analysis
-    if (workout.type === 'strength' || workout.type === 'strength_training') {
+        // Add strength-specific analysis
+        if (workout.type === 'strength' || workout.type === 'strength_training') {
+          const intensityAnalysis = intensity_analysis;
+          if (intensityAnalysis && intensityAnalysis.intensity) {
+            const intensity = intensityAnalysis.intensity;
+            
+            if (intensity.rir_analysis) {
+              prompt += `
+        STRENGTH TRAINING ANALYSIS (RIR-based):
+        - RIR Average: ${intensity.rir_analysis.avg_rir} (range: ${intensity.rir_analysis.min_rir}-${intensity.rir_analysis.max_rir})
+        - RIR Consistency: ${intensity.rir_analysis.rir_consistency}% variation
+        - Fatigue Pattern: ${intensity.rir_analysis.intensity_progression} (${intensity.rir_analysis.rir_fade} RIR change)
+        - Total Sets: ${intensity.rir_analysis.total_sets}`;
+            }
+            
+            if (intensity.weight_analysis) {
+              prompt += `
+        WEIGHT/LOAD ANALYSIS:
+        - Weight Range: ${intensity.weight_analysis.min_weight}-${intensity.weight_analysis.max_weight}kg (avg: ${intensity.weight_analysis.avg_weight}kg)
+        - Weight Progression: ${intensity.weight_analysis.weight_progression}kg across sets`;
+              
+              if (intensity.weight_analysis.percent_of_1rm) {
+                prompt += `
+        - Intensity: ${intensity.weight_analysis.percent_of_1rm}% of 1RM`;
+              }
+            }
+            
+            if (intensity.reps_analysis) {
+              prompt += `
+        REPS ANALYSIS:
+        - Total Reps: ${intensity.reps_analysis.total_reps} across ${intensity.reps_analysis.total_sets} sets
+        - Average Reps: ${intensity.reps_analysis.avg_reps} per set (range: ${intensity.reps_analysis.min_reps}-${intensity.reps_analysis.max_reps})`;
+            }
+            
+            if (!intensity.rir_analysis && !intensity.weight_analysis) {
+              prompt += `
+        STRENGTH TRAINING ANALYSIS:
+        - No RIR or weight data available for analysis
+        - Consider logging RIR and weight for each set to enable detailed analysis`;
+            }
+          }
+        }
+
+    // Add swim-specific lengths analysis
+    if (workout.type === 'swim' || workout.type === 'swimming') {
       const intensityAnalysis = intensity_analysis;
-      if (intensityAnalysis && intensityAnalysis.intensity) {
-        const intensity = intensityAnalysis.intensity;
-        
-        if (intensity.rir_analysis) {
-          prompt += `
-STRENGTH TRAINING ANALYSIS (RIR-based):
-- RIR Average: ${intensity.rir_analysis.avg_rir} (range: ${intensity.rir_analysis.min_rir}-${intensity.rir_analysis.max_rir})
-- RIR Consistency: ${intensity.rir_analysis.rir_consistency}% variation
-- Fatigue Pattern: ${intensity.rir_analysis.intensity_progression} (${intensity.rir_analysis.rir_fade} RIR change)
-- Total Sets: ${intensity.rir_analysis.total_sets}`;
-        }
-        
-        if (!intensity.rir_analysis) {
-          prompt += `
-STRENGTH TRAINING ANALYSIS:
-- No RIR data available for analysis
-- Consider logging RIR for each set to enable detailed analysis`;
-        }
+      if (intensityAnalysis && intensityAnalysis.lengths_analysis) {
+        const lengths = intensityAnalysis.lengths_analysis;
+        prompt += `
+SWIM LENGTHS ANALYSIS:
+- Total Lengths: ${lengths.total_lengths}
+- Average Pace: ${lengths.avg_pace_per_length}s per length
+- Pace Range: ${lengths.fastest_length}s (fastest) to ${lengths.slowest_length}s (slowest)
+- Pace Consistency: ${lengths.pace_consistency}% variation
+- Pace Progression: ${lengths.pace_progression} (${lengths.pace_fade_seconds}s change)`;
       }
     }
 
@@ -975,15 +1012,16 @@ STRENGTH TRAINING ANALYSIS:
     if (workout.type === 'swim' || workout.type === 'swimming') {
       prompt += `
 SWIM WORKOUT ANALYSIS:
-- Swim workouts focus on heart rate response and duration
-- Power analysis not applicable for swimming
-- HR data shows physiological response to swimming effort`;
+- Individual length analysis available for pace consistency and progression
+- HR response shows physiological effort
+- Length-by-length pace tracking for fatigue patterns
+- Simple adherence tracking (planned vs executed)`;
     } else if (workout.type === 'strength' || workout.type === 'strength_training') {
       prompt += `
 STRENGTH WORKOUT ANALYSIS:
-- Strength workouts focus on RIR progression and set consistency
-- Power analysis not applicable for strength training
-- Focus on fatigue patterns and intensity progression`;
+- Strength training focuses on RIR progression and set consistency
+- Duration is not a key metric for strength training
+- Focus on fatigue patterns and intensity progression through sets`;
     } else if (workout.type !== 'run' && workout.type !== 'running' && workout.type !== 'ride' && workout.type !== 'cycling' && workout.type !== 'bike') {
       prompt += `
 WORKOUT TYPE: ${workout.type.toUpperCase()}
@@ -1071,17 +1109,25 @@ ${bursts.map((burst: any) =>
 ).join('\n')}`;
     }
 
-    prompt += `
+    // Only include relevant baselines for each workout type
+    if (workout.type === 'strength' || workout.type === 'strength_training') {
+      prompt += `
+STRENGTH TRAINING CONTEXT:
+Focus on RIR progression and set consistency - no endurance metrics applicable.
+${userBaselines.one_rm ? `1RM Baseline: ${userBaselines.one_rm}kg` : 'No 1RM baseline available'}
+
+Analyze this strength workout and provide 3-4 performance observations:
+`;
+    } else {
+      prompt += `
 BASELINE CONTEXT:
 FTP: ${userBaselines.ftp}W
 
 Analyze this workout and provide 3-4 performance observations:
+`;
+    }
 
-1. Overall performance summary (1 sentence, specific metrics)
-2. Key data observation (1 sentence, data-driven)  
-3. Performance pattern (1 sentence, factual)
-4. Notable physiological response (only if significant)
-
+    prompt += `
 ANALYSIS STYLE:
 - Factual, data-driven tone
 - Use specific numbers and metrics
@@ -1148,7 +1194,7 @@ function analyzePaceVariability(sensorData: any[], computed: any): any {
   const paceSamples = sensorData
     .map(s => {
       if (s.speedMetersPerSecond && s.speedMetersPerSecond > 0) {
-        return (1000 / s.speedMetersPerSecond) * 60; // Convert to seconds per mile
+        return (1000 / s.speedMetersPerSecond) * 60; // Convert to seconds per km
       }
       return null;
     })
@@ -1623,8 +1669,8 @@ function analyzeRunIntensity(sensorData: any[], computed: any, userBaselines: an
   if (paceSamples.length > 0) {
     const avgPace = paceSamples.reduce((sum, p) => sum + p, 0) / paceSamples.length;
     
-    if (userBaselines.fiveK_pace) {
-      const baselineSeconds = paceToSeconds(userBaselines.fiveK_pace);
+    if (userBaselines.five_k) {
+      const baselineSeconds = paceToSeconds(userBaselines.five_k);
       const pacePercent = (avgPace / baselineSeconds) * 100;
       
       if (pacePercent <= 110) {
@@ -1724,19 +1770,27 @@ function analyzeBikeIntensity(sensorData: any[], computed: any, userBaselines: a
 }
 
 /**
- * Analyze strength training intensity from RIR data and sensor data
+ * Analyze strength training intensity from strength exercises data
  */
-function analyzeStrengthIntensity(computed: any, userBaselines: any): any {
-  console.log('Checking strength workout RIR data availability...');
+function analyzeStrengthIntensity(workout: any, userBaselines: any): any {
+  console.log('Checking strength workout data availability...');
+  console.log(`1RM baseline: ${userBaselines.one_rm || 'not available'}`);
   
-  // Look for RIR data in computed data only
-  const rirData = computed?.rir_data || computed?.sets || [];
-  console.log(`RIR data available: ${rirData.length} sets`);
+  // Look for strength exercises data
+  const strengthExercises = workout.strength_exercises || [];
+  console.log(`Strength exercises available: ${strengthExercises.length} exercises`);
+  
+  // Extract all completed sets from all exercises
+  const allCompletedSets = strengthExercises.flatMap(exercise => 
+    exercise.completed_sets || []
+  ).filter(set => set.completed);
+  
+  console.log(`Completed sets available: ${allCompletedSets.length} sets`);
 
-  // Analysis based on RIR data only
+  // Analysis based on RIR data
   let rirAnalysis: any = null;
-  if (rirData && rirData.length > 0) {
-    const rirValues = rirData.map(set => set.rir || set.reps_in_reserve).filter(rir => rir !== null && rir !== undefined);
+  if (allCompletedSets && allCompletedSets.length > 0) {
+    const rirValues = allCompletedSets.map(set => set.rir).filter(rir => rir !== null && rir !== undefined);
     
     if (rirValues.length > 0) {
       console.log(`Valid RIR values found: ${rirValues.length}`);
@@ -1762,19 +1816,78 @@ function analyzeStrengthIntensity(computed: any, userBaselines: any): any {
         intensity_progression: rirFade > 1 ? 'increasing fatigue' : rirFade < -0.5 ? 'maintaining intensity' : 'slight fatigue'
       };
     } else {
-      console.log('No valid RIR values found in sets data');
+      console.log('No valid RIR values found in completed sets');
     }
   } else {
-    console.log('No RIR data structure found');
+    console.log('No completed sets found');
+  }
+
+  // Analyze weight/load data
+  let weightAnalysis: any = null;
+  if (allCompletedSets && allCompletedSets.length > 0) {
+    const weightValues = allCompletedSets.map(set => set.weight).filter(weight => weight && weight > 0);
+    
+    if (weightValues.length > 0) {
+      console.log(`Valid weight values found: ${weightValues.length}`);
+      const avgWeight = weightValues.reduce((sum, weight) => sum + weight, 0) / weightValues.length;
+      const maxWeight = Math.max(...weightValues);
+      const minWeight = Math.min(...weightValues);
+      const weightProgression = maxWeight - minWeight;
+      
+      // Calculate percentage of 1RM if available
+      let percentOf1RM: string | null = null;
+      if (userBaselines.one_rm && userBaselines.one_rm > 0) {
+        percentOf1RM = ((avgWeight / userBaselines.one_rm) * 100).toFixed(1);
+      }
+      
+      weightAnalysis = {
+        avg_weight: Math.round(avgWeight),
+        max_weight: maxWeight,
+        min_weight: minWeight,
+        weight_progression: Math.round(weightProgression),
+        percent_of_1rm: percentOf1RM,
+        total_sets: weightValues.length
+      };
+    } else {
+      console.log('No valid weight values found in completed sets');
+    }
+  }
+
+  // Analyze reps data
+  let repsAnalysis: any = null;
+  if (allCompletedSets && allCompletedSets.length > 0) {
+    const repsValues = allCompletedSets.map(set => set.reps).filter(reps => reps && reps > 0);
+    
+    if (repsValues.length > 0) {
+      console.log(`Valid reps values found: ${repsValues.length}`);
+      const avgReps = repsValues.reduce((sum, reps) => sum + reps, 0) / repsValues.length;
+      const maxReps = Math.max(...repsValues);
+      const minReps = Math.min(...repsValues);
+      const totalReps = repsValues.reduce((sum, reps) => sum + reps, 0);
+      
+      repsAnalysis = {
+        avg_reps: Math.round(avgReps * 10) / 10,
+        max_reps: maxReps,
+        min_reps: minReps,
+        total_reps: totalReps,
+        total_sets: repsValues.length
+      };
+    } else {
+      console.log('No valid reps values found in completed sets');
+    }
   }
 
   // Determine data quality - RIR data is the only requirement
   const hasRIRData = rirAnalysis !== null;
+  const has1RM = userBaselines.one_rm && userBaselines.one_rm > 0;
   
   let dataQuality = 'insufficient';
   let focus = 'No RIR data available';
   
-  if (hasRIRData) {
+  if (hasRIRData && has1RM) {
+    dataQuality = 'excellent';
+    focus = 'RIR progression with 1RM context';
+  } else if (hasRIRData) {
     dataQuality = 'good';
     focus = 'RIR progression analysis';
   } else {
@@ -1784,6 +1897,9 @@ function analyzeStrengthIntensity(computed: any, userBaselines: any): any {
   return {
     intensity: {
       rir_analysis: rirAnalysis,
+      weight_analysis: weightAnalysis,
+      reps_analysis: repsAnalysis,
+      one_rm_baseline: userBaselines.one_rm || null,
       data_quality: dataQuality,
       focus: focus
     },
@@ -1791,7 +1907,7 @@ function analyzeStrengthIntensity(computed: any, userBaselines: any): any {
       workout_type: 'strength',
       primary_metric: hasRIRData ? 'RIR' : 'none',
       data_quality: dataQuality,
-      insights: generateStrengthInsights(rirAnalysis, hasRIRData)
+      insights: generateStrengthInsights(rirAnalysis, weightAnalysis, repsAnalysis, hasRIRData, has1RM, userBaselines.one_rm)
     }
   };
 }
@@ -1799,16 +1915,49 @@ function analyzeStrengthIntensity(computed: any, userBaselines: any): any {
 /**
  * Generate strength-specific insights based on available data
  */
-function generateStrengthInsights(rirAnalysis: any, hasRIR: boolean): string[] {
+function generateStrengthInsights(rirAnalysis: any, weightAnalysis: any, repsAnalysis: any, hasRIR: boolean, has1RM: boolean, oneRM: number): string[] {
   const insights: string[] = [];
   
   if (hasRIR) {
     insights.push(`RIR average: ${rirAnalysis.avg_rir} (range: ${rirAnalysis.min_rir}-${rirAnalysis.max_rir})`);
     insights.push(`RIR consistency: ${rirAnalysis.rir_consistency}% variation - ${rirAnalysis.rir_consistency < 20 ? 'very consistent' : 'some variation'}`);
     insights.push(`Fatigue pattern: ${rirAnalysis.intensity_progression} (${rirAnalysis.rir_fade} RIR change)`);
+    
+    if (weightAnalysis) {
+      insights.push(`Weight range: ${weightAnalysis.min_weight}-${weightAnalysis.max_weight}kg (avg: ${weightAnalysis.avg_weight}kg)`);
+      if (weightAnalysis.percent_of_1rm) {
+        insights.push(`Intensity: ${weightAnalysis.percent_of_1rm}% of 1RM - ${parseFloat(weightAnalysis.percent_of_1rm) > 85 ? 'high intensity' : parseFloat(weightAnalysis.percent_of_1rm) > 70 ? 'moderate intensity' : 'low intensity'}`);
+      }
+      if (weightAnalysis.weight_progression > 0) {
+        insights.push(`Weight progression: +${weightAnalysis.weight_progression}kg across sets`);
+      }
+    }
+    
+    if (repsAnalysis) {
+      insights.push(`Reps: ${repsAnalysis.total_reps} total (avg: ${repsAnalysis.avg_reps} per set, range: ${repsAnalysis.min_reps}-${repsAnalysis.max_reps})`);
+    }
+    
+    if (has1RM) {
+      insights.push(`1RM baseline: ${oneRM}kg - provides context for strength progression`);
+    }
   } else {
     insights.push('No RIR data available for analysis');
     insights.push('Consider logging RIR for each set to enable detailed analysis');
+    
+    if (weightAnalysis) {
+      insights.push(`Weight range: ${weightAnalysis.min_weight}-${weightAnalysis.max_weight}kg (avg: ${weightAnalysis.avg_weight}kg)`);
+      if (weightAnalysis.percent_of_1rm) {
+        insights.push(`Intensity: ${weightAnalysis.percent_of_1rm}% of 1RM`);
+      }
+    }
+    
+    if (repsAnalysis) {
+      insights.push(`Reps: ${repsAnalysis.total_reps} total (avg: ${repsAnalysis.avg_reps} per set)`);
+    }
+    
+    if (has1RM) {
+      insights.push(`1RM baseline: ${oneRM}kg - strength training context available`);
+    }
   }
   
   return insights;
@@ -1818,16 +1967,22 @@ function generateStrengthInsights(rirAnalysis: any, hasRIR: boolean): string[] {
 /**
  * Analyze swim intensity from sensor data
  */
-function analyzeSwimIntensity(sensorData: any[], computed: any, userBaselines: any): any {
+function analyzeSwimIntensity(sensorData: any[], computed: any, userBaselines: any, workout: any): any {
   const hrSamples = sensorData
     .map(s => s.heartRate)
     .filter(hr => hr && hr > 0);
 
   if (hrSamples.length === 0) {
-    return { intensity: 'unknown', analysis: 'No data available' };
+    return { 
+      intensity: 'unknown', 
+      analysis: 'No data available',
+      pace_analysis: null,
+      adherence: null
+    };
   }
 
   const avgHR = hrSamples.reduce((sum, hr) => sum + hr, 0) / hrSamples.length;
+  const maxHR = Math.max(...hrSamples);
   
   let intensity: string | null = null;
   let analysis: string | null = null;
@@ -1847,7 +2002,92 @@ function analyzeSwimIntensity(sensorData: any[], computed: any, userBaselines: a
     }
   }
 
-  return { intensity, analysis };
+  // Analyze individual lengths data for detailed pace analysis
+  let lengthsAnalysis: any = null;
+  
+  // Parse swim_data if it's a string
+  let swimData = null;
+  console.log('DEBUG: workout.swim_data type:', typeof workout.swim_data);
+  console.log('DEBUG: workout.swim_data value:', workout.swim_data);
+  
+  if (typeof workout.swim_data === 'string') {
+    try {
+      swimData = JSON.parse(workout.swim_data);
+      console.log('DEBUG: Parsed swim_data:', swimData);
+    } catch (e) {
+      console.error('Failed to parse swim_data:', e);
+      swimData = null;
+    }
+  } else {
+    swimData = workout.swim_data;
+  }
+  
+  if (swimData?.lengths && Array.isArray(swimData.lengths) && swimData.lengths.length > 0) {
+    const lengths = swimData.lengths;
+    const durations = lengths.map(l => l.duration_s).filter(d => d && d > 0);
+    
+    if (durations.length > 0) {
+      const avgPace = durations.reduce((sum, d) => sum + d, 0) / durations.length;
+      const fastestLength = Math.min(...durations);
+      const slowestLength = Math.max(...durations);
+      const paceVariability = calculateVariability(durations);
+      
+      // Analyze pace progression (fatigue pattern)
+      const firstHalf = durations.slice(0, Math.floor(durations.length / 2));
+      const secondHalf = durations.slice(Math.floor(durations.length / 2));
+      const firstHalfAvg = firstHalf.reduce((sum, d) => sum + d, 0) / firstHalf.length;
+      const secondHalfAvg = secondHalf.reduce((sum, d) => sum + d, 0) / secondHalf.length;
+      const paceFade = secondHalfAvg - firstHalfAvg; // Positive = getting slower
+      
+      lengthsAnalysis = {
+        total_lengths: lengths.length,
+        avg_pace_per_length: Math.round(avgPace),
+        fastest_length: fastestLength,
+        slowest_length: slowestLength,
+        pace_consistency: Math.round(paceVariability * 10) / 10,
+        pace_progression: paceFade > 5 ? 'increasing fatigue' : paceFade < -5 ? 'improving pace' : 'consistent pace',
+        pace_fade_seconds: Math.round(paceFade * 10) / 10
+      };
+    }
+  }
+
+  // Simple pace analysis from overall distance/duration (fallback)
+  let paceAnalysis: any = null;
+  if (computed?.overall?.distance_m && computed?.overall?.duration_s) {
+    const distanceM = computed.overall.distance_m;
+    const durationS = computed.overall.duration_s;
+    const pacePer100m = (durationS / (distanceM / 100)) / 60; // minutes per 100m
+    const minutes = Math.floor(pacePer100m);
+    const seconds = Math.round((pacePer100m - minutes) * 60);
+    
+    paceAnalysis = {
+      avg_pace_per_100m: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+      distance_m: Math.round(distanceM),
+      duration_s: durationS
+    };
+  }
+
+  // Simple adherence analysis
+  let adherence: any = null;
+  if (computed?.overall?.execution_score) {
+    const score = computed.overall.execution_score;
+    adherence = {
+      execution_score: score,
+      status: score >= 80 ? 'completed' : score >= 60 ? 'partial' : 'incomplete'
+    };
+  }
+
+  return { 
+    intensity, 
+    analysis,
+    lengths_analysis: lengthsAnalysis,
+    pace_analysis: paceAnalysis,
+    adherence: adherence,
+    hr_summary: {
+      avg_hr: Math.round(avgHR),
+      max_hr: maxHR
+    }
+  };
 }
 
 /**

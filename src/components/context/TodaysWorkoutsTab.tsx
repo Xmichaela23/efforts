@@ -15,11 +15,39 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const [analysisTriggered, setAnalysisTriggered] = useState(false);
   const [baselineError, setBaselineError] = useState<string | null>(null);
   const [reanalyzing, setReanalyzing] = useState(false);
+  const [analyzingWorkout, setAnalyzingWorkout] = useState<string | null>(null);
 
   // Use unified API instead of direct table queries
   // Use user's local timezone for date calculations
   const today = new Date().toLocaleDateString('en-CA');
   const { items: todayItems = [], loading: todayLoading } = useWeekUnified(today, today);
+
+  // Analyze a single workout
+  const analyzeSingleWorkout = async (workoutId: string) => {
+    try {
+      setAnalyzingWorkout(workoutId);
+      console.log(`🚀 Analyzing workout: ${workoutId}`);
+      
+      const { data, error } = await supabase.functions.invoke('analyze-workout', {
+        body: { workout_id: workoutId }
+      });
+
+      if (error) {
+        console.error('Analysis error:', error);
+        return;
+      }
+
+      console.log('Analysis completed:', data);
+      
+      // Refresh the workout data to show updated analysis
+      await loadRecentWorkouts();
+      
+    } catch (error) {
+      console.error('Failed to analyze workout:', error);
+    } finally {
+      setAnalyzingWorkout(null);
+    }
+  };
 
   // Trigger analysis for existing workouts that don't have it
   const triggerAnalysisForExistingWorkouts = async () => {
@@ -501,7 +529,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
           </div>
           <div className="text-sm text-black mt-1 space-y-1">
             {recentWorkouts.slice(0, 3).map((workout) => (
-              <div key={workout.id} className="flex justify-between items-center py-1">
+              <div 
+                key={workout.id} 
+                className={`flex justify-between items-center py-2 px-2 rounded-lg transition-colors ${
+                  analyzingWorkout === workout.id 
+                    ? 'bg-orange-50 cursor-wait' 
+                    : 'hover:bg-gray-50 cursor-pointer'
+                }`}
+                onClick={() => {
+                  if (analyzingWorkout !== workout.id) {
+                    analyzeSingleWorkout(workout.id);
+                  }
+                }}
+              >
                 <div>
                   <div className="font-medium">
                     {workout.name || `${workout.type} Workout`}
@@ -522,9 +562,17 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                   {(workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike' || workout.type === 'swim' || workout.type === 'swimming') && workout.avg_heart_rate && (
                     <div>HR: {workout.avg_heart_rate} bpm</div>
                   )}
-                  {workout.workout_analysis && (
+                  {analyzingWorkout === workout.id ? (
+                    <div className="text-xs text-orange-600 font-medium">
+                      Analyzing...
+                    </div>
+                  ) : workout.workout_analysis ? (
                     <div className="text-xs text-green-600 font-medium">
                       ✓ Analysis available
+                    </div>
+                  ) : (
+                    <div className="text-xs text-blue-600 font-medium">
+                      Tap to analyze
                     </div>
                   )}
                 </div>
