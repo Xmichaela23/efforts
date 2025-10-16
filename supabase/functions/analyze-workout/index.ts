@@ -974,26 +974,26 @@ ${bursts.map((burst: any) =>
 BASELINE CONTEXT:
 FTP: ${userBaselines.ftp}W
 
-Analyze this workout and provide 3-4 professional insights:
+Analyze this workout and provide 3-4 performance observations:
 
-1. Overall execution assessment (1 sentence, specific metrics)
-2. Key performance observation (1 sentence, data-driven)  
-3. Area for improvement (1 sentence, actionable)
+1. Overall performance summary (1 sentence, specific metrics)
+2. Key data observation (1 sentence, data-driven)  
+3. Performance pattern (1 sentence, factual)
 4. Notable physiological response (only if significant)
 
 ANALYSIS STYLE:
-- Professional, analytical tone
+- Factual, data-driven tone
 - Use specific numbers and metrics
 - For RUNS/RIDES: Focus on power distribution, pacing consistency, execution adherence
 - For STRENGTH: Focus on RIR progression, fatigue patterns, set consistency
 - Use HR as physiological response indicator
-- Be direct and factual, not motivational
-- Avoid hype language, energy drink marketing speak, or excessive enthusiasm
+- Be direct and factual, not motivational or coaching
+- Avoid advice, suggestions, or coaching language
 - Focus on what the data actually shows
-- Keep insights under 20 words each
-- Sound like a sports scientist or performance analyst
+- Keep observations under 20 words each
+- Sound like a performance data analyst
 
-Example tone: "Power consistency was 2.1% variation" not "You absolutely crushed it today"`;
+Example tone: "Power consistency was 2.1% variation" not "Focus on smoother transitions next time"`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

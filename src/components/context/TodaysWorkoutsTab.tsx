@@ -286,11 +286,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
              "Latest workout analysis:"}
           </div>
           
-          {/* Analysis focus - not execution metrics */}
+          {/* Performance data focus */}
           <div className="text-sm text-[#666666] mb-3">
-            {analysisMetrics.isToday ? "Today's training analysis" : 
-             analysisMetrics.isYesterday ? "Yesterday's training analysis" : 
-             "Latest training analysis"}
+            {analysisMetrics.isToday ? "Today's performance data" : 
+             analysisMetrics.isYesterday ? "Yesterday's performance data" : 
+             "Latest performance data"}
           </div>
         </div>
       ) : (
@@ -311,7 +311,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         analysisMetrics.insights.length > 0 ? (
           <div className="px-2 mt-4">
             <div className="text-sm text-[#666666] font-normal mb-3">
-              <div className="font-medium">Analysis:</div>
+              <div className="font-medium">Performance Data:</div>
             </div>
             <div className="text-sm text-black space-y-3">
               {analysisMetrics.insights.map((insight, index) => (
