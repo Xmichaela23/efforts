@@ -32,6 +32,16 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       
       console.log(`🚀 SIMPLE ANALYSIS: ${workoutId}`);
       
+      // Debug: Check what workout data we're sending
+      const targetWorkout = recentWorkouts.find(w => w.id === workoutId);
+      console.log(`🔍 CLIENT DEBUG: Target workout:`, {
+        id: targetWorkout?.id,
+        type: targetWorkout?.type,
+        has_strength_exercises: !!targetWorkout?.strength_exercises,
+        strength_exercises_type: typeof targetWorkout?.strength_exercises,
+        strength_exercises_value: targetWorkout?.strength_exercises
+      });
+      
       const { data, error } = await supabase.functions.invoke('analyze-workout', {
         body: { workout_id: workoutId }
       });
