@@ -128,16 +128,31 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const getAnalysisMetrics = () => {
     if (loading || recentWorkouts.length === 0) return null;
 
-    // Find yesterday's workout (most recent completed workout)
-    const yesterdayWorkout = recentWorkouts.find(workout => 
-      workout.workout_status === 'completed' && workout.workout_analysis
+    console.log('🔍 All recent workouts:', recentWorkouts.map(w => ({
+      id: w.id,
+      type: w.type,
+      status: w.workout_status,
+      has_analysis: !!w.workout_analysis,
+      analysis_grade: w.workout_analysis?.execution_grade
+    })));
+
+    // Find the most recent workout with analysis (regardless of status)
+    const workoutWithAnalysis = recentWorkouts.find(workout => 
+      workout.workout_analysis
     );
 
-    if (!yesterdayWorkout?.workout_analysis) {
+    console.log('🎯 Found workout with analysis:', workoutWithAnalysis ? {
+      id: workoutWithAnalysis.id,
+      type: workoutWithAnalysis.type,
+      status: workoutWithAnalysis.workout_status,
+      grade: workoutWithAnalysis.workout_analysis?.execution_grade
+    } : 'NONE');
+
+    if (!workoutWithAnalysis?.workout_analysis) {
       return null;
     }
 
-    const analysis = yesterdayWorkout.workout_analysis;
+    const analysis = workoutWithAnalysis.workout_analysis;
     console.log('🔍 Analysis data structure:', JSON.stringify(analysis, null, 2));
     
     // Only return data if we have basic analysis
@@ -171,8 +186,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         hr_drift: hrDrift
       },
       red_flags: analysis.red_flags || [],
-      workout: yesterdayWorkout,
-      is_yesterday: yesterdayWorkout.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA')
+      workout: workoutWithAnalysis,
+      is_yesterday: workoutWithAnalysis.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA')
     };
   };
 
