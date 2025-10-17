@@ -1828,6 +1828,8 @@ function analyzeStrengthIntensity(workout: any, userBaselines: any): any {
   
   // Look for strength exercises data
   const strengthExercises = workout.strength_exercises || [];
+  console.log(`🔍 STRENGTH DEBUG: workout.strength_exercises type:`, typeof workout.strength_exercises);
+  console.log(`🔍 STRENGTH DEBUG: workout.strength_exercises value:`, workout.strength_exercises);
   console.log(`Strength exercises available: ${strengthExercises.length} exercises`);
   console.log(`Strength exercises data:`, JSON.stringify(strengthExercises, null, 2));
   
@@ -1836,8 +1838,18 @@ function analyzeStrengthIntensity(workout: any, userBaselines: any): any {
     exercise.sets || exercise.completed_sets || []
   ).filter(set => set.completed);
   
-  console.log(`Completed sets available: ${allCompletedSets.length} sets`);
-  console.log(`Completed sets data:`, JSON.stringify(allCompletedSets, null, 2));
+  console.log(`🔍 STRENGTH DEBUG: allCompletedSets length: ${allCompletedSets.length}`);
+  console.log(`🔍 STRENGTH DEBUG: allCompletedSets data:`, JSON.stringify(allCompletedSets, null, 2));
+  
+  // Debug individual sets
+  allCompletedSets.forEach((set, index) => {
+    console.log(`🔍 STRENGTH DEBUG: Set ${index}:`, {
+      completed: set.completed,
+      rir: set.rir,
+      weight: set.weight,
+      reps: set.reps
+    });
+  });
 
   // Analysis based on RIR data
   let rirAnalysis: any = null;

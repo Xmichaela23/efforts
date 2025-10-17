@@ -10,6 +10,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const [recentWorkouts, setRecentWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzingWorkout, setAnalyzingWorkout] = useState<string | null>(null);
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
   const analyzingRef = useRef<Set<string>>(new Set());
 
   // Use unified API instead of direct table queries
@@ -41,6 +42,9 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       }
 
       console.log('✅ SIMPLE ANALYSIS RESULT:', data);
+      
+      // Set this as the selected workout for display
+      setSelectedWorkoutId(workoutId);
       
       // Simple state update
       setRecentWorkouts(prev => prev.map(workout => 
@@ -136,12 +140,22 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       analysis_grade: w.workout_analysis?.execution_grade
     })));
 
-    // Find the most recent workout with actual insights (not just empty analysis)
-    const workoutWithAnalysis = recentWorkouts.find(workout => 
-      workout.workout_analysis && 
-      workout.workout_analysis.insights && 
-      workout.workout_analysis.insights.length > 0
-    ) || recentWorkouts.find(workout => workout.workout_analysis); // Fallback to any analysis
+    // If a specific workout was selected, show that one (even if no insights)
+    let workoutWithAnalysis = null;
+    if (selectedWorkoutId) {
+      workoutWithAnalysis = recentWorkouts.find(workout => workout.id === selectedWorkoutId);
+      console.log('🎯 Showing selected workout:', selectedWorkoutId, workoutWithAnalysis ? 'found' : 'not found');
+    }
+    
+    // If no selected workout or selected workout has no analysis, find the most recent with insights
+    if (!workoutWithAnalysis || !workoutWithAnalysis.workout_analysis) {
+      workoutWithAnalysis = recentWorkouts.find(workout => 
+        workout.workout_analysis && 
+        workout.workout_analysis.insights && 
+        workout.workout_analysis.insights.length > 0
+      ) || recentWorkouts.find(workout => workout.workout_analysis); // Fallback to any analysis
+      console.log('🎯 Fallback to most recent with analysis');
+    }
 
     console.log('🎯 Found workout with analysis:', workoutWithAnalysis ? {
       id: workoutWithAnalysis.id,
@@ -157,9 +171,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     const analysis = workoutWithAnalysis.workout_analysis;
     console.log('🔍 Analysis data structure:', JSON.stringify(analysis, null, 2));
     
-    // Only return data if we have actual insights
+    // If this is the selected workout but has no insights, show that it was analyzed but no insights
     if (!analysis.insights || analysis.insights.length === 0) {
-      console.log('❌ No insights in analysis');
+      console.log('❌ No insights in analysis for selected workout');
+      if (selectedWorkoutId && workoutWithAnalysis.id === selectedWorkoutId) {
+        return {
+          insights: [],
+          key_metrics: {},
+          red_flags: [],
+          workout: workoutWithAnalysis,
+          is_yesterday: workoutWithAnalysis.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA'),
+          noInsights: true
+        };
+      }
       return null;
     }
     
@@ -249,6 +273,17 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                   </div>
                 </div>
               )}
+            </div>
+          ) : analysisMetrics.noInsights ? (
+            <div className="px-2 mt-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="text-sm font-medium text-blue-800">
+                  Analysis Complete - No Insights Available
+                </div>
+                <div className="text-xs text-blue-600 mt-1">
+                  {analysisMetrics.workout.type} workout analyzed but no meaningful data found for insights.
+                </div>
+              </div>
             </div>
           ) : (
             <div className="px-2 mt-4">
