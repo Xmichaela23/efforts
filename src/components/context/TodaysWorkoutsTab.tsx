@@ -136,10 +136,12 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       analysis_grade: w.workout_analysis?.execution_grade
     })));
 
-    // Find the most recent workout with analysis (regardless of status)
+    // Find the most recent workout with actual insights (not just empty analysis)
     const workoutWithAnalysis = recentWorkouts.find(workout => 
-      workout.workout_analysis
-    );
+      workout.workout_analysis && 
+      workout.workout_analysis.insights && 
+      workout.workout_analysis.insights.length > 0
+    ) || recentWorkouts.find(workout => workout.workout_analysis); // Fallback to any analysis
 
     console.log('🎯 Found workout with analysis:', workoutWithAnalysis ? {
       id: workoutWithAnalysis.id,
@@ -155,21 +157,10 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     const analysis = workoutWithAnalysis.workout_analysis;
     console.log('🔍 Analysis data structure:', JSON.stringify(analysis, null, 2));
     
-    // Only return data if we have basic analysis
-    if (analysis.execution_grade === undefined) {
-      console.log('❌ No execution_grade in analysis');
+    // Only return data if we have actual insights
+    if (!analysis.insights || analysis.insights.length === 0) {
+      console.log('❌ No insights in analysis');
       return null;
-    }
-    
-    // Handle null grade (no meaningful data to grade)
-    if (analysis.execution_grade === null) {
-      console.log('⚠️ Analysis completed but no meaningful data to grade');
-      return {
-        execution_grade: null,
-        insights: analysis.insights || [],
-        key_metrics: analysis.key_metrics || {},
-        red_flags: analysis.red_flags || []
-      };
     }
     
     // Extract metrics from new analysis structure
@@ -178,7 +169,6 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     const hrDrift = analysis.key_metrics?.hr_dynamics?.hr_drift_percent;
 
     return {
-      execution_grade: analysis.execution_grade,
       insights: analysis.insights || [],
       key_metrics: {
         power_variability: powerVariability,
@@ -192,6 +182,13 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   };
 
   const analysisMetrics = getAnalysisMetrics();
+  
+  // Debug: Log what we're about to display
+  console.log('🎨 UI Display Decision:', {
+    hasAnalysisMetrics: !!analysisMetrics,
+    insightsCount: analysisMetrics?.insights?.length || 0,
+    willShowInsights: analysisMetrics?.insights && analysisMetrics?.insights.length > 0
+  });
 
   return (
     <>
@@ -205,7 +202,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
           </div>
 
           {/* Analysis Results */}
-          {analysisMetrics.execution_grade && analysisMetrics.insights.length > 0 ? (
+          {analysisMetrics.insights && analysisMetrics.insights.length > 0 ? (
             <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -224,10 +221,9 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-green-600">
-                    {analysisMetrics.execution_grade}
+                  <div className="text-sm text-gray-500">
+                    Analysis Complete
                   </div>
-                  <div className="text-xs text-gray-500">Execution Grade</div>
                 </div>
               </div>
 
