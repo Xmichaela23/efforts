@@ -482,14 +482,18 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
     console.log('No sensor data available, using computed data with historical trends');
     const basicAnalysis = analyzeWorkoutFromComputed(workout, computed, userBaselines);
     
-    // Add historical trend analysis even without sensor data
-    try {
-      console.log('Running HR trend analysis for computed data...');
-      const hrTrends = await analyzeHRTrends([], computed, workout, supabase);
-      basicAnalysis.hr_responsiveness = hrTrends;
-      console.log('HR trend analysis completed for computed data:', JSON.stringify(hrTrends, null, 2));
-    } catch (error) {
-      console.error('HR trend analysis failed for computed data:', error);
+    // Add historical trend analysis only for workouts that have meaningful HR data
+    if (workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike' || workout.type === 'swim' || workout.type === 'swimming') {
+      try {
+        console.log('Running HR trend analysis for computed data...');
+        const hrTrends = await analyzeHRTrends([], computed, workout, supabase);
+        basicAnalysis.hr_responsiveness = hrTrends;
+        console.log('HR trend analysis completed for computed data:', JSON.stringify(hrTrends, null, 2));
+      } catch (error) {
+        console.error('HR trend analysis failed for computed data:', error);
+      }
+    } else {
+      console.log(`Skipping HR trend analysis for ${workout.type} workout - not applicable`);
     }
     
     return basicAnalysis;

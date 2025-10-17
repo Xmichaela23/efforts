@@ -157,14 +157,16 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       console.log('🎯 Showing selected workout:', selectedWorkoutId, workoutWithAnalysis ? 'found' : 'not found');
     }
     
-    // If no selected workout or selected workout has no analysis, find the most recent with insights
-    if (!workoutWithAnalysis || !workoutWithAnalysis.workout_analysis) {
+    // If no selected workout, find the most recent with insights
+    if (!workoutWithAnalysis) {
       workoutWithAnalysis = recentWorkouts.find(workout => 
         workout.workout_analysis && 
         workout.workout_analysis.insights && 
         workout.workout_analysis.insights.length > 0
       ) || recentWorkouts.find(workout => workout.workout_analysis); // Fallback to any analysis
       console.log('🎯 Fallback to most recent with analysis');
+    } else if (!workoutWithAnalysis.workout_analysis) {
+      console.log('🎯 Selected workout has no analysis yet - will show when analysis completes');
     }
 
     console.log('🎯 Found workout with analysis:', workoutWithAnalysis ? {
@@ -174,7 +176,17 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       grade: workoutWithAnalysis.workout_analysis?.execution_grade
     } : 'NONE');
 
-    if (!workoutWithAnalysis?.workout_analysis) {
+    if (!workoutWithAnalysis) {
+      return null;
+    }
+    
+    // If selected workout has no analysis yet, return null to show "Analysis Not Available"
+    if (selectedWorkoutId && !workoutWithAnalysis.workout_analysis) {
+      return null;
+    }
+    
+    // If no selected workout and no analysis, return null
+    if (!selectedWorkoutId && !workoutWithAnalysis.workout_analysis) {
       return null;
     }
 
@@ -240,7 +252,6 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
             <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">{getWorkoutIcon(analysisMetrics.workout.type)}</span>
                   <div>
                     <div className="font-medium text-gray-900">
                       {analysisMetrics.workout.name || `${analysisMetrics.workout.type} Workout`}
