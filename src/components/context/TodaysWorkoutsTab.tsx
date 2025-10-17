@@ -24,9 +24,9 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const { items: todayItems = [], loading: todayLoading } = useWeekUnified(today, today);
 
 
-  // Analyze a workout (always fresh analysis)
+  // SIMPLIFIED: Clean analysis function
   const analyzeWorkout = async (workoutId: string) => {
-    // Prevent multiple simultaneous analysis calls
+    // Prevent multiple calls
     if (analyzingRef.current.has(workoutId)) {
       console.log(`Already analyzing workout: ${workoutId}`);
       return;
@@ -36,10 +36,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       analyzingRef.current.add(workoutId);
       setAnalyzingWorkout(workoutId);
       
-      // Find the workout to verify we're analyzing the right one
-      const targetWorkout = recentWorkouts.find(w => w.id === workoutId);
-      console.log(`🚀 Analyzing workout: ${workoutId}`);
-      console.log(`🎯 Target workout:`, targetWorkout ? { id: targetWorkout.id, type: targetWorkout.type, name: targetWorkout.name } : 'NOT FOUND');
+      console.log(`🚀 SIMPLE ANALYSIS: ${workoutId}`);
       
       const { data, error } = await supabase.functions.invoke('analyze-workout', {
         body: { workout_id: workoutId }
@@ -50,19 +47,14 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         return;
       }
 
-      console.log('Analysis completed:', data);
+      console.log('✅ SIMPLE ANALYSIS RESULT:', data);
       
-      // Update the specific workout in state
-      setRecentWorkouts(prev => {
-        const updated = prev.map(workout => 
-          workout.id === workoutId 
-            ? { ...workout, workout_analysis: data }
-            : workout
-        );
-        console.log('🔄 Updated workout state for:', workoutId);
-        console.log('🔄 Updated workout analysis:', updated.find(w => w.id === workoutId)?.workout_analysis);
-        return updated;
-      });
+      // Simple state update
+      setRecentWorkouts(prev => prev.map(workout => 
+        workout.id === workoutId 
+          ? { ...workout, workout_analysis: data }
+          : workout
+      ));
       
     } catch (error) {
       console.error('Failed to analyze workout:', error);
@@ -74,8 +66,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
 
 
 
-  // Trigger analysis for existing workouts that don't have it
-  const triggerAnalysisForExistingWorkouts = async () => {
+  // REMOVED: Complex automatic analysis logic
+  // const triggerAnalysisForExistingWorkouts = async () => {
     if (analysisTriggered || recentWorkouts.length === 0) {
       console.log('🚫 Skipping auto-analysis - already triggered or no workouts');
       return;
@@ -166,20 +158,12 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     }
   }, [todayLoading]);
 
-  // Trigger analysis when recent workouts are loaded (only once)
-  useEffect(() => {
-    // DISABLE automatic analysis entirely - only manual analysis
-    console.log('🚫 Auto-analysis disabled - only manual analysis allowed');
-    console.log('🚫 Current state:', { recentWorkoutsLength: recentWorkouts.length, analysisTriggered, loading, analyzingWorkout });
-    
-    // if (recentWorkouts.length > 0 && !analysisTriggered && !loading && analyzingWorkout === null) {
-    //   console.log('🔄 Auto-triggering analysis for existing workouts');
-    //   console.log('🔄 Current state:', { recentWorkoutsLength: recentWorkouts.length, analysisTriggered, loading, analyzingWorkout });
-    //   triggerAnalysisForExistingWorkouts();
-    // } else {
-    //   console.log('🚫 Skipping auto-analysis:', { recentWorkoutsLength: recentWorkouts.length, analysisTriggered, loading, analyzingWorkout });
-    // }
-  }, [recentWorkouts.length, analysisTriggered, loading, analyzingWorkout]);
+  // SIMPLIFIED: No automatic analysis - only manual clicks
+  // useEffect(() => {
+  //   // DISABLE automatic analysis entirely - only manual analysis
+  //   console.log('🚫 Auto-analysis disabled - only manual analysis allowed');
+  //   console.log('🚫 Current state:', { recentWorkoutsLength: recentWorkouts.length, analysisTriggered, loading, analyzingWorkout });
+  // }, [recentWorkouts.length, analysisTriggered, loading, analyzingWorkout]);
 
   const loadRecentWorkouts = async () => {
     try {
@@ -440,12 +424,13 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
               <div className="flex items-center gap-3 mt-2">
                 <button 
                   onClick={() => {
-                    setAnalysisTriggered(false);
-                    triggerAnalysisForExistingWorkouts();
+                    console.log('🚫 Auto-analysis disabled');
+                    // setAnalysisTriggered(false);
+                    // triggerAnalysisForExistingWorkouts();
                   }}
                   className="hover:text-red-800 transition-colors"
                 >
-                  Analyze
+                  Analyze (Disabled)
                 </button>
                 <span className="text-red-300">•</span>
                 <button 
@@ -511,12 +496,13 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => {
-                setAnalysisTriggered(false);
-                triggerAnalysisForExistingWorkouts();
+                console.log('🚫 Auto-analysis disabled');
+                // setAnalysisTriggered(false);
+                // triggerAnalysisForExistingWorkouts();
               }}
               className="hover:text-red-800 transition-colors text-sm"
             >
-              Analyze
+              Analyze (Disabled)
             </button>
             <span className="text-gray-300">•</span>
             <button 
