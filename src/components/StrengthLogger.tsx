@@ -156,7 +156,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
             onClick={handleSubmit}
             className="w-full py-2 text-gray-700 hover:text-gray-900 text-sm font-medium"
           >
-            Saved
+            Save
           </button>
         </div>
       )}
