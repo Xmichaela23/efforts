@@ -73,7 +73,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
           className="w-full px-4 py-3 flex items-center justify-between"
         >
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">▼</span>
+            <span className="text-sm text-gray-600">▶</span>
             <span className="text-sm font-medium">Quick check-in (optional)</span>
           </div>
           <span className="text-sm text-gray-500">
@@ -87,7 +87,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
             onClick={onToggle}
             className="w-full flex items-center gap-2 mb-4"
           >
-            <span className="text-sm text-gray-600">▲</span>
+            <span className="text-sm text-gray-600">▼</span>
             <span className="text-sm font-medium">Quick check-in</span>
           </button>
           
@@ -1570,10 +1570,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const workoutEndTime = new Date();
     const durationMinutes = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
 
-    // Done is mandatory: keep only sets marked completed; drop exercises with no completed sets
+    // Keep exercises with names and any sets (for manual logging, be permissive)
     const validExercises = exercises
       .filter(ex => ex.name.trim())
-      .map(ex => ({ ...ex, sets: ex.sets.filter(s => s.completed) }))
+      .map(ex => ({ 
+        ...ex, 
+        sets: ex.sets.filter(s => s.reps > 0 || s.weight > 0 || s.completed) // Keep sets with data OR completed status
+      }))
       .filter(ex => ex.sets.length > 0);
 
     console.log('🔍 Exercise validation:');
@@ -1583,7 +1586,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       name: ex.name,
       nameTrimmed: ex.name.trim(),
       setsCount: ex.sets.length,
-      isValid: ex.name.trim() && ex.sets.length > 0
+      setsWithReps: ex.sets.filter(s => s.reps > 0).length,
+      setsData: ex.sets.map(s => ({ reps: s.reps, weight: s.weight, completed: s.completed })),
+      isValid: ex.name.trim() && ex.sets.filter(s => s.reps > 0).length > 0
     })));
 
     if (validExercises.length === 0) {
