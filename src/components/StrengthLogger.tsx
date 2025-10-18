@@ -98,7 +98,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
               <span className="text-lg">{energy}</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xl">😴</span>
+              <span className="text-sm text-gray-500">Low</span>
               <input
                 type="range"
                 min="1"
@@ -107,7 +107,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
                 onChange={(e) => setEnergy(Number(e.target.value))}
                 className="flex-1 h-2 bg-gray-200 rounded-lg"
               />
-              <span className="text-xl">⚡</span>
+              <span className="text-sm text-gray-500">High</span>
             </div>
           </div>
           
@@ -118,7 +118,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
               <span className="text-lg">{soreness}</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xl">😊</span>
+              <span className="text-sm text-gray-500">None</span>
               <input
                 type="range"
                 min="0"
@@ -127,7 +127,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
                 onChange={(e) => setSoreness(Number(e.target.value))}
                 className="flex-1 h-2 bg-gray-200 rounded-lg"
               />
-              <span className="text-xl">😰</span>
+              <span className="text-sm text-gray-500">Severe</span>
             </div>
           </div>
           
@@ -138,7 +138,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
               <span className="text-lg">{sleep}h</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xl">😴</span>
+              <span className="text-sm text-gray-500">0h</span>
               <input
                 type="range"
                 min="0"
@@ -148,15 +148,15 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
                 onChange={(e) => setSleep(Number(e.target.value))}
                 className="flex-1 h-2 bg-gray-200 rounded-lg"
               />
-              <span className="text-xl">😴</span>
+              <span className="text-sm text-gray-500">12h</span>
             </div>
           </div>
           
           <button
             onClick={handleSubmit}
-            className="w-full py-2 bg-black text-white rounded-lg text-sm font-medium"
+            className="w-full py-2 text-gray-700 hover:text-gray-900 text-sm font-medium"
           >
-            ✓ Saved
+            Saved
           </button>
         </div>
       )}
@@ -2347,7 +2347,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   className={`
                     h-14 text-lg font-medium rounded-lg
                     ${selectedRIR === rir 
-                      ? 'bg-black text-white' 
+                      ? 'bg-gray-900 text-white' 
                       : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                     }
                   `}
@@ -2367,7 +2367,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               <button
                 onClick={() => handleRIRSubmit(selectedRIR)}
                 disabled={selectedRIR === null}
-                className="flex-1 py-3 bg-black text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3 text-gray-700 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Submit
               </button>
@@ -2382,7 +2382,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <div className="absolute inset-0 bg-black/40" onClick={handleSessionRPESkip} />
           <div className="relative w-full max-w-md mx-4 bg-white rounded-lg shadow-xl p-6 z-10">
             <h2 className="text-2xl font-bold mb-2 text-center">
-              💪 Workout Complete!
+              Workout Complete!
             </h2>
             
             <p className="text-gray-600 mb-8 text-center">
@@ -2392,8 +2392,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {/* RPE slider */}
             <div className="mb-6">
               <div className="flex justify-between mb-2">
-                <span className="text-2xl">😌</span>
-                <span className="text-2xl">😰</span>
+                <span className="text-sm text-gray-500">Easy</span>
+                <span className="text-sm text-gray-500">Maximal</span>
               </div>
               
               <input
@@ -2406,7 +2406,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               />
               
               <div className="text-center mt-3">
-                <div className="text-4xl font-bold text-black">{sessionRPE}</div>
+                <div className="text-4xl font-bold text-gray-900">{sessionRPE}</div>
                 <div className="text-sm text-gray-600 mt-1">
                   {getRPELabel(sessionRPE)}
                 </div>
@@ -2422,7 +2422,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               </button>
               <button
                 onClick={() => handleSessionRPESubmit(sessionRPE)}
-                className="flex-1 py-4 bg-black text-white rounded-lg font-medium"
+                className="flex-1 py-4 text-gray-700 hover:text-gray-900 font-medium"
               >
                 Submit & Finish
               </button>
