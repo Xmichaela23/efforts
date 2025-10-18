@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Plus, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -39,6 +40,128 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
       const exerciseVolume = setsWithData.reduce((sum, set) => sum + (set.reps * set.weight), 0);
       return total + exerciseVolume;
     }, 0);
+};
+
+// Readiness Check Banner Component
+interface ReadinessCheckBannerProps {
+  isExpanded: boolean;
+  onToggle: () => void;
+  onSubmit: (data: { energy: number; soreness: number; sleep: number }) => void;
+  data: { energy: number; soreness: number; sleep: number } | null;
+}
+
+const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({ 
+  isExpanded, 
+  onToggle, 
+  onSubmit, 
+  data 
+}) => {
+  const [energy, setEnergy] = useState(data?.energy || 7);
+  const [soreness, setSoreness] = useState(data?.soreness || 3);
+  const [sleep, setSleep] = useState(data?.sleep || 7);
+
+  const handleSubmit = () => {
+    onSubmit({ energy, soreness, sleep });
+  };
+
+  return (
+    <div className="bg-gray-50">
+      {/* Collapsed state */}
+      {!isExpanded ? (
+        <button
+          onClick={onToggle}
+          className="w-full px-4 py-3 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">▼</span>
+            <span className="text-sm font-medium">Quick check-in (optional)</span>
+          </div>
+          <span className="text-sm text-gray-500">
+            Energy • Soreness • Sleep
+          </span>
+        </button>
+      ) : (
+        /* Expanded state */
+        <div className="p-4">
+          <button
+            onClick={onToggle}
+            className="w-full flex items-center gap-2 mb-4"
+          >
+            <span className="text-sm text-gray-600">▲</span>
+            <span className="text-sm font-medium">Quick check-in</span>
+          </button>
+          
+          {/* Energy slider */}
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-sm font-medium">Energy level</label>
+              <span className="text-lg">{energy}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xl">😴</span>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={energy}
+                onChange={(e) => setEnergy(Number(e.target.value))}
+                className="flex-1 h-2 bg-gray-200 rounded-lg"
+              />
+              <span className="text-xl">⚡</span>
+            </div>
+          </div>
+          
+          {/* Soreness slider */}
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-sm font-medium">Muscle soreness</label>
+              <span className="text-lg">{soreness}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xl">😊</span>
+              <input
+                type="range"
+                min="0"
+                max="10"
+                value={soreness}
+                onChange={(e) => setSoreness(Number(e.target.value))}
+                className="flex-1 h-2 bg-gray-200 rounded-lg"
+              />
+              <span className="text-xl">😰</span>
+            </div>
+          </div>
+          
+          {/* Sleep input */}
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-sm font-medium">Sleep last night</label>
+              <span className="text-lg">{sleep}h</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xl">😴</span>
+              <input
+                type="range"
+                min="0"
+                max="12"
+                step="0.5"
+                value={sleep}
+                onChange={(e) => setSleep(Number(e.target.value))}
+                className="flex-1 h-2 bg-gray-200 rounded-lg"
+              />
+              <span className="text-xl">😴</span>
+            </div>
+          </div>
+          
+          <button
+            onClick={handleSubmit}
+            className="w-full py-2 bg-black text-white rounded-lg text-sm font-medium"
+          >
+            ✓ Saved
+          </button>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // Plate Math Component
@@ -171,12 +294,39 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [selectedWarmupCategory, setSelectedWarmupCategory] = useState<string>('general');
   const [selectedWarmupVariant, setSelectedWarmupVariant] = useState<string>('A');
   
+  // RIR prompt state
+  const [showRIRPrompt, setShowRIRPrompt] = useState(false);
+  const [currentRIRExercise, setCurrentRIRExercise] = useState<string>('');
+  const [currentRIRSet, setCurrentRIRSet] = useState<number>(-1);
+  const [selectedRIR, setSelectedRIR] = useState<number | null>(null);
+  
+  // Session RPE prompt state
+  const [showSessionRPE, setShowSessionRPE] = useState(false);
+  const [sessionRPE, setSessionRPE] = useState<number>(5);
+  
+  // Readiness check state
+  const [showReadinessCheck, setShowReadinessCheck] = useState(false);
+  const [readinessData, setReadinessData] = useState<{
+    energy: number;
+    soreness: number;
+    sleep: number;
+  } | null>(null);
+  
   // Helper: detect common bodyweight movements (no default load)
   const isBodyweightMove = (raw?: string): boolean => {
     try {
       const n = String(raw || '').toLowerCase().replace(/[\s-]/g,'');
       return /dip|chinup|pullup|pushup|plank/.test(n);
     } catch { return false; }
+  };
+
+  // Helper: get RPE label
+  const getRPELabel = (rpe: number): string => {
+    if (rpe <= 3) return 'Light';
+    if (rpe <= 5) return 'Moderate';
+    if (rpe <= 7) return 'Hard';
+    if (rpe <= 9) return 'Very Hard';
+    return 'Maximal';
   };
   
   // Session persistence key based on target date - use consistent date format
@@ -1341,6 +1491,78 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
   };
 
+  // RIR prompt handlers
+  const handleSetComplete = (exerciseId: string, setIndex: number) => {
+    const exercise = exercises.find(ex => ex.id === exerciseId);
+    const set = exercise?.sets[setIndex];
+    
+    if (!exercise || !set) return;
+    
+    // If set is already completed, toggle it off
+    if (set.completed) {
+      updateSet(exerciseId, setIndex, { completed: false });
+      return;
+    }
+    
+    // If set is not completed, show RIR prompt
+    setCurrentRIRExercise(exerciseId);
+    setCurrentRIRSet(setIndex);
+    setSelectedRIR(null);
+    setShowRIRPrompt(true);
+  };
+
+  const handleRIRSubmit = (rir: number | null) => {
+    if (currentRIRExercise && currentRIRSet >= 0) {
+      updateSet(currentRIRExercise, currentRIRSet, { 
+        completed: true, 
+        rir: rir !== null ? rir : undefined 
+      });
+    }
+    setShowRIRPrompt(false);
+    setCurrentRIRExercise('');
+    setCurrentRIRSet(-1);
+    setSelectedRIR(null);
+  };
+
+  const handleRIRSkip = () => {
+    if (currentRIRExercise && currentRIRSet >= 0) {
+      updateSet(currentRIRExercise, currentRIRSet, { completed: true });
+    }
+    setShowRIRPrompt(false);
+    setCurrentRIRExercise('');
+    setCurrentRIRSet(-1);
+    setSelectedRIR(null);
+  };
+
+  // Session RPE handlers
+  const handleSessionRPESubmit = (rpe: number) => {
+    setShowSessionRPE(false);
+    // Check if user has notes/RPE meta, then show notes modal, otherwise save directly
+    const hasMeta = (typeof notesRpe === 'number') || (typeof notesText === 'string' && notesText.trim().length > 0);
+    if (hasMeta) {
+      setShowNotesModal(true);
+    } else {
+      finalizeSave({ rpe });
+    }
+  };
+
+  const handleSessionRPESkip = () => {
+    setShowSessionRPE(false);
+    // Check if user has notes/RPE meta, then show notes modal, otherwise save directly
+    const hasMeta = (typeof notesRpe === 'number') || (typeof notesText === 'string' && notesText.trim().length > 0);
+    if (hasMeta) {
+      setShowNotesModal(true);
+    } else {
+      finalizeSave();
+    }
+  };
+
+  // Readiness check handlers
+  const handleReadinessSubmit = (data: { energy: number; soreness: number; sleep: number }) => {
+    setReadinessData(data);
+    setShowReadinessCheck(false);
+  };
+
   const finalizeSave = async (extra?: { notes?: string; rpe?: number; mood?: 'positive'|'neutral'|'negative' }) => {
     // Clear session progress when workout is completed
     clearSessionProgress();
@@ -1413,7 +1635,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       notes: extra?.notes,
       rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
       addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence })),
-      planned_id: sourcePlannedId || undefined
+      planned_id: sourcePlannedId || undefined,
+      readiness: readinessData || undefined
     } : {
       id: scheduledWorkout?.id || Date.now().toString(),
       name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
@@ -1429,7 +1652,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       notes: extra?.notes,
       rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
       addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence })),
-      planned_id: sourcePlannedId || undefined
+      planned_id: sourcePlannedId || undefined,
+      readiness: readinessData || undefined
     };
 
     console.log('🔍 Saving completed workout:', completedWorkout);
@@ -1516,13 +1740,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const saveWorkout = () => {
-    // Open Notes/RPE modal only when user has entered meta; otherwise save immediately
-    const hasMeta = (typeof notesRpe === 'number') || (typeof notesText === 'string' && notesText.trim().length > 0);
-    if (hasMeta) {
-      setShowNotesModal(true);
-    } else {
-      finalizeSave();
-    }
+    // Show session RPE prompt first
+    setShowSessionRPE(true);
   };
 
   const handleInputChange = (value: string) => {
@@ -1679,6 +1898,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <div className="mt-2 text-sm text-gray-600">Source: {sourcePlannedName}</div>
         )}
       </div>
+
+      {/* Readiness Check Banner */}
+      <ReadinessCheckBanner 
+        isExpanded={showReadinessCheck}
+        onToggle={() => setShowReadinessCheck(!showReadinessCheck)}
+        onSubmit={handleReadinessSubmit}
+        data={readinessData}
+      />
 
       {/* Main content container with proper mobile scrolling */}
       <div className="space-y-2 w-full pb-3">
@@ -1942,7 +2169,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         placeholder="RIR"
                       />
                       <button
-                        onClick={() => updateSet(exercise.id, setIndex, { completed: !set.completed })}
+                        onClick={() => handleSetComplete(exercise.id, setIndex)}
                         className={`text-xs px-2 py-1 rounded min-h-[28px] ${set.completed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}
                       >
                         {set.completed ? '✓ Done' : 'Done'}
@@ -2100,6 +2327,105 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 <button onClick={()=>{ setShowNotesModal(false); finalizeSave(); }} className="text-sm text-gray-700 hover:text-gray-900">Skip</button>
                 <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="text-sm text-black hover:text-blue-600">Save</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RIR Prompt */}
+      <Sheet open={showRIRPrompt} onOpenChange={setShowRIRPrompt}>
+        <SheetContent side="bottom" className="h-auto max-h-[80vh]">
+          <SheetHeader>
+            <SheetTitle className="text-center">How many more reps could you have done?</SheetTitle>
+          </SheetHeader>
+          <div className="py-6">
+            <div className="grid grid-cols-6 gap-3 mb-6">
+              {[0, 1, 2, 3, 4, 5].map((rir) => (
+                <button
+                  key={rir}
+                  onClick={() => setSelectedRIR(rir)}
+                  className={`
+                    h-14 text-lg font-medium rounded-lg
+                    ${selectedRIR === rir 
+                      ? 'bg-black text-white' 
+                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                    }
+                  `}
+                >
+                  {rir === 5 ? '5+' : rir}
+                </button>
+              ))}
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={handleRIRSkip}
+                className="flex-1 py-3 text-gray-600 hover:text-gray-900"
+              >
+                Skip
+              </button>
+              <button
+                onClick={() => handleRIRSubmit(selectedRIR)}
+                disabled={selectedRIR === null}
+                className="flex-1 py-3 bg-black text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Session RPE Prompt */}
+      {showSessionRPE && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={handleSessionRPESkip} />
+          <div className="relative w-full max-w-md mx-4 bg-white rounded-lg shadow-xl p-6 z-10">
+            <h2 className="text-2xl font-bold mb-2 text-center">
+              💪 Workout Complete!
+            </h2>
+            
+            <p className="text-gray-600 mb-8 text-center">
+              How hard was that session?
+            </p>
+            
+            {/* RPE slider */}
+            <div className="mb-6">
+              <div className="flex justify-between mb-2">
+                <span className="text-2xl">😌</span>
+                <span className="text-2xl">😰</span>
+              </div>
+              
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={sessionRPE}
+                onChange={(e) => setSessionRPE(Number(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              />
+              
+              <div className="text-center mt-3">
+                <div className="text-4xl font-bold text-black">{sessionRPE}</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  {getRPELabel(sessionRPE)}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={handleSessionRPESkip}
+                className="flex-1 py-4 text-gray-600 hover:text-gray-900"
+              >
+                Skip
+              </button>
+              <button
+                onClick={() => handleSessionRPESubmit(sessionRPE)}
+                className="flex-1 py-4 bg-black text-white rounded-lg font-medium"
+              >
+                Submit & Finish
+              </button>
             </div>
           </div>
         </div>

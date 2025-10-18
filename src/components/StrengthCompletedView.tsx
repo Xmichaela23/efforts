@@ -327,16 +327,53 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
         </div>
       )}
 
+      {/* Session RPE Section */}
+      {workoutData.session_rpe && (
+        <div className="py-4">
+          <h3 className="font-medium text-gray-900 mb-2">Session RPE</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold text-gray-900">{workoutData.session_rpe}</span>
+            <span className="text-sm text-gray-600">
+              {workoutData.session_rpe <= 3 ? 'Light' :
+               workoutData.session_rpe <= 5 ? 'Moderate' :
+               workoutData.session_rpe <= 7 ? 'Hard' :
+               workoutData.session_rpe <= 9 ? 'Very Hard' : 'Maximal'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Readiness Check Section */}
+      {workoutData.readiness && (
+        <div className="py-4">
+          <h3 className="font-medium text-gray-900 mb-2">Pre-Workout Readiness</h3>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <div className="text-gray-600">Energy</div>
+              <div className="font-medium">{workoutData.readiness.energy}/10</div>
+            </div>
+            <div>
+              <div className="text-gray-600">Soreness</div>
+              <div className="font-medium">{workoutData.readiness.soreness}/10</div>
+            </div>
+            <div>
+              <div className="text-gray-600">Sleep</div>
+              <div className="font-medium">{workoutData.readiness.sleep}h</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Notes Section */}
       {workoutData.userComments && (
-        <div className="p-4 bg-gray-50">
+        <div className="py-4">
           <h3 className="font-medium text-gray-900 mb-2">Notes</h3>
           <p className="text-sm text-gray-700">{workoutData.userComments}</p>
         </div>
       )}
 
       {/* Workout Statistics */}
-      <div className="p-4 bg-white border-t border-gray-200">
+      <div className="py-4">
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-lg font-semibold text-gray-900">{workoutStats.actual.sets}</div>
