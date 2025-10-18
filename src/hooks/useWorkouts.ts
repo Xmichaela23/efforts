@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { analyzeWorkoutWithRetry } from "../services/workoutAnalysisService";
 
 // [Keep all your existing interfaces exactly as they are]
 export interface RunInterval {
@@ -1400,12 +1401,10 @@ export const useWorkouts = () => {
         console.log('ℹ️ Auto-attach skipped:', e);
       }
 
-      // Generate context for completed workouts
+      // Generate context for completed workouts using routing service
       try {
         if (newWorkout.workout_status === 'completed') {
-          await supabase.functions.invoke('analyze-workout', {
-            body: { workout_id: newWorkout.id }
-          });
+          await analyzeWorkoutWithRetry(newWorkout.id, newWorkout.type);
           console.log('✅ Context generated for workout:', newWorkout.id);
         }
       } catch (contextError) {

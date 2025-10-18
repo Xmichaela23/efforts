@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAppContext } from '../../contexts/AppContext';
 import { useWeekUnified } from '../../hooks/useWeekUnified';
+import { analyzeWorkoutWithRetry } from '../../services/workoutAnalysisService';
 
 interface TodaysWorkoutsTabProps {}
 
@@ -18,7 +19,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
   const today = new Date().toLocaleDateString('en-CA');
   const { items: todayItems = [], loading: todayLoading } = useWeekUnified(today, today);
 
-  // SIMPLIFIED: Clean analysis function
+  // SIMPLIFIED: Clean analysis function with routing
   const analyzeWorkout = async (workoutId: string) => {
     // Prevent multiple calls
     if (analyzingRef.current.has(workoutId)) {
@@ -30,7 +31,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       analyzingRef.current.add(workoutId);
       setAnalyzingWorkout(workoutId);
       
-      console.log(`🚀 SIMPLE ANALYSIS: ${workoutId}`);
+      console.log(`🚀 ROUTED ANALYSIS: ${workoutId}`);
       
       // Debug: Check what workout data we're sending
       const targetWorkout = recentWorkouts.find(w => w.id === workoutId);
@@ -42,16 +43,10 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         strength_exercises_value: targetWorkout?.strength_exercises
       });
       
-      const { data, error } = await supabase.functions.invoke('analyze-workout', {
-        body: { workout_id: workoutId }
-      });
+      // Use the new routing service
+      const data = await analyzeWorkoutWithRetry(workoutId, targetWorkout?.type);
 
-      if (error) {
-        console.error('Analysis error:', error);
-        return;
-      }
-
-      console.log('✅ SIMPLE ANALYSIS RESULT:', data);
+      console.log('✅ ROUTED ANALYSIS RESULT:', data);
       
       // Set this as the selected workout for display
       setSelectedWorkoutId(workoutId);

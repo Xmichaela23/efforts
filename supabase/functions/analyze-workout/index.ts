@@ -233,10 +233,10 @@ Deno.serve(async (req) => {
     console.log(`=== WORKOUT ANALYSIS START ===`);
     console.log(`Analyzing workout: ${workout_id}`);
 
-    // Get workout with full sensor data and strength exercises
+    // Get workout with full sensor data
     const { data: workout, error: workoutError } = await supabase
       .from('workouts')
-      .select('*, sensor_data, computed, strength_exercises')
+      .select('*, sensor_data, computed')
       .eq('id', workout_id)
       .single();
 
@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
     const [baselinesResult, userTimezone] = await Promise.all([
       supabase
         .from('user_baselines')
-        .select('performance_numbers')
+        .select('performance_numbers, units')
         .eq('user_id', workout.user_id)
         .single(),
       getUserTimezone(supabase, workout.user_id)
@@ -274,14 +274,15 @@ Deno.serve(async (req) => {
       rest_hr: rawBaselines.rest_hr || rawBaselines.restHR,
       five_k: rawBaselines.fiveK || rawBaselines.five_k,
       swim: rawBaselines.swim,
-      one_rm: rawBaselines.one_rm || rawBaselines.oneRM || rawBaselines.max_strength
+      units: baselinesResult.data?.units || 'imperial' // Default to imperial if not set
     };
     
     console.log('Raw baselines data:', JSON.stringify(baselinesResult.data, null, 2));
     console.log('Parsed userBaselines:', JSON.stringify(userBaselines, null, 2));
+    console.log('🔍 UNITS DEBUG: User units preference:', userBaselines.units);
     
-    // Check for required baselines - NO FALLBACKS (except for strength workouts)
-    if (!userBaselines.ftp && workout.type !== 'strength' && workout.type !== 'strength_training') {
+    // Check for required baselines - NO FALLBACKS
+    if (!userBaselines.ftp) {
       console.log('FTP missing from baselines');
       return new Response(JSON.stringify({
         error: 'FTP baseline required for analysis. Please update your profile with your FTP.',
@@ -346,9 +347,11 @@ Deno.serve(async (req) => {
     const grade = calculateExecutionGrade(workout, analysis);
 
     // Generate comprehensive insights using all analysis components
+    console.log('🔍 CALLING generateWorkoutInsights...');
+    console.log('🔍 Analysis keys:', Object.keys(analysis));
+    console.log('🔍 intensity_analysis:', !!analysis.intensity_analysis);
     const insights = await generateWorkoutInsights({
       workout: workout,
-      planned_vs_executed: analysis.planned_vs_executed,
       bursts: analysis.speed_bursts,
       consistency: analysis.pace_consistency,
       fatigue: analysis.fatigue_pattern,
@@ -365,7 +368,6 @@ Deno.serve(async (req) => {
       execution_grade: grade,
       insights: insights,
       key_metrics: {
-        planned_vs_executed: analysis.planned_vs_executed,
         speed_bursts: analysis.speed_bursts,
         pace_consistency: analysis.pace_consistency,
         fatigue_pattern: analysis.fatigue_pattern,
@@ -432,6 +434,7 @@ Deno.serve(async (req) => {
  * OUTPUT: Comprehensive analysis object with all metrics and distributions
  */
 async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supabase: any): Promise<any> {
+  console.log(`🔍 ANALYZE_SAMPLES_ENTRY: Processing workout type: "${workout.type}"`);
   // Parse sensor_data - Supabase stores it as JSONB (already parsed)
   let sensorData = [];
   console.log('DEBUG: Original sensor_data type:', typeof workout.sensor_data);
@@ -480,6 +483,8 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
 
   if (sensorData.length === 0) {
     console.log('No sensor data available, using computed data with historical trends');
+    
+    
     const basicAnalysis = analyzeWorkoutFromComputed(workout, computed, userBaselines);
     
     // Add historical trend analysis only for workouts that have meaningful HR data
@@ -502,16 +507,12 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
   console.log('Running enhanced analysis with sensor data...');
 
   // Only analyze runs and rides - skip everything else
-  let plannedVsExecuted: any = null;
   let burstAnalysis: any = null;
   let consistencyAnalysis: any = null;
   let fatigueAnalysis: any = null;
 
   if (workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike') {
     console.log(`Running power/pace analysis for ${workout.type} workout`);
-    
-    // 1. Compare planned vs executed (adherence)
-    plannedVsExecuted = comparePlannedVsExecuted(sensorData, intervals);
 
     // 2. Detect bursts relative to plan
     burstAnalysis = analyzeSpeedBursts(sensorData, intervals);
@@ -528,7 +529,6 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
   // 5. Run enhanced analysis with historical context
   const analysis = {
     // New enhanced analysis (always generated)
-    planned_vs_executed: plannedVsExecuted,
     speed_bursts: burstAnalysis,
     pace_consistency: consistencyAnalysis,
     fatigue_pattern: fatigueAnalysis,
@@ -557,6 +557,8 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
   }
 
   // Analyze based on workout type
+  console.log(`🔍 WORKOUT TYPE DEBUG: workout.type = "${workout.type}"`);
+  console.log(`🔍 ABOUT TO CHECK WORKOUT TYPE CONDITIONS`);
   if (workout.type === 'run' || workout.type === 'running') {
     analysis.pace_variability = analyzePaceVariability(sensorData, computed);
     analysis.intensity_analysis = analyzeRunIntensity(sensorData, computed, userBaselines);
@@ -566,9 +568,6 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
     analysis.intensity_analysis = analyzeBikeIntensity(sensorData, computed, userBaselines);
   } else if (workout.type === 'swim' || workout.type === 'swimming') {
     analysis.intensity_analysis = analyzeSwimIntensity(sensorData, computed, userBaselines, workout);
-  } else if (workout.type === 'strength' || workout.type === 'strength_training') {
-    console.log(`Analyzing strength workout - checking for RIR data`);
-    analysis.intensity_analysis = analyzeStrengthIntensity(workout, userBaselines);
   } else if (workout.type === 'mobility' || workout.type === 'mobility_session') {
     // Mobility workouts don't need analysis - no meaningful data
     analysis.intensity_analysis = null;
@@ -591,7 +590,7 @@ async function analyzeWorkoutWithSamples(workout: any, userBaselines: any, supab
  * - Computes adherence percentages
  * - Identifies where execution deviated from plan
  */
-function comparePlannedVsExecuted(samples: any[], intervals: any[]) {
+function comparePlannedVsExecuted_DELETED(samples: any[], intervals: any[]) {
   const workIntervals = intervals.filter(i => i.kind === 'work');
   
   const comparison = workIntervals.map((interval, idx) => {
@@ -914,7 +913,6 @@ function analyzeFatiguePattern(samples: any[], intervals: any[]) {
  */
 async function generateWorkoutInsights(data: {
   workout: any;
-  planned_vs_executed: any;
   bursts: any;
   consistency: any;
   fatigue: any;
@@ -924,12 +922,14 @@ async function generateWorkoutInsights(data: {
   userBaselines: any;
 }): Promise<string[]> {
   
+  console.log('🔍 generateWorkoutInsights ENTRY - Function called!');
+  console.log('🔍 generateWorkoutInsights ENTRY - Workout type:', data.workout.type);
+  
   // NO FALLBACKS - Check if there's meaningful data to analyze
   let hasMeaningfulData = false;
   
   console.log('=== GPT-4 INSIGHTS DEBUG ===');
   console.log('Workout type:', data.workout.type);
-  console.log('Planned vs executed:', !!data.planned_vs_executed, data.planned_vs_executed?.length);
   console.log('Bursts:', !!data.bursts);
   console.log('Consistency:', !!data.consistency);
   console.log('Fatigue:', !!data.fatigue);
@@ -937,23 +937,14 @@ async function generateWorkoutInsights(data: {
   console.log('HR dynamics:', !!data.hr_dynamics);
   console.log('Intensity analysis:', !!data.intensity_analysis);
   
-  if (data.workout.type === 'strength' || data.workout.type === 'strength_training') {
-    // For strength workouts, only proceed if we have actual RIR/weight/reps data
-    hasMeaningfulData = data.intensity_analysis && 
-                       data.intensity_analysis.analysis && 
-                       data.intensity_analysis.analysis.insights && 
-                       data.intensity_analysis.analysis.insights.length > 0;
-  } else {
-    // For other workouts, check for meaningful analysis data
-    hasMeaningfulData = 
-      data.planned_vs_executed || 
-      data.bursts || 
-      data.consistency || 
-      data.fatigue || 
-      data.power_distribution || 
-      data.hr_dynamics || 
-      (data.intensity_analysis && data.intensity_analysis.analysis && data.intensity_analysis.analysis.insights && data.intensity_analysis.analysis.insights.length > 0);
-  }
+  // For other workouts, check for meaningful analysis data
+  hasMeaningfulData = 
+    data.bursts || 
+    data.consistency || 
+    data.fatigue || 
+    data.power_distribution || 
+    data.hr_dynamics || 
+    (data.intensity_analysis && data.intensity_analysis.analysis && data.intensity_analysis.analysis.insights && data.intensity_analysis.analysis.insights.length > 0);
   
   console.log('Has meaningful data:', hasMeaningfulData);
   
@@ -962,7 +953,7 @@ async function generateWorkoutInsights(data: {
     return [];
   }
   
-  const { workout, planned_vs_executed, bursts, consistency, fatigue, power_distribution, hr_dynamics, intensity_analysis, userBaselines } = data;
+  const { workout, bursts, consistency, fatigue, power_distribution, hr_dynamics, intensity_analysis, userBaselines } = data;
   
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
@@ -973,9 +964,7 @@ async function generateWorkoutInsights(data: {
     let prompt = `You're analyzing a ${workout.type} workout to have a conversation with the athlete about their training.
 
 WORKOUT OVERVIEW:
-${workout.type === 'strength' || workout.type === 'strength_training' ? 
-  `Strength Training Session | Adherence: ${workout.computed?.overall?.execution_score}%` : 
-  `Duration: ${Math.round(workout.duration)}min | Adherence: ${workout.computed?.overall?.execution_score}%`}
+Duration: ${Math.round(workout.duration)}min | Adherence: ${workout.computed?.overall?.execution_score}%
 Grade: ${workout.execution_grade}`;
 
     // Add power distribution analysis
@@ -987,8 +976,8 @@ POWER DISTRIBUTION:
 - Dominant Zone: ${power_distribution.dominant_zone}`;
     }
 
-    // Add HR as physiological response indicator (not for strength workouts)
-    if (hr_dynamics && workout.type !== 'strength' && workout.type !== 'strength_training') {
+    // Add HR as physiological response indicator
+    if (hr_dynamics) {
       prompt += `
 PHYSIOLOGICAL RESPONSE:
 - Avg HR: ${hr_dynamics.avg_hr} bpm, Peak: ${hr_dynamics.max_hr} bpm
@@ -1000,48 +989,6 @@ PHYSIOLOGICAL RESPONSE:
       }
     }
 
-        // Add strength-specific analysis
-        if (workout.type === 'strength' || workout.type === 'strength_training') {
-          const intensityAnalysis = intensity_analysis;
-          if (intensityAnalysis && intensityAnalysis.intensity) {
-            const intensity = intensityAnalysis.intensity;
-            
-            if (intensity.rir_analysis) {
-              prompt += `
-        STRENGTH TRAINING ANALYSIS (RIR-based):
-        - RIR Average: ${intensity.rir_analysis.avg_rir} (range: ${intensity.rir_analysis.min_rir}-${intensity.rir_analysis.max_rir})
-        - RIR Consistency: ${intensity.rir_analysis.rir_consistency}% variation
-        - Fatigue Pattern: ${intensity.rir_analysis.intensity_progression} (${intensity.rir_analysis.rir_fade} RIR change)
-        - Total Sets: ${intensity.rir_analysis.total_sets}`;
-            }
-            
-            if (intensity.weight_analysis) {
-              prompt += `
-        WEIGHT/LOAD ANALYSIS:
-        - Weight Range: ${intensity.weight_analysis.min_weight}-${intensity.weight_analysis.max_weight}kg (avg: ${intensity.weight_analysis.avg_weight}kg)
-        - Weight Progression: ${intensity.weight_analysis.weight_progression}kg across sets`;
-              
-              if (intensity.weight_analysis.percent_of_1rm) {
-                prompt += `
-        - Intensity: ${intensity.weight_analysis.percent_of_1rm}% of 1RM`;
-              }
-            }
-            
-            if (intensity.reps_analysis) {
-              prompt += `
-        REPS ANALYSIS:
-        - Total Reps: ${intensity.reps_analysis.total_reps} across ${intensity.reps_analysis.total_sets} sets
-        - Average Reps: ${intensity.reps_analysis.avg_reps} per set (range: ${intensity.reps_analysis.min_reps}-${intensity.reps_analysis.max_reps})`;
-            }
-            
-            if (!intensity.rir_analysis && !intensity.weight_analysis) {
-              prompt += `
-        STRENGTH TRAINING ANALYSIS:
-        - No RIR or weight data available for analysis
-        - Consider logging RIR and weight for each set to enable detailed analysis`;
-            }
-          }
-        }
 
     // Add swim-specific lengths analysis
     if (workout.type === 'swim' || workout.type === 'swimming') {
@@ -1066,12 +1013,6 @@ SWIM WORKOUT ANALYSIS:
 - HR response shows physiological effort
 - Length-by-length pace tracking for fatigue patterns
 - Simple adherence tracking (planned vs executed)`;
-    } else if (workout.type === 'strength' || workout.type === 'strength_training') {
-      prompt += `
-STRENGTH WORKOUT ANALYSIS:
-- Strength training focuses on RIR progression and set consistency
-- Duration is not a key metric for strength training
-- Focus on fatigue patterns and intensity progression through sets`;
     } else if (workout.type !== 'run' && workout.type !== 'running' && workout.type !== 'ride' && workout.type !== 'cycling' && workout.type !== 'bike') {
       prompt += `
 WORKOUT TYPE: ${workout.type.toUpperCase()}
@@ -1080,30 +1021,6 @@ WORKOUT TYPE: ${workout.type.toUpperCase()}
     }
 
     // Add interval-by-interval performance analysis
-    if (planned_vs_executed && planned_vs_executed.length > 0) {
-      prompt += `
-INTERVAL PERFORMANCE:
-${planned_vs_executed.map((interval: any, idx: number) => {
-  const power = interval.executed.avg_power;
-  const target = interval.planned.target_power;
-  const adherence = interval.adherence.power_percent;
-  const hr = interval.executed.avg_hr;
-  const hrResponse = interval.executed.hr_response;
-  
-  let hrContext = '';
-  if (hrResponse) {
-    if (hrResponse.response_type === 'rising') {
-      hrContext = ` - HR climbed ${hrResponse.hr_climb} bpm`;
-    } else if (hrResponse.response_type === 'dropping') {
-      hrContext = ` - HR dropped ${Math.abs(hrResponse.hr_climb)} bpm`;
-    } else {
-      hrContext = ` - HR stable`;
-    }
-  }
-  
-  return `Interval ${interval.interval_number}: ${power}W (${adherence}% of ${target}W) - HR: ${hr} bpm${hrContext}`;
-}).join('\n')}`;
-    }
 
     // Add workout context
     prompt += `
@@ -1160,17 +1077,7 @@ ${bursts.map((burst: any) =>
     }
 
     // Only include relevant baselines for each workout type
-    if (workout.type === 'strength' || workout.type === 'strength_training') {
-      // Only include 1RM if available - no fallback text
-      const oneRMText = userBaselines.one_rm ? `1RM Baseline: ${userBaselines.one_rm}kg` : '';
-      prompt += `
-STRENGTH TRAINING CONTEXT:
-Focus on RIR progression and set consistency - no endurance metrics applicable.
-${oneRMText}
-
-Analyze this strength workout and provide 3-4 performance observations:
-`;
-    } else {
+    if (workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike' || workout.type === 'swim' || workout.type === 'swimming') {
       // Only include FTP if available - no fallback text
       const ftpText = userBaselines.ftp ? `FTP: ${userBaselines.ftp}W` : '';
       prompt += `
@@ -1186,7 +1093,6 @@ ANALYSIS STYLE:
 - Factual, data-driven tone
 - Use specific numbers and metrics
 - For RUNS/RIDES: Focus on power distribution, pacing consistency, execution adherence
-- For STRENGTH: Focus on RIR progression, fatigue patterns, set consistency
 - For MOBILITY: Focus on movement quality, HR recovery response, session completion
 - Use HR as physiological response indicator
 - Be direct and factual, not motivational or coaching
@@ -1823,198 +1729,9 @@ function analyzeBikeIntensity(sensorData: any[], computed: any, userBaselines: a
   return { intensity, analysis };
 }
 
-/**
- * Analyze strength training intensity from strength exercises data
- */
-function analyzeStrengthIntensity(workout: any, userBaselines: any): any {
-  console.log('Checking strength workout data availability...');
-  console.log(`1RM baseline: ${userBaselines.one_rm || 'not available'}`);
-  
-  // Look for strength exercises data
-  const strengthExercises = workout.strength_exercises || [];
-  console.log(`🔍 STRENGTH DEBUG: workout.strength_exercises type:`, typeof workout.strength_exercises);
-  console.log(`🔍 STRENGTH DEBUG: workout.strength_exercises value:`, workout.strength_exercises);
-  console.log(`Strength exercises available: ${strengthExercises.length} exercises`);
-  console.log(`Strength exercises data:`, JSON.stringify(strengthExercises, null, 2));
-  
-  // Extract all completed sets from all exercises
-  const allCompletedSets = strengthExercises.flatMap(exercise => 
-    exercise.sets || exercise.completed_sets || []
-  ).filter(set => set.completed);
-  
-  console.log(`🔍 STRENGTH DEBUG: allCompletedSets length: ${allCompletedSets.length}`);
-  console.log(`🔍 STRENGTH DEBUG: allCompletedSets data:`, JSON.stringify(allCompletedSets, null, 2));
-  
-  // Debug individual sets
-  allCompletedSets.forEach((set, index) => {
-    console.log(`🔍 STRENGTH DEBUG: Set ${index}:`, {
-      completed: set.completed,
-      rir: set.rir,
-      weight: set.weight,
-      reps: set.reps
-    });
-  });
 
-  // Analysis based on RIR data
-  let rirAnalysis: any = null;
-  if (allCompletedSets && allCompletedSets.length > 0) {
-    const rirValues = allCompletedSets.map(set => set.rir).filter(rir => rir !== null && rir !== undefined);
-    
-    if (rirValues.length > 0) {
-      console.log(`Valid RIR values found: ${rirValues.length}`);
-      const avgRIR = rirValues.reduce((sum, rir) => sum + rir, 0) / rirValues.length;
-      const minRIR = Math.min(...rirValues);
-      const maxRIR = Math.max(...rirValues);
-      const rirConsistency = calculateVariability(rirValues);
-      
-      // Analyze RIR progression (fatigue pattern)
-      const firstHalf = rirValues.slice(0, Math.floor(rirValues.length / 2));
-      const secondHalf = rirValues.slice(Math.floor(rirValues.length / 2));
-      const firstHalfAvg = firstHalf.reduce((sum, rir) => sum + rir, 0) / firstHalf.length;
-      const secondHalfAvg = secondHalf.reduce((sum, rir) => sum + rir, 0) / secondHalf.length;
-      const rirFade = firstHalfAvg - secondHalfAvg;
-      
-      rirAnalysis = {
-        avg_rir: avgRIR.toFixed(1),
-        min_rir: minRIR,
-        max_rir: maxRIR,
-        rir_consistency: rirConsistency.toFixed(1),
-        rir_fade: rirFade.toFixed(1),
-        total_sets: rirValues.length,
-        intensity_progression: rirFade > 1 ? 'increasing fatigue' : rirFade < -0.5 ? 'maintaining intensity' : 'slight fatigue'
-      };
-    } else {
-      console.log('No valid RIR values found in completed sets');
-    }
-  } else {
-    console.log('No completed sets found');
-  }
 
-  // Analyze weight/load data
-  let weightAnalysis: any = null;
-  if (allCompletedSets && allCompletedSets.length > 0) {
-    const weightValues = allCompletedSets.map(set => set.weight).filter(weight => weight && weight > 0);
-    
-    if (weightValues.length > 0) {
-      console.log(`Valid weight values found: ${weightValues.length}`);
-      const avgWeight = weightValues.reduce((sum, weight) => sum + weight, 0) / weightValues.length;
-      const maxWeight = Math.max(...weightValues);
-      const minWeight = Math.min(...weightValues);
-      const weightProgression = maxWeight - minWeight;
-      
-      // Calculate percentage of 1RM if available
-      let percentOf1RM: string | null = null;
-      if (userBaselines.one_rm && userBaselines.one_rm > 0) {
-        percentOf1RM = ((avgWeight / userBaselines.one_rm) * 100).toFixed(1);
-      }
-      
-      weightAnalysis = {
-        avg_weight: Math.round(avgWeight),
-        max_weight: maxWeight,
-        min_weight: minWeight,
-        weight_progression: Math.round(weightProgression),
-        percent_of_1rm: percentOf1RM,
-        total_sets: weightValues.length
-      };
-    } else {
-      console.log('No valid weight values found in completed sets');
-    }
-  }
 
-  // Analyze reps data
-  let repsAnalysis: any = null;
-  if (allCompletedSets && allCompletedSets.length > 0) {
-    const repsValues = allCompletedSets.map(set => set.reps).filter(reps => reps && reps > 0);
-    
-    if (repsValues.length > 0) {
-      console.log(`Valid reps values found: ${repsValues.length}`);
-      const avgReps = repsValues.reduce((sum, reps) => sum + reps, 0) / repsValues.length;
-      const maxReps = Math.max(...repsValues);
-      const minReps = Math.min(...repsValues);
-      const totalReps = repsValues.reduce((sum, reps) => sum + reps, 0);
-      
-      repsAnalysis = {
-        avg_reps: Math.round(avgReps * 10) / 10,
-        max_reps: maxReps,
-        min_reps: minReps,
-        total_reps: totalReps,
-        total_sets: repsValues.length
-      };
-    } else {
-      console.log('No valid reps values found in completed sets');
-    }
-  }
-
-  // Determine data quality - RIR data is the only requirement
-  const hasRIRData = rirAnalysis !== null;
-  const has1RM = userBaselines.one_rm && userBaselines.one_rm > 0;
-  
-  let dataQuality = 'insufficient';
-  let focus = 'No RIR data available';
-  
-  if (hasRIRData && has1RM) {
-    dataQuality = 'excellent';
-    focus = 'RIR progression with 1RM context';
-  } else if (hasRIRData) {
-    dataQuality = 'good';
-    focus = 'RIR progression analysis';
-  } else {
-    console.log('Insufficient RIR data for strength analysis - skipping detailed analysis');
-  }
-
-  return {
-    intensity: {
-      rir_analysis: rirAnalysis,
-      weight_analysis: weightAnalysis,
-      reps_analysis: repsAnalysis,
-      one_rm_baseline: userBaselines.one_rm || null,
-      data_quality: dataQuality,
-      focus: focus
-    },
-    analysis: {
-      workout_type: 'strength',
-      primary_metric: hasRIRData ? 'RIR' : 'none',
-      data_quality: dataQuality,
-      insights: generateStrengthInsights(rirAnalysis, weightAnalysis, repsAnalysis, hasRIRData, has1RM, userBaselines.one_rm)
-    }
-  };
-}
-
-/**
- * Generate strength-specific insights based on available data
- */
-function generateStrengthInsights(rirAnalysis: any, weightAnalysis: any, repsAnalysis: any, hasRIR: boolean, has1RM: boolean, oneRM: number): string[] {
-  const insights: string[] = [];
-  
-  if (hasRIR) {
-    insights.push(`RIR average: ${rirAnalysis.avg_rir} (range: ${rirAnalysis.min_rir}-${rirAnalysis.max_rir})`);
-    insights.push(`RIR consistency: ${rirAnalysis.rir_consistency}% variation - ${rirAnalysis.rir_consistency < 20 ? 'very consistent' : 'some variation'}`);
-    insights.push(`Fatigue pattern: ${rirAnalysis.intensity_progression} (${rirAnalysis.rir_fade} RIR change)`);
-    
-    if (weightAnalysis) {
-      insights.push(`Weight range: ${weightAnalysis.min_weight}-${weightAnalysis.max_weight}kg (avg: ${weightAnalysis.avg_weight}kg)`);
-      if (weightAnalysis.percent_of_1rm) {
-        insights.push(`Intensity: ${weightAnalysis.percent_of_1rm}% of 1RM - ${parseFloat(weightAnalysis.percent_of_1rm) > 85 ? 'high intensity' : parseFloat(weightAnalysis.percent_of_1rm) > 70 ? 'moderate intensity' : 'low intensity'}`);
-      }
-      if (weightAnalysis.weight_progression > 0) {
-        insights.push(`Weight progression: +${weightAnalysis.weight_progression}kg across sets`);
-      }
-    }
-    
-    if (repsAnalysis) {
-      insights.push(`Reps: ${repsAnalysis.total_reps} total (avg: ${repsAnalysis.avg_reps} per set, range: ${repsAnalysis.min_reps}-${repsAnalysis.max_reps})`);
-    }
-    
-    if (has1RM) {
-      insights.push(`1RM baseline: ${oneRM}kg - provides context for strength progression`);
-    }
-  } else {
-    // NO FALLBACKS - return empty insights when no RIR data
-    return [];
-  }
-  
-  return insights;
-}
 
 
 /**
@@ -2186,36 +1903,31 @@ function calculateExecutionGrade(workout: any, analysis: any): string | null {
   const hasPaceData = analysis.pace_variability?.consistency_score && analysis.pace_variability.consistency_score > 0;
   const hasHRData = analysis.hr_responsiveness?.avg_hr && analysis.hr_responsiveness.avg_hr > 0;
   
-  // Check power data in the correct location (planned_vs_executed)
-  const hasPowerData = analysis.planned_vs_executed?.[0]?.executed?.avg_power && analysis.planned_vs_executed[0].executed.avg_power > 0;
+  // Check power data in the correct location
+  const hasPowerData = analysis.power_distribution && analysis.power_distribution.avg_power && analysis.power_distribution.avg_power > 0;
   
   // Check for any meaningful analysis data (broader check)
-  const hasAnyAnalysisData = analysis.planned_vs_executed?.length > 0 || 
-                            analysis.speed_bursts || 
+  const hasAnyAnalysisData = analysis.speed_bursts || 
                             analysis.pace_consistency || 
                             analysis.fatigue_pattern || 
                             analysis.power_distribution || 
                             analysis.hr_responsiveness || 
                             analysis.pace_variability;
   
-  const hasStrengthData = analysis.intensity_analysis?.analysis?.insights && analysis.intensity_analysis.analysis.insights.length > 0;
-  
-  const hasAnalysisData = hasPaceData || hasHRData || hasPowerData || hasStrengthData || hasAnyAnalysisData;
+  const hasAnalysisData = hasPaceData || hasHRData || hasPowerData;
   
   console.log('=== EXECUTION GRADE DEBUG ===');
   console.log('Workout type:', workout.type);
   console.log('Execution data:', hasExecutionData, 'Analysis data:', hasAnalysisData);
-  console.log('Pace data:', hasPaceData, 'HR data:', hasHRData, 'Power data:', hasPowerData, 'Strength data:', hasStrengthData);
+  console.log('Pace data:', hasPaceData, 'HR data:', hasHRData, 'Power data:', hasPowerData);
   console.log('Any analysis data:', hasAnyAnalysisData);
   console.log('Analysis object keys:', Object.keys(analysis));
-  console.log('Planned vs executed:', analysis.planned_vs_executed?.length, 'items');
   console.log('Speed bursts:', !!analysis.speed_bursts);
   console.log('Pace consistency:', !!analysis.pace_consistency);
   console.log('Fatigue pattern:', !!analysis.fatigue_pattern);
   console.log('Power distribution:', !!analysis.power_distribution);
   console.log('HR responsiveness:', !!analysis.hr_responsiveness);
   console.log('Pace variability:', !!analysis.pace_variability);
-  console.log('Planned vs executed power:', analysis.planned_vs_executed?.[0]?.executed?.avg_power);
   
   if (!hasExecutionData && !hasAnalysisData) {
     console.log('No meaningful data for execution grade - returning null');
