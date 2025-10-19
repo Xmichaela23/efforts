@@ -654,6 +654,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     return null;
   };
 
+  const getDisplayPace = (workout: any, interval: any): number | null => {
+    // For summary display, always use overall workout pace to match Details tab
+    // Individual interval pace should only be used for per-interval analysis
+    const overallPace = Number(workout?.computed?.overall?.avg_pace_s_per_mi ?? workout?.metrics?.avg_pace_s_per_mi);
+    if (Number.isFinite(overallPace) && overallPace > 0) {
+      return overallPace;
+    }
+    
+    // Fallback to interval-specific pace only if no overall pace available
+    if (interval?.executed?.avg_pace_s_per_mi) {
+      return Number(interval.executed.avg_pace_s_per_mi);
+    }
+    
+    return null;
+  };
+
   // --- Execution percentage helpers (strict, server-computed only) ---
   const shouldShowPercentage = (st: any): boolean => {
     const t = String((st?.type || st?.kind || '')).toLowerCase();
@@ -1888,6 +1904,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               if (isRideSport) {
                 const power = getDisplayPower(hydratedCompleted || completed, row);
                 if (Number.isFinite(power) && power > 0) return `${Math.round(power)} W`;
+                return '—';
+              }
+              // For runs/walks, use universal pace selection logic
+              if (isRunOrWalk) {
+                const secPerMi = getDisplayPace(hydratedCompleted || completed, row);
+                if (Number.isFinite(secPerMi) && secPerMi > 0) {
+                  return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
+                }
                 return '—';
               }
               // For other sports, use server-computed interval data
