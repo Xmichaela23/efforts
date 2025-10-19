@@ -1907,6 +1907,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                 return '—';
               }
               // For runs/walks, use universal pace selection logic
+              const isRunOrWalk = /run|walk/i.test(sportType);
               if (isRunOrWalk) {
                 const secPerMi = getDisplayPace(hydratedCompleted || completed, row);
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
