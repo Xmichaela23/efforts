@@ -154,11 +154,14 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     
     // If no selected workout, find the most recent with insights
     if (!workoutWithAnalysis) {
-      workoutWithAnalysis = recentWorkouts.find(workout => 
-        workout.workout_analysis && 
-        workout.workout_analysis.insights && 
-        workout.workout_analysis.insights.length > 0
-      ) || recentWorkouts.find(workout => workout.workout_analysis); // Fallback to any analysis
+      workoutWithAnalysis = recentWorkouts.find(workout => {
+        const analysis = workout.workout_analysis;
+        if (!analysis) return false;
+        
+        // Handle both old and new analysis data structures
+        const insights = analysis.insights || (analysis.workout_analysis && analysis.workout_analysis.insights);
+        return insights && insights.length > 0;
+      }) || recentWorkouts.find(workout => workout.workout_analysis); // Fallback to any analysis
       console.log('🎯 Fallback to most recent with analysis');
     } else if (!workoutWithAnalysis.workout_analysis) {
       console.log('🎯 Selected workout has no analysis yet - will show when analysis completes');
@@ -188,8 +191,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     const analysis = workoutWithAnalysis.workout_analysis;
     console.log('🔍 Analysis data structure:', JSON.stringify(analysis, null, 2));
     
+    // Handle both old and new analysis data structures for insights
+    const insights = analysis.insights || (analysis.workout_analysis && analysis.workout_analysis.insights) || [];
+    
     // If this is the selected workout but has no insights, show that it was analyzed but no insights
-    if (!analysis.insights || analysis.insights.length === 0) {
+    if (!insights || insights.length === 0) {
       console.log('❌ No insights in analysis for selected workout');
       if (selectedWorkoutId && workoutWithAnalysis.id === selectedWorkoutId) {
         return {
@@ -210,7 +216,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     const hrDrift = analysis.key_metrics?.hr_dynamics?.hr_drift_percent;
 
     return {
-      insights: analysis.insights || [],
+      insights: insights,
       key_metrics: {
         power_variability: powerVariability,
         power_fade: powerFade,

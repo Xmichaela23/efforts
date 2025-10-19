@@ -377,13 +377,29 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
       ((executedConverted.value - plannedConverted.value) / plannedConverted.value) * 100 : 0;
   }
   
-  // Calculate RIR adherence (if RIR was planned)
-  let rirAdherence = null;
+  // Calculate RIR adherence and analysis
+  let rirAdherence: number | null = null;
+  let avgExecutedRIR: number | null = null;
+  let rirConsistency: number | null = null;
+  
+  // Get planned RIR (if any)
   const plannedRIR = plannedSets.find((set: any) => set.rir !== null && set.rir !== undefined);
-  if (plannedRIR && completedSets.length > 0) {
-    const executedRIR = completedSets.find((set: any) => set.rir !== null && set.rir !== undefined);
-    if (executedRIR) {
-      rirAdherence = Math.abs(executedRIR.rir - plannedRIR.rir);
+  
+  // Get executed RIR data
+  const executedRIRSets = completedSets.filter((set: any) => set.rir !== null && set.rir !== undefined);
+  
+  if (executedRIRSets.length > 0) {
+    // Calculate average RIR
+    avgExecutedRIR = executedRIRSets.reduce((sum: number, set: any) => sum + set.rir, 0) / executedRIRSets.length;
+    
+    // Calculate RIR consistency (standard deviation)
+    const variance = executedRIRSets.reduce((sum: number, set: any) => 
+      sum + Math.pow(set.rir - avgExecutedRIR!, 2), 0) / executedRIRSets.length;
+    rirConsistency = Math.sqrt(variance);
+    
+    // Calculate adherence to planned RIR
+    if (plannedRIR && avgExecutedRIR !== null) {
+      rirAdherence = Math.abs(avgExecutedRIR - plannedRIR.rir);
     }
   }
   
@@ -400,6 +416,9 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
     set_completion: Math.round(setCompletion),
     weight_progression: Math.round(weightProgression * 10) / 10,
     rir_adherence: rirAdherence as number | null,
+    avg_rir: avgExecutedRIR ? Math.round(avgExecutedRIR * 10) / 10 : null,
+    rir_consistency: rirConsistency ? Math.round(rirConsistency * 10) / 10 : null,
+    rir_sets_count: executedRIRSets.length,
     volume_completion: Math.round(volumeCompletion)
   };
 }
@@ -502,6 +521,70 @@ async function getStrengthProgression(
   }
 }
 
+// Helper function to analyze Session RPE data
+function analyzeSessionRPE(sessionRPE: number | null): any {
+  if (sessionRPE === null || sessionRPE === undefined) {
+    return null;
+  }
+  
+  return {
+    value: sessionRPE,
+    intensity_level: sessionRPE <= 3 ? 'Light' :
+                   sessionRPE <= 5 ? 'Moderate' :
+                   sessionRPE <= 7 ? 'Hard' :
+                   sessionRPE <= 9 ? 'Very Hard' : 'Maximal',
+    is_high_intensity: sessionRPE >= 8,
+    is_low_intensity: sessionRPE <= 4
+  };
+}
+
+// Helper function to analyze Readiness Check data
+function analyzeReadinessCheck(readiness: any): any {
+  if (!readiness || typeof readiness !== 'object') {
+    return null;
+  }
+  
+  const { energy, soreness, sleep } = readiness;
+  
+  if (energy === undefined && soreness === undefined && sleep === undefined) {
+    return null;
+  }
+  
+  return {
+    energy: energy || null,
+    soreness: soreness || null,
+    sleep: sleep || null,
+    energy_level: energy ? (energy >= 8 ? 'High' : energy >= 6 ? 'Moderate' : 'Low') : null,
+    soreness_level: soreness ? (soreness <= 2 ? 'Low' : soreness <= 5 ? 'Moderate' : 'High') : null,
+    sleep_quality: sleep ? (sleep >= 8 ? 'Excellent' : sleep >= 7 ? 'Good' : sleep >= 6 ? 'Fair' : 'Poor') : null,
+    overall_readiness: calculateOverallReadiness(energy, soreness, sleep)
+  };
+}
+
+// Helper function to calculate overall readiness score
+function calculateOverallReadiness(energy: number | null, soreness: number | null, sleep: number | null): string | null {
+  const scores: number[] = [];
+  
+  if (energy !== null) {
+    scores.push(energy / 10);
+  }
+  if (soreness !== null) {
+    scores.push((10 - soreness) / 10); // Invert soreness (lower is better)
+  }
+  if (sleep !== null) {
+    scores.push(sleep / 12); // Normalize sleep to 0-1 scale
+  }
+  
+  if (scores.length === 0) return null;
+  
+  const avgScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  
+  if (avgScore >= 0.8) return 'Excellent';
+  if (avgScore >= 0.6) return 'Good';
+  if (avgScore >= 0.4) return 'Fair';
+  return 'Poor';
+}
+
 // Main strength workout analysis function
 async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBaselines: any, supabase: any): Promise<any> {
   console.log('🔍 STRENGTH ANALYSIS START');
@@ -597,6 +680,13 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   
   console.log(`📊 PROGRESSION: Analyzed ${Object.keys(progressionData).length} exercises`);
   
+  // Analyze Session RPE and Readiness data
+  const sessionRPEData = analyzeSessionRPE(workout.session_rpe);
+  const readinessData = analyzeReadinessCheck(workout.readiness);
+  
+  console.log(`📊 SESSION RPE: ${sessionRPEData ? 'Available' : 'Not provided'}`);
+  console.log(`📊 READINESS: ${readinessData ? 'Available' : 'Not provided'}`);
+  
   // Generate enhanced insights using GPT-4
   const insights = await generateEnhancedStrengthInsights(
     workout, 
@@ -604,7 +694,9 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     overallAdherence, 
     progressionData, 
     planMetadata, 
-    userUnits
+    userUnits,
+    sessionRPEData,
+    readinessData
   );
   
   return {
@@ -613,6 +705,8 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     overall_adherence: overallAdherence,
     progression_data: progressionData,
     plan_metadata: planMetadata,
+    session_rpe: sessionRPEData,
+    readiness: readinessData,
     insights: insights,
     units: userUnits
   };
@@ -625,7 +719,9 @@ async function generateEnhancedStrengthInsights(
   overallAdherence: any,
   progressionData: any,
   planMetadata: EnhancedPlanContext | null,
-  userUnits: string
+  userUnits: string,
+  sessionRPEData: any,
+  readinessData: any
 ): Promise<string[]> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
@@ -710,6 +806,78 @@ PROGRESSION DATA:`;
     }
   }
   
+  // Add RIR analysis to context
+  context += `
+
+RIR ANALYSIS:`;
+  
+  const exercisesWithRIR = exerciseAdherence.filter(ex => ex.matched && ex.adherence.avg_rir !== null);
+  if (exercisesWithRIR.length > 0) {
+    context += `
+- Exercises with RIR data: ${exercisesWithRIR.length}`;
+    
+    for (const exercise of exercisesWithRIR) {
+      context += `
+- ${exercise.name}: Avg RIR ${exercise.adherence.avg_rir}`;
+      
+      if (exercise.adherence.rir_consistency !== null) {
+        context += ` (consistency: ${exercise.adherence.rir_consistency})`;
+      }
+      
+      if (exercise.adherence.rir_adherence !== null) {
+        context += `, adherence: ${exercise.adherence.rir_adherence}`;
+      }
+    }
+  } else {
+    context += `
+- No RIR data available`;
+  }
+  
+  // Add Session RPE to context
+  if (sessionRPEData) {
+    context += `
+
+SESSION RPE:
+- Value: ${sessionRPEData.value}/10
+- Intensity Level: ${sessionRPEData.intensity_level}
+- High Intensity: ${sessionRPEData.is_high_intensity ? 'Yes' : 'No'}`;
+  } else {
+    context += `
+
+SESSION RPE: Not provided`;
+  }
+  
+  // Add Readiness Check to context
+  if (readinessData) {
+    context += `
+
+READINESS CHECK:`;
+    
+    if (readinessData.energy !== null) {
+      context += `
+- Energy: ${readinessData.energy}/10 (${readinessData.energy_level})`;
+    }
+    
+    if (readinessData.soreness !== null) {
+      context += `
+- Soreness: ${readinessData.soreness}/10 (${readinessData.soreness_level})`;
+    }
+    
+    if (readinessData.sleep !== null) {
+      context += `
+- Sleep: ${readinessData.sleep}h (${readinessData.sleep_quality})`;
+    }
+    
+    if (readinessData.overall_readiness) {
+      context += `
+- Overall Readiness: ${readinessData.overall_readiness}`;
+    }
+  } else {
+    context += `
+
+READINESS CHECK: Not provided`;
+  }
+  
   context += `
 
 ANALYSIS REQUIREMENTS:
@@ -718,7 +886,9 @@ ANALYSIS REQUIREMENTS:
 - Focus on plan adherence when plan is available
 - Highlight weight progression relative to phase expectations
 - Note any missed or added exercises
-- Comment on RIR adherence if available
+- Comment on RIR data quality and consistency if available
+- Consider Session RPE in context of workout difficulty
+- Factor in Readiness Check data for performance interpretation
 - Consider deload week context if applicable
 - Keep insights factual and data-driven
 - Use ${userUnits} units consistently
@@ -797,7 +967,7 @@ Deno.serve(async (req) => {
     // Get workout data
     const { data: workout, error: workoutError } = await supabase
       .from('workouts')
-      .select('*, strength_exercises, planned_id')
+      .select('*, strength_exercises, planned_id, session_rpe, readiness')
       .eq('id', workout_id)
       .single();
     
@@ -836,7 +1006,7 @@ Deno.serve(async (req) => {
     };
     
     // Get planned workout if available
-    let plannedWorkout = null;
+    let plannedWorkout: any = null;
     if (workout.planned_id) {
       console.log(`Fetching planned workout: ${workout.planned_id}`);
       const { data: plannedData, error: plannedError } = await supabase
