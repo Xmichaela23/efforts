@@ -657,7 +657,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
   const getDisplayPace = (workout: any, interval: any): number | null => {
     // For summary display, always use overall workout pace to match Details tab
     // Individual interval pace should only be used for per-interval analysis
-    const overallPace = Number(workout?.computed?.overall?.avg_pace_s_per_mi ?? workout?.metrics?.avg_pace_s_per_mi);
+    
+    // Try multiple sources for overall pace (same as Details tab)
+    const overallPace = Number(
+      workout?.computed?.overall?.avg_pace_s_per_mi ?? 
+      workout?.metrics?.avg_pace_s_per_mi ??
+      workout?.avg_pace_s_per_mi ??
+      workout?.metrics?.avg_pace
+    );
+    
     if (Number.isFinite(overallPace) && overallPace > 0) {
       return overallPace;
     }
@@ -1910,6 +1918,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               const isRunOrWalk = /run|walk/i.test(sportType);
               if (isRunOrWalk) {
                 const secPerMi = getDisplayPace(hydratedCompleted || completed, row);
+                console.log(`🔍 [PACE DEBUG] isRunOrWalk: ${isRunOrWalk}, secPerMi: ${secPerMi}, overall: ${(hydratedCompleted || completed)?.computed?.overall?.avg_pace_s_per_mi}, metrics: ${(hydratedCompleted || completed)?.metrics?.avg_pace_s_per_mi}`);
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
                   return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
                 }
@@ -1943,12 +1952,32 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             })();
 
             const timeCell = (() => {
-              if (!hasServerComputed || !row) return '—';
+              if (!hasServerComputed || !row) {
+                // For first row (overall), show overall workout time
+                if (idx === 0) {
+                  const overall = (completed as any)?.computed?.overall || {};
+                  const dur = Number(overall?.duration_s_moving ?? overall?.duration_s);
+                  if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
+                  const fromResolver = resolveMovingSeconds(completed);
+                  if (Number.isFinite(fromResolver as any) && (fromResolver as number) > 0) return fmtTime(fromResolver as number);
+                }
+                return '—';
+              }
               const dur = row?.executed?.duration_s; return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
             })();
 
             const hrVal = (() => {
-              if (!hasServerComputed || !row) return null as number | null;
+              if (!hasServerComputed || !row) {
+                // For first row (overall), show overall workout HR
+                if (idx === 0) {
+                  const overall = (completed as any)?.computed?.overall || {};
+                  const hr = Number(overall?.avg_hr);
+                  if (Number.isFinite(hr) && hr > 0) return Math.round(hr);
+                  const fromMetrics = Number((completed as any)?.avg_heart_rate ?? (completed as any)?.metrics?.avg_heart_rate);
+                  if (Number.isFinite(fromMetrics) && fromMetrics > 0) return Math.round(fromMetrics);
+                }
+                return null;
+              }
               const hr = row?.executed?.avg_hr; return (typeof hr === 'number' && hr > 0) ? Math.round(hr) : null;
             })();
 
