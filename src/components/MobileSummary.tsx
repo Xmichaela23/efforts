@@ -639,13 +639,19 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
   };
 
   const getDisplayPower = (workout: any, interval: any): number | null => {
-    // Always prefer interval-specific power when available
+    // For summary display, always use overall workout power to match Details tab
+    // Individual interval power should only be used for per-interval analysis
+    const overallPower = Number(workout?.avg_power ?? workout?.metrics?.avg_power ?? workout?.average_watts);
+    if (Number.isFinite(overallPower) && overallPower > 0) {
+      return overallPower;
+    }
+    
+    // Fallback to interval-specific power only if no overall power available
     if (interval?.executed?.avg_power_w) {
       return Number(interval.executed.avg_power_w);
     }
     
-    // Fallback to overall workout power
-    return Number(workout?.avg_power ?? workout?.metrics?.avg_power ?? workout?.average_watts);
+    return null;
   };
 
   // --- Execution percentage helpers (strict, server-computed only) ---

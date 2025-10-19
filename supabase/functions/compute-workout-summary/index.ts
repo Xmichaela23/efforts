@@ -481,7 +481,7 @@ function gapSecPerMi(rows:any[], sIdx:number, eIdx:number) {
 }
 
 // ---------- Adherence calculation function ----------
-function calculateExecutionPercentage(plannedStep: any, executedStep: any): number | null {
+function calculateExecutionPercentage(plannedStep: any, executedStep: any, overallWorkout?: any, isContinuousWorkout?: boolean, rows?: any[]): number | null {
   if (!executedStep) return null;
 
   try {
@@ -491,7 +491,57 @@ function calculateExecutionPercentage(plannedStep: any, executedStep: any): numb
     const upper = Number(powerRange?.upper);
     if (Number.isFinite(lower) && Number.isFinite(upper) && lower > 0 && upper > 0) {
       const targetMidpoint = (lower + upper) / 2;
-      const executedWatts = Number((executedStep as any)?.avg_power_w || (executedStep as any)?.avg_watts || (executedStep as any)?.power);
+      
+      // For continuous endurance workouts, use overall workout power (includes all time)
+      // For interval workouts, use interval-specific power (excludes zeros)
+      let executedWatts: number;
+      
+      // Use robust fallback for overall workout power, similar to client
+      // Try multiple fallback sources for power data
+      const overallWorkoutPower = Number(
+        overallWorkout?.avg_power ?? 
+        overallWorkout?.metrics?.avg_power ?? 
+        overallWorkout?.average_watts ??
+        overallWorkout?.metrics?.avg_power_w ??
+        overallWorkout?.computed?.overall?.avg_power_w ??
+        overallWorkout?.computed?.overall?.avg_power
+      );
+      
+      console.log(`🔍 [SERVER ADHERENCE DEBUG] isContinuousWorkout: ${isContinuousWorkout}, overallWorkoutPower: ${overallWorkoutPower}, overallWorkout keys: ${Object.keys(overallWorkout || {}).join(', ')}`);
+      console.log(`🔍 [SERVER ADHERENCE DEBUG] overallWorkout.avg_power: ${overallWorkout?.avg_power}, metrics.avg_power: ${overallWorkout?.metrics?.avg_power}, average_watts: ${overallWorkout?.average_watts}`);
+      console.log(`🔍 [SERVER ADHERENCE DEBUG] computed.overall.avg_power_w: ${overallWorkout?.computed?.overall?.avg_power_w}, computed.overall.avg_power: ${overallWorkout?.computed?.overall?.avg_power}`);
+      console.log(`🔍 [SERVER ADHERENCE DEBUG] Full overallWorkout object:`, JSON.stringify(overallWorkout, null, 2));
+      
+      if (isContinuousWorkout && Number.isFinite(overallWorkoutPower) && overallWorkoutPower > 0) {
+        executedWatts = overallWorkoutPower;
+        console.log(`🔍 [SERVER ADHERENCE] Continuous workout: Using overall power ${executedWatts}W (includes all time)`);
+      } else if (isContinuousWorkout && rows && rows.length > 0) {
+        // For continuous workouts, calculate overall power from all samples (includes zeros)
+        // Treat missing power values as 0 watts (coasting/stopped time)
+        const allPowerValues = rows.map(r => {
+          const p = r.p;
+          if (typeof p === 'number' && Number.isFinite(p)) {
+            return p;
+          } else {
+            return 0; // Treat missing power as 0 watts
+          }
+        });
+        
+        console.log(`🔍 [SERVER ADHERENCE DEBUG] Total samples: ${rows.length}, All power samples: ${allPowerValues.length}, Sample power range: ${Math.min(...allPowerValues)}-${Math.max(...allPowerValues)}`);
+        
+        if (allPowerValues.length > 0) {
+          const overallPower = Math.round(allPowerValues.reduce((a, b) => a + b, 0) / allPowerValues.length);
+          executedWatts = overallPower;
+          console.log(`🔍 [SERVER ADHERENCE] Continuous workout: Calculated overall power ${executedWatts}W from ${allPowerValues.length} samples (includes all time, missing power = 0W)`);
+        } else {
+          executedWatts = Number((executedStep as any)?.avg_power_w || (executedStep as any)?.avg_watts || (executedStep as any)?.power);
+          console.log(`🔍 [SERVER ADHERENCE] Continuous workout: Fallback to interval power ${executedWatts}W (no power samples found)`);
+        }
+      } else {
+        executedWatts = Number((executedStep as any)?.avg_power_w || (executedStep as any)?.avg_watts || (executedStep as any)?.power);
+        console.log(`🔍 [SERVER ADHERENCE] Interval workout: Using interval power ${executedWatts}W (excludes zeros)`);
+      }
+      
       if (Number.isFinite(executedWatts) && executedWatts > 0 && targetMidpoint > 0) {
         const percentage = Math.round((executedWatts / targetMidpoint) * 100);
         console.log(`🔍 [SERVER ADHERENCE] Power: ${executedWatts}W vs ${lower}-${upper}W (midpoint: ${targetMidpoint}W) = ${percentage}%`);
@@ -562,7 +612,7 @@ Deno.serve(async (req) => {
     // Load workout + planned link
     const { data: w } = await supabase
       .from('workouts')
-      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time')
+      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power,average_watts')
       .eq('id', workout_id)
       .maybeSingle();
     try { console.error('[compute] WORKOUT LOAD ok:', !!w, 'planned_id:', (w as any)?.planned_id, 'type:', (w as any)?.type); } catch {}
@@ -1677,7 +1727,19 @@ Deno.serve(async (req) => {
         power_range: (st as any)?.power_range || (st as any)?.powerRange
       };
 
-      const adherencePercentage = calculateExecutionPercentage(plannedData, executedData);
+      // Detect continuous endurance workouts (single long interval > 60 minutes)
+      const isContinuousWorkout = (plannedSteps.length === 1 && 
+        plannedData.duration_s && 
+        plannedData.duration_s > 3600 && // > 60 minutes
+        plannedData.power_range && 
+        Number.isFinite(plannedData.power_range.lower) && 
+        Number.isFinite(plannedData.power_range.upper));
+
+      console.log(`🔍 [CONTINUOUS DETECTION] plannedSteps.length: ${plannedSteps.length}, duration_s: ${plannedData.duration_s}, power_range: ${JSON.stringify(plannedData.power_range)}, isContinuous: ${isContinuousWorkout}`);
+      console.log(`🔍 [FUNCTION CALL DEBUG] Calling calculateExecutionPercentage with overallWorkout keys: ${Object.keys(w || {}).join(', ')}`);
+      console.log(`🔍 [FUNCTION CALL DEBUG] overallWorkout.avg_power: ${w?.avg_power}, metrics.avg_power: ${w?.metrics?.avg_power}, average_watts: ${w?.average_watts}`);
+
+      const adherencePercentage = calculateExecutionPercentage(plannedData, executedData, w, isContinuousWorkout, rows);
 
       outIntervals.push({
         planned_step_id: st?.id ?? null,
