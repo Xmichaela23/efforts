@@ -149,13 +149,43 @@ Deno.serve(async (req) => {
     if (workoutsNeedingAnalysis.length > 0) {
       console.log(`Auto-triggering analysis for ${workoutsNeedingAnalysis.length} workouts without analysis`);
       
-      // Trigger analysis for each workout (fire and forget)
+      // Trigger analysis for each workout using proper routing (fire and forget)
       for (const workout of workoutsNeedingAnalysis) {
         try {
-          await supabase.functions.invoke('analyze-workout', {
+          // Determine the correct analysis function based on workout type
+          let functionName = 'analyze-workout'; // Default fallback
+          
+          switch (workout.type) {
+            case 'strength':
+            case 'strength_training':
+              functionName = 'analyze-strength-workout';
+              break;
+            case 'run':
+            case 'running':
+              functionName = 'analyze-running-workout'; // Future: dedicated function
+              break;
+            case 'ride':
+            case 'cycling':
+            case 'bike':
+              functionName = 'analyze-cycling-workout'; // Future: dedicated function
+              break;
+            case 'swim':
+            case 'swimming':
+              functionName = 'analyze-swimming-workout'; // Future: dedicated function
+              break;
+            default:
+              functionName = 'analyze-workout';
+          }
+          
+          const { data, error } = await supabase.functions.invoke(functionName, {
             body: { workout_id: workout.id }
           });
-          console.log(`✅ Analysis triggered for ${workout.type} on ${workout.date}`);
+          
+          if (error) {
+            console.warn(`❌ Analysis failed for ${workout.id} (${functionName}):`, error);
+          } else {
+            console.log(`✅ Analysis triggered for ${workout.type} on ${workout.date} using ${functionName}`);
+          }
         } catch (err) {
           console.warn(`❌ Failed to trigger analysis for ${workout.id}:`, err);
         }
