@@ -1,70 +1,32 @@
 import { supabase } from '../lib/supabase';
 
 /**
- * Workout Analysis Service
- * Routes workouts to the appropriate analysis function based on workout type
+ * DUMB CLIENT - Workout Analysis Service
+ * All business logic moved to server-side master orchestrator
+ * Client only calls the master function and displays results
  */
 
 export interface WorkoutAnalysisResult {
-  status: string;
+  success: boolean;
+  analysis?: any;
+  execution_grade?: string | null;
   insights?: string[];
   key_metrics?: any;
   red_flags?: string[];
-  execution_grade?: string | null;
+  strengths?: string[];
   [key: string]: any;
 }
 
 /**
- * Determines the correct analysis function based on workout type
+ * DUMB CLIENT: Analyzes a workout by calling the master orchestrator
+ * All logic (routing, orchestration, formatting) happens server-side
  */
-function getAnalysisFunction(workoutType: string): string {
-  switch (workoutType) {
-    case 'strength':
-    case 'strength_training':
-      return 'analyze-strength-workout';
-    case 'run':
-    case 'running':
-      return 'analyze-running-workout'; // Future: dedicated running function
-    case 'ride':
-    case 'cycling':
-    case 'bike':
-      return 'analyze-cycling-workout'; // Future: dedicated cycling function
-    case 'swim':
-    case 'swimming':
-      return 'analyze-swimming-workout'; // Future: dedicated swimming function
-    default:
-      return 'analyze-workout'; // Fallback to general function
-  }
-}
-
-/**
- * Analyzes a workout using the appropriate function
- */
-export async function analyzeWorkout(workoutId: string, workoutType?: string): Promise<WorkoutAnalysisResult> {
+export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysisResult> {
   try {
-    // If workout type not provided, fetch it
-    let type = workoutType;
-    if (!type) {
-      const { data: workout, error } = await supabase
-        .from('workouts')
-        .select('type')
-        .eq('id', workoutId)
-        .single();
-      
-      if (error) {
-        throw new Error(`Failed to fetch workout type: ${error.message}`);
-      }
-      
-      type = workout.type;
-    }
+    console.log(`🎯 DUMB CLIENT: Calling master orchestrator for workout ${workoutId}`);
     
-    // Determine the correct function
-    const functionName = getAnalysisFunction(type);
-    
-    console.log(`🔍 ROUTING: ${type} workout to ${functionName}`);
-    
-    // Call the appropriate function
-    const { data, error } = await supabase.functions.invoke(functionName, {
+    // ONE function call - all logic is server-side
+    const { data, error } = await supabase.functions.invoke('analyze-workout', {
       body: { workout_id: workoutId }
     });
     
@@ -81,18 +43,18 @@ export async function analyzeWorkout(workoutId: string, workoutType?: string): P
 }
 
 /**
- * Analyzes a workout with retry logic
+ * DUMB CLIENT: Analyzes a workout with retry logic
+ * Still just calls the master orchestrator
  */
 export async function analyzeWorkoutWithRetry(
   workoutId: string, 
-  workoutType?: string, 
   maxRetries: number = 2
 ): Promise<WorkoutAnalysisResult> {
   let lastError: Error | null = null;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await analyzeWorkout(workoutId, workoutType);
+      return await analyzeWorkout(workoutId);
     } catch (error) {
       lastError = error as Error;
       console.warn(`Analysis attempt ${attempt} failed:`, error);
@@ -108,7 +70,8 @@ export async function analyzeWorkoutWithRetry(
 }
 
 /**
- * Checks if a workout type is supported for analysis
+ * DUMB CLIENT: Check if workout type is supported
+ * This is just a display helper, not business logic
  */
 export function isWorkoutTypeSupported(workoutType: string): boolean {
   const supportedTypes = [
@@ -122,16 +85,21 @@ export function isWorkoutTypeSupported(workoutType: string): boolean {
 }
 
 /**
- * Gets the display name for an analysis function
+ * DUMB CLIENT: Get display name for workout type
+ * This is just a display helper, not business logic
  */
-export function getAnalysisFunctionDisplayName(functionName: string): string {
+export function getWorkoutTypeDisplayName(workoutType: string): string {
   const displayNames: Record<string, string> = {
-    'analyze-strength-workout': 'Strength Analysis',
-    'analyze-running-workout': 'Running Analysis',
-    'analyze-cycling-workout': 'Cycling Analysis',
-    'analyze-swimming-workout': 'Swimming Analysis',
-    'analyze-workout': 'General Analysis'
+    'strength': 'Strength Training',
+    'strength_training': 'Strength Training',
+    'run': 'Running',
+    'running': 'Running',
+    'ride': 'Cycling',
+    'cycling': 'Cycling',
+    'bike': 'Cycling',
+    'swim': 'Swimming',
+    'swimming': 'Swimming'
   };
   
-  return displayNames[functionName] || 'Unknown Analysis';
+  return displayNames[workoutType] || 'Unknown Workout';
 }

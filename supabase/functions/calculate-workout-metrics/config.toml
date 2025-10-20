@@ -1,0 +1,2 @@
+[functions.calculate-workout-metrics]
+verify_jwt = false

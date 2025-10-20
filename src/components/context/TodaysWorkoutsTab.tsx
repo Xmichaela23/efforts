@@ -43,8 +43,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         strength_exercises_value: targetWorkout?.strength_exercises
       });
       
-      // Use the new routing service
-      const data = await analyzeWorkoutWithRetry(workoutId, targetWorkout?.type);
+      // Use the dumb client service (no workout type needed - server handles routing)
+      const data = await analyzeWorkoutWithRetry(workoutId);
 
       console.log('✅ ROUTED ANALYSIS RESULT:', data);
       

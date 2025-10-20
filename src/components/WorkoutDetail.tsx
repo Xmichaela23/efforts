@@ -246,7 +246,10 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               )}
               
               {/* AI Analysis */}
-              <WorkoutAIDisplay aiAnalysis={workout.ai_analysis} />
+              <WorkoutAIDisplay 
+                aiAnalysis={workout.ai_analysis} 
+                workoutAnalysis={workout.workout_analysis}
+              />
               
               <Card>
                 <CardHeader>

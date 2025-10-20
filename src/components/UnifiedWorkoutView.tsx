@@ -263,7 +263,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     if (activeTab === 'summary') ensureMaterialized();
   }, [linkedPlanned, activeTab]);
 
-  // Auto-trigger server compute on Summary open when attached plan exists but intervals are missing or lack planned_step_id
+  // Auto-trigger server compute AND analysis on Summary open
   useEffect(() => {
     (async () => {
       try {
@@ -271,9 +271,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (!isCompleted) return;
         const wid = String((workout as any)?.id || '');
         const pid = String(((linkedPlanned as any)?.id || (workout as any)?.planned_id || ''));
-        if (!wid || !pid) return;
+        if (!wid) return;
 
-        // Check existing computed intervals and mapping
+        // Step 1: Ensure compute-workout-summary has run
         let intervals: any[] = [];
         try {
           const local = (workout as any)?.computed;
@@ -284,12 +284,37 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           const cmp = (data as any)?.computed;
           if (cmp && Array.isArray(cmp?.intervals)) intervals = cmp.intervals;
         }
-        const needs = (!intervals || !intervals.length) || intervals.every((it:any)=> !it?.planned_step_id);
-        if (needs) {
+        const needsCompute = (!intervals || !intervals.length) || intervals.every((it:any)=> !it?.planned_step_id);
+        if (needsCompute) {
+          console.log('🔄 Running compute-workout-summary...');
           await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
-          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
         }
-      } catch {}
+
+        // Step 1.5: Ensure comprehensive metrics are calculated
+        const { data: workoutData } = await supabase.from('workouts').select('calculated_metrics').eq('id', wid).maybeSingle();
+        if (!workoutData?.calculated_metrics) {
+          console.log('📊 Running calculate-workout-metrics...');
+          await supabase.functions.invoke('calculate-workout-metrics', { body: { workout_id: wid } });
+        }
+
+        // Step 2: Run analysis if needed (server handles all routing and orchestration)
+        const needsAnalysis = !(workout as any)?.workout_analysis;
+        
+        if (needsAnalysis) {
+          console.log('🏃 Running workout analysis...');
+          try {
+            const { analyzeWorkoutWithRetry } = await import('../services/workoutAnalysisService');
+            await analyzeWorkoutWithRetry(wid);
+          } catch (error) {
+            console.warn('Analysis failed, falling back to basic metrics:', error);
+          }
+        }
+
+        // Refresh data
+        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+      } catch (error) {
+        console.error('Summary tab analysis error:', error);
+      }
     })();
   }, [activeTab, isCompleted, linkedPlanned?.id, workout?.id]);
 

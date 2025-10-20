@@ -1411,16 +1411,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             return null;
           })();
 
-          // Build components
-          const pacePct = (plannedPaceSecPerMi && executedSecPerMi) ? Math.round((plannedPaceSecPerMi / executedSecPerMi) * 100) : null;
-          const paceDeltaSec = (plannedPaceSecPerMi && executedSecPerMi) ? (plannedPaceSecPerMi - executedSecPerMi) : null; // + is faster
-          const durationPct = (plannedSecondsTotal && executedSeconds) ? Math.round((executedSeconds / plannedSecondsTotal) * 100) : null;
-          const durationDelta = (plannedSecondsTotal && executedSeconds) ? (executedSeconds - plannedSecondsTotal) : null; // + means longer
-          const distPct = (plannedDistanceMeters && executedMeters) ? Math.round((executedMeters / plannedDistanceMeters) * 100) : null;
-          const distDeltaMi = (plannedDistanceMeters && executedMeters) ? ((executedMeters - plannedDistanceMeters) / 1609.34) : null; // + means longer
-
-          // Use server-computed overall execution score
-          const executionScore = (completed as any)?.computed?.overall?.execution_score;
+          // Use server-calculated metrics (no client-side math)
+          const executionMetrics = (completed as any)?.calculated_metrics?.execution_metrics;
+          const pacePct = executionMetrics?.pace_adherence_pct;
+          const paceDeltaSec = executionMetrics?.pace_delta_sec;
+          const durationPct = executionMetrics?.duration_adherence_pct;
+          const durationDelta = executionMetrics?.duration_delta_sec;
+          const distPct = executionMetrics?.distance_adherence_pct;
+          const distDeltaMi = executionMetrics?.distance_delta_m ? (executionMetrics.distance_delta_m / 1609.34) : null; // Convert to miles
+          const executionScore = executionMetrics?.overall_execution_score;
           
           // Debug: Check what we're getting from the server
           console.log('🚨 [EXECUTION DEBUG] MOBILE SUMMARY RENDERING - RUNNING UPDATED CODE');
