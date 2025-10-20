@@ -211,7 +211,34 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     console.log('🔍 Analysis data structure:', JSON.stringify(analysis, null, 2));
     
     // Handle both old and new analysis data structures for insights
-    const insights = analysis.insights || (analysis.workout_analysis && analysis.workout_analysis.insights) || [];
+    let insights = analysis.insights || (analysis.workout_analysis && analysis.workout_analysis.insights) || [];
+    
+    // Convert new granular analysis format to insights format
+    if (analysis.adherence_percentage !== undefined) {
+      console.log('🔄 Converting granular analysis to insights format');
+      insights = [];
+      
+      // Add adherence insights
+      if (analysis.adherence_percentage >= 0.9) {
+        insights.push(`Excellent execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+      } else if (analysis.adherence_percentage >= 0.8) {
+        insights.push(`Good execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+      } else if (analysis.adherence_percentage >= 0.7) {
+        insights.push(`Fair execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+      } else {
+        insights.push(`Needs improvement - only ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+      }
+      
+      // Add execution grade
+      if (analysis.execution_grade) {
+        insights.push(`Overall grade: ${analysis.execution_grade}`);
+      }
+      
+      // Add strengths as insights
+      if (analysis.strengths && analysis.strengths.length > 0) {
+        insights.push(...analysis.strengths);
+      }
+    }
     
     // If this is the selected workout but has no insights, show that it was analyzed but no insights
     if (!insights || insights.length === 0) {
@@ -241,7 +268,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         power_fade: powerFade,
         hr_drift: hrDrift
       },
-      red_flags: analysis.red_flags || [],
+      red_flags: analysis.red_flags || analysis.primary_issues || [],
       workout: workoutWithAnalysis,
       is_yesterday: workoutWithAnalysis.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA')
     };

@@ -19,6 +19,295 @@ function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
   return out;
 }
 
+// =============================================================================
+// GRANULAR ADHERENCE ANALYSIS FUNCTIONS
+// =============================================================================
+
+interface PrescribedRange {
+  lower: number;
+  upper: number;
+}
+
+interface PlannedInterval {
+  type: string;
+  duration_s: number;
+  pace_range?: PrescribedRange;
+  power_range?: PrescribedRange;
+}
+
+interface ExecutedInterval {
+  start_time_s: number;
+  end_time_s: number;
+  samples: Array<{
+    time_s: number;
+    pace_s_per_km?: number;
+    power_w?: number;
+    hr_bpm?: number;
+  }>;
+}
+
+interface IntervalAnalysis {
+  interval_type: string;
+  prescribed_range: PrescribedRange;
+  average_value: number;
+  adherence_percentage: number;
+  time_in_range_s: number;
+  time_outside_range_s: number;
+  issues: string[];
+  grade: string;
+}
+
+interface PrescribedRangeAdherence {
+  overallAdherence: number;
+  timeInRange: number;
+  timeOutsideRange: number;
+  intervalAnalysis: IntervalAnalysis[];
+  executionGrade: string;
+  primaryIssues: string[];
+  strengths: string[];
+}
+
+function calculatePrescribedRangeAdherence(
+  executedIntervals: ExecutedInterval[],
+  plannedIntervals: PlannedInterval[],
+  overallMetrics: any
+): PrescribedRangeAdherence {
+  console.log('🔍 Starting granular adherence analysis...');
+  console.log('📊 Executed intervals:', executedIntervals.length);
+  console.log('📋 Planned intervals:', plannedIntervals.length);
+
+  let totalTimeInRange = 0;
+  let totalTimeOutsideRange = 0;
+  const intervalAnalysis: IntervalAnalysis[] = [];
+
+  // Process each planned interval
+  for (let i = 0; i < plannedIntervals.length; i++) {
+    const planned = plannedIntervals[i];
+    const executed = executedIntervals[i];
+
+    if (!executed || !planned) {
+      console.log(`⚠️ Skipping interval ${i} - missing data`);
+      continue;
+    }
+
+    // Determine which metric to analyze (pace or power)
+    const prescribedRange = planned.pace_range || planned.power_range;
+    if (!prescribedRange) {
+      console.log(`⚠️ Skipping interval ${i} - no prescribed range`);
+      continue;
+    }
+
+    const metricType = planned.pace_range ? 'pace' : 'power';
+    console.log(`📈 Analyzing interval ${i} (${planned.type}) - ${metricType} range: ${prescribedRange.lower}-${prescribedRange.upper}`);
+
+    // Calculate adherence for this interval
+    const intervalResult = calculateIntervalAdherence(executed, prescribedRange, metricType);
+    
+    intervalAnalysis.push({
+      interval_type: planned.type,
+      prescribed_range: prescribedRange,
+      average_value: intervalResult.averageValue,
+      adherence_percentage: intervalResult.adherencePercentage,
+      time_in_range_s: intervalResult.timeInRange,
+      time_outside_range_s: intervalResult.timeOutsideRange,
+      issues: intervalResult.issues,
+      grade: intervalResult.grade
+    });
+
+    totalTimeInRange += intervalResult.timeInRange;
+    totalTimeOutsideRange += intervalResult.timeOutsideRange;
+
+    console.log(`✅ Interval ${i} complete: ${intervalResult.adherencePercentage.toFixed(1)}% adherence, grade: ${intervalResult.grade}`);
+  }
+
+  const totalTime = totalTimeInRange + totalTimeOutsideRange;
+  const overallAdherence = totalTime > 0 ? totalTimeInRange / totalTime : 0;
+
+  console.log('📊 Overall adherence calculation:', {
+    timeInRange: totalTimeInRange,
+    timeOutsideRange: totalTimeOutsideRange,
+    totalTime,
+    adherence: overallAdherence
+  });
+
+  return {
+    overallAdherence,
+    timeInRange: totalTimeInRange,
+    timeOutsideRange: totalTimeOutsideRange,
+    intervalAnalysis,
+    executionGrade: calculateHonestGrade(overallAdherence),
+    primaryIssues: identifyPrimaryIssues(intervalAnalysis),
+    strengths: identifyStrengths(intervalAnalysis)
+  };
+}
+
+function calculateIntervalAdherence(
+  executed: ExecutedInterval,
+  prescribedRange: PrescribedRange,
+  metricType: 'pace' | 'power'
+): {
+  averageValue: number;
+  adherencePercentage: number;
+  timeInRange: number;
+  timeOutsideRange: number;
+  issues: string[];
+  grade: string;
+} {
+  let timeInRange = 0;
+  let timeOutsideRange = 0;
+  let totalValue = 0;
+  let validSamples = 0;
+
+  const samples = executed.samples || [];
+  console.log(`🔍 Processing ${samples.length} samples for interval`);
+
+  for (let i = 0; i < samples.length; i++) {
+    const sample = samples[i];
+    const value = metricType === 'pace' ? sample.pace_s_per_km : sample.power_w;
+    
+    if (value === undefined || value === null) continue;
+
+    // Convert pace to seconds per km if needed (assuming input is in seconds per mile)
+    const normalizedValue = metricType === 'pace' ? value * 1.60934 : value;
+    
+    // Check if value is realistic
+    if (metricType === 'pace' && (normalizedValue < 180 || normalizedValue > 1200)) {
+      console.log(`⚠️ Skipping unrealistic pace: ${normalizedValue}s/km`);
+      continue;
+    }
+    if (metricType === 'power' && (normalizedValue < 50 || normalizedValue > 1000)) {
+      console.log(`⚠️ Skipping unrealistic power: ${normalizedValue}W`);
+      continue;
+    }
+
+    totalValue += normalizedValue;
+    validSamples++;
+
+    // Calculate sample duration
+    const nextSample = samples[i + 1];
+    const sampleDuration = nextSample ? 
+      Math.min(nextSample.time_s - sample.time_s, 10) : // Cap at 10 seconds
+      1; // Default 1 second for last sample
+
+    // Check if value is in prescribed range
+    const isInRange = normalizedValue >= prescribedRange.lower && normalizedValue <= prescribedRange.upper;
+    
+    if (isInRange) {
+      timeInRange += sampleDuration;
+    } else {
+      timeOutsideRange += sampleDuration;
+    }
+  }
+
+  const averageValue = validSamples > 0 ? totalValue / validSamples : 0;
+  const totalTime = timeInRange + timeOutsideRange;
+  const adherencePercentage = totalTime > 0 ? timeInRange / totalTime : 0;
+
+  const issues = identifyIntervalIssues(adherencePercentage, averageValue, prescribedRange, metricType);
+  const grade = calculateIntervalGrade(adherencePercentage, executed);
+
+  return {
+    averageValue,
+    adherencePercentage,
+    timeInRange,
+    timeOutsideRange,
+    issues,
+    grade
+  };
+}
+
+function identifyIntervalIssues(
+  adherence: number,
+  averageValue: number,
+  prescribedRange: PrescribedRange,
+  metricType: 'pace' | 'power'
+): string[] {
+  const issues: string[] = [];
+  
+  if (adherence < 0.5) {
+    issues.push('very_poor_adherence');
+  } else if (adherence < 0.7) {
+    issues.push('poor_adherence');
+  }
+
+  if (averageValue < prescribedRange.lower) {
+    issues.push(metricType === 'pace' ? 'too_fast' : 'too_high_power');
+  } else if (averageValue > prescribedRange.upper) {
+    issues.push(metricType === 'pace' ? 'too_slow' : 'too_low_power');
+  }
+
+  return issues;
+}
+
+function calculateIntervalGrade(adherence: number, executed: ExecutedInterval): string {
+  if (adherence >= 0.9) return 'A';
+  if (adherence >= 0.8) return 'B';
+  if (adherence >= 0.7) return 'C';
+  if (adherence >= 0.6) return 'D';
+  return 'F';
+}
+
+function calculateHonestGrade(overallAdherence: number): string {
+  if (overallAdherence >= 0.9) return 'A';
+  if (overallAdherence >= 0.8) return 'B';
+  if (overallAdherence >= 0.7) return 'C';
+  if (overallAdherence >= 0.6) return 'D';
+  return 'F';
+}
+
+function identifyPrimaryIssues(intervalAnalysis: IntervalAnalysis[]): string[] {
+  const issues: string[] = [];
+  
+  // Check for consistently too fast
+  const workIntervals = intervalAnalysis.filter(i => i.interval_type === 'work');
+  const tooFastCount = workIntervals.filter(i => i.issues.includes('too_fast')).length;
+  if (tooFastCount > workIntervals.length / 2) {
+    issues.push('Consistently too fast in work intervals');
+  }
+
+  // Check for fading
+  const lastThird = workIntervals.slice(-Math.floor(workIntervals.length / 3));
+  const fadingCount = lastThird.filter(i => i.adherence_percentage < 0.7).length;
+  if (fadingCount > lastThird.length / 2) {
+    issues.push('Fading in final intervals - consider reducing target pace');
+  }
+
+  // Check for poor recovery
+  const recoveryIntervals = intervalAnalysis.filter(i => i.interval_type === 'recovery');
+  const poorRecoveryCount = recoveryIntervals.filter(i => i.adherence_percentage < 0.6).length;
+  if (poorRecoveryCount > recoveryIntervals.length / 2) {
+    issues.push('Poor recovery discipline - not slowing down enough');
+  }
+
+  return issues;
+}
+
+function identifyStrengths(intervalAnalysis: IntervalAnalysis[]): string[] {
+  const strengths: string[] = [];
+  
+  // Check for strong finish
+  const workIntervals = intervalAnalysis.filter(i => i.interval_type === 'work');
+  const lastInterval = workIntervals[workIntervals.length - 1];
+  if (lastInterval && lastInterval.adherence_percentage >= 0.8) {
+    strengths.push('Strong finish - maintained pace through final interval');
+  }
+
+  // Check for consistent execution
+  const consistentIntervals = workIntervals.filter(i => i.adherence_percentage >= 0.8).length;
+  if (consistentIntervals >= workIntervals.length * 0.8) {
+    strengths.push('Excellent consistency across all work intervals');
+  }
+
+  // Check for good recovery discipline
+  const recoveryIntervals = intervalAnalysis.filter(i => i.interval_type === 'recovery');
+  const goodRecoveryCount = recoveryIntervals.filter(i => i.adherence_percentage >= 0.7).length;
+  if (goodRecoveryCount >= recoveryIntervals.length * 0.8) {
+    strengths.push('Good recovery discipline - properly slowed down between intervals');
+  }
+
+  return strengths;
+}
+
 Deno.serve(async (req) => {
   // CORS
   if (req.method === 'OPTIONS') {
@@ -696,10 +985,58 @@ Deno.serve(async (req) => {
       power_in_analysis: !!computed.analysis?.power
     });
 
-    // Update workout with computed analysis
+    // Add granular analysis for running workouts
+    let workoutAnalysis = null;
+    if (w.type === 'run' && w.planned_id) {
+      try {
+        console.log('🏃 Running granular analysis for running workout...');
+        
+        // Get planned workout data
+        const { data: plannedWorkout } = await supabase
+          .from('planned_workouts')
+          .select('intervals')
+          .eq('id', w.planned_id)
+          .single();
+        
+        if (plannedWorkout?.intervals) {
+          // Run granular adherence analysis
+          const analysis = calculatePrescribedRangeAdherence(
+            computed.analysis?.intervals || [],
+            plannedWorkout.intervals,
+            computed.overall
+          );
+          
+          workoutAnalysis = {
+            adherence_percentage: analysis.overallAdherence,
+            time_in_range_s: analysis.timeInRange,
+            time_outside_range_s: analysis.timeOutsideRange,
+            interval_breakdown: analysis.intervalAnalysis,
+            execution_grade: analysis.executionGrade,
+            primary_issues: analysis.primaryIssues,
+            strengths: analysis.strengths,
+            analysis_version: 'v1.0.0'
+          };
+          
+          console.log('✅ Granular analysis completed:', {
+            adherence: analysis.overallAdherence,
+            grade: analysis.executionGrade,
+            issues: analysis.primaryIssues.length
+          });
+        }
+      } catch (error) {
+        console.error('❌ Granular analysis failed:', error);
+      }
+    }
+
+    // Update workout with computed analysis and granular analysis
+    const updateData = { computed };
+    if (workoutAnalysis) {
+      updateData.workout_analysis = workoutAnalysis;
+    }
+    
     const { error: upErr } = await supabase
       .from('workouts')
-      .update({ computed })
+      .update(updateData)
       .eq('id', workout_id);
     
     console.log('✅ UPDATE result:', { error: upErr ? String(upErr) : null });

@@ -23,10 +23,10 @@ export interface WorkoutAnalysisResult {
  */
 export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysisResult> {
   try {
-    console.log(`🎯 DUMB CLIENT: Calling master orchestrator for workout ${workoutId}`);
+    console.log(`🎯 DUMB CLIENT: Calling compute-workout-analysis for workout ${workoutId}`);
     
-    // ONE function call - all logic is server-side
-    const { data, error } = await supabase.functions.invoke('analyze-workout', {
+    // Call the existing analysis function that now includes granular analysis
+    const { data, error } = await supabase.functions.invoke('compute-workout-analysis', {
       body: { workout_id: workoutId }
     });
     
@@ -34,7 +34,15 @@ export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysis
       throw new Error(`Analysis error: ${error.message}`);
     }
     
-    return data;
+    return {
+      success: true,
+      analysis: data,
+      execution_grade: null, // Will be read from workout_analysis
+      insights: [],
+      key_metrics: null,
+      red_flags: [],
+      strengths: []
+    };
     
   } catch (error) {
     console.error('Workout analysis failed:', error);

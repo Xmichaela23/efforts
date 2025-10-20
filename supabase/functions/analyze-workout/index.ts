@@ -1,36 +1,35 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-/**
- * =============================================================================
- * ANALYZE-WORKOUT - MASTER ORCHESTRATOR EDGE FUNCTION
- * =============================================================================
- * 
- * FUNCTION NAME: analyze-workout
- * PURPOSE: Master orchestrator for all workout analysis
- * 
- * WHAT IT DOES:
- * - This is the ONLY function the client should call
- * - Routes workouts to appropriate sport-specific analyzers
- * - Orchestrates compute-workout-summary and calculate-workout-metrics
- * - Handles all business logic server-side (smart server architecture)
- * - Formats responses consistently across all workout types
- * 
- * SUPPORTED WORKOUT TYPES:
- * - run/running → analyze-running-workout
- * - ride/cycling/bike → analyze-cycling-workout (future)
- * - swim/swimming → analyze-swimming-workout (future)
- * - strength/strength_training → analyze-strength-workout
- * 
- * CLIENT USAGE:
- * - Single function call: supabase.functions.invoke('analyze-workout', { body: { workout_id } })
- * - No business logic in client (dumb client architecture)
- * 
- * DATA FLOW:
- * Client → analyze-workout → compute-workout-summary → calculate-workout-metrics → sport-specific-analyzer → workouts.workout_analysis
- * 
- * INPUT: { workout_id: string }
- * OUTPUT: { success: boolean, analysis: object, execution_grade: string, insights: string[], strengths: string[] }
- */
+// =============================================================================
+// ANALYZE-WORKOUT - MASTER ORCHESTRATOR EDGE FUNCTION
+// =============================================================================
+// 
+// FUNCTION NAME: analyze-workout
+// PURPOSE: Master orchestrator for all workout analysis
+// 
+// WHAT IT DOES:
+// - This is the ONLY function the client should call
+// - Routes workouts to appropriate sport-specific analyzers
+// - Orchestrates compute-workout-summary and calculate-workout-metrics
+// - Handles all business logic server-side (smart server architecture)
+// - Formats responses consistently across all workout types
+// 
+// SUPPORTED WORKOUT TYPES:
+// - run/running → analyze-running-workout
+// - ride/cycling/bike → analyze-cycling-workout (future)
+// - swim/swimming → analyze-swimming-workout (future)
+// - strength/strength_training → analyze-strength-workout
+// 
+// CLIENT USAGE:
+// - Single function call: supabase.functions.invoke('analyze-workout', { body: { workout_id } })
+// - No business logic in client (dumb client architecture)
+// 
+// DATA FLOW:
+// Client → analyze-workout → compute-workout-summary → calculate-workout-metrics → sport-specific-analyzer → workouts.workout_analysis
+// 
+// INPUT: { workout_id: string }
+// OUTPUT: { success: boolean, analysis: object, execution_grade: string, insights: string[], strengths: string[] }
+// =============================================================================
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

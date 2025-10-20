@@ -1,43 +1,42 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-/**
- * =============================================================================
- * ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
- * =============================================================================
- * 
- * FUNCTION NAME: analyze-running-workout
- * PURPOSE: Granular adherence analysis for running workouts
- * 
- * WHAT IT DOES:
- * - Analyzes running workouts with prescribed pace/power ranges
- * - Calculates time-in-prescribed-range (not just averages)
- * - Provides interval-by-interval execution breakdown
- * - Detects patterns: too fast, fading, inconsistent pacing
- * - Generates honest execution grades (A/B/C/D/F)
- * - Identifies specific issues and strengths
- * 
- * KEY FEATURES:
- * - Uses prescribed ranges from planned_workouts.intervals
- * - Time-based analysis (how much TIME spent in range)
- * - Context-aware grading (stricter for intervals, lenient for warmup)
- * - GPS spike and outlier detection
- * - Gap handling and interpolation for sensor data
- * - Fuzzy interval boundary matching
- * 
- * DATA SOURCES:
- * - workouts.computed (from compute-workout-summary)
- * - planned_workouts.intervals (prescribed pace/power ranges)
- * 
- * ANALYSIS OUTPUT:
- * - adherence_percentage: % of time spent in prescribed ranges
- * - interval_breakdown: per-interval execution quality
- * - execution_grade: honest A-F grade
- * - primary_issues: specific problems identified
- * - strengths: positive execution patterns
- * 
- * INPUT: { workout_id: string }
- * OUTPUT: { success: boolean, analysis: PrescribedRangeAdherence }
- */
+// =============================================================================
+// ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
+// =============================================================================
+// 
+// FUNCTION NAME: analyze-running-workout
+// PURPOSE: Granular adherence analysis for running workouts
+// 
+// WHAT IT DOES:
+// - Analyzes running workouts with prescribed pace/power ranges
+// - Calculates time-in-prescribed-range (not just averages)
+// - Provides interval-by-interval execution breakdown
+// - Detects patterns: too fast, fading, inconsistent pacing
+// - Generates honest execution grades (A/B/C/D/F)
+// - Identifies specific issues and strengths
+// 
+// KEY FEATURES:
+// - Uses prescribed ranges from planned_workouts.intervals
+// - Time-based analysis (how much TIME spent in range)
+// - Context-aware grading (stricter for intervals, lenient for warmup)
+// - GPS spike and outlier detection
+// - Gap handling and interpolation for sensor data
+// - Fuzzy interval boundary matching
+// 
+// DATA SOURCES:
+// - workouts.computed (from compute-workout-summary)
+// - planned_workouts.intervals (prescribed pace/power ranges)
+// 
+// ANALYSIS OUTPUT:
+// - adherence_percentage: % of time spent in prescribed ranges
+// - interval_breakdown: per-interval execution quality
+// - execution_grade: honest A-F grade
+// - primary_issues: specific problems identified
+// - strengths: positive execution patterns
+// 
+// INPUT: { workout_id: string }
+// OUTPUT: { success: boolean, analysis: PrescribedRangeAdherence }
+// =============================================================================
 
 Deno.serve(async (req) => {
   const supabase = createClient(
