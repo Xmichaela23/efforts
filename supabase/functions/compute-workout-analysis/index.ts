@@ -1491,6 +1491,21 @@ Deno.serve(async (req) => {
           workoutAnalysis = runningAnalysis;
         }
         
+        // Load planned workout data for token parsing
+        let plannedWorkout = null;
+        if (w.planned_id) {
+          try {
+            const { data: plannedData } = await supabase
+              .from('planned_workouts')
+              .select('steps_preset, intervals')
+              .eq('id', w.planned_id)
+              .single();
+            plannedWorkout = plannedData;
+          } catch (error) {
+            console.log('⚠️ Could not load planned workout:', error);
+          }
+        }
+        
         console.log('📋 Planned workout data:', {
           found: !!plannedWorkout,
           hasStepsPreset: !!plannedWorkout?.steps_preset,
