@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
               break;
             case 'run':
             case 'running':
-              functionName = 'analyze-running-workout'; // Future: dedicated function
+              functionName = 'analyze-workout'; // Use master orchestrator
               break;
             case 'ride':
             case 'cycling':
