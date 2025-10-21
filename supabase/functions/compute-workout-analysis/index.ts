@@ -1478,15 +1478,17 @@ Deno.serve(async (req) => {
       try {
         console.log('🏃 Running granular analysis for running workout...');
         
-        // Check if we have a planned workout first
-        let plannedWorkout = null;
-        if (w.planned_id) {
-          const { data: plannedData } = await supabase
-            .from('planned_workouts')
-            .select('steps_preset, intervals')
-            .eq('id', w.planned_id)
-            .single();
-          plannedWorkout = plannedData;
+        // Call the dedicated analyze-running-workout function
+        const { data: runningAnalysis, error: runningError } = await supabase.functions.invoke('analyze-running-workout', {
+          body: { workout_id: workout_id }
+        });
+        
+        if (runningError) {
+          console.error('❌ Running analysis failed:', runningError.message);
+          // Continue with basic analysis
+        } else {
+          console.log('✅ Running analysis completed');
+          workoutAnalysis = runningAnalysis;
         }
         
         console.log('📋 Planned workout data:', {
