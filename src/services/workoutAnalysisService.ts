@@ -23,10 +23,10 @@ export interface WorkoutAnalysisResult {
  */
 export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysisResult> {
   try {
-    console.log(`🎯 DUMB CLIENT: Calling compute-workout-analysis for workout ${workoutId}`);
+    console.log(`🎯 DUMB CLIENT: Calling analyze-workout for workout ${workoutId}`);
     
-    // Call the existing analysis function that now includes granular analysis
-    const { data, error } = await supabase.functions.invoke('compute-workout-analysis', {
+    // Call the master orchestrator that routes to appropriate analyzers
+    const { data, error } = await supabase.functions.invoke('analyze-workout', {
       body: { workout_id: workoutId }
     });
     
