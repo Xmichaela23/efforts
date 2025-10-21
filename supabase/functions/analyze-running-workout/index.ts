@@ -85,12 +85,14 @@ Deno.serve(async (req) => {
       throw new Error('Workout data not computed. Run compute-workout-summary first.');
     }
 
-    // Get planned workout data
+    // Get planned workout data with token parsing support
     let plannedWorkout = null;
+    let intervals = [];
+    
     if (workout.planned_id) {
       const { data: planned, error: plannedError } = await supabase
         .from('planned_workouts')
-        .select('id, intervals')
+        .select('id, intervals, steps_preset')
         .eq('id', workout.planned_id)
         .single();
 
@@ -98,11 +100,59 @@ Deno.serve(async (req) => {
         console.warn('⚠️ Could not load planned workout:', plannedError.message);
       } else {
         plannedWorkout = planned;
+        
+        // Get user baselines for token parsing
+        let baselines = {};
+        try {
+          const { data: userBaselines } = await supabase
+            .from('user_baselines')
+            .select('performance_numbers')
+            .eq('user_id', workout.user_id)
+            .single();
+          baselines = userBaselines?.performance_numbers || {};
+        } catch (error) {
+          console.log('⚠️ No user baselines found, using defaults');
+          // Use default baselines for analysis
+          baselines = {
+            fiveK_pace: 450, // 7:30/mi
+            easyPace: 540,   // 9:00/mi
+            tenK_pace: 480,  // 8:00/mi
+            marathon_pace: 600 // 10:00/mi
+          };
+        }
+
+        // Parse tokens if available, otherwise use intervals
+        if (plannedWorkout.steps_preset && plannedWorkout.steps_preset.length > 0) {
+          console.log('🏃 Parsing steps_preset tokens...');
+          try {
+            // Import the token parser
+            const { parseRunningTokens } = await import('../../lib/analysis/running/token-parser.ts');
+            const parsedStructure = parseRunningTokens(plannedWorkout.steps_preset, baselines);
+            
+            // Convert parsed segments to intervals format
+            intervals = parsedStructure.segments.map((segment: any) => ({
+              type: segment.type,
+              duration_s: segment.duration,
+              distance_m: segment.distance,
+              pace_range: segment.target_pace ? {
+                lower: segment.target_pace.lower,
+                upper: segment.target_pace.upper
+              } : null
+            }));
+            
+            console.log(`✅ Parsed ${intervals.length} intervals from tokens`);
+          } catch (error) {
+            console.warn('⚠️ Token parsing failed, using intervals:', error);
+            intervals = plannedWorkout.intervals || [];
+          }
+        } else {
+          intervals = plannedWorkout.intervals || [];
+        }
       }
     }
 
-    if (!plannedWorkout || !plannedWorkout.intervals) {
-      throw new Error('No planned workout intervals found. This analysis requires a planned workout with intervals.');
+    if (!intervals || intervals.length === 0) {
+      throw new Error('No planned workout intervals found. This analysis requires a planned workout with intervals or steps_preset.');
     }
 
     // Extract sensor data from computed workout
@@ -113,7 +163,7 @@ Deno.serve(async (req) => {
     }
 
     // Perform granular adherence analysis
-    const analysis = calculatePrescribedRangeAdherence(sensorData, plannedWorkout.intervals);
+    const analysis = calculatePrescribedRangeAdherence(sensorData, intervals);
 
     // Store analysis in database
     const { error: updateError } = await supabase

@@ -81,45 +81,48 @@ Deno.serve(async (req) => {
 
     console.log(`📊 Workout type: ${workout.type}`);
 
-    // Step 2: Ensure foundation exists (server-side orchestration)
-    // For running workouts, always run compute-workout-analysis to get fresh granular analysis
-    if (!workout.computed || workout.type === 'run' || workout.type === 'running') {
-      console.log('🔄 Running compute-workout-analysis...');
-      const { error: computeError } = await supabase.functions.invoke('compute-workout-analysis', {
+    // Step 2: Call discipline-specific analysis functions directly
+    let analysisResult = null;
+    
+    if (workout.type === 'run' || workout.type === 'running') {
+      console.log('🏃 Calling analyze-running-workout directly...');
+      const { data: runningAnalysis, error: runningError } = await supabase.functions.invoke('analyze-running-workout', {
         body: { workout_id }
       });
       
-      if (computeError) {
-        throw new Error(`Compute-workout-analysis failed: ${computeError.message}`);
+      if (runningError) {
+        console.error('❌ Running analysis failed:', runningError.message);
+        throw new Error(`Running analysis failed: ${runningError.message}`);
       }
-    }
-
-    // Step 3: Ensure metrics are calculated (server-side orchestration)
-    if (!workout.calculated_metrics) {
-      console.log('📊 Running calculate-workout-metrics...');
-      const { error: metricsError } = await supabase.functions.invoke('calculate-workout-metrics', {
+      
+      analysisResult = runningAnalysis;
+    } else if (workout.type === 'strength') {
+      console.log('💪 Calling analyze-strength-workout directly...');
+      const { data: strengthAnalysis, error: strengthError } = await supabase.functions.invoke('analyze-strength-workout', {
         body: { workout_id }
       });
       
-      if (metricsError) {
-        console.warn('Metrics calculation failed, continuing with analysis:', metricsError.message);
+      if (strengthError) {
+        console.error('❌ Strength analysis failed:', strengthError.message);
+        throw new Error(`Strength analysis failed: ${strengthError.message}`);
       }
+      
+      analysisResult = strengthAnalysis;
+    } else {
+      // For other workout types, return basic structure
+      analysisResult = {
+        analysis: {
+          execution_quality: {
+            overall_grade: 'N/A',
+            primary_issues: [`No analyzer available for ${workout.type} workouts`],
+            strengths: []
+          }
+        }
+      };
     }
 
-    // Step 4: Get the analysis results from compute-workout-analysis
-    // The granular analysis is now built into compute-workout-analysis
-    const { data: workoutWithAnalysis, error: fetchError } = await supabase
-      .from('workouts')
-      .select('workout_analysis, computed, calculated_metrics')
-      .eq('id', workout_id)
-      .single();
-
-    if (fetchError) {
-      throw new Error(`Failed to fetch analysis results: ${fetchError.message}`);
-    }
-
-    // Step 5: Format response (server-side formatting)
-    const formattedResponse = formatAnalysisResponse(workoutWithAnalysis, workout.type);
+    // Step 3: Format response (server-side formatting)
+    const formattedResponse = formatAnalysisResponse(analysisResult, workout.type);
 
     console.log(`✅ Analysis complete for ${workout.type} workout`);
 
@@ -163,29 +166,21 @@ function getAnalyzerFunction(workoutType: string): string | null {
 /**
  * Server-side response formatting
  */
-function formatAnalysisResponse(workoutData: any, workoutType: string) {
-  const workoutAnalysis = workoutData.workout_analysis;
-  
-  // For running workouts, format the granular analysis
+function formatAnalysisResponse(analysisResult: any, workoutType: string) {
+  // Handle direct response from discipline-specific functions
   if (workoutType === 'run' || workoutType === 'running') {
-    if (workoutAnalysis) {
+    if (analysisResult && analysisResult.analysis) {
       return {
-        analysis: {
-          adherence_percentage: workoutAnalysis.adherence_percentage,
-          execution_grade: workoutAnalysis.execution_grade,
-          primary_issues: workoutAnalysis.primary_issues || [],
-          strengths: workoutAnalysis.strengths || [],
-          workout_type: workoutAnalysis.workout_type
-        },
-        execution_grade: workoutAnalysis.execution_grade,
-        insights: workoutAnalysis.primary_issues || [],
+        analysis: analysisResult.analysis,
+        execution_grade: analysisResult.analysis.execution_grade,
+        insights: analysisResult.analysis.primary_issues || [],
         key_metrics: {
-          adherence_percentage: workoutAnalysis.adherence_percentage,
-          time_in_range_s: workoutAnalysis.time_in_range_s,
-          time_outside_range_s: workoutAnalysis.time_outside_range_s
+          adherence_percentage: analysisResult.analysis.adherence_percentage,
+          time_in_range_s: analysisResult.analysis.time_in_range_s,
+          time_outside_range_s: analysisResult.analysis.time_outside_range_s
         },
-        red_flags: workoutAnalysis.primary_issues || [],
-        strengths: workoutAnalysis.strengths || []
+        red_flags: analysisResult.analysis.primary_issues || [],
+        strengths: analysisResult.analysis.strengths || []
       };
     } else {
       // No analysis available
@@ -206,19 +201,19 @@ function formatAnalysisResponse(workoutData: any, workoutType: string) {
     }
   }
 
-  // For other workout types, return basic structure
+  // For other workout types, return the analysis result directly
   return {
-    analysis: workoutAnalysis || {
+    analysis: analysisResult?.analysis || {
       execution_quality: {
         overall_grade: 'N/A',
         primary_issues: [`No analyzer available for ${workoutType} workouts`],
         strengths: []
       }
     },
-    execution_grade: workoutAnalysis?.execution_grade || null,
-    insights: workoutAnalysis?.primary_issues || [],
-    key_metrics: workoutAnalysis || null,
-    red_flags: workoutAnalysis?.primary_issues || [],
-    strengths: workoutAnalysis?.strengths || []
+    execution_grade: analysisResult?.analysis?.execution_grade || null,
+    insights: analysisResult?.analysis?.primary_issues || [],
+    key_metrics: analysisResult?.analysis || null,
+    red_flags: analysisResult?.analysis?.primary_issues || [],
+    strengths: analysisResult?.analysis?.strengths || []
   };
 }
