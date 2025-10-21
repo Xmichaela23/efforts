@@ -812,7 +812,7 @@ Deno.serve(async (req) => {
     // Load workout essentials
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, moving_time')
+      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, moving_time, planned_id')
       .eq('id', workout_id)
       .maybeSingle();
     if (wErr) throw wErr;
@@ -1474,16 +1474,20 @@ Deno.serve(async (req) => {
       hasPlannedId: !!w.planned_id
     });
     
-    if (w.type === 'run' && w.planned_id) {
+    if (w.type === 'run') {
       try {
         console.log('🏃 Running granular analysis for running workout...');
         
-        // Get planned workout data with steps_preset
-        const { data: plannedWorkout } = await supabase
-          .from('planned_workouts')
-          .select('steps_preset, intervals')
-          .eq('id', w.planned_id)
-          .single();
+        // Check if we have a planned workout first
+        let plannedWorkout = null;
+        if (w.planned_id) {
+          const { data: plannedData } = await supabase
+            .from('planned_workouts')
+            .select('steps_preset, intervals')
+            .eq('id', w.planned_id)
+            .single();
+          plannedWorkout = plannedData;
+        }
         
         console.log('📋 Planned workout data:', {
           found: !!plannedWorkout,
@@ -1493,14 +1497,26 @@ Deno.serve(async (req) => {
           intervalsLength: plannedWorkout?.intervals?.length
         });
         
-        // Get user baselines for token parsing
-        const { data: userBaselines } = await supabase
-          .from('user_baselines')
-          .select('performance_numbers')
-          .eq('user_id', w.user_id)
-          .single();
+        // Get user baselines for token parsing (with fallback)
+        let baselines = {};
+        try {
+          const { data: userBaselines } = await supabase
+            .from('user_baselines')
+            .select('performance_numbers')
+            .eq('user_id', w.user_id)
+            .single();
+          baselines = userBaselines?.performance_numbers || {};
+        } catch (error) {
+          console.log('⚠️ No user baselines found, using defaults');
+          // Use default baselines for analysis
+          baselines = {
+            fiveK_pace: 450, // 7:30/mi
+            easyPace: 540,   // 9:00/mi
+            tenK_pace: 480,  // 8:00/mi
+            marathon_pace: 600 // 10:00/mi
+          };
+        }
         
-        const baselines = userBaselines?.performance_numbers || {};
         console.log('📊 User baselines:', baselines);
         
         if (plannedWorkout?.steps_preset && plannedWorkout.steps_preset.length > 0) {
@@ -1669,6 +1685,39 @@ Deno.serve(async (req) => {
               issues: analysis.primaryIssues.length
             });
           }
+        } else {
+          // No planned workout - create a simple analysis based on workout data
+          console.log('🏃 No planned workout found - creating basic analysis');
+          
+          // Create a simple long run analysis based on the workout's actual data
+          const basicAnalysis = analyzeLongRun(computed, {
+            type: 'work',
+            duration: computed.overall?.duration_s || 0,
+            target_pace: {
+              target: computed.overall?.avg_pace_s_per_mi || 600, // Default 10:00/mi
+              lower: (computed.overall?.avg_pace_s_per_mi || 600) * 0.9, // 10% faster
+              upper: (computed.overall?.avg_pace_s_per_mi || 600) * 1.1, // 10% slower
+              tolerance: 0.10
+            }
+          });
+          
+          workoutAnalysis = {
+            adherence_percentage: basicAnalysis.paceConsistency,
+            time_in_range_s: basicAnalysis.timeInRange,
+            time_outside_range_s: basicAnalysis.timeOutsideRange,
+            interval_breakdown: basicAnalysis.segments,
+            execution_grade: basicAnalysis.grade,
+            primary_issues: basicAnalysis.issues,
+            strengths: basicAnalysis.strengths,
+            analysis_version: 'v1.0.0',
+            workout_type: 'long_run'
+          };
+          
+          console.log('✅ Basic analysis completed:', {
+            consistency: basicAnalysis.paceConsistency,
+            grade: basicAnalysis.grade,
+            issues: basicAnalysis.issues.length
+          });
         }
       } catch (error) {
         console.error('❌ Granular analysis failed:', error);

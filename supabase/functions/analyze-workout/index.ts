@@ -49,10 +49,10 @@ Deno.serve(async (req) => {
 
   try {
     const { workout_id } = await req.json();
-    
+
     if (!workout_id) {
       return new Response(JSON.stringify({ error: 'workout_id required' }), { 
-        status: 400, 
+        status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
       });
     }
@@ -83,13 +83,13 @@ Deno.serve(async (req) => {
 
     // Step 2: Ensure foundation exists (server-side orchestration)
     if (!workout.computed) {
-      console.log('🔄 Running compute-workout-summary...');
-      const { error: computeError } = await supabase.functions.invoke('compute-workout-summary', {
+      console.log('🔄 Running compute-workout-analysis...');
+      const { error: computeError } = await supabase.functions.invoke('compute-workout-analysis', {
         body: { workout_id }
       });
       
       if (computeError) {
-        throw new Error(`Compute-workout-summary failed: ${computeError.message}`);
+        throw new Error(`Compute-workout-analysis failed: ${computeError.message}`);
       }
     }
 
