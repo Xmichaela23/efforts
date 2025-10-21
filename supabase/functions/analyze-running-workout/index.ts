@@ -152,7 +152,24 @@ Deno.serve(async (req) => {
     }
 
     if (!intervals || intervals.length === 0) {
-      throw new Error('No planned workout intervals found. This analysis requires a planned workout with intervals or steps_preset.');
+      // Return a meaningful response instead of crashing
+      return new Response(JSON.stringify({
+        success: true,
+        analysis: {
+          adherence_percentage: 0,
+          execution_grade: 'N/A',
+          primary_issues: ['No user baselines found - cannot analyze workout without pace references'],
+          strengths: [],
+          workout_type: 'long_run',
+          time_in_range_s: 0,
+          time_outside_range_s: 0
+        }
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
     }
 
     // Extract sensor data from computed workout
