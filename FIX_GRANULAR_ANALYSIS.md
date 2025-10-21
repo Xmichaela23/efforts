@@ -29,8 +29,14 @@ The granular analysis system is not working because:
 ### 1. **Update Planned Workout Intervals** ⚠️
 The planned workout `09f9a709-b6aa-49c4-8692-3eb1be3c501d` has empty intervals:
 
+**Run this SQL script:**
+```bash
+# Execute the SQL script to fix the planned workout
+psql -f update-planned-workout.sql
+```
+
+**Or run this SQL directly:**
 ```sql
--- Run this SQL to fix the planned workout
 UPDATE planned_workouts 
 SET intervals = '[
   {

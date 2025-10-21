@@ -1625,7 +1625,7 @@ export const useWorkouts = () => {
 
       // Compute summary (fire-and-forget) to refresh metrics post-update
       try {
-        (supabase.functions.invoke as any)?.('compute-workout-summary', { body: { workout_id: id } } as any)
+        (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: id } } as any)
           .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
           .catch(() => {});
       } catch {}
