@@ -82,7 +82,8 @@ Deno.serve(async (req) => {
     console.log(`📊 Workout type: ${workout.type}`);
 
     // Step 2: Ensure foundation exists (server-side orchestration)
-    if (!workout.computed) {
+    // For running workouts, always run compute-workout-analysis to get fresh granular analysis
+    if (!workout.computed || workout.type === 'run' || workout.type === 'running') {
       console.log('🔄 Running compute-workout-analysis...');
       const { error: computeError } = await supabase.functions.invoke('compute-workout-analysis', {
         body: { workout_id }
