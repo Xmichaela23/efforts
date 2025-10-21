@@ -308,6 +308,183 @@ function identifyStrengths(intervalAnalysis: IntervalAnalysis[]): string[] {
   return strengths;
 }
 
+function parseTimeToSeconds(timeStr: string): number {
+  // Parse time strings like "15:00", "1:30", "45" (seconds)
+  if (!timeStr) return 300; // Default 5 minutes
+  
+  const parts = timeStr.split(':');
+  if (parts.length === 2) {
+    // Format: "15:00" (minutes:seconds)
+    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  } else if (parts.length === 1) {
+    // Format: "45" (seconds) or "15" (minutes)
+    const num = parseInt(parts[0]);
+    return num > 60 ? num : num * 60; // Assume minutes if > 60
+  }
+  
+  return 300; // Default 5 minutes
+}
+
+// Long run analysis for pace consistency, negative splits, and drift
+function analyzeLongRun(computed: any, plannedInterval: any) {
+  console.log('🏃 Analyzing long run...');
+  
+  const intervals = computed.analysis?.intervals || [];
+  if (intervals.length === 0) {
+    return {
+      paceConsistency: 0,
+      timeInRange: 0,
+      timeOutsideRange: 0,
+      segments: [],
+      grade: 'F',
+      issues: ['No interval data available'],
+      strengths: []
+    };
+  }
+  
+  // Extract pace data from intervals
+  const paceData = intervals.map((interval: any) => ({
+    time: interval.start_time || 0,
+    pace: interval.avg_pace || 0,
+    duration: interval.duration || 0
+  })).filter(d => d.pace > 0);
+  
+  if (paceData.length === 0) {
+    return {
+      paceConsistency: 0,
+      timeInRange: 0,
+      timeOutsideRange: 0,
+      segments: [],
+      grade: 'F',
+      issues: ['No pace data available'],
+      strengths: []
+    };
+  }
+  
+  // Calculate pace statistics
+  const paces = paceData.map(d => d.pace);
+  const avgPace = paces.reduce((a, b) => a + b, 0) / paces.length;
+  const paceStdDev = Math.sqrt(paces.reduce((sum, pace) => sum + Math.pow(pace - avgPace, 2), 0) / paces.length);
+  const paceCV = paceStdDev / avgPace; // Coefficient of variation
+  
+  // Calculate pace consistency (inverse of CV - lower CV = higher consistency)
+  const paceConsistency = Math.max(0, Math.min(1, 1 - paceCV * 2)); // Scale CV to 0-1
+  
+  // Analyze segments (first 25%, middle 50%, final 25%)
+  const totalDuration = paceData.reduce((sum, d) => sum + d.duration, 0);
+  const first25Duration = totalDuration * 0.25;
+  const middle50Duration = totalDuration * 0.5;
+  const final25Duration = totalDuration * 0.25;
+  
+  let first25Pace = 0, middle50Pace = 0, final25Pace = 0;
+  let first25Time = 0, middle50Time = 0, final25Time = 0;
+  
+  let currentTime = 0;
+  for (const segment of paceData) {
+    if (currentTime < first25Duration) {
+      const segmentTime = Math.min(segment.duration, first25Duration - currentTime);
+      first25Pace += segment.pace * segmentTime;
+      first25Time += segmentTime;
+    } else if (currentTime < first25Duration + middle50Duration) {
+      const segmentTime = Math.min(segment.duration, first25Duration + middle50Duration - currentTime);
+      middle50Pace += segment.pace * segmentTime;
+      middle50Time += segmentTime;
+    } else {
+      const segmentTime = segment.duration;
+      final25Pace += segment.pace * segmentTime;
+      final25Time += segmentTime;
+    }
+    currentTime += segment.duration;
+  }
+  
+  first25Pace = first25Time > 0 ? first25Pace / first25Time : avgPace;
+  middle50Pace = middle50Time > 0 ? middle50Pace / middle50Time : avgPace;
+  final25Pace = final25Time > 0 ? final25Pace / final25Time : avgPace;
+  
+  // Calculate negative split (second half faster than first half)
+  const firstHalfPace = (first25Pace + middle50Pace) / 2;
+  const secondHalfPace = (middle50Pace + final25Pace) / 2;
+  const negativeSplit = secondHalfPace < firstHalfPace;
+  const splitDifference = Math.abs(secondHalfPace - firstHalfPace) / firstHalfPace;
+  
+  // Calculate pace drift (final 25% vs middle 50%)
+  const paceDrift = (final25Pace - middle50Pace) / middle50Pace;
+  const significantDrift = Math.abs(paceDrift) > 0.05; // 5% threshold
+  
+  // Generate issues and strengths
+  const issues: string[] = [];
+  const strengths: string[] = [];
+  
+  if (paceCV > 0.05) {
+    issues.push('Pace variability too high - work on steady pacing');
+  }
+  
+  if (paceDrift > 0.05) {
+    issues.push('Pace drift detected - consider starting slower');
+  } else if (paceDrift < -0.05) {
+    issues.push('Significant pace fade - may have started too fast');
+  }
+  
+  if (paceConsistency >= 0.9) {
+    strengths.push('Excellent pace consistency throughout');
+  }
+  
+  if (negativeSplit && splitDifference > 0.02) {
+    strengths.push('Strong negative split - great pacing discipline');
+  }
+  
+  if (paceCV < 0.03) {
+    strengths.push('Very steady pacing - excellent aerobic control');
+  }
+  
+  // Calculate grade based on consistency and execution
+  let grade = 'F';
+  if (paceConsistency >= 0.9 && !significantDrift) {
+    grade = 'A';
+  } else if (paceConsistency >= 0.8 && paceDrift < 0.1) {
+    grade = 'B';
+  } else if (paceConsistency >= 0.7) {
+    grade = 'C';
+  } else if (paceConsistency >= 0.6) {
+    grade = 'D';
+  }
+  
+  // Create segment breakdown
+  const segments = [
+    {
+      segment: 'First 25%',
+      pace: first25Pace,
+      duration: first25Time,
+      grade: first25Pace <= avgPace * 1.05 ? 'A' : 'B'
+    },
+    {
+      segment: 'Middle 50%',
+      pace: middle50Pace,
+      duration: middle50Time,
+      grade: Math.abs(middle50Pace - avgPace) / avgPace < 0.03 ? 'A' : 'B'
+    },
+    {
+      segment: 'Final 25%',
+      pace: final25Pace,
+      duration: final25Time,
+      grade: final25Pace <= avgPace * 1.1 ? 'A' : 'B'
+    }
+  ];
+  
+  return {
+    paceConsistency,
+    timeInRange: totalDuration * paceConsistency,
+    timeOutsideRange: totalDuration * (1 - paceConsistency),
+    segments,
+    grade,
+    issues,
+    strengths,
+    paceCV,
+    negativeSplit,
+    paceDrift
+  };
+}
+
 Deno.serve(async (req) => {
   // CORS
   if (req.method === 'OPTIONS') {
@@ -987,6 +1164,13 @@ Deno.serve(async (req) => {
 
     // Add granular analysis for running workouts
     let workoutAnalysis = null;
+    console.log('🔍 Checking granular analysis conditions:', {
+      type: w.type,
+      planned_id: w.planned_id,
+      isRun: w.type === 'run',
+      hasPlannedId: !!w.planned_id
+    });
+    
     if (w.type === 'run' && w.planned_id) {
       try {
         console.log('🏃 Running granular analysis for running workout...');
@@ -998,30 +1182,106 @@ Deno.serve(async (req) => {
           .eq('id', w.planned_id)
           .single();
         
-        if (plannedWorkout?.intervals) {
-          // Run granular adherence analysis
-          const analysis = calculatePrescribedRangeAdherence(
-            computed.analysis?.intervals || [],
-            plannedWorkout.intervals,
-            computed.overall
-          );
+        console.log('📋 Planned workout data:', {
+          found: !!plannedWorkout,
+          hasIntervals: !!plannedWorkout?.intervals,
+          intervalsType: typeof plannedWorkout?.intervals,
+          intervalsLength: plannedWorkout?.intervals?.length
+        });
+        
+        if (plannedWorkout?.intervals && plannedWorkout.intervals.length > 0) {
+          console.log('📊 Planned intervals found:', plannedWorkout.intervals.length);
           
-          workoutAnalysis = {
-            adherence_percentage: analysis.overallAdherence,
-            time_in_range_s: analysis.timeInRange,
-            time_outside_range_s: analysis.timeOutsideRange,
-            interval_breakdown: analysis.intervalAnalysis,
-            execution_grade: analysis.executionGrade,
-            primary_issues: analysis.primaryIssues,
-            strengths: analysis.strengths,
-            analysis_version: 'v1.0.0'
-          };
+          // Check if this is a long run (single steady effort) or interval workout
+          const isLongRun = plannedWorkout.intervals.length === 1 && 
+            (plannedWorkout.intervals[0].effortLabel?.toLowerCase().includes('steady') ||
+             plannedWorkout.intervals[0].effortLabel?.toLowerCase().includes('long') ||
+             plannedWorkout.intervals[0].effortLabel?.toLowerCase().includes('easy'));
           
-          console.log('✅ Granular analysis completed:', {
-            adherence: analysis.overallAdherence,
-            grade: analysis.executionGrade,
-            issues: analysis.primaryIssues.length
-          });
+          if (isLongRun) {
+            console.log('🏃 Long run detected - analyzing pace consistency');
+            
+            // Analyze long run: pace consistency, negative splits, drift
+            const longRunAnalysis = analyzeLongRun(computed, plannedWorkout.intervals[0]);
+            
+            workoutAnalysis = {
+              adherence_percentage: longRunAnalysis.paceConsistency,
+              time_in_range_s: longRunAnalysis.timeInRange,
+              time_outside_range_s: longRunAnalysis.timeOutsideRange,
+              interval_breakdown: longRunAnalysis.segments,
+              execution_grade: longRunAnalysis.grade,
+              primary_issues: longRunAnalysis.issues,
+              strengths: longRunAnalysis.strengths,
+              analysis_version: 'v1.0.0',
+              workout_type: 'long_run'
+            };
+            
+            console.log('✅ Long run analysis completed:', {
+              consistency: longRunAnalysis.paceConsistency,
+              grade: longRunAnalysis.grade,
+              issues: longRunAnalysis.issues.length
+            });
+          } else {
+            console.log('🏃 Interval workout detected - analyzing target adherence');
+            
+            // Convert planned intervals to the format expected by granular analysis
+            const convertedIntervals = plannedWorkout.intervals.map((interval: any, index: number) => {
+              // Extract pace range from bpmTarget or effortLabel
+              let paceRange = null;
+              if (interval.bpmTarget) {
+                // Convert BPM to pace range (rough approximation)
+                const bpm = interval.bpmTarget.split('-').map((b: string) => parseInt(b.trim()));
+                if (bpm.length === 2) {
+                  // Rough conversion: 150-160 BPM ≈ 6:00-7:00/mi pace
+                  const paceLower = 360 + (160 - bpm[1]) * 10; // seconds per mile
+                  const paceUpper = 360 + (160 - bpm[0]) * 10;
+                  paceRange = { lower: paceLower, upper: paceUpper };
+                }
+              }
+              
+              // Extract power range from effortLabel or use default
+              let powerRange = null;
+              if (interval.effortLabel?.toLowerCase().includes('threshold')) {
+                powerRange = { lower: 250, upper: 300 }; // Default threshold range
+              } else if (interval.effortLabel?.toLowerCase().includes('tempo')) {
+                powerRange = { lower: 200, upper: 250 }; // Default tempo range
+              }
+              
+              return {
+                type: interval.effortLabel?.toLowerCase() || 'work',
+                duration_s: interval.time ? parseTimeToSeconds(interval.time) : 300, // Default 5 min
+                pace_range: paceRange,
+                power_range: powerRange
+              };
+            });
+            
+            console.log('🔄 Converted intervals:', convertedIntervals.length);
+            
+            // Run granular adherence analysis
+            const analysis = calculatePrescribedRangeAdherence(
+              computed.analysis?.intervals || [],
+              convertedIntervals,
+              computed.overall
+            );
+            
+            workoutAnalysis = {
+              adherence_percentage: analysis.overallAdherence,
+              time_in_range_s: analysis.timeInRange,
+              time_outside_range_s: analysis.timeOutsideRange,
+              interval_breakdown: analysis.intervalAnalysis,
+              execution_grade: analysis.executionGrade,
+              primary_issues: analysis.primaryIssues,
+              strengths: analysis.strengths,
+              analysis_version: 'v1.0.0',
+              workout_type: 'intervals'
+            };
+            
+            console.log('✅ Granular analysis completed:', {
+              adherence: analysis.overallAdherence,
+              grade: analysis.executionGrade,
+              issues: analysis.primaryIssues.length
+            });
+          }
         }
       } catch (error) {
         console.error('❌ Granular analysis failed:', error);
@@ -1043,7 +1303,16 @@ Deno.serve(async (req) => {
     
     if (upErr) throw upErr;
 
-    return new Response(JSON.stringify({ success: true, analysisVersion: ANALYSIS_VERSION }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+    return new Response(JSON.stringify({ 
+      success: true, 
+      analysisVersion: ANALYSIS_VERSION,
+      debug: {
+        hasWorkoutAnalysis: !!workoutAnalysis,
+        workoutType: w.type,
+        plannedId: w.planned_id,
+        analysisData: workoutAnalysis
+      }
+    }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
   }

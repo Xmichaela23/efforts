@@ -218,15 +218,44 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       console.log('🔄 Converting granular analysis to insights format');
       insights = [];
       
-      // Add adherence insights
-      if (analysis.adherence_percentage >= 0.9) {
-        insights.push(`Excellent execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
-      } else if (analysis.adherence_percentage >= 0.8) {
-        insights.push(`Good execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
-      } else if (analysis.adherence_percentage >= 0.7) {
-        insights.push(`Fair execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+      // Check if this is a long run or interval workout
+      const isLongRun = analysis.workout_type === 'long_run';
+      
+      if (isLongRun) {
+        // Long run specific insights
+        const paceConsistency = Math.round(analysis.adherence_percentage * 100);
+        if (paceConsistency >= 90) {
+          insights.push(`Excellent pace consistency - ${paceConsistency}% steady pacing throughout`);
+        } else if (paceConsistency >= 80) {
+          insights.push(`Good pace consistency - ${paceConsistency}% steady pacing`);
+        } else if (paceConsistency >= 70) {
+          insights.push(`Fair pace consistency - ${paceConsistency}% steady pacing`);
+        } else {
+          insights.push(`Pace variability high - only ${paceConsistency}% consistent pacing`);
+        }
+        
+        // Add long run specific metrics
+        if (analysis.negativeSplit) {
+          insights.push('Strong negative split - great pacing discipline');
+        }
+        if (analysis.paceDrift && Math.abs(analysis.paceDrift) > 0.05) {
+          if (analysis.paceDrift > 0) {
+            insights.push('Pace drift detected - consider starting slower next time');
+          } else {
+            insights.push('Significant pace fade - may have started too fast');
+          }
+        }
       } else {
-        insights.push(`Needs improvement - only ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+        // Interval workout insights
+        if (analysis.adherence_percentage >= 0.9) {
+          insights.push(`Excellent execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+        } else if (analysis.adherence_percentage >= 0.8) {
+          insights.push(`Good execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+        } else if (analysis.adherence_percentage >= 0.7) {
+          insights.push(`Fair execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+        } else {
+          insights.push(`Needs improvement - only ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+        }
       }
       
       // Add execution grade

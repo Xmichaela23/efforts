@@ -1421,6 +1421,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const distDeltaMi = executionMetrics?.distance_delta_m ? (executionMetrics.distance_delta_m / 1609.34) : null; // Convert to miles
           const executionScore = executionMetrics?.overall_execution_score;
           
+          // Check for granular analysis data (new adherence analysis)
+          const workoutAnalysis = (completed as any)?.workout_analysis;
+          const granularAdherence = workoutAnalysis?.adherence_percentage;
+          const executionGrade = workoutAnalysis?.execution_grade;
+          const workoutType = workoutAnalysis?.workout_type;
+          
           // Debug: Check what we're getting from the server
           console.log('🚨 [EXECUTION DEBUG] MOBILE SUMMARY RENDERING - RUNNING UPDATED CODE');
           console.log('🔍 [EXECUTION DEBUG] completed:', completed);
@@ -1466,12 +1472,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
           return (
             <div className="w-full pt-1 pb-2">
-              <div className="flex items-center justify-center gap-6 text-center">
-                <div className="flex items-end gap-3">
-                  {chip('Execution', executionScore, 'Overall adherence', 'pace')}
-                  {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—', 'pace')}
-                  {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
-                </div>
+                <div className="flex items-center justify-center gap-6 text-center">
+                  <div className="flex items-end gap-3">
+                    {chip('Execution', granularAdherence ? Math.round(granularAdherence * 100) : executionScore, 
+                         granularAdherence ? `${executionGrade} Grade` : 'Overall adherence', 'pace')}
+                    {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—', 'pace')}
+                    {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
+                  </div>
               </div>
               {message && (
                 <div className="mt-2 text-xs text-gray-600 text-center">
