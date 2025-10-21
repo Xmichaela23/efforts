@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
         throw new Error(`Running analysis failed: ${runningError.message}`);
       }
       
-      analysisResult = runningAnalysis;
+      analysisResult = runningAnalysis.analysis;
     } else if (workout.type === 'strength') {
       console.log('💪 Calling analyze-strength-workout directly...');
       const { data: strengthAnalysis, error: strengthError } = await supabase.functions.invoke('analyze-strength-workout', {
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
         throw new Error(`Strength analysis failed: ${strengthError.message}`);
       }
       
-      analysisResult = strengthAnalysis;
+      analysisResult = strengthAnalysis.analysis;
     } else {
       // For other workout types, return basic structure
       analysisResult = {
@@ -169,18 +169,18 @@ function getAnalyzerFunction(workoutType: string): string | null {
 function formatAnalysisResponse(analysisResult: any, workoutType: string) {
   // Handle direct response from discipline-specific functions
   if (workoutType === 'run' || workoutType === 'running') {
-    if (analysisResult && analysisResult.analysis) {
+    if (analysisResult) {
       return {
-        analysis: analysisResult.analysis,
-        execution_grade: analysisResult.analysis.execution_grade,
-        insights: analysisResult.analysis.primary_issues || [],
+        analysis: analysisResult,
+        execution_grade: analysisResult.execution_grade,
+        insights: analysisResult.primary_issues || [],
         key_metrics: {
-          adherence_percentage: analysisResult.analysis.adherence_percentage,
-          time_in_range_s: analysisResult.analysis.time_in_range_s,
-          time_outside_range_s: analysisResult.analysis.time_outside_range_s
+          adherence_percentage: analysisResult.adherence_percentage,
+          time_in_range_s: analysisResult.time_in_range_s,
+          time_outside_range_s: analysisResult.time_outside_range_s
         },
-        red_flags: analysisResult.analysis.primary_issues || [],
-        strengths: analysisResult.analysis.strengths || []
+        red_flags: analysisResult.primary_issues || [],
+        strengths: analysisResult.strengths || []
       };
     } else {
       // No analysis available
@@ -203,17 +203,17 @@ function formatAnalysisResponse(analysisResult: any, workoutType: string) {
 
   // For other workout types, return the analysis result directly
   return {
-    analysis: analysisResult?.analysis || {
+    analysis: analysisResult || {
       execution_quality: {
         overall_grade: 'N/A',
         primary_issues: [`No analyzer available for ${workoutType} workouts`],
         strengths: []
       }
     },
-    execution_grade: analysisResult?.analysis?.execution_grade || null,
-    insights: analysisResult?.analysis?.primary_issues || [],
-    key_metrics: analysisResult?.analysis || null,
-    red_flags: analysisResult?.analysis?.primary_issues || [],
-    strengths: analysisResult?.analysis?.strengths || []
+    execution_grade: analysisResult?.execution_grade || null,
+    insights: analysisResult?.primary_issues || [],
+    key_metrics: analysisResult || null,
+    red_flags: analysisResult?.primary_issues || [],
+    strengths: analysisResult?.strengths || []
   };
 }
