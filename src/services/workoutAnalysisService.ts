@@ -34,14 +34,15 @@ export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysis
       throw new Error(`Analysis error: ${error.message}`);
     }
     
+    // Extract the analysis results from the orchestrator response
     return {
       success: true,
-      analysis: data,
-      execution_grade: null, // Will be read from workout_analysis
-      insights: [],
-      key_metrics: null,
-      red_flags: [],
-      strengths: []
+      analysis: data.analysis,
+      execution_grade: data.execution_grade,
+      insights: data.insights || [],
+      key_metrics: data.key_metrics,
+      red_flags: data.red_flags || [],
+      strengths: data.strengths || []
     };
     
   } catch (error) {
