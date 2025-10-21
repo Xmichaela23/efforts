@@ -1412,9 +1412,9 @@ export const useWorkouts = () => {
         // Don't throw - context generation is not critical
       }
 
-      // Compute summary (fire-and-forget) so computed.overall is available to unified/Today
+      // Compute analysis (fire-and-forget) so computed.overall is available to unified/Today
       try {
-        (supabase.functions.invoke as any)?.('compute-workout-summary', { body: { workout_id: data.id } } as any)
+        (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: data.id } } as any)
           .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
           .catch(() => {});
       } catch {}

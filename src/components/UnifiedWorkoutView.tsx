@@ -286,8 +286,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         }
         const needsCompute = (!intervals || !intervals.length) || intervals.every((it:any)=> !it?.planned_step_id);
         if (needsCompute) {
-          console.log('🔄 Running compute-workout-summary...');
-          await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
+          console.log('🔄 Running compute-workout-analysis...');
+          await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } });
         }
 
         // Step 1.5: Ensure comprehensive metrics are calculated
