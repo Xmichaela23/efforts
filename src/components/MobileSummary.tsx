@@ -1423,8 +1423,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           
           // Check for granular analysis data (new adherence analysis)
           const workoutAnalysis = (completed as any)?.workout_analysis;
-          const granularAdherence = workoutAnalysis?.analysis?.overall_adherence;
-          const executionGrade = workoutAnalysis?.analysis?.execution_grade;
+          const granularAdherence = workoutAnalysis?.overall_adherence;
+          const executionGrade = workoutAnalysis?.execution_grade;
           const workoutType = workoutAnalysis?.workout_type;
           
           // Debug: Check what we're getting from the server
@@ -1433,6 +1433,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           console.log('🔍 [EXECUTION DEBUG] computed:', (completed as any)?.computed);
           console.log('🔍 [EXECUTION DEBUG] overall:', (completed as any)?.computed?.overall);
           console.log('🔍 [EXECUTION DEBUG] execution_score:', executionScore);
+          console.log('🔍 [EXECUTION DEBUG] workout_analysis:', workoutAnalysis);
+          console.log('🔍 [EXECUTION DEBUG] granularAdherence:', granularAdherence);
+          console.log('🔍 [EXECUTION DEBUG] executionGrade:', executionGrade);
           
           // Use enhanced analysis if available, otherwise fall back to old metrics
           const finalExecutionScore = granularAdherence ? Math.round(granularAdherence * 100) : executionScore;
