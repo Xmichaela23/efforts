@@ -1897,10 +1897,31 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                 if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null;
               }
             }
-            // Use server-computed adherence percentage from database
-            const pct = (hasServerComputed && shouldShowPercentage(st) && row?.executed?.adherence_percentage) 
-              ? Number(row.executed.adherence_percentage) 
-              : null;
+            // Use enhanced pacing analysis adherence percentage if available, otherwise fall back to server-computed
+            const getEnhancedAdherence = () => {
+              // Check for enhanced pacing analysis from analyze-running-workout
+              const workoutAnalysis = (completed as any)?.workout_analysis;
+              if (workoutAnalysis?.analysis?.interval_breakdown) {
+                const intervalBreakdown = workoutAnalysis.analysis.interval_breakdown;
+                // Find matching interval by planned step ID or index
+                const matchingInterval = intervalBreakdown.find((interval: any) => {
+                  const plannedStepId = (st as any)?.id;
+                  const plannedIndex = (st as any)?.planned_index;
+                  return interval.interval_id === plannedStepId || 
+                         interval.interval_id === `interval_${plannedIndex}` ||
+                         interval.interval_id === plannedStepId;
+                });
+                if (matchingInterval) {
+                  return Math.round(matchingInterval.adherence_percentage * 100);
+                }
+              }
+              return null;
+            };
+            
+            const pct = getEnhancedAdherence() || 
+              (hasServerComputed && shouldShowPercentage(st) && row?.executed?.adherence_percentage) 
+                ? Number(row.executed.adherence_percentage) 
+                : null;
             // Planned label: prioritize server-computed label, fallback to simple client-side generation
             const plannedLabel = (() => {
               // Priority 1: Use server-computed planned_label if available
@@ -1993,7 +2014,29 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                   <div className="flex items-center justify-between w-full min-h-[2.1rem]">
                     <span className="text-[13px] font-medium truncate pr-2">{plannedLabel}</span>
                     {pct != null && (
-                      <span className={`text-[11px] font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
+                      <div className="flex items-center gap-1">
+                        <span className={`text-[11px] font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
+                        {/* Enhanced analysis indicator */}
+                        {(() => {
+                          const workoutAnalysis = (completed as any)?.workout_analysis;
+                          if (workoutAnalysis?.analysis?.pacing_analysis) {
+                            const pacingAnalysis = workoutAnalysis.analysis.pacing_analysis;
+                            const variability = pacingAnalysis.pacing_variability;
+                            
+                            // Show pacing quality indicator
+                            if (variability.coefficient_of_variation > 10) {
+                              return <span className="text-[9px] text-red-500" title="High pacing variability">⚠️</span>;
+                            } else if (variability.coefficient_of_variation > 7) {
+                              return <span className="text-[9px] text-orange-500" title="Moderate pacing variability">⚠️</span>;
+                            } else if (variability.coefficient_of_variation > 3) {
+                              return <span className="text-[9px] text-yellow-500" title="Good pacing consistency">✓</span>;
+                            } else {
+                              return <span className="text-[9px] text-green-500" title="Excellent pacing consistency">✓</span>;
+                            }
+                          }
+                          return null;
+                        })()}
+                      </div>
                     )}
                   </div>
                 </td>
