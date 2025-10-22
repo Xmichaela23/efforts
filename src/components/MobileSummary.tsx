@@ -1423,8 +1423,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           
           // Check for granular analysis data (new adherence analysis)
           const workoutAnalysis = (completed as any)?.workout_analysis;
-          const granularAdherence = workoutAnalysis?.adherence_percentage;
-          const executionGrade = workoutAnalysis?.execution_grade;
+          const granularAdherence = workoutAnalysis?.analysis?.overall_adherence;
+          const executionGrade = workoutAnalysis?.analysis?.execution_grade;
           const workoutType = workoutAnalysis?.workout_type;
           
           // Debug: Check what we're getting from the server
@@ -1434,8 +1434,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           console.log('🔍 [EXECUTION DEBUG] overall:', (completed as any)?.computed?.overall);
           console.log('🔍 [EXECUTION DEBUG] execution_score:', executionScore);
           
+          // Use enhanced analysis if available, otherwise fall back to old metrics
+          const finalExecutionScore = granularAdherence ? Math.round(granularAdherence * 100) : executionScore;
+          const finalPacePct = granularAdherence ? Math.round(granularAdherence * 100) : pacePct;
+          const finalDurationPct = durationPct;
+          const finalDistPct = distPct;
+          
           // If nothing to show, skip
-          const anyVal = (pacePct!=null) || (durationPct!=null) || (distPct!=null) || (executionScore!=null);
+          const anyVal = (finalPacePct!=null) || (finalDurationPct!=null) || (finalDistPct!=null) || (finalExecutionScore!=null);
           if (!anyVal) return null;
 
           // Determine workout intent for rule-based coloring
@@ -1468,18 +1474,18 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           };
 
           // Get contextual message (pass planned and executedSecPerMi for range validation)
-          const message = getContextualMessage(workoutIntent, durationPct, distPct, pacePct, 'run', planned, executedSecPerMi);
+          const message = getContextualMessage(workoutIntent, finalDurationPct, finalDistPct, finalPacePct, 'run', planned, executedSecPerMi);
 
           return (
             <div className="w-full pt-1 pb-2">
-                <div className="flex items-center justify-center gap-6 text-center">
-                  <div className="flex items-end gap-3">
-                    {chip('Execution', granularAdherence ? Math.round(granularAdherence * 100) : executionScore, 
-                         granularAdherence ? `${executionGrade} Grade` : 'Overall adherence', 'pace')}
-                    {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—', 'pace')}
-                    {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
+                  <div className="flex items-center justify-center gap-6 text-center">
+                    <div className="flex items-end gap-3">
+                      {chip('Execution', finalExecutionScore, 
+                           granularAdherence ? `${executionGrade} Grade` : 'Overall adherence', 'pace')}
+                      {chip('Pace', finalPacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—', 'pace')}
+                      {chip('Duration', finalDurationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
+                    </div>
                   </div>
-              </div>
               {message && (
                 <div className="mt-2 text-xs text-gray-600 text-center">
                   {message.icon} {message.text}
