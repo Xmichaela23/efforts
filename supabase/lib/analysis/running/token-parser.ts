@@ -372,15 +372,33 @@ function parseEasyRunToken(token: string, baselines: UserBaselines): RunSegment 
 function getPaceFromReference(paceRef: string, baselines: UserBaselines): number | null {
   switch (paceRef) {
     case '5kpace':
-      return baselines.fiveK_pace || null;
+      return parsePaceString(baselines.fiveK_pace) || null;
     case 'easypace':
-      return baselines.easyPace || null;
+      return parsePaceString(baselines.easyPace) || null;
     case '10kpace':
-      return baselines.tenK_pace || null;
+      return parsePaceString(baselines.tenK_pace) || null;
     case 'marathon_pace':
-      return baselines.marathon_pace || null;
+      return parsePaceString(baselines.marathon_pace) || null;
     default:
       console.warn(`⚠️ Unknown pace reference: ${paceRef}`);
       return null;
   }
+}
+
+function parsePaceString(paceStr: string | number): number | null {
+  if (typeof paceStr === 'number') {
+    return paceStr;
+  }
+  
+  if (typeof paceStr === 'string') {
+    // Parse "10:30/mi" format to seconds per mile
+    const match = paceStr.match(/(\d+):(\d+)\/mi/);
+    if (match) {
+      const minutes = parseInt(match[1]);
+      const seconds = parseInt(match[2]);
+      return minutes * 60 + seconds; // Convert to seconds per mile
+    }
+  }
+  
+  return null;
 }

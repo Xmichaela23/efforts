@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
     }
 
     console.log(`🏃‍♂️ Analyzing running workout: ${workout_id}`);
+    console.log('🆕 NEW VERSION: Checking time_series_data and garmin_data for pace data');
 
     // Get workout data
     const { data: workout, error: workoutError } = await supabase
@@ -67,8 +68,12 @@ Deno.serve(async (req) => {
       .select(`
         id,
         type,
+        sensor_data,
         computed,
-        planned_id
+        time_series_data,
+        garmin_data,
+        planned_id,
+        user_id
       `)
       .eq('id', workout_id)
       .single();
@@ -77,12 +82,19 @@ Deno.serve(async (req) => {
       throw new Error(`Workout not found: ${workoutError?.message}`);
     }
 
+    console.log('🔍 Available data sources:', {
+      time_series_data: !!workout.time_series_data,
+      garmin_data: !!workout.garmin_data,
+      computed: !!workout.computed,
+      sensor_data: !!workout.sensor_data
+    });
+
     if (workout.type !== 'run' && workout.type !== 'running') {
       throw new Error(`Workout type ${workout.type} is not supported for running analysis`);
     }
 
-    if (!workout.computed) {
-      throw new Error('Workout data not computed. Run compute-workout-summary first.');
+    if (!workout.sensor_data && !workout.computed) {
+      throw new Error('No sensor data or computed data available. Workout may not have been processed yet.');
     }
 
     // Get planned workout data with token parsing support
@@ -172,11 +184,56 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Extract sensor data from computed workout
-    const sensorData = extractSensorData(workout.computed);
+    // Extract sensor data - try different data sources
+    let sensorData = [];
+    
+    // Try time_series_data first (most likely to have pace data)
+    if (workout.time_series_data) {
+      console.log('🔍 Trying time_series_data first...');
+      sensorData = extractSensorData(workout.time_series_data);
+      console.log(`📊 time_series_data yielded ${sensorData.length} samples`);
+    }
+    
+    // Try garmin_data if time_series_data doesn't work
+    if (sensorData.length === 0 && workout.garmin_data) {
+      console.log('🔍 Trying garmin_data...');
+      sensorData = extractSensorData(workout.garmin_data);
+      console.log(`📊 garmin_data yielded ${sensorData.length} samples`);
+    }
+    
+    // Try computed data
+    if (sensorData.length === 0 && workout.computed) {
+      console.log('🔍 Trying computed data...');
+      sensorData = extractSensorData(workout.computed);
+      console.log(`📊 computed data yielded ${sensorData.length} samples`);
+    }
+    
+    // Try sensor_data as last resort
+    if (sensorData.length === 0 && workout.sensor_data) {
+      console.log('🔍 Trying sensor_data as fallback...');
+      sensorData = extractSensorData(workout.sensor_data);
+      console.log(`📊 sensor_data yielded ${sensorData.length} samples`);
+    }
     
     if (!sensorData || sensorData.length === 0) {
-      throw new Error('No sensor data found in computed workout');
+      // Return a meaningful response instead of crashing
+      return new Response(JSON.stringify({
+        success: true,
+        analysis: {
+          adherence_percentage: 0,
+          execution_grade: 'N/A',
+          primary_issues: ['No sensor data available - workout may not have been processed yet'],
+          strengths: [],
+          workout_type: 'long_run',
+          time_in_range_s: 0,
+          time_outside_range_s: 0
+        }
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
     }
 
     // Perform granular adherence analysis
@@ -268,21 +325,167 @@ interface SampleTiming {
 }
 
 /**
- * Extract sensor data from computed workout data
- * This reads the normalized data from compute-workout-summary
+ * Extract sensor data from sensor_data column
+ * This reads the raw sensor data from the workouts table
  */
-function extractSensorData(computed: any): any[] {
-  if (!computed || !computed.samples) {
+function extractSensorData(data: any): any[] {
+  console.log('🔍 Data type:', typeof data);
+  console.log('🔍 Data is array:', Array.isArray(data));
+  console.log('🔍 Data keys:', data && typeof data === 'object' ? Object.keys(data) : 'N/A');
+  
+  if (!data) {
+    console.log('⚠️ Data is null or undefined.');
     return [];
   }
 
-  return computed.samples.map((sample: any) => ({
-    timestamp: sample.timestamp,
-    pace_s_per_mi: sample.pace_s_per_mi,
-    power_w: sample.power_w,
-    heart_rate: sample.heart_rate,
-    duration_s: sample.duration_s || 1
-  }));
+  // Handle different data structures
+  let dataArray = [];
+  
+  if (Array.isArray(data)) {
+    // Direct array
+    dataArray = data;
+  } else if (typeof data === 'string') {
+    // JSON string - try to parse it
+    console.log('🔍 Parsing JSON string...');
+    try {
+      const parsed = JSON.parse(data);
+      console.log('🔍 Parsed JSON type:', typeof parsed);
+      console.log('🔍 Parsed JSON is array:', Array.isArray(parsed));
+      
+      if (Array.isArray(parsed)) {
+        dataArray = parsed;
+      } else if (parsed && typeof parsed === 'object') {
+        // Check if it's an object with array properties
+        if (parsed.samples && Array.isArray(parsed.samples)) {
+          dataArray = parsed.samples;
+        } else if (parsed.data && Array.isArray(parsed.data)) {
+          dataArray = parsed.data;
+        } else if (parsed.series && Array.isArray(parsed.series)) {
+          dataArray = parsed.series;
+        } else {
+          console.log('⚠️ Parsed JSON is an object but no array property found.');
+          console.log('🔍 Available properties:', Object.keys(parsed));
+          return [];
+        }
+      } else {
+        console.log('⚠️ Parsed JSON is not an array or object.');
+        return [];
+      }
+    } catch (error) {
+      console.log('⚠️ Failed to parse JSON string:', error.message);
+      return [];
+    }
+  } else if (data && typeof data === 'object') {
+    // Check if it's an object with array properties
+    if (data.samples && Array.isArray(data.samples)) {
+      dataArray = data.samples;
+    } else if (data.data && Array.isArray(data.data)) {
+      dataArray = data.data;
+    } else if (data.series && Array.isArray(data.series)) {
+      dataArray = data.series;
+    } else if (data.intervals && Array.isArray(data.intervals)) {
+      // Check if it's already processed analysis data
+      console.log('🔍 Found intervals in computed data, checking for sensor data...');
+      console.log('🔍 Intervals structure:', JSON.stringify(data.intervals[0], null, 2));
+      // This might be processed analysis, not raw sensor data
+      return [];
+    } else {
+      console.log('⚠️ Data is an object but no array property found.');
+      console.log('🔍 Available properties:', Object.keys(data));
+      console.log('🔍 Full data structure:', JSON.stringify(data, null, 2));
+      return [];
+    }
+  } else {
+    console.log('⚠️ Data is not an array, object, or string.');
+    return [];
+  }
+
+  console.log(`📊 Raw sensor data length: ${dataArray.length}`);
+
+  if (dataArray.length === 0) {
+    console.log('⚠️ Sensor data array is empty.');
+    return [];
+  }
+
+  // Log first few samples to understand structure
+  console.log('🔍 First sample structure:', JSON.stringify(dataArray[0], null, 2));
+
+  // Filter out samples where pace is null or undefined, as pace is critical for running analysis
+  const filteredSamples = dataArray.map((sample: any, index: number) => {
+    // Check if sample has the required structure
+    if (!sample || typeof sample !== 'object') {
+      return null;
+    }
+
+    // Skip first sample as we need previous sample for calculations
+    if (index === 0) return null;
+    
+    const prevSample = dataArray[index - 1];
+    if (!prevSample) return null;
+
+    // Extract pace using Garmin API priority order
+    let pace_s_per_mi: number | null = null;
+    let dataSource = 'unknown';
+    
+    // Priority 1: Direct speed from device (Best)
+    if (sample.speedMetersPerSecond != null && sample.speedMetersPerSecond > 0) {
+      pace_s_per_mi = 26.8224 / sample.speedMetersPerSecond; // Convert m/s to min/mi, then to s/mi
+      pace_s_per_mi = pace_s_per_mi * 60; // Convert min/mi to s/mi
+      dataSource = 'device_speed';
+      if (index % 100 === 0) console.log(`🔍 Device speed: ${(pace_s_per_mi/60).toFixed(1)} min/mi`);
+    }
+    
+    // Priority 2: Calculate from cumulative distance (Good)
+    else if (sample.totalDistanceInMeters != null && prevSample.totalDistanceInMeters != null) {
+      const distanceDelta = sample.totalDistanceInMeters - prevSample.totalDistanceInMeters;
+      const timeDelta = sample.timestamp - prevSample.timestamp;
+      
+      if (distanceDelta > 0 && timeDelta > 0) {
+        const speedMPS = distanceDelta / timeDelta;
+        if (speedMPS > 0.5 && speedMPS < 10) { // Realistic running speeds (1.8-36 km/h)
+          pace_s_per_mi = 26.8224 / speedMPS; // Convert m/s to min/mi
+          pace_s_per_mi = pace_s_per_mi * 60; // Convert min/mi to s/mi
+          dataSource = 'cumulative_distance';
+          if (index % 100 === 0) console.log(`🔍 Cumulative distance: ${(pace_s_per_mi/60).toFixed(1)} min/mi`);
+        }
+      }
+    }
+    
+    // Priority 3: Calculate from GPS coordinates (Fallback)
+    else if (sample.latitude != null && sample.longitude != null && 
+             prevSample.latitude != null && prevSample.longitude != null) {
+      pace_s_per_mi = calculatePaceFromGPS(sample, prevSample);
+      if (pace_s_per_mi != null) {
+        dataSource = 'gps_calculation';
+        if (index % 100 === 0) console.log(`🔍 GPS pace calculated: ${(pace_s_per_mi/60).toFixed(1)} min/mi`);
+      }
+    }
+
+    if (pace_s_per_mi == null) {
+      return null; // Filter out samples with no pace data
+    }
+
+    return {
+      timestamp: sample.timestamp || index,
+      pace_s_per_mi: pace_s_per_mi,
+      power_w: sample.power || null,
+      heart_rate: sample.heartRate || sample.heart_rate || null,
+      duration_s: 1,
+      data_source: dataSource // Track which method was used
+    };
+  }).filter(Boolean); // Remove null entries
+
+  // Log data source distribution
+  const dataSourceCounts = filteredSamples.reduce((acc: any, sample: any) => {
+    const source = sample.data_source || 'unknown';
+    acc[source] = (acc[source] || 0) + 1;
+    return acc;
+  }, {});
+  
+  console.log(`✅ Extracted ${filteredSamples.length} valid sensor samples.`);
+  console.log('📊 Data source distribution:', dataSourceCounts);
+  
+  return filteredSamples;
 }
 
 /**
@@ -302,6 +505,7 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[]):
   
   for (const interval of intervals) {
     console.log(`🔍 Analyzing interval: ${interval.type} (${interval.duration_s}s)`);
+    console.log('🔍 Interval structure:', JSON.stringify(interval, null, 2));
     
     // Get samples for this interval
     const intervalSamples = getSamplesForInterval(sensorData, interval);
@@ -374,6 +578,12 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[]):
  * Uses fuzzy matching to handle timing discrepancies
  */
 function getSamplesForInterval(sensorData: any[], interval: any): any[] {
+  // For long runs or single intervals, use all samples
+  if (!interval.start_time || !interval.end_time) {
+    console.log('🔍 No start/end time for interval, using all samples for long run');
+    return sensorData;
+  }
+  
   const startTime = new Date(interval.start_time).getTime() / 1000;
   const endTime = new Date(interval.end_time).getTime() / 1000;
   
@@ -567,6 +777,51 @@ function getPrescribedRange(interval: any): { lower: number, upper: number, unit
     upper: 1000,
     unit: 'unknown'
   };
+}
+
+/**
+ * Calculate pace from GPS coordinates
+ */
+function calculatePaceFromGPS(sample: any, prevSample: any): number | null {
+  if (!prevSample || !prevSample.latitude || !prevSample.longitude || !prevSample.timestamp) {
+    return null;
+  }
+  
+  // Calculate distance between GPS points using Haversine formula
+  const distance = calculateDistance(
+    prevSample.latitude, prevSample.longitude,
+    sample.latitude, sample.longitude
+  );
+  
+  // Calculate time difference
+  const timeDiff = sample.timestamp - prevSample.timestamp;
+  
+  // Skip if time difference is too small or too large (GPS errors)
+  if (timeDiff <= 0 || timeDiff > 60) return null;
+  
+  // Calculate speed in m/s
+  const speedMps = distance / timeDiff;
+  
+  // Skip unrealistic speeds (faster than 20 mph or slower than 2 mph)
+  if (speedMps < 0.9 || speedMps > 8.9) return null;
+  
+  // Convert to pace in seconds per mile using Garmin API formula
+  const paceMinPerMile = 26.8224 / speedMps; // Convert m/s to min/mi
+  return paceMinPerMile * 60; // Convert min/mi to s/mi
+}
+
+/**
+ * Calculate distance between two GPS points using Haversine formula
+ */
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in meters
 }
 
 /**
