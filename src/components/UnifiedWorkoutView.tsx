@@ -309,6 +309,17 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             console.warn('Analysis failed, falling back to basic metrics:', error);
           }
         }
+        
+        // Step 3: Force enhanced running analysis for running workouts
+        if (isCompleted && (workout.type === 'run' || workout.type === 'running')) {
+          console.log('🏃‍♂️ Forcing enhanced running analysis...');
+          try {
+            await supabase.functions.invoke('analyze-running-workout', { body: { workout_id: wid } });
+            console.log('✅ Enhanced running analysis completed');
+          } catch (error) {
+            console.warn('⚠️ Enhanced running analysis failed:', error);
+          }
+        }
 
         // Refresh data
         try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
