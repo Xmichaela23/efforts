@@ -66,6 +66,29 @@ interface HeartRateAdherence {
   hr_consistency: number;
 }
 
+// Pacing Variability Types
+interface PacingVariability {
+  coefficient_of_variation: number;
+  avg_pace_change_per_min: number;
+  num_surges: number;
+  num_crashes: number;
+  steadiness_score: number;
+  avg_pace_change_seconds: number;
+}
+
+interface EnhancedAdherence {
+  overall_adherence: number;
+  time_in_range_score: number;
+  variability_score: number;
+  smoothness_score: number;
+  pacing_variability: PacingVariability;
+  time_in_range_s: number;
+  time_outside_range_s: number;
+  total_time_s: number;
+  samples_in_range: number;
+  samples_outside_range: number;
+}
+
 Deno.serve(async (req) => {
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -612,10 +635,13 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[]):
     console.log(`✅ Interval adherence: ${(intervalResult.adherence_percentage * 100).toFixed(1)}%`);
   }
   
-  const totalTime = totalTimeInRange + totalTimeOutsideRange;
-  const overallAdherence = totalTime > 0 ? totalTimeInRange / totalTime : 0;
+  // Calculate enhanced adherence with pacing quality metrics
+  const enhancedAdherence = calculateEnhancedAdherence(sensorData, {
+    lower: intervals[0]?.pace_range?.lower || 0,
+    upper: intervals[0]?.pace_range?.upper || 1000
+  });
   
-  // Calculate execution grade as percentage (no letter grades)
+  const overallAdherence = enhancedAdherence.overall_adherence;
   const executionGrade = Math.round(overallAdherence * 100);
   
   // Calculate heart rate analysis
@@ -632,14 +658,20 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[]):
   
   return {
     overall_adherence: overallAdherence,
-    time_in_range_s: totalTimeInRange,
-    time_outside_range_s: totalTimeOutsideRange,
-    total_time_s: totalTime,
+    time_in_range_s: enhancedAdherence.time_in_range_s,
+    time_outside_range_s: enhancedAdherence.time_outside_range_s,
+    total_time_s: enhancedAdherence.total_time_s,
     interval_breakdown: intervalAnalysis,
     execution_grade: executionGrade,
     primary_issues: primaryIssues,
     strengths: strengths,
     heart_rate_analysis: heartRateAnalysis,
+    pacing_analysis: {
+      time_in_range_score: enhancedAdherence.time_in_range_score,
+      variability_score: enhancedAdherence.variability_score,
+      smoothness_score: enhancedAdherence.smoothness_score,
+      pacing_variability: enhancedAdherence.pacing_variability
+    },
     analysis_metadata: {
       total_intervals: intervals.length,
       intervals_analyzed: intervalAnalysis.length,
@@ -1084,6 +1116,186 @@ function generateHRRecommendations(hrDrift: number, hrConsistency: number, zoneA
   }
   
   return recommendations;
+}
+
+/**
+ * Calculate pacing variability metrics (CV, surges, crashes, smoothness)
+ */
+function calculatePacingVariability(samples: any[]): PacingVariability {
+  const paces = samples
+    .map(s => s.pace_s_per_mi)
+    .filter(p => p != null && p > 0);
+  
+  if (paces.length < 2) {
+    return {
+      coefficient_of_variation: 0,
+      avg_pace_change_per_min: 0,
+      num_surges: 0,
+      num_crashes: 0,
+      steadiness_score: 0,
+      avg_pace_change_seconds: 0
+    };
+  }
+  
+  // Calculate coefficient of variation
+  const mean = paces.reduce((a, b) => a + b, 0) / paces.length;
+  const variance = paces.reduce((sum, pace) => sum + Math.pow(pace - mean, 2), 0) / paces.length;
+  const stdDev = Math.sqrt(variance);
+  const cv = (stdDev / mean) * 100;
+  
+  // Calculate sequential changes
+  let surges = 0;
+  let crashes = 0;
+  let totalChange = 0;
+  let significantChanges = 0;
+  
+  for (let i = 1; i < paces.length; i++) {
+    const delta = paces[i] - paces[i-1];
+    totalChange += Math.abs(delta);
+    
+    // Count significant pace changes (>10s/mi)
+    if (delta < -10) {
+      surges++; // Pace dropped >10s/mi (surge)
+      significantChanges++;
+    }
+    if (delta > 10) {
+      crashes++; // Pace increased >10s/mi (crash)
+      significantChanges++;
+    }
+  }
+  
+  const avgChange = totalChange / (paces.length - 1);
+  const avgChangePerMin = avgChange; // Assuming 1 sample per minute
+  
+  // Calculate steadiness score (0-100)
+  let steadinessScore = 100;
+  
+  // Penalize high CV
+  if (cv > 10) steadinessScore -= 40;
+  else if (cv > 7) steadinessScore -= 30;
+  else if (cv > 5) steadinessScore -= 20;
+  else if (cv > 3) steadinessScore -= 10;
+  
+  // Penalize surges and crashes
+  const surgeRate = surges / paces.length;
+  const crashRate = crashes / paces.length;
+  
+  if (surgeRate > 0.1) steadinessScore -= 20; // >10% of samples are surges
+  if (crashRate > 0.1) steadinessScore -= 20; // >10% of samples are crashes
+  
+  // Penalize high average change
+  if (avgChange > 15) steadinessScore -= 20;
+  else if (avgChange > 10) steadinessScore -= 15;
+  else if (avgChange > 5) steadinessScore -= 10;
+  
+  steadinessScore = Math.max(0, steadinessScore);
+  
+  return {
+    coefficient_of_variation: Math.round(cv * 10) / 10,
+    avg_pace_change_per_min: Math.round(avgChangePerMin * 10) / 10,
+    num_surges: surges,
+    num_crashes: crashes,
+    steadiness_score: Math.round(steadinessScore),
+    avg_pace_change_seconds: Math.round(avgChange * 10) / 10
+  };
+}
+
+/**
+ * Calculate enhanced adherence with pacing quality metrics
+ */
+function calculateEnhancedAdherence(samples: any[], targetRange: { lower: number, upper: number }): EnhancedAdherence {
+  // 1. Time in range (current metric - 40% weight)
+  let timeInRange = 0;
+  let totalTime = 0;
+  let samplesInRange = 0;
+  
+  for (const sample of samples) {
+    if (sample.pace_s_per_mi != null && sample.pace_s_per_mi > 0) {
+      const duration = sample.duration_s || 1;
+      totalTime += duration;
+      
+      if (sample.pace_s_per_mi >= targetRange.lower && sample.pace_s_per_mi <= targetRange.upper) {
+        timeInRange += duration;
+        samplesInRange++;
+      }
+    }
+  }
+  
+  const timeInRangeScore = totalTime > 0 ? timeInRange / totalTime : 0;
+  
+  // 2. Pacing variability (30% weight)
+  const variability = calculatePacingVariability(samples);
+  const variabilityScore = variability.steadiness_score / 100;
+  
+  // 3. Sequential smoothness (30% weight)
+  const smoothnessScore = calculatePacingSmoothness(samples);
+  
+  // Weighted overall adherence
+  const overallAdherence = (
+    timeInRangeScore * 0.4 +
+    variabilityScore * 0.3 +
+    smoothnessScore * 0.3
+  );
+  
+  return {
+    overall_adherence: overallAdherence,
+    time_in_range_score: timeInRangeScore,
+    variability_score: variabilityScore,
+    smoothness_score: smoothnessScore,
+    pacing_variability: variability,
+    time_in_range_s: timeInRange,
+    time_outside_range_s: totalTime - timeInRange,
+    total_time_s: totalTime,
+    samples_in_range: samplesInRange,
+    samples_outside_range: samples.length - samplesInRange
+  };
+}
+
+/**
+ * Calculate pacing smoothness based on sequential changes
+ */
+function calculatePacingSmoothness(samples: any[]): number {
+  const paces = samples
+    .map(s => s.pace_s_per_mi)
+    .filter(p => p != null && p > 0);
+  
+  if (paces.length < 2) return 0;
+  
+  let totalChange = 0;
+  let smoothChanges = 0;
+  let roughChanges = 0;
+  
+  for (let i = 1; i < paces.length; i++) {
+    const delta = Math.abs(paces[i] - paces[i-1]);
+    totalChange += delta;
+    
+    if (delta < 2) smoothChanges++;
+    else if (delta > 10) roughChanges++;
+  }
+  
+  const avgChange = totalChange / (paces.length - 1);
+  const smoothnessRatio = smoothChanges / (paces.length - 1);
+  const roughnessRatio = roughChanges / (paces.length - 1);
+  
+  // Score based on smoothness
+  let score = 100;
+  
+  // Penalize high average change
+  if (avgChange > 15) score -= 40;
+  else if (avgChange > 10) score -= 30;
+  else if (avgChange > 5) score -= 20;
+  else if (avgChange > 2) score -= 10;
+  
+  // Penalize rough changes
+  if (roughnessRatio > 0.2) score -= 30; // >20% rough changes
+  else if (roughnessRatio > 0.1) score -= 20; // >10% rough changes
+  else if (roughnessRatio > 0.05) score -= 10; // >5% rough changes
+  
+  // Reward smooth changes
+  if (smoothnessRatio > 0.8) score += 10; // >80% smooth changes
+  else if (smoothnessRatio > 0.6) score += 5; // >60% smooth changes
+  
+  return Math.max(0, Math.min(100, score)) / 100; // Return as 0-1
 }
 
 /**

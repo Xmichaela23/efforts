@@ -259,6 +259,56 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         }
       }
       
+      // Add pacing analysis insights (NEW - Garmin-style analysis)
+      if (granularAnalysis.pacing_analysis) {
+        const pacingAnalysis = granularAnalysis.pacing_analysis;
+        const variability = pacingAnalysis.pacing_variability;
+        
+        // Pacing variability insights
+        if (variability.coefficient_of_variation > 10) {
+          insights.push(`High pacing variability: ${variability.coefficient_of_variation}% CV (erratic pacing)`);
+        } else if (variability.coefficient_of_variation > 7) {
+          insights.push(`Moderate pacing variability: ${variability.coefficient_of_variation}% CV`);
+        } else if (variability.coefficient_of_variation > 3) {
+          insights.push(`Good pacing consistency: ${variability.coefficient_of_variation}% CV`);
+        } else {
+          insights.push(`Excellent pacing consistency: ${variability.coefficient_of_variation}% CV`);
+        }
+        
+        // Surge and crash analysis
+        if (variability.num_surges > 10) {
+          insights.push(`Pacing surges detected: ${variability.num_surges} significant drops (consider steadier effort)`);
+        } else if (variability.num_surges > 5) {
+          insights.push(`Some pacing surges: ${variability.num_surges} drops detected`);
+        }
+        
+        if (variability.num_crashes > 10) {
+          insights.push(`Pacing crashes detected: ${variability.num_crashes} significant increases (pace discipline needed)`);
+        } else if (variability.num_crashes > 5) {
+          insights.push(`Some pacing crashes: ${variability.num_crashes} increases detected`);
+        }
+        
+        // Overall pacing quality
+        if (pacingAnalysis.variability_score < 0.5) {
+          insights.push(`Poor pacing steadiness: ${Math.round(pacingAnalysis.variability_score * 100)}% (erratic effort)`);
+        } else if (pacingAnalysis.variability_score < 0.7) {
+          insights.push(`Fair pacing steadiness: ${Math.round(pacingAnalysis.variability_score * 100)}%`);
+        } else if (pacingAnalysis.variability_score < 0.9) {
+          insights.push(`Good pacing steadiness: ${Math.round(pacingAnalysis.variability_score * 100)}%`);
+        } else {
+          insights.push(`Excellent pacing steadiness: ${Math.round(pacingAnalysis.variability_score * 100)}%`);
+        }
+        
+        // Smoothness analysis
+        if (pacingAnalysis.smoothness_score < 0.5) {
+          insights.push(`Rough pacing transitions: ${Math.round(pacingAnalysis.smoothness_score * 100)}% smoothness`);
+        } else if (pacingAnalysis.smoothness_score < 0.8) {
+          insights.push(`Moderate pacing smoothness: ${Math.round(pacingAnalysis.smoothness_score * 100)}%`);
+        } else {
+          insights.push(`Smooth pacing transitions: ${Math.round(pacingAnalysis.smoothness_score * 100)}%`);
+        }
+      }
+      
       // Add heart rate analysis insights
       if (granularAnalysis.heart_rate_analysis && granularAnalysis.heart_rate_analysis.available) {
         const hrAnalysis = granularAnalysis.heart_rate_analysis;

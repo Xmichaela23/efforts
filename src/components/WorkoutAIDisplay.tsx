@@ -41,6 +41,67 @@ const WorkoutAIDisplay: React.FC<WorkoutAIDisplayProps> = ({ aiAnalysis, workout
           </div>
         )}
 
+        {/* Pacing Analysis (NEW - Garmin-style) */}
+        {granularAnalysis.pacing_analysis && (
+          <div className="border-t pt-3">
+            <div className="text-sm font-medium mb-2 text-purple-600">Pacing Analysis</div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Variability (CV)</span>
+                <span className={`text-sm font-medium ${
+                  granularAnalysis.pacing_analysis.pacing_variability.coefficient_of_variation > 10 ? 'text-red-600' :
+                  granularAnalysis.pacing_analysis.pacing_variability.coefficient_of_variation > 7 ? 'text-orange-600' :
+                  granularAnalysis.pacing_analysis.pacing_variability.coefficient_of_variation > 3 ? 'text-yellow-600' :
+                  'text-green-600'
+                }`}>
+                  {granularAnalysis.pacing_analysis.pacing_variability.coefficient_of_variation}%
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Surges</span>
+                <span className={`text-sm font-medium ${
+                  granularAnalysis.pacing_analysis.pacing_variability.num_surges > 10 ? 'text-red-600' :
+                  granularAnalysis.pacing_analysis.pacing_variability.num_surges > 5 ? 'text-orange-600' :
+                  'text-green-600'
+                }`}>
+                  {granularAnalysis.pacing_analysis.pacing_variability.num_surges}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Crashes</span>
+                <span className={`text-sm font-medium ${
+                  granularAnalysis.pacing_analysis.pacing_variability.num_crashes > 10 ? 'text-red-600' :
+                  granularAnalysis.pacing_analysis.pacing_variability.num_crashes > 5 ? 'text-orange-600' :
+                  'text-green-600'
+                }`}>
+                  {granularAnalysis.pacing_analysis.pacing_variability.num_crashes}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Steadiness</span>
+                <span className={`text-sm font-medium ${
+                  granularAnalysis.pacing_analysis.variability_score < 0.5 ? 'text-red-600' :
+                  granularAnalysis.pacing_analysis.variability_score < 0.7 ? 'text-orange-600' :
+                  granularAnalysis.pacing_analysis.variability_score < 0.9 ? 'text-yellow-600' :
+                  'text-green-600'
+                }`}>
+                  {Math.round(granularAnalysis.pacing_analysis.variability_score * 100)}%
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Smoothness</span>
+                <span className={`text-sm font-medium ${
+                  granularAnalysis.pacing_analysis.smoothness_score < 0.5 ? 'text-red-600' :
+                  granularAnalysis.pacing_analysis.smoothness_score < 0.8 ? 'text-orange-600' :
+                  'text-green-600'
+                }`}>
+                  {Math.round(granularAnalysis.pacing_analysis.smoothness_score * 100)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Heart Rate Analysis */}
         {granularAnalysis.heart_rate_analysis && granularAnalysis.heart_rate_analysis.available && (
           <div className="border-t pt-3">
