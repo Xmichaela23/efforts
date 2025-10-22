@@ -290,9 +290,10 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         }
       }
       
-      // Add execution grade
+      // Add execution grade as percentage
       if (granularAnalysis.execution_grade) {
-        insights.push(`Overall grade: ${granularAnalysis.execution_grade}`);
+        const gradePercentage = Math.round(granularAnalysis.overall_adherence * 100);
+        insights.push(`Overall execution: ${gradePercentage}%`);
       }
       
       // Add strengths as insights

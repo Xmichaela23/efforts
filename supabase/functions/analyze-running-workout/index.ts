@@ -615,8 +615,8 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[]):
   const totalTime = totalTimeInRange + totalTimeOutsideRange;
   const overallAdherence = totalTime > 0 ? totalTimeInRange / totalTime : 0;
   
-  // Calculate execution grade
-  const executionGrade = calculateHonestGrade(overallAdherence, intervalAnalysis);
+  // Calculate execution grade as percentage (no letter grades)
+  const executionGrade = Math.round(overallAdherence * 100);
   
   // Calculate heart rate analysis
   const heartRateAnalysis = calculateOverallHeartRateAnalysis(sensorData);
@@ -626,7 +626,7 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[]):
   const strengths = identifyStrengths(intervalAnalysis);
   
   console.log(`🎯 Overall adherence: ${(overallAdherence * 100).toFixed(1)}%`);
-  console.log(`📊 Grade: ${executionGrade}`);
+  console.log(`📊 Execution: ${executionGrade}%`);
   console.log(`🚨 Issues: ${primaryIssues.length}`);
   console.log(`💪 Strengths: ${strengths.length}`);
   

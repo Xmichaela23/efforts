@@ -68,18 +68,18 @@ const WorkoutAIDisplay: React.FC<WorkoutAIDisplayProps> = ({ aiAnalysis, workout
           </div>
         )}
 
-        {/* Execution Grade */}
+        {/* Execution Grade as Percentage */}
         {granularAnalysis.execution_grade && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Execution</span>
             <span className={`text-sm font-medium ${
-              granularAnalysis.execution_grade === 'A' ? 'text-green-600' :
-              granularAnalysis.execution_grade === 'B' ? 'text-blue-600' :
-              granularAnalysis.execution_grade === 'C' ? 'text-yellow-600' :
-              granularAnalysis.execution_grade === 'D' ? 'text-orange-600' :
+              granularAnalysis.overall_adherence >= 0.9 ? 'text-green-600' :
+              granularAnalysis.overall_adherence >= 0.8 ? 'text-blue-600' :
+              granularAnalysis.overall_adherence >= 0.7 ? 'text-yellow-600' :
+              granularAnalysis.overall_adherence >= 0.6 ? 'text-orange-600' :
               'text-red-600'
             }`}>
-              {granularAnalysis.execution_grade}
+              {Math.round(granularAnalysis.overall_adherence * 100)}%
             </span>
           </div>
         )}
