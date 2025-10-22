@@ -1004,7 +1004,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 <MobileSummary 
                   planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
                   completed={isCompleted ? completedData : null}
-                  hideTopAdherence
                 />
               );
             })()}
