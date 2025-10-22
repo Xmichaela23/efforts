@@ -38,6 +38,34 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // OUTPUT: { success: boolean, analysis: PrescribedRangeAdherence }
 // =============================================================================
 
+// Heart Rate Analysis Types
+interface HeartRateZone {
+  lower: number;
+  upper: number;
+  name: string;
+}
+
+interface HeartRateZones {
+  zone1: HeartRateZone;
+  zone2: HeartRateZone;
+  zone3: HeartRateZone;
+  zone4: HeartRateZone;
+  zone5: HeartRateZone;
+}
+
+interface HeartRateAdherence {
+  adherence_percentage: number;
+  time_in_zone_s: number;
+  time_outside_zone_s: number;
+  total_time_s: number;
+  samples_in_zone: number;
+  samples_outside_zone: number;
+  average_heart_rate: number;
+  target_zone: HeartRateZone;
+  hr_drift_bpm: number;
+  hr_consistency: number;
+}
+
 Deno.serve(async (req) => {
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -239,11 +267,28 @@ Deno.serve(async (req) => {
     // Perform granular adherence analysis
     const analysis = calculatePrescribedRangeAdherence(sensorData, intervals);
 
+    // Add data quality information to analysis
+    const enhancedAnalysis = {
+      ...analysis,
+      data_quality: {
+        confidence_level: sensorData.length > 0 ? sensorData[0].data_quality?.confidence_level || 'unknown' : 'unknown',
+        data_source_breakdown: {
+          device_speed_samples: sensorData.filter(s => s.data_source === 'device_speed').length,
+          cumulative_distance_samples: sensorData.filter(s => s.data_source === 'cumulative_distance').length,
+          gps_calculation_samples: sensorData.filter(s => s.data_source === 'gps_calculation').length
+        },
+        total_samples: sensorData.length,
+        quality_warning: sensorData.length > 0 && sensorData[0].data_quality?.confidence_level === 'low' 
+          ? 'Adherence calculated from GPS data only. Precision may be affected by GPS accuracy.' 
+          : null
+      }
+    };
+
     // Store analysis in database
     const { error: updateError } = await supabase
       .from('workouts')
       .update({
-        workout_analysis: analysis
+        workout_analysis: enhancedAnalysis
       })
       .eq('id', workout_id);
 
@@ -257,7 +302,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      analysis: analysis
+      analysis: enhancedAnalysis
     }), {
       headers: {
         'Content-Type': 'application/json',
@@ -485,7 +530,35 @@ function extractSensorData(data: any): any[] {
   console.log(`✅ Extracted ${filteredSamples.length} valid sensor samples.`);
   console.log('📊 Data source distribution:', dataSourceCounts);
   
-  return filteredSamples;
+  // Add data quality metadata
+  const totalSamples = filteredSamples.length;
+  const deviceSpeedPct = totalSamples > 0 ? (dataSourceCounts.device_speed || 0) / totalSamples : 0;
+  const cumulativeDistancePct = totalSamples > 0 ? (dataSourceCounts.cumulative_distance || 0) / totalSamples : 0;
+  const gpsCalculationPct = totalSamples > 0 ? (dataSourceCounts.gps_calculation || 0) / totalSamples : 0;
+  
+  // Calculate confidence level based on data source quality
+  let confidenceLevel = 'low';
+  if (deviceSpeedPct > 0.8) {
+    confidenceLevel = 'high';
+  } else if (deviceSpeedPct > 0.3 || cumulativeDistancePct > 0.5) {
+    confidenceLevel = 'medium';
+  }
+  
+  console.log(`📊 Data quality: ${(deviceSpeedPct * 100).toFixed(1)}% device speed, ${(cumulativeDistancePct * 100).toFixed(1)}% cumulative distance, ${(gpsCalculationPct * 100).toFixed(1)}% GPS calculation`);
+  console.log(`🎯 Confidence level: ${confidenceLevel}`);
+  
+  // Add data quality metadata to each sample for later use
+  const samplesWithQuality = filteredSamples.map(sample => ({
+    ...sample,
+    data_quality: {
+      device_speed_coverage: deviceSpeedPct,
+      cumulative_distance_coverage: cumulativeDistancePct,
+      gps_calculation_coverage: gpsCalculationPct,
+      confidence_level: confidenceLevel
+    }
+  }));
+  
+  return samplesWithQuality;
 }
 
 /**
@@ -545,6 +618,9 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[]):
   // Calculate execution grade
   const executionGrade = calculateHonestGrade(overallAdherence, intervalAnalysis);
   
+  // Calculate heart rate analysis
+  const heartRateAnalysis = calculateOverallHeartRateAnalysis(sensorData);
+  
   // Identify primary issues and strengths
   const primaryIssues = identifyPrimaryIssues(intervalAnalysis);
   const strengths = identifyStrengths(intervalAnalysis);
@@ -563,6 +639,7 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[]):
     execution_grade: executionGrade,
     primary_issues: primaryIssues,
     strengths: strengths,
+    heart_rate_analysis: heartRateAnalysis,
     analysis_metadata: {
       total_intervals: intervals.length,
       intervals_analyzed: intervalAnalysis.length,
@@ -825,6 +902,191 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 /**
+ * Calculate heart rate zones based on max heart rate
+ */
+function calculateHeartRateZones(maxHR: number): HeartRateZones {
+  return {
+    zone1: { lower: 0.5 * maxHR, upper: 0.6 * maxHR, name: 'Recovery' },
+    zone2: { lower: 0.6 * maxHR, upper: 0.7 * maxHR, name: 'Aerobic Base' },
+    zone3: { lower: 0.7 * maxHR, upper: 0.8 * maxHR, name: 'Aerobic Threshold' },
+    zone4: { lower: 0.8 * maxHR, upper: 0.9 * maxHR, name: 'Lactate Threshold' },
+    zone5: { lower: 0.9 * maxHR, upper: 1.0 * maxHR, name: 'VO2 Max' }
+  };
+}
+
+/**
+ * Calculate heart rate zone adherence for samples
+ */
+function calculateHeartRateAdherence(samples: any[], targetZone: HeartRateZone): HeartRateAdherence {
+  let timeInZone = 0;
+  let totalTime = 0;
+  let samplesInZone = 0;
+  let totalSamples = 0;
+  let hrValues: number[] = [];
+  
+  for (const sample of samples) {
+    if (sample.heart_rate != null && sample.heart_rate > 0) {
+      const duration = sample.duration_s || 1;
+      totalTime += duration;
+      totalSamples++;
+      hrValues.push(sample.heart_rate);
+      
+      if (sample.heart_rate >= targetZone.lower && sample.heart_rate <= targetZone.upper) {
+        timeInZone += duration;
+        samplesInZone++;
+      }
+    }
+  }
+  
+  const adherence = totalTime > 0 ? timeInZone / totalTime : 0;
+  const avgHR = hrValues.length > 0 ? hrValues.reduce((a, b) => a + b, 0) / hrValues.length : 0;
+  const hrDrift = calculateHeartRateDrift(hrValues);
+  
+  return {
+    adherence_percentage: adherence,
+    time_in_zone_s: timeInZone,
+    time_outside_zone_s: totalTime - timeInZone,
+    total_time_s: totalTime,
+    samples_in_zone: samplesInZone,
+    samples_outside_zone: totalSamples - samplesInZone,
+    average_heart_rate: avgHR,
+    target_zone: targetZone,
+    hr_drift_bpm: hrDrift,
+    hr_consistency: calculateHRConsistency(hrValues)
+  };
+}
+
+/**
+ * Calculate heart rate drift (increase over time)
+ */
+function calculateHeartRateDrift(hrValues: number[]): number {
+  if (hrValues.length < 10) return 0;
+  
+  const firstThird = hrValues.slice(0, Math.floor(hrValues.length / 3));
+  const lastThird = hrValues.slice(-Math.floor(hrValues.length / 3));
+  
+  const firstAvg = firstThird.reduce((a, b) => a + b, 0) / firstThird.length;
+  const lastAvg = lastThird.reduce((a, b) => a + b, 0) / lastThird.length;
+  
+  return lastAvg - firstAvg;
+}
+
+/**
+ * Calculate heart rate consistency (coefficient of variation)
+ */
+function calculateHRConsistency(hrValues: number[]): number {
+  if (hrValues.length < 2) return 0;
+  
+  const mean = hrValues.reduce((a, b) => a + b, 0) / hrValues.length;
+  const variance = hrValues.reduce((sum, hr) => sum + Math.pow(hr - mean, 2), 0) / hrValues.length;
+  const stdDev = Math.sqrt(variance);
+  
+  return (stdDev / mean) * 100; // Coefficient of variation as percentage
+}
+
+/**
+ * Calculate overall heart rate analysis for the entire workout
+ */
+function calculateOverallHeartRateAnalysis(sensorData: any[]): any {
+  // Extract heart rate values
+  const hrValues = sensorData
+    .filter(sample => sample.heart_rate != null && sample.heart_rate > 0)
+    .map(sample => sample.heart_rate);
+  
+  if (hrValues.length === 0) {
+    return {
+      available: false,
+      message: 'No heart rate data available'
+    };
+  }
+  
+  // Calculate basic HR metrics
+  const avgHR = hrValues.reduce((a, b) => a + b, 0) / hrValues.length;
+  const maxHR = Math.max(...hrValues);
+  const minHR = Math.min(...hrValues);
+  const hrDrift = calculateHeartRateDrift(hrValues);
+  const hrConsistency = calculateHRConsistency(hrValues);
+  
+  // Estimate max HR if not available (220 - age approximation)
+  // For now, use 190 as default (typical for 30-year-old)
+  const estimatedMaxHR = 190;
+  const hrZones = calculateHeartRateZones(estimatedMaxHR);
+  
+  // Calculate time in each zone
+  const zoneAnalysis = calculateTimeInZones(sensorData, hrZones);
+  
+  return {
+    available: true,
+    average_heart_rate: Math.round(avgHR),
+    max_heart_rate: maxHR,
+    min_heart_rate: minHR,
+    hr_drift_bpm: Math.round(hrDrift * 10) / 10,
+    hr_consistency_percent: Math.round(hrConsistency * 10) / 10,
+    estimated_max_hr: estimatedMaxHR,
+    zones: hrZones,
+    zone_analysis: zoneAnalysis,
+    recommendations: generateHRRecommendations(hrDrift, hrConsistency, zoneAnalysis)
+  };
+}
+
+/**
+ * Calculate time spent in each heart rate zone
+ */
+function calculateTimeInZones(sensorData: any[], zones: HeartRateZones): any {
+  const zoneTimes: any = {};
+  
+  for (const [zoneName, zone] of Object.entries(zones)) {
+    const adherence = calculateHeartRateAdherence(sensorData, zone);
+    zoneTimes[zoneName] = {
+      name: zone.name,
+      time_s: adherence.time_in_zone_s,
+      percentage: adherence.adherence_percentage,
+      samples: adherence.samples_in_zone
+    };
+  }
+  
+  return zoneTimes;
+}
+
+/**
+ * Generate heart rate recommendations based on analysis
+ */
+function generateHRRecommendations(hrDrift: number, hrConsistency: number, zoneAnalysis: any): string[] {
+  const recommendations: string[] = [];
+  
+  // HR Drift recommendations
+  if (hrDrift > 10) {
+    recommendations.push('High HR drift detected - consider easier pace or better fitness base');
+  } else if (hrDrift > 5) {
+    recommendations.push('Moderate HR drift - monitor effort level');
+  } else if (hrDrift < -5) {
+    recommendations.push('Negative HR drift - excellent fitness or conservative pacing');
+  }
+  
+  // HR Consistency recommendations
+  if (hrConsistency > 15) {
+    recommendations.push('High HR variability - focus on steady effort');
+  } else if (hrConsistency < 5) {
+    recommendations.push('Excellent HR consistency - very steady effort');
+  }
+  
+  // Zone distribution recommendations
+  const zone2Time = zoneAnalysis.zone2?.percentage || 0;
+  const zone3Time = zoneAnalysis.zone3?.percentage || 0;
+  const zone4Time = zoneAnalysis.zone4?.percentage || 0;
+  
+  if (zone2Time > 0.8) {
+    recommendations.push('Excellent aerobic base training - mostly Zone 2');
+  } else if (zone3Time > 0.6) {
+    recommendations.push('Good threshold training - significant Zone 3 time');
+  } else if (zone4Time > 0.3) {
+    recommendations.push('High intensity workout - substantial Zone 4 time');
+  }
+  
+  return recommendations;
+}
+
+/**
  * Get the relevant value from a sample based on interval type
  */
 function getSampleValue(sample: any, interval: any): number | null {
@@ -834,6 +1096,10 @@ function getSampleValue(sample: any, interval: any): number | null {
   
   if (interval.power_range && sample.power_w != null) {
     return sample.power_w;
+  }
+  
+  if (interval.heart_rate_range && sample.heart_rate != null) {
+    return sample.heart_rate;
   }
   
   return null;

@@ -28,40 +28,68 @@ const WorkoutAIDisplay: React.FC<WorkoutAIDisplayProps> = ({ aiAnalysis, workout
   // Show new granular analysis if available, otherwise fall back to old AI analysis
   if (workoutAnalysis?.analysis) {
     const analysis = workoutAnalysis.analysis;
-    const executionQuality = analysis.execution_quality;
+    const granularAnalysis = analysis.analysis || analysis;
+    const executionQuality = granularAnalysis.execution_quality;
     
     return (
       <div className="space-y-3">
         {/* Adherence Score */}
-        {analysis.adherence_percentage !== undefined && (
+        {granularAnalysis.overall_adherence !== undefined && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Adherence</span>
-            <span className="text-sm font-medium">{analysis.adherence_percentage}%</span>
+            <span className="text-sm font-medium">{Math.round(granularAnalysis.overall_adherence * 100)}%</span>
+          </div>
+        )}
+
+        {/* Heart Rate Analysis */}
+        {granularAnalysis.heart_rate_analysis && granularAnalysis.heart_rate_analysis.available && (
+          <div className="border-t pt-3">
+            <div className="text-sm font-medium mb-2 text-blue-600">Heart Rate Analysis</div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Avg HR</span>
+                <span className="text-sm font-medium">{granularAnalysis.heart_rate_analysis.average_heart_rate} bpm</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">HR Drift</span>
+                <span className={`text-sm font-medium ${
+                  granularAnalysis.heart_rate_analysis.hr_drift_bpm > 5 ? 'text-orange-600' :
+                  granularAnalysis.heart_rate_analysis.hr_drift_bpm < -5 ? 'text-green-600' :
+                  'text-gray-600'
+                }`}>
+                  {granularAnalysis.heart_rate_analysis.hr_drift_bpm > 0 ? '+' : ''}{granularAnalysis.heart_rate_analysis.hr_drift_bpm} bpm
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Consistency</span>
+                <span className="text-sm font-medium">{granularAnalysis.heart_rate_analysis.hr_consistency_percent}%</span>
+              </div>
+            </div>
           </div>
         )}
 
         {/* Execution Grade */}
-        {executionQuality?.overall_grade && (
+        {granularAnalysis.execution_grade && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Execution</span>
             <span className={`text-sm font-medium ${
-              executionQuality.overall_grade === 'A' ? 'text-green-600' :
-              executionQuality.overall_grade === 'B' ? 'text-blue-600' :
-              executionQuality.overall_grade === 'C' ? 'text-yellow-600' :
-              executionQuality.overall_grade === 'D' ? 'text-orange-600' :
+              granularAnalysis.execution_grade === 'A' ? 'text-green-600' :
+              granularAnalysis.execution_grade === 'B' ? 'text-blue-600' :
+              granularAnalysis.execution_grade === 'C' ? 'text-yellow-600' :
+              granularAnalysis.execution_grade === 'D' ? 'text-orange-600' :
               'text-red-600'
             }`}>
-              {executionQuality.overall_grade}
+              {granularAnalysis.execution_grade}
             </span>
           </div>
         )}
 
         {/* Primary Issues */}
-        {executionQuality?.primary_issues && executionQuality.primary_issues.length > 0 && (
+        {granularAnalysis.primary_issues && granularAnalysis.primary_issues.length > 0 && (
           <div className="border-t pt-3">
             <div className="text-sm font-medium mb-2 text-red-600">Areas to Improve</div>
             <ul className="space-y-1">
-              {executionQuality.primary_issues.map((issue, index) => (
+              {granularAnalysis.primary_issues.map((issue, index) => (
                 <li key={index} className="text-sm text-gray-600">• {issue}</li>
               ))}
             </ul>
@@ -69,12 +97,24 @@ const WorkoutAIDisplay: React.FC<WorkoutAIDisplayProps> = ({ aiAnalysis, workout
         )}
 
         {/* Strengths */}
-        {executionQuality?.strengths && executionQuality.strengths.length > 0 && (
+        {granularAnalysis.strengths && granularAnalysis.strengths.length > 0 && (
           <div className="border-t pt-3">
             <div className="text-sm font-medium mb-2 text-green-600">Strengths</div>
             <ul className="space-y-1">
-              {executionQuality.strengths.map((strength, index) => (
+              {granularAnalysis.strengths.map((strength, index) => (
                 <li key={index} className="text-sm text-gray-600">• {strength}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Heart Rate Recommendations */}
+        {granularAnalysis.heart_rate_analysis && granularAnalysis.heart_rate_analysis.recommendations && granularAnalysis.heart_rate_analysis.recommendations.length > 0 && (
+          <div className="border-t pt-3">
+            <div className="text-sm font-medium mb-2 text-blue-600">HR Recommendations</div>
+            <ul className="space-y-1">
+              {granularAnalysis.heart_rate_analysis.recommendations.slice(0, 3).map((rec, index) => (
+                <li key={index} className="text-sm text-gray-600">• {rec}</li>
               ))}
             </ul>
           </div>

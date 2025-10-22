@@ -72,6 +72,31 @@ async function fetchActivityDetails(summaryId, userId) {
     }
     const activityDetails = await response.json();
     console.log(`Fetched ${activityDetails.length} activity details from Garmin API`);
+    
+    // 🔍 DIAGNOSTIC: Log raw Garmin API response for FR 965 debugging
+    if (activityDetails.length > 0) {
+      const firstActivity = activityDetails[0];
+      console.log('🔍 RAW GARMIN API RESPONSE DIAGNOSTICS:', {
+        activity_count: activityDetails.length,
+        summary_fields: Object.keys(firstActivity.summary || {}),
+        sample_count: firstActivity.samples?.length || 0,
+        device_name: firstActivity.summary?.deviceName,
+        activity_type: firstActivity.summary?.activityType,
+        manual: firstActivity.summary?.manual,
+        is_web_upload: firstActivity.summary?.isWebUpload,
+        first_sample_fields: firstActivity.samples?.[0] ? Object.keys(firstActivity.samples[0]) : 'No samples',
+        first_sample_data: firstActivity.samples?.[0] || 'No samples',
+        sample_field_availability: {
+          speedMetersPerSecond: firstActivity.samples?.filter(s => s.speedMetersPerSecond != null).length || 0,
+          totalDistanceInMeters: firstActivity.samples?.filter(s => s.totalDistanceInMeters != null).length || 0,
+          heartRate: firstActivity.samples?.filter(s => s.heartRate != null).length || 0,
+          stepsPerMinute: firstActivity.samples?.filter(s => s.stepsPerMinute != null).length || 0,
+          latitude: firstActivity.samples?.filter(s => s.latitudeInDegree != null).length || 0,
+          longitude: firstActivity.samples?.filter(s => s.longitudeInDegree != null).length || 0
+        }
+      });
+    }
+    
     // Find the specific activity we're looking for
     const targetActivity = activityDetails.find((detail)=>detail.summaryId === summaryId || detail.summary?.summaryId === summaryId);
     return targetActivity || null;
@@ -262,6 +287,24 @@ async function processActivityDetails(activityDetails) {
       };
       const samples = activityDetail.samples || [];
       console.log(`Processing activity detail: ${activity.summaryId} with ${samples.length} samples`);
+      
+      // 🔍 DIAGNOSTIC: Log sample processing for FR 965 debugging
+      if (samples.length > 0) {
+        const firstSample = samples[0];
+        console.log('🔍 SAMPLE PROCESSING DIAGNOSTICS:', {
+          sample_count: samples.length,
+          first_sample_fields: Object.keys(firstSample),
+          first_sample_values: firstSample,
+          field_availability: {
+            speedMetersPerSecond: samples.filter(s => s.speedMetersPerSecond != null).length,
+            totalDistanceInMeters: samples.filter(s => s.totalDistanceInMeters != null).length,
+            heartRate: samples.filter(s => s.heartRate != null).length,
+            stepsPerMinute: samples.filter(s => s.stepsPerMinute != null).length,
+            latitudeInDegree: samples.filter(s => s.latitudeInDegree != null).length,
+            longitudeInDegree: samples.filter(s => s.longitudeInDegree != null).length
+          }
+        });
+      }
       // Get user connection
       const { data: connections } = await supabase.from('user_connections').select('user_id, connection_data').eq('provider', 'garmin').eq('connection_data->>user_id', activity.userId).limit(1);
       const connection = connections?.[0];

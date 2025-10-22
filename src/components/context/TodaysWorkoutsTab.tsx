@@ -214,32 +214,33 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     let insights = analysis.insights || (analysis.workout_analysis && analysis.workout_analysis.insights) || [];
     
     // Convert new granular analysis format to insights format
-    if (analysis.adherence_percentage !== undefined) {
+    const granularAnalysis = analysis.analysis || analysis;
+    if (granularAnalysis.overall_adherence !== undefined) {
       console.log('🔄 Converting granular analysis to insights format');
       insights = [];
       
       // Check if this is a long run or interval workout
-      const isLongRun = analysis.workout_type === 'long_run';
+      const isLongRun = granularAnalysis.workout_type === 'long_run';
+      const adherencePercentage = Math.round(granularAnalysis.overall_adherence * 100);
       
       if (isLongRun) {
         // Long run specific insights
-        const paceConsistency = Math.round(analysis.adherence_percentage * 100);
-        if (paceConsistency >= 90) {
-          insights.push(`Excellent pace consistency - ${paceConsistency}% steady pacing throughout`);
-        } else if (paceConsistency >= 80) {
-          insights.push(`Good pace consistency - ${paceConsistency}% steady pacing`);
-        } else if (paceConsistency >= 70) {
-          insights.push(`Fair pace consistency - ${paceConsistency}% steady pacing`);
+        if (adherencePercentage >= 90) {
+          insights.push(`Excellent pace consistency - ${adherencePercentage}% steady pacing throughout`);
+        } else if (adherencePercentage >= 80) {
+          insights.push(`Good pace consistency - ${adherencePercentage}% steady pacing`);
+        } else if (adherencePercentage >= 70) {
+          insights.push(`Fair pace consistency - ${adherencePercentage}% steady pacing`);
         } else {
-          insights.push(`Pace variability high - only ${paceConsistency}% consistent pacing`);
+          insights.push(`Pace variability high - only ${adherencePercentage}% consistent pacing`);
         }
         
         // Add long run specific metrics
-        if (analysis.negativeSplit) {
+        if (granularAnalysis.negativeSplit) {
           insights.push('Strong negative split - great pacing discipline');
         }
-        if (analysis.paceDrift && Math.abs(analysis.paceDrift) > 0.05) {
-          if (analysis.paceDrift > 0) {
+        if (granularAnalysis.paceDrift && Math.abs(granularAnalysis.paceDrift) > 0.05) {
+          if (granularAnalysis.paceDrift > 0) {
             insights.push('Pace drift detected - consider starting slower next time');
           } else {
             insights.push('Significant pace fade - may have started too fast');
@@ -247,25 +248,56 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         }
       } else {
         // Interval workout insights
-        if (analysis.adherence_percentage >= 0.9) {
-          insights.push(`Excellent execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
-        } else if (analysis.adherence_percentage >= 0.8) {
-          insights.push(`Good execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
-        } else if (analysis.adherence_percentage >= 0.7) {
-          insights.push(`Fair execution - ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+        if (granularAnalysis.overall_adherence >= 0.9) {
+          insights.push(`Excellent execution - ${adherencePercentage}% time in prescribed ranges`);
+        } else if (granularAnalysis.overall_adherence >= 0.8) {
+          insights.push(`Good execution - ${adherencePercentage}% time in prescribed ranges`);
+        } else if (granularAnalysis.overall_adherence >= 0.7) {
+          insights.push(`Fair execution - ${adherencePercentage}% time in prescribed ranges`);
         } else {
-          insights.push(`Needs improvement - only ${Math.round(analysis.adherence_percentage * 100)}% time in prescribed ranges`);
+          insights.push(`Needs improvement - only ${adherencePercentage}% time in prescribed ranges`);
+        }
+      }
+      
+      // Add heart rate analysis insights
+      if (granularAnalysis.heart_rate_analysis && granularAnalysis.heart_rate_analysis.available) {
+        const hrAnalysis = granularAnalysis.heart_rate_analysis;
+        insights.push(`Average heart rate: ${hrAnalysis.average_heart_rate} bpm`);
+        
+        // Add HR drift insight
+        if (hrAnalysis.hr_drift_bpm > 5) {
+          insights.push(`Heart rate drift: +${hrAnalysis.hr_drift_bpm} bpm (consider easier pace)`);
+        } else if (hrAnalysis.hr_drift_bpm < -5) {
+          insights.push(`Negative HR drift: ${hrAnalysis.hr_drift_bpm} bpm (excellent fitness!)`);
+        }
+        
+        // Add zone analysis
+        const zoneAnalysis = hrAnalysis.zone_analysis;
+        if (zoneAnalysis) {
+          const primaryZone = Object.entries(zoneAnalysis)
+            .filter(([_, data]: [string, any]) => data.percentage > 0.5)
+            .sort(([_, a]: [string, any], [__, b]: [string, any]) => b.percentage - a.percentage)[0];
+          
+          if (primaryZone) {
+            const [zoneName, zoneData] = primaryZone;
+            insights.push(`Primary zone: ${zoneData.name} (${Math.round(zoneData.percentage * 100)}% of workout)`);
+          }
+        }
+        
+        // Add HR recommendations
+        if (hrAnalysis.recommendations && hrAnalysis.recommendations.length > 0) {
+          insights.push(...hrAnalysis.recommendations.slice(0, 2)); // Limit to 2 recommendations
         }
       }
       
       // Add execution grade
-      if (analysis.execution_grade) {
-        insights.push(`Overall grade: ${analysis.execution_grade}`);
+      if (granularAnalysis.execution_grade) {
+        insights.push(`Overall grade: ${granularAnalysis.execution_grade}`);
       }
       
       // Add strengths as insights
-      if (analysis.strengths && analysis.strengths.length > 0) {
-        insights.push(...analysis.strengths);
+      if (granularAnalysis.strengths && granularAnalysis.strengths.length > 0) {
+        insights.push(...granularAnalysis.strengths);
       }
     }
     
