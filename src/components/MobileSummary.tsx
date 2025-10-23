@@ -1426,6 +1426,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const granularAdherence = workoutAnalysis?.overall_adherence;
           const executionGrade = workoutAnalysis?.execution_grade;
           const workoutType = workoutAnalysis?.workout_type;
+          const durationAdherence = workoutAnalysis?.duration_adherence;
           
           // Debug: Check what we're getting from the server
           console.log('🚨 [EXECUTION DEBUG] MOBILE SUMMARY RENDERING - RUNNING UPDATED CODE');
@@ -1440,7 +1441,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           // Use enhanced analysis if available, otherwise fall back to old metrics
           const finalExecutionScore = granularAdherence ? Math.round(granularAdherence * 100) : executionScore;
           const finalPacePct = granularAdherence ? Math.round(granularAdherence * 100) : pacePct;
-          const finalDurationPct = durationPct;
+          const finalDurationPct = durationAdherence?.adherence_percentage ? Math.round(durationAdherence.adherence_percentage) : durationPct;
           const finalDistPct = distPct;
           
           // If nothing to show, skip
@@ -1466,6 +1467,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const sign = s>=0 ? '+' : '−'; const v = Math.abs(Math.round(s));
             const m = Math.floor(v/60); const ss = v%60; return `${sign}${m}:${String(ss).padStart(2,'0')}`;
           };
+          
+          // Use enhanced duration delta if available
+          const finalDurationDelta = durationAdherence?.delta_seconds || durationDelta;
           const fmtDeltaPace = (s:number) => {
             const faster = s>0; const v = Math.abs(s); const m = Math.floor(v/60); const ss = Math.round(v%60);
             return `${m?`${m}m `:''}${ss}s/mi ${faster? 'faster' : 'slower'}`.trim();
@@ -1486,7 +1490,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                       {chip('Execution', finalExecutionScore, 
                            granularAdherence ? `${executionGrade} Grade` : 'Overall adherence', 'pace')}
                       {chip('Pace', finalPacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—', 'pace')}
-                      {chip('Duration', finalDurationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
+                      {chip('Duration', finalDurationPct, finalDurationDelta!=null ? fmtDeltaTime(finalDurationDelta) : '—', 'duration')}
                     </div>
                   </div>
               {message && (

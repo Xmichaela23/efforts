@@ -90,6 +90,19 @@ interface EnhancedAdherence {
 }
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+        'Access-Control-Max-Age': '86400'
+      }
+    });
+  }
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -585,6 +598,40 @@ function extractSensorData(data: any): any[] {
 }
 
 /**
+ * Calculate duration adherence for running workouts
+ * Compares planned vs actual duration
+ */
+function calculateDurationAdherence(workout: any, intervals: any[]): any {
+  // Get planned duration from intervals
+  const plannedDurationSeconds = intervals.reduce((total, interval) => {
+    return total + (interval.duration_s || 0);
+  }, 0);
+  
+  // Get actual duration from workout
+  const actualDurationSeconds = workout.moving_time || workout.duration || 0;
+  
+  if (plannedDurationSeconds === 0 || actualDurationSeconds === 0) {
+    return {
+      planned_duration_s: plannedDurationSeconds,
+      actual_duration_s: actualDurationSeconds,
+      adherence_percentage: null,
+      delta_seconds: null
+    };
+  }
+  
+  // Calculate adherence percentage (actual / planned * 100)
+  const adherencePercentage = (actualDurationSeconds / plannedDurationSeconds) * 100;
+  const deltaSeconds = actualDurationSeconds - plannedDurationSeconds;
+  
+  return {
+    planned_duration_s: plannedDurationSeconds,
+    actual_duration_s: actualDurationSeconds,
+    adherence_percentage: adherencePercentage,
+    delta_seconds: deltaSeconds
+  };
+}
+
+/**
  * Calculate prescribed range adherence for running workouts
  * This is the core analysis function that measures time-in-range
  */
@@ -647,6 +694,9 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[]):
   // Calculate heart rate analysis
   const heartRateAnalysis = calculateOverallHeartRateAnalysis(sensorData);
   
+  // Calculate duration adherence
+  const durationAdherence = calculateDurationAdherence(workout, intervals);
+  
   // Identify primary issues and strengths
   const primaryIssues = identifyPrimaryIssues(intervalAnalysis);
   const strengths = identifyStrengths(intervalAnalysis);
@@ -672,6 +722,7 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[]):
       smoothness_score: enhancedAdherence.smoothness_score,
       pacing_variability: enhancedAdherence.pacing_variability
     },
+    duration_adherence: durationAdherence,
     analysis_metadata: {
       total_intervals: intervals.length,
       intervals_analyzed: intervalAnalysis.length,

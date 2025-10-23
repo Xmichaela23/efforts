@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
 
     // Select minimal set plus optional blobs
     const baseSel = [
-      'id','user_id','date','type','workout_status','planned_id','name','metrics','computed',
+      'id','user_id','date','type','workout_status','planned_id','name','metrics','computed','workout_analysis',
       'avg_heart_rate','max_heart_rate','avg_power','max_power','avg_cadence','max_cadence',
       'avg_speed','distance','duration','elapsed_time','moving_time','calories','steps','elevation_gain','elevation_loss',
       'start_position_lat','start_position_long','timestamp',
@@ -118,6 +118,7 @@ Deno.serve(async (req) => {
     // Parse/attach structured fields
     try { (detail as any).computed = (()=>{ try { return typeof row.computed === 'string' ? JSON.parse(row.computed) : (row.computed || null); } catch { return row.computed || null; } })(); } catch {}
     try { (detail as any).metrics  = (()=>{ try { return typeof row.metrics  === 'string' ? JSON.parse(row.metrics)  : (row.metrics  || null); } catch { return row.metrics  || null; } })(); } catch {}
+    try { (detail as any).workout_analysis = (()=>{ try { return typeof row.workout_analysis === 'string' ? JSON.parse(row.workout_analysis) : (row.workout_analysis || null); } catch { return row.workout_analysis || null; } })(); } catch {}
     try { (detail as any).strength_exercises = (()=>{ try { return typeof row.strength_exercises === 'string' ? JSON.parse(row.strength_exercises) : (row.strength_exercises || null); } catch { return row.strength_exercises || null; } })(); } catch {}
     try { (detail as any).mobility_exercises = (()=>{ try { return typeof row.mobility_exercises === 'string' ? JSON.parse(row.mobility_exercises) : (row.mobility_exercises || null); } catch { return row.mobility_exercises || null; } })(); } catch {}
     if (opts.include_gps) {
