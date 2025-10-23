@@ -1423,10 +1423,26 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           
           // Legacy system provides all the data we need
           
+          // Calculate duration adherence directly if not available from legacy system
+          let finalDurationPct = durationPct;
+          if (!finalDurationPct && planned && completed) {
+            // Calculate planned duration from intervals
+            const plannedDuration = planned.computed?.total_duration_seconds || 
+              (Array.isArray(planned.computed?.steps) ? 
+                planned.computed.steps.reduce((total: number, step: any) => total + (step.duration_s || 0), 0) : 0);
+            
+            // Get actual duration from completed workout
+            const actualDuration = (completed as any)?.computed?.overall?.duration_s_moving || 0;
+            
+            if (plannedDuration > 0 && actualDuration > 0) {
+              finalDurationPct = Math.round((actualDuration / plannedDuration) * 100);
+              console.log(`🔍 [DURATION DEBUG] Calculated duration adherence: ${finalDurationPct}% (planned: ${plannedDuration}s, actual: ${actualDuration}s)`);
+            }
+          }
+          
           // Use legacy system that already works for duration adherence
           const finalExecutionScore = executionScore;
           const finalPacePct = pacePct;
-          const finalDurationPct = durationPct;
           console.log('🔍 [DURATION DEBUG] finalDurationPct:', finalDurationPct, 'durationPct:', durationPct);
           const finalDistPct = distPct;
           
