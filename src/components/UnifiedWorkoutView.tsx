@@ -324,8 +324,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           }
         }
 
-        // Refresh data
-        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+        // Refresh data after a delay to ensure database update is complete
+        setTimeout(() => {
+          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+        }, 2000);
       } catch (error) {
         console.error('Summary tab analysis error:', error);
       }
