@@ -1437,11 +1437,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           console.log('🔍 [EXECUTION DEBUG] workout_analysis:', workoutAnalysis);
           console.log('🔍 [EXECUTION DEBUG] granularAdherence:', granularAdherence);
           console.log('🔍 [EXECUTION DEBUG] executionGrade:', executionGrade);
+          console.log('🔍 [DURATION DEBUG] durationAdherence:', durationAdherence);
           
           // Use enhanced analysis if available, otherwise fall back to old metrics
           const finalExecutionScore = granularAdherence ? Math.round(granularAdherence * 100) : executionScore;
           const finalPacePct = granularAdherence ? Math.round(granularAdherence * 100) : pacePct;
           const finalDurationPct = durationAdherence?.adherence_percentage ? Math.round(durationAdherence.adherence_percentage) : durationPct;
+          console.log('🔍 [DURATION DEBUG] finalDurationPct:', finalDurationPct, 'durationPct:', durationPct);
           const finalDistPct = distPct;
           
           // If nothing to show, skip
