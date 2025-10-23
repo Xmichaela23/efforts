@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // - Calculates time-in-prescribed-range (not just averages)
 // - Provides interval-by-interval execution breakdown
 // - Detects patterns: too fast, fading, inconsistent pacing
-// - Generates honest execution grades (A/B/C/D/F)
+// - Provides descriptive performance assessment
 // - Identifies specific issues and strengths
 // 
 // KEY FEATURES:
@@ -30,7 +30,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // ANALYSIS OUTPUT:
 // - adherence_percentage: % of time spent in prescribed ranges
 // - interval_breakdown: per-interval execution quality
-// - execution_grade: honest A-F grade
+// - performance_assessment: descriptive text based on percentage
 // - primary_issues: specific problems identified
 // - strengths: positive execution patterns
 // 
@@ -137,7 +137,13 @@ Deno.serve(async (req) => {
         time_series_data,
         garmin_data,
         planned_id,
-        user_id
+        user_id,
+        moving_time,
+        duration,
+        elapsed_time,
+        duration_s_moving,
+        total_timer_time,
+        total_time_s
       `)
       .eq('id', workout_id)
       .single();
@@ -233,7 +239,7 @@ Deno.serve(async (req) => {
         success: true,
         analysis: {
           adherence_percentage: 0,
-          execution_grade: 'N/A',
+          performance_assessment: 'Unable to assess',
           primary_issues: ['No user baselines found - cannot analyze workout without pace references'],
           strengths: [],
           workout_type: 'long_run',
@@ -285,7 +291,7 @@ Deno.serve(async (req) => {
         success: true,
         analysis: {
           adherence_percentage: 0,
-          execution_grade: 'N/A',
+          performance_assessment: 'Unable to assess',
           primary_issues: ['No sensor data available - workout may not have been processed yet'],
           strengths: [],
           workout_type: 'long_run',
@@ -334,7 +340,7 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Running analysis complete for workout ${workout_id}`);
     console.log(`📊 Overall adherence: ${(analysis.overall_adherence * 100).toFixed(1)}%`);
-    console.log(`🎯 Execution grade: ${analysis.execution_grade}`);
+    console.log(`🎯 Performance: ${analysis.performance_assessment}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -367,7 +373,7 @@ interface PrescribedRangeAdherence {
   time_outside_range_s: number;
   total_time_s: number;
   interval_breakdown: IntervalAnalysis[];
-  execution_grade: string;
+  performance_assessment: string;
   primary_issues: string[];
   strengths: string[];
   analysis_metadata: {
@@ -395,7 +401,7 @@ interface IntervalAnalysis {
   average_value: number;
   range_consistency: number;
   issues: string[];
-  grade: string;
+  performance_assessment: string;
 }
 
 interface SampleTiming {
@@ -601,15 +607,20 @@ function extractSensorData(data: any): any[] {
  * Calculate duration adherence for running workouts
  * Compares planned vs actual duration
  */
-function calculateDurationAdherence(workout: any, intervals: any[]): any {
+function calculateDurationAdherence(sensorData: any[], intervals: any[]): any {
   try {
     // Get planned duration from intervals
     const plannedDurationSeconds = intervals.reduce((total, interval) => {
       return total + (interval.duration_s || 0);
     }, 0);
     
-    // Get actual duration from workout
-    const actualDurationSeconds = workout.moving_time || workout.duration || workout.elapsed_time || 0;
+    // Calculate actual duration from sensor data
+    let actualDurationSeconds = 0;
+    if (sensorData.length > 0) {
+      const firstSample = sensorData[0];
+      const lastSample = sensorData[sensorData.length - 1];
+      actualDurationSeconds = lastSample.timestamp - firstSample.timestamp;
+    }
     
     console.log(`📊 Duration adherence calculation: planned=${plannedDurationSeconds}s, actual=${actualDurationSeconds}s`);
     
@@ -704,20 +715,20 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
   });
   
   const overallAdherence = enhancedAdherence.overall_adherence;
-  const executionGrade = Math.round(overallAdherence * 100);
+  const performanceAssessment = getOverallPerformanceAssessment(overallAdherence, intervalAnalysis);
   
   // Calculate heart rate analysis
   const heartRateAnalysis = calculateOverallHeartRateAnalysis(sensorData);
   
   // Calculate duration adherence
-  const durationAdherence = calculateDurationAdherence(workout, intervals);
+  const durationAdherence = calculateDurationAdherence(sensorData, intervals);
   
   // Identify primary issues and strengths
   const primaryIssues = identifyPrimaryIssues(intervalAnalysis);
   const strengths = identifyStrengths(intervalAnalysis);
   
   console.log(`🎯 Overall adherence: ${(overallAdherence * 100).toFixed(1)}%`);
-  console.log(`📊 Execution: ${executionGrade}%`);
+  console.log(`📊 Performance: ${performanceAssessment}`);
   console.log(`🚨 Issues: ${primaryIssues.length}`);
   console.log(`💪 Strengths: ${strengths.length}`);
   
@@ -727,7 +738,7 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
     time_outside_range_s: enhancedAdherence.time_outside_range_s,
     total_time_s: enhancedAdherence.total_time_s,
     interval_breakdown: intervalAnalysis,
-    execution_grade: executionGrade.toString(),
+    performance_assessment: performanceAssessment,
     primary_issues: primaryIssues,
     strengths: strengths,
     heart_rate_analysis: heartRateAnalysis,
@@ -907,8 +918,8 @@ function calculateIntervalAdherence(samples: any[], interval: any): IntervalAnal
   // Identify issues for this interval
   const issues = identifyIntervalIssues(adherencePercentage, averageValue, prescribedRange, interval);
   
-  // Calculate grade for this interval
-  const grade = calculateIntervalGrade(adherencePercentage, interval.type);
+  // Calculate performance assessment for this interval
+  const performanceAssessment = getPerformanceAssessment(adherencePercentage, interval.type);
   
   return {
     interval_id: interval.id || `interval_${Date.now()}`,
@@ -922,7 +933,7 @@ function calculateIntervalAdherence(samples: any[], interval: any): IntervalAnal
     average_value: averageValue,
     range_consistency: rangeConsistency,
     issues: issues,
-    grade: grade
+    performance_assessment: performanceAssessment
   };
 }
 
@@ -1431,24 +1442,43 @@ function identifyIntervalIssues(adherence: number, averageValue: number, range: 
 }
 
 /**
- * Calculate grade for a specific interval
+ * Get performance assessment for a specific interval based on adherence percentage
  */
-function calculateIntervalGrade(adherence: number, intervalType: string): string {
-  const thresholds = getGradingThresholds(intervalType);
+function getPerformanceAssessment(adherence: number, intervalType: string): string {
+  const percentage = Math.round(adherence * 100);
   
-  if (adherence >= thresholds.excellent) return 'A';
-  if (adherence >= thresholds.good) return 'B';
-  if (adherence >= thresholds.acceptable) return 'C';
-  if (adherence >= thresholds.poor) return 'D';
-  return 'F';
+  if (intervalType === 'warmup' || intervalType === 'cooldown') {
+    // More lenient for warmup/cooldown
+    if (adherence >= 0.80) return 'Excellent';
+    if (adherence >= 0.70) return 'Good';
+    if (adherence >= 0.60) return 'Fair';
+    if (adherence >= 0.45) return 'Poor';
+    return 'Very Poor';
+  }
+  
+  if (intervalType === 'interval' || intervalType === 'work') {
+    // Stricter for intervals
+    if (adherence >= 0.90) return 'Excellent';
+    if (adherence >= 0.80) return 'Good';
+    if (adherence >= 0.70) return 'Fair';
+    if (adherence >= 0.55) return 'Poor';
+    return 'Very Poor';
+  }
+  
+  // Default thresholds
+  if (adherence >= 0.85) return 'Excellent';
+  if (adherence >= 0.75) return 'Good';
+  if (adherence >= 0.65) return 'Fair';
+  if (adherence >= 0.50) return 'Poor';
+  return 'Very Poor';
 }
 
 /**
- * Calculate honest overall grade based on adherence and patterns
+ * Get overall performance assessment based on adherence and patterns
  */
-function calculateHonestGrade(overallAdherence: number, intervalAnalysis: IntervalAnalysis[]): string {
-  // Base grade on overall adherence
-  let grade = calculateIntervalGrade(overallAdherence, 'overall');
+function getOverallPerformanceAssessment(overallAdherence: number, intervalAnalysis: IntervalAnalysis[]): string {
+  // Base assessment on overall adherence
+  let assessment = getPerformanceAssessment(overallAdherence, 'overall');
   
   // Adjust based on patterns
   const workIntervals = intervalAnalysis.filter(i => i.interval_type === 'work' || i.interval_type === 'interval');
@@ -1456,32 +1486,14 @@ function calculateHonestGrade(overallAdherence: number, intervalAnalysis: Interv
     ? workIntervals.reduce((sum, i) => sum + i.adherence_percentage, 0) / workIntervals.length
     : overallAdherence;
   
-  // Stricter grading for work intervals
+  // Stricter assessment for work intervals
   if (workIntervals.length > 0 && workAdherence < 0.6) {
-    grade = 'F';
+    assessment = 'Very Poor';
   } else if (workIntervals.length > 0 && workAdherence < 0.7) {
-    grade = 'D';
+    assessment = 'Poor';
   }
   
-  return grade;
-}
-
-/**
- * Get grading thresholds based on interval type
- */
-function getGradingThresholds(intervalType: string): { excellent: number, good: number, acceptable: number, poor: number } {
-  if (intervalType === 'warmup' || intervalType === 'cooldown') {
-    // More lenient for warmup/cooldown
-    return { excellent: 0.80, good: 0.70, acceptable: 0.60, poor: 0.45 };
-  }
-  
-  if (intervalType === 'interval' || intervalType === 'work') {
-    // Stricter for intervals
-    return { excellent: 0.90, good: 0.80, acceptable: 0.70, poor: 0.55 };
-  }
-  
-  // Default thresholds
-  return { excellent: 0.85, good: 0.75, acceptable: 0.65, poor: 0.50 };
+  return assessment;
 }
 
 /**

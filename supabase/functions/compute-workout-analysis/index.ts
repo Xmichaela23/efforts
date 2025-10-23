@@ -357,7 +357,7 @@ interface IntervalAnalysis {
   time_in_range_s: number;
   time_outside_range_s: number;
   issues: string[];
-  grade: string;
+  performance_assessment: string;
 }
 
 interface PrescribedRangeAdherence {
@@ -414,13 +414,13 @@ function calculatePrescribedRangeAdherence(
       time_in_range_s: intervalResult.timeInRange,
       time_outside_range_s: intervalResult.timeOutsideRange,
       issues: intervalResult.issues,
-      grade: intervalResult.grade
+      performance_assessment: intervalResult.performanceAssessment
     });
 
     totalTimeInRange += intervalResult.timeInRange;
     totalTimeOutsideRange += intervalResult.timeOutsideRange;
 
-    console.log(`✅ Interval ${i} complete: ${intervalResult.adherencePercentage.toFixed(1)}% adherence, grade: ${intervalResult.grade}`);
+    console.log(`✅ Interval ${i} complete: ${intervalResult.adherencePercentage.toFixed(1)}% adherence, assessment: ${intervalResult.performanceAssessment}`);
   }
 
   const totalTime = totalTimeInRange + totalTimeOutsideRange;
@@ -454,7 +454,7 @@ function calculateIntervalAdherence(
   timeInRange: number;
   timeOutsideRange: number;
   issues: string[];
-  grade: string;
+  performanceAssessment: string;
 } {
   let timeInRange = 0;
   let timeOutsideRange = 0;
@@ -507,7 +507,7 @@ function calculateIntervalAdherence(
   const adherencePercentage = totalTime > 0 ? timeInRange / totalTime : 0;
 
   const issues = identifyIntervalIssues(adherencePercentage, averageValue, prescribedRange, metricType);
-  const grade = calculateIntervalGrade(adherencePercentage, executed);
+  const performanceAssessment = getPerformanceAssessment(adherencePercentage, executed);
 
   return {
     averageValue,
@@ -515,8 +515,40 @@ function calculateIntervalAdherence(
     timeInRange,
     timeOutsideRange,
     issues,
-    grade
+    performanceAssessment
   };
+}
+
+function getPerformanceAssessment(adherence: number, executed: ExecutedInterval): string {
+  const percentage = Math.round(adherence * 100);
+  
+  // Determine interval type from executed data
+  const intervalType = executed.interval_type || 'unknown';
+  
+  if (intervalType === 'warmup' || intervalType === 'cooldown') {
+    // More lenient for warmup/cooldown
+    if (adherence >= 0.80) return 'Excellent';
+    if (adherence >= 0.70) return 'Good';
+    if (adherence >= 0.60) return 'Fair';
+    if (adherence >= 0.45) return 'Poor';
+    return 'Very Poor';
+  }
+  
+  if (intervalType === 'interval' || intervalType === 'work') {
+    // Stricter for intervals
+    if (adherence >= 0.90) return 'Excellent';
+    if (adherence >= 0.80) return 'Good';
+    if (adherence >= 0.70) return 'Fair';
+    if (adherence >= 0.55) return 'Poor';
+    return 'Very Poor';
+  }
+  
+  // Default thresholds
+  if (adherence >= 0.85) return 'Excellent';
+  if (adherence >= 0.75) return 'Good';
+  if (adherence >= 0.65) return 'Fair';
+  if (adherence >= 0.50) return 'Poor';
+  return 'Very Poor';
 }
 
 function identifyIntervalIssues(
@@ -639,7 +671,7 @@ function analyzeLongRun(computed: any, plannedInterval: any) {
       timeInRange: 0,
       timeOutsideRange: 0,
       segments: [],
-      grade: 'F',
+      performance_assessment: 'Very Poor',
       issues: ['No interval data available'],
       strengths: []
     };
@@ -658,7 +690,7 @@ function analyzeLongRun(computed: any, plannedInterval: any) {
       timeInRange: 0,
       timeOutsideRange: 0,
       segments: [],
-      grade: 'F',
+      performance_assessment: 'Very Poor',
       issues: ['No pace data available'],
       strengths: []
     };
@@ -741,15 +773,15 @@ function analyzeLongRun(computed: any, plannedInterval: any) {
   }
   
   // Calculate grade based on consistency and execution
-  let grade = 'F';
+  let performanceAssessment = 'Very Poor';
   if (paceConsistency >= 0.9 && !significantDrift) {
-    grade = 'A';
+    performanceAssessment = 'Excellent';
   } else if (paceConsistency >= 0.8 && paceDrift < 0.1) {
-    grade = 'B';
+    performanceAssessment = 'Good';
   } else if (paceConsistency >= 0.7) {
-    grade = 'C';
+    performanceAssessment = 'Fair';
   } else if (paceConsistency >= 0.6) {
-    grade = 'D';
+    performanceAssessment = 'Poor';
   }
   
   // Create segment breakdown
@@ -758,19 +790,19 @@ function analyzeLongRun(computed: any, plannedInterval: any) {
       segment: 'First 25%',
       pace: first25Pace,
       duration: first25Time,
-      grade: first25Pace <= avgPace * 1.05 ? 'A' : 'B'
+      performance_assessment: first25Pace <= avgPace * 1.05 ? 'Excellent' : 'Good'
     },
     {
       segment: 'Middle 50%',
       pace: middle50Pace,
       duration: middle50Time,
-      grade: Math.abs(middle50Pace - avgPace) / avgPace < 0.03 ? 'A' : 'B'
+      performance_assessment: Math.abs(middle50Pace - avgPace) / avgPace < 0.03 ? 'Excellent' : 'Good'
     },
     {
       segment: 'Final 25%',
       pace: final25Pace,
       duration: final25Time,
-      grade: final25Pace <= avgPace * 1.1 ? 'A' : 'B'
+      performance_assessment: final25Pace <= avgPace * 1.1 ? 'Excellent' : 'Good'
     }
   ];
   
@@ -779,7 +811,7 @@ function analyzeLongRun(computed: any, plannedInterval: any) {
     timeInRange: totalDuration * paceConsistency,
     timeOutsideRange: totalDuration * (1 - paceConsistency),
     segments,
-    grade,
+    performance_assessment: performanceAssessment,
     issues,
     strengths,
     paceCV,
@@ -1559,7 +1591,7 @@ Deno.serve(async (req) => {
                 time_in_range_s: longRunAnalysis.timeInRange,
                 time_outside_range_s: longRunAnalysis.timeOutsideRange,
                 interval_breakdown: longRunAnalysis.segments,
-                execution_grade: longRunAnalysis.grade,
+                performance_assessment: longRunAnalysis.performance_assessment,
                 primary_issues: longRunAnalysis.issues,
                 strengths: longRunAnalysis.strengths,
                 analysis_version: 'v1.0.0',
@@ -1568,7 +1600,7 @@ Deno.serve(async (req) => {
               
               console.log('✅ Long run analysis completed:', {
                 consistency: longRunAnalysis.paceConsistency,
-                grade: longRunAnalysis.grade,
+                performance: longRunAnalysis.performance_assessment,
                 issues: longRunAnalysis.issues.length
               });
             } else {
@@ -1602,7 +1634,7 @@ Deno.serve(async (req) => {
                 time_in_range_s: analysis.timeInRange,
                 time_outside_range_s: analysis.timeOutsideRange,
                 interval_breakdown: analysis.intervalAnalysis,
-                execution_grade: analysis.executionGrade,
+                performance_assessment: analysis.performance_assessment,
                 primary_issues: analysis.primaryIssues,
                 strengths: analysis.strengths,
                 analysis_version: 'v1.0.0',
@@ -1637,7 +1669,7 @@ Deno.serve(async (req) => {
               time_in_range_s: longRunAnalysis.timeInRange,
               time_outside_range_s: longRunAnalysis.timeOutsideRange,
               interval_breakdown: longRunAnalysis.segments,
-              execution_grade: longRunAnalysis.grade,
+              performance_assessment: longRunAnalysis.performance_assessment,
               primary_issues: longRunAnalysis.issues,
               strengths: longRunAnalysis.strengths,
               analysis_version: 'v1.0.0',
@@ -1646,7 +1678,7 @@ Deno.serve(async (req) => {
             
             console.log('✅ Long run analysis completed (intervals fallback):', {
               consistency: longRunAnalysis.paceConsistency,
-              grade: longRunAnalysis.grade,
+              performance: longRunAnalysis.performance_assessment,
               issues: longRunAnalysis.issues.length
             });
           } else {
@@ -1689,7 +1721,7 @@ Deno.serve(async (req) => {
               time_in_range_s: analysis.timeInRange,
               time_outside_range_s: analysis.timeOutsideRange,
               interval_breakdown: analysis.intervalAnalysis,
-              execution_grade: analysis.executionGrade,
+              performance_assessment: analysis.performance_assessment,
               primary_issues: analysis.primaryIssues,
               strengths: analysis.strengths,
               analysis_version: 'v1.0.0',
@@ -1723,7 +1755,7 @@ Deno.serve(async (req) => {
             time_in_range_s: basicAnalysis.timeInRange,
             time_outside_range_s: basicAnalysis.timeOutsideRange,
             interval_breakdown: basicAnalysis.segments,
-            execution_grade: basicAnalysis.grade,
+            performance_assessment: basicAnalysis.performance_assessment,
             primary_issues: basicAnalysis.issues,
             strengths: basicAnalysis.strengths,
             analysis_version: 'v1.0.0',
@@ -1732,7 +1764,7 @@ Deno.serve(async (req) => {
           
           console.log('✅ Basic analysis completed:', {
             consistency: basicAnalysis.paceConsistency,
-            grade: basicAnalysis.grade,
+            performance: basicAnalysis.performance_assessment,
             issues: basicAnalysis.issues.length
           });
         }

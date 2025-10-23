@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 export interface WorkoutAnalysisResult {
   success: boolean;
   analysis?: any;
-  execution_grade?: string | null;
+  performance_assessment?: string | null;
   insights?: string[];
   key_metrics?: any;
   red_flags?: string[];
@@ -38,7 +38,7 @@ export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysis
     return {
       success: true,
       analysis: data.analysis,
-      execution_grade: data.execution_grade,
+      performance_assessment: data.performance_assessment,
       insights: data.insights || [],
       key_metrics: data.key_metrics,
       red_flags: data.red_flags || [],

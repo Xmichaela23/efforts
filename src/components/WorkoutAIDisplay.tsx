@@ -8,7 +8,7 @@ interface WorkoutAIDisplayProps {
     recommendation: string;
   };
   workoutAnalysis?: {
-    execution_grade?: string;
+    performance_assessment?: string;
     insights?: string[];
     strengths?: string[];
     key_metrics?: any;
@@ -129,18 +129,18 @@ const WorkoutAIDisplay: React.FC<WorkoutAIDisplayProps> = ({ aiAnalysis, workout
           </div>
         )}
 
-        {/* Execution Grade as Percentage */}
-        {granularAnalysis.execution_grade && (
+        {/* Performance Assessment */}
+        {granularAnalysis.performance_assessment && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Execution</span>
+            <span className="text-sm text-gray-600">Performance</span>
             <span className={`text-sm font-medium ${
-              granularAnalysis.overall_adherence >= 0.9 ? 'text-green-600' :
-              granularAnalysis.overall_adherence >= 0.8 ? 'text-blue-600' :
-              granularAnalysis.overall_adherence >= 0.7 ? 'text-yellow-600' :
-              granularAnalysis.overall_adherence >= 0.6 ? 'text-orange-600' :
+              granularAnalysis.performance_assessment === 'Excellent' ? 'text-green-600' :
+              granularAnalysis.performance_assessment === 'Good' ? 'text-blue-600' :
+              granularAnalysis.performance_assessment === 'Fair' ? 'text-yellow-600' :
+              granularAnalysis.performance_assessment === 'Poor' ? 'text-orange-600' :
               'text-red-600'
             }`}>
-              {Math.round(granularAnalysis.overall_adherence * 100)}%
+              {granularAnalysis.performance_assessment}
             </span>
           </div>
         )}

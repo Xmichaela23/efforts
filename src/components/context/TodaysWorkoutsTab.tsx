@@ -99,7 +99,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         type: w.type,
         date: w.date,
         has_analysis: !!w.workout_analysis,
-        analysis_grade: w.workout_analysis?.execution_grade
+        performance_assessment: w.workout_analysis?.performance_assessment
       })));
       
       setRecentWorkouts(recentData || []);
@@ -161,7 +161,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       type: w.type,
       status: w.workout_status,
       has_analysis: !!w.workout_analysis,
-      analysis_grade: w.workout_analysis?.execution_grade
+      performance_assessment: w.workout_analysis?.performance_assessment
     })));
 
     // If a specific workout was selected, show that one (even if no insights)
@@ -190,7 +190,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       id: workoutWithAnalysis.id,
       type: workoutWithAnalysis.type,
       status: workoutWithAnalysis.workout_status,
-      grade: workoutWithAnalysis.workout_analysis?.execution_grade
+      performance: workoutWithAnalysis.workout_analysis?.performance_assessment
     } : 'NONE');
 
     if (!workoutWithAnalysis) {
@@ -340,10 +340,10 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
         }
       }
       
-      // Add execution grade as percentage
-      if (granularAnalysis.execution_grade) {
-        const gradePercentage = Math.round(granularAnalysis.overall_adherence * 100);
-        insights.push(`Overall execution: ${gradePercentage}%`);
+      // Add performance assessment
+      if (granularAnalysis.performance_assessment) {
+        const percentage = Math.round(granularAnalysis.overall_adherence * 100);
+        insights.push(`${granularAnalysis.performance_assessment} execution: ${percentage}%`);
       }
       
       // Add strengths as insights

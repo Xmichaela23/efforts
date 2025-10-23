@@ -1424,7 +1424,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           // Check for granular analysis data (new adherence analysis)
           const workoutAnalysis = (completed as any)?.workout_analysis;
           const granularAdherence = workoutAnalysis?.overall_adherence;
-          const executionGrade = workoutAnalysis?.execution_grade;
+          const performanceAssessment = workoutAnalysis?.performance_assessment;
           const workoutType = workoutAnalysis?.workout_type;
           const durationAdherence = workoutAnalysis?.duration_adherence;
           
@@ -1436,7 +1436,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           console.log('🔍 [EXECUTION DEBUG] execution_score:', executionScore);
           console.log('🔍 [EXECUTION DEBUG] workout_analysis:', workoutAnalysis);
           console.log('🔍 [EXECUTION DEBUG] granularAdherence:', granularAdherence);
-          console.log('🔍 [EXECUTION DEBUG] executionGrade:', executionGrade);
+          console.log('🔍 [EXECUTION DEBUG] performanceAssessment:', performanceAssessment);
           console.log('🔍 [DURATION DEBUG] durationAdherence:', durationAdherence);
           
           // Use enhanced analysis if available, otherwise fall back to old metrics
@@ -1490,7 +1490,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                   <div className="flex items-center justify-center gap-6 text-center">
                     <div className="flex items-end gap-3">
                       {chip('Execution', finalExecutionScore, 
-                           granularAdherence ? `${executionGrade} Grade` : 'Overall adherence', 'pace')}
+                           granularAdherence ? `${performanceAssessment} Performance` : 'Overall adherence', 'pace')}
                       {chip('Pace', finalPacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—', 'pace')}
                       {chip('Duration', finalDurationPct, finalDurationDelta!=null ? fmtDeltaTime(finalDurationDelta) : '—', 'duration')}
                     </div>

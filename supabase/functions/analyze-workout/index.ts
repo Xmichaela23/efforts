@@ -28,7 +28,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // Client → analyze-workout → compute-workout-summary → calculate-workout-metrics → sport-specific-analyzer → workouts.workout_analysis
 // 
 // INPUT: { workout_id: string }
-// OUTPUT: { success: boolean, analysis: object, execution_grade: string, insights: string[], strengths: string[] }
+// OUTPUT: { success: boolean, analysis: object, performance_assessment: string, insights: string[], strengths: string[] }
 // =============================================================================
 
 const corsHeaders = {
@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
       analysisResult = {
         analysis: {
           execution_quality: {
-            overall_grade: 'N/A',
+            performance_assessment: 'Unable to assess',
             primary_issues: [`No analyzer available for ${workout.type} workouts`],
             strengths: []
           }
@@ -172,7 +172,7 @@ function formatAnalysisResponse(analysisResult: any, workoutType: string) {
     if (analysisResult) {
       return {
         analysis: analysisResult,
-        execution_grade: analysisResult.execution_grade,
+        performance_assessment: analysisResult.performance_assessment,
         insights: analysisResult.primary_issues || [],
         key_metrics: {
           adherence_percentage: analysisResult.adherence_percentage,
@@ -187,12 +187,12 @@ function formatAnalysisResponse(analysisResult: any, workoutType: string) {
       return {
         analysis: {
           execution_quality: {
-            overall_grade: 'N/A',
+            performance_assessment: 'Unable to assess',
             primary_issues: ['No analysis available'],
             strengths: []
           }
         },
-        execution_grade: null,
+        performance_assessment: null,
         insights: [],
         key_metrics: null,
         red_flags: [],
@@ -205,12 +205,12 @@ function formatAnalysisResponse(analysisResult: any, workoutType: string) {
   return {
     analysis: analysisResult || {
       execution_quality: {
-        overall_grade: 'N/A',
+        performance_assessment: 'Unable to assess',
         primary_issues: [`No analyzer available for ${workoutType} workouts`],
         strengths: []
       }
     },
-    execution_grade: analysisResult?.execution_grade || null,
+    performance_assessment: analysisResult?.performance_assessment || null,
     insights: analysisResult?.primary_issues || [],
     key_metrics: analysisResult || null,
     red_flags: analysisResult?.primary_issues || [],
