@@ -714,6 +714,8 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
     upper: intervals[0]?.pace_range?.upper || 1000
   });
   
+  console.log('🔍 Enhanced adherence result:', enhancedAdherence);
+  
   const overallAdherence = enhancedAdherence.overall_adherence;
   const performanceAssessment = getOverallPerformanceAssessment(overallAdherence, intervalAnalysis);
   

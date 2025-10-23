@@ -1411,40 +1411,30 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             return null;
           })();
 
-          // Use server-calculated metrics (no client-side math)
-          const executionMetrics = (completed as any)?.calculated_metrics?.execution_metrics;
-          const pacePct = executionMetrics?.pace_adherence_pct;
-          const paceDeltaSec = executionMetrics?.pace_delta_sec;
-          const durationPct = executionMetrics?.duration_adherence_pct;
-          const durationDelta = executionMetrics?.duration_delta_sec;
-          const distPct = executionMetrics?.distance_adherence_pct;
-          const distDeltaMi = executionMetrics?.distance_delta_m ? (executionMetrics.distance_delta_m / 1609.34) : null; // Convert to miles
-          const executionScore = executionMetrics?.overall_execution_score;
+          // Use unified data source from workout_analysis
+          const workoutAnalysis = (completed as any)?.workout_analysis;
+          const granularAnalysis = workoutAnalysis?.granular_analysis;
           
-          // Legacy system provides all the data we need
+          // Get adherence data from unified source
+          const overallAdherence = granularAnalysis?.overall_adherence;
+          const durationAdherence = granularAnalysis?.duration_adherence;
+          const performanceAssessment = granularAnalysis?.performance_assessment;
           
-          // Calculate duration adherence directly if not available from legacy system
-          let finalDurationPct = durationPct;
-          if (!finalDurationPct && planned && completed) {
-            // Calculate planned duration from intervals
-            const plannedDuration = planned.computed?.total_duration_seconds || 
-              (Array.isArray(planned.computed?.steps) ? 
-                planned.computed.steps.reduce((total: number, step: any) => total + (step.duration_s || 0), 0) : 0);
-            
-            // Get actual duration from completed workout
-            const actualDuration = (completed as any)?.computed?.overall?.duration_s_moving || 0;
-            
-            if (plannedDuration > 0 && actualDuration > 0) {
-              finalDurationPct = Math.round((actualDuration / plannedDuration) * 100);
-              console.log(`🔍 [DURATION DEBUG] Calculated duration adherence: ${finalDurationPct}% (planned: ${plannedDuration}s, actual: ${actualDuration}s)`);
-            }
-          }
+          // Convert percentages to match expected format
+          const finalExecutionScore = overallAdherence ? Math.round(overallAdherence * 100) : null;
+          const finalPacePct = granularAnalysis?.pacing_analysis?.time_in_range_score ? 
+            Math.round(granularAnalysis.pacing_analysis.time_in_range_score * 100) : null;
+          const finalDurationPct = durationAdherence?.adherence_percentage || null;
+          const finalDistPct = null; // Distance adherence not available in current analysis
           
-          // Use legacy system that already works for duration adherence
-          const finalExecutionScore = executionScore;
-          const finalPacePct = pacePct;
-          console.log('🔍 [DURATION DEBUG] finalDurationPct:', finalDurationPct, 'durationPct:', durationPct);
-          const finalDistPct = distPct;
+          console.log('🔍 [UNIFIED DEBUG] Using workout_analysis data:', {
+            overallAdherence,
+            durationAdherence,
+            performanceAssessment,
+            finalExecutionScore,
+            finalPacePct,
+            finalDurationPct
+          });
           
           // If nothing to show, skip
           const anyVal = (finalPacePct!=null) || (finalDurationPct!=null) || (finalDistPct!=null) || (finalExecutionScore!=null);
@@ -1490,7 +1480,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                   <div className="flex items-center justify-center gap-6 text-center">
                     <div className="flex items-end gap-3">
                       {chip('Execution', finalExecutionScore, 
-                           granularAdherence ? `${performanceAssessment} Performance` : 'Overall adherence', 'pace')}
+                           performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence', 'pace')}
                       {chip('Pace', finalPacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—', 'pace')}
                       {chip('Duration', finalDurationPct, finalDurationDelta!=null ? fmtDeltaTime(finalDurationDelta) : '—', 'duration')}
                     </div>
