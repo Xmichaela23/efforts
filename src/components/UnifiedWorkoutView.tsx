@@ -314,20 +314,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (isCompleted && (workout.type === 'run' || workout.type === 'running')) {
           console.log('🏃‍♂️ Forcing enhanced running analysis...');
           try {
-            await supabase.functions.invoke('analyze-running-workout', { body: { workout_id: wid } });
-            console.log('✅ Enhanced running analysis completed');
+            const result = await supabase.functions.invoke('analyze-running-workout', { body: { workout_id: wid } });
+            console.log('✅ Enhanced running analysis completed', result);
             
-            // Wait a moment for the database update to complete
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Force immediate data refresh to get the new analysis
+            try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
           } catch (error) {
             console.warn('⚠️ Enhanced running analysis failed:', error);
           }
         }
-
-        // Refresh data after a delay to ensure database update is complete
-        setTimeout(() => {
-          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-        }, 2000);
       } catch (error) {
         console.error('Summary tab analysis error:', error);
       }
