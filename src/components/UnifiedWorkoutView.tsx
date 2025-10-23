@@ -316,6 +316,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           try {
             await supabase.functions.invoke('analyze-running-workout', { body: { workout_id: wid } });
             console.log('✅ Enhanced running analysis completed');
+            
+            // Wait a moment for the database update to complete
+            await new Promise(resolve => setTimeout(resolve, 1000));
           } catch (error) {
             console.warn('⚠️ Enhanced running analysis failed:', error);
           }
