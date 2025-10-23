@@ -1428,6 +1428,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const workoutType = workoutAnalysis?.workout_type;
           const durationAdherence = workoutAnalysis?.duration_adherence;
           
+          // Debug: Check the structure of workoutAnalysis
+          console.log('🔍 [DURATION DEBUG] workoutAnalysis structure:', workoutAnalysis);
+          console.log('🔍 [DURATION DEBUG] duration_adherence from workoutAnalysis:', workoutAnalysis?.duration_adherence);
+          
           // Debug: Check what we're getting from the server
           console.log('🚨 [EXECUTION DEBUG] MOBILE SUMMARY RENDERING - RUNNING UPDATED CODE');
           console.log('🔍 [EXECUTION DEBUG] completed:', completed);
@@ -1439,10 +1443,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           console.log('🔍 [EXECUTION DEBUG] performanceAssessment:', performanceAssessment);
           console.log('🔍 [DURATION DEBUG] durationAdherence:', durationAdherence);
           
-          // Use enhanced analysis if available, otherwise fall back to old metrics
-          const finalExecutionScore = granularAdherence ? Math.round(granularAdherence * 100) : executionScore;
-          const finalPacePct = granularAdherence ? Math.round(granularAdherence * 100) : pacePct;
-          const finalDurationPct = durationAdherence?.adherence_percentage ? Math.round(durationAdherence.adherence_percentage) : durationPct;
+          // Use legacy system that already works for duration adherence
+          const finalExecutionScore = executionScore;
+          const finalPacePct = pacePct;
+          const finalDurationPct = durationPct;
           console.log('🔍 [DURATION DEBUG] finalDurationPct:', finalDurationPct, 'durationPct:', durationPct);
           const finalDistPct = distPct;
           
@@ -1470,8 +1474,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const m = Math.floor(v/60); const ss = v%60; return `${sign}${m}:${String(ss).padStart(2,'0')}`;
           };
           
-          // Use enhanced duration delta if available
-          const finalDurationDelta = durationAdherence?.delta_seconds || durationDelta;
+          // Use legacy duration delta that already works
+          const finalDurationDelta = durationDelta;
           const fmtDeltaPace = (s:number) => {
             const faster = s>0; const v = Math.abs(s); const m = Math.floor(v/60); const ss = Math.round(v%60);
             return `${m?`${m}m `:''}${ss}s/mi ${faster? 'faster' : 'slower'}`.trim();
