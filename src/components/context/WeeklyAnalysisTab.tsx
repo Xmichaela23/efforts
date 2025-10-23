@@ -91,13 +91,13 @@ const WeeklyAnalysisTab: React.FC<WeeklyAnalysisTabProps> = () => {
 
       {/* Week Overview - 3-column grid like CompletedTab */}
       <div className="grid grid-cols-3 gap-1 px-2 mt-2">
-        {/* Week Grade */}
+        {/* Week Performance */}
         <div className="px-2 pb-1">
           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-            {weekData.week_grade}
+            {weekData.week_performance || 'N/A'}
           </div>
           <div className="text-xs text-[#666666] font-normal">
-            <div className="font-medium">Week Grade</div>
+            <div className="font-medium">Week Performance</div>
           </div>
         </div>
 

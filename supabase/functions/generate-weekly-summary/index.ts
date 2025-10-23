@@ -22,7 +22,7 @@
  *     disciplines: {...}             // Detailed breakdown by sport
  *   },
  *   performance_snapshot: string,    // AI-generated 2-3 sentence summary
- *   week_grade: string,              // "A", "B+", "C-", etc.
+ *   week_performance: string,         // "85%" or "Excellent"
  *   key_insights: string[],          // 3-4 actionable bullet points
  *   next_week_preview: {
  *     focus: string,                 // Training focus for next week
@@ -868,7 +868,7 @@ Keep it actionable and specific. Use numbers.
 
 Return ONLY valid JSON:
 {
-  "week_grade": "A-",
+  "week_performance": "85%",
   "performance_snapshot": "your analysis",
   "key_insights": ["insight 1", "insight 2", "insight 3"],
   "next_week_preview": "your preview"

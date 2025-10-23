@@ -1421,27 +1421,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const distDeltaMi = executionMetrics?.distance_delta_m ? (executionMetrics.distance_delta_m / 1609.34) : null; // Convert to miles
           const executionScore = executionMetrics?.overall_execution_score;
           
-          // Check for granular analysis data (new adherence analysis)
-          const workoutAnalysis = (completed as any)?.workout_analysis;
-          const granularAdherence = workoutAnalysis?.overall_adherence;
-          const performanceAssessment = workoutAnalysis?.performance_assessment;
-          const workoutType = workoutAnalysis?.workout_type;
-          const durationAdherence = workoutAnalysis?.duration_adherence;
-          
-          // Debug: Check the structure of workoutAnalysis
-          console.log('🔍 [DURATION DEBUG] workoutAnalysis structure:', workoutAnalysis);
-          console.log('🔍 [DURATION DEBUG] duration_adherence from workoutAnalysis:', workoutAnalysis?.duration_adherence);
-          
-          // Debug: Check what we're getting from the server
-          console.log('🚨 [EXECUTION DEBUG] MOBILE SUMMARY RENDERING - RUNNING UPDATED CODE');
-          console.log('🔍 [EXECUTION DEBUG] completed:', completed);
-          console.log('🔍 [EXECUTION DEBUG] computed:', (completed as any)?.computed);
-          console.log('🔍 [EXECUTION DEBUG] overall:', (completed as any)?.computed?.overall);
-          console.log('🔍 [EXECUTION DEBUG] execution_score:', executionScore);
-          console.log('🔍 [EXECUTION DEBUG] workout_analysis:', workoutAnalysis);
-          console.log('🔍 [EXECUTION DEBUG] granularAdherence:', granularAdherence);
-          console.log('🔍 [EXECUTION DEBUG] performanceAssessment:', performanceAssessment);
-          console.log('🔍 [DURATION DEBUG] durationAdherence:', durationAdherence);
+          // Legacy system provides all the data we need
           
           // Use legacy system that already works for duration adherence
           const finalExecutionScore = executionScore;
