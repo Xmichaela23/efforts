@@ -182,10 +182,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               await supabase.from('planned_workouts').update({ computed: { ...(linkedPlanned as any).computed, steps: withIds } } as any).eq('id', String((linkedPlanned as any).id));
               const { data } = await supabase.from('planned_workouts').select('*').eq('id', String((linkedPlanned as any).id)).maybeSingle();
               if (data) setLinkedPlanned(data);
-              if (isCompleted && (workout as any)?.id) {
-                await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: String((workout as any).id) } });
-                try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-              }
+              // Enhanced analysis will be triggered when user opens Summary tab
             }
           } catch {}
           return;
@@ -246,12 +243,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               const merged = { ...row, ...(Number.isFinite(authoritativeTotal) && authoritativeTotal>0 ? { total_duration_seconds: authoritativeTotal } : {}), ...update };
               setLinkedPlanned(merged);
               try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-              try {
-                if (isCompleted && (workout as any)?.id) {
-                  await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: String((workout as any).id) } });
-                  try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                }
-              } catch {}
+              // Enhanced analysis will be triggered when user opens Summary tab
               return;
             }
           }
@@ -274,26 +266,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         const pid = String(((linkedPlanned as any)?.id || (workout as any)?.planned_id || ''));
         if (!wid) return;
 
-        // Step 1: Ensure compute-workout-analysis has run
-        let intervals: any[] = [];
-        try {
-          const local = (workout as any)?.computed;
-          if (local && Array.isArray(local?.intervals)) intervals = local.intervals;
-        } catch {}
-        if (!intervals || !intervals.length) {
-          const { data } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
-          const cmp = (data as any)?.computed;
-          if (cmp && Array.isArray(cmp?.intervals)) intervals = cmp.intervals;
-        }
-        const needsCompute = (!intervals || !intervals.length) || intervals.every((it:any)=> !it?.planned_step_id);
-        if (needsCompute) {
-          console.log('🔄 Running compute-workout-analysis...');
-          await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } });
-        }
-
-        // Step 1.5: Legacy metrics no longer needed - using enhanced analysis
-
-        // Step 2: Run enhanced analysis if needed (single source of truth)
+        // Step 1: Run enhanced analysis if needed (single source of truth)
         const needsAnalysis = !(workout as any)?.workout_analysis?.granular_analysis;
         
         if (needsAnalysis) {
@@ -415,8 +388,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (recomputeGuardRef.current.has(wid)) return;
         recomputeGuardRef.current.add(wid);
 
-        await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } });
-        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+        // Enhanced analysis will be triggered when user opens Summary tab
       } catch {}
     })();
   }, [activeTab, isCompleted, hydratedPlanned?.computed?.steps, workout?.id]);
@@ -441,8 +413,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           // Avoid double invoke using same guard
           if (recomputeGuardRef.current.has(`snap-${wid}`)) return;
           recomputeGuardRef.current.add(`snap-${wid}`);
-          await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } });
-          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+          // Enhanced analysis will be triggered when user opens Summary tab
         }
       } catch {}
     })();
@@ -468,9 +439,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (recomputeGuardRef.current.has(key)) return;
         recomputeGuardRef.current.add(key);
 
-        // Only compute summary - no auto-attach logic here
-        try { await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } } as any); } catch {}
-        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+        // Enhanced analysis will be triggered when user opens Summary tab
       } catch {}
     })();
   }, [activeTab, isCompleted, (workout as any)?.id, (workout as any)?.planned_id, linkedPlanned?.id, hydratedPlanned?.id]);

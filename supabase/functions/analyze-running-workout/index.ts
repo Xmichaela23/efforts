@@ -165,6 +165,27 @@ Deno.serve(async (req) => {
       throw new Error('No sensor data or computed data available. Workout may not have been processed yet.');
     }
 
+    // Get user baselines first (needed for both planned and unplanned workouts)
+    let baselines = {};
+    try {
+      const { data: userBaselines } = await supabase
+        .from('user_baselines')
+        .select('performance_numbers')
+        .eq('user_id', workout.user_id)
+        .single();
+      baselines = userBaselines?.performance_numbers || {};
+      console.log('📊 User baselines found:', baselines);
+    } catch (error) {
+      console.log('⚠️ No user baselines found, using defaults');
+      // Use default baselines for analysis
+      baselines = {
+        fiveK_pace: 450, // 7:30/mi
+        easyPace: 540,   // 9:00/mi
+        tenK_pace: 480,  // 8:00/mi
+        marathon_pace: 600 // 10:00/mi
+      };
+    }
+
     // Get planned workout data with token parsing support
     let plannedWorkout = null;
     let intervals = [];
@@ -180,26 +201,6 @@ Deno.serve(async (req) => {
         console.warn('⚠️ Could not load planned workout:', plannedError.message);
       } else {
         plannedWorkout = planned;
-        
-        // Get user baselines for token parsing
-        let baselines = {};
-        try {
-          const { data: userBaselines } = await supabase
-            .from('user_baselines')
-            .select('performance_numbers')
-            .eq('user_id', workout.user_id)
-            .single();
-          baselines = userBaselines?.performance_numbers || {};
-        } catch (error) {
-          console.log('⚠️ No user baselines found, using defaults');
-          // Use default baselines for analysis
-          baselines = {
-            fiveK_pace: 450, // 7:30/mi
-            easyPace: 540,   // 9:00/mi
-            tenK_pace: 480,  // 8:00/mi
-            marathon_pace: 600 // 10:00/mi
-          };
-        }
 
         // Parse tokens if available, otherwise use intervals
         if (plannedWorkout.steps_preset && plannedWorkout.steps_preset.length > 0) {
@@ -232,24 +233,39 @@ Deno.serve(async (req) => {
     }
 
     if (!intervals || intervals.length === 0) {
-      // Return a meaningful response instead of crashing
-      return new Response(JSON.stringify({
-        success: true,
-        analysis: {
-          adherence_percentage: 0,
-          performance_assessment: 'Unable to assess',
-          primary_issues: ['No user baselines found - cannot analyze workout without pace references'],
-          strengths: [],
-          workout_type: 'long_run',
-          time_in_range_s: 0,
-          time_outside_range_s: 0
+      // Create reasonable pace targets for unplanned workouts using user baselines
+      console.log('🏃 No planned workout found, creating pace targets from baselines');
+      
+      // Determine workout type based on duration and pace
+      const workoutDuration = workout.moving_time || workout.duration || 0;
+      const avgPace = workout.computed?.overall?.avg_pace_s_per_mi || 0;
+      
+      let targetPace = baselines.easyPace || 540; // Default to easy pace
+      let workoutType = 'easy_run';
+      
+      if (workoutDuration > 3600) { // > 1 hour
+        workoutType = 'long_run';
+        targetPace = baselines.marathon_pace || 600;
+      } else if (workoutDuration > 1800) { // 30-60 minutes
+        workoutType = 'tempo_run';
+        targetPace = baselines.tenK_pace || 480;
+      } else if (workoutDuration < 900) { // < 15 minutes
+        workoutType = 'interval_run';
+        targetPace = baselines.fiveK_pace || 450;
+      }
+      
+      // Create a single interval for the entire workout
+      intervals = [{
+        id: 'unplanned_interval',
+        type: workoutType,
+        duration_s: workoutDuration,
+        pace_range: {
+          lower: targetPace * 0.95, // 5% below target
+          upper: targetPace * 1.05  // 5% above target
         }
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
+      }];
+      
+      console.log(`🎯 Created pace target for ${workoutType}: ${targetPace}s/mi (${Math.floor(targetPace/60)}:${String(targetPace%60).padStart(2,'0')}/mi)`);
     }
 
     // Extract sensor data - try different data sources

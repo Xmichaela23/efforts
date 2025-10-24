@@ -1476,7 +1476,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           };
           
           // Use legacy duration delta that already works
-          const finalDurationDelta = durationDelta;
+          const finalDurationDelta = null; // Will be calculated from granular analysis
           const fmtDeltaPace = (s:number) => {
             const faster = s>0; const v = Math.abs(s); const m = Math.floor(v/60); const ss = Math.round(v%60);
             return `${m?`${m}m `:''}${ss}s/mi ${faster? 'faster' : 'slower'}`.trim();
@@ -1496,7 +1496,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                     <div className="flex items-end gap-3">
                       {chip('Execution', finalExecutionScore, 
                            performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence', 'pace')}
-                      {chip('Pace', finalPacePct, paceDeltaSec!=null ? fmtDeltaPace(paceDeltaSec) : '—', 'pace')}
+                      {chip('Pace', finalPacePct, '—', 'pace')}
                       {chip('Duration', finalDurationPct, finalDurationDelta!=null ? fmtDeltaTime(finalDurationDelta) : '—', 'duration')}
                     </div>
                   </div>
