@@ -104,24 +104,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       
       setRecentWorkouts(recentData || []);
       
-      // Auto-trigger analysis for workouts without analysis
-      const workoutsNeedingAnalysis = (recentData || []).filter(workout => 
-        workout.workout_status === 'completed' && !workout.workout_analysis
-      );
-      
-      if (workoutsNeedingAnalysis.length > 0) {
-        console.log(`🔄 Auto-triggering analysis for ${workoutsNeedingAnalysis.length} workouts without analysis`);
-        
-        // Trigger analysis for each workout (fire and forget)
-        for (const workout of workoutsNeedingAnalysis) {
-          try {
-            await analyzeWorkout(workout.id);
-            console.log(`✅ Analysis triggered for ${workout.type} on ${workout.date}`);
-          } catch (err) {
-            console.warn(`❌ Failed to trigger analysis for ${workout.id}:`, err);
-          }
-        }
-      }
+      // Analysis will be triggered by UnifiedWorkoutView when user opens Summary tab
+      // No need for auto-triggering here to avoid race conditions
 
     } catch (error) {
       console.error('Error loading recent workouts:', error);

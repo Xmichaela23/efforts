@@ -141,9 +141,7 @@ Deno.serve(async (req) => {
         moving_time,
         duration,
         elapsed_time,
-        duration_s_moving,
-        total_timer_time,
-        total_time_s
+        total_timer_time
       `)
       .eq('id', workout_id)
       .single();
@@ -326,11 +324,13 @@ Deno.serve(async (req) => {
       }
     };
 
-    // Store analysis in database
+    // Store analysis in database with correct nested structure
     const { error: updateError } = await supabase
       .from('workouts')
       .update({
-        workout_analysis: enhancedAnalysis
+        workout_analysis: {
+          granular_analysis: enhancedAnalysis
+        }
       })
       .eq('id', workout_id);
 
@@ -376,6 +376,14 @@ interface PrescribedRangeAdherence {
   performance_assessment: string;
   primary_issues: string[];
   strengths: string[];
+  heart_rate_analysis: any;
+  pacing_analysis: {
+    time_in_range_score: number;
+    variability_score: number;
+    smoothness_score: number;
+    pacing_variability: number;
+  };
+  duration_adherence: any;
   analysis_metadata: {
     total_intervals: number;
     intervals_analyzed: number;

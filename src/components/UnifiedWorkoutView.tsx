@@ -290,37 +290,36 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } });
         }
 
-        // Step 1.5: Ensure comprehensive metrics are calculated
-        const { data: workoutData } = await supabase.from('workouts').select('calculated_metrics').eq('id', wid).maybeSingle();
-        if (!workoutData?.calculated_metrics) {
-          console.log('📊 Running calculate-workout-metrics...');
-          await supabase.functions.invoke('calculate-workout-metrics', { body: { workout_id: wid } });
-        }
+        // Step 1.5: Legacy metrics no longer needed - using enhanced analysis
 
-        // Step 2: Run analysis if needed (server handles all routing and orchestration)
-        const needsAnalysis = !(workout as any)?.workout_analysis;
+        // Step 2: Run enhanced analysis if needed (single source of truth)
+        const needsAnalysis = !(workout as any)?.workout_analysis?.granular_analysis;
         
         if (needsAnalysis) {
-          console.log('🏃 Running workout analysis...');
-          try {
-            const { analyzeWorkoutWithRetry } = await import('../services/workoutAnalysisService');
-            await analyzeWorkoutWithRetry(wid);
-          } catch (error) {
-            console.warn('Analysis failed, falling back to basic metrics:', error);
-          }
-        }
-        
-        // Step 3: Force enhanced running analysis for running workouts
-        if (isCompleted && (workout.type === 'run' || workout.type === 'running')) {
-          console.log('🏃‍♂️ Forcing enhanced running analysis...');
+          console.log('🏃‍♂️ Running enhanced workout analysis...');
           try {
             const result = await supabase.functions.invoke('analyze-running-workout', { body: { workout_id: wid } });
-            console.log('✅ Enhanced running analysis completed', result);
+            console.log('✅ Enhanced analysis completed', result);
             
-            // Force immediate data refresh to get the new analysis
+            // Wait for analysis to complete and refresh workout data
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Refresh workout data to get the new analysis
+            const { data: updatedWorkout } = await supabase
+              .from('workouts')
+              .select('*')
+              .eq('id', wid)
+              .single();
+            
+            if (updatedWorkout && onUpdateWorkout) {
+              console.log('🔄 Refreshing workout data with new analysis...');
+              onUpdateWorkout(updatedWorkout);
+            }
+            
+            // Force immediate data refresh
             try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
           } catch (error) {
-            console.warn('⚠️ Enhanced running analysis failed:', error);
+            console.warn('⚠️ Enhanced analysis failed:', error);
           }
         }
       } catch (error) {

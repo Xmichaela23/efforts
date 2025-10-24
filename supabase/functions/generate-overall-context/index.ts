@@ -144,68 +144,8 @@ Deno.serve(async (req) => {
     const planned = plannedResult.data || [];
     let completedWorkouts = workoutsResult.data || [];
 
-    // Auto-trigger analysis for workouts that don't have it yet
-    const workoutsNeedingAnalysis = completedWorkouts.filter(workout => !workout.workout_analysis);
-    if (workoutsNeedingAnalysis.length > 0) {
-      console.log(`Auto-triggering analysis for ${workoutsNeedingAnalysis.length} workouts without analysis`);
-      
-      // Trigger analysis for each workout using proper routing (fire and forget)
-      for (const workout of workoutsNeedingAnalysis) {
-        try {
-          // Determine the correct analysis function based on workout type
-          let functionName = 'analyze-workout'; // Default fallback
-          
-          switch (workout.type) {
-            case 'strength':
-            case 'strength_training':
-              functionName = 'analyze-strength-workout';
-              break;
-            case 'run':
-            case 'running':
-              functionName = 'analyze-workout'; // Use master orchestrator
-              break;
-            case 'ride':
-            case 'cycling':
-            case 'bike':
-              functionName = 'analyze-cycling-workout'; // Future: dedicated function
-              break;
-            case 'swim':
-            case 'swimming':
-              functionName = 'analyze-swimming-workout'; // Future: dedicated function
-              break;
-            default:
-              functionName = 'analyze-workout';
-          }
-          
-          const { data, error } = await supabase.functions.invoke(functionName, {
-            body: { workout_id: workout.id }
-          });
-          
-          if (error) {
-            console.warn(`❌ Analysis failed for ${workout.id} (${functionName}):`, error);
-          } else {
-            console.log(`✅ Analysis triggered for ${workout.type} on ${workout.date} using ${functionName}`);
-          }
-        } catch (err) {
-          console.warn(`❌ Failed to trigger analysis for ${workout.id}:`, err);
-        }
-      }
-      
-      // Wait a moment for analysis to complete, then refetch workouts
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Refetch workouts to get the new analysis data
-      const { data: updatedWorkouts } = await supabase
-        .from('workouts')
-        .select('*')
-        .eq('user_id', user_id)
-        .eq('workout_status', 'completed')
-        .gte('date', startDateISO)
-        .lte('date', endDateISO)
-        .order('date', { ascending: true });
-      
-      completedWorkouts = updatedWorkouts || completedWorkouts;
-    }
+    // Analysis will be triggered by UnifiedWorkoutView when user opens Summary tab
+    // No need for auto-triggering here to avoid race conditions
 
     // ADD THIS ONE LINE:
     console.log('📊 ALL bikes from DB:', completedWorkouts
