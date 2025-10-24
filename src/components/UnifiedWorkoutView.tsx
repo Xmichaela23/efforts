@@ -319,6 +319,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               onUpdateWorkout(updatedWorkout);
               
               // Store updated workout data for immediate use
+              console.log('🔍 [SET UPDATED DATA] Setting updatedWorkoutData with structure:', updatedWorkout?.workout_analysis ? 'has workout_analysis' : 'no workout_analysis');
               setUpdatedWorkoutData(updatedWorkout);
             }
             
@@ -1026,6 +1027,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             )}
             {(() => {
               console.log('🔍 [UNIFIED DEBUG] isCompleted:', isCompleted, 'isLinked:', isLinked, 'linkedPlanned:', linkedPlanned);
+              console.log('🔍 [DATA SOURCE DEBUG] updatedWorkoutData:', !!updatedWorkoutData, 'hydratedCompleted:', !!hydratedCompleted, 'workout:', !!workout);
+              console.log('🔍 [DATA SOURCE DEBUG] updatedWorkoutData structure:', updatedWorkoutData?.workout_analysis ? 'has workout_analysis' : 'no workout_analysis');
+              console.log('🔍 [DATA SOURCE DEBUG] hydratedCompleted structure:', hydratedCompleted?.workout_analysis ? 'has workout_analysis' : 'no workout_analysis');
               return isCompleted && !isLinked ? (
                 <div className="px-3 py-2 text-sm text-gray-600">Attach this workout to a planned session to see planned vs actual.</div>
               ) : (
