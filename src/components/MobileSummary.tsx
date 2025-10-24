@@ -1439,7 +1439,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const finalPacePct = granularAnalysis?.pacing_analysis?.time_in_range_score ? 
             Math.round(granularAnalysis.pacing_analysis.time_in_range_score * 100) : null;
           const finalDurationPct = durationAdherence?.adherence_percentage ? 
-            Math.round(durationAdherence.adherence_percentage * 100) : null;
+            Math.round(durationAdherence.adherence_percentage) : null;
           const finalDistPct = null; // Distance adherence not available in current analysis
           
           console.log('🔍 [UNIFIED DEBUG] Using workout_analysis data:', {
