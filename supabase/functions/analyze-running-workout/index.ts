@@ -654,9 +654,12 @@ function calculateDurationAdherence(sensorData: any[], intervals: any[]): any {
       return total + (interval.duration_s || 0);
     }, 0);
     
-    // Calculate actual duration from sensor data
+    // Calculate actual duration from workout moving_time (actual running time)
     let actualDurationSeconds = 0;
-    if (sensorData.length > 0) {
+    if (workout.moving_time) {
+      actualDurationSeconds = workout.moving_time;
+    } else if (sensorData.length > 0) {
+      // Fallback to sensor data if moving_time not available
       const firstSample = sensorData[0];
       const lastSample = sensorData[sensorData.length - 1];
       actualDurationSeconds = lastSample.timestamp - firstSample.timestamp;
