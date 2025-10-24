@@ -198,7 +198,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
     let insights = analysis.insights || (analysis.workout_analysis && analysis.workout_analysis.insights) || [];
     
     // Convert new granular analysis format to insights format
-    const granularAnalysis = analysis.analysis || analysis;
+    const granularAnalysis = analysis.granular_analysis || analysis.analysis || analysis;
     if (granularAnalysis.overall_adherence !== undefined) {
       console.log('🔄 Converting granular analysis to insights format');
       insights = [];

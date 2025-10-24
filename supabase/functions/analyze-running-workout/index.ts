@@ -328,10 +328,21 @@ Deno.serve(async (req) => {
     console.log('💾 Storing analysis in database...');
     console.log('🔍 Enhanced analysis structure:', JSON.stringify(enhancedAnalysis, null, 2));
     
+    // Get existing workout_analysis to preserve other fields
+    const { data: existingWorkout } = await supabase
+      .from('workouts')
+      .select('workout_analysis')
+      .eq('id', workout_id)
+      .single();
+    
+    const existingAnalysis = existingWorkout?.workout_analysis || {};
+    console.log('🔍 Existing workout_analysis structure:', JSON.stringify(existingAnalysis, null, 2));
+    
     const { error: updateError } = await supabase
       .from('workouts')
       .update({
         workout_analysis: {
+          ...existingAnalysis,
           granular_analysis: enhancedAnalysis
         }
       })
