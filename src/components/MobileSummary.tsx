@@ -275,6 +275,14 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
 
 export default function MobileSummary({ planned, completed, hideTopAdherence }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
   const { useImperial } = useAppContext();
+  
+  // Debug logging for data changes
+  console.log('🔍 [MobileSummary] Render with:', {
+    hasCompleted: !!completed,
+    hasPlanned: !!planned,
+    hideTopAdherence,
+    workoutAnalysis: (completed as any)?.workout_analysis ? 'present' : 'missing'
+  });
   // Prefer server snapshot from completed.computed when available
   const serverPlannedLight: any[] = Array.isArray((completed as any)?.computed?.planned_steps_light) ? (completed as any).computed.planned_steps_light : [];
   const hasServerPlanned = serverPlannedLight.length > 0;
@@ -1441,7 +1449,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           
           // If nothing to show, skip
           const anyVal = (finalPacePct!=null) || (finalDurationPct!=null) || (finalDistPct!=null) || (finalExecutionScore!=null);
-          if (!anyVal) return null;
+          console.log('🔍 [ADHERENCE DEBUG] anyVal:', anyVal, 'hideTopAdherence:', hideTopAdherence);
+          if (!anyVal || hideTopAdherence) return null;
 
           // Determine workout intent for rule-based coloring
           const workoutIntent = determineWorkoutIntent(planned);
