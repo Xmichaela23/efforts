@@ -314,6 +314,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             if (updatedWorkout && onUpdateWorkout) {
               console.log('🔄 Refreshing workout data with new analysis...');
               console.log('🔍 Updated workout analysis:', updatedWorkout.workout_analysis);
+              console.log('🔍 Granular analysis:', updatedWorkout.workout_analysis?.granular_analysis);
               onUpdateWorkout(updatedWorkout);
             }
             

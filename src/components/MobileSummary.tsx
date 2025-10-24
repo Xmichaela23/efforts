@@ -1426,6 +1426,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const workoutAnalysis = (completed as any)?.workout_analysis;
           const granularAnalysis = workoutAnalysis?.granular_analysis;
           
+          console.log('🔍 [DATA STRUCTURE DEBUG] workoutAnalysis:', workoutAnalysis);
+          console.log('🔍 [DATA STRUCTURE DEBUG] granularAnalysis:', granularAnalysis);
+          
           // Get adherence data from unified source
           const overallAdherence = granularAnalysis?.overall_adherence;
           const durationAdherence = granularAnalysis?.duration_adherence;
