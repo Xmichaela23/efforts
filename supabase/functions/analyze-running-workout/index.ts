@@ -674,8 +674,15 @@ function calculateDurationAdherence(sensorData: any[], intervals: any[]): any {
       };
     }
     
-    // Calculate adherence percentage (actual / planned * 100)
-    const adherencePercentage = (actualDurationSeconds / plannedDurationSeconds) * 100;
+    // Calculate adherence percentage (closer to 100% = better adherence)
+    let adherencePercentage;
+    if (actualDurationSeconds <= plannedDurationSeconds) {
+      // Completed on time or early - good adherence
+      adherencePercentage = (actualDurationSeconds / plannedDurationSeconds) * 100;
+    } else {
+      // Took longer than planned - show how much over target
+      adherencePercentage = Math.min(100, (plannedDurationSeconds / actualDurationSeconds) * 100);
+    }
     const deltaSeconds = actualDurationSeconds - plannedDurationSeconds;
     
     console.log(`✅ Duration adherence: ${adherencePercentage.toFixed(1)}% (delta: ${deltaSeconds}s)`);
