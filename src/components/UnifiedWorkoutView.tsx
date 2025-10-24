@@ -267,7 +267,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (!wid) return;
 
         // Step 1: Run enhanced analysis if needed (single source of truth)
-        const needsAnalysis = !(workout as any)?.workout_analysis?.granular_analysis;
+        const granularAnalysis = (workout as any)?.workout_analysis?.granular_analysis;
+        const needsAnalysis = !granularAnalysis || 
+          !granularAnalysis.duration_adherence || 
+          !granularAnalysis.overall_adherence ||
+          granularAnalysis.duration_adherence.adherence_percentage === null;
         
         if (needsAnalysis) {
           console.log('🏃‍♂️ Running enhanced workout analysis...');
