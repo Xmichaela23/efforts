@@ -325,6 +325,9 @@ Deno.serve(async (req) => {
     };
 
     // Store analysis in database with correct nested structure
+    console.log('💾 Storing analysis in database...');
+    console.log('🔍 Enhanced analysis structure:', JSON.stringify(enhancedAnalysis, null, 2));
+    
     const { error: updateError } = await supabase
       .from('workouts')
       .update({
@@ -336,6 +339,8 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.warn('⚠️ Could not store analysis:', updateError.message);
+    } else {
+      console.log('✅ Analysis stored successfully in database');
     }
 
     console.log(`✅ Running analysis complete for workout ${workout_id}`);

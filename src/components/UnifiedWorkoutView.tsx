@@ -301,8 +301,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             const result = await supabase.functions.invoke('analyze-running-workout', { body: { workout_id: wid } });
             console.log('✅ Enhanced analysis completed', result);
             
-            // Wait for analysis to complete and refresh workout data
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Wait for database to commit the analysis
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for database commit
             
             // Refresh workout data to get the new analysis
             const { data: updatedWorkout } = await supabase
@@ -313,6 +313,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             
             if (updatedWorkout && onUpdateWorkout) {
               console.log('🔄 Refreshing workout data with new analysis...');
+              console.log('🔍 Updated workout analysis:', updatedWorkout.workout_analysis);
               onUpdateWorkout(updatedWorkout);
             }
             
