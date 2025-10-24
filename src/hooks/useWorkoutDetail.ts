@@ -147,9 +147,25 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
 
   // Allow external invalidation
   useEffect(() => {
-    const handler = () => { try { queryClient.invalidateQueries({ queryKey: ['workout-detail'] }); } catch {} };
+    const handler = () => { 
+      try { 
+        queryClient.invalidateQueries({ queryKey: ['workout-detail'] }); 
+        // Force immediate refetch by removing stale time
+        queryClient.refetchQueries({ queryKey: ['workout-detail'] });
+      } catch {} 
+    };
+    const detailHandler = () => { 
+      try { 
+        queryClient.invalidateQueries({ queryKey: ['workout-detail'] }); 
+        queryClient.refetchQueries({ queryKey: ['workout-detail'] });
+      } catch {} 
+    };
     window.addEventListener('workouts:invalidate', handler);
-    return () => { window.removeEventListener('workouts:invalidate', handler); };
+    window.addEventListener('workout-detail:invalidate', detailHandler);
+    return () => { 
+      window.removeEventListener('workouts:invalidate', handler);
+      window.removeEventListener('workout-detail:invalidate', detailHandler);
+    };
   }, [queryClient]);
 
   // Stable reference: memoize the returned object by workout id

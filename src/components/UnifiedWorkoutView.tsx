@@ -317,8 +317,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               onUpdateWorkout(updatedWorkout);
             }
             
-            // Force immediate data refresh
+            // Force immediate data refresh with multiple strategies
             try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+            try { window.dispatchEvent(new CustomEvent('workout-detail:invalidate')); } catch {}
+            
+            // Force React Query to refetch immediately
+            setTimeout(() => {
+              try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+            }, 1000);
           } catch (error) {
             console.warn('⚠️ Enhanced analysis failed:', error);
           }
@@ -1014,7 +1020,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               ) : (
                 <MobileSummary 
                   planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
-                  completed={isCompleted ? completedData : null}
+                  completed={isCompleted ? (hydratedCompleted || workout) : null}
                 />
               );
             })()}

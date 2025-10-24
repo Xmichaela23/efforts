@@ -655,10 +655,18 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
   };
 
   const getDisplayPace = (workout: any, interval: any): number | null => {
-    // For summary display, always use overall workout pace to match Details tab
-    // Individual interval pace should only be used for per-interval analysis
+    // For interval workouts, use individual interval pace
+    // For continuous workouts, use overall pace
     
-    // Try multiple sources for overall pace (same as Details tab)
+    // Priority 1: Use individual interval pace if available
+    if (interval?.executed?.avg_pace_s_per_mi) {
+      const intervalPace = Number(interval.executed.avg_pace_s_per_mi);
+      if (Number.isFinite(intervalPace) && intervalPace > 0) {
+        return intervalPace;
+      }
+    }
+    
+    // Priority 2: Use overall workout pace as fallback
     const overallPace = Number(
       workout?.computed?.overall?.avg_pace_s_per_mi ?? 
       workout?.metrics?.avg_pace_s_per_mi ??
@@ -668,11 +676,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
     
     if (Number.isFinite(overallPace) && overallPace > 0) {
       return overallPace;
-    }
-    
-    // Fallback to interval-specific pace only if no overall pace available
-    if (interval?.executed?.avg_pace_s_per_mi) {
-      return Number(interval.executed.avg_pace_s_per_mi);
     }
     
     return null;
