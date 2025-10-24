@@ -647,7 +647,7 @@ function extractSensorData(data: any): any[] {
  * Calculate duration adherence for running workouts
  * Compares planned vs actual duration
  */
-function calculateDurationAdherence(sensorData: any[], intervals: any[]): any {
+function calculateDurationAdherence(sensorData: any[], intervals: any[], workout: any): any {
   try {
     console.log('🔍 [DURATION CALC DEBUG] workout.moving_time:', workout.moving_time);
     console.log('🔍 [DURATION CALC DEBUG] sensorData.length:', sensorData.length);
@@ -780,7 +780,7 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
   const heartRateAnalysis = calculateOverallHeartRateAnalysis(sensorData);
   
   // Calculate duration adherence
-  const durationAdherence = calculateDurationAdherence(sensorData, intervals);
+  const durationAdherence = calculateDurationAdherence(sensorData, intervals, workout);
   
   // Identify primary issues and strengths
   const primaryIssues = identifyPrimaryIssues(intervalAnalysis);
