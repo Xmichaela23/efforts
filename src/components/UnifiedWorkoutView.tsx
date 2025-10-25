@@ -268,15 +268,23 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
         // Step 1: Run enhanced analysis if needed (single source of truth)
         const granularAnalysis = (workout as any)?.workout_analysis?.granular_analysis;
+        console.log('🔍 [ANALYSIS DEBUG] Checking if analysis is needed:', {
+          hasGranularAnalysis: !!granularAnalysis,
+          hasDurationAdherence: !!granularAnalysis?.duration_adherence,
+          hasOverallAdherence: !!granularAnalysis?.overall_adherence,
+          durationPercentage: granularAnalysis?.duration_adherence?.adherence_percentage,
+          needsAnalysis: !granularAnalysis || 
+            !granularAnalysis.duration_adherence || 
+            !granularAnalysis.overall_adherence ||
+            granularAnalysis.duration_adherence.adherence_percentage === null
+        });
+        
         const needsAnalysis = !granularAnalysis || 
           !granularAnalysis.duration_adherence || 
           !granularAnalysis.overall_adherence ||
           granularAnalysis.duration_adherence.adherence_percentage === null;
         
-        // TEMPORARY: Force analysis for debugging
-        const forceAnalysis = true;
-        
-        if (needsAnalysis || forceAnalysis) {
+        if (needsAnalysis) {
           console.log('🏃‍♂️ Running enhanced workout analysis...');
           try {
             const result = await supabase.functions.invoke('analyze-running-workout', { body: { workout_id: wid } });
