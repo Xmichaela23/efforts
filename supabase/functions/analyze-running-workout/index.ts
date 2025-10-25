@@ -832,14 +832,23 @@ function calculateDurationAdherence(sensorData: any[], intervals: any[], workout
  */
 function calculatePrescribedRangeAdherenceGranular(sensorData: any[], intervals: any[], workout: any): PrescribedRangeAdherence {
   console.log(`📊 Starting granular prescribed range analysis for ${intervals.length} intervals`);
+  console.log(`🔍 Interval structure debug:`, intervals.map(i => ({
+    kind: i.kind,
+    role: i.role,
+    hasPlanned: !!i.planned,
+    hasExecuted: !!i.executed,
+    plannedKeys: i.planned ? Object.keys(i.planned) : [],
+    executedKeys: i.executed ? Object.keys(i.executed) : []
+  })));
   
   // Check if this is an interval workout (has work segments with pace targets)
-  const workIntervals = intervals.filter(interval => 
-    interval.type === 'work' && 
-    interval.pace_range && 
-    interval.pace_range.lower && 
-    interval.pace_range.upper
-  );
+  // Look for intervals with 'work' role or 'interval' kind, and check for pace targets
+  const workIntervals = intervals.filter(interval => {
+    const isWorkRole = interval.role === 'work' || interval.kind === 'work';
+    const hasPaceTarget = interval.planned?.target_pace_s_per_mi || interval.executed?.avg_pace_s_per_mi;
+    console.log(`🔍 Checking interval: role=${interval.role}, kind=${interval.kind}, hasPaceTarget=${!!hasPaceTarget}`);
+    return isWorkRole && hasPaceTarget;
+  });
   
   const isIntervalWorkout = workIntervals.length > 0;
   console.log(`🔍 Workout type: ${isIntervalWorkout ? 'Intervals' : 'Steady-state'} (${workIntervals.length} work segments)`);
