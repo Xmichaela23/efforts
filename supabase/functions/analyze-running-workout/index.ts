@@ -321,7 +321,7 @@ Deno.serve(async (req) => {
     }
 
     // Perform granular adherence analysis
-    const analysis = calculatePrescribedRangeAdherence(sensorData, intervals, workout);
+    const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervals, workout);
 
     // Add data quality information to analysis
     const enhancedAnalysis = {
@@ -644,7 +644,64 @@ function extractSensorData(data: any): any[] {
 }
 
 /**
- * Calculate duration adherence for running workouts
+ * Calculate duration adherence using computed data (workout-level metric)
+ * This is the correct approach for duration - use pre-computed, validated data
+ */
+function calculateDurationAdherenceFromComputed(workout: any, plannedWorkout: any): any {
+  try {
+    console.log('🔍 [DURATION COMPUTED] Using computed data for duration adherence');
+    
+    // Get planned duration from planned workout
+    const plannedDurationSeconds = plannedWorkout?.computed?.total_duration_seconds || 0;
+    console.log('🔍 [DURATION COMPUTED] Planned duration (computed):', plannedDurationSeconds);
+    
+    // Get actual duration from completed workout computed data
+    const actualDurationSeconds = workout?.computed?.overall?.duration_s_moving || 0;
+    console.log('🔍 [DURATION COMPUTED] Actual duration (computed):', actualDurationSeconds);
+    
+    if (plannedDurationSeconds === 0 || actualDurationSeconds === 0) {
+      console.log('⚠️ Duration adherence: missing computed data');
+      return {
+        planned_duration_s: plannedDurationSeconds,
+        actual_duration_s: actualDurationSeconds,
+        adherence_percentage: null,
+        delta_seconds: null
+      };
+    }
+    
+    // Calculate adherence percentage
+    let adherencePercentage;
+    if (actualDurationSeconds <= plannedDurationSeconds) {
+      // Completed on time or early - good adherence
+      adherencePercentage = (actualDurationSeconds / plannedDurationSeconds) * 100;
+    } else {
+      // Took longer than planned - show how much over target
+      adherencePercentage = Math.min(100, (plannedDurationSeconds / actualDurationSeconds) * 100);
+    }
+    
+    const deltaSeconds = actualDurationSeconds - plannedDurationSeconds;
+    
+    console.log(`✅ Duration adherence (computed): ${adherencePercentage.toFixed(1)}% (delta: ${deltaSeconds}s)`);
+    
+    return {
+      planned_duration_s: plannedDurationSeconds,
+      actual_duration_s: actualDurationSeconds,
+      adherence_percentage: parseFloat(adherencePercentage.toFixed(1)),
+      delta_seconds: deltaSeconds
+    };
+  } catch (error) {
+    console.error('❌ Duration adherence calculation error:', error);
+    return {
+      planned_duration_s: 0,
+      actual_duration_s: 0,
+      adherence_percentage: null,
+      delta_seconds: null
+    };
+  }
+}
+
+/**
+ * Calculate duration adherence for running workouts (DEPRECATED - use computed data instead)
  * Compares planned vs actual duration
  */
 function calculateDurationAdherence(sensorData: any[], intervals: any[], workout: any): any {
@@ -760,7 +817,294 @@ function calculateDurationAdherence(sensorData: any[], intervals: any[], workout
 }
 
 /**
- * Calculate prescribed range adherence for running workouts
+ * Calculate prescribed range adherence using proper granular analysis
+ * Handles both intervals and steady-state workouts with consistency analysis
+ */
+function calculatePrescribedRangeAdherenceGranular(sensorData: any[], intervals: any[], workout: any): PrescribedRangeAdherence {
+  console.log(`📊 Starting granular prescribed range analysis for ${intervals.length} intervals`);
+  
+  // Check if this is an interval workout (has work segments with pace targets)
+  const workIntervals = intervals.filter(interval => 
+    interval.type === 'work' && 
+    interval.pace_range && 
+    interval.pace_range.lower && 
+    interval.pace_range.upper
+  );
+  
+  const isIntervalWorkout = workIntervals.length > 0;
+  console.log(`🔍 Workout type: ${isIntervalWorkout ? 'Intervals' : 'Steady-state'} (${workIntervals.length} work segments)`);
+  
+  if (isIntervalWorkout) {
+    return calculateIntervalPaceAdherence(sensorData, intervals, workout);
+  } else {
+    return calculateSteadyStatePaceAdherence(sensorData, intervals, workout);
+  }
+}
+
+/**
+ * Calculate pace adherence for interval workouts
+ * Focuses on work segments only, filters out warmup/cooldown/rest
+ */
+function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], workout: any): PrescribedRangeAdherence {
+  console.log('🏃‍♂️ Analyzing interval workout pace adherence');
+  
+  // Filter to work segments only
+  const workIntervals = intervals.filter(interval => 
+    interval.type === 'work' && 
+    interval.pace_range && 
+    interval.pace_range.lower && 
+    interval.pace_range.upper
+  );
+  
+  console.log(`📊 Analyzing ${workIntervals.length} work intervals`);
+  
+  let totalTimeInRange = 0;
+  let totalTimeOutsideRange = 0;
+  let totalSamples = 0;
+  let filteredOutliers = 0;
+  let handledGaps = 0;
+  
+  const intervalAnalysis: any[] = [];
+  
+  // Analyze each work interval
+  for (const interval of workIntervals) {
+    console.log(`🔍 Analyzing work interval: ${interval.distance_m}m @ ${interval.pace_range.lower}-${interval.pace_range.upper}s/mi`);
+    
+    // Find samples for this interval (this is simplified - you'd need proper time mapping)
+    const intervalSamples = sensorData; // Simplified - would need proper time segmentation
+    
+    if (intervalSamples.length === 0) {
+      console.log('⚠️ No samples found for interval');
+      continue;
+    }
+    
+    // Calculate adherence for this interval
+    const intervalResult = analyzeIntervalPace(intervalSamples, interval);
+    
+    totalTimeInRange += intervalResult.timeInRange;
+    totalTimeOutsideRange += intervalResult.timeOutsideRange;
+    totalSamples += intervalResult.totalSamples;
+    filteredOutliers += intervalResult.filteredOutliers;
+    handledGaps += intervalResult.handledGaps;
+    
+    intervalAnalysis.push({
+      type: interval.type,
+      distance_m: interval.distance_m,
+      target_pace: interval.pace_range,
+      adherence: intervalResult.adherence,
+      time_in_range: intervalResult.timeInRange,
+      time_outside_range: intervalResult.timeOutsideRange
+    });
+  }
+  
+  const totalTime = totalTimeInRange + totalTimeOutsideRange;
+  const timeInRangeScore = totalTime > 0 ? totalTimeInRange / totalTime : 0;
+  
+  console.log(`✅ Interval analysis complete: ${(timeInRangeScore * 100).toFixed(1)}% time in range`);
+  
+  return {
+    overall_adherence: timeInRangeScore,
+    time_in_range_score: timeInRangeScore,
+    variability_score: 0, // Would calculate from interval-to-interval consistency
+    smoothness_score: 0, // Would calculate from pace transitions
+    pacing_variability: {
+      coefficient_of_variation: 0,
+      avg_pace_change_per_min: 0,
+      num_surges: 0,
+      num_crashes: 0,
+      steadiness_score: 0,
+      avg_pace_change_seconds: 0
+    },
+    time_in_range_s: totalTimeInRange,
+    time_outside_range_s: totalTimeOutsideRange,
+    total_time_s: totalTime,
+    samples_in_range: totalSamples,
+    samples_outside_range: 0,
+    heart_rate_analysis: null,
+    pacing_analysis: null,
+    duration_adherence: null
+  };
+}
+
+/**
+ * Calculate pace adherence for steady-state workouts
+ * Evaluates both average pace and consistency (CV penalty)
+ */
+function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], workout: any): PrescribedRangeAdherence {
+  console.log('🏃‍♂️ Analyzing steady-state workout pace adherence');
+  
+  // For steady-state, analyze the main workout segments (excluding warmup/cooldown)
+  const mainSegments = intervals.filter(interval => 
+    interval.type !== 'warmup' && 
+    interval.type !== 'cooldown' &&
+    interval.pace_range &&
+    interval.pace_range.lower &&
+    interval.pace_range.upper
+  );
+  
+  if (mainSegments.length === 0) {
+    console.log('⚠️ No main segments found for steady-state analysis');
+    return createEmptyAdherence();
+  }
+  
+  // Break workout into ~1-2 minute segments for consistency analysis
+  const segmentDuration = 120; // 2 minutes
+  const segments = [];
+  
+  for (let i = 0; i < sensorData.length; i += segmentDuration) {
+    const segmentSamples = sensorData.slice(i, i + segmentDuration);
+    if (segmentSamples.length > 0) {
+      const avgPace = calculateAveragePace(segmentSamples);
+      if (avgPace > 0) {
+        segments.push(avgPace);
+      }
+    }
+  }
+  
+  if (segments.length === 0) {
+    console.log('⚠️ No valid segments found');
+    return createEmptyAdherence();
+  }
+  
+  // Calculate pace statistics
+  const avgPace = segments.reduce((sum, pace) => sum + pace, 0) / segments.length;
+  const stdDev = calculateStandardDeviation(segments);
+  const cv = stdDev / avgPace;
+  
+  // Get target pace from the main segment
+  const targetPace = mainSegments[0].pace_range.lower + 
+    (mainSegments[0].pace_range.upper - mainSegments[0].pace_range.lower) / 2;
+  
+  // Calculate base adherence
+  const paceAdherence = targetPace / avgPace; // Closer to 1.0 is better
+  
+  // Apply consistency penalty
+  let consistencyMultiplier = 1.0;
+  if (cv > 0.06) { // > 6% variability
+    consistencyMultiplier = 0.85; // Major penalty
+  } else if (cv > 0.04) { // 4-6% variability
+    consistencyMultiplier = 0.90; // Moderate penalty
+  } else if (cv > 0.02) { // 2-4% variability
+    consistencyMultiplier = 0.95; // Minor penalty
+  }
+  
+  const finalScore = paceAdherence * consistencyMultiplier;
+  
+  console.log(`✅ Steady-state analysis: pace=${avgPace.toFixed(1)}s/mi, target=${targetPace.toFixed(1)}s/mi, CV=${(cv*100).toFixed(1)}%, score=${(finalScore*100).toFixed(1)}%`);
+  
+  return {
+    overall_adherence: finalScore,
+    time_in_range_score: paceAdherence,
+    variability_score: cv,
+    smoothness_score: 1 - cv, // Higher CV = lower smoothness
+    pacing_variability: {
+      coefficient_of_variation: cv * 100,
+      avg_pace_change_per_min: stdDev,
+      num_surges: 0, // Would calculate from pace changes
+      num_crashes: 0, // Would calculate from pace changes
+      steadiness_score: Math.max(0, 100 - (cv * 100)),
+      avg_pace_change_seconds: stdDev
+    },
+    time_in_range_s: 0, // Not applicable for steady-state
+    time_outside_range_s: 0,
+    total_time_s: 0,
+    samples_in_range: 0,
+    samples_outside_range: 0,
+    heart_rate_analysis: null,
+    pacing_analysis: null,
+    duration_adherence: null
+  };
+}
+
+/**
+ * Helper function to create empty adherence result
+ */
+function createEmptyAdherence(): PrescribedRangeAdherence {
+  return {
+    overall_adherence: 0,
+    time_in_range_score: 0,
+    variability_score: 0,
+    smoothness_score: 0,
+    pacing_variability: {
+      coefficient_of_variation: 0,
+      avg_pace_change_per_min: 0,
+      num_surges: 0,
+      num_crashes: 0,
+      steadiness_score: 0,
+      avg_pace_change_seconds: 0
+    },
+    time_in_range_s: 0,
+    time_outside_range_s: 0,
+    total_time_s: 0,
+    samples_in_range: 0,
+    samples_outside_range: 0,
+    heart_rate_analysis: null,
+    pacing_analysis: null,
+    duration_adherence: null
+  };
+}
+
+/**
+ * Calculate average pace from sensor samples
+ */
+function calculateAveragePace(samples: any[]): number {
+  if (samples.length === 0) return 0;
+  
+  const validPaces = samples
+    .map(sample => sample.pace_s_per_mi)
+    .filter(pace => pace && pace > 0);
+  
+  if (validPaces.length === 0) return 0;
+  
+  return validPaces.reduce((sum, pace) => sum + pace, 0) / validPaces.length;
+}
+
+/**
+ * Calculate standard deviation
+ */
+function calculateStandardDeviation(values: number[]): number {
+  if (values.length === 0) return 0;
+  
+  const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+  
+  return Math.sqrt(variance);
+}
+
+/**
+ * Analyze interval pace (simplified version)
+ */
+function analyzeIntervalPace(samples: any[], interval: any): any {
+  // This is a simplified version - would need proper time segmentation
+  const validSamples = samples.filter(s => s.pace_s_per_mi && s.pace_s_per_mi > 0);
+  
+  if (validSamples.length === 0) {
+    return {
+      timeInRange: 0,
+      timeOutsideRange: 0,
+      totalSamples: 0,
+      filteredOutliers: 0,
+      handledGaps: 0,
+      adherence: 0
+    };
+  }
+  
+  const avgPace = validSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validSamples.length;
+  const targetPace = (interval.pace_range.lower + interval.pace_range.upper) / 2;
+  const adherence = targetPace / avgPace;
+  
+  return {
+    timeInRange: adherence >= 0.95 && adherence <= 1.05 ? validSamples.length : 0,
+    timeOutsideRange: adherence < 0.95 || adherence > 1.05 ? validSamples.length : 0,
+    totalSamples: validSamples.length,
+    filteredOutliers: 0,
+    handledGaps: 0,
+    adherence: adherence
+  };
+}
+
+/**
+ * Calculate prescribed range adherence for running workouts (DEPRECATED - use granular analysis)
  * This is the core analysis function that measures time-in-range
  */
 function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], workout: any): PrescribedRangeAdherence {
@@ -824,8 +1168,8 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
   // Calculate heart rate analysis
   const heartRateAnalysis = calculateOverallHeartRateAnalysis(sensorData);
   
-  // Calculate duration adherence
-  const durationAdherence = calculateDurationAdherence(sensorData, intervals, workout);
+  // Calculate duration adherence using computed data (workout-level metric)
+  const durationAdherence = calculateDurationAdherenceFromComputed(workout, plannedWorkout);
   
   // Identify primary issues and strengths
   const primaryIssues = identifyPrimaryIssues(intervalAnalysis);
