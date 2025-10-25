@@ -125,6 +125,7 @@ Deno.serve(async (req) => {
 
     console.log(`🏃‍♂️ Analyzing running workout: ${workout_id}`);
     console.log('🆕 NEW VERSION: Checking time_series_data and garmin_data for pace data');
+    console.log('🔍 [MAIN DEBUG] Starting analysis for workout:', workout_id);
 
     // Get workout data
     const { data: workout, error: workoutError } = await supabase
@@ -202,7 +203,7 @@ Deno.serve(async (req) => {
       } else {
         plannedWorkout = planned;
 
-        // Parse tokens if available, otherwise use intervals
+        // ✅ Parse intervals from planned workout first
         if (plannedWorkout.steps_preset && plannedWorkout.steps_preset.length > 0) {
           console.log('🏃 Parsing steps_preset tokens...');
           try {
@@ -210,29 +211,57 @@ Deno.serve(async (req) => {
             const { parseRunningTokens } = await import('../../lib/analysis/running/token-parser.ts');
             const parsedStructure = parseRunningTokens(plannedWorkout.steps_preset, baselines);
             
-            // Convert parsed segments to intervals format
-            intervals = parsedStructure.segments.map((segment: any) => ({
+            // Convert parsed segments to clean planned intervals format
+            const parsedIntervals = parsedStructure.segments.map((segment: any) => ({
               type: segment.type,
-              kind: segment.type, // Add kind field for compatibility
+              kind: segment.type,
+              role: segment.type === 'work' ? 'work' : segment.type,
               duration: segment.duration,
               duration_s: segment.duration,
               distance: segment.distance,
               distance_m: segment.distance,
-              target_pace: segment.target_pace, // Keep original structure
+              target_pace: segment.target_pace,
               pace_range: segment.target_pace ? {
                 lower: segment.target_pace.lower,
                 upper: segment.target_pace.upper
-              } : null
+              } : null,
+              step_index: segment.step_index || null
             }));
             
+            // ✅ Then enrich with execution data from computed intervals
+            intervals = parsedIntervals.map(planned => {
+              // Find matching executed interval
+              const executed = workout?.computed?.intervals?.find(exec => 
+                exec.step_index === planned.step_index ||
+                (exec.role === planned.role && exec.kind === planned.kind)
+              );
+              
+              return {
+                ...planned,
+                executed: executed?.executed || null,
+                hasExecuted: !!executed?.executed
+              };
+            });
+            
             console.log(`✅ Parsed ${intervals.length} intervals from tokens`);
-            console.log(`🔍 DEBUG: Intervals after parsing:`, JSON.stringify(intervals, null, 2));
+            console.log(`✅ Enriched with execution data from computed`);
+            console.log(`🔍 DEBUG: Intervals after enrichment:`, intervals.map(i => ({
+              role: i.role,
+              hasPlanned: !!i.target_pace,
+              hasExecuted: i.hasExecuted,
+              plannedPace: i.target_pace?.lower ? `${i.target_pace.lower}-${i.target_pace.upper}` : 'N/A',
+              executedPace: i.executed?.avg_pace_s_per_mi || 'N/A'
+            })));
           } catch (error) {
-            console.warn('⚠️ Token parsing failed, using intervals:', error);
-            intervals = plannedWorkout.intervals || [];
+            console.warn('⚠️ Token parsing failed, using computed intervals:', error);
+            // Fallback to computed intervals
+            intervals = workout.computed?.intervals || plannedWorkout.intervals || [];
+            console.log(`🔍 Using computed intervals: ${intervals.length} intervals found`);
           }
         } else {
-          intervals = plannedWorkout.intervals || [];
+          // Use computed intervals from the completed workout if no planned workout
+          intervals = workout.computed?.intervals || plannedWorkout.intervals || [];
+          console.log(`🔍 No tokens found, using computed intervals: ${intervals.length} intervals found`);
         }
       }
     }
@@ -331,7 +360,7 @@ Deno.serve(async (req) => {
     console.log('🔍 Using planned intervals for granular analysis (raw sensor data vs planned targets)');
     
     // Perform granular adherence analysis
-    const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervalsToAnalyze, workout);
+    const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervalsToAnalyze, workout, plannedWorkout);
 
     // Add data quality information to analysis
     const enhancedAnalysis = {
@@ -726,19 +755,43 @@ function calculateDurationAdherenceFromComputed(workout: any, plannedWorkout: an
  * Calculate duration adherence for running workouts (DEPRECATED - use computed data instead)
  * Compares planned vs actual duration
  */
-function calculateDurationAdherence(sensorData: any[], intervals: any[], workout: any): any {
+function calculateDurationAdherence(sensorData: any[], intervals: any[], workout: any, plannedWorkout: any): any {
   try {
     console.log('🔍 [DURATION CALC DEBUG] workout.moving_time:', workout.moving_time);
     console.log('🔍 [DURATION CALC DEBUG] sensorData.length:', sensorData.length);
     console.log('🔍 [DURATION CALC DEBUG] intervals (for planned duration):', intervals);
     console.log('🔍 [DURATION CALC DEBUG] intervals structure:', intervals.map(i => ({ type: i.type, duration_s: i.duration_s, distance: i.distance })));
     
-    // Get planned duration from intervals (all segments including rest)
-    const plannedDurationSeconds = intervals.reduce((total, interval) => {
-      return total + (interval.duration_s || 0);
-    }, 0);
+    // Add comprehensive logging to track which data source is used
+    console.log('🔍 [DURATION DEBUG] Data sources available:', {
+      hasPlannedComputed: !!plannedWorkout?.computed?.total_duration_seconds,
+      hasWorkoutComputedIntervals: !!workout?.computed?.intervals?.length,
+      hasParsedIntervals: intervals.length,
+      plannedComputedValue: plannedWorkout?.computed?.total_duration_seconds,
+      computedIntervalsSum: workout?.computed?.intervals?.reduce((s, i) => s + (i.planned?.duration_s || 0), 0),
+      parsedIntervalsSum: intervals.reduce((s, i) => s + (i.duration_s || 0), 0)
+    });
     
-    console.log('🔍 [DURATION CALC DEBUG] plannedDurationSeconds (calculated):', plannedDurationSeconds);
+    // Priority 1: Use planned workout's computed total duration (most accurate)
+    let plannedDurationSeconds = 0;
+    if (plannedWorkout?.computed?.total_duration_seconds) {
+      plannedDurationSeconds = plannedWorkout.computed.total_duration_seconds;
+      console.log('✅ Using planned workout computed duration:', plannedDurationSeconds);
+    }
+    // Priority 2: Sum computed intervals from completed workout (has planned snapshot)
+    else if (workout?.computed?.intervals?.length > 0) {
+      plannedDurationSeconds = workout.computed.intervals.reduce((sum, int) => 
+        sum + (int.planned?.duration_s || 0), 0);
+      console.log('✅ Using computed intervals planned duration:', plannedDurationSeconds);
+    }
+    // Priority 3: Fallback to parsing intervals (current approach)
+    else {
+      plannedDurationSeconds = intervals.reduce((total, interval) => 
+        total + (interval.duration_s || 0), 0);
+      console.log('⚠️ Using parsed intervals duration (may be incomplete):', plannedDurationSeconds);
+    }
+    
+    console.log('🔍 [DURATION CALC DEBUG] plannedDurationSeconds (final):', plannedDurationSeconds);
     
     // Calculate actual duration from total elapsed time
     let actualDurationSeconds = 0;
@@ -757,21 +810,21 @@ function calculateDurationAdherence(sensorData: any[], intervals: any[], workout
         } else {
           console.log('🔍 [DURATION CALC DEBUG] Invalid sensor data timestamps, falling back to moving_time');
           if (workout.moving_time) {
-            actualDurationSeconds = workout.moving_time * 60;
+            actualDurationSeconds = workout.moving_time; // moving_time is already in seconds
             console.log('🔍 [DURATION CALC DEBUG] Using moving_time fallback:', actualDurationSeconds);
           }
         }
       } catch (error) {
         console.log('🔍 [DURATION CALC DEBUG] Error calculating from sensor data:', error);
         if (workout.moving_time) {
-          actualDurationSeconds = workout.moving_time * 60;
+          actualDurationSeconds = workout.moving_time; // moving_time is already in seconds
           console.log('🔍 [DURATION CALC DEBUG] Using moving_time fallback after error:', actualDurationSeconds);
         }
       }
     } else if (workout.moving_time) {
       // Fallback to moving_time if no sensor data
-      actualDurationSeconds = workout.moving_time * 60; // Convert minutes to seconds
-      console.log('🔍 [DURATION CALC DEBUG] Using moving_time - workout.moving_time:', workout.moving_time, 'converted to seconds:', actualDurationSeconds);
+      actualDurationSeconds = workout.moving_time; // moving_time is already in seconds
+      console.log('🔍 [DURATION CALC DEBUG] Using moving_time - workout.moving_time:', workout.moving_time, 'in seconds:', actualDurationSeconds);
     }
     
     console.log('🔍 [DURATION CALC DEBUG] actualDurationSeconds (calculated):', actualDurationSeconds);
@@ -842,7 +895,7 @@ function calculateDurationAdherence(sensorData: any[], intervals: any[], workout
  * Calculate prescribed range adherence using proper granular analysis
  * Handles both intervals and steady-state workouts with consistency analysis
  */
-function calculatePrescribedRangeAdherenceGranular(sensorData: any[], intervals: any[], workout: any): PrescribedRangeAdherence {
+function calculatePrescribedRangeAdherenceGranular(sensorData: any[], intervals: any[], workout: any, plannedWorkout: any): PrescribedRangeAdherence {
   console.log(`📊 Starting granular prescribed range analysis for ${intervals.length} intervals`);
   console.log(`🔍 Interval structure debug:`, intervals.map(i => ({
     kind: i.kind,
@@ -880,12 +933,12 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   console.log('🏃‍♂️ Analyzing interval workout pace adherence');
   
   // Filter to work segments only
-  const workIntervals = intervals.filter(interval => 
-    (interval.type === 'work' || interval.kind === 'work') && 
-    interval.target_pace && 
-    interval.target_pace.lower && 
-    interval.target_pace.upper
-  );
+  const workIntervals = intervals.filter(interval => {
+    const isWorkRole = interval.role === 'work' || interval.kind === 'work';
+    const hasPaceTarget = interval.planned?.target_pace_s_per_mi || interval.executed?.avg_pace_s_per_mi;
+    console.log(`🔍 [INTERVAL FILTER] role=${interval.role}, kind=${interval.kind}, hasPaceTarget=${!!hasPaceTarget}`);
+    return isWorkRole && hasPaceTarget;
+  });
   
   console.log(`📊 Analyzing ${workIntervals.length} work intervals`);
   
@@ -1121,8 +1174,12 @@ function analyzeIntervalPace(samples: any[], interval: any): any {
   }
   
   const avgPace = validSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validSamples.length;
-  const targetPace = (interval.target_pace.lower + interval.target_pace.upper) / 2;
-  const adherence = targetPace / avgPace;
+  
+  // ✅ Clean structure - use planned target pace
+  const targetPace = interval.target_pace?.lower || 0;
+  const actualPace = interval.executed?.avg_pace_s_per_mi || avgPace;
+  
+  const adherence = targetPace > 0 ? targetPace / actualPace : 1;
   
   return {
     timeInRange: adherence >= 0.95 && adherence <= 1.05 ? validSamples.length : 0,
@@ -1199,8 +1256,28 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
   // Calculate heart rate analysis
   const heartRateAnalysis = calculateOverallHeartRateAnalysis(sensorData);
   
-  // Calculate duration adherence using the working method
-  const durationAdherence = calculateDurationAdherence(sensorData, intervals, workout);
+  // ✅ Fix Duration - Use proper data sources
+  console.log('🔍 [DURATION DEBUG] Calculating duration adherence with proper data sources');
+  
+  // For duration adherence (workout-level metric)
+  const plannedDurationSeconds = 
+    plannedWorkout?.computed?.total_duration_seconds ||
+    intervals.reduce((sum, i) => sum + (i.duration_s || 0), 0);
+
+  const actualDurationSeconds = 
+    workout?.computed?.overall?.duration_s_moving || 0;
+  
+  console.log('🔍 [DURATION DEBUG] Planned duration:', plannedDurationSeconds);
+  console.log('🔍 [DURATION DEBUG] Actual duration:', actualDurationSeconds);
+  
+  const durationAdherence = plannedDurationSeconds > 0 ? {
+    planned_duration_s: plannedDurationSeconds,
+    actual_duration_s: actualDurationSeconds,
+    adherence_percentage: Math.round((actualDurationSeconds / plannedDurationSeconds) * 100),
+    deviation_s: actualDurationSeconds - plannedDurationSeconds
+  } : null;
+  
+  console.log('🔍 [DURATION DEBUG] Duration adherence result:', durationAdherence);
   
   // Identify primary issues and strengths
   const primaryIssues = identifyPrimaryIssues(intervalAnalysis);

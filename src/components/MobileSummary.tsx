@@ -1434,12 +1434,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const durationAdherence = granularAnalysis?.duration_adherence;
           const performanceAssessment = granularAnalysis?.performance_assessment;
           
-          // Convert percentages to match expected format
-          const finalExecutionScore = overallAdherence ? Math.round(overallAdherence * 100) : null;
+          // Convert percentages to match expected format with graceful fallbacks
+          const finalExecutionScore = overallAdherence ? Math.round(overallAdherence * 100) : 0;
           const finalPacePct = granularAnalysis?.pacing_analysis?.time_in_range_score ? 
-            Math.round(granularAnalysis.pacing_analysis.time_in_range_score * 100) : null;
+            Math.round(granularAnalysis.pacing_analysis.time_in_range_score * 100) : 0;
           const finalDurationPct = durationAdherence?.adherence_percentage ? 
-            Math.round(durationAdherence.adherence_percentage) : null;
+            Math.round(durationAdherence.adherence_percentage) : 0;
           const finalDistPct = null; // Distance adherence not available in current analysis
           
           console.log('🔍 [UNIFIED DEBUG] Using workout_analysis data:', {
@@ -1451,8 +1451,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             finalDurationPct
           });
           
-          // If nothing to show, skip
-          const anyVal = (finalPacePct!=null) || (finalDurationPct!=null) || (finalDistPct!=null) || (finalExecutionScore!=null);
+          // If nothing to show, skip (but allow 0 values to show)
+          const anyVal = (finalPacePct > 0) || (finalDurationPct > 0) || (finalDistPct != null) || (finalExecutionScore > 0);
           console.log('🔍 [ADHERENCE DEBUG] anyVal:', anyVal, 'hideTopAdherence:', hideTopAdherence);
           if (!anyVal || hideTopAdherence) return null;
 
@@ -1495,10 +1495,17 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             <div className="w-full pt-1 pb-2">
                   <div className="flex items-center justify-center gap-6 text-center">
                     <div className="flex items-end gap-3">
+                      {/* Overall Execution Score */}
                       {chip('Execution', finalExecutionScore, 
                            performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence', 'pace')}
-                      {chip('Pace', finalPacePct, '—', 'pace')}
-                      {chip('Duration', finalDurationPct, finalDurationDelta!=null ? fmtDeltaTime(finalDurationDelta) : '—', 'duration')}
+                      
+                      {/* Duration Adherence */}
+                      {chip('Duration', finalDurationPct, 
+                           'Time adherence', 'duration')}
+                      
+                      {/* Pace Adherence */}
+                      {chip('Pace', finalPacePct, 
+                           'Interval adherence', 'pace')}
                     </div>
                   </div>
               {message && (
