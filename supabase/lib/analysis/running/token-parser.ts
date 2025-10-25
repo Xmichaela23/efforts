@@ -186,21 +186,25 @@ function parseIntervalToken(token: string, baselines: UserBaselines): RunSegment
   
   const segments: RunSegment[] = [];
   
-  // Parse: interval_6x800m_5kpace_r90s
-  const intervalMatch = token.match(/interval_(\d+)x(\d+)m_(\w+)_[rR](\d+)([sm]?)/);
+  // Parse: interval_6x800m_5kpace_r90s or interval_4x1mi_5kpace_R2min
+  const intervalMatch = token.match(/interval_(\d+)x(\d+)(m|mi)_(\w+)_[rR](\d+)([sm]?|min)/);
   if (!intervalMatch) {
     console.warn(`⚠️ Could not parse interval token: ${token}`);
     return segments;
   }
   
   const reps = parseInt(intervalMatch[1]);
-  const distance = parseInt(intervalMatch[2]); // meters
-  const paceRef = intervalMatch[3];
-  const restDuration = parseInt(intervalMatch[4]);
-  const restUnit = intervalMatch[5] || 's'; // Default to seconds
+  const distanceValue = parseInt(intervalMatch[2]);
+  const distanceUnit = intervalMatch[3]; // 'm' or 'mi'
+  const paceRef = intervalMatch[4];
+  const restDuration = parseInt(intervalMatch[5]);
+  const restUnit = intervalMatch[6] || 's'; // Default to seconds
+  
+  // Convert distance to meters
+  const distance = distanceUnit === 'mi' ? distanceValue * 1609 : distanceValue;
   
   // Convert rest duration to seconds
-  const restSeconds = restUnit === 'm' ? restDuration * 60 : restDuration;
+  const restSeconds = (restUnit === 'm' || restUnit === 'min') ? restDuration * 60 : restDuration;
   
   // Look up target pace
   const targetPace = getPaceFromReference(paceRef, baselines);
