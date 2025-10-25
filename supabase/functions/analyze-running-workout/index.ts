@@ -664,11 +664,31 @@ function calculateDurationAdherence(sensorData: any[], intervals: any[], workout
     // Calculate actual duration from total elapsed time
     let actualDurationSeconds = 0;
     if (sensorData.length > 0) {
-      // Use total elapsed time from sensor data (includes rests)
-      const firstSample = sensorData[0];
-      const lastSample = sensorData[sensorData.length - 1];
-      actualDurationSeconds = lastSample.timestamp - firstSample.timestamp;
-      console.log('🔍 [DURATION CALC DEBUG] Using sensor data - firstSample timestamp:', firstSample.timestamp, 'lastSample timestamp:', lastSample.timestamp);
+      try {
+        // Use total elapsed time from sensor data (includes rests)
+        const firstSample = sensorData[0];
+        const lastSample = sensorData[sensorData.length - 1];
+        console.log('🔍 [DURATION CALC DEBUG] First sample:', firstSample);
+        console.log('🔍 [DURATION CALC DEBUG] Last sample:', lastSample);
+        
+        if (firstSample && lastSample && firstSample.timestamp && lastSample.timestamp) {
+          actualDurationSeconds = lastSample.timestamp - firstSample.timestamp;
+          console.log('🔍 [DURATION CALC DEBUG] Using sensor data - firstSample timestamp:', firstSample.timestamp, 'lastSample timestamp:', lastSample.timestamp);
+          console.log('🔍 [DURATION CALC DEBUG] Calculated duration from sensor data:', actualDurationSeconds);
+        } else {
+          console.log('🔍 [DURATION CALC DEBUG] Invalid sensor data timestamps, falling back to moving_time');
+          if (workout.moving_time) {
+            actualDurationSeconds = workout.moving_time * 60;
+            console.log('🔍 [DURATION CALC DEBUG] Using moving_time fallback:', actualDurationSeconds);
+          }
+        }
+      } catch (error) {
+        console.log('🔍 [DURATION CALC DEBUG] Error calculating from sensor data:', error);
+        if (workout.moving_time) {
+          actualDurationSeconds = workout.moving_time * 60;
+          console.log('🔍 [DURATION CALC DEBUG] Using moving_time fallback after error:', actualDurationSeconds);
+        }
+      }
     } else if (workout.moving_time) {
       // Fallback to moving_time if no sensor data
       actualDurationSeconds = workout.moving_time * 60; // Convert minutes to seconds
