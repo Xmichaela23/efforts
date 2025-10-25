@@ -222,6 +222,7 @@ Deno.serve(async (req) => {
             }));
             
             console.log(`✅ Parsed ${intervals.length} intervals from tokens`);
+            console.log(`🔍 DEBUG: Intervals after parsing:`, JSON.stringify(intervals, null, 2));
           } catch (error) {
             console.warn('⚠️ Token parsing failed, using intervals:', error);
             intervals = plannedWorkout.intervals || [];
@@ -669,13 +670,15 @@ function calculateDurationAdherenceFromComputed(workout: any, plannedWorkout: an
     // Get planned duration from planned workout
     const plannedDurationSeconds = plannedWorkout?.computed?.total_duration_seconds || 0;
     console.log('🔍 [DURATION COMPUTED] Planned duration (computed):', plannedDurationSeconds);
-    
+    console.log('🔍 [DURATION COMPUTED] Raw plannedWorkout.computed.total_duration_seconds:', plannedWorkout?.computed?.total_duration_seconds);
+
     // Get actual duration from completed workout computed data
     const actualDurationSeconds = workout?.computed?.overall?.duration_s_moving || 0;
     console.log('🔍 [DURATION COMPUTED] Actual duration (computed):', actualDurationSeconds);
-    
+    console.log('🔍 [DURATION COMPUTED] Raw workout.computed.overall.duration_s_moving:', workout?.computed?.overall?.duration_s_moving);
+
     if (plannedDurationSeconds === 0 || actualDurationSeconds === 0) {
-      console.log('⚠️ Duration adherence: missing computed data');
+      console.log('⚠️ Duration adherence: missing computed data (planned:', plannedDurationSeconds, 'actual:', actualDurationSeconds, ')');
       return {
         planned_duration_s: plannedDurationSeconds,
         actual_duration_s: actualDurationSeconds,
