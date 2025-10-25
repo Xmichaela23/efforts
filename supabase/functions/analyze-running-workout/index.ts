@@ -1199,8 +1199,8 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
   // Calculate heart rate analysis
   const heartRateAnalysis = calculateOverallHeartRateAnalysis(sensorData);
   
-  // Calculate duration adherence using computed data (workout-level metric)
-  const durationAdherence = calculateDurationAdherenceFromComputed(workout, plannedWorkout, intervals);
+  // Calculate duration adherence using the working method
+  const durationAdherence = calculateDurationAdherence(sensorData, intervals, workout);
   
   // Identify primary issues and strengths
   const primaryIssues = identifyPrimaryIssues(intervalAnalysis);
