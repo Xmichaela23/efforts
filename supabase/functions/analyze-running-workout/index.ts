@@ -324,6 +324,7 @@ Deno.serve(async (req) => {
     let intervalsToAnalyze = intervals;
     if (workout.computed?.intervals && workout.computed.intervals.length > 0) {
       console.log('🔍 Using computed intervals for analysis (has proper structure)');
+      console.log('🔍 Computed intervals structure:', JSON.stringify(workout.computed.intervals[0], null, 2));
       intervalsToAnalyze = workout.computed.intervals;
     } else {
       console.log('🔍 Using parsed token intervals for analysis');
