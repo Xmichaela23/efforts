@@ -875,9 +875,9 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   // Filter to work segments only
   const workIntervals = intervals.filter(interval => 
     (interval.type === 'work' || interval.kind === 'work') && 
-    interval.pace_range && 
-    interval.pace_range.lower && 
-    interval.pace_range.upper
+    interval.target_pace && 
+    interval.target_pace.lower && 
+    interval.target_pace.upper
   );
   
   console.log(`📊 Analyzing ${workIntervals.length} work intervals`);
@@ -892,7 +892,7 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   
   // Analyze each work interval
   for (const interval of workIntervals) {
-    console.log(`🔍 Analyzing work interval: ${interval.distance_m || 'N/A'}m @ ${interval.pace_range?.lower || 'N/A'}-${interval.pace_range?.upper || 'N/A'}s/mi`);
+    console.log(`🔍 Analyzing work interval: ${interval.distance || 'N/A'}m @ ${interval.target_pace?.lower || 'N/A'}-${interval.target_pace?.upper || 'N/A'}s/mi`);
     
     // Find samples for this interval (this is simplified - you'd need proper time mapping)
     const intervalSamples = sensorData; // Simplified - would need proper time segmentation
@@ -913,8 +913,8 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
     
     intervalAnalysis.push({
       type: interval.type || interval.kind,
-      distance_m: interval.distance_m,
-      target_pace: interval.pace_range,
+      distance_m: interval.distance,
+      target_pace: interval.target_pace,
       adherence: intervalResult.adherence,
       time_in_range: intervalResult.timeInRange,
       time_outside_range: intervalResult.timeOutsideRange
@@ -1114,7 +1114,7 @@ function analyzeIntervalPace(samples: any[], interval: any): any {
   }
   
   const avgPace = validSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validSamples.length;
-  const targetPace = (interval.pace_range.lower + interval.pace_range.upper) / 2;
+  const targetPace = (interval.target_pace.lower + interval.target_pace.upper) / 2;
   const adherence = targetPace / avgPace;
   
   return {
