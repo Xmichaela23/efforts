@@ -879,10 +879,8 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   
   // Filter to work segments only
   const workIntervals = intervals.filter(interval => 
-    interval.type === 'work' && 
-    interval.pace_range && 
-    interval.pace_range.lower && 
-    interval.pace_range.upper
+    (interval.kind === 'work' || interval.role === 'work') && 
+    interval.planned?.target_pace_s_per_mi
   );
   
   console.log(`📊 Analyzing ${workIntervals.length} work intervals`);
@@ -897,7 +895,7 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   
   // Analyze each work interval
   for (const interval of workIntervals) {
-    console.log(`🔍 Analyzing work interval: ${interval.distance_m}m @ ${interval.pace_range.lower}-${interval.pace_range.upper}s/mi`);
+    console.log(`🔍 Analyzing work interval: ${interval.planned?.distance_m || 'N/A'}m @ ${interval.planned?.target_pace_s_per_mi || 'N/A'}s/mi`);
     
     // Find samples for this interval (this is simplified - you'd need proper time mapping)
     const intervalSamples = sensorData; // Simplified - would need proper time segmentation
@@ -917,9 +915,9 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
     handledGaps += intervalResult.handledGaps;
     
     intervalAnalysis.push({
-      type: interval.type,
-      distance_m: interval.distance_m,
-      target_pace: interval.pace_range,
+      type: interval.kind || interval.role,
+      distance_m: interval.planned?.distance_m,
+      target_pace: interval.planned?.target_pace_s_per_mi,
       adherence: intervalResult.adherence,
       time_in_range: intervalResult.timeInRange,
       time_outside_range: intervalResult.timeOutsideRange
@@ -1119,8 +1117,8 @@ function analyzeIntervalPace(samples: any[], interval: any): any {
   }
   
   const avgPace = validSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validSamples.length;
-  const targetPace = (interval.pace_range.lower + interval.pace_range.upper) / 2;
-  const adherence = targetPace / avgPace;
+  const targetPace = interval.planned?.target_pace_s_per_mi || 0;
+  const adherence = targetPace > 0 ? targetPace / avgPace : 0;
   
   return {
     timeInRange: adherence >= 0.95 && adherence <= 1.05 ? validSamples.length : 0,
