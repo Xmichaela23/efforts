@@ -1262,10 +1262,11 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
   // For duration adherence (workout-level metric)
   const plannedDurationSeconds = 
     plannedWorkout?.computed?.total_duration_seconds ||
-    intervals.reduce((sum, i) => sum + (i.duration_s || 0), 0);
+    intervals.reduce((sum, i) => sum + (i.planned?.duration_s || 0), 0);
 
   const actualDurationSeconds = 
-    workout?.computed?.overall?.duration_s_moving || 0;
+    workout?.computed?.overall?.duration_s_moving ||
+    intervals.reduce((sum, i) => sum + (i.executed?.duration_s || 0), 0);
   
   console.log('🔍 [DURATION DEBUG] Planned duration:', plannedDurationSeconds);
   console.log('🔍 [DURATION DEBUG] Actual duration:', actualDurationSeconds);
