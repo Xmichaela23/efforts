@@ -650,6 +650,16 @@ function extractSensorData(data: any): any[] {
 function calculateDurationAdherenceFromComputed(workout: any, plannedWorkout: any): any {
   try {
     console.log('🔍 [DURATION COMPUTED] Using computed data for duration adherence');
+    console.log('🔍 [DURATION COMPUTED] workout structure:', {
+      hasComputed: !!workout?.computed,
+      computedKeys: workout?.computed ? Object.keys(workout.computed) : [],
+      hasOverall: !!workout?.computed?.overall,
+      overallKeys: workout?.computed?.overall ? Object.keys(workout.computed.overall) : []
+    });
+    console.log('🔍 [DURATION COMPUTED] plannedWorkout structure:', {
+      hasComputed: !!plannedWorkout?.computed,
+      computedKeys: plannedWorkout?.computed ? Object.keys(plannedWorkout.computed) : []
+    });
     
     // Get planned duration from planned workout
     const plannedDurationSeconds = plannedWorkout?.computed?.total_duration_seconds || 0;
