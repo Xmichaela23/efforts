@@ -653,9 +653,13 @@ function calculateDurationAdherence(sensorData: any[], intervals: any[], workout
     console.log('🔍 [DURATION CALC DEBUG] sensorData.length:', sensorData.length);
     console.log('🔍 [DURATION CALC DEBUG] intervals (for planned duration):', intervals);
     
-    // Get planned duration from intervals
+    // Get planned duration from intervals (only work segments, not rest periods)
     const plannedDurationSeconds = intervals.reduce((total, interval) => {
-      return total + (interval.duration_s || 0);
+      // Only count work segments for duration adherence
+      if (interval.type === 'work' || interval.type === 'warmup' || interval.type === 'cooldown') {
+        return total + (interval.duration_s || 0);
+      }
+      return total;
     }, 0);
     
     console.log('🔍 [DURATION CALC DEBUG] plannedDurationSeconds (calculated):', plannedDurationSeconds);
