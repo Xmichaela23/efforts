@@ -320,8 +320,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Use computed intervals if available (they have the proper structure)
+    let intervalsToAnalyze = intervals;
+    if (workout.computed?.intervals && workout.computed.intervals.length > 0) {
+      console.log('🔍 Using computed intervals for analysis (has proper structure)');
+      intervalsToAnalyze = workout.computed.intervals;
+    } else {
+      console.log('🔍 Using parsed token intervals for analysis');
+    }
+    
     // Perform granular adherence analysis
-    const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervals, workout);
+    const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervalsToAnalyze, workout);
 
     // Add data quality information to analysis
     const enhancedAnalysis = {
