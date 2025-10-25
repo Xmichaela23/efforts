@@ -213,8 +213,12 @@ Deno.serve(async (req) => {
             // Convert parsed segments to intervals format
             intervals = parsedStructure.segments.map((segment: any) => ({
               type: segment.type,
+              kind: segment.type, // Add kind field for compatibility
+              duration: segment.duration,
               duration_s: segment.duration,
+              distance: segment.distance,
               distance_m: segment.distance,
+              target_pace: segment.target_pace, // Keep original structure
               pace_range: segment.target_pace ? {
                 lower: segment.target_pace.lower,
                 upper: segment.target_pace.upper
@@ -653,7 +657,7 @@ function extractSensorData(data: any): any[] {
  * Calculate duration adherence using computed data (workout-level metric)
  * This is the correct approach for duration - use pre-computed, validated data
  */
-function calculateDurationAdherenceFromComputed(workout: any, plannedWorkout: any): any {
+function calculateDurationAdherenceFromComputed(workout: any, plannedWorkout: any, intervals: any[]): any {
   try {
     console.log('🔍 [DURATION COMPUTED] Using computed data for duration adherence');
     console.log('🔍 [DURATION COMPUTED] workout structure:', {
@@ -667,9 +671,9 @@ function calculateDurationAdherenceFromComputed(workout: any, plannedWorkout: an
       computedKeys: plannedWorkout?.computed ? Object.keys(plannedWorkout.computed) : []
     });
     
-    // Get planned duration from planned workout
-    const plannedDurationSeconds = plannedWorkout?.computed?.total_duration_seconds || 0;
-    console.log('🔍 [DURATION COMPUTED] Planned duration (computed):', plannedDurationSeconds);
+    // Get planned duration from parsed intervals (more reliable than computed)
+    const plannedDurationSeconds = intervals.reduce((sum, segment) => sum + (segment.duration || segment.duration_s || 0), 0);
+    console.log('🔍 [DURATION COMPUTED] Planned duration (from intervals):', plannedDurationSeconds);
     console.log('🔍 [DURATION COMPUTED] Raw plannedWorkout.computed.total_duration_seconds:', plannedWorkout?.computed?.total_duration_seconds);
 
     // Get actual duration from completed workout computed data
@@ -1196,7 +1200,7 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
   const heartRateAnalysis = calculateOverallHeartRateAnalysis(sensorData);
   
   // Calculate duration adherence using computed data (workout-level metric)
-  const durationAdherence = calculateDurationAdherenceFromComputed(workout, plannedWorkout);
+  const durationAdherence = calculateDurationAdherenceFromComputed(workout, plannedWorkout, intervals);
   
   // Identify primary issues and strengths
   const primaryIssues = identifyPrimaryIssues(intervalAnalysis);
