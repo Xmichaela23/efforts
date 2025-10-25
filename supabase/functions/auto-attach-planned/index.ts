@@ -198,6 +198,11 @@ Deno.serve(async (req) => {
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
         await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
         
+        // Compute analysis for enhanced adherence metrics
+        console.log('[auto-attach-planned] Computing workout analysis');
+        const analysisUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
+        await fetch(analysisUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+        
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       } catch (explicitError: any) {
         console.error('[auto-attach-planned] Explicit attach error:', explicitError);
