@@ -652,6 +652,7 @@ function calculateDurationAdherence(sensorData: any[], intervals: any[], workout
     console.log('🔍 [DURATION CALC DEBUG] workout.moving_time:', workout.moving_time);
     console.log('🔍 [DURATION CALC DEBUG] sensorData.length:', sensorData.length);
     console.log('🔍 [DURATION CALC DEBUG] intervals (for planned duration):', intervals);
+    console.log('🔍 [DURATION CALC DEBUG] intervals structure:', intervals.map(i => ({ type: i.type, duration_s: i.duration_s, distance: i.distance })));
     
     // Get planned duration from intervals (all segments including rest)
     const plannedDurationSeconds = intervals.reduce((total, interval) => {
@@ -667,9 +668,11 @@ function calculateDurationAdherence(sensorData: any[], intervals: any[], workout
       const firstSample = sensorData[0];
       const lastSample = sensorData[sensorData.length - 1];
       actualDurationSeconds = lastSample.timestamp - firstSample.timestamp;
+      console.log('🔍 [DURATION CALC DEBUG] Using sensor data - firstSample timestamp:', firstSample.timestamp, 'lastSample timestamp:', lastSample.timestamp);
     } else if (workout.moving_time) {
       // Fallback to moving_time if no sensor data
       actualDurationSeconds = workout.moving_time * 60; // Convert minutes to seconds
+      console.log('🔍 [DURATION CALC DEBUG] Using moving_time - workout.moving_time:', workout.moving_time, 'converted to seconds:', actualDurationSeconds);
     }
     
     console.log('🔍 [DURATION CALC DEBUG] actualDurationSeconds (calculated):', actualDurationSeconds);
