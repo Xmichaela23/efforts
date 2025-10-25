@@ -320,15 +320,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use computed intervals if available (they have the proper structure)
+    // Use planned intervals for granular analysis (not computed intervals)
+    // Computed intervals are already processed results - we need the raw planned structure
     let intervalsToAnalyze = intervals;
-    if (workout.computed?.intervals && workout.computed.intervals.length > 0) {
-      console.log('🔍 Using computed intervals for analysis (has proper structure)');
-      console.log('🔍 Computed intervals structure:', JSON.stringify(workout.computed.intervals[0], null, 2));
-      intervalsToAnalyze = workout.computed.intervals;
-    } else {
-      console.log('🔍 Using parsed token intervals for analysis');
-    }
+    console.log('🔍 Using planned intervals for granular analysis (raw sensor data vs planned targets)');
     
     // Perform granular adherence analysis
     const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervalsToAnalyze, workout);
@@ -879,8 +874,10 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   
   // Filter to work segments only
   const workIntervals = intervals.filter(interval => 
-    (interval.kind === 'work' || interval.role === 'work') && 
-    interval.planned?.target_pace_s_per_mi
+    (interval.type === 'work' || interval.kind === 'work') && 
+    interval.pace_range && 
+    interval.pace_range.lower && 
+    interval.pace_range.upper
   );
   
   console.log(`📊 Analyzing ${workIntervals.length} work intervals`);
@@ -895,7 +892,7 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   
   // Analyze each work interval
   for (const interval of workIntervals) {
-    console.log(`🔍 Analyzing work interval: ${interval.planned?.distance_m || 'N/A'}m @ ${interval.planned?.target_pace_s_per_mi || 'N/A'}s/mi`);
+    console.log(`🔍 Analyzing work interval: ${interval.distance_m || 'N/A'}m @ ${interval.pace_range?.lower || 'N/A'}-${interval.pace_range?.upper || 'N/A'}s/mi`);
     
     // Find samples for this interval (this is simplified - you'd need proper time mapping)
     const intervalSamples = sensorData; // Simplified - would need proper time segmentation
@@ -915,9 +912,9 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
     handledGaps += intervalResult.handledGaps;
     
     intervalAnalysis.push({
-      type: interval.kind || interval.role,
-      distance_m: interval.planned?.distance_m,
-      target_pace: interval.planned?.target_pace_s_per_mi,
+      type: interval.type || interval.kind,
+      distance_m: interval.distance_m,
+      target_pace: interval.pace_range,
       adherence: intervalResult.adherence,
       time_in_range: intervalResult.timeInRange,
       time_outside_range: intervalResult.timeOutsideRange
@@ -1117,8 +1114,8 @@ function analyzeIntervalPace(samples: any[], interval: any): any {
   }
   
   const avgPace = validSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validSamples.length;
-  const targetPace = interval.planned?.target_pace_s_per_mi || 0;
-  const adherence = targetPace > 0 ? targetPace / avgPace : 0;
+  const targetPace = (interval.pace_range.lower + interval.pace_range.upper) / 2;
+  const adherence = targetPace / avgPace;
   
   return {
     timeInRange: adherence >= 0.95 && adherence <= 1.05 ? validSamples.length : 0,
