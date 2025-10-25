@@ -282,7 +282,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         const needsAnalysis = !granularAnalysis || 
           !granularAnalysis.duration_adherence || 
           !granularAnalysis.overall_adherence ||
-          granularAnalysis.duration_adherence.adherence_percentage === null;
+          granularAnalysis.duration_adherence.adherence_percentage === null ||
+          granularAnalysis.duration_adherence.adherence_percentage < 50; // Re-analyze if duration is suspiciously low
         
         if (needsAnalysis) {
           console.log('🏃‍♂️ Running enhanced workout analysis...');
