@@ -1260,6 +1260,11 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
   console.log('🔍 [DURATION DEBUG] Calculating duration adherence with proper data sources');
   
   // For duration adherence (workout-level metric)
+  console.log('🔍 [DURATION DEBUG] plannedWorkout?.computed?.total_duration_seconds:', plannedWorkout?.computed?.total_duration_seconds);
+  console.log('🔍 [DURATION DEBUG] intervals.length:', intervals.length);
+  console.log('🔍 [DURATION DEBUG] intervals[0] planned duration:', intervals[0]?.planned?.duration_s);
+  console.log('🔍 [DURATION DEBUG] intervals[0] executed duration:', intervals[0]?.executed?.duration_s);
+  
   const plannedDurationSeconds = 
     plannedWorkout?.computed?.total_duration_seconds ||
     intervals.reduce((sum, i) => sum + (i.planned?.duration_s || 0), 0);
