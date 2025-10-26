@@ -304,11 +304,13 @@ Deno.serve(async (req) => {
             // Fallback to computed intervals
             intervals = workout.computed?.intervals || plannedWorkout.intervals || [];
             console.log(`🔍 Using computed intervals: ${intervals.length} intervals found`);
+            console.log(`🔍 [DEBUG] First interval structure:`, JSON.stringify(intervals[0], null, 2));
           }
         } else {
           // Use computed intervals from the completed workout if no planned workout
           intervals = workout.computed?.intervals || plannedWorkout.intervals || [];
           console.log(`🔍 No tokens found, using computed intervals: ${intervals.length} intervals found`);
+          console.log(`🔍 [DEBUG] First interval structure:`, JSON.stringify(intervals[0], null, 2));
         }
       }
     }
@@ -405,6 +407,7 @@ Deno.serve(async (req) => {
     // Computed intervals are already processed results - we need the raw planned structure
     let intervalsToAnalyze = intervals;
     console.log('🔍 Using planned intervals for granular analysis (raw sensor data vs planned targets)');
+    console.log('🔍 [CRITICAL DEBUG] intervalsToAnalyze structure:', JSON.stringify(intervalsToAnalyze, null, 2));
     
     // Perform granular adherence analysis
     const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervalsToAnalyze, workout, plannedWorkout);
@@ -962,7 +965,11 @@ function calculatePrescribedRangeAdherenceGranular(sensorData: any[], intervals:
   // Look for intervals with 'work' role or 'interval' kind, and check for pace targets
   const workIntervals = intervals.filter(interval => {
     const isWorkRole = interval.role === 'work' || interval.kind === 'work';
-    const hasPaceTarget = interval.target_pace?.lower || interval.pace_range?.lower;
+    // Check for pace target in multiple possible locations
+    const hasPaceTarget = interval.target_pace?.lower || 
+                         interval.pace_range?.lower || 
+                         interval.planned?.target_pace_s_per_mi ||
+                         interval.planned?.pace_range;
     console.log(`🔍 Checking interval: role=${interval.role}, kind=${interval.kind}, hasPaceTarget=${!!hasPaceTarget}`);
     return isWorkRole && hasPaceTarget;
   });
@@ -987,7 +994,11 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   // Filter to work segments only
   const workIntervals = intervals.filter(interval => {
     const isWorkRole = interval.role === 'work' || interval.kind === 'work';
-    const hasPaceTarget = interval.target_pace?.lower || interval.pace_range?.lower;
+    // Check for pace target in multiple possible locations
+    const hasPaceTarget = interval.target_pace?.lower || 
+                         interval.pace_range?.lower || 
+                         interval.planned?.target_pace_s_per_mi ||
+                         interval.planned?.pace_range;
     console.log(`🔍 [INTERVAL FILTER] role=${interval.role}, kind=${interval.kind}, hasPaceTarget=${!!hasPaceTarget}`);
     return isWorkRole && hasPaceTarget;
   });

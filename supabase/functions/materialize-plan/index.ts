@@ -789,12 +789,26 @@ function toV3Step(st: any): any {
   }
   
   if (typeof st?.distance_m === 'number') out.distanceMeters = Math.max(1, Math.round(st.distance_m));
-  if (typeof st?.pace_sec_per_mi === 'number') out.paceTarget = `${mmss(st.pace_sec_per_mi)}/mi`;
+  if (typeof st?.pace_sec_per_mi === 'number') {
+    out.paceTarget = `${mmss(st.pace_sec_per_mi)}/mi`;
+    
+    // Calculate pace range with appropriate tolerance
+    // Use strict tolerance for quality work (matches Garmin/TrainingPeaks standards)
+    // Use lenient tolerance for easy/recovery/long runs (accounts for terrain, fatigue)
+    const paceSec = st.pace_sec_per_mi;
+    const tolerance = (st?.role === 'work' || st?.kind === 'interval' || st?.type === 'tempo') 
+      ? 0.02   // ±2% for quality work (~10-20s for most paces)
+      : 0.06;  // ±6% for easy runs (~30-60s for most paces)
+    
+    const lower = Math.round(paceSec * (1 - tolerance));
+    const upper = Math.round(paceSec * (1 + tolerance));
+    out.pace_range = { lower, upper };
+  }
   if (Array.isArray(st?.pace_range) && st.pace_range.length===2) {
     const a = Number(st.pace_range[0]); const b = Number(st.pace_range[1]);
     if (Number.isFinite(a) && Number.isFinite(b) && a>0 && b>0) {
-      // Store as formatted strings for display (e.g., ["8:02/mi", "8:42/mi"])
-      out.pace_range = [`${mmss(a)}/mi`, `${mmss(b)}/mi`];
+      // Store as object with numeric properties for analysis
+      out.pace_range = { lower: a, upper: b };
     }
   }
   if (st?.power_range && typeof st.power_range.lower === 'number' && typeof st.power_range.upper === 'number') {
