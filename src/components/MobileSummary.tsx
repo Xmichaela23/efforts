@@ -1437,7 +1437,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           // Convert percentages to match expected format with graceful fallbacks
           const finalExecutionScore = overallAdherence ? Math.round(overallAdherence * 100) : 0;
           const finalPacePct = granularAnalysis?.pacing_analysis?.time_in_range_score ? 
-            Math.round(granularAnalysis.pacing_analysis.time_in_range_score * 100) : 0;
+            Math.round(granularAnalysis.pacing_analysis.time_in_range_score) : 0;
           const finalDurationPct = durationAdherence?.adherence_percentage ? 
             Math.round(durationAdherence.adherence_percentage) : 0;
           const finalDistPct = null; // Distance adherence not available in current analysis
