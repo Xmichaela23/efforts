@@ -283,7 +283,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           !granularAnalysis.duration_adherence || 
           !granularAnalysis.overall_adherence ||
           granularAnalysis.duration_adherence.adherence_percentage === null ||
-          granularAnalysis.duration_adherence.adherence_percentage < 50; // Re-analyze if duration is suspiciously low
+          granularAnalysis.duration_adherence.adherence_percentage < 50 || // Re-analyze if duration is suspiciously low
+          granularAnalysis.duration_adherence.adherence_percentage === 0; // Force re-analysis if duration is exactly 0%
+        
+        console.log('🔍 Analysis check:', {
+          hasGranularAnalysis: !!granularAnalysis,
+          hasDurationAdherence: !!granularAnalysis?.duration_adherence,
+          durationPercentage: granularAnalysis?.duration_adherence?.adherence_percentage,
+          needsAnalysis
+        });
         
         if (needsAnalysis) {
           console.log('🏃‍♂️ Running enhanced workout analysis...');
