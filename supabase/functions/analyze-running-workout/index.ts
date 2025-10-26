@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
     if (workout.planned_id) {
       const { data: planned, error: plannedError } = await supabase
         .from('planned_workouts')
-        .select('id, intervals, steps_preset')
+        .select('id, intervals, steps_preset, computed, total_duration_seconds')
         .eq('id', workout.planned_id)
         .single();
 
@@ -203,9 +203,50 @@ Deno.serve(async (req) => {
       } else {
         plannedWorkout = planned;
 
-        // ✅ Parse intervals from planned workout first
-        if (plannedWorkout.steps_preset && plannedWorkout.steps_preset.length > 0) {
-          console.log('🏃 Parsing steps_preset tokens...');
+        // ✅ Use ACTUAL planned intervals from database (not calculated ranges)
+        if (plannedWorkout.intervals && Array.isArray(plannedWorkout.intervals)) {
+          console.log('🏃 Using actual planned intervals from database...');
+          
+          // Use the actual planned intervals with their real ranges
+          const actualPlannedIntervals = plannedWorkout.intervals.map((interval: any) => ({
+            type: interval.type || interval.kind,
+            kind: interval.kind || interval.type,
+            role: interval.role || interval.kind || interval.type,
+            duration: interval.duration_s,
+            duration_s: interval.duration_s,
+            distance: interval.distance_m,
+            distance_m: interval.distance_m,
+            target_pace: interval.pace_range ? {
+              lower: interval.pace_range.lower,
+              upper: interval.pace_range.upper
+            } : null,
+            pace_range: interval.pace_range ? {
+              lower: interval.pace_range.lower,
+              upper: interval.pace_range.upper
+            } : null,
+            step_index: interval.step_index || null
+          }));
+          
+          intervals = actualPlannedIntervals;
+          
+          // ✅ Enrich with execution data from computed intervals
+          intervals = actualPlannedIntervals.map(planned => {
+            // Find matching executed interval
+            const computedInterval = workout?.computed?.intervals?.find(exec => 
+              exec.step_index === planned.step_index ||
+              (exec.role === planned.role && exec.kind === planned.kind)
+            );
+            
+            return {
+              ...planned,
+              executed: computedInterval?.executed || null,
+              sample_idx_start: computedInterval?.sample_idx_start,
+              sample_idx_end: computedInterval?.sample_idx_end,
+              hasExecuted: !!computedInterval?.executed
+            };
+          });
+        } else if (plannedWorkout.steps_preset && plannedWorkout.steps_preset.length > 0) {
+          console.log('🏃 Fallback: Parsing steps_preset tokens...');
           try {
             // Import the token parser
             const { parseRunningTokens } = await import('./token-parser.ts');
@@ -228,18 +269,22 @@ Deno.serve(async (req) => {
               step_index: segment.step_index || null
             }));
             
+            intervals = parsedIntervals;
+            
             // ✅ Then enrich with execution data from computed intervals
             intervals = parsedIntervals.map(planned => {
               // Find matching executed interval
-              const executed = workout?.computed?.intervals?.find(exec => 
+              const computedInterval = workout?.computed?.intervals?.find(exec => 
                 exec.step_index === planned.step_index ||
                 (exec.role === planned.role && exec.kind === planned.kind)
               );
               
               return {
                 ...planned,
-                executed: executed?.executed || null,
-                hasExecuted: !!executed?.executed
+                executed: computedInterval?.executed || null,
+                sample_idx_start: computedInterval?.sample_idx_start,  // ✅ ADD
+                sample_idx_end: computedInterval?.sample_idx_end,      // ✅ ADD
+                hasExecuted: !!computedInterval?.executed
               };
             });
             
@@ -959,15 +1004,84 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   
   // Analyze each work interval
   for (const interval of workIntervals) {
-    console.log(`🔍 Analyzing work interval: ${interval.distance || 'N/A'}m @ ${interval.target_pace?.lower || 'N/A'}-${interval.target_pace?.upper || 'N/A'}s/mi`);
-    
-    // Find samples for this interval (this is simplified - you'd need proper time mapping)
-    const intervalSamples = sensorData; // Simplified - would need proper time segmentation
-    
-    if (intervalSamples.length === 0) {
-      console.log('⚠️ No samples found for interval');
-      continue;
+    // AUDIT: Debug the interval data structure to understand what boundaries are available
+    console.log(`🔍 SEGMENTATION DEBUG for interval ${workIntervals.indexOf(interval) + 1}:`);
+    console.log(`   Available interval.executed fields:`, interval.executed ? Object.keys(interval.executed) : 'NO EXECUTED DATA');
+    console.log(`   Available interval fields:`, Object.keys(interval));
+    if (interval.executed) {
+      console.log(`   - start_time:`, interval.executed.start_time);
+      console.log(`   - end_time:`, interval.executed.end_time);
+      console.log(`   - duration_s:`, interval.executed.duration_s);
+      console.log(`   - avg_pace_s_per_mi:`, interval.executed.avg_pace_s_per_mi);
+      console.log(`   - sample_idx_start:`, interval.sample_idx_start);
+      console.log(`   - sample_idx_end:`, interval.sample_idx_end);
     }
+    console.log(`   Total sensorData samples:`, sensorData.length);
+    if (sensorData.length > 0) {
+      console.log(`   Sample sensor data fields:`, Object.keys(sensorData[0]));
+      console.log(`   First sample:`, sensorData[0]);
+    }
+    
+    // Segment sensor data for this specific interval
+    let intervalSamples = sensorData;
+
+    if (interval.sample_idx_start !== undefined && interval.sample_idx_end !== undefined && 
+        interval.sample_idx_end > interval.sample_idx_start) {
+      // Method 1: Use sample indices (most accurate)
+      intervalSamples = sensorData.slice(interval.sample_idx_start, interval.sample_idx_end + 1);
+      console.log(`✅ METHOD 1: Segmented ${intervalSamples.length} samples using indices [${interval.sample_idx_start}:${interval.sample_idx_end}]`);
+
+    } else if (interval.executed?.start_time && interval.executed?.end_time) {
+      // Method 2: Use timestamps from executed interval
+      const startTime = new Date(interval.executed.start_time).getTime();
+      const endTime = new Date(interval.executed.end_time).getTime();
+
+      intervalSamples = sensorData.filter(sample => {
+        if (!sample.timestamp) return false;
+        const sampleTime = new Date(sample.timestamp).getTime();
+        return sampleTime >= startTime && sampleTime <= endTime;
+      });
+
+      console.log(`✅ METHOD 2: Segmented ${intervalSamples.length} samples using timestamps (${interval.executed.start_time} to ${interval.executed.end_time})`);
+
+    } else if (interval.executed?.elapsed_start_s !== undefined && interval.executed?.elapsed_end_s !== undefined) {
+      // Method 3: Use elapsed time boundaries
+      const startTime = interval.executed.elapsed_start_s;
+      const endTime = interval.executed.elapsed_end_s;
+
+      intervalSamples = sensorData.filter(sample => {
+        if (sample.elapsed_time == null) return false;
+        return sample.elapsed_time >= startTime && sample.elapsed_time <= endTime;
+      });
+
+      console.log(`✅ METHOD 3: Segmented ${intervalSamples.length} samples using elapsed time [${startTime}s:${endTime}s]`);
+
+    } else if (interval.executed?.duration_s && interval.executed.duration_s > 0) {
+      // Method 4: Use duration to estimate sample count (for intervals with collapsed boundaries)
+      const avgSampleRate = sensorData.length > 0 ? 
+        (sensorData[sensorData.length - 1].elapsed_time || sensorData.length) / sensorData.length : 1;
+      const estimatedSamples = Math.floor(interval.executed.duration_s / avgSampleRate);
+      
+      // Use a reasonable range around the estimated samples
+      const startIdx = Math.max(0, Math.floor(estimatedSamples * 0.5));
+      const endIdx = Math.min(sensorData.length - 1, Math.floor(estimatedSamples * 1.5));
+      
+      intervalSamples = sensorData.slice(startIdx, endIdx + 1);
+      console.log(`⚠️ METHOD 4: Estimated ${intervalSamples.length} samples using duration (${interval.executed.duration_s}s) - indices [${startIdx}:${endIdx}]`);
+
+    } else {
+      // Fallback: Skip this interval (no usable data)
+      console.error(`❌ No usable boundaries for interval - skipping analysis`);
+      continue; // Skip this interval entirely
+    }
+
+    // Validate we got data for this interval
+    if (intervalSamples.length === 0) {
+      console.error(`❌ No sensor data found for interval ${interval.step_index || 'unknown'}`);
+      continue; // Skip this interval in analysis
+    }
+
+    console.log(`📊 Analyzing ${intervalSamples.length} samples for interval`);
     
     // Calculate adherence for this interval
     const intervalResult = analyzeIntervalPace(intervalSamples, interval);
@@ -993,28 +1107,52 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   
   console.log(`✅ Interval analysis complete: ${(timeInRangeScore * 100).toFixed(1)}% time in range`);
   
-  // Calculate duration adherence - use the planned duration from enriched intervals
-  const plannedDurationSeconds = 
-    plannedWorkout?.computed?.total_duration_seconds ||
-    intervals.reduce((sum, i) => sum + (i.plannedDuration || 0), 0);
+  // Calculate duration adherence - use computed total duration (most reliable)
+  const plannedDurationSeconds = plannedWorkout?.computed?.total_duration_seconds || 0;
 
   const actualDurationSeconds = 
     workout?.computed?.overall?.duration_s_moving ||
     intervals.reduce((sum, i) => sum + (i.executed?.duration_s || 0), 0);
   
-  // Calculate average pace adherence from work intervals
-  const avgPaceAdherence = workIntervals.length > 0
-    ? workIntervals.reduce((sum, i) => sum + (i.executed?.adherence_percentage || 0), 0) / workIntervals.length
-    : 0;
+  // Calculate average pace adherence from WORK intervals only (exclude rest/recovery)
+  // Use time-in-range calculation instead of the incorrect ratio calculation from compute-workout-summary
+  const paceIntervals = intervals.filter(i => 
+    i.role !== 'rest' && 
+    i.kind !== 'rest' &&
+    i.target_pace?.lower && 
+    i.target_pace?.upper
+  );
+  
+  let totalPaceAdherence = 0;
+  let validPaceIntervals = 0;
+  
+  for (const interval of paceIntervals) {
+    // Calculate time-in-range for this interval using sensor data
+    const intervalSamples = sensorData.slice(interval.sample_idx_start || 0, (interval.sample_idx_end || 0) + 1);
+    const adherence = calculateTimeInRangeAdherence(intervalSamples, interval);
+    
+    if (adherence !== null) {
+      totalPaceAdherence += adherence;
+      validPaceIntervals++;
+    }
+  }
+  
+  const avgPaceAdherence = validPaceIntervals > 0 ? totalPaceAdherence / validPaceIntervals : 0;
   
   console.log('🔍 Pace adherence debug:', {
-    firstInterval: workIntervals[0]?.executed,
-    adherence_values: workIntervals.map(i => i.executed?.adherence_percentage),
-    average: avgPaceAdherence
+    paceIntervals: paceIntervals.map(i => ({ 
+      role: i.role, 
+      kind: i.kind, 
+      targetRange: `${i.target_pace?.lower}-${i.target_pace?.upper}s/mi`,
+      oldAdherence: i.executed?.adherence_percentage 
+    })),
+    excludedRest: intervals.filter(i => i.role === 'rest' || i.kind === 'rest').map(i => ({ role: i.role, adherence: i.executed?.adherence_percentage })),
+    newTimeInRangeAverage: avgPaceAdherence,
+    validIntervals: validPaceIntervals
   });
   
   return {
-    overall_adherence: timeInRangeScore,
+    overall_adherence: avgPaceAdherence / 100, // Convert percentage to decimal for consistency
     time_in_range_score: timeInRangeScore,
     variability_score: 0, // Would calculate from interval-to-interval consistency
     smoothness_score: 0, // Would calculate from pace transitions
@@ -1122,10 +1260,8 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
   
   console.log(`✅ Steady-state analysis: pace=${avgPace.toFixed(1)}s/mi, target=${targetPace.toFixed(1)}s/mi, CV=${(cv*100).toFixed(1)}%, score=${(finalScore*100).toFixed(1)}%`);
   
-  // Calculate duration adherence - use the planned duration from enriched intervals
-  const plannedDurationSeconds = 
-    plannedWorkout?.computed?.total_duration_seconds ||
-    intervals.reduce((sum, i) => sum + (i.plannedDuration || 0), 0);
+  // Calculate duration adherence - use computed total duration (most reliable)
+  const plannedDurationSeconds = plannedWorkout?.computed?.total_duration_seconds || 0;
 
   const actualDurationSeconds = 
     workout?.computed?.overall?.duration_s_moving ||
@@ -1218,6 +1354,41 @@ function calculateStandardDeviation(values: number[]): number {
   const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
   
   return Math.sqrt(variance);
+}
+
+/**
+ * Calculate time-in-range adherence for a single interval
+ * This is the CORRECT way to calculate adherence - measures what percentage of time was spent in prescribed range
+ */
+function calculateTimeInRangeAdherence(samples: any[], interval: any): number | null {
+  if (!interval.target_pace?.lower || !interval.target_pace?.upper) {
+    return null;
+  }
+  
+  const validSamples = samples.filter(s => s.pace_s_per_mi && s.pace_s_per_mi > 0);
+  
+  if (validSamples.length === 0) {
+    return null;
+  }
+  
+  const lowerBound = interval.target_pace.lower;
+  const upperBound = interval.target_pace.upper;
+  
+  let samplesInRange = 0;
+  let totalSamples = 0;
+  
+  for (const sample of validSamples) {
+    totalSamples++;
+    if (sample.pace_s_per_mi >= lowerBound && sample.pace_s_per_mi <= upperBound) {
+      samplesInRange++;
+    }
+  }
+  
+  const adherencePercentage = totalSamples > 0 ? (samplesInRange / totalSamples) * 100 : 0;
+  
+  console.log(`🔍 Time-in-range for ${interval.role}: ${samplesInRange}/${totalSamples} samples (${adherencePercentage.toFixed(1)}%)`);
+  
+  return adherencePercentage;
 }
 
 /**
