@@ -218,10 +218,14 @@ function parseIntervalToken(token: string, baselines: UserBaselines): RunSegment
   
   // Create work and rest segments for each rep
   for (let i = 0; i < reps; i++) {
+    // Calculate expected duration from distance and target pace
+    const expectedDuration = Math.round((distance / 1609) * targetPace); // Convert meters to miles, then multiply by pace
+    
     // Work segment
     segments.push({
       type: 'work',
       distance,
+      duration: expectedDuration,
       target_pace: {
         target: targetPace,
         lower: Math.round(targetPace * (1 - tolerance)),

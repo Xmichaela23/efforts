@@ -250,7 +250,9 @@ Deno.serve(async (req) => {
               hasPlanned: !!i.target_pace,
               hasExecuted: i.hasExecuted,
               plannedPace: i.target_pace?.lower ? `${i.target_pace.lower}-${i.target_pace.upper}` : 'N/A',
-              executedPace: i.executed?.avg_pace_s_per_mi || 'N/A'
+              executedPace: i.executed?.avg_pace_s_per_mi || 'N/A',
+              plannedDuration: i.duration_s,
+              executedDuration: i.executed?.duration_s
             })));
           } catch (error) {
             console.warn('⚠️ Token parsing failed, using computed intervals:', error);
@@ -1262,12 +1264,12 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
   // For duration adherence (workout-level metric)
   console.log('🔍 [DURATION DEBUG] plannedWorkout?.computed?.total_duration_seconds:', plannedWorkout?.computed?.total_duration_seconds);
   console.log('🔍 [DURATION DEBUG] intervals.length:', intervals.length);
-  console.log('🔍 [DURATION DEBUG] intervals[0] planned duration:', intervals[0]?.planned?.duration_s);
+  console.log('🔍 [DURATION DEBUG] intervals[0] planned duration:', intervals[0]?.duration_s);
   console.log('🔍 [DURATION DEBUG] intervals[0] executed duration:', intervals[0]?.executed?.duration_s);
   
   const plannedDurationSeconds = 
     plannedWorkout?.computed?.total_duration_seconds ||
-    intervals.reduce((sum, i) => sum + (i.planned?.duration_s || 0), 0);
+    intervals.reduce((sum, i) => sum + (i.duration_s || 0), 0);
 
   const actualDurationSeconds = 
     workout?.computed?.overall?.duration_s_moving ||
@@ -1293,6 +1295,14 @@ function calculatePrescribedRangeAdherence(sensorData: any[], intervals: any[], 
   console.log(`📊 Performance: ${performanceAssessment}`);
   console.log(`🚨 Issues: ${primaryIssues.length}`);
   console.log(`💪 Strengths: ${strengths.length}`);
+  
+  console.log('🔍 Pre-return debug:', {
+    plannedDurationSeconds,
+    actualDurationSeconds,
+    durationAdherence,
+    enhancedAdherence,
+    workIntervalsCount: intervals?.filter(i => i.role === 'work').length
+  });
   
   return {
     overall_adherence: overallAdherence,
