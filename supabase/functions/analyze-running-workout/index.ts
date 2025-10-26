@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
           console.log('🏃 Parsing steps_preset tokens...');
           try {
             // Import the token parser
-            const { parseRunningTokens } = await import('../../lib/analysis/running/token-parser.ts');
+            const { parseRunningTokens } = await import('./token-parser.ts');
             const parsedStructure = parseRunningTokens(plannedWorkout.steps_preset, baselines);
             
             // Convert parsed segments to clean planned intervals format
@@ -993,10 +993,10 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   
   console.log(`✅ Interval analysis complete: ${(timeInRangeScore * 100).toFixed(1)}% time in range`);
   
-  // Calculate duration adherence
+  // Calculate duration adherence - use the planned duration from enriched intervals
   const plannedDurationSeconds = 
     plannedWorkout?.computed?.total_duration_seconds ||
-    intervals.reduce((sum, i) => sum + (i.planned?.duration_s || 0), 0);
+    intervals.reduce((sum, i) => sum + (i.plannedDuration || 0), 0);
 
   const actualDurationSeconds = 
     workout?.computed?.overall?.duration_s_moving ||
@@ -1099,14 +1099,6 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
   // Calculate base adherence
   const paceAdherence = targetPace / avgPace; // Closer to 1.0 is better
   
-  console.log('🔍 Steady-state pace adherence debug:', {
-    targetPace,
-    avgPace,
-    paceAdherence,
-    cv,
-    finalScore: paceAdherence * consistencyMultiplier
-  });
-  
   // Apply consistency penalty
   let consistencyMultiplier = 1.0;
   if (cv > 0.06) { // > 6% variability
@@ -1119,12 +1111,21 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
   
   const finalScore = paceAdherence * consistencyMultiplier;
   
+  console.log('🔍 Steady-state pace adherence debug:', {
+    targetPace,
+    avgPace,
+    paceAdherence,
+    cv,
+    consistencyMultiplier,
+    finalScore
+  });
+  
   console.log(`✅ Steady-state analysis: pace=${avgPace.toFixed(1)}s/mi, target=${targetPace.toFixed(1)}s/mi, CV=${(cv*100).toFixed(1)}%, score=${(finalScore*100).toFixed(1)}%`);
   
-  // Calculate duration adherence
+  // Calculate duration adherence - use the planned duration from enriched intervals
   const plannedDurationSeconds = 
     plannedWorkout?.computed?.total_duration_seconds ||
-    intervals.reduce((sum, i) => sum + (i.planned?.duration_s || 0), 0);
+    intervals.reduce((sum, i) => sum + (i.plannedDuration || 0), 0);
 
   const actualDurationSeconds = 
     workout?.computed?.overall?.duration_s_moving ||
