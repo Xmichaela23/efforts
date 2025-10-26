@@ -272,6 +272,30 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   }, [selectedWorkout?.id, selectedWorkout?.workout_status]);
 
   const handleUpdateWorkout = async (workoutId: string, updates: any) => {
+    console.log('🔄 handleUpdateWorkout called with:', { workoutId, updates });
+    
+    // Update the selected workout data with the new analysis
+    if (selectedWorkout && selectedWorkout.id === workoutId) {
+      const updatedWorkout = { ...selectedWorkout, ...updates };
+      setSelectedWorkout(updatedWorkout);
+      console.log('✅ Updated selectedWorkout with new analysis data');
+    }
+    
+    // Also refresh the workouts list to ensure consistency
+    try {
+      const { data: refreshedWorkout } = await supabase
+        .from('workouts')
+        .select('*')
+        .eq('id', workoutId)
+        .single();
+      
+      if (refreshedWorkout) {
+        setSelectedWorkout(refreshedWorkout);
+        console.log('✅ Refreshed workout data from database');
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing workout data:', error);
+    }
   };
 
   const handleOpenPlanBuilder = () => {
