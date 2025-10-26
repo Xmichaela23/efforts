@@ -1916,6 +1916,49 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           </thead>
           <tbody>
           {stepsDisplay.map((st, idx) => {
+            // Check if we should show a target pace range subtitle
+            const shouldShowRangeSubtitle = (() => {
+              // Show subtitle if:
+              // 1. First interval, OR
+              // 2. Target range changed from previous interval
+              
+              if (idx === 0) return true;
+              
+              const currentRange = (() => {
+                const prng = (st as any)?.pace_range || (st as any)?.paceRange;
+                if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
+                  return `${prng.lower}-${prng.upper}`;
+                }
+                return null;
+              })();
+              
+              const previousRange = (() => {
+                const prevSt = stepsDisplay[idx - 1];
+                const prng = (prevSt as any)?.pace_range || (prevSt as any)?.paceRange;
+                if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
+                  return `${prng.lower}-${prng.upper}`;
+                }
+                return null;
+              })();
+              
+              return currentRange !== previousRange;
+            })();
+            
+            // Format pace range for display
+            const formatPaceRange = (st: any): string | null => {
+              const prng = (st as any)?.pace_range || (st as any)?.paceRange;
+              if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
+                const formatPace = (sec: number) => {
+                  const mins = Math.floor(sec / 60);
+                  const secs = Math.round(sec % 60);
+                  return `${mins}:${secs.toString().padStart(2, '0')}`;
+                };
+                return `(Target: ${formatPace(prng.lower)}-${formatPace(prng.upper)}/mi)`;
+              }
+              return null;
+            };
+            
+            const rangeSubtitle = formatPaceRange(st);
             let row: any = null;
             if (hasServerComputed) {
               const pid = String((st as any)?.id || '');
@@ -2037,51 +2080,65 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             })();
 
             return (
-              <tr key={idx} className="border-b border-gray-100">
-                <td className="px-2 py-1.5">
-                  <div className="flex items-center justify-between w-full min-h-[2.1rem]">
-                    <span className="text-[13px] font-medium truncate pr-2">{plannedLabel}</span>
-                    {pct != null && (
-                      <div className="flex items-center gap-1">
-                        <span className={`text-[11px] font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
-                        {/* Enhanced analysis indicator */}
-                        {(() => {
-                          const workoutAnalysis = (completed as any)?.workout_analysis;
-                          if (workoutAnalysis?.analysis?.pacing_analysis) {
-                            const pacingAnalysis = workoutAnalysis.analysis.pacing_analysis;
-                            const variability = pacingAnalysis.pacing_variability;
-                            
-                            // Show pacing quality indicator
-                            if (variability.coefficient_of_variation > 10) {
-                              return <span className="text-[9px] text-red-500" title="High pacing variability">⚠️</span>;
-                            } else if (variability.coefficient_of_variation > 7) {
-                              return <span className="text-[9px] text-orange-500" title="Moderate pacing variability">⚠️</span>;
-                            } else if (variability.coefficient_of_variation > 3) {
-                              return <span className="text-[9px] text-yellow-500" title="Good pacing consistency">✓</span>;
-                            } else {
-                              return <span className="text-[9px] text-green-500" title="Excellent pacing consistency">✓</span>;
-                            }
-                          }
-                          return null;
-                        })()}
+              <>
+                {/* Target pace range subtitle */}
+                {shouldShowRangeSubtitle && rangeSubtitle && (
+                  <tr key={`subtitle-${idx}`} className="border-b border-gray-50">
+                    <td colSpan={5} className="px-2 py-1">
+                      <div className="text-[11px] text-gray-500 italic">
+                        {rangeSubtitle}
                       </div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-2 py-1.5 font-medium">{execCell}</td>
-                <td className="px-2 py-1.5">{distCell}</td>
-                <td className="px-2 py-1.5">{timeCell}</td>
-                <td className="px-1 py-1.5 text-[13px]">
-                  <div className="text-right">
-                    {hrVal != null ? (
-                      <>
-                        <div className="font-medium">{hrVal}</div>
-                        <div className="text-[10px] text-gray-500">bpm</div>
-                      </>
-                    ) : '—'}
-                  </div>
-                </td>
-              </tr>
+                    </td>
+                  </tr>
+                )}
+                
+                {/* Main interval row */}
+                <tr key={idx} className="border-b border-gray-100">
+                  <td className="px-2 py-1.5">
+                    <div className="flex items-center justify-between w-full min-h-[2.1rem]">
+                      <span className="text-[13px] font-medium truncate pr-2">{plannedLabel}</span>
+                      {pct != null && (
+                        <div className="flex items-center gap-1">
+                          <span className={`text-[11px] font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
+                          {/* Enhanced analysis indicator */}
+                          {(() => {
+                            const workoutAnalysis = (completed as any)?.workout_analysis;
+                            if (workoutAnalysis?.analysis?.pacing_analysis) {
+                              const pacingAnalysis = workoutAnalysis.analysis.pacing_analysis;
+                              const variability = pacingAnalysis.pacing_variability;
+                              
+                              // Show pacing quality indicator
+                              if (variability.coefficient_of_variation > 10) {
+                                return <span className="text-[9px] text-red-500" title="High pacing variability">⚠️</span>;
+                              } else if (variability.coefficient_of_variation > 7) {
+                                return <span className="text-[9px] text-orange-500" title="Moderate pacing variability">⚠️</span>;
+                              } else if (variability.coefficient_of_variation > 3) {
+                                return <span className="text-[9px] text-yellow-500" title="Good pacing consistency">✓</span>;
+                              } else {
+                                return <span className="text-[9px] text-green-500" title="Excellent pacing consistency">✓</span>;
+                              }
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-2 py-1.5 font-medium">{execCell}</td>
+                  <td className="px-2 py-1.5">{distCell}</td>
+                  <td className="px-2 py-1.5">{timeCell}</td>
+                  <td className="px-1 py-1.5 text-[13px]">
+                    <div className="text-right">
+                      {hrVal != null ? (
+                        <>
+                          <div className="font-medium">{hrVal}</div>
+                          <div className="text-[10px] text-gray-500">bpm</div>
+                        </>
+                      ) : '—'}
+                    </div>
+                  </td>
+                </tr>
+              </>
             );
           })}
           </tbody>
