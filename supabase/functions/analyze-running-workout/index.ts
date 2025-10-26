@@ -962,7 +962,7 @@ function calculatePrescribedRangeAdherenceGranular(sensorData: any[], intervals:
   // Look for intervals with 'work' role or 'interval' kind, and check for pace targets
   const workIntervals = intervals.filter(interval => {
     const isWorkRole = interval.role === 'work' || interval.kind === 'work';
-    const hasPaceTarget = interval.planned?.target_pace_s_per_mi || interval.executed?.avg_pace_s_per_mi;
+    const hasPaceTarget = interval.target_pace?.lower || interval.pace_range?.lower;
     console.log(`🔍 Checking interval: role=${interval.role}, kind=${interval.kind}, hasPaceTarget=${!!hasPaceTarget}`);
     return isWorkRole && hasPaceTarget;
   });
@@ -987,7 +987,7 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   // Filter to work segments only
   const workIntervals = intervals.filter(interval => {
     const isWorkRole = interval.role === 'work' || interval.kind === 'work';
-    const hasPaceTarget = interval.planned?.target_pace_s_per_mi || interval.executed?.avg_pace_s_per_mi;
+    const hasPaceTarget = interval.target_pace?.lower || interval.pace_range?.lower;
     console.log(`🔍 [INTERVAL FILTER] role=${interval.role}, kind=${interval.kind}, hasPaceTarget=${!!hasPaceTarget}`);
     return isWorkRole && hasPaceTarget;
   });
