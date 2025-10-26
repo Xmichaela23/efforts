@@ -1925,10 +1925,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               if (idx === 0) return true;
               
               const currentRange = (() => {
+                // Try multiple sources for pace range
                 const prng = (st as any)?.pace_range || (st as any)?.paceRange;
                 if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
                   return `${prng.lower}-${prng.upper}`;
                 }
+                
+                // Fallback: try to get pace range from planned workout intervals
+                const plannedIntervals = (planned as any)?.intervals;
+                if (Array.isArray(plannedIntervals) && plannedIntervals[idx]) {
+                  const interval = plannedIntervals[idx];
+                  if (interval.pace_range && typeof interval.pace_range === 'object' && 
+                      interval.pace_range.lower && interval.pace_range.upper) {
+                    return `${interval.pace_range.lower}-${interval.pace_range.upper}`;
+                  }
+                }
+                
                 return null;
               })();
               
@@ -1938,6 +1950,17 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                 if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
                   return `${prng.lower}-${prng.upper}`;
                 }
+                
+                // Fallback: try to get pace range from planned workout intervals
+                const plannedIntervals = (planned as any)?.intervals;
+                if (Array.isArray(plannedIntervals) && plannedIntervals[idx - 1]) {
+                  const interval = plannedIntervals[idx - 1];
+                  if (interval.pace_range && typeof interval.pace_range === 'object' && 
+                      interval.pace_range.lower && interval.pace_range.upper) {
+                    return `${interval.pace_range.lower}-${interval.pace_range.upper}`;
+                  }
+                }
+                
                 return null;
               })();
               
@@ -1946,6 +1969,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             
             // Format pace range for display
             const formatPaceRange = (st: any): string | null => {
+              // Try multiple sources for pace range
               const prng = (st as any)?.pace_range || (st as any)?.paceRange;
               if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
                 const formatPace = (sec: number) => {
@@ -1955,6 +1979,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                 };
                 return `(Target: ${formatPace(prng.lower)}-${formatPace(prng.upper)}/mi)`;
               }
+              
+              // Fallback: try to get pace range from planned workout intervals
+              const plannedIntervals = (planned as any)?.intervals;
+              if (Array.isArray(plannedIntervals) && plannedIntervals[idx]) {
+                const interval = plannedIntervals[idx];
+                if (interval.pace_range && typeof interval.pace_range === 'object' && 
+                    interval.pace_range.lower && interval.pace_range.upper) {
+                  const formatPace = (sec: number) => {
+                    const mins = Math.floor(sec / 60);
+                    const secs = Math.round(sec % 60);
+                    return `${mins}:${secs.toString().padStart(2, '0')}`;
+                  };
+                  return `(Target: ${formatPace(interval.pace_range.lower)}-${formatPace(interval.pace_range.upper)}/mi)`;
+                }
+              }
+              
               return null;
             };
             
