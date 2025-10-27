@@ -467,12 +467,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
   }
 
   // Endurance (run/ride/swim)
-  // Prefer server-computed executed intervals if present to render Executed Pace/BPM directly
-  const workoutAnalysisIntervals = (hydratedCompleted as any)?.workout_analysis?.intervals || (completed as any)?.workout_analysis?.intervals;
+  // Read intervals from computed.intervals (single source of truth)
+  // These intervals include both executed data AND granular_metrics from analyze-{discipline}-workout
   const completedComputed = (hydratedCompleted as any)?.computed || (completed as any)?.computed;
-  const computedIntervals: any[] = Array.isArray(workoutAnalysisIntervals)
-    ? workoutAnalysisIntervals
-    : (Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : []);
+  const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) 
+    ? completedComputed.intervals 
+    : [];
   const hasServerComputed = computedIntervals.length > 0;
   // Prefer full planned steps (same source as Planned tab) for labels; use server "light" only for alignment
   const plannedStepsFull: any[] = Array.isArray((planned as any)?.computed?.steps)

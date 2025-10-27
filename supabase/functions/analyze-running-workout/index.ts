@@ -598,16 +598,20 @@ Deno.serve(async (req) => {
 
     console.log('✅ Performance calculated:', performance);
 
-    // Store granular_analysis, intervals, and performance in database
-    // Use computed.intervals as the base (already has executed data)
+    // Store enhanced intervals back to computed.intervals (single source of truth)
+    // Store summary analysis in workout_analysis
     const { error: updateError } = await supabase
       .from('workouts')
       .update({
+        computed: {
+          ...workout.computed,
+          intervals: computedIntervals  // Enhanced with granular_metrics
+        },
         workout_analysis: {
           ...existingAnalysis,
           granular_analysis: enhancedAnalysis,
-          intervals: computedIntervals,
           performance: performance
+          // Note: intervals now stored in computed.intervals (not duplicated here)
         }
       })
       .eq('id', workout_id);

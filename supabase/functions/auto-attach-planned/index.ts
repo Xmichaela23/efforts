@@ -159,10 +159,10 @@ Deno.serve(async (req) => {
         }
         
         // Update workout linkage (+ pool context for swims)
-        // Clear computed entirely to force full regeneration with new planned workout IDs
+        // Clear planned_steps_light to force regeneration with new planned workout IDs
         const updates: any = { 
           planned_id: String(plannedRow.id),
-          computed: null  // ✅ Clear entire computed to force full regeneration
+          computed: w.computed ? { ...w.computed, planned_steps_light: null, intervals: [] } : null
         };
         if (String((plannedRow as any)?.type||'').toLowerCase()==='swim') {
           const env = (plannedRow as any)?.environment as string | undefined;
@@ -323,10 +323,10 @@ Deno.serve(async (req) => {
       const poolLenM = (best as any)?.pool_length_m as number | undefined;
       const poolUnit = (best as any)?.pool_unit as string | undefined;
       const poolLabel = (best as any)?.pool_label as string | undefined;
-      // Clear computed entirely to force full regeneration with new planned workout IDs
+      // Clear planned_steps_light and intervals to force regeneration with new planned workout IDs
       const updates: any = { 
         planned_id: best.id,
-        computed: null  // ✅ Clear entire computed to force full regeneration
+        computed: w.computed ? { ...w.computed, planned_steps_light: null, intervals: [] } : null
       };
       if (String((best as any)?.type||'').toLowerCase()==='swim') {
         if (env === 'open_water') {
