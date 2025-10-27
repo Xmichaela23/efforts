@@ -2065,6 +2065,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               // For runs/walks, use universal pace selection logic
               const isRunOrWalk = /run|walk/i.test(sportType);
               if (isRunOrWalk) {
+                console.log(`🔍 [INTERVAL DEBUG] row structure:`, row ? Object.keys(row) : 'no row');
+                console.log(`🔍 [INTERVAL DEBUG] row.executed:`, row?.executed);
+                console.log(`🔍 [INTERVAL DEBUG] row.executed?.avg_pace_s_per_mi:`, row?.executed?.avg_pace_s_per_mi);
                 const secPerMi = getDisplayPace(hydratedCompleted || completed, row);
                 console.log(`🔍 [PACE DEBUG] isRunOrWalk: ${isRunOrWalk}, secPerMi: ${secPerMi}, overall: ${(hydratedCompleted || completed)?.computed?.overall?.avg_pace_s_per_mi}, metrics: ${(hydratedCompleted || completed)?.metrics?.avg_pace_s_per_mi}`);
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
