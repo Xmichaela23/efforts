@@ -2011,15 +2011,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             let row: any = null;
             if (hasServerComputed) {
               const pid = String((st as any)?.id || '');
-              console.log(`🔍 [ROW LOOKUP DEBUG] Step ${idx}: st.id="${pid}", st.planned_index="${(st as any)?.planned_index}"`);
-              console.log(`🔍 [ROW LOOKUP DEBUG] intervalByPlannedId keys:`, Array.from(intervalByPlannedId.keys()));
-              console.log(`🔍 [ROW LOOKUP DEBUG] intervalByIndex keys:`, Array.from(intervalByIndex.keys()));
               row = pid ? intervalByPlannedId.get(pid) : null;
               if (!row) {
                 const ix = Number((st as any)?.planned_index);
                 if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null;
               }
-              console.log(`🔍 [ROW LOOKUP DEBUG] Found row:`, row ? 'yes' : 'no');
             }
             // Use enhanced pacing analysis adherence percentage if available, otherwise fall back to server-computed
             const getEnhancedAdherence = () => {
@@ -2069,9 +2065,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
               // For runs/walks, use universal pace selection logic
               const isRunOrWalk = /run|walk/i.test(sportType);
               if (isRunOrWalk) {
-                console.log(`🔍 [INTERVAL DEBUG] row structure:`, row ? Object.keys(row) : 'no row');
-                console.log(`🔍 [INTERVAL DEBUG] row.executed:`, row?.executed);
-                console.log(`🔍 [INTERVAL DEBUG] row.executed?.avg_pace_s_per_mi:`, row?.executed?.avg_pace_s_per_mi);
                 const secPerMi = getDisplayPace(hydratedCompleted || completed, row);
                 console.log(`🔍 [PACE DEBUG] isRunOrWalk: ${isRunOrWalk}, secPerMi: ${secPerMi}, overall: ${(hydratedCompleted || completed)?.computed?.overall?.avg_pace_s_per_mi}, metrics: ${(hydratedCompleted || completed)?.metrics?.avg_pace_s_per_mi}`);
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
