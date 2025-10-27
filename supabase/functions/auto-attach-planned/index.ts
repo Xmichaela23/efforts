@@ -184,17 +184,23 @@ Deno.serve(async (req) => {
           }
         }
         console.log('[auto-attach-planned] Setting workout.planned_id to:', plannedRow.id);
+        console.log('[auto-attach-planned] Updates payload:', JSON.stringify(updates, null, 2));
         const { error: workoutUpdateErr } = await supabase.from('workouts').update(updates).eq('id', w.id).eq('user_id', w.user_id);
         if (workoutUpdateErr) {
           console.error('[auto-attach-planned] Failed to update workouts:', workoutUpdateErr);
           throw new Error(`Failed to link workout: ${workoutUpdateErr.message}`);
         }
+        console.log('[auto-attach-planned] Workout update successful');
         
         // Verify the database state before computing summary
         console.log('[auto-attach-planned] Verifying database linkage...');
-        const { data: verifyWorkout } = await supabase.from('workouts').select('id,planned_id').eq('id', w.id).maybeSingle();
+        const { data: verifyWorkout } = await supabase.from('workouts').select('id,planned_id,computed').eq('id', w.id).maybeSingle();
         const { data: verifyPlanned } = await supabase.from('planned_workouts').select('id,completed_workout_id,workout_status').eq('id', String(plannedRow.id)).maybeSingle();
         console.log('[auto-attach-planned] Verification - workout.planned_id:', verifyWorkout?.planned_id, 'planned.completed_workout_id:', verifyPlanned?.completed_workout_id, 'planned.workout_status:', verifyPlanned?.workout_status);
+        console.log('[auto-attach-planned] Verification - computed.intervals.length:', verifyWorkout?.computed?.intervals?.length);
+        
+        // Wait for database commit before calling next function
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Compute summary
         console.log('[auto-attach-planned] Computing workout summary');
@@ -202,6 +208,11 @@ Deno.serve(async (req) => {
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
         const summaryResponse = await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
         console.log('[auto-attach-planned] Compute summary response status:', summaryResponse.status);
+        if (summaryResponse.status !== 200) {
+          const errorBody = await summaryResponse.text();
+          console.error('[auto-attach-planned] Compute summary FAILED:', errorBody);
+          throw new Error(`compute-workout-summary failed with ${summaryResponse.status}: ${errorBody}`);
+        }
         
         // Wait a moment for database to commit
         await new Promise(resolve => setTimeout(resolve, 1000));
