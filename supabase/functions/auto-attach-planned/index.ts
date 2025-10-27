@@ -199,19 +199,39 @@ Deno.serve(async (req) => {
         console.log('[auto-attach-planned] Verification - workout.planned_id:', verifyWorkout?.planned_id, 'planned.completed_workout_id:', verifyPlanned?.completed_workout_id, 'planned.workout_status:', verifyPlanned?.workout_status);
         console.log('[auto-attach-planned] Verification - computed.intervals.length:', verifyWorkout?.computed?.intervals?.length);
         
-        // Wait for database commit before calling next function
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait longer for database commit (large computed object with sensor data takes time to write)
+        console.log('[auto-attach-planned] Waiting 3s for database transaction to fully commit...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // Compute summary
+        // Compute summary (with retry logic in case of 404)
         console.log('[auto-attach-planned] Computing workout summary');
         const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-        const summaryResponse = await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
-        console.log('[auto-attach-planned] Compute summary response status:', summaryResponse.status);
-        if (summaryResponse.status !== 200) {
-          const errorBody = await summaryResponse.text();
-          console.error('[auto-attach-planned] Compute summary FAILED:', errorBody);
-          throw new Error(`compute-workout-summary failed with ${summaryResponse.status}: ${errorBody}`);
+        
+        let summaryResponse: Response;
+        let retries = 0;
+        const maxRetries = 3;
+        
+        while (retries < maxRetries) {
+          summaryResponse = await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+          console.log(`[auto-attach-planned] Compute summary response status (attempt ${retries + 1}/${maxRetries}):`, summaryResponse.status);
+          
+          if (summaryResponse.status === 200) {
+            break;
+          }
+          
+          if (summaryResponse.status === 404 && retries < maxRetries - 1) {
+            // 404 might be due to database replication lag - retry after a delay
+            const retryDelay = 1000 * (retries + 1); // 1s, 2s, 3s
+            console.log(`[auto-attach-planned] Got 404, waiting ${retryDelay}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            retries++;
+          } else {
+            // Non-404 error or final retry - fail
+            const errorBody = await summaryResponse.text();
+            console.error('[auto-attach-planned] Compute summary FAILED:', errorBody);
+            throw new Error(`compute-workout-summary failed with ${summaryResponse.status}: ${errorBody}`);
+          }
         }
         
         // Wait a moment for database to commit
