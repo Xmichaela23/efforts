@@ -329,7 +329,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               
               console.log('🔍 Updated workout analysis with API data:', updatedWorkout.workout_analysis);
               console.log('🔍 Granular analysis:', updatedWorkout.workout_analysis?.granular_analysis);
-              onUpdateWorkout(updatedWorkout);
+              onUpdateWorkout(updatedWorkout.id, updatedWorkout);
               
               // Store updated workout data for immediate use
               console.log('🔍 [SET UPDATED DATA] Setting updatedWorkoutData with structure:', updatedWorkout?.workout_analysis ? 'has workout_analysis' : 'no workout_analysis');
