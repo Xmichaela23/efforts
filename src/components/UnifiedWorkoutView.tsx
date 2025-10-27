@@ -268,92 +268,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
         // Step 1: Run enhanced analysis if needed (single source of truth)
         const granularAnalysis = (workout as any)?.workout_analysis?.granular_analysis;
-        console.log('🔍 [ANALYSIS DEBUG] Checking if analysis is needed:', {
-          hasGranularAnalysis: !!granularAnalysis,
-          hasDurationAdherence: !!granularAnalysis?.duration_adherence,
-          hasOverallAdherence: !!granularAnalysis?.overall_adherence,
-          durationPercentage: granularAnalysis?.duration_adherence?.adherence_percentage,
-          needsAnalysis: !granularAnalysis || 
-            !granularAnalysis.duration_adherence || 
-            !granularAnalysis.overall_adherence ||
-            granularAnalysis.duration_adherence.adherence_percentage === null
-        });
-        
-        const needsAnalysis = !granularAnalysis || 
-          !granularAnalysis.duration_adherence || 
-          !granularAnalysis.overall_adherence ||
-          granularAnalysis.duration_adherence.adherence_percentage === null ||
-          granularAnalysis.duration_adherence.adherence_percentage < 50 || // Re-analyze if duration is suspiciously low
-          granularAnalysis.duration_adherence.adherence_percentage === 0; // Force re-analysis if duration is exactly 0%
-        
+        // Analysis is now handled server-side by auto-attach-planned
+        // which calls compute-workout-summary → analyze-running-workout
         console.log('🔍 Analysis check:', {
           hasGranularAnalysis: !!granularAnalysis,
           hasDurationAdherence: !!granularAnalysis?.duration_adherence,
-          durationPercentage: granularAnalysis?.duration_adherence?.adherence_percentage,
-          needsAnalysis
+          durationPercentage: granularAnalysis?.duration_adherence?.adherence_percentage
         });
-        
-        if (needsAnalysis) {
-          console.log('🏃‍♂️ Running enhanced workout analysis...');
-          try {
-            const result = await supabase.functions.invoke('analyze-running-workout', { body: { workout_id: wid } });
-            console.log('✅ Enhanced analysis completed', result);
-            console.log('🔍 API response data:', result.data);
-            
-            // Get the analysis from the API response
-            const apiAnalysis = result.data;
-            const apiIntervals = apiAnalysis?.intervals || [];
-            const apiPerformance = apiAnalysis?.performance || null;
-            console.log('🔍 API intervals:', apiIntervals.length, 'intervals');
-            console.log('🔍 API performance:', apiPerformance);
-            
-            // Wait for database to commit the analysis
-            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for database commit
-            
-            // Refresh workout data to get the new analysis
-            const { data: updatedWorkout } = await supabase
-              .from('workouts')
-              .select('*')
-              .eq('id', wid)
-              .single();
-            
-            if (updatedWorkout && onUpdateWorkout) {
-              console.log('🔄 Refreshing workout data with new analysis...');
-              
-              // MERGE API response data into the workout
-              updatedWorkout.workout_analysis = {
-                ...updatedWorkout.workout_analysis,
-                intervals: apiIntervals,
-                performance: apiPerformance
-              };
-              
-              console.log('🔍 Updated workout analysis with API data:', updatedWorkout.workout_analysis);
-              console.log('🔍 Granular analysis:', updatedWorkout.workout_analysis?.granular_analysis);
-              onUpdateWorkout(updatedWorkout.id, updatedWorkout);
-              
-              // Store updated workout data for immediate use
-              console.log('🔍 [SET UPDATED DATA] Setting updatedWorkoutData with structure:', updatedWorkout?.workout_analysis ? 'has workout_analysis' : 'no workout_analysis');
-              setUpdatedWorkoutData(updatedWorkout);
-            }
-            
-            // Force immediate data refresh with multiple strategies
-            try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-            try { window.dispatchEvent(new CustomEvent('workout-detail:invalidate')); } catch {}
-            
-            // Force React Query to refetch immediately with additional delay
-            setTimeout(() => {
-              try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-              try { window.dispatchEvent(new CustomEvent('workout-detail:invalidate')); } catch {}
-            }, 1000);
-            
-            // Additional delayed refresh to ensure data propagation
-            setTimeout(() => {
-              try { window.dispatchEvent(new CustomEvent('workout-detail:invalidate')); } catch {}
-            }, 2000);
-          } catch (error) {
-            console.warn('⚠️ Enhanced analysis failed:', error);
-          }
-        }
       } catch (error) {
         console.error('Summary tab analysis error:', error);
       }

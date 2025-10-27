@@ -159,7 +159,11 @@ Deno.serve(async (req) => {
         }
         
         // Update workout linkage (+ pool context for swims)
-        const updates: any = { planned_id: String(plannedRow.id) };
+        // Clear computed entirely to force full regeneration with new planned workout IDs
+        const updates: any = { 
+          planned_id: String(plannedRow.id),
+          computed: null  // ✅ Clear entire computed to force full regeneration
+        };
         if (String((plannedRow as any)?.type||'').toLowerCase()==='swim') {
           const env = (plannedRow as any)?.environment as string | undefined;
           const poolLenM = (plannedRow as any)?.pool_length_m as number | undefined;
@@ -196,12 +200,17 @@ Deno.serve(async (req) => {
         console.log('[auto-attach-planned] Computing workout summary');
         const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-        await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+        const summaryResponse = await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+        console.log('[auto-attach-planned] Compute summary response status:', summaryResponse.status);
         
-        // Compute analysis for enhanced adherence metrics
-        console.log('[auto-attach-planned] Computing workout analysis');
-        const analysisUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
-        await fetch(analysisUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+        // Wait a moment for database to commit
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Analyze running workout to populate workout_analysis.intervals
+        console.log('[auto-attach-planned] Analyzing running workout');
+        const analyzeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`;
+        const analyzeResponse = await fetch(analyzeUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+        console.log('[auto-attach-planned] Analyze running workout response status:', analyzeResponse.status);
         
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       } catch (explicitError: any) {
@@ -314,7 +323,11 @@ Deno.serve(async (req) => {
       const poolLenM = (best as any)?.pool_length_m as number | undefined;
       const poolUnit = (best as any)?.pool_unit as string | undefined;
       const poolLabel = (best as any)?.pool_label as string | undefined;
-      const updates: any = { planned_id: best.id };
+      // Clear computed entirely to force full regeneration with new planned workout IDs
+      const updates: any = { 
+        planned_id: best.id,
+        computed: null  // ✅ Clear entire computed to force full regeneration
+      };
       if (String((best as any)?.type||'').toLowerCase()==='swim') {
         if (env === 'open_water') {
           updates.environment = 'open_water';
