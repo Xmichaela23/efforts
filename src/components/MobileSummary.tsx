@@ -468,8 +468,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
   // Endurance (run/ride/swim)
   // Prefer server-computed executed intervals if present to render Executed Pace/BPM directly
-  const workoutAnalysisIntervals = (completed as any)?.workout_analysis?.intervals;
-  const completedComputed = (completed as any)?.computed || (hydratedCompleted as any)?.computed;
+  const workoutAnalysisIntervals = (hydratedCompleted as any)?.workout_analysis?.intervals || (completed as any)?.workout_analysis?.intervals;
+  const completedComputed = (hydratedCompleted as any)?.computed || (completed as any)?.computed;
   const computedIntervals: any[] = Array.isArray(workoutAnalysisIntervals)
     ? workoutAnalysisIntervals
     : (Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : []);
