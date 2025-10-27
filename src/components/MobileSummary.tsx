@@ -1430,16 +1430,21 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           console.log('🔍 [DATA STRUCTURE DEBUG] granularAnalysis:', granularAnalysis);
           
           // Get adherence data from unified source
+          // Priority 1: Read from workout_analysis.performance (API response)
+          const performance = (completed as any)?.workout_analysis?.performance;
+          const executionAdherence = performance?.execution_adherence;
+          const paceAdherence = performance?.pace_adherence;
+          const durationAdherence = performance?.duration_adherence || granularAnalysis?.duration_adherence;
           const overallAdherence = granularAnalysis?.overall_adherence;
-          const durationAdherence = granularAnalysis?.duration_adherence;
           const performanceAssessment = granularAnalysis?.performance_assessment;
           
           // Convert percentages to match expected format with graceful fallbacks
-          const finalExecutionScore = overallAdherence ? Math.round(overallAdherence * 100) : 0;
-          const finalPacePct = granularAnalysis?.overall_adherence ? 
-            Math.round(granularAnalysis.overall_adherence * 100) : 0;
-          const finalDurationPct = durationAdherence?.adherence_percentage ? 
-            Math.round(durationAdherence.adherence_percentage) : 0;
+          // Use API performance data if available
+          const finalExecutionScore = executionAdherence ? Math.round(executionAdherence) : (overallAdherence ? Math.round(overallAdherence * 100) : 0);
+          const finalPacePct = paceAdherence ? Math.round(paceAdherence) : (granularAnalysis?.overall_adherence ? Math.round(granularAnalysis.overall_adherence * 100) : 0);
+          const finalDurationPct = (typeof durationAdherence === 'number') 
+            ? Math.round(durationAdherence) 
+            : (durationAdherence?.adherence_percentage ? Math.round(durationAdherence.adherence_percentage) : 0);
           const finalDistPct = null; // Distance adherence not available in current analysis
           
           console.log('🔍 [UNIFIED DEBUG] Using workout_analysis data:', {

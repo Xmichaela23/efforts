@@ -203,8 +203,117 @@ Deno.serve(async (req) => {
       } else {
         plannedWorkout = planned;
 
-        // ✅ Use ACTUAL planned intervals from database (not calculated ranges)
-        if (plannedWorkout.intervals && Array.isArray(plannedWorkout.intervals)) {
+        // ✅ FIRST: Try to use planned_steps_light snapshot (taken when workout completed)
+        // This is critical because the planned workout may have been regenerated with new IDs
+        if (workout?.computed?.planned_steps_light && Array.isArray(workout.computed.planned_steps_light)) {
+          console.log('🏃 Using planned_steps_light snapshot from completed workout...');
+          
+          // Use snapshot directly - it's the source of truth
+          // But enrich with pace_range from the full planned workout
+          const plannedSteps = workout.computed.planned_steps_light.map((snap: any) => {
+            // Find the full step data from the planned workout to get pace_range
+            const fullStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === snap.planned_step_id);
+            
+            return {
+              id: snap.planned_step_id,      // ✅ Matches completed intervals
+              kind: snap.kind,
+              seconds: snap.seconds,
+              distanceMeters: snap.meters,
+              planned_index: snap.planned_index,
+              pace_range: fullStep?.pace_range || snap.pace_range || null
+            };
+          });
+          
+          intervals = plannedSteps.map((step: any, idx: number) => ({
+            id: step.id,
+            type: step.kind,
+            kind: step.kind,
+            role: step.kind,
+            duration_s: step.seconds,
+            duration: step.seconds,
+            distance_m: step.distanceMeters,
+            distance: step.distanceMeters,
+            target_pace: step.pace_range ? {
+              lower: step.pace_range.lower,
+              upper: step.pace_range.upper
+            } : null,
+            pace_range: step.pace_range ? {
+              lower: step.pace_range.lower,
+              upper: step.pace_range.upper
+            } : null,
+            step_index: step.planned_index !== undefined ? step.planned_index : idx,
+            planned_index: step.planned_index !== undefined ? step.planned_index : idx
+          }));
+          
+          // ✅ Enrich with execution data from computed intervals - match by snapshot ID
+          intervals = intervals.map(planned => {
+            const computedInterval = workout?.computed?.intervals?.find(exec => 
+              exec.planned_step_id === planned.id
+            );
+            
+            console.log(`🔍 Matching snapshot id=${planned.id}:`, {
+              foundMatch: !!computedInterval,
+              hasExecuted: !!computedInterval?.executed
+            });
+            
+            return {
+              ...planned,
+              executed: computedInterval?.executed || null,
+              sample_idx_start: computedInterval?.sample_idx_start,
+              sample_idx_end: computedInterval?.sample_idx_end,
+              hasExecuted: !!computedInterval?.executed
+            };
+          });
+        } else if (plannedWorkout.computed?.steps && Array.isArray(plannedWorkout.computed.steps)) {
+          console.log('🏃 Using computed.steps from materialization...');
+          
+          // Convert materialized steps to intervals format
+          const materializedSteps = plannedWorkout.computed.steps.map((step: any, idx: number) => ({
+            id: step.id, // ✅ CRITICAL: Include the UUID for matching
+            type: step.kind || step.type,
+            kind: step.kind || step.type,
+            role: step.kind || step.type,
+            duration_s: step.seconds,
+            duration: step.seconds,
+            distance_m: step.distanceMeters,
+            distance: step.distanceMeters,
+            target_pace: step.pace_range ? {
+              lower: step.pace_range.lower,
+              upper: step.pace_range.upper
+            } : null,
+            pace_range: step.pace_range ? {
+              lower: step.pace_range.lower,
+              upper: step.pace_range.upper
+            } : null,
+            step_index: step.planned_index !== undefined ? step.planned_index : idx,
+            planned_index: step.planned_index !== undefined ? step.planned_index : idx
+          }));
+          
+          intervals = materializedSteps;
+          
+          // ✅ Enrich with execution data from computed intervals
+          // Match by UUID (planned_step_id) instead of step_index
+          intervals = materializedSteps.map(planned => {
+            // Find matching executed interval by UUID
+            const computedInterval = workout?.computed?.intervals?.find(exec => 
+              exec.planned_step_id === planned.id
+            );
+            
+            console.log(`🔍 Matching planned.id=${planned.id} with intervals:`, {
+              foundMatch: !!computedInterval,
+              planned_step_id: computedInterval?.planned_step_id,
+              hasExecuted: !!computedInterval?.executed
+            });
+            
+            return {
+              ...planned,
+              executed: computedInterval?.executed || null,
+              sample_idx_start: computedInterval?.sample_idx_start,
+              sample_idx_end: computedInterval?.sample_idx_end,
+              hasExecuted: !!computedInterval?.executed
+            };
+          });
+        } else if (plannedWorkout.intervals && Array.isArray(plannedWorkout.intervals)) {
           console.log('🏃 Using actual planned intervals from database...');
           
           // Use the actual planned intervals with their real ranges
@@ -403,10 +512,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use planned intervals for granular analysis (not computed intervals)
-    // Computed intervals are already processed results - we need the raw planned structure
-    let intervalsToAnalyze = intervals;
-    console.log('🔍 Using planned intervals for granular analysis (raw sensor data vs planned targets)');
+    // Use computed.intervals as the base (already has matched executed data)
+    // Enhance with granular analysis
+    const computedIntervals = workout?.computed?.intervals || [];
+    console.log(`🔍 Using ${computedIntervals.length} computed intervals as base`);
+    
+    let intervalsToAnalyze = computedIntervals;
     console.log('🔍 [CRITICAL DEBUG] intervalsToAnalyze structure:', JSON.stringify(intervalsToAnalyze, null, 2));
     
     // Perform granular adherence analysis
@@ -443,12 +554,60 @@ Deno.serve(async (req) => {
     const existingAnalysis = existingWorkout?.workout_analysis || {};
     console.log('🔍 Existing workout_analysis structure:', JSON.stringify(existingAnalysis, null, 2));
     
+    // Calculate performance metrics using computed intervals
+    let performance = {
+      execution_adherence: 0,
+      pace_adherence: 0,
+      duration_adherence: 0,
+      completed_steps: 0,
+      total_steps: computedIntervals.length
+    };
+
+    if (computedIntervals.length > 0) {
+      const completedCount = computedIntervals.filter((i: any) => i.executed).length;
+      performance.execution_adherence = (completedCount / computedIntervals.length) * 100;
+      performance.completed_steps = completedCount;
+      
+      // Pace adherence
+      const withPaceTarget = computedIntervals.filter((i: any) => 
+        i.executed && i.target_pace
+      );
+      if (withPaceTarget.length > 0) {
+        const inTarget = withPaceTarget.filter((i: any) => {
+          const actual = i.executed.avg_pace_s_per_mi;
+          const { lower, upper } = i.target_pace;
+          return actual >= lower && actual <= upper;
+        }).length;
+        performance.pace_adherence = (inTarget / withPaceTarget.length) * 100;
+      } else {
+        performance.pace_adherence = 100;
+      }
+      
+      // Duration adherence
+      const withDuration = computedIntervals.filter((i: any) => 
+        i.executed && i.duration_s
+      );
+      if (withDuration.length > 0) {
+        const plannedTotal = withDuration.reduce((sum: number, i: any) => sum + i.duration_s, 0);
+        const actualTotal = withDuration.reduce((sum: number, i: any) => sum + i.executed.duration_s, 0);
+        performance.duration_adherence = Math.min(100, (actualTotal / plannedTotal) * 100);
+      } else {
+        performance.duration_adherence = 100;
+      }
+    }
+
+    console.log('✅ Performance calculated:', performance);
+
+    // Store granular_analysis, intervals, and performance in database
+    // Use computed.intervals as the base (already has executed data)
     const { error: updateError } = await supabase
       .from('workouts')
       .update({
         workout_analysis: {
           ...existingAnalysis,
-          granular_analysis: enhancedAnalysis
+          granular_analysis: enhancedAnalysis,
+          intervals: computedIntervals,
+          performance: performance
         }
       })
       .eq('id', workout_id);
@@ -465,7 +624,9 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      analysis: enhancedAnalysis
+      analysis: enhancedAnalysis,
+      intervals: computedIntervals,
+      performance: performance
     }), {
       status: 200,
       headers: {
@@ -1097,6 +1258,11 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
     // Calculate adherence for this interval
     const intervalResult = analyzeIntervalPace(intervalSamples, interval);
     
+    // Attach granular metrics to the interval
+    if (intervalResult.granular_metrics) {
+      interval.granular_metrics = intervalResult.granular_metrics;
+    }
+    
     totalTimeInRange += intervalResult.timeInRange;
     totalTimeOutsideRange += intervalResult.timeOutsideRange;
     totalSamples += intervalResult.totalSamples;
@@ -1406,7 +1572,6 @@ function calculateTimeInRangeAdherence(samples: any[], interval: any): number | 
  * Analyze interval pace (simplified version)
  */
 function analyzeIntervalPace(samples: any[], interval: any): any {
-  // This is a simplified version - would need proper time segmentation
   const validSamples = samples.filter(s => s.pace_s_per_mi && s.pace_s_per_mi > 0);
   
   if (validSamples.length === 0) {
@@ -1416,7 +1581,8 @@ function analyzeIntervalPace(samples: any[], interval: any): any {
       totalSamples: 0,
       filteredOutliers: 0,
       handledGaps: 0,
-      adherence: 0
+      adherence: 0,
+      granular_metrics: null
     };
   }
   
@@ -1428,13 +1594,48 @@ function analyzeIntervalPace(samples: any[], interval: any): any {
   
   const adherence = targetPace > 0 ? targetPace / actualPace : 1;
   
+  // Calculate granular metrics
+  const paceValues = validSamples.map(s => s.pace_s_per_mi);
+  const hrValues = samples.filter(s => s.heart_rate && s.heart_rate > 0).map(s => s.heart_rate);
+  const cadenceValues = samples.filter(s => s.cadence && s.cadence > 0).map(s => s.cadence);
+  
+  // Pace variation (coefficient of variation)
+  const paceStdDev = Math.sqrt(paceValues.reduce((sum, v) => sum + Math.pow(v - avgPace, 2), 0) / paceValues.length);
+  const paceVariation = avgPace > 0 ? (paceStdDev / avgPace) * 100 : 0;
+  
+  // HR drift
+  const hrDrift = hrValues.length >= 10 
+    ? calculateHeartRateDrift(hrValues)
+    : 0;
+  
+  // Cadence consistency (coefficient of variation)
+  const avgCadence = cadenceValues.length > 0 
+    ? cadenceValues.reduce((sum, v) => sum + v, 0) / cadenceValues.length 
+    : 0;
+  const cadenceStdDev = cadenceValues.length > 0
+    ? Math.sqrt(cadenceValues.reduce((sum, v) => sum + Math.pow(v - avgCadence, 2), 0) / cadenceValues.length)
+    : 0;
+  const cadenceConsistency = avgCadence > 0 ? (cadenceStdDev / avgCadence) * 100 : 0;
+  
+  // Time in target zones
+  const targetLower = interval.target_pace?.lower || 0;
+  const targetUpper = interval.target_pace?.upper || targetLower;
+  const samplesInTarget = paceValues.filter(p => p >= targetLower && p <= targetUpper).length;
+  const timeInTarget = (samplesInTarget / paceValues.length) * 100;
+  
   return {
     timeInRange: adherence >= 0.95 && adherence <= 1.05 ? validSamples.length : 0,
     timeOutsideRange: adherence < 0.95 || adherence > 1.05 ? validSamples.length : 0,
     totalSamples: validSamples.length,
     filteredOutliers: 0,
     handledGaps: 0,
-    adherence: adherence
+    adherence: adherence,
+    granular_metrics: {
+      pace_variation_pct: Math.round(paceVariation * 10) / 10,
+      hr_drift_bpm: Math.round(hrDrift * 10) / 10,
+      cadence_consistency_pct: Math.round(cadenceConsistency * 10) / 10,
+      time_in_target_pct: Math.round(timeInTarget)
+    }
   };
 }
 

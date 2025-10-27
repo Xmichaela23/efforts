@@ -298,6 +298,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           try {
             const result = await supabase.functions.invoke('analyze-running-workout', { body: { workout_id: wid } });
             console.log('✅ Enhanced analysis completed', result);
+            console.log('🔍 API response data:', result.data);
+            
+            // Get the analysis from the API response
+            const apiAnalysis = result.data;
+            const apiIntervals = apiAnalysis?.intervals || [];
+            const apiPerformance = apiAnalysis?.performance || null;
+            console.log('🔍 API intervals:', apiIntervals.length, 'intervals');
+            console.log('🔍 API performance:', apiPerformance);
             
             // Wait for database to commit the analysis
             await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for database commit
@@ -311,7 +319,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             
             if (updatedWorkout && onUpdateWorkout) {
               console.log('🔄 Refreshing workout data with new analysis...');
-              console.log('🔍 Updated workout analysis:', updatedWorkout.workout_analysis);
+              
+              // MERGE API response data into the workout
+              updatedWorkout.workout_analysis = {
+                ...updatedWorkout.workout_analysis,
+                intervals: apiIntervals,
+                performance: apiPerformance
+              };
+              
+              console.log('🔍 Updated workout analysis with API data:', updatedWorkout.workout_analysis);
               console.log('🔍 Granular analysis:', updatedWorkout.workout_analysis?.granular_analysis);
               onUpdateWorkout(updatedWorkout);
               
