@@ -568,17 +568,17 @@ Deno.serve(async (req) => {
       performance.execution_adherence = (completedCount / computedIntervals.length) * 100;
       performance.completed_steps = completedCount;
       
-      // Pace adherence
+      // Pace adherence - use time-in-range from granular analysis
       const withPaceTarget = computedIntervals.filter((i: any) => 
-        i.executed && i.target_pace
+        i.executed && i.target_pace && i.granular_metrics
       );
       if (withPaceTarget.length > 0) {
-        const inTarget = withPaceTarget.filter((i: any) => {
-          const actual = i.executed.avg_pace_s_per_mi;
-          const { lower, upper } = i.target_pace;
-          return actual >= lower && actual <= upper;
-        }).length;
-        performance.pace_adherence = (inTarget / withPaceTarget.length) * 100;
+        // Use time_in_target_pct from granular metrics
+        const avgTimeInTarget = withPaceTarget.reduce((sum: number, i: any) => {
+          const pct = i.granular_metrics?.time_in_target_pct || 0;
+          return sum + pct;
+        }, 0) / withPaceTarget.length;
+        performance.pace_adherence = Math.round(avgTimeInTarget);
       } else {
         performance.pace_adherence = 100;
       }

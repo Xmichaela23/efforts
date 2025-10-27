@@ -1444,7 +1444,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           // Convert percentages to match expected format with graceful fallbacks
           // Use API performance data if available
           const finalExecutionScore = executionAdherence ? Math.round(executionAdherence) : (overallAdherence ? Math.round(overallAdherence * 100) : 0);
-          const finalPacePct = paceAdherence ? Math.round(paceAdherence) : (granularAnalysis?.overall_adherence ? Math.round(granularAnalysis.overall_adherence * 100) : 0);
+          const finalPacePct = paceAdherence ? Math.round(paceAdherence) : 0;
           const finalDurationPct = (typeof durationAdherence === 'number') 
             ? Math.round(durationAdherence) 
             : (durationAdherence?.adherence_percentage ? Math.round(durationAdherence.adherence_percentage) : 0);
@@ -2021,8 +2021,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             const getEnhancedAdherence = () => {
               // Check for enhanced pacing analysis from analyze-running-workout
               const workoutAnalysis = (completed as any)?.workout_analysis;
-              if (workoutAnalysis?.analysis?.interval_breakdown) {
-                const intervalBreakdown = workoutAnalysis.analysis.interval_breakdown;
+              if (workoutAnalysis?.granular_analysis?.interval_breakdown) {
+                const intervalBreakdown = workoutAnalysis.granular_analysis.interval_breakdown;
                 // Find matching interval by planned step ID or index
                 const matchingInterval = intervalBreakdown.find((interval: any) => {
                   const plannedStepId = (st as any)?.id;
@@ -2032,6 +2032,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                          interval.interval_id === plannedStepId;
                 });
                 if (matchingInterval) {
+                  // adherence_percentage is already a decimal (0-1), convert to percentage
                   return Math.round(matchingInterval.adherence_percentage * 100);
                 }
               }
@@ -2040,7 +2041,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             
             const pct = getEnhancedAdherence() || 
               (hasServerComputed && shouldShowPercentage(st) && row?.executed?.adherence_percentage) 
-                ? Number(row.executed.adherence_percentage) 
+                ? Math.round(Number(row.executed.adherence_percentage) * 100) 
                 : null;
             // Planned label: prioritize server-computed label, fallback to simple client-side generation
             const plannedLabel = (() => {
