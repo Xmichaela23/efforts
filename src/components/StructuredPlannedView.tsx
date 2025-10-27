@@ -118,7 +118,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const t = String(k||'').toLowerCase();
         if (t==='warmup') return 'Warmup';
         if (t==='cooldown') return 'Cooldown';
-        if (t==='recovery' || t==='rest' || t==='interval_rest') return 'Rest';
+        if (t==='recovery') return 'Recovery';  // Active recovery with pace target
+        if (t==='rest' || t==='interval_rest') return 'Rest';  // Passive rest (no pace)
         if (t==='drill') return 'Drill';
         return '';
       };

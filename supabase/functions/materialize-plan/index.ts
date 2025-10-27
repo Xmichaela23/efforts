@@ -232,19 +232,21 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
     const pace = (fkp!=null) ? (fkp + plus) : undefined;
     out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: pace }); return out;
   }
-  // Intervals: interval_5x800m_5kpace_r90s
+  // Intervals: interval_5x800m_5kpace_r90s, interval_6x800m_5kpace_r120, interval_4x1mi_5kpace_R2min
   if (/interval_\d+x/.test(lower)) {
-    const m = lower.match(/interval_(\d+)x(\d+)(m|mi)_5kpace(?:_r(\d+)(s|min))?/);
+    // Handle both _r and _R, optional s/min suffix
+    const m = lower.match(/interval_(\d+)x(\d+)(m|mi)_5kpace(?:_[rR](\d+)(s|min)?)?/);
     if (m) {
       const reps = parseInt(m[1],10);
       const val = parseInt(m[2],10);
       const unit = m[3];
       const dist_m = unit==='mi' ? Math.round(val*1609.34) : val;
+      // Parse rest: if m[4] exists, check if m[5] is 'min' (multiply by 60) or default to seconds
       const rest_s = m[4] ? (m[5]==='min' ? parseInt(m[4],10)*60 : parseInt(m[4],10)) : 0;
       const pace = secPerMiFromBaseline(baselines,'fivek') || undefined;
       for (let i=0;i<reps;i+=1) {
         out.push({ id: uid(), kind:'work', distance_m: dist_m, pace_sec_per_mi: pace });
-        if (rest_s>0) out.push({ id: uid(), kind:'recovery', duration_s: rest_s, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined });
+        if (rest_s>0 && i<reps-1) out.push({ id: uid(), kind:'recovery', duration_s: rest_s, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined });
       }
       return out;
     }
@@ -796,7 +798,7 @@ function toV3Step(st: any): any {
     // Use strict tolerance for quality work (matches Garmin/TrainingPeaks standards)
     // Use lenient tolerance for easy/recovery/long runs (accounts for terrain, fatigue)
     const paceSec = st.pace_sec_per_mi;
-    const tolerance = (st?.role === 'work' || st?.kind === 'interval' || st?.type === 'tempo') 
+    const tolerance = (st?.kind === 'work') 
       ? 0.02   // ±2% for quality work (~10-20s for most paces)
       : 0.06;  // ±6% for easy runs (~30-60s for most paces)
     
