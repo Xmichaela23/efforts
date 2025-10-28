@@ -1991,7 +1991,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                     const secs = Math.round(sec % 60);
                     return `${mins}:${secs.toString().padStart(2, '0')}`;
                   };
-                  return `(Target: ${formatPace(step.pace_range.lower)}-${formatPace(step.pace_range.upper)}/mi)`;
+                  return `${formatPace(step.pace_range.lower)}-${formatPace(step.pace_range.upper)}/mi`;
                 }
               }
               
@@ -2003,7 +2003,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                   const secs = Math.round(sec % 60);
                   return `${mins}:${secs.toString().padStart(2, '0')}`;
                 };
-                return `(Target: ${formatPace(prng.lower)}-${formatPace(prng.upper)}/mi)`;
+                return `${formatPace(prng.lower)}-${formatPace(prng.upper)}/mi`;
               }
               
               return null;
@@ -2169,7 +2169,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                   <div className="flex flex-col">
                     <div className="font-medium">{timeCell}</div>
                     {shouldShowRangeSubtitle && rangeSubtitle && (
-                      <div className="text-[10px] text-gray-500 italic mt-0.5">
+                      <div className="text-[9px] text-gray-500 mt-0.5">
                         {rangeSubtitle}
                       </div>
                     )}
