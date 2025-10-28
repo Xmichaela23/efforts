@@ -1432,21 +1432,21 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           console.log('🔍 [DATA STRUCTURE DEBUG] workoutAnalysis:', workoutAnalysis);
           console.log('🔍 [DATA STRUCTURE DEBUG] granularAnalysis:', granularAnalysis);
           
-          // 🎯 GARMIN-STYLE METRICS (from server)
-          // Read from workout_analysis.performance - all calculated server-side
+          // 🎯 TEMPORARY FIX: Read from both old and new locations
           const performance = (completed as any)?.workout_analysis?.performance;
           console.log('🎯 [FRONTEND] Reading performance:', performance);
           
-          // Three Garmin metrics (no calculation, just read!)
-          const executionAdherence = performance?.execution_adherence;  // Duration-weighted all intervals
-          const paceAdherence = performance?.pace_adherence;            // Work intervals only
-          const durationAdherence = performance?.duration_adherence;    // Total time (capped at 100%)
+          // Try new Garmin metrics first, fallback to old calculation
+          const executionAdherence = performance?.execution_adherence;
+          const paceAdherence = performance?.pace_adherence;
+          const durationAdherence = performance?.duration_adherence;
           
           const performanceAssessment = granularAnalysis?.performance_assessment;
           console.log('🎯 [FRONTEND] Execution:', executionAdherence, 'Pace:', paceAdherence, 'Duration:', durationAdherence);
           
-          // Convert to display format - just read, no calculation!
-          const finalExecutionScore = Number.isFinite(executionAdherence) ? Math.round(executionAdherence) : 0;
+          // Convert to display format with fallbacks
+          const finalExecutionScore = Number.isFinite(executionAdherence) ? Math.round(executionAdherence) : 
+            (Number.isFinite(Number(compOverall?.execution_score)) ? Math.round(Number(compOverall?.execution_score)) : 0);
           const finalPacePct = Number.isFinite(paceAdherence) ? Math.round(paceAdherence) : 0;
           const finalDurationPct = Number.isFinite(durationAdherence) ? Math.round(durationAdherence) : 0;
           const finalDistPct = null;  // Not used in Garmin formula
@@ -2134,31 +2134,38 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             return (
               <tr key={idx} className="border-b border-gray-100">
                 <td className="px-2 py-1.5">
-                  <div className="flex items-center justify-between w-full min-h-[2.1rem]">
-                    <span className="text-[13px] font-medium truncate pr-2">{plannedLabel}</span>
-                    {pct != null && (
-                      <div className="flex items-center gap-1">
-                        <span className={`text-[11px] font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
-                        {/* Enhanced analysis indicator */}
-                        {(() => {
-                          const workoutAnalysis = (completed as any)?.workout_analysis;
-                          if (workoutAnalysis?.analysis?.pacing_analysis) {
-                            const pacingAnalysis = workoutAnalysis.analysis.pacing_analysis;
-                            const variability = pacingAnalysis.pacing_variability;
-                            
-                            // Show pacing quality indicator
-                            if (variability.coefficient_of_variation > 10) {
-                              return <span className="text-[9px] text-red-500" title="High pacing variability">⚠️</span>;
-                            } else if (variability.coefficient_of_variation > 7) {
-                              return <span className="text-[9px] text-orange-500" title="Moderate pacing variability">⚠️</span>;
-                            } else if (variability.coefficient_of_variation > 3) {
-                              return <span className="text-[9px] text-yellow-500" title="Good pacing consistency">✓</span>;
-                            } else {
-                              return <span className="text-[9px] text-green-500" title="Excellent pacing consistency">✓</span>;
+                  <div className="flex flex-col">
+                    <div className="flex items-center justify-between w-full min-h-[2.1rem]">
+                      <span className="text-[13px] font-medium truncate pr-2">{plannedLabel}</span>
+                      {pct != null && (
+                        <div className="flex items-center gap-1">
+                          <span className={`text-[11px] font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
+                          {/* Enhanced analysis indicator */}
+                          {(() => {
+                            const workoutAnalysis = (completed as any)?.workout_analysis;
+                            if (workoutAnalysis?.analysis?.pacing_analysis) {
+                              const pacingAnalysis = workoutAnalysis.analysis.pacing_analysis;
+                              const variability = pacingAnalysis.pacing_variability;
+                              
+                              // Show pacing quality indicator
+                              if (variability.coefficient_of_variation > 10) {
+                                return <span className="text-[9px] text-red-500" title="High pacing variability">⚠️</span>;
+                              } else if (variability.coefficient_of_variation > 7) {
+                                return <span className="text-[9px] text-orange-500" title="Moderate pacing variability">⚠️</span>;
+                              } else if (variability.coefficient_of_variation > 3) {
+                                return <span className="text-[9px] text-yellow-500" title="Good pacing consistency">✓</span>;
+                              } else {
+                                return <span className="text-[9px] text-green-500" title="Excellent pacing consistency">✓</span>;
+                              }
                             }
-                          }
-                          return null;
-                        })()}
+                            return null;
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                    {shouldShowRangeSubtitle && rangeSubtitle && (
+                      <div className="text-[9px] text-gray-500 mt-0.5">
+                        {rangeSubtitle}
                       </div>
                     )}
                   </div>
@@ -2166,14 +2173,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
                 <td className="px-2 py-1.5 font-medium">{execCell}</td>
                 <td className="px-2 py-1.5">{distCell}</td>
                 <td className="px-2 py-1.5">
-                  <div className="flex flex-col">
-                    <div className="font-medium">{timeCell}</div>
-                    {shouldShowRangeSubtitle && rangeSubtitle && (
-                      <div className="text-[9px] text-gray-500 mt-0.5">
-                        {rangeSubtitle}
-                      </div>
-                    )}
-                  </div>
+                  <div className="font-medium">{timeCell}</div>
                 </td>
                 <td className="px-1 py-1.5 text-[13px]">
                   <div className="text-right">
