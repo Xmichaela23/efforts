@@ -159,10 +159,10 @@ Deno.serve(async (req) => {
         }
         
         // Update workout linkage (+ pool context for swims)
-        // Clear planned_steps_light to force regeneration with new planned workout IDs
+        // CRITICAL: Only update planned_id - don't touch computed at all
+        // This avoids sending massive computed object (3000+ sensor data points) that locks the DB row
         const updates: any = { 
-          planned_id: String(plannedRow.id),
-          computed: w.computed ? { ...w.computed, planned_steps_light: null, intervals: [] } : null
+          planned_id: String(plannedRow.id)
         };
         if (String((plannedRow as any)?.type||'').toLowerCase()==='swim') {
           const env = (plannedRow as any)?.environment as string | undefined;
@@ -184,24 +184,23 @@ Deno.serve(async (req) => {
           }
         }
         console.log('[auto-attach-planned] Setting workout.planned_id to:', plannedRow.id);
-        console.log('[auto-attach-planned] Updates payload:', JSON.stringify(updates, null, 2));
+        console.log('[auto-attach-planned] Lightweight update (no massive computed object):', updates);
         const { error: workoutUpdateErr } = await supabase.from('workouts').update(updates).eq('id', w.id).eq('user_id', w.user_id);
         if (workoutUpdateErr) {
           console.error('[auto-attach-planned] Failed to update workouts:', workoutUpdateErr);
           throw new Error(`Failed to link workout: ${workoutUpdateErr.message}`);
         }
-        console.log('[auto-attach-planned] Workout update successful');
+        console.log('[auto-attach-planned] Lightweight update successful (no DB lock)');
         
         // Verify the database state before computing summary
         console.log('[auto-attach-planned] Verifying database linkage...');
-        const { data: verifyWorkout } = await supabase.from('workouts').select('id,planned_id,computed').eq('id', w.id).maybeSingle();
+        const { data: verifyWorkout } = await supabase.from('workouts').select('id,planned_id').eq('id', w.id).maybeSingle();
         const { data: verifyPlanned } = await supabase.from('planned_workouts').select('id,completed_workout_id,workout_status').eq('id', String(plannedRow.id)).maybeSingle();
         console.log('[auto-attach-planned] Verification - workout.planned_id:', verifyWorkout?.planned_id, 'planned.completed_workout_id:', verifyPlanned?.completed_workout_id, 'planned.workout_status:', verifyPlanned?.workout_status);
-        console.log('[auto-attach-planned] Verification - computed.intervals.length:', verifyWorkout?.computed?.intervals?.length);
         
-        // Wait longer for database commit (large computed object with sensor data takes time to write)
-        console.log('[auto-attach-planned] Waiting 3s for database transaction to fully commit...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Minimal delay (lightweight update commits quickly)
+        console.log('[auto-attach-planned] Waiting 500ms for database commit...');
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Compute summary (with retry logic in case of 404)
         console.log('[auto-attach-planned] Computing workout summary');
