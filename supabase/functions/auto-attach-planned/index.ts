@@ -158,15 +158,10 @@ Deno.serve(async (req) => {
           throw new Error(`Failed to link planned workout: ${plannedUpdateErr.message}`);
         }
         
-        // Update planned_id and clear intervals to force regeneration
-        const currentComputed = w.computed || {};
+        // Update ONLY planned_id - don't touch computed at all
+        // compute-workout-summary will detect the new planned_id and regenerate intervals
         const updates: any = { 
-          planned_id: String(plannedRow.id),
-          computed: {
-            ...currentComputed,
-            intervals: [],  // Clear to force regeneration with new planned_step_ids
-            planned_steps_light: null  // Clear cached planned steps
-          }
+          planned_id: String(plannedRow.id)
         };
         
         // Add swim context if needed
