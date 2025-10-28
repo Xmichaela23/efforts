@@ -1442,8 +1442,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           const performanceAssessment = granularAnalysis?.performance_assessment;
           
           // Convert percentages to match expected format with graceful fallbacks
-          // Use API performance data if available
-          const finalExecutionScore = executionAdherence ? Math.round(executionAdherence) : (overallAdherence ? Math.round(overallAdherence * 100) : 0);
+          // Use API performance data if available, or fallback to computed.overall.execution_score
+          const computedExecutionScore = Number(compOverall?.execution_score);
+          const finalExecutionScore = executionAdherence ? Math.round(executionAdherence) : 
+            (overallAdherence ? Math.round(overallAdherence * 100) : 
+            (Number.isFinite(computedExecutionScore) && computedExecutionScore > 0 ? Math.round(computedExecutionScore) : 0));
           const finalPacePct = paceAdherence ? Math.round(paceAdherence) : 0;
           const finalDurationPct = (typeof durationAdherence === 'number') 
             ? Math.round(durationAdherence) 
@@ -2041,7 +2044,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             
             const pct = getEnhancedAdherence() || 
               (hasServerComputed && shouldShowPercentage(st) && row?.executed?.adherence_percentage) 
-                ? Math.round(Number(row.executed.adherence_percentage) * 100) 
+                ? Math.round(Number(row.executed.adherence_percentage)) 
                 : null;
             // Planned label: prioritize server-computed label, fallback to simple client-side generation
             const plannedLabel = (() => {
