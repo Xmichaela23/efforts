@@ -888,8 +888,19 @@ Deno.serve(async (req) => {
     console.log('✅ Performance calculated:', performance);
 
     // 🚀 ENHANCED DETAILED ANALYSIS - Chart-like insights
-    const detailedAnalysis = generateDetailedChartAnalysis(sensorData, computedIntervals, enhancedAnalysis);
-    console.log('📊 Detailed analysis generated:', JSON.stringify(detailedAnalysis, null, 2));
+    console.log('🚀 Starting detailed analysis generation...');
+    console.log('🔍 Sensor data length:', sensorData.length);
+    console.log('🔍 Computed intervals length:', computedIntervals.length);
+    console.log('🔍 Enhanced analysis keys:', Object.keys(enhancedAnalysis));
+    
+    let detailedAnalysis = null;
+    try {
+      detailedAnalysis = generateDetailedChartAnalysis(sensorData, computedIntervals, enhancedAnalysis);
+      console.log('📊 Detailed analysis generated successfully:', JSON.stringify(detailedAnalysis, null, 2));
+    } catch (error) {
+      console.error('❌ Detailed analysis generation failed:', error);
+      detailedAnalysis = { error: 'Failed to generate detailed analysis', message: error.message };
+    }
 
     // Store enhanced intervals back to computed.intervals (single source of truth)
     // Store summary analysis in workout_analysis
