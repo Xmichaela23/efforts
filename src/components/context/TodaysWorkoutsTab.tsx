@@ -80,10 +80,27 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       const targetWorkout = recentWorkouts.find(w => w.id === focusWorkoutId);
       if (targetWorkout) {
         setSelectedWorkoutId(focusWorkoutId);
-        // Force fresh analysis when navigating from Summary screen
-        // This ensures we get the latest detailed analysis
-        console.log('🔄 Forcing fresh analysis for focus workout:', focusWorkoutId);
-        analyzeWorkout(focusWorkoutId);
+        
+        // Smart analysis: only re-analyze if missing detailed analysis or outdated version
+        const analysis = targetWorkout.workout_analysis;
+        const needsAnalysis = !analysis || 
+                             !analysis.detailed_analysis || 
+                             analysis.analysis_version !== 'v1.0.0';
+        
+        if (needsAnalysis) {
+          console.log('🔄 Analysis needed for focus workout:', {
+            workoutId: focusWorkoutId,
+            hasAnalysis: !!analysis,
+            hasDetailedAnalysis: !!analysis?.detailed_analysis,
+            analysisVersion: analysis?.analysis_version,
+            reason: !analysis ? 'no analysis' : 
+                   !analysis.detailed_analysis ? 'missing detailed analysis' : 
+                   'outdated version'
+          });
+          analyzeWorkout(focusWorkoutId);
+        } else {
+          console.log('✅ Analysis up to date for focus workout:', focusWorkoutId);
+        }
       }
     }
   }, [focusWorkoutId, recentWorkouts]);
@@ -601,8 +618,24 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 }`}
                 onClick={() => {
                   if (analyzingWorkout !== workout.id) {
-                    // Always run fresh analysis - no cache confusion
-                    analyzeWorkout(workout.id);
+                    // Smart analysis: only re-analyze if needed
+                    const analysis = workout.workout_analysis;
+                    const needsAnalysis = !analysis || 
+                                         !analysis.detailed_analysis || 
+                                         analysis.analysis_version !== 'v1.0.0';
+                    
+                    if (needsAnalysis) {
+                      console.log('🔄 Manual analysis needed for workout:', {
+                        workoutId: workout.id,
+                        hasAnalysis: !!analysis,
+                        hasDetailedAnalysis: !!analysis?.detailed_analysis,
+                        analysisVersion: analysis?.analysis_version
+                      });
+                      analyzeWorkout(workout.id);
+                    } else {
+                      console.log('✅ Analysis up to date, selecting workout:', workout.id);
+                      setSelectedWorkoutId(workout.id);
+                    }
                   }
                 }}
               >
