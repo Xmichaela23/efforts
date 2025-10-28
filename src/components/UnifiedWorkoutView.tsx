@@ -35,6 +35,7 @@ interface UnifiedWorkoutViewProps {
   onClose: () => void;
   onUpdateWorkout?: (workoutId: string, updates: any) => void;
   onDelete?: (workoutId: string) => void;
+  onNavigateToContext?: (workoutId: string) => void;
   initialTab?: 'planned' | 'summary' | 'completed';
   origin?: 'today' | 'weekly' | 'other';
 }
@@ -44,6 +45,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   onClose,
   onUpdateWorkout,
   onDelete,
+  onNavigateToContext,
   initialTab,
   origin = 'other'
 }) => {
@@ -994,6 +996,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 <MobileSummary 
                   planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
                   completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
+                  onNavigateToContext={onNavigateToContext}
                 />
               );
             })()}

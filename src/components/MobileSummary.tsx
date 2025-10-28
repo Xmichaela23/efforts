@@ -7,6 +7,7 @@ import resolveMovingSeconds from '@/utils/resolveMovingSeconds';
 type MobileSummaryProps = {
   planned: any | null;
   completed: any | null;
+  onNavigateToContext?: (workoutId: string) => void;
 };
 
 const fmtTime = (sec?: number) => {
@@ -273,7 +274,7 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
   return { text: '—', hr: getAvgHR(completed) };
 };
 
-export default function MobileSummary({ planned, completed, hideTopAdherence }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
+export default function MobileSummary({ planned, completed, hideTopAdherence, onNavigateToContext }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
   const { useImperial } = useAppContext();
   
   // Debug logging for data changes
@@ -1503,24 +1504,49 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
           return (
             <div className="w-full pt-1 pb-2">
-                  <div className="flex items-center justify-center gap-6 text-center">
-                    <div className="flex items-end gap-3">
-                      {/* Overall Execution Score */}
-                      {chip('Execution', finalExecutionScore, 
-                           performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence', 'pace')}
-                      
-                      {/* Duration Adherence */}
-                      {chip('Duration', finalDurationPct, 
-                           'Time adherence', 'duration')}
-                      
-                      {/* Pace Adherence */}
-                      {chip('Pace', finalPacePct, 
-                           'Interval adherence', 'pace')}
-                    </div>
-                  </div>
+              {/* Descriptive blurb first */}
               {message && (
-                <div className="mt-2 text-xs text-gray-600 text-center">
+                <div className="mb-3 text-xs text-gray-600 text-center">
                   {message.icon} {message.text}
+                </div>
+              )}
+              
+              {/* Adherence scores */}
+              <div className="flex items-center justify-center gap-6 text-center mb-3">
+                <div className="flex items-end gap-3">
+                  {/* Overall Execution Score */}
+                  {chip('Execution', finalExecutionScore, 
+                       performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence', 'pace')}
+                  
+                  {/* Duration Adherence */}
+                  {chip('Duration', finalDurationPct, 
+                       'Time adherence', 'duration')}
+                  
+                  {/* Pace Adherence */}
+                  {chip('Pace', finalPacePct, 
+                       'Interval adherence', 'pace')}
+                </div>
+              </div>
+              
+              {/* View in Context link */}
+              {onNavigateToContext && completed?.id && (
+                <div className="text-center">
+                  <button
+                    onClick={() => onNavigateToContext(completed.id)}
+                    className="text-sm font-medium text-black hover:text-gray-600 transition-colors"
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontWeight: 500,
+                      fontSize: '15px',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0
+                    }}
+                  >
+                    View in Context →
+                  </button>
                 </div>
               )}
             </div>
@@ -1625,16 +1651,41 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
             return (
               <div className="w-full pt-1 pb-2">
-                <div className="flex items-center justify-center gap-6 text-center">
+                {/* Descriptive blurb first */}
+                {message && (
+                  <div className="mb-3 text-xs text-gray-600 text-center">
+                    {message.icon} {message.text}
+                  </div>
+                )}
+                
+                {/* Adherence scores */}
+                <div className="flex items-center justify-center gap-6 text-center mb-3">
                   <div className="flex items-end gap-3">
                     {chip('Execution', executionScore, 'Overall adherence', 'pace')}
                     {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPer100(paceDeltaSec) : '—', 'pace')}
                     {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
                   </div>
                 </div>
-                {message && (
-                  <div className="mt-2 text-xs text-gray-600 text-center">
-                    {message.icon} {message.text}
+                
+                {/* View in Context link */}
+                {onNavigateToContext && completed?.id && (
+                  <div className="text-center">
+                    <button
+                      onClick={() => onNavigateToContext(completed.id)}
+                      className="text-sm font-medium text-black hover:text-gray-600 transition-colors"
+                      style={{
+                        fontFamily: 'Inter, sans-serif',
+                        fontWeight: 500,
+                        fontSize: '15px',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        background: 'none',
+                        border: 'none',
+                        padding: 0
+                      }}
+                    >
+                      View in Context →
+                    </button>
                   </div>
                 )}
               </div>
@@ -1734,16 +1785,41 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
 
             return (
               <div className="w-full pt-1 pb-2">
-                <div className="flex items-center justify-center gap-6 text-center">
+                {/* Descriptive blurb first */}
+                {message && (
+                  <div className="mb-3 text-xs text-gray-600 text-center">
+                    {message.icon} {message.text}
+                  </div>
+                )}
+                
+                {/* Adherence scores */}
+                <div className="flex items-center justify-center gap-6 text-center mb-3">
                   <div className="flex items-end gap-3">
                     {chip('Execution', executionScore, 'Overall adherence', 'pace')}
                     {chip('Watts', powerPct, powerDelta!=null ? fmtDeltaWatts(powerDelta) : '—', 'pace')}
                     {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
                   </div>
                 </div>
-                {message && (
-                  <div className="mt-2 text-xs text-gray-600 text-center">
-                    {message.icon} {message.text}
+                
+                {/* View in Context link */}
+                {onNavigateToContext && completed?.id && (
+                  <div className="text-center">
+                    <button
+                      onClick={() => onNavigateToContext(completed.id)}
+                      className="text-sm font-medium text-black hover:text-gray-600 transition-colors"
+                      style={{
+                        fontFamily: 'Inter, sans-serif',
+                        fontWeight: 500,
+                        fontSize: '15px',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        background: 'none',
+                        border: 'none',
+                        padding: 0
+                      }}
+                    >
+                      View in Context →
+                    </button>
                   </div>
                 )}
               </div>

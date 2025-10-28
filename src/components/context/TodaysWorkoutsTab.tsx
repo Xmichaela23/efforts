@@ -4,9 +4,11 @@ import { useAppContext } from '../../contexts/AppContext';
 import { useWeekUnified } from '../../hooks/useWeekUnified';
 import { analyzeWorkoutWithRetry } from '../../services/workoutAnalysisService';
 
-interface TodaysWorkoutsTabProps {}
+interface TodaysWorkoutsTabProps {
+  focusWorkoutId?: string | null;
+}
 
-const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
+const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId }) => {
   const { useImperial } = useAppContext();
   const [recentWorkouts, setRecentWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +73,20 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = () => {
       loadRecentWorkouts();
     }
   }, [todayLoading]);
+
+  // Auto-select workout when focusWorkoutId is provided
+  useEffect(() => {
+    if (focusWorkoutId && recentWorkouts.length > 0) {
+      const targetWorkout = recentWorkouts.find(w => w.id === focusWorkoutId);
+      if (targetWorkout) {
+        setSelectedWorkoutId(focusWorkoutId);
+        // Trigger analysis if not already analyzed
+        if (!targetWorkout.workout_analysis) {
+          analyzeWorkout(focusWorkoutId);
+        }
+      }
+    }
+  }, [focusWorkoutId, recentWorkouts]);
 
   const loadRecentWorkouts = async () => {
     try {

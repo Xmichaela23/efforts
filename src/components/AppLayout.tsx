@@ -61,6 +61,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showImportPage, setShowImportPage] = useState(false);
   const [showTrainingBaselines, setShowTrainingBaselines] = useState(false);
   const [showContext, setShowContext] = useState(false);
+  const [contextFocusWorkoutId, setContextFocusWorkoutId] = useState<string | null>(null);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
@@ -487,12 +488,25 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
   };
 
-  const handleOpenContext = () => {
+  const handleOpenContext = (workoutId?: string) => {
+    if (workoutId) {
+      setContextFocusWorkoutId(workoutId);
+    }
     setShowContext(true);
   };
 
   const handleCloseContext = () => {
     setShowContext(false);
+    setContextFocusWorkoutId(null);
+  };
+
+  const handleNavigateToContext = (workoutId: string) => {
+    // Close workout detail view
+    setSelectedWorkout(null);
+    setActiveTab('summary');
+    // Set focus workout and open context
+    setContextFocusWorkoutId(workoutId);
+    setShowContext(true);
   };
 
   const handleBackToDashboard = () => {
@@ -981,6 +995,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             <div className="pt-4">
               <ContextTabs
                 onClose={handleCloseContext}
+                focusWorkoutId={contextFocusWorkoutId}
               />
             </div>
           ) : showBuilder ? (
@@ -1002,6 +1017,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onUpdateWorkout={handleUpdateWorkout}
                 onClose={handleBackToDashboard}
                 onDelete={handleDeleteWorkout}
+                onNavigateToContext={handleNavigateToContext}
                 origin="today"
                 initialTab={activeTab as any}
               />

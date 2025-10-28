@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, CalendarCheck, CalendarDays } from 'lucide-react';
@@ -8,10 +8,18 @@ import BlockSummaryTab from './context/BlockSummaryTab';
 
 interface ContextTabsProps {
   onClose?: () => void;
+  focusWorkoutId?: string | null;
 }
 
-const ContextTabs: React.FC<ContextTabsProps> = ({ onClose }) => {
+const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, focusWorkoutId }) => {
   const [activeTab, setActiveTab] = useState('today');
+
+  // Auto-select Daily tab when focusWorkoutId is provided
+  useEffect(() => {
+    if (focusWorkoutId) {
+      setActiveTab('today');
+    }
+  }, [focusWorkoutId]);
 
   return (
     <div className="w-full h-full">
@@ -67,7 +75,7 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose }) => {
 
         <div className="flex-1 overflow-auto">
           <TabsContent value="today" className="flex-1 p-1">
-            <TodaysWorkoutsTab />
+            <TodaysWorkoutsTab focusWorkoutId={focusWorkoutId} />
           </TabsContent>
           
           <TabsContent value="weekly" className="flex-1 p-1">
