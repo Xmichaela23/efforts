@@ -265,72 +265,24 @@ function formatPlannedLabel(st: any, sport?: string): string | null {
   const isRide = sport === 'ride' || sport === 'cycling' || sport === 'bike';
   const isSwim = sport === 'swim' || sport === 'lap_swimming' || sport === 'open_water_swimming';
   
-  // For RUNS: Show duration for time-based steps, pace for distance-based steps
+  // For RUNS: Show distance or time only (pace range will be shown as subtitle in UI)
   if (isRun) {
     const meters = deriveMetersFromPlannedStep(st);
     const seconds = deriveSecondsFromPlannedStep(st);
     
-    // Priority 1: If it's a DISTANCE-based step (has distance), show pace
+    // Priority 1: If it's a DISTANCE-based step, show distance
     if (meters && meters > 0) {
-      // Check for pace_range object {lower, upper}
-      const prng = (st as any)?.pace_range || (st as any)?.paceRange;
-      if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
-        return `${prng.lower}–${prng.upper}`;
-      }
-      // Check for pace_range array [lower, upper]
-      if (Array.isArray(prng) && prng.length === 2 && prng[0] && prng[1]) {
-        return `${prng[0]}–${prng[1]}`;
-      }
-      // Single pace target
-      const paceTarget = st?.paceTarget || st?.target_pace || st?.pace;
-      if (typeof paceTarget === 'string' && /\d+:\d{2}\s*\/\s*(mi|km)/i.test(paceTarget)) {
-        return paceTarget;
-      }
-      // Derive from pace_sec_per_mi
-      const paceSecPerMi = derivePlannedPaceSecPerMi(st);
-      if (paceSecPerMi && paceSecPerMi > 0) {
-        const mins = Math.floor(paceSecPerMi / 60);
-        const secs = Math.round(paceSecPerMi % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}/mi`;
-      }
+      const miles = meters / 1609.34;
+      return miles < 1 
+        ? `${miles.toFixed(2)} mi` 
+        : `${miles.toFixed(1)} mi`;
     }
     
-    // Priority 2: If it's a TIME-based step (has duration but no distance), show duration + pace when available
+    // Priority 2: If it's a TIME-based step, show duration
     if (seconds && seconds > 0) {
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
-      const durationStr = secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
-      
-      // Try to include pace information for time-based steps
-      let paceText: string | null = null;
-      
-      // Check for pace_range object {lower, upper}
-      const prng = (st as any)?.pace_range || (st as any)?.paceRange;
-      if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
-        paceText = `${prng.lower}–${prng.upper}`;
-      }
-      // Check for pace_range array [lower, upper]
-      else if (Array.isArray(prng) && prng.length === 2 && prng[0] && prng[1]) {
-        paceText = `${prng[0]}–${prng[1]}`;
-      }
-      // Single pace target
-      else {
-        const paceTarget = st?.paceTarget || st?.target_pace || st?.pace;
-        if (typeof paceTarget === 'string' && /\d+:\d{2}\s*\/\s*(mi|km)/i.test(paceTarget)) {
-          paceText = paceTarget;
-        }
-        // Derive from pace_sec_per_mi
-        else {
-          const paceSecPerMi = derivePlannedPaceSecPerMi(st);
-          if (paceSecPerMi && paceSecPerMi > 0) {
-            const paceMins = Math.floor(paceSecPerMi / 60);
-            const paceSecs = Math.round(paceSecPerMi % 60);
-            paceText = `${paceMins}:${paceSecs.toString().padStart(2, '0')}/mi`;
-          }
-        }
-      }
-      
-      return paceText ? `${durationStr} @ ${paceText}` : durationStr;
+      return secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
     }
     
     return '—';
