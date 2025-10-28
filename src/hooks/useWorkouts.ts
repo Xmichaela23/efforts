@@ -217,7 +217,7 @@ export const useWorkouts = () => {
           'avg_speed','max_speed','avg_cadence','max_cadence','elevation_gain','elevation_loss','calories',
           'moving_time','elapsed_time','timestamp','start_position_lat','start_position_long',
           // computed snapshot and metrics (small JSON); exclude gps_track/sensor_data/swim_data
-          'computed','metrics',
+          'computed','metrics','workout_analysis',
           // strength and mobility exercise data (matches get-week selection)
           'strength_exercises','mobility_exercises',
           // workload data
