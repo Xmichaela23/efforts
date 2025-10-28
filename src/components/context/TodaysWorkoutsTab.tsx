@@ -72,7 +72,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     if (!todayLoading) {
       loadRecentWorkouts();
     }
-  }, [todayLoading]);
+  }, [todayLoading, focusWorkoutId]);
 
   // Auto-select workout when focusWorkoutId is provided
   useEffect(() => {
@@ -96,19 +96,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Load most recent completed workouts (last 7 days)
+      // Load most recent completed workouts (last 14 days to catch more workouts)
       // Use user's local timezone for date range calculation
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const sevenDaysAgoLocal = sevenDaysAgo.toLocaleDateString('en-CA');
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+      const fourteenDaysAgoLocal = fourteenDaysAgo.toLocaleDateString('en-CA');
       
       const { data: recentData } = await supabase
         .from('workouts')
         .select('*, workout_analysis')
         .eq('user_id', user.id)
-        .gte('date', sevenDaysAgoLocal)
+        .gte('date', fourteenDaysAgoLocal)
         .order('date', { ascending: false })
-        .limit(5);
+        .limit(10);
 
       console.log('📊 Loaded workouts:', recentData?.map(w => ({
         id: w.id,
@@ -120,8 +120,25 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       
       setRecentWorkouts(recentData || []);
       
-      // Analysis will be triggered by UnifiedWorkoutView when user opens Summary tab
-      // No need for auto-triggering here to avoid race conditions
+      // If we have a focusWorkoutId but it's not in the recent workouts, load it specifically
+      if (focusWorkoutId && recentData && !recentData.find(w => w.id === focusWorkoutId)) {
+        console.log('🔍 Focus workout not in recent list, loading specifically:', focusWorkoutId);
+        const { data: focusWorkout } = await supabase
+          .from('workouts')
+          .select('*, workout_analysis')
+          .eq('id', focusWorkoutId)
+          .single();
+        
+        if (focusWorkout) {
+          console.log('✅ Loaded focus workout:', {
+            id: focusWorkout.id,
+            type: focusWorkout.type,
+            date: focusWorkout.date,
+            has_analysis: !!focusWorkout.workout_analysis
+          });
+          setRecentWorkouts(prev => [focusWorkout, ...prev]);
+        }
+      }
 
     } catch (error) {
       console.error('Error loading recent workouts:', error);
@@ -175,11 +192,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     if (!workoutWithAnalysis) {
       workoutWithAnalysis = recentWorkouts.find(workout => {
         const analysis = workout.workout_analysis;
+        console.log('🔍 Checking workout for analysis:', {
+          id: workout.id,
+          type: workout.type,
+          has_analysis: !!analysis,
+          analysis_structure: analysis ? Object.keys(analysis) : 'none'
+        });
         if (!analysis) return false;
         
         // Handle both old and new analysis data structures
         const insights = analysis.insights || (analysis.workout_analysis && analysis.workout_analysis.insights);
-        return insights && insights.length > 0;
+        const hasInsights = insights && insights.length > 0;
+        console.log('🔍 Analysis insights check:', { insights, hasInsights });
+        return hasInsights;
       }) || recentWorkouts.find(workout => workout.workout_analysis); // Fallback to any analysis
       console.log('🎯 Fallback to most recent with analysis');
     } else if (!workoutWithAnalysis.workout_analysis) {
