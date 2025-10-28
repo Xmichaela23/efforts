@@ -158,8 +158,16 @@ Deno.serve(async (req) => {
           throw new Error(`Failed to link planned workout: ${plannedUpdateErr.message}`);
         }
         
-        // Simple update: just change planned_id
-        const updates: any = { planned_id: String(plannedRow.id) };
+        // Update planned_id and clear intervals to force regeneration
+        const currentComputed = w.computed || {};
+        const updates: any = { 
+          planned_id: String(plannedRow.id),
+          computed: {
+            ...currentComputed,
+            intervals: [],  // Clear to force regeneration with new planned_step_ids
+            planned_steps_light: null  // Clear cached planned steps
+          }
+        };
         
         // Add swim context if needed
         if (String((plannedRow as any)?.type||'').toLowerCase()==='swim') {
