@@ -521,7 +521,9 @@ Deno.serve(async (req) => {
     console.log('🔍 [CRITICAL DEBUG] intervalsToAnalyze structure:', JSON.stringify(intervalsToAnalyze, null, 2));
     
     // Perform granular adherence analysis
+    console.log('🚀 [TIMING] Starting calculatePrescribedRangeAdherenceGranular...');
     const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervalsToAnalyze, workout, plannedWorkout);
+    console.log('✅ [TIMING] Granular analysis completed!');
 
     // Add data quality information to analysis
     const enhancedAnalysis = {
@@ -611,22 +613,32 @@ Deno.serve(async (req) => {
 
     // Store enhanced intervals back to computed.intervals (single source of truth)
     // Store summary analysis in workout_analysis
+    console.log('💾 [TIMING] Starting database update...');
+    console.log('💾 [TIMING] Updating computed.intervals with', computedIntervals.length, 'intervals');
+    
+    // Build minimal computed object - DON'T spread (avoids sending thousands of sensor samples)
+    const minimalComputed = {
+      version: workout.computed?.version || '1.0',
+      overall: workout.computed?.overall || {},
+      intervals: computedIntervals,  // Enhanced with granular_metrics
+      planned_steps_light: workout.computed?.planned_steps_light || null
+    };
+    
+    // Single update with both computed and workout_analysis
     const { error: updateError } = await supabase
       .from('workouts')
       .update({
-        computed: {
-          ...workout.computed,
-          intervals: computedIntervals  // Enhanced with granular_metrics
-        },
+        computed: minimalComputed,  // Lightweight update (no sensor data)
         workout_analysis: {
           ...existingAnalysis,
           granular_analysis: enhancedAnalysis,
           performance: performance
-          // Note: intervals now stored in computed.intervals (not duplicated here)
         }
       })
       .eq('id', workout_id);
 
+    console.log('✅ [TIMING] Database update completed!');
+    
     if (updateError) {
       console.warn('⚠️ Could not store analysis:', updateError.message);
     } else {
