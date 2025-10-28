@@ -80,10 +80,10 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       const targetWorkout = recentWorkouts.find(w => w.id === focusWorkoutId);
       if (targetWorkout) {
         setSelectedWorkoutId(focusWorkoutId);
-        // Trigger analysis if not already analyzed
-        if (!targetWorkout.workout_analysis) {
-          analyzeWorkout(focusWorkoutId);
-        }
+        // Force fresh analysis when navigating from Summary screen
+        // This ensures we get the latest detailed analysis
+        console.log('🔄 Forcing fresh analysis for focus workout:', focusWorkoutId);
+        analyzeWorkout(focusWorkoutId);
       }
     }
   }, [focusWorkoutId, recentWorkouts]);
