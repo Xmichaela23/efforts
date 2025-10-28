@@ -610,12 +610,16 @@ Deno.serve(async (req) => {
     try { console.error('[compute] SUPABASE CLIENT CREATED'); } catch {}
 
     // Load workout + planned link
-    const { data: w } = await supabase
+    const { data: w, error: workoutError } = await supabase
       .from('workouts')
       .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power,average_watts')
       .eq('id', workout_id)
       .maybeSingle();
-    try { console.error('[compute] WORKOUT LOAD ok:', !!w, 'planned_id:', (w as any)?.planned_id, 'type:', (w as any)?.type); } catch {}
+    try { 
+      console.error('[compute] WORKOUT LOAD ok:', !!w, 'planned_id:', (w as any)?.planned_id, 'type:', (w as any)?.type); 
+      if (workoutError) console.error('[compute] WORKOUT LOAD ERROR:', JSON.stringify(workoutError));
+      if (!w) console.error('[compute] WORKOUT NOT FOUND - workout_id:', workout_id);
+    } catch {}
 
     if (!w) {
       return new Response(JSON.stringify({ error:'workout not found' }), { status:404, headers:{'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*'}});
