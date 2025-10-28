@@ -158,12 +158,10 @@ Deno.serve(async (req) => {
           throw new Error(`Failed to link planned workout: ${plannedUpdateErr.message}`);
         }
         
-        // Update workout linkage (+ pool context for swims)
-        // CRITICAL: Only update planned_id - don't touch computed at all
-        // This avoids sending massive computed object (3000+ sensor data points) that locks the DB row
-        const updates: any = { 
-          planned_id: String(plannedRow.id)
-        };
+        // Simple update: just change planned_id
+        const updates: any = { planned_id: String(plannedRow.id) };
+        
+        // Add swim context if needed
         if (String((plannedRow as any)?.type||'').toLowerCase()==='swim') {
           const env = (plannedRow as any)?.environment as string | undefined;
           const poolLenM = (plannedRow as any)?.pool_length_m as number | undefined;
@@ -183,64 +181,30 @@ Deno.serve(async (req) => {
             if (poolLabel) updates.plan_label = poolLabel;
           }
         }
-        console.log('[auto-attach-planned] Setting workout.planned_id to:', plannedRow.id);
-        console.log('[auto-attach-planned] Lightweight update (no massive computed object):', updates);
+        
         const { error: workoutUpdateErr } = await supabase.from('workouts').update(updates).eq('id', w.id).eq('user_id', w.user_id);
         if (workoutUpdateErr) {
-          console.error('[auto-attach-planned] Failed to update workouts:', workoutUpdateErr);
           throw new Error(`Failed to link workout: ${workoutUpdateErr.message}`);
         }
-        console.log('[auto-attach-planned] Lightweight update successful (no DB lock)');
         
-        // Verify the database state before computing summary
-        console.log('[auto-attach-planned] Verifying database linkage...');
-        const { data: verifyWorkout } = await supabase.from('workouts').select('id,planned_id').eq('id', w.id).maybeSingle();
-        const { data: verifyPlanned } = await supabase.from('planned_workouts').select('id,completed_workout_id,workout_status').eq('id', String(plannedRow.id)).maybeSingle();
-        console.log('[auto-attach-planned] Verification - workout.planned_id:', verifyWorkout?.planned_id, 'planned.completed_workout_id:', verifyPlanned?.completed_workout_id, 'planned.workout_status:', verifyPlanned?.workout_status);
-        
-        // Minimal delay (lightweight update commits quickly)
-        console.log('[auto-attach-planned] Waiting 500ms for database commit...');
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Compute summary (with retry logic in case of 404)
-        console.log('[auto-attach-planned] Computing workout summary');
+        // Regenerate intervals with new planned_id
         const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        await fetch(fnUrl, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
+          body: JSON.stringify({ workout_id: w.id }) 
+        });
         
-        let summaryResponse: Response;
-        let retries = 0;
-        const maxRetries = 3;
-        
-        while (retries < maxRetries) {
-          summaryResponse = await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
-          console.log(`[auto-attach-planned] Compute summary response status (attempt ${retries + 1}/${maxRetries}):`, summaryResponse.status);
-          
-          if (summaryResponse.status === 200) {
-            break;
-          }
-          
-          if (summaryResponse.status === 404 && retries < maxRetries - 1) {
-            // 404 might be due to database replication lag - retry after a delay
-            const retryDelay = 1000 * (retries + 1); // 1s, 2s, 3s
-            console.log(`[auto-attach-planned] Got 404, waiting ${retryDelay}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            retries++;
-          } else {
-            // Non-404 error or final retry - fail
-            const errorBody = await summaryResponse.text();
-            console.error('[auto-attach-planned] Compute summary FAILED:', errorBody);
-            throw new Error(`compute-workout-summary failed with ${summaryResponse.status}: ${errorBody}`);
-          }
+        // Run discipline-specific analysis
+        if (w.type === 'run' || w.type === 'running') {
+          const analyzeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`;
+          await fetch(analyzeUrl, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
+            body: JSON.stringify({ workout_id: w.id }) 
+          });
         }
-        
-        // Wait a moment for database to commit
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Analyze running workout to populate workout_analysis.intervals
-        console.log('[auto-attach-planned] Analyzing running workout');
-        const analyzeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`;
-        const analyzeResponse = await fetch(analyzeUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
-        console.log('[auto-attach-planned] Analyze running workout response status:', analyzeResponse.status);
         
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       } catch (explicitError: any) {

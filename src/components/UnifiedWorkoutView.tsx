@@ -266,15 +266,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         const pid = String(((linkedPlanned as any)?.id || (workout as any)?.planned_id || ''));
         if (!wid) return;
 
-        // Step 1: Run enhanced analysis if needed (single source of truth)
-        const granularAnalysis = (workout as any)?.workout_analysis?.granular_analysis;
-        // Analysis is now handled server-side by auto-attach-planned
-        // which calls compute-workout-summary → analyze-running-workout
-        console.log('🔍 Analysis check:', {
-          hasGranularAnalysis: !!granularAnalysis,
-          hasDurationAdherence: !!granularAnalysis?.duration_adherence,
-          durationPercentage: granularAnalysis?.duration_adherence?.adherence_percentage
-        });
+        // Analysis is handled by auto-attach-planned
+        // (calls compute-workout-summary → analyze-running-workout)
       } catch (error) {
         console.error('Summary tab analysis error:', error);
       }
