@@ -42,7 +42,8 @@ export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysis
       insights: data.insights || [],
       key_metrics: data.key_metrics,
       red_flags: data.red_flags || [],
-      strengths: data.strengths || []
+      strengths: data.strengths || [],
+      detailed_analysis: data.detailed_analysis || null  // NEW: Pass through detailed analysis
     };
     
   } catch (error) {

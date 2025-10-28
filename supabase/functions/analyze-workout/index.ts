@@ -180,7 +180,8 @@ function formatAnalysisResponse(analysisResult: any, workoutType: string) {
           time_outside_range_s: analysisResult.time_outside_range_s
         },
         red_flags: analysisResult.primary_issues || [],
-        strengths: analysisResult.strengths || []
+        strengths: analysisResult.strengths || [],
+        detailed_analysis: analysisResult.detailed_analysis || null  // NEW: Pass through detailed analysis
       };
     } else {
       // No analysis available
