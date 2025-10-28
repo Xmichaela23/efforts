@@ -186,9 +186,12 @@ Deno.serve(async (req) => {
         if (workoutUpdateErr) {
           throw new Error(`Failed to link workout: ${workoutUpdateErr.message}`);
         }
-        console.log('[auto-attach-planned] Workout linked successfully, now calling compute-workout-summary');
+        console.log('[auto-attach-planned] Workout linked, waiting 1s for DB commit...');
         
-        // Regenerate intervals with new planned_id
+        // Wait for database transaction to commit before calling functions
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.log('[auto-attach-planned] Calling compute-workout-summary');
         const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
         const computeResponse = await fetch(fnUrl, { 
