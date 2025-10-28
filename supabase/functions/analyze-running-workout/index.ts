@@ -887,6 +887,10 @@ Deno.serve(async (req) => {
 
     console.log('✅ Performance calculated:', performance);
 
+    // 🚀 ENHANCED DETAILED ANALYSIS - Chart-like insights
+    const detailedAnalysis = generateDetailedChartAnalysis(sensorData, computedIntervals, enhancedAnalysis);
+    console.log('📊 Detailed analysis generated:', JSON.stringify(detailedAnalysis, null, 2));
+
     // Store enhanced intervals back to computed.intervals (single source of truth)
     // Store summary analysis in workout_analysis
     console.log('💾 [TIMING] Starting database update...');
@@ -908,7 +912,8 @@ Deno.serve(async (req) => {
         workout_analysis: {
           ...existingAnalysis,
           granular_analysis: enhancedAnalysis,
-          performance: performance
+          performance: performance,
+          detailed_analysis: detailedAnalysis
         }
       })
       .eq('id', workout_id);
@@ -2815,4 +2820,346 @@ function identifyStrengths(intervalAnalysis: IntervalAnalysis[]): string[] {
   }
   
   return strengths;
+}
+
+/**
+ * Generate detailed, chart-like analysis with specific metrics
+ * Provides actionable insights similar to Garmin Connect analysis
+ */
+function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], granularAnalysis: any): any {
+  console.log('📊 Generating detailed chart analysis...');
+  
+  // Extract work intervals for detailed analysis
+  const workIntervals = intervals.filter(i => i.role === 'work' && i.executed);
+  const recoveryIntervals = intervals.filter(i => i.role === 'recovery' && i.executed);
+  
+  // Speed fluctuation analysis
+  const speedAnalysis = analyzeSpeedFluctuations(sensorData, workIntervals);
+  
+  // Heart rate recovery analysis
+  const hrRecoveryAnalysis = analyzeHeartRateRecovery(sensorData, workIntervals, recoveryIntervals);
+  
+  // Interval-by-interval breakdown
+  const intervalBreakdown = generateIntervalBreakdown(workIntervals);
+  
+  // Pacing consistency analysis
+  const pacingConsistency = analyzePacingConsistency(sensorData, workIntervals);
+  
+  return {
+    speed_fluctuations: speedAnalysis,
+    heart_rate_recovery: hrRecoveryAnalysis,
+    interval_breakdown: intervalBreakdown,
+    pacing_consistency: pacingConsistency,
+    workout_summary: {
+      total_intervals: workIntervals.length,
+      completed_intervals: workIntervals.filter(i => i.executed).length,
+      average_pace_adherence: workIntervals.length > 0 ? 
+        workIntervals.reduce((sum, i) => sum + (i.pace_adherence || 0), 0) / workIntervals.length : 0,
+      pace_variability: granularAnalysis.pacing_analysis?.pacing_variability || 0,
+      hr_drift: granularAnalysis.heart_rate_analysis?.hr_drift_bpm || 0
+    }
+  };
+}
+
+/**
+ * Analyze speed fluctuations throughout the workout
+ */
+function analyzeSpeedFluctuations(sensorData: any[], workIntervals: any[]): any {
+  if (workIntervals.length === 0) {
+    return { available: false, message: 'No work intervals to analyze' };
+  }
+  
+  // Extract pace data from work intervals
+  const paceData = [];
+  let currentTime = 0;
+  
+  for (const interval of workIntervals) {
+    const intervalSamples = sensorData.filter(s => 
+      s.timestamp >= interval.start_time_s && s.timestamp <= interval.end_time_s
+    );
+    
+    for (const sample of intervalSamples) {
+      if (sample.pace_s_per_mi && sample.pace_s_per_mi > 0) {
+        paceData.push({
+          time_s: currentTime + (sample.timestamp - interval.start_time_s),
+          pace_min_per_mi: sample.pace_s_per_mi / 60,
+          interval_type: interval.role
+        });
+      }
+    }
+    currentTime += interval.duration_s;
+  }
+  
+  if (paceData.length === 0) {
+    return { available: false, message: 'No pace data available' };
+  }
+  
+  // Calculate pace statistics
+  const paces = paceData.map(d => d.pace_min_per_mi);
+  const avgPace = paces.reduce((a, b) => a + b, 0) / paces.length;
+  const minPace = Math.min(...paces);
+  const maxPace = Math.max(...paces);
+  const paceRange = maxPace - minPace;
+  
+  // Calculate pace variability (coefficient of variation)
+  const variance = paces.reduce((sum, pace) => sum + Math.pow(pace - avgPace, 2), 0) / paces.length;
+  const stdDev = Math.sqrt(variance);
+  const paceVariability = (stdDev / avgPace) * 100;
+  
+  // Identify pace patterns
+  const patterns = identifyPacePatterns(paceData, workIntervals);
+  
+  return {
+    available: true,
+    average_pace_min_per_mi: Math.round(avgPace * 100) / 100,
+    pace_range_min_per_mi: Math.round(paceRange * 100) / 100,
+    fastest_pace_min_per_mi: Math.round(minPace * 100) / 100,
+    slowest_pace_min_per_mi: Math.round(maxPace * 100) / 100,
+    pace_variability_percent: Math.round(paceVariability * 10) / 10,
+    pace_consistency_score: Math.max(0, 100 - paceVariability), // Higher is better
+    patterns: patterns,
+    data_points: paceData.length
+  };
+}
+
+/**
+ * Analyze heart rate recovery between intervals
+ */
+function analyzeHeartRateRecovery(sensorData: any[], workIntervals: any[], recoveryIntervals: any[]): any {
+  if (workIntervals.length === 0 || recoveryIntervals.length === 0) {
+    return { available: false, message: 'Need both work and recovery intervals for HR analysis' };
+  }
+  
+  const hrRecoveryData = [];
+  
+  // Analyze HR recovery for each work-recovery pair
+  for (let i = 0; i < Math.min(workIntervals.length, recoveryIntervals.length); i++) {
+    const workInterval = workIntervals[i];
+    const recoveryInterval = recoveryIntervals[i];
+    
+    // Get HR at end of work interval
+    const workEndSamples = sensorData.filter(s => 
+      s.timestamp >= workInterval.end_time_s - 10 && s.timestamp <= workInterval.end_time_s
+    );
+    const workEndHR = workEndSamples
+      .filter(s => s.heart_rate && s.heart_rate > 0)
+      .map(s => s.heart_rate);
+    
+    // Get HR at end of recovery interval
+    const recoveryEndSamples = sensorData.filter(s => 
+      s.timestamp >= recoveryInterval.end_time_s - 10 && s.timestamp <= recoveryInterval.end_time_s
+    );
+    const recoveryEndHR = recoveryEndSamples
+      .filter(s => s.heart_rate && s.heart_rate > 0)
+      .map(s => s.heart_rate);
+    
+    if (workEndHR.length > 0 && recoveryEndHR.length > 0) {
+      const avgWorkEndHR = workEndHR.reduce((a, b) => a + b, 0) / workEndHR.length;
+      const avgRecoveryEndHR = recoveryEndHR.reduce((a, b) => a + b, 0) / recoveryEndHR.length;
+      const hrDrop = avgWorkEndHR - avgRecoveryEndHR;
+      
+      hrRecoveryData.push({
+        interval_number: i + 1,
+        work_end_hr: Math.round(avgWorkEndHR),
+        recovery_end_hr: Math.round(avgRecoveryEndHR),
+        hr_drop_bpm: Math.round(hrDrop),
+        recovery_time_s: recoveryInterval.duration_s,
+        recovery_efficiency: hrDrop / recoveryInterval.duration_s // BPM drop per second
+      });
+    }
+  }
+  
+  if (hrRecoveryData.length === 0) {
+    return { available: false, message: 'No heart rate recovery data available' };
+  }
+  
+  // Calculate recovery statistics
+  const avgHRDrop = hrRecoveryData.reduce((sum, d) => sum + d.hr_drop_bpm, 0) / hrRecoveryData.length;
+  const avgRecoveryEfficiency = hrRecoveryData.reduce((sum, d) => sum + d.recovery_efficiency, 0) / hrRecoveryData.length;
+  
+  // Assess recovery quality
+  const recoveryQuality = avgHRDrop > 20 ? 'Excellent' : 
+                         avgHRDrop > 15 ? 'Good' : 
+                         avgHRDrop > 10 ? 'Fair' : 'Poor';
+  
+  return {
+    available: true,
+    average_hr_drop_bpm: Math.round(avgHRDrop),
+    average_recovery_efficiency: Math.round(avgRecoveryEfficiency * 100) / 100,
+    recovery_quality: recoveryQuality,
+    intervals_analyzed: hrRecoveryData.length,
+    recovery_data: hrRecoveryData
+  };
+}
+
+/**
+ * Generate detailed interval-by-interval breakdown
+ */
+function generateIntervalBreakdown(workIntervals: any[]): any {
+  if (workIntervals.length === 0) {
+    return { available: false, message: 'No work intervals to analyze' };
+  }
+  
+  const breakdown = workIntervals.map((interval, index) => {
+    const plannedDuration = interval.planned?.duration_s || 0;
+    const actualDuration = interval.duration_s || 0;
+    const durationAdherence = plannedDuration > 0 ? (actualDuration / plannedDuration) * 100 : 0;
+    
+    // Calculate pace adherence
+    const plannedPace = interval.planned?.target_pace_s_per_mi || 0;
+    const actualPace = interval.executed?.avg_pace_s_per_mi || 0;
+    const paceAdherence = plannedPace > 0 ? Math.max(0, 100 - Math.abs(actualPace - plannedPace) / plannedPace * 100) : 0;
+    
+    // Determine performance grade
+    const overallScore = (durationAdherence + paceAdherence) / 2;
+    const grade = overallScore >= 90 ? 'A' :
+                 overallScore >= 80 ? 'B' :
+                 overallScore >= 70 ? 'C' :
+                 overallScore >= 60 ? 'D' : 'F';
+    
+    return {
+      interval_number: index + 1,
+      planned_duration_s: plannedDuration,
+      actual_duration_s: actualDuration,
+      duration_adherence_percent: Math.round(durationAdherence),
+      planned_pace_min_per_mi: plannedPace > 0 ? Math.round(plannedPace / 60 * 100) / 100 : 0,
+      actual_pace_min_per_mi: actualPace > 0 ? Math.round(actualPace / 60 * 100) / 100 : 0,
+      pace_adherence_percent: Math.round(paceAdherence),
+      overall_grade: grade,
+      performance_score: Math.round(overallScore)
+    };
+  });
+  
+  return {
+    available: true,
+    intervals: breakdown,
+    summary: {
+      average_grade: calculateAverageGrade(breakdown),
+      total_intervals: breakdown.length,
+      excellent_intervals: breakdown.filter(i => i.overall_grade === 'A').length,
+      good_intervals: breakdown.filter(i => i.overall_grade === 'B').length,
+      fair_intervals: breakdown.filter(i => i.overall_grade === 'C').length,
+      poor_intervals: breakdown.filter(i => ['D', 'F'].includes(i.overall_grade)).length
+    }
+  };
+}
+
+/**
+ * Analyze pacing consistency across intervals
+ */
+function analyzePacingConsistency(sensorData: any[], workIntervals: any[]): any {
+  if (workIntervals.length < 2) {
+    return { available: false, message: 'Need at least 2 intervals for consistency analysis' };
+  }
+  
+  // Calculate average pace for each interval
+  const intervalPaces = workIntervals.map(interval => {
+    const intervalSamples = sensorData.filter(s => 
+      s.timestamp >= interval.start_time_s && s.timestamp <= interval.end_time_s
+    );
+    
+    const paces = intervalSamples
+      .filter(s => s.pace_s_per_mi && s.pace_s_per_mi > 0)
+      .map(s => s.pace_s_per_mi / 60); // Convert to min/mi
+    
+    return paces.length > 0 ? paces.reduce((a, b) => a + b, 0) / paces.length : 0;
+  }).filter(pace => pace > 0);
+  
+  if (intervalPaces.length < 2) {
+    return { available: false, message: 'Insufficient pace data for consistency analysis' };
+  }
+  
+  // Calculate consistency metrics
+  const avgPace = intervalPaces.reduce((a, b) => a + b, 0) / intervalPaces.length;
+  const variance = intervalPaces.reduce((sum, pace) => sum + Math.pow(pace - avgPace, 2), 0) / intervalPaces.length;
+  const stdDev = Math.sqrt(variance);
+  const coefficientOfVariation = (stdDev / avgPace) * 100;
+  
+  // Determine consistency level
+  const consistencyLevel = coefficientOfVariation < 2 ? 'Excellent' :
+                          coefficientOfVariation < 4 ? 'Good' :
+                          coefficientOfVariation < 6 ? 'Fair' : 'Poor';
+  
+  return {
+    available: true,
+    average_pace_min_per_mi: Math.round(avgPace * 100) / 100,
+    pace_std_dev_min_per_mi: Math.round(stdDev * 100) / 100,
+    coefficient_of_variation_percent: Math.round(coefficientOfVariation * 10) / 10,
+    consistency_level: consistencyLevel,
+    consistency_score: Math.max(0, 100 - coefficientOfVariation * 10), // Higher is better
+    interval_paces: intervalPaces.map(pace => Math.round(pace * 100) / 100)
+  };
+}
+
+/**
+ * Identify pace patterns (fading, surging, consistent)
+ */
+function identifyPacePatterns(paceData: any[], workIntervals: any[]): any {
+  if (paceData.length === 0 || workIntervals.length < 2) {
+    return { patterns: [], summary: 'Insufficient data for pattern analysis' };
+  }
+  
+  const patterns = [];
+  
+  // Analyze pace trend across intervals
+  const intervalAverages = workIntervals.map(interval => {
+    const intervalSamples = paceData.filter(d => 
+      d.time_s >= interval.start_time_s && d.time_s <= interval.end_time_s
+    );
+    return intervalSamples.length > 0 ? 
+      intervalSamples.reduce((sum, d) => sum + d.pace_min_per_mi, 0) / intervalSamples.length : 0;
+  }).filter(avg => avg > 0);
+  
+  if (intervalAverages.length >= 2) {
+    // Check for fading pattern (getting slower)
+    const firstHalf = intervalAverages.slice(0, Math.floor(intervalAverages.length / 2));
+    const secondHalf = intervalAverages.slice(Math.floor(intervalAverages.length / 2));
+    
+    const firstHalfAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+    const secondHalfAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+    
+    const paceDifference = secondHalfAvg - firstHalfAvg;
+    
+    if (paceDifference > 0.1) {
+      patterns.push({
+        type: 'fading',
+        description: `Pace slowed by ${Math.round(paceDifference * 100) / 100} min/mi in later intervals`,
+        severity: paceDifference > 0.3 ? 'high' : paceDifference > 0.2 ? 'medium' : 'low'
+      });
+    } else if (paceDifference < -0.1) {
+      patterns.push({
+        type: 'surging',
+        description: `Pace improved by ${Math.round(Math.abs(paceDifference) * 100) / 100} min/mi in later intervals`,
+        severity: Math.abs(paceDifference) > 0.3 ? 'high' : Math.abs(paceDifference) > 0.2 ? 'medium' : 'low'
+      });
+    } else {
+      patterns.push({
+        type: 'consistent',
+        description: 'Pace remained consistent throughout workout',
+        severity: 'low'
+      });
+    }
+  }
+  
+  return {
+    patterns: patterns,
+    summary: patterns.length > 0 ? patterns[0].description : 'No clear patterns detected'
+  };
+}
+
+/**
+ * Calculate average grade from interval breakdown
+ */
+function calculateAverageGrade(breakdown: any[]): string {
+  if (breakdown.length === 0) return 'N/A';
+  
+  const gradeValues = { 'A': 4, 'B': 3, 'C': 2, 'D': 1, 'F': 0 };
+  const totalValue = breakdown.reduce((sum, interval) => sum + gradeValues[interval.overall_grade], 0);
+  const averageValue = totalValue / breakdown.length;
+  
+  if (averageValue >= 3.5) return 'A';
+  if (averageValue >= 2.5) return 'B';
+  if (averageValue >= 1.5) return 'C';
+  if (averageValue >= 0.5) return 'D';
+  return 'F';
 }
