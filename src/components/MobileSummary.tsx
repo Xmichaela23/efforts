@@ -1533,10 +1533,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 <div className="text-center">
                   <button
                     onClick={() => onNavigateToContext(completed.id)}
-                    className="text-sm font-medium text-black hover:text-gray-600 transition-colors"
+                    className="text-sm text-black hover:text-gray-600 transition-colors"
                     style={{
                       fontFamily: 'Inter, sans-serif',
-                      fontWeight: 500,
+                      fontWeight: 400,
                       fontSize: '15px',
                       textDecoration: 'none',
                       cursor: 'pointer',
@@ -1545,7 +1545,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                       padding: 0
                     }}
                   >
-                    View in Context →
+                    View context
                   </button>
                 </div>
               )}
@@ -1672,19 +1672,19 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   <div className="text-center">
                     <button
                       onClick={() => onNavigateToContext(completed.id)}
-                      className="text-sm font-medium text-black hover:text-gray-600 transition-colors"
-                      style={{
-                        fontFamily: 'Inter, sans-serif',
-                        fontWeight: 500,
-                        fontSize: '15px',
-                        textDecoration: 'none',
-                        cursor: 'pointer',
-                        background: 'none',
-                        border: 'none',
-                        padding: 0
-                      }}
-                    >
-                      View in Context →
+                    className="text-sm text-black hover:text-gray-600 transition-colors"
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontWeight: 400,
+                      fontSize: '15px',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0
+                    }}
+                  >
+                    View context
                     </button>
                   </div>
                 )}
@@ -1806,19 +1806,19 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   <div className="text-center">
                     <button
                       onClick={() => onNavigateToContext(completed.id)}
-                      className="text-sm font-medium text-black hover:text-gray-600 transition-colors"
-                      style={{
-                        fontFamily: 'Inter, sans-serif',
-                        fontWeight: 500,
-                        fontSize: '15px',
-                        textDecoration: 'none',
-                        cursor: 'pointer',
-                        background: 'none',
-                        border: 'none',
-                        padding: 0
-                      }}
-                    >
-                      View in Context →
+                    className="text-sm text-black hover:text-gray-600 transition-colors"
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontWeight: 400,
+                      fontSize: '15px',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0
+                    }}
+                  >
+                    View context
                     </button>
                   </div>
                 )}
