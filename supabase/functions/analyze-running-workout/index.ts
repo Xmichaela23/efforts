@@ -556,16 +556,15 @@ Deno.serve(async (req) => {
     
     // Calculate performance metrics using computed intervals
     let performance = {
-      execution_adherence: 0,
       pace_adherence: 0,
       duration_adherence: 0,
+      distance_adherence: 0,
       completed_steps: 0,
       total_steps: computedIntervals.length
     };
 
     if (computedIntervals.length > 0) {
       const completedCount = computedIntervals.filter((i: any) => i.executed).length;
-      performance.execution_adherence = (completedCount / computedIntervals.length) * 100;
       performance.completed_steps = completedCount;
       
       // Pace adherence - use time-in-range from granular analysis
@@ -590,9 +589,21 @@ Deno.serve(async (req) => {
       if (withDuration.length > 0) {
         const plannedTotal = withDuration.reduce((sum: number, i: any) => sum + i.duration_s, 0);
         const actualTotal = withDuration.reduce((sum: number, i: any) => sum + i.executed.duration_s, 0);
-        performance.duration_adherence = Math.min(100, (actualTotal / plannedTotal) * 100);
+        performance.duration_adherence = Math.round(Math.min(100, (actualTotal / plannedTotal) * 100));
       } else {
         performance.duration_adherence = 100;
+      }
+      
+      // Distance adherence
+      const withDistance = computedIntervals.filter((i: any) => 
+        i.executed && i.planned && i.planned.distance_m
+      );
+      if (withDistance.length > 0) {
+        const plannedDistTotal = withDistance.reduce((sum: number, i: any) => sum + i.planned.distance_m, 0);
+        const actualDistTotal = withDistance.reduce((sum: number, i: any) => sum + (i.executed.distance_m || 0), 0);
+        performance.distance_adherence = Math.round(Math.min(100, (actualDistTotal / plannedDistTotal) * 100));
+      } else {
+        performance.distance_adherence = 100;
       }
     }
 

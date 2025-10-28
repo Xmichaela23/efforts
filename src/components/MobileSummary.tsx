@@ -1433,54 +1433,24 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           console.log('🔍 [DATA STRUCTURE DEBUG] granularAnalysis:', granularAnalysis);
           
           // Get adherence data from unified source
-          // Priority 1: Read from workout_analysis.performance (API response)
+          // Priority 1: Read from workout_analysis.performance (discipline-specific)
           const performance = (completed as any)?.workout_analysis?.performance;
-          const executionAdherence = performance?.execution_adherence;
           const paceAdherence = performance?.pace_adherence;
-          const durationAdherence = performance?.duration_adherence || granularAnalysis?.duration_adherence;
+          const durationAdherence = performance?.duration_adherence;
+          const distanceAdherence = performance?.distance_adherence;
           const overallAdherence = granularAnalysis?.overall_adherence;
           const performanceAssessment = granularAnalysis?.performance_assessment;
           
-          // Calculate pace and duration adherence from intervals if not available
-          const computedIntervals = completedComputed?.intervals || [];
-          const calculatePaceAdherence = () => {
-            if (paceAdherence) return Math.round(paceAdherence);
-            if (!Array.isArray(computedIntervals) || computedIntervals.length === 0) return 0;
-            
-            // Average adherence of work intervals only
-            const workIntervals = computedIntervals.filter((interval: any) => 
-              interval.role === 'work' && 
-              Number.isFinite(interval.executed?.adherence_percentage)
-            );
-            
-            if (workIntervals.length === 0) return 0;
-            const sum = workIntervals.reduce((acc: number, interval: any) => 
-              acc + Number(interval.executed.adherence_percentage), 0
-            );
-            return Math.round(sum / workIntervals.length);
-          };
-          
-          const calculateDurationAdherence = () => {
-            if (typeof durationAdherence === 'number') return Math.round(durationAdherence);
-            if (durationAdherence?.adherence_percentage) return Math.round(durationAdherence.adherence_percentage);
-            
-            // Calculate from planned vs executed seconds
-            if (plannedSecondsTotal && executedSeconds) {
-              const pct = (executedSeconds / plannedSecondsTotal) * 100;
-              return Math.round(Math.min(pct, 100)); // Cap at 100%
-            }
-            return 0;
-          };
-          
-          // Convert percentages to match expected format with graceful fallbacks
-          // Use API performance data if available, or fallback to computed.overall.execution_score
+          // Priority 2: Read execution_score from computed.overall (generic)
           const computedExecutionScore = Number(compOverall?.execution_score);
-          const finalExecutionScore = executionAdherence ? Math.round(executionAdherence) : 
-            (overallAdherence ? Math.round(overallAdherence * 100) : 
-            (Number.isFinite(computedExecutionScore) && computedExecutionScore > 0 ? Math.round(computedExecutionScore) : 0));
-          const finalPacePct = calculatePaceAdherence();
-          const finalDurationPct = calculateDurationAdherence();
-          const finalDistPct = null; // Distance adherence not available in current analysis
+          
+          // Convert to display format - just read, no calculation!
+          const finalExecutionScore = Number.isFinite(computedExecutionScore) && computedExecutionScore > 0 
+            ? Math.round(computedExecutionScore) 
+            : 0;
+          const finalPacePct = Number.isFinite(paceAdherence) ? Math.round(paceAdherence) : 0;
+          const finalDurationPct = Number.isFinite(durationAdherence) ? Math.round(durationAdherence) : 0;
+          const finalDistPct = Number.isFinite(distanceAdherence) ? Math.round(distanceAdherence) : null;
           
           console.log('🔍 [UNIFIED DEBUG] Using workout_analysis data:', {
             overallAdherence,
