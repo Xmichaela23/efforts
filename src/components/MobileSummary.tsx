@@ -1432,30 +1432,28 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           console.log('🔍 [DATA STRUCTURE DEBUG] workoutAnalysis:', workoutAnalysis);
           console.log('🔍 [DATA STRUCTURE DEBUG] granularAnalysis:', granularAnalysis);
           
-          // Get adherence data from unified source
-          // Priority 1: Read from workout_analysis.performance (discipline-specific)
+          // 🎯 GARMIN-STYLE METRICS (from server)
+          // Read from workout_analysis.performance - all calculated server-side
           const performance = (completed as any)?.workout_analysis?.performance;
           console.log('🎯 [FRONTEND] Reading performance:', performance);
-          const paceAdherence = performance?.pace_adherence;
-          const durationAdherence = performance?.duration_adherence;
-          const distanceAdherence = performance?.distance_adherence;
-          const overallAdherence = granularAnalysis?.overall_adherence;
-          const performanceAssessment = granularAnalysis?.performance_assessment;
-          console.log('🎯 [FRONTEND] Pace:', paceAdherence, 'Duration:', durationAdherence);
           
-          // Priority 2: Read execution_score from computed.overall (generic)
-          const computedExecutionScore = Number(compOverall?.execution_score);
+          // Three Garmin metrics (no calculation, just read!)
+          const executionAdherence = performance?.execution_adherence;  // Duration-weighted all intervals
+          const paceAdherence = performance?.pace_adherence;            // Work intervals only
+          const durationAdherence = performance?.duration_adherence;    // Total time (capped at 100%)
+          
+          const performanceAssessment = granularAnalysis?.performance_assessment;
+          console.log('🎯 [FRONTEND] Execution:', executionAdherence, 'Pace:', paceAdherence, 'Duration:', durationAdherence);
           
           // Convert to display format - just read, no calculation!
-          const finalExecutionScore = Number.isFinite(computedExecutionScore) && computedExecutionScore > 0 
-            ? Math.round(computedExecutionScore) 
-            : 0;
+          const finalExecutionScore = Number.isFinite(executionAdherence) ? Math.round(executionAdherence) : 0;
           const finalPacePct = Number.isFinite(paceAdherence) ? Math.round(paceAdherence) : 0;
           const finalDurationPct = Number.isFinite(durationAdherence) ? Math.round(durationAdherence) : 0;
-          const finalDistPct = Number.isFinite(distanceAdherence) ? Math.round(distanceAdherence) : null;
+          const finalDistPct = null;  // Not used in Garmin formula
           
           console.log('🔍 [UNIFIED DEBUG] Using workout_analysis data:', {
-            overallAdherence,
+            executionAdherence,
+            paceAdherence,
             durationAdherence,
             performanceAssessment,
             finalExecutionScore,
@@ -2134,65 +2132,60 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
             })();
 
             return (
-              <>
-                {/* Target pace range subtitle */}
-                {shouldShowRangeSubtitle && rangeSubtitle && (
-                  <tr key={`subtitle-${idx}`} className="border-b border-gray-50">
-                    <td colSpan={5} className="px-2 py-1">
-                      <div className="text-[11px] text-gray-500 italic">
+              <tr key={idx} className="border-b border-gray-100">
+                <td className="px-2 py-1.5">
+                  <div className="flex items-center justify-between w-full min-h-[2.1rem]">
+                    <span className="text-[13px] font-medium truncate pr-2">{plannedLabel}</span>
+                    {pct != null && (
+                      <div className="flex items-center gap-1">
+                        <span className={`text-[11px] font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
+                        {/* Enhanced analysis indicator */}
+                        {(() => {
+                          const workoutAnalysis = (completed as any)?.workout_analysis;
+                          if (workoutAnalysis?.analysis?.pacing_analysis) {
+                            const pacingAnalysis = workoutAnalysis.analysis.pacing_analysis;
+                            const variability = pacingAnalysis.pacing_variability;
+                            
+                            // Show pacing quality indicator
+                            if (variability.coefficient_of_variation > 10) {
+                              return <span className="text-[9px] text-red-500" title="High pacing variability">⚠️</span>;
+                            } else if (variability.coefficient_of_variation > 7) {
+                              return <span className="text-[9px] text-orange-500" title="Moderate pacing variability">⚠️</span>;
+                            } else if (variability.coefficient_of_variation > 3) {
+                              return <span className="text-[9px] text-yellow-500" title="Good pacing consistency">✓</span>;
+                            } else {
+                              return <span className="text-[9px] text-green-500" title="Excellent pacing consistency">✓</span>;
+                            }
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td className="px-2 py-1.5 font-medium">{execCell}</td>
+                <td className="px-2 py-1.5">{distCell}</td>
+                <td className="px-2 py-1.5">
+                  <div className="flex flex-col">
+                    <div className="font-medium">{timeCell}</div>
+                    {shouldShowRangeSubtitle && rangeSubtitle && (
+                      <div className="text-[10px] text-gray-500 italic mt-0.5">
                         {rangeSubtitle}
                       </div>
-                    </td>
-                  </tr>
-                )}
-                
-                {/* Main interval row */}
-                <tr key={idx} className="border-b border-gray-100">
-                  <td className="px-2 py-1.5">
-                    <div className="flex items-center justify-between w-full min-h-[2.1rem]">
-                      <span className="text-[13px] font-medium truncate pr-2">{plannedLabel}</span>
-                      {pct != null && (
-                        <div className="flex items-center gap-1">
-                          <span className={`text-[11px] font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
-                          {/* Enhanced analysis indicator */}
-                          {(() => {
-                            const workoutAnalysis = (completed as any)?.workout_analysis;
-                            if (workoutAnalysis?.analysis?.pacing_analysis) {
-                              const pacingAnalysis = workoutAnalysis.analysis.pacing_analysis;
-                              const variability = pacingAnalysis.pacing_variability;
-                              
-                              // Show pacing quality indicator
-                              if (variability.coefficient_of_variation > 10) {
-                                return <span className="text-[9px] text-red-500" title="High pacing variability">⚠️</span>;
-                              } else if (variability.coefficient_of_variation > 7) {
-                                return <span className="text-[9px] text-orange-500" title="Moderate pacing variability">⚠️</span>;
-                              } else if (variability.coefficient_of_variation > 3) {
-                                return <span className="text-[9px] text-yellow-500" title="Good pacing consistency">✓</span>;
-                              } else {
-                                return <span className="text-[9px] text-green-500" title="Excellent pacing consistency">✓</span>;
-                              }
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-2 py-1.5 font-medium">{execCell}</td>
-                  <td className="px-2 py-1.5">{distCell}</td>
-                  <td className="px-2 py-1.5">{timeCell}</td>
-                  <td className="px-1 py-1.5 text-[13px]">
-                    <div className="text-right">
-                      {hrVal != null ? (
-                        <>
-                          <div className="font-medium">{hrVal}</div>
-                          <div className="text-[10px] text-gray-500">bpm</div>
-                        </>
-                      ) : '—'}
-                    </div>
-                  </td>
-                </tr>
-              </>
+                    )}
+                  </div>
+                </td>
+                <td className="px-1 py-1.5 text-[13px]">
+                  <div className="text-right">
+                    {hrVal != null ? (
+                      <>
+                        <div className="font-medium">{hrVal}</div>
+                        <div className="text-[10px] text-gray-500">bpm</div>
+                      </>
+                    ) : '—'}
+                  </div>
+                </td>
+              </tr>
             );
           })}
           </tbody>

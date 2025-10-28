@@ -556,11 +556,13 @@ Deno.serve(async (req) => {
     const existingAnalysis = existingWorkout?.workout_analysis || {};
     console.log('🔍 Existing workout_analysis structure:', JSON.stringify(existingAnalysis, null, 2));
     
-    // Calculate performance metrics using computed intervals
+    // 🎯 GARMIN-STYLE PERFORMANCE CALCULATION
+    // Based on reverse-engineered Garmin Connect formula
+    
     let performance = {
-      pace_adherence: 0,
-      duration_adherence: 0,
-      distance_adherence: 0,
+      execution_adherence: 0,  // Overall score (duration-weighted, all intervals)
+      pace_adherence: 0,       // Work intervals only (simple average)
+      duration_adherence: 0,   // Total time adherence (capped at 100%)
       completed_steps: 0,
       total_steps: computedIntervals.length
     };
@@ -569,43 +571,72 @@ Deno.serve(async (req) => {
       const completedCount = computedIntervals.filter((i: any) => i.executed).length;
       performance.completed_steps = completedCount;
       
-      // Pace adherence - use time-in-range from granular analysis
-      const withPaceTarget = computedIntervals.filter((i: any) => 
-        i.executed && i.target_pace && i.granular_metrics
+      // 1️⃣ EXECUTION ADHERENCE (Garmin "Overall Adherence")
+      // Duration-weighted average of ALL intervals (work + recovery + warmup + cooldown)
+      // A bad recovery interval WILL pull down your score!
+      const intervalsWithDuration = computedIntervals.filter((i: any) => 
+        i.executed && i.executed.duration_s > 0 && i.executed.adherence_percentage != null
       );
-      if (withPaceTarget.length > 0) {
-        // Use time_in_target_pct from granular metrics
-        const avgTimeInTarget = withPaceTarget.reduce((sum: number, i: any) => {
-          const pct = i.granular_metrics?.time_in_target_pct || 0;
-          return sum + pct;
-        }, 0) / withPaceTarget.length;
-        performance.pace_adherence = Math.round(avgTimeInTarget);
+      
+      if (intervalsWithDuration.length > 0) {
+        const totalDuration = intervalsWithDuration.reduce((sum: number, i: any) => 
+          sum + i.executed.duration_s, 0
+        );
+        
+        const weightedSum = intervalsWithDuration.reduce((sum: number, i: any) => {
+          const weight = i.executed.duration_s / totalDuration;
+          const adherence = i.executed.adherence_percentage;
+          return sum + (adherence * weight);
+        }, 0);
+        
+        performance.execution_adherence = Math.round(weightedSum);
+        console.log(`🎯 Execution adherence (duration-weighted): ${performance.execution_adherence}%`);
+      } else {
+        performance.execution_adherence = 100;
+      }
+      
+      // 2️⃣ PACE ADHERENCE (Garmin "Pace Adherence")
+      // Simple average of WORK intervals only
+      // Recovery intervals don't count here
+      const workIntervals = computedIntervals.filter((i: any) => 
+        i.executed && 
+        (i.role === 'work' || i.kind === 'work') &&
+        i.executed.adherence_percentage != null
+      );
+      
+      if (workIntervals.length > 0) {
+        const avgPaceAdherence = workIntervals.reduce((sum: number, i: any) => 
+          sum + i.executed.adherence_percentage, 0
+        ) / workIntervals.length;
+        
+        performance.pace_adherence = Math.round(avgPaceAdherence);
+        console.log(`🎯 Pace adherence (work intervals avg): ${performance.pace_adherence}%`);
       } else {
         performance.pace_adherence = 100;
       }
       
-      // Duration adherence
+      // 3️⃣ DURATION ADHERENCE (Garmin "Duration Adherence")
+      // Total planned vs actual time, capped at 100%
+      // Going over time = bad, going under = also bad
       const withDuration = computedIntervals.filter((i: any) => 
-        i.executed && i.duration_s
+        i.executed && i.planned && i.planned.duration_s
       );
+      
       if (withDuration.length > 0) {
-        const plannedTotal = withDuration.reduce((sum: number, i: any) => sum + i.duration_s, 0);
-        const actualTotal = withDuration.reduce((sum: number, i: any) => sum + i.executed.duration_s, 0);
-        performance.duration_adherence = Math.round(Math.min(100, (actualTotal / plannedTotal) * 100));
+        const plannedTotal = withDuration.reduce((sum: number, i: any) => 
+          sum + i.planned.duration_s, 0
+        );
+        const actualTotal = withDuration.reduce((sum: number, i: any) => 
+          sum + i.executed.duration_s, 0
+        );
+        
+        // Cap at 100% - going faster doesn't earn bonus points
+        performance.duration_adherence = Math.round(Math.min(100, 
+          (actualTotal / plannedTotal) * 100
+        ));
+        console.log(`🎯 Duration adherence (capped at 100%): ${performance.duration_adherence}%`);
       } else {
         performance.duration_adherence = 100;
-      }
-      
-      // Distance adherence
-      const withDistance = computedIntervals.filter((i: any) => 
-        i.executed && i.planned && i.planned.distance_m
-      );
-      if (withDistance.length > 0) {
-        const plannedDistTotal = withDistance.reduce((sum: number, i: any) => sum + i.planned.distance_m, 0);
-        const actualDistTotal = withDistance.reduce((sum: number, i: any) => sum + (i.executed.distance_m || 0), 0);
-        performance.distance_adherence = Math.round(Math.min(100, (actualDistTotal / plannedDistTotal) * 100));
-      } else {
-        performance.distance_adherence = 100;
       }
     }
 
@@ -1500,6 +1531,11 @@ function analyzeIntervalPace(samples: any[], interval: any): any {
   
   const adherence = targetPace > 0 ? targetPace / actualPace : 1;
   
+  // 🎯 Garmin-style adherence check (no context-aware fancy logic, just raw percentages)
+  // Simple thresholds - being close to target = good, anything else = bad
+  const lowerThreshold = 0.95;  // 95% - too slow
+  const upperThreshold = 1.05;  // 105% - too fast
+  
   // Calculate granular metrics
   const paceValues = validSamples.map(s => s.pace_s_per_mi);
   const hrValues = samples.filter(s => s.heart_rate && s.heart_rate > 0).map(s => s.heart_rate);
@@ -1530,8 +1566,8 @@ function analyzeIntervalPace(samples: any[], interval: any): any {
   const timeInTarget = (samplesInTarget / paceValues.length) * 100;
   
   return {
-    timeInRange: adherence >= 0.95 && adherence <= 1.05 ? validSamples.length : 0,
-    timeOutsideRange: adherence < 0.95 || adherence > 1.05 ? validSamples.length : 0,
+    timeInRange: adherence >= lowerThreshold && adherence <= upperThreshold ? validSamples.length : 0,
+    timeOutsideRange: adherence < lowerThreshold || adherence > upperThreshold ? validSamples.length : 0,
     totalSamples: validSamples.length,
     filteredOutliers: 0,
     handledGaps: 0,
