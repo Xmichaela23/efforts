@@ -197,6 +197,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         throw new Error(`Not attached: ${(data as any)?.reason || 'unknown reason'}`);
       }
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('workout:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
       onAssociated?.(planned.id);
       onClose();

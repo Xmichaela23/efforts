@@ -74,6 +74,38 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const dateIso = String((workout as any)?.date || '').slice(0,10);
   const { items: unifiedItems = [] } = useWeekUnified(dateIso, dateIso);
   
+  // Listen for workout invalidation events to refresh data
+  useEffect(() => {
+    const handleWorkoutInvalidate = async () => {
+      if (!isCompleted || !workout?.id) return;
+      
+      console.log('🔄 [UnifiedWorkoutView] Refreshing workout data after analysis...');
+      try {
+        // Fetch the updated workout data from the database
+        const { data: refreshedWorkout, error } = await supabase
+          .from('workouts')
+          .select('*')
+          .eq('id', workout.id)
+          .single();
+        
+        if (error) {
+          console.error('❌ Failed to refresh workout data:', error);
+          return;
+        }
+        
+        if (refreshedWorkout) {
+          console.log('✅ [UnifiedWorkoutView] Workout data refreshed, updating state');
+          setUpdatedWorkoutData(refreshedWorkout);
+        }
+      } catch (error) {
+        console.error('❌ Error refreshing workout data:', error);
+      }
+    };
+    
+    window.addEventListener('workout:invalidate', handleWorkoutInvalidate);
+    return () => window.removeEventListener('workout:invalidate', handleWorkoutInvalidate);
+  }, [isCompleted, workout?.id]);
+  
   // For planned workouts, use the same data structure as Today's Efforts
   const unifiedWorkout = (() => {
     if (isCompleted) {

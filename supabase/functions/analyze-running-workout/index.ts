@@ -671,9 +671,34 @@ Deno.serve(async (req) => {
     console.log('✅ [TIMING] Database update completed!');
     
     if (updateError) {
-      console.warn('⚠️ Could not store analysis:', updateError.message);
+      console.error('❌ Database update FAILED:', updateError);
+      console.error('❌ Update payload:', JSON.stringify({
+        computed: minimalComputed,
+        workout_analysis: {
+          ...existingAnalysis,
+          granular_analysis: enhancedAnalysis,
+          performance: performance
+        }
+      }, null, 2));
     } else {
       console.log('✅ Analysis stored successfully in database');
+      console.log('🔍 Stored performance:', JSON.stringify(performance, null, 2));
+      console.log('🔍 Stored granular_analysis keys:', Object.keys(enhancedAnalysis));
+      
+      // Verify the update actually worked by reading it back
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('workouts')
+        .select('workout_analysis')
+        .eq('id', workout_id)
+        .single();
+      
+      if (verifyError) {
+        console.error('❌ Verification read failed:', verifyError);
+      } else {
+        console.log('🔍 Verification - stored workout_analysis:', JSON.stringify(verifyData?.workout_analysis, null, 2));
+        console.log('🔍 Verification - performance exists:', !!verifyData?.workout_analysis?.performance);
+        console.log('🔍 Verification - granular_analysis exists:', !!verifyData?.workout_analysis?.granular_analysis);
+      }
     }
 
     console.log(`✅ Running analysis complete for workout ${workout_id}`);
