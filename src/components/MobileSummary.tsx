@@ -1435,11 +1435,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence }: 
           // Get adherence data from unified source
           // Priority 1: Read from workout_analysis.performance (discipline-specific)
           const performance = (completed as any)?.workout_analysis?.performance;
+          console.log('🎯 [FRONTEND] Reading performance:', performance);
           const paceAdherence = performance?.pace_adherence;
           const durationAdherence = performance?.duration_adherence;
           const distanceAdherence = performance?.distance_adherence;
           const overallAdherence = granularAnalysis?.overall_adherence;
           const performanceAssessment = granularAnalysis?.performance_assessment;
+          console.log('🎯 [FRONTEND] Pace:', paceAdherence, 'Duration:', durationAdherence);
           
           // Priority 2: Read execution_score from computed.overall (generic)
           const computedExecutionScore = Number(compOverall?.execution_score);
