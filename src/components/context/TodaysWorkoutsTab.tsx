@@ -262,12 +262,12 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       
       // Add strengths
       if (analysis.strengths && analysis.strengths.length > 0) {
-        insights.push(...analysis.strengths.map(s => `✅ ${s}`));
+        insights.push(...analysis.strengths);
       }
       
       // Add primary issues
       if (analysis.primary_issues && analysis.primary_issues.length > 0) {
-        insights.push(...analysis.primary_issues.map(i => `⚠️ ${i}`));
+        insights.push(...analysis.primary_issues);
       }
       
       // Add detailed analysis insights if available
@@ -277,28 +277,29 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         // Speed fluctuation insights
         if (detailed.speed_fluctuations?.available) {
           const sf = detailed.speed_fluctuations;
-          insights.push(`📊 Pace Range: ${sf.fastest_pace_min_per_mi}-${sf.slowest_pace_min_per_mi} min/mi (${sf.pace_variability_percent}% variability)`);
+          insights.push(`Pace range: ${sf.fastest_pace_min_per_mi}-${sf.slowest_pace_min_per_mi} min/mi (${sf.pace_variability_percent}% variability)`);
           if (sf.patterns?.summary) {
-            insights.push(`📈 Pattern: ${sf.patterns.summary}`);
+            insights.push(`Pacing pattern: ${sf.patterns.summary}`);
           }
         }
         
         // Heart rate recovery insights
         if (detailed.heart_rate_recovery?.available) {
           const hr = detailed.heart_rate_recovery;
-          insights.push(`💓 HR Recovery: ${hr.average_hr_drop_bpm} bpm drop (${hr.recovery_quality} quality)`);
+          insights.push(`Heart rate recovery: ${hr.average_hr_drop_bpm} bpm drop (${hr.recovery_quality} quality)`);
         }
         
-        // Interval breakdown insights
+        // Interval breakdown insights - percentage based, no letter grades
         if (detailed.interval_breakdown?.available) {
           const ib = detailed.interval_breakdown;
-          insights.push(`🎯 Interval Grades: ${ib.summary.excellent_intervals}A, ${ib.summary.good_intervals}B, ${ib.summary.fair_intervals}C (Avg: ${ib.summary.average_grade})`);
+          const avgScore = ib.intervals.reduce((sum, i) => sum + i.performance_score, 0) / ib.intervals.length;
+          insights.push(`Interval performance: ${Math.round(avgScore)}% average adherence across ${ib.intervals.length} intervals`);
         }
         
         // Pacing consistency insights
         if (detailed.pacing_consistency?.available) {
           const pc = detailed.pacing_consistency;
-          insights.push(`⚡ Consistency: ${pc.consistency_level} (${pc.coefficient_of_variation_percent}% variation)`);
+          insights.push(`Pacing consistency: ${pc.consistency_score}% (${pc.coefficient_of_variation_percent}% variation)`);
         }
       }
     } else if (granularAnalysis.overall_adherence !== undefined) {

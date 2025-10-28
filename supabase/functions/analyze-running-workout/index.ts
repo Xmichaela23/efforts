@@ -3010,12 +3010,8 @@ function generateIntervalBreakdown(workIntervals: any[]): any {
     const actualPace = interval.executed?.avg_pace_s_per_mi || 0;
     const paceAdherence = plannedPace > 0 ? Math.max(0, 100 - Math.abs(actualPace - plannedPace) / plannedPace * 100) : 0;
     
-    // Determine performance grade
+    // Calculate overall performance score (percentage only)
     const overallScore = (durationAdherence + paceAdherence) / 2;
-    const grade = overallScore >= 90 ? 'A' :
-                 overallScore >= 80 ? 'B' :
-                 overallScore >= 70 ? 'C' :
-                 overallScore >= 60 ? 'D' : 'F';
     
     return {
       interval_number: index + 1,
@@ -3025,7 +3021,6 @@ function generateIntervalBreakdown(workIntervals: any[]): any {
       planned_pace_min_per_mi: plannedPace > 0 ? Math.round(plannedPace / 60 * 100) / 100 : 0,
       actual_pace_min_per_mi: actualPace > 0 ? Math.round(actualPace / 60 * 100) / 100 : 0,
       pace_adherence_percent: Math.round(paceAdherence),
-      overall_grade: grade,
       performance_score: Math.round(overallScore)
     };
   });
@@ -3034,12 +3029,12 @@ function generateIntervalBreakdown(workIntervals: any[]): any {
     available: true,
     intervals: breakdown,
     summary: {
-      average_grade: calculateAverageGrade(breakdown),
+      average_performance_score: Math.round(breakdown.reduce((sum, i) => sum + i.performance_score, 0) / breakdown.length),
       total_intervals: breakdown.length,
-      excellent_intervals: breakdown.filter(i => i.overall_grade === 'A').length,
-      good_intervals: breakdown.filter(i => i.overall_grade === 'B').length,
-      fair_intervals: breakdown.filter(i => i.overall_grade === 'C').length,
-      poor_intervals: breakdown.filter(i => ['D', 'F'].includes(i.overall_grade)).length
+      high_performance_intervals: breakdown.filter(i => i.performance_score >= 90).length,
+      good_performance_intervals: breakdown.filter(i => i.performance_score >= 80 && i.performance_score < 90).length,
+      fair_performance_intervals: breakdown.filter(i => i.performance_score >= 70 && i.performance_score < 80).length,
+      poor_performance_intervals: breakdown.filter(i => i.performance_score < 70).length
     }
   };
 }
@@ -3145,21 +3140,4 @@ function identifyPacePatterns(paceData: any[], workIntervals: any[]): any {
     patterns: patterns,
     summary: patterns.length > 0 ? patterns[0].description : 'No clear patterns detected'
   };
-}
-
-/**
- * Calculate average grade from interval breakdown
- */
-function calculateAverageGrade(breakdown: any[]): string {
-  if (breakdown.length === 0) return 'N/A';
-  
-  const gradeValues = { 'A': 4, 'B': 3, 'C': 2, 'D': 1, 'F': 0 };
-  const totalValue = breakdown.reduce((sum, interval) => sum + gradeValues[interval.overall_grade], 0);
-  const averageValue = totalValue / breakdown.length;
-  
-  if (averageValue >= 3.5) return 'A';
-  if (averageValue >= 2.5) return 'B';
-  if (averageValue >= 1.5) return 'C';
-  if (averageValue >= 0.5) return 'D';
-  return 'F';
 }
