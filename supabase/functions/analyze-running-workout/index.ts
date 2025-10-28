@@ -89,6 +89,307 @@ interface EnhancedAdherence {
   samples_outside_range: number;
 }
 
+// Garmin-style execution scoring interfaces
+type SegmentType = 'warmup' | 'cooldown' | 'work_interval' | 'tempo' | 'cruise_interval' | 'recovery_jog' | 'easy_run';
+
+interface SegmentConfig {
+  tolerance: number;
+  weight: number;
+}
+
+interface SegmentPenalty {
+  segment_idx: number;
+  type: SegmentType;
+  adherence: number;
+  deviation: number;
+  tolerance: number;
+  base_penalty: number;
+  direction_penalty: number;
+  total_penalty: number;
+  reason: string;
+}
+
+interface WorkoutExecutionAnalysis {
+  overall_execution: number;
+  pace_execution: number;
+  duration_adherence: number;
+  segment_summary: {
+    work_intervals: {
+      completed: number;
+      total: number;
+      avg_adherence: number;
+      within_tolerance: number;
+    };
+    recovery_jogs: {
+      completed: number;
+      total: number;
+      avg_adherence: number;
+      below_target: number;
+    };
+    warmup: {
+      adherence: number;
+      status: 'good' | 'acceptable' | 'poor';
+    };
+    cooldown: {
+      adherence: number;
+      duration_pct: number;
+      status: 'good' | 'acceptable' | 'poor';
+    };
+  };
+  penalties: {
+    total: number;
+    by_segment: SegmentPenalty[];
+  };
+}
+
+// Garmin-style execution scoring configuration
+const SEGMENT_CONFIG: Record<SegmentType, SegmentConfig> = {
+  warmup: { tolerance: 10, weight: 0.5 },
+  cooldown: { tolerance: 10, weight: 0.3 },
+  work_interval: { tolerance: 5, weight: 1.0 },
+  tempo: { tolerance: 4, weight: 1.0 },
+  cruise_interval: { tolerance: 5, weight: 0.9 },
+  recovery_jog: { tolerance: 15, weight: 0.7 },
+  easy_run: { tolerance: 8, weight: 0.6 }
+};
+
+/**
+ * Infer segment type from interval data and planned step
+ */
+function inferSegmentType(segment: any, plannedStep: any): SegmentType {
+  const role = segment.role;
+  const token = plannedStep?.token || '';
+  
+  if (role === 'warmup') return 'warmup';
+  if (role === 'cooldown') return 'cooldown';
+  if (role === 'recovery') return 'recovery_jog';
+  
+  if (role === 'work') {
+    // Distinguish interval vs tempo vs cruise based on token patterns
+    if (token.includes('interval_')) {
+      return 'work_interval'; // Short, high intensity
+    }
+    if (token.includes('tempo_')) {
+      return 'tempo'; // Sustained threshold effort
+    }
+    if (token.includes('cruise_')) {
+      return 'cruise_interval'; // Between interval and tempo
+    }
+    
+    // Fallback: infer from duration
+    const durationMin = segment.executed?.duration_s ? segment.executed.duration_s / 60 : 0;
+    if (durationMin <= 8) {
+      return 'work_interval'; // Short = interval
+    } else {
+      return 'tempo'; // Long = tempo
+    }
+  }
+  
+  return 'easy_run'; // Default fallback
+}
+
+/**
+ * Calculate directional penalty for wrong stimulus direction
+ */
+function getDirectionalPenalty(segment: any, adherence: number): number {
+  const type = segment.type;
+  
+  // Too slow on work = missed training stimulus
+  if (['work_interval', 'tempo', 'cruise_interval'].includes(type)) {
+    if (adherence < 95) return 5;  // Significantly too slow
+    if (adherence > 110) return 3; // Significantly too fast
+  }
+  
+  // Too slow on recovery = poor execution/fatigue
+  if (type === 'recovery_jog') {
+    if (adherence < 85) return 3; // Way too slow (walking)
+    if (adherence > 110) return 2; // Too fast (not recovering)
+  }
+  
+  // Too slow on easy runs = okay, too fast = not easy enough
+  if (type === 'easy_run') {
+    if (adherence > 115) return 2; // Way too fast for easy
+  }
+  
+  return 0; // No directional penalty
+}
+
+/**
+ * Calculate penalty for a single segment
+ */
+function calculateSegmentPenalty(segment: any, config: SegmentConfig, segmentIdx: number): SegmentPenalty {
+  const adherence = segment.executed?.adherence_percentage || 100;
+  const { tolerance, weight } = config;
+  
+  // Absolute deviation from target
+  const deviation = Math.abs(adherence - 100);
+  
+  // Within tolerance = no penalty
+  if (deviation <= tolerance) {
+    return {
+      segment_idx: segmentIdx,
+      type: segment.type,
+      adherence,
+      deviation,
+      tolerance,
+      base_penalty: 0,
+      direction_penalty: 0,
+      total_penalty: 0,
+      reason: `Within ${tolerance}% tolerance`
+    };
+  }
+  
+  // Base penalty for excess deviation
+  const excessDeviation = deviation - tolerance;
+  const basePenalty = excessDeviation * weight;
+  
+  // Directional penalty for wrong stimulus
+  const directionPenalty = getDirectionalPenalty(segment, adherence);
+  
+  const totalPenalty = basePenalty + directionPenalty;
+  
+  return {
+    segment_idx: segmentIdx,
+    type: segment.type,
+    adherence,
+    deviation,
+    tolerance,
+    base_penalty: basePenalty,
+    direction_penalty: directionPenalty,
+    total_penalty: totalPenalty,
+    reason: generatePenaltyReason(segment, adherence, config, excessDeviation, directionPenalty)
+  };
+}
+
+/**
+ * Generate human-readable penalty reason
+ */
+function generatePenaltyReason(segment: any, adherence: number, config: SegmentConfig, excessDeviation: number, directionPenalty: number): string {
+  const type = segment.type;
+  const plannedLabel = segment.planned_label || `Segment ${segment.segment_idx + 1}`;
+  
+  let reason = `${plannedLabel}: ${adherence}% adherence (${excessDeviation.toFixed(1)}% beyond ${config.tolerance}% tolerance)`;
+  
+  if (directionPenalty > 0) {
+    if (adherence < 95 && ['work_interval', 'tempo', 'cruise_interval'].includes(type)) {
+      reason += ' + too slow penalty';
+    } else if (adherence > 110 && ['work_interval', 'tempo', 'cruise_interval'].includes(type)) {
+      reason += ' + too fast penalty';
+    } else if (adherence < 85 && type === 'recovery_jog') {
+      reason += ' + poor recovery penalty';
+    } else if (adherence > 110 && type === 'recovery_jog') {
+      reason += ' + not recovering penalty';
+    }
+  }
+  
+  return reason;
+}
+
+/**
+ * Calculate Garmin-style execution score using penalty-based system
+ */
+function calculateGarminExecutionScore(segments: any[], plannedWorkout: any): WorkoutExecutionAnalysis {
+  console.log('🏃‍♂️ Calculating Garmin-style execution score for', segments.length, 'segments');
+  
+  const penalties: SegmentPenalty[] = [];
+  let totalPenalty = 0;
+  
+  // Add segment type inference to each segment
+  const segmentsWithTypes = segments.map((segment, idx) => {
+    const plannedStep = plannedWorkout?.computed?.steps?.[idx] || {};
+    const segmentType = inferSegmentType(segment, plannedStep);
+    return {
+      ...segment,
+      type: segmentType,
+      segment_idx: idx
+    };
+  });
+  
+  // Calculate penalties for each segment
+  segmentsWithTypes.forEach((segment, idx) => {
+    const config = SEGMENT_CONFIG[segment.type];
+    const penalty = calculateSegmentPenalty(segment, config, idx);
+    
+    if (penalty.total_penalty > 0) {
+      penalties.push(penalty);
+      totalPenalty += penalty.total_penalty;
+      console.log(`⚠️ Penalty for ${segment.planned_label || `Segment ${idx + 1}`}: ${penalty.total_penalty.toFixed(1)} (${penalty.reason})`);
+    }
+  });
+  
+  // Execution score: 100 minus penalties, floor at 0
+  const executionScore = Math.max(0, Math.round(100 - totalPenalty));
+  
+  // Calculate duration adherence (keep existing logic)
+  const withDuration = segments.filter((i: any) => 
+    i.executed && i.planned && i.planned.duration_s
+  );
+  
+  let durationAdherence = 100;
+  if (withDuration.length > 0) {
+    const plannedTotal = withDuration.reduce((sum: number, i: any) => 
+      sum + i.planned.duration_s, 0
+    );
+    const actualTotal = withDuration.reduce((sum: number, i: any) => 
+      sum + i.executed.duration_s, 0
+    );
+    
+    durationAdherence = Math.round(Math.min(100, (actualTotal / plannedTotal) * 100));
+  }
+  
+  // Generate segment summaries
+  const workIntervals = segmentsWithTypes.filter(s => s.type === 'work_interval');
+  const recoveryJogs = segmentsWithTypes.filter(s => s.type === 'recovery_jog');
+  const warmup = segmentsWithTypes.find(s => s.type === 'warmup');
+  const cooldown = segmentsWithTypes.find(s => s.type === 'cooldown');
+  
+  const segmentSummary = {
+    work_intervals: {
+      completed: workIntervals.filter(s => s.executed).length,
+      total: workIntervals.length,
+      avg_adherence: workIntervals.length > 0 ? 
+        Math.round(workIntervals.reduce((sum, s) => sum + (s.executed?.adherence_percentage || 100), 0) / workIntervals.length) : 100,
+      within_tolerance: workIntervals.filter(s => {
+        const adherence = s.executed?.adherence_percentage || 100;
+        const deviation = Math.abs(adherence - 100);
+        return deviation <= SEGMENT_CONFIG.work_interval.tolerance;
+      }).length
+    },
+    recovery_jogs: {
+      completed: recoveryJogs.filter(s => s.executed).length,
+      total: recoveryJogs.length,
+      avg_adherence: recoveryJogs.length > 0 ? 
+        Math.round(recoveryJogs.reduce((sum, s) => sum + (s.executed?.adherence_percentage || 100), 0) / recoveryJogs.length) : 100,
+      below_target: recoveryJogs.filter(s => {
+        const adherence = s.executed?.adherence_percentage || 100;
+        return adherence < 85; // Significantly below target
+      }).length
+    },
+    warmup: {
+      adherence: warmup?.executed?.adherence_percentage || 100,
+      status: (warmup && warmup.executed?.adherence_percentage > 90 && warmup.executed?.adherence_percentage < 110 ? 'good' : 'acceptable') as 'good' | 'acceptable' | 'poor'
+    },
+    cooldown: {
+      adherence: cooldown?.executed?.adherence_percentage || 100,
+      duration_pct: cooldown ? (cooldown.executed?.duration_s / cooldown.planned?.duration_s) * 100 : 100,
+      status: (cooldown && cooldown.executed?.adherence_percentage > 90 && cooldown.executed?.adherence_percentage < 110 ? 'good' : 'acceptable') as 'good' | 'acceptable' | 'poor'
+    }
+  };
+  
+  console.log(`✅ Garmin execution analysis complete: ${executionScore}% execution, ${penalties.length} penalties`);
+  
+  return {
+    overall_execution: executionScore,
+    pace_execution: executionScore, // Same as overall since pace is main factor
+    duration_adherence: durationAdherence,
+    segment_summary: segmentSummary,
+    penalties: {
+      total: totalPenalty,
+      by_segment: penalties
+    }
+  };
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -557,11 +858,11 @@ Deno.serve(async (req) => {
     console.log('🔍 Existing workout_analysis structure:', JSON.stringify(existingAnalysis, null, 2));
     
     // 🎯 GARMIN-STYLE PERFORMANCE CALCULATION
-    // Based on reverse-engineered Garmin Connect formula
+    // Penalty-based execution scoring (honest assessment of workout compliance)
     
     let performance = {
-      execution_adherence: 0,  // Overall score (duration-weighted, all intervals)
-      pace_adherence: 0,       // Work intervals only (simple average)
+      execution_adherence: 0,  // Overall score (100 - penalties)
+      pace_adherence: 0,       // Same as overall (pace is main factor)
       duration_adherence: 0,   // Total time adherence (capped at 100%)
       completed_steps: 0,
       total_steps: computedIntervals.length
@@ -571,73 +872,17 @@ Deno.serve(async (req) => {
       const completedCount = computedIntervals.filter((i: any) => i.executed).length;
       performance.completed_steps = completedCount;
       
-      // 1️⃣ EXECUTION ADHERENCE (Garmin "Overall Adherence")
-      // Duration-weighted average of ALL intervals (work + recovery + warmup + cooldown)
-      // A bad recovery interval WILL pull down your score!
-      const intervalsWithDuration = computedIntervals.filter((i: any) => 
-        i.executed && i.executed.duration_s > 0 && i.executed.adherence_percentage != null
-      );
+      // Calculate Garmin-style execution score using penalty system
+      const executionAnalysis = calculateGarminExecutionScore(computedIntervals, plannedWorkout);
       
-      if (intervalsWithDuration.length > 0) {
-        const totalDuration = intervalsWithDuration.reduce((sum: number, i: any) => 
-          sum + i.executed.duration_s, 0
-        );
-        
-        const weightedSum = intervalsWithDuration.reduce((sum: number, i: any) => {
-          const weight = i.executed.duration_s / totalDuration;
-          const adherence = i.executed.adherence_percentage;
-          return sum + (adherence * weight);
-        }, 0);
-        
-        performance.execution_adherence = Math.round(weightedSum);
-        console.log(`🎯 Execution adherence (duration-weighted): ${performance.execution_adherence}%`);
-      } else {
-        performance.execution_adherence = 100;
-      }
+      performance.execution_adherence = executionAnalysis.overall_execution;
+      performance.pace_adherence = executionAnalysis.pace_execution;
+      performance.duration_adherence = executionAnalysis.duration_adherence;
       
-      // 2️⃣ PACE ADHERENCE (Garmin "Pace Adherence")
-      // Simple average of WORK intervals only
-      // Recovery intervals don't count here
-      const workIntervals = computedIntervals.filter((i: any) => 
-        i.executed && 
-        (i.role === 'work' || i.kind === 'work') &&
-        i.executed.adherence_percentage != null
-      );
-      
-      if (workIntervals.length > 0) {
-        const avgPaceAdherence = workIntervals.reduce((sum: number, i: any) => 
-          sum + i.executed.adherence_percentage, 0
-        ) / workIntervals.length;
-        
-        performance.pace_adherence = Math.round(avgPaceAdherence);
-        console.log(`🎯 Pace adherence (work intervals avg): ${performance.pace_adherence}%`);
-      } else {
-        performance.pace_adherence = 100;
-      }
-      
-      // 3️⃣ DURATION ADHERENCE (Garmin "Duration Adherence")
-      // Total planned vs actual time, capped at 100%
-      // Going over time = bad, going under = also bad
-      const withDuration = computedIntervals.filter((i: any) => 
-        i.executed && i.planned && i.planned.duration_s
-      );
-      
-      if (withDuration.length > 0) {
-        const plannedTotal = withDuration.reduce((sum: number, i: any) => 
-          sum + i.planned.duration_s, 0
-        );
-        const actualTotal = withDuration.reduce((sum: number, i: any) => 
-          sum + i.executed.duration_s, 0
-        );
-        
-        // Cap at 100% - going faster doesn't earn bonus points
-        performance.duration_adherence = Math.round(Math.min(100, 
-          (actualTotal / plannedTotal) * 100
-        ));
-        console.log(`🎯 Duration adherence (capped at 100%): ${performance.duration_adherence}%`);
-      } else {
-        performance.duration_adherence = 100;
-      }
+      console.log(`🎯 Garmin execution score: ${performance.execution_adherence}% (was duration-weighted average)`);
+      console.log(`🎯 Pace execution: ${performance.pace_adherence}%`);
+      console.log(`🎯 Duration adherence: ${performance.duration_adherence}%`);
+      console.log(`🎯 Total penalties: ${executionAnalysis.penalties.total.toFixed(1)}`);
     }
 
     console.log('✅ Performance calculated:', performance);
