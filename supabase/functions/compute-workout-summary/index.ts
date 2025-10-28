@@ -612,7 +612,7 @@ Deno.serve(async (req) => {
     // Load workout + planned link
     const { data: w, error: workoutError } = await supabase
       .from('workouts')
-      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power,average_watts')
+      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power')
       .eq('id', workout_id)
       .maybeSingle();
     try { 
