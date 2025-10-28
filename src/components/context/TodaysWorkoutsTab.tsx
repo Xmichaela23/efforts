@@ -248,6 +248,9 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
 
     const analysis = workoutWithAnalysis.workout_analysis;
     console.log('🔍 Analysis data structure:', JSON.stringify(analysis, null, 2));
+    console.log('🔍 Detailed analysis available:', !!analysis.detailed_analysis);
+    console.log('🔍 Strengths available:', !!analysis.strengths);
+    console.log('🔍 Primary issues available:', !!analysis.primary_issues);
     
     // Handle both old and new analysis data structures for insights
     let insights = analysis.insights || (analysis.workout_analysis && analysis.workout_analysis.insights) || [];
@@ -258,6 +261,9 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     // Handle the new analysis structure with strengths and primary_issues
     if (analysis.strengths || analysis.primary_issues) {
       console.log('🔄 Converting new analysis structure to insights format');
+      console.log('🔄 Strengths:', analysis.strengths);
+      console.log('🔄 Primary issues:', analysis.primary_issues);
+      console.log('🔄 Detailed analysis:', analysis.detailed_analysis);
       insights = [];
       
       // Add strengths
