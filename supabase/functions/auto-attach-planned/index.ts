@@ -186,24 +186,28 @@ Deno.serve(async (req) => {
         if (workoutUpdateErr) {
           throw new Error(`Failed to link workout: ${workoutUpdateErr.message}`);
         }
+        console.log('[auto-attach-planned] Workout linked successfully, now calling compute-workout-summary');
         
         // Regenerate intervals with new planned_id
         const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-        await fetch(fnUrl, { 
+        const computeResponse = await fetch(fnUrl, { 
           method: 'POST', 
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
           body: JSON.stringify({ workout_id: w.id }) 
         });
+        console.log('[auto-attach-planned] compute-workout-summary status:', computeResponse.status);
         
         // Run discipline-specific analysis
         if (w.type === 'run' || w.type === 'running') {
+          console.log('[auto-attach-planned] Calling analyze-running-workout');
           const analyzeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`;
-          await fetch(analyzeUrl, { 
+          const analyzeResponse = await fetch(analyzeUrl, { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
             body: JSON.stringify({ workout_id: w.id }) 
           });
+          console.log('[auto-attach-planned] analyze-running-workout status:', analyzeResponse.status);
         }
         
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
