@@ -202,8 +202,22 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         
         // Handle both old and new analysis data structures
         const insights = analysis.insights || (analysis.workout_analysis && analysis.workout_analysis.insights);
-        const hasInsights = insights && insights.length > 0;
-        console.log('🔍 Analysis insights check:', { insights, hasInsights });
+        
+        // NEW: Handle granular analysis structure (strengths + primary_issues)
+        const granularInsights = [];
+        if (analysis.strengths && analysis.strengths.length > 0) {
+          granularInsights.push(...analysis.strengths.map(s => `✅ ${s}`));
+        }
+        if (analysis.primary_issues && analysis.primary_issues.length > 0) {
+          granularInsights.push(...analysis.primary_issues.map(i => `⚠️ ${i}`));
+        }
+        
+        const hasInsights = (insights && insights.length > 0) || granularInsights.length > 0;
+        console.log('🔍 Analysis insights check:', { 
+          oldInsights: insights, 
+          granularInsights, 
+          hasInsights 
+        });
         return hasInsights;
       }) || recentWorkouts.find(workout => workout.workout_analysis); // Fallback to any analysis
       console.log('🎯 Fallback to most recent with analysis');
@@ -240,7 +254,22 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     
     // Convert new granular analysis format to insights format
     const granularAnalysis = analysis.granular_analysis || analysis.analysis || analysis;
-    if (granularAnalysis.overall_adherence !== undefined) {
+    
+    // Handle the new analysis structure with strengths and primary_issues
+    if (analysis.strengths || analysis.primary_issues) {
+      console.log('🔄 Converting new analysis structure to insights format');
+      insights = [];
+      
+      // Add strengths
+      if (analysis.strengths && analysis.strengths.length > 0) {
+        insights.push(...analysis.strengths.map(s => `✅ ${s}`));
+      }
+      
+      // Add primary issues
+      if (analysis.primary_issues && analysis.primary_issues.length > 0) {
+        insights.push(...analysis.primary_issues.map(i => `⚠️ ${i}`));
+      }
+    } else if (granularAnalysis.overall_adherence !== undefined) {
       console.log('🔄 Converting granular analysis to insights format');
       insights = [];
       
