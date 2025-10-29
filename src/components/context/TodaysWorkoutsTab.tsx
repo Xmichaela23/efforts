@@ -21,11 +21,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
   const today = new Date().toLocaleDateString('en-CA');
   const { items: todayItems = [], loading: todayLoading } = useWeekUnified(today, today);
 
-  // SIMPLIFIED: Clean analysis function with routing
+  // SIMPLIFIED: Only analyze if no existing analysis
   const analyzeWorkout = async (workoutId: string) => {
     // Prevent multiple calls
     if (analyzingRef.current.has(workoutId)) {
       console.log(`Already analyzing workout: ${workoutId}`);
+      return;
+    }
+    
+    // Check if analysis already exists
+    const targetWorkout = recentWorkouts.find(w => w.id === workoutId);
+    if (targetWorkout?.workout_analysis) {
+      console.log(`✅ Analysis already exists for workout ${workoutId}, just selecting it`);
+      setSelectedWorkoutId(workoutId);
       return;
     }
     
@@ -36,7 +44,6 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       console.log(`🚀 ROUTED ANALYSIS: ${workoutId}`);
       
       // Debug: Check what workout data we're sending
-      const targetWorkout = recentWorkouts.find(w => w.id === workoutId);
       console.log(`🔍 CLIENT DEBUG: Target workout:`, {
         id: targetWorkout?.id,
         type: targetWorkout?.type,
@@ -81,25 +88,13 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       if (targetWorkout) {
         setSelectedWorkoutId(focusWorkoutId);
         
-        // Smart analysis: only re-analyze if missing detailed analysis or outdated version
+        // Only analyze if no analysis exists at all
         const analysis = targetWorkout.workout_analysis;
-        const needsAnalysis = !analysis || 
-                             !analysis.detailed_analysis || 
-                             analysis.analysis_version !== 'v1.0.0';
-        
-        if (needsAnalysis) {
-          console.log('🔄 Analysis needed for focus workout:', {
-            workoutId: focusWorkoutId,
-            hasAnalysis: !!analysis,
-            hasDetailedAnalysis: !!analysis?.detailed_analysis,
-            analysisVersion: analysis?.analysis_version,
-            reason: !analysis ? 'no analysis' : 
-                   !analysis.detailed_analysis ? 'missing detailed analysis' : 
-                   'outdated version'
-          });
+        if (!analysis) {
+          console.log('🔄 No analysis found for focus workout, analyzing:', focusWorkoutId);
           analyzeWorkout(focusWorkoutId);
         } else {
-          console.log('✅ Analysis up to date for focus workout:', focusWorkoutId);
+          console.log('✅ Analysis exists for focus workout, using existing:', focusWorkoutId);
         }
       }
     }
@@ -618,22 +613,13 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 }`}
                 onClick={() => {
                   if (analyzingWorkout !== workout.id) {
-                    // Smart analysis: only re-analyze if needed
+                    // Only analyze if no analysis exists
                     const analysis = workout.workout_analysis;
-                    const needsAnalysis = !analysis || 
-                                         !analysis.detailed_analysis || 
-                                         analysis.analysis_version !== 'v1.0.0';
-                    
-                    if (needsAnalysis) {
-                      console.log('🔄 Manual analysis needed for workout:', {
-                        workoutId: workout.id,
-                        hasAnalysis: !!analysis,
-                        hasDetailedAnalysis: !!analysis?.detailed_analysis,
-                        analysisVersion: analysis?.analysis_version
-                      });
+                    if (!analysis) {
+                      console.log('🔄 No analysis found, analyzing workout:', workout.id);
                       analyzeWorkout(workout.id);
                     } else {
-                      console.log('✅ Analysis up to date, selecting workout:', workout.id);
+                      console.log('✅ Analysis exists, selecting workout:', workout.id);
                       setSelectedWorkoutId(workout.id);
                     }
                   }
