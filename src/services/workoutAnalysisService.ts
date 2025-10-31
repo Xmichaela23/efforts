@@ -18,15 +18,16 @@ export interface WorkoutAnalysisResult {
 }
 
 /**
- * DUMB CLIENT: Analyzes a workout by calling the master orchestrator
- * All logic (routing, orchestration, formatting) happens server-side
+ * DUMB CLIENT: Analyzes a workout by calling discipline-specific functions directly
+ * Client knows workout type and routes to appropriate analyzer
  */
-export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysisResult> {
+export async function analyzeWorkout(workoutId: string, workoutType: string): Promise<WorkoutAnalysisResult> {
   try {
-    console.log(`🎯 DUMB CLIENT: Calling analyze-workout for workout ${workoutId}`);
+    const functionName = getAnalysisFunction(workoutType);
+    console.log(`🎯 DUMB CLIENT: Calling ${functionName} for workout ${workoutId} (type: ${workoutType})`);
     
-    // Call the master orchestrator that routes to appropriate analyzers
-    const { data, error } = await supabase.functions.invoke('analyze-workout', {
+    // Call discipline-specific function directly
+    const { data, error } = await supabase.functions.invoke(functionName, {
       body: { workout_id: workoutId }
     });
     
@@ -34,7 +35,7 @@ export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysis
       throw new Error(`Analysis error: ${error.message}`);
     }
     
-    // Extract the analysis results from the orchestrator response
+    // Extract the analysis results from the discipline function response
     return {
       success: true,
       analysis: data.analysis,
@@ -43,7 +44,7 @@ export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysis
       key_metrics: data.key_metrics,
       red_flags: data.red_flags || [],
       strengths: data.strengths || [],
-      detailed_analysis: data.detailed_analysis || null  // NEW: Pass through detailed analysis
+      detailed_analysis: data.detailed_analysis || null
     };
     
   } catch (error) {
@@ -53,29 +54,56 @@ export async function analyzeWorkout(workoutId: string): Promise<WorkoutAnalysis
 }
 
 /**
+ * Get the appropriate analysis function name based on workout type
+ */
+function getAnalysisFunction(type: string): string {
+  switch (type.toLowerCase()) {
+    case 'run':
+    case 'running': 
+      return 'analyze-running-workout';
+    case 'strength':
+    case 'strength_training': 
+      return 'analyze-strength-workout';
+    case 'ride':
+    case 'cycling':
+    case 'bike': 
+      return 'analyze-cycling-workout';
+    case 'swim':
+    case 'swimming': 
+      return 'analyze-swimming-workout';
+    default: 
+      throw new Error(`No analyzer available for workout type: ${type}`);
+  }
+}
+
+/**
  * DUMB CLIENT: Analyzes a workout with retry logic
- * Still just calls the master orchestrator
+ * Calls discipline-specific functions directly
  */
 export async function analyzeWorkoutWithRetry(
   workoutId: string, 
+  workoutType: string,
   maxRetries: number = 2
 ): Promise<WorkoutAnalysisResult> {
   let lastError: Error | null = null;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await analyzeWorkout(workoutId);
+      console.log(`🔄 Analysis attempt ${attempt}/${maxRetries} for workout ${workoutId} (type: ${workoutType})`);
+      return await analyzeWorkout(workoutId, workoutType);
     } catch (error) {
       lastError = error as Error;
-      console.warn(`Analysis attempt ${attempt} failed:`, error);
+      console.warn(`⚠️ Analysis attempt ${attempt} failed:`, error);
       
       if (attempt < maxRetries) {
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s
+        console.log(`⏳ Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
   
+  console.error(`❌ All ${maxRetries} analysis attempts failed for workout ${workoutId}`);
   throw lastError || new Error('Analysis failed after all retries');
 }
 

@@ -428,6 +428,19 @@ Deno.serve(async (req) => {
     console.log('🆕 NEW VERSION: Checking time_series_data and garmin_data for pace data');
     console.log('🔍 [MAIN DEBUG] Starting analysis for workout:', workout_id);
 
+    // Set analysis status to 'analyzing' at start
+    const { error: statusError } = await supabase
+      .from('workouts')
+      .update({ 
+        analysis_status: 'analyzing',
+        analysis_error: null 
+      })
+      .eq('id', workout_id);
+
+    if (statusError) {
+      console.warn('⚠️ Failed to set analyzing status:', statusError.message);
+    }
+
     // Get workout data
     const { data: workout, error: workoutError } = await supabase
       .from('workouts')
@@ -915,7 +928,20 @@ Deno.serve(async (req) => {
       planned_steps_light: workout.computed?.planned_steps_light || null
     };
     
-    // Single update with both computed and workout_analysis
+    // Create analysis_v2 with version metadata
+    const analysisV2 = {
+      _meta: {
+        version: "2.0",
+        source: "analyze-running-workout",
+        generated_at: new Date().toISOString(),
+        generator_version: "2.0.1"
+      },
+      granular_analysis: enhancedAnalysis,
+      performance: performance,
+      detailed_analysis: detailedAnalysis
+    };
+
+    // Single update with computed, workout_analysis, and status
     const { error: updateError } = await supabase
       .from('workouts')
       .update({
@@ -925,7 +951,9 @@ Deno.serve(async (req) => {
           granular_analysis: enhancedAnalysis,
           performance: performance,
           detailed_analysis: detailedAnalysis
-        }
+        },
+        analysis_status: 'complete',
+        analyzed_at: new Date().toISOString()
       })
       .eq('id', workout_id);
 
@@ -970,7 +998,8 @@ Deno.serve(async (req) => {
       success: true,
       analysis: enhancedAnalysis,
       intervals: computedIntervals,
-      performance: performance
+      performance: performance,
+      detailed_analysis: detailedAnalysis  // Include in response to avoid extra DB reload
     }), {
       status: 200,
       headers: {
@@ -983,6 +1012,20 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Analyze running workout error:', error);
+    
+    // Set analysis status to 'failed' and capture error message
+    try {
+      await supabase
+        .from('workouts')
+        .update({ 
+          analysis_status: 'failed',
+          analysis_error: error.message || 'Internal server error'
+        })
+        .eq('id', workout_id);
+    } catch (statusError) {
+      console.error('❌ Failed to set error status:', statusError);
+    }
+    
     return new Response(JSON.stringify({
       error: error.message || 'Internal server error'
     }), {

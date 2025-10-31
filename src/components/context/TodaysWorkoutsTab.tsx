@@ -14,12 +14,108 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
   const [loading, setLoading] = useState(true);
   const [analyzingWorkout, setAnalyzingWorkout] = useState<string | null>(null);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const analyzingRef = useRef<Set<string>>(new Set());
+  const pollingRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Use unified API instead of direct table queries
   // Use user's local timezone for date calculations
   const today = new Date().toLocaleDateString('en-CA');
   const { items: todayItems = [], loading: todayLoading } = useWeekUnified(today, today);
+
+  // Polling function with exponential backoff
+  const pollAnalysisStatus = async (workoutId: string, attempt: number = 1): Promise<void> => {
+    const maxAttempts = 8;
+    const baseDelay = 500; // Start with 500ms
+    const maxDelay = 5000; // Cap at 5 seconds
+    
+    if (attempt > maxAttempts) {
+      console.error(`❌ Polling timeout after ${maxAttempts} attempts for workout ${workoutId}`);
+      setAnalysisError('Analysis timed out. Please try again.');
+      analyzingRef.current.delete(workoutId);
+      setAnalyzingWorkout(null);
+      return;
+    }
+
+    try {
+      const { data: workout, error } = await supabase
+        .from('workouts')
+        .select('analysis_status, analysis_error, workout_analysis')
+        .eq('id', workoutId)
+        .single();
+
+      if (error) {
+        console.error('❌ Failed to poll analysis status:', error);
+        setAnalysisError('Failed to check analysis status. Please try again.');
+        analyzingRef.current.delete(workoutId);
+        setAnalyzingWorkout(null);
+        return;
+      }
+
+      console.log(`🔍 Polling attempt ${attempt}: status = ${workout.analysis_status}`);
+
+      if (workout.analysis_status === 'complete') {
+        console.log('✅ Analysis completed successfully!');
+        analyzingRef.current.delete(workoutId);
+        setAnalyzingWorkout(null);
+        setAnalysisError(null);
+        
+        // Clear polling timer
+        const timeoutId = pollingRef.current.get(workoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          pollingRef.current.delete(workoutId);
+        }
+        
+        // Reload workout data to get the complete analysis
+        const { data: updatedWorkout } = await supabase
+          .from('workouts')
+          .select('*, workout_analysis')
+          .eq('id', workoutId)
+          .single();
+        
+        if (updatedWorkout) {
+          setRecentWorkouts(prev => 
+            prev.map(w => w.id === workoutId ? updatedWorkout : w)
+          );
+          // Set as selected workout to display the analysis
+          setSelectedWorkoutId(workoutId);
+        }
+        return;
+      }
+
+      if (workout.analysis_status === 'failed') {
+        console.error('❌ Analysis failed:', workout.analysis_error);
+        setAnalysisError(workout.analysis_error || 'Analysis failed. Please try again.');
+        analyzingRef.current.delete(workoutId);
+        setAnalyzingWorkout(null);
+        
+        // Clear polling timer
+        const timeoutId = pollingRef.current.get(workoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          pollingRef.current.delete(workoutId);
+        }
+        return;
+      }
+
+      // Still analyzing, schedule next poll
+      const delay = Math.min(baseDelay * Math.pow(1.5, attempt - 1), maxDelay);
+      console.log(`⏳ Scheduling next poll in ${delay}ms (attempt ${attempt + 1})`);
+      
+      const timeoutId = setTimeout(() => {
+        pollAnalysisStatus(workoutId, attempt + 1);
+      }, delay);
+      
+      pollingRef.current.set(workoutId, timeoutId);
+      
+    } catch (error) {
+      console.error('❌ Polling error:', error);
+      setAnalysisError('Failed to check analysis status. Please try again.');
+      analyzingRef.current.delete(workoutId);
+      setAnalyzingWorkout(null);
+    }
+  };
 
   // SIMPLIFIED: Only analyze if no existing analysis
   const analyzeWorkout = async (workoutId: string) => {
@@ -41,39 +137,47 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       analyzingRef.current.add(workoutId);
       setAnalyzingWorkout(workoutId);
       
-      console.log(`🚀 ROUTED ANALYSIS: ${workoutId}`);
+      console.log(`🚀 Starting analysis for workout: ${workoutId} (type: ${targetWorkout.type})`);
       
-      // Debug: Check what workout data we're sending
-      console.log(`🔍 CLIENT DEBUG: Target workout:`, {
-        id: targetWorkout?.id,
-        type: targetWorkout?.type,
-        has_strength_exercises: !!targetWorkout?.strength_exercises,
-        strength_exercises_type: typeof targetWorkout?.strength_exercises,
-        strength_exercises_value: targetWorkout?.strength_exercises
-      });
+      // Clear any previous errors
+      setAnalysisError(null);
       
-      // Use the dumb client service (no workout type needed - server handles routing)
-      const data = await analyzeWorkoutWithRetry(workoutId);
-
-      console.log('✅ ROUTED ANALYSIS RESULT:', data);
+      // Trigger analysis (fire and forget - don't wait for response)
+      analyzeWorkoutWithRetry(workoutId, targetWorkout.type)
+        .then(() => {
+          console.log('✅ Analysis request submitted successfully');
+        })
+        .catch((error) => {
+          console.error('❌ Failed to submit analysis request:', error);
+          setAnalysisError(error instanceof Error ? error.message : 'Failed to start analysis. Please try again.');
+          analyzingRef.current.delete(workoutId);
+          setAnalyzingWorkout(null);
+        });
       
-      // Set this as the selected workout for display
-      setSelectedWorkoutId(workoutId);
-      
-      // Simple state update
-      setRecentWorkouts(prev => prev.map(workout => 
-        workout.id === workoutId 
-          ? { ...workout, workout_analysis: data }
-          : workout
-      ));
+      // Start polling for status updates
+      console.log('🔄 Starting status polling...');
+      pollAnalysisStatus(workoutId);
       
     } catch (error) {
-      console.error('Failed to analyze workout:', error);
-    } finally {
+      console.error('Failed to start analysis:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start analysis. Please try again.';
+      setAnalysisError(errorMessage);
       analyzingRef.current.delete(workoutId);
       setAnalyzingWorkout(null);
     }
   };
+
+  // Cleanup polling timers on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all active polling timers
+      pollingRef.current.forEach((timeoutId) => {
+        clearTimeout(timeoutId);
+      });
+      pollingRef.current.clear();
+      console.log('🧹 Cleaned up polling timers');
+    };
+  }, []);
 
   useEffect(() => {
     if (!todayLoading) {
@@ -585,12 +689,72 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         </div>
       ) : (
         <div className="px-2 mt-4">
+          {/* Show error if analysis failed */}
+          {analysisError ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+              <div className="text-sm font-medium text-red-800">
+                Analysis Failed
+              </div>
+              <div className="text-xs text-red-600 mt-1">
+                {analysisError}
+              </div>
+              <button
+                onClick={() => {
+                  setAnalysisError(null);
+                  if (selectedWorkoutId) {
+                    analyzeWorkout(selectedWorkoutId);
+                  }
+                }}
+                className="mt-2 text-xs text-red-700 hover:text-red-900 underline"
+              >
+                Try again
+              </button>
+            </div>
+          ) : analyzingWorkout === selectedWorkoutId ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <div className="text-sm font-medium text-blue-800">
+                  Analyzing Workout...
+                </div>
+              </div>
+              <div className="text-xs text-blue-600 mt-1">
+                This may take a few seconds. Analysis will appear automatically when complete.
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="text-sm font-medium text-gray-800">
+                Analysis Not Available
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                No workout analysis found. Click "Analyze" to generate insights.
+              </div>
+              {selectedWorkoutId && (
+                <button
+                  onClick={() => analyzeWorkout(selectedWorkoutId)}
+                  className="mt-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Analyze Workout
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Show error banner at top if there's an error (even when analysis is showing) */}
+      {analysisError && analysisMetrics && (
+        <div className="px-2 -mt-6 mb-3">
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
             <div className="text-sm font-medium text-red-800">
-              Analysis Not Available
+              ⚠️ Analysis Error
             </div>
             <div className="text-xs text-red-600 mt-1">
-              No workout analysis found. 
+              {analysisError}
             </div>
           </div>
         </div>
@@ -646,8 +810,16 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                     <div>HR: {workout.avg_heart_rate} bpm</div>
                   )}
                   {analyzingWorkout === workout.id ? (
-                    <div className="text-xs text-orange-600 font-medium">
+                    <div className="flex items-center gap-1 text-xs text-blue-600 font-medium">
+                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
                       Analyzing...
+                    </div>
+                  ) : workout.workout_analysis ? (
+                    <div className="text-xs text-green-600 font-medium">
+                      View analysis
                     </div>
                   ) : (
                     <div className="text-xs text-blue-600 font-medium">
