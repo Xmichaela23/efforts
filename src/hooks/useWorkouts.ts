@@ -1401,7 +1401,7 @@ export const useWorkouts = () => {
         console.log('ℹ️ Auto-attach skipped:', e);
       }
 
-      // Generate context for completed workouts using discipline-specific functions
+      // Generate context for completed workouts using routing service
       try {
         if (newWorkout.workout_status === 'completed') {
           await analyzeWorkoutWithRetry(newWorkout.id, newWorkout.type);
@@ -1412,6 +1412,12 @@ export const useWorkouts = () => {
         // Don't throw - context generation is not critical
       }
 
+      // Compute analysis (fire-and-forget) so computed.overall is available to unified/Today
+      try {
+        (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: data.id } } as any)
+          .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
+          .catch(() => {});
+      } catch {}
       return newWorkout;
     } catch (err) {
       console.error("Error in addWorkout:", err);
@@ -1617,6 +1623,12 @@ export const useWorkouts = () => {
 
       setWorkouts((prev) => prev.map((w) => (w.id === id ? updated : w)));
 
+      // Compute summary (fire-and-forget) to refresh metrics post-update
+      try {
+        (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: id } } as any)
+          .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
+          .catch(() => {});
+      } catch {}
       return updated;
     } catch (err) {
       console.error("Error in updateWorkout:", err);
