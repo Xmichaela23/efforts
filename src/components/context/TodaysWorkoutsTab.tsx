@@ -125,12 +125,17 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       return;
     }
     
-    // Check if analysis already exists
+    // Check if analysis already exists AND is complete
     const targetWorkout = recentWorkouts.find(w => w.id === workoutId);
-    if (targetWorkout?.workout_analysis) {
-      console.log(`✅ Analysis already exists for workout ${workoutId}, just selecting it`);
+    if (targetWorkout?.workout_analysis && targetWorkout?.analysis_status === 'complete') {
+      console.log(`✅ Analysis already complete for workout ${workoutId}, just selecting it`);
       setSelectedWorkoutId(workoutId);
       return;
+    }
+    
+    // If analysis is pending or failed, or if we have old generic analysis, re-analyze
+    if (targetWorkout?.workout_analysis && !targetWorkout?.analysis_status) {
+      console.log(`🔄 Old analysis format detected, re-analyzing workout ${workoutId}`);
     }
     
     try {
@@ -190,15 +195,16 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     if (focusWorkoutId && recentWorkouts.length > 0) {
       const targetWorkout = recentWorkouts.find(w => w.id === focusWorkoutId);
       if (targetWorkout) {
-        setSelectedWorkoutId(focusWorkoutId);
+        // Check if we need to analyze (no analysis, or old generic analysis, or failed)
+        const needsAnalysis = !targetWorkout.workout_analysis || 
+                             targetWorkout.analysis_status !== 'complete';
         
-        // Only analyze if no analysis exists at all
-        const analysis = targetWorkout.workout_analysis;
-        if (!analysis) {
-          console.log('🔄 No analysis found for focus workout, analyzing:', focusWorkoutId);
+        if (needsAnalysis) {
+          console.log('🔄 Analyzing focus workout:', focusWorkoutId);
           analyzeWorkout(focusWorkoutId);
         } else {
-          console.log('✅ Analysis exists for focus workout, using existing:', focusWorkoutId);
+          console.log('✅ Analysis complete for focus workout, displaying:', focusWorkoutId);
+          setSelectedWorkoutId(focusWorkoutId);
         }
       }
     }

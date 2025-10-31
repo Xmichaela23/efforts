@@ -95,7 +95,9 @@ Deno.serve(async (req) => {
         throw new Error(`Running analysis failed: ${runningError.message}`);
       }
       
-      analysisResult = runningAnalysis.analysis;
+      // analyze-running-workout now includes detailed_analysis in response
+      // No need for extra database reload
+      analysisResult = runningAnalysis;
     } else if (workout.type === 'strength') {
       console.log('💪 Calling analyze-strength-workout directly...');
       const { data: strengthAnalysis, error: strengthError } = await supabase.functions.invoke('analyze-strength-workout', {
@@ -169,19 +171,23 @@ function getAnalyzerFunction(workoutType: string): string | null {
 function formatAnalysisResponse(analysisResult: any, workoutType: string) {
   // Handle direct response from discipline-specific functions
   if (workoutType === 'run' || workoutType === 'running') {
-    if (analysisResult) {
+    if (analysisResult && analysisResult.analysis) {
+      const analysis = analysisResult.analysis;
+      // Extract strengths from stored workout_analysis if available, otherwise from response
+      // The response now includes detailed_analysis, so we can use it directly
+      const storedWorkout = analysisResult.stored_analysis; // Legacy, may not exist
       return {
-        analysis: analysisResult,
-        performance_assessment: analysisResult.performance_assessment,
-        insights: analysisResult.primary_issues || [],
+        analysis: analysis,
+        performance_assessment: analysis.performance_assessment || analysisResult.performance?.performance_assessment,
+        insights: analysis.primary_issues || [],
         key_metrics: {
-          adherence_percentage: analysisResult.adherence_percentage,
-          time_in_range_s: analysisResult.time_in_range_s,
-          time_outside_range_s: analysisResult.time_outside_range_s
+          adherence_percentage: analysis.adherence_percentage || analysis.overall_adherence,
+          time_in_range_s: analysis.time_in_range_s,
+          time_outside_range_s: analysis.time_outside_range_s
         },
-        red_flags: analysisResult.primary_issues || [],
-        strengths: analysisResult.strengths || [],
-        detailed_analysis: analysisResult.detailed_analysis || null  // NEW: Pass through detailed analysis
+        red_flags: analysis.primary_issues || [],
+        strengths: storedWorkout?.strengths || analysis.strengths || [],
+        detailed_analysis: analysisResult.detailed_analysis || null  // Now comes from response
       };
     } else {
       // No analysis available
