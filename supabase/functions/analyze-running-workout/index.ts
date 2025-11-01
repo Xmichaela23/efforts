@@ -918,7 +918,11 @@ Deno.serve(async (req) => {
     // 🤖 GENERATE AI NARRATIVE INSIGHTS
     let narrativeInsights = null;
     try {
-      console.log('🤖 Generating AI narrative insights...');
+      console.log('🤖 [CRITICAL] Starting AI narrative generation...');
+      console.log('🤖 [CRITICAL] Checking for OPENAI_API_KEY...');
+      const hasKey = !!Deno.env.get('OPENAI_API_KEY');
+      console.log('🤖 [CRITICAL] OPENAI_API_KEY present:', hasKey);
+      
       narrativeInsights = await generateAINarrativeInsights(
         sensorData,
         workout,
@@ -927,9 +931,13 @@ Deno.serve(async (req) => {
         performance,
         detailedAnalysis
       );
-      console.log('✅ AI narrative generated:', narrativeInsights);
+      console.log('✅ [CRITICAL] AI narrative generated:', JSON.stringify(narrativeInsights));
+      console.log('✅ [CRITICAL] AI narrative is array:', Array.isArray(narrativeInsights));
+      console.log('✅ [CRITICAL] AI narrative length:', narrativeInsights?.length);
     } catch (error) {
-      console.error('❌ AI narrative generation failed:', error);
+      console.error('❌ [CRITICAL] AI narrative generation failed:', error);
+      console.error('❌ [CRITICAL] Error message:', error.message);
+      console.error('❌ [CRITICAL] Error stack:', error.stack);
       narrativeInsights = null; // Continue without narrative if AI fails
     }
 
