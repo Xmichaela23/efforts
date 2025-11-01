@@ -3269,13 +3269,9 @@ async function generateAINarrativeInsights(
   console.log('🤖 [DEBUG] Building workout context for AI from sensor data...');
   
   // Calculate metrics from sensor data
-  const totalDurationSeconds = sensorData.length > 0 ? 
-    sensorData[sensorData.length - 1].timestamp - sensorData[0].timestamp : 
-    (workout.moving_time || workout.duration || 0);
-  
-  const totalDistanceMeters = sensorData.length > 0 ?
-    sensorData[sensorData.length - 1].cumulative_distance_m || 0 :
-    0;
+  // Use workout-level fields for duration and distance (more reliable than sensor cumulative fields)
+  const totalDurationSeconds = workout.moving_time || workout.duration || 0;
+  const totalDistanceMeters = workout.distance || 0;
   
   const totalDistanceMiles = totalDistanceMeters / 1609.34;
   const avgPaceMinPerMi = totalDistanceMiles > 0 ? 
