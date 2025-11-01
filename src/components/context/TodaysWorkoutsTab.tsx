@@ -244,19 +244,25 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
       const fourteenDaysAgoLocal = fourteenDaysAgo.toLocaleDateString('en-CA');
       
-      const { data: recentData } = await supabase
+      const { data: recentData, error: loadError } = await supabase
         .from('workouts')
-        .select('*, workout_analysis')
+        .select('*, workout_analysis, analysis_status')
         .eq('user_id', user.id)
         .gte('date', fourteenDaysAgoLocal)
         .order('date', { ascending: false })
         .limit(10);
 
+      if (loadError) {
+        console.error('❌ Error loading workouts:', loadError);
+      }
+
       console.log('📊 Loaded workouts:', recentData?.map(w => ({
         id: w.id,
         type: w.type,
         date: w.date,
+        status: w.status,
         has_analysis: !!w.workout_analysis,
+        analysis_status: w.analysis_status,
         performance_assessment: w.workout_analysis?.performance_assessment
       })));
       
