@@ -3265,14 +3265,42 @@ async function generateAINarrativeInsights(
     return null;
   }
 
-  // Build context for AI
+  // Build context for AI - Calculate from sensor data directly
+  console.log('🤖 [DEBUG] Building workout context for AI from sensor data...');
+  
+  // Calculate metrics from sensor data
+  const totalDurationSeconds = sensorData.length > 0 ? 
+    sensorData[sensorData.length - 1].timestamp - sensorData[0].timestamp : 
+    (workout.moving_time || workout.duration || 0);
+  
+  const totalDistanceMeters = sensorData.length > 0 ?
+    sensorData[sensorData.length - 1].cumulative_distance_m || 0 :
+    0;
+  
+  const totalDistanceMiles = totalDistanceMeters / 1609.34;
+  const avgPaceMinPerMi = totalDistanceMiles > 0 ? 
+    (totalDurationSeconds / 60) / totalDistanceMiles : 0;
+  
+  const heartRates = sensorData.filter(s => s.heart_rate && s.heart_rate > 0).map(s => s.heart_rate);
+  const avgHeartRate = heartRates.length > 0 ? 
+    Math.round(heartRates.reduce((a, b) => a + b, 0) / heartRates.length) : 0;
+  const maxHeartRate = heartRates.length > 0 ? Math.max(...heartRates) : 0;
+  
+  console.log('🤖 [DEBUG] Calculated metrics:', {
+    duration_seconds: totalDurationSeconds,
+    distance_miles: totalDistanceMiles,
+    avg_pace: avgPaceMinPerMi,
+    avg_hr: avgHeartRate,
+    max_hr: maxHeartRate
+  });
+  
   const workoutContext = {
     type: workout.type,
-    duration_minutes: Math.round((workout.moving_time || workout.duration) / 60),
-    distance_miles: workout.computed?.overall?.distance_mi || 0,
-    avg_pace_min_per_mi: workout.computed?.overall?.avg_pace_min_per_mi || 0,
-    avg_heart_rate: workout.computed?.overall?.avg_heart_rate_bpm || 0,
-    max_heart_rate: workout.computed?.overall?.max_heart_rate_bpm || 0,
+    duration_minutes: Math.round(totalDurationSeconds / 60),
+    distance_miles: totalDistanceMiles,
+    avg_pace_min_per_mi: avgPaceMinPerMi,
+    avg_heart_rate: avgHeartRate,
+    max_heart_rate: maxHeartRate,
     aerobic_training_effect: workout.garmin_data?.trainingEffect || null,
     anaerobic_training_effect: workout.garmin_data?.anaerobicTrainingEffect || null,
     performance_condition_start: workout.garmin_data?.performanceCondition || null,
@@ -3281,6 +3309,8 @@ async function generateAINarrativeInsights(
     stamina_end: workout.garmin_data?.staminaEnd || null,
     exercise_load: workout.garmin_data?.activityTrainingLoad || null
   };
+  
+  console.log('🤖 [DEBUG] Final workoutContext for AI:', JSON.stringify(workoutContext, null, 2));
 
   const adherenceContext = {
     execution_adherence_pct: Math.round(performance.execution_adherence),
