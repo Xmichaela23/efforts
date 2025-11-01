@@ -127,22 +127,27 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       return;
     }
     
-    // Check if analysis already exists AND is complete
+    // Check if analysis already exists AND is complete WITH NEW FORMAT
     const targetWorkout = recentWorkouts.find(w => w.id === workoutId);
     console.log('🔍 Target workout found:', !!targetWorkout);
     console.log('🔍 Target workout type:', targetWorkout?.type);
     console.log('🔍 Target workout has analysis?:', !!targetWorkout?.workout_analysis);
     console.log('🔍 Target workout analysis_status:', targetWorkout?.analysis_status);
     
-    if (targetWorkout?.workout_analysis && targetWorkout?.analysis_status === 'complete') {
-      console.log(`✅ Analysis already complete for workout ${workoutId}, just selecting it`);
+    // Check for new format (performance + detailed_analysis)
+    const analysis = targetWorkout?.workout_analysis;
+    const hasNewFormat = analysis?.performance && analysis?.detailed_analysis;
+    console.log('🔍 Has new format?:', hasNewFormat);
+    
+    if (targetWorkout?.workout_analysis && targetWorkout?.analysis_status === 'complete' && hasNewFormat) {
+      console.log(`✅ Analysis already complete with new format for workout ${workoutId}, just selecting it`);
       setSelectedWorkoutId(workoutId);
       return;
     }
     
     // If analysis is pending or failed, or if we have old generic analysis, re-analyze
-    if (targetWorkout?.workout_analysis && !targetWorkout?.analysis_status) {
-      console.log(`🔄 Old analysis format detected, re-analyzing workout ${workoutId}`);
+    if (targetWorkout?.workout_analysis && (!targetWorkout?.analysis_status || !hasNewFormat)) {
+      console.log(`🔄 Old/incomplete analysis format detected, re-analyzing workout ${workoutId}`);
     }
     
     try {
