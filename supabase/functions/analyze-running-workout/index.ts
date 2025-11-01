@@ -3304,6 +3304,13 @@ async function generateAINarrativeInsights(
     Math.round(heartRates.reduce((a, b) => a + b, 0) / heartRates.length) : 0;
   const maxHeartRate = heartRates.length > 0 ? Math.max(...heartRates) : 0;
   
+  console.log('🤖 [DEBUG] RAW workout fields:', {
+    workout_distance_km: workout.distance,
+    workout_moving_time_min: workout.moving_time,
+    workout_duration_min: workout.duration,
+    workout_type: workout.type
+  });
+  
   console.log('🤖 [DEBUG] Calculated metrics:', {
     duration_minutes: totalDurationMinutes,
     distance: distanceValue,
@@ -3312,7 +3319,9 @@ async function generateAINarrativeInsights(
     pace_unit: paceUnit,
     avg_hr: avgHeartRate,
     max_hr: maxHeartRate,
-    user_units: userUnits
+    user_units: userUnits,
+    sensor_data_count: sensorData?.length || 0,
+    hr_samples: heartRates.length
   });
   
   const workoutContext = {
@@ -3380,6 +3389,16 @@ Generate 4-6 observations in this style (use ${workoutContext.pace_unit} and ${w
 Return ONLY a JSON array of strings, no other text:
 ["observation 1", "observation 2", ...]`;
 
+  console.log('🤖 [DEBUG] Sending prompt to OpenAI with context:', {
+    duration: workoutContext.duration_minutes,
+    distance: workoutContext.distance,
+    distance_unit: workoutContext.distance_unit,
+    avg_pace: workoutContext.avg_pace,
+    pace_unit: workoutContext.pace_unit,
+    avg_hr: workoutContext.avg_heart_rate,
+    max_hr: workoutContext.max_heart_rate
+  });
+
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -3412,6 +3431,8 @@ Return ONLY a JSON array of strings, no other text:
     const data = await response.json();
     const content = data.choices[0]?.message?.content?.trim();
     
+    console.log('🤖 [DEBUG] Raw AI response:', content);
+    
     if (!content) {
       throw new Error('Empty response from OpenAI');
     }
@@ -3424,6 +3445,7 @@ Return ONLY a JSON array of strings, no other text:
     }
 
     console.log(`✅ Generated ${insights.length} AI narrative insights`);
+    console.log('✅ First insight preview:', insights[0]?.substring(0, 100));
     return insights;
 
   } catch (error) {
