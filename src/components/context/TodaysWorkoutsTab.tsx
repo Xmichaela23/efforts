@@ -425,6 +425,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     // 🤖 PREFER AI-GENERATED NARRATIVE INSIGHTS
     if (analysis.narrative_insights && Array.isArray(analysis.narrative_insights) && analysis.narrative_insights.length > 0) {
       console.log(`✅ Found ${analysis.narrative_insights.length} AI narrative insights`);
+      
+      // 🔍 VALIDATION: Check if insights contain invalid data (0 miles, 0 bpm, 1 minute)
+      const firstInsight = analysis.narrative_insights[0] || '';
+      const hasInvalidData = firstInsight.includes('0.00 miles') || 
+                            firstInsight.includes('1 minute with a total distance') ||
+                            firstInsight.includes('0 bpm with a maximum heart rate of 0 bpm');
+      
+      if (hasInvalidData) {
+        console.warn('⚠️ AI narrative contains invalid data (0 miles/0 bpm), triggering re-analysis');
+        // Return null to trigger re-analysis
+        return null;
+      }
+      
       return {
         workout: workoutWithAnalysis,
         insights: analysis.narrative_insights,
