@@ -426,6 +426,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     if (analysis.narrative_insights && Array.isArray(analysis.narrative_insights) && analysis.narrative_insights.length > 0) {
       console.log(`✅ Found ${analysis.narrative_insights.length} AI narrative insights`);
       return {
+        workout: workoutWithAnalysis,
         insights: analysis.narrative_insights,
         performance: analysis.performance
       };
