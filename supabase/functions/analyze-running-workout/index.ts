@@ -456,7 +456,8 @@ Deno.serve(async (req) => {
         moving_time,
         duration,
         elapsed_time,
-        total_timer_time
+        total_timer_time,
+        distance
       `)
       .eq('id', workout_id)
       .single();
@@ -470,6 +471,13 @@ Deno.serve(async (req) => {
       garmin_data: !!workout.garmin_data,
       computed: !!workout.computed,
       sensor_data: !!workout.sensor_data
+    });
+    
+    console.log('🔍 Workout summary fields:', {
+      distance: workout.distance,
+      moving_time: workout.moving_time,
+      duration: workout.duration,
+      type: workout.type
     });
 
     if (workout.type !== 'run' && workout.type !== 'running') {
