@@ -1073,7 +1073,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onOpenPlanBuilder={handleOpenPlanBuilder}
               />
               <Button
-                onClick={handleOpenContext}
+                onClick={() => handleOpenContext()}
                 className="flex items-center gap-2 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-0 focus:border-0 active:outline-none active:ring-0 active:border-0"
                 style={{
                   fontFamily: 'Inter, sans-serif',
