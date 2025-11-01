@@ -490,12 +490,17 @@ Deno.serve(async (req) => {
 
     // Get user baselines first (needed for both planned and unplanned workouts)
     let baselines = {};
+    let userUnits = 'imperial'; // default
     try {
       const { data: userBaselines } = await supabase
         .from('user_baselines')
-        .select('performance_numbers')
+        .select('performance_numbers, units')
         .eq('user_id', workout.user_id)
         .single();
+      
+      if (userBaselines?.units === 'metric' || userBaselines?.units === 'imperial') {
+        userUnits = userBaselines.units;
+      }
       baselines = userBaselines?.performance_numbers || {};
       console.log('📊 User baselines found:', baselines);
     } catch (error) {
@@ -930,6 +935,7 @@ Deno.serve(async (req) => {
       console.log('🤖 [CRITICAL] Checking for OPENAI_API_KEY...');
       const hasKey = !!Deno.env.get('OPENAI_API_KEY');
       console.log('🤖 [CRITICAL] OPENAI_API_KEY present:', hasKey);
+      console.log('🤖 [CRITICAL] User units preference:', userUnits);
       
       narrativeInsights = await generateAINarrativeInsights(
         sensorData,
@@ -937,7 +943,8 @@ Deno.serve(async (req) => {
         plannedWorkout,
         enhancedAnalysis,
         performance,
-        detailedAnalysis
+        detailedAnalysis,
+        userUnits
       );
       console.log('✅ [CRITICAL] AI narrative generated:', JSON.stringify(narrativeInsights));
       console.log('✅ [CRITICAL] AI narrative is array:', Array.isArray(narrativeInsights));
@@ -3264,7 +3271,8 @@ async function generateAINarrativeInsights(
   plannedWorkout: any,
   granularAnalysis: any,
   performance: any,
-  detailedAnalysis: any
+  detailedAnalysis: any,
+  userUnits: 'metric' | 'imperial' = 'imperial'
 ): Promise<string[]> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   
@@ -3277,13 +3285,19 @@ async function generateAINarrativeInsights(
   console.log('🤖 [DEBUG] Building workout context for AI from sensor data...');
   
   // Calculate metrics from sensor data
-  // Use workout-level fields for duration and distance (more reliable than sensor cumulative fields)
-  const totalDurationSeconds = workout.moving_time || workout.duration || 0;
-  const totalDistanceMeters = workout.distance || 0;
+  // Use workout-level fields for duration and distance
+  // NOTE: Database stores distance in KM and moving_time in MINUTES (not meters/seconds!)
+  const totalDurationMinutes = workout.moving_time || workout.duration || 0;
+  const totalDurationSeconds = totalDurationMinutes * 60;
+  const totalDistanceKm = workout.distance || 0;
   
-  const totalDistanceMiles = totalDistanceMeters / 1609.34;
-  const avgPaceMinPerMi = totalDistanceMiles > 0 ? 
-    (totalDurationSeconds / 60) / totalDistanceMiles : 0;
+  // Convert distance based on user preference
+  const distanceValue = userUnits === 'metric' ? totalDistanceKm : totalDistanceKm * 0.621371;
+  const distanceUnit = userUnits === 'metric' ? 'km' : 'miles';
+  const paceUnit = userUnits === 'metric' ? 'min/km' : 'min/mi';
+  
+  const avgPace = distanceValue > 0 ? 
+    totalDurationMinutes / distanceValue : 0;
   
   const heartRates = sensorData.filter(s => s.heart_rate && s.heart_rate > 0).map(s => s.heart_rate);
   const avgHeartRate = heartRates.length > 0 ? 
@@ -3291,18 +3305,23 @@ async function generateAINarrativeInsights(
   const maxHeartRate = heartRates.length > 0 ? Math.max(...heartRates) : 0;
   
   console.log('🤖 [DEBUG] Calculated metrics:', {
-    duration_seconds: totalDurationSeconds,
-    distance_miles: totalDistanceMiles,
-    avg_pace: avgPaceMinPerMi,
+    duration_minutes: totalDurationMinutes,
+    distance: distanceValue,
+    distance_unit: distanceUnit,
+    avg_pace: avgPace,
+    pace_unit: paceUnit,
     avg_hr: avgHeartRate,
-    max_hr: maxHeartRate
+    max_hr: maxHeartRate,
+    user_units: userUnits
   });
   
   const workoutContext = {
     type: workout.type,
-    duration_minutes: Math.round(totalDurationSeconds / 60),
-    distance_miles: totalDistanceMiles,
-    avg_pace_min_per_mi: avgPaceMinPerMi,
+    duration_minutes: totalDurationMinutes,
+    distance: distanceValue,
+    distance_unit: distanceUnit,
+    avg_pace: avgPace,
+    pace_unit: paceUnit,
     avg_heart_rate: avgHeartRate,
     max_heart_rate: maxHeartRate,
     aerobic_training_effect: workout.garmin_data?.trainingEffect || null,
@@ -3338,8 +3357,8 @@ CRITICAL RULES:
 Workout Profile:
 - Type: ${workoutContext.type}
 - Duration: ${workoutContext.duration_minutes} minutes
-- Distance: ${workoutContext.distance_miles.toFixed(2)} miles
-- Avg Pace: ${workoutContext.avg_pace_min_per_mi.toFixed(2)} min/mi
+- Distance: ${workoutContext.distance.toFixed(2)} ${workoutContext.distance_unit}
+- Avg Pace: ${workoutContext.avg_pace.toFixed(2)} ${workoutContext.pace_unit}
 - Avg HR: ${workoutContext.avg_heart_rate} bpm (Max: ${workoutContext.max_heart_rate} bpm)
 ${workoutContext.aerobic_training_effect ? `- Aerobic TE: ${workoutContext.aerobic_training_effect} (Anaerobic: ${workoutContext.anaerobic_training_effect})` : ''}
 ${workoutContext.performance_condition_start !== null ? `- Performance Condition: ${workoutContext.performance_condition_start} → ${workoutContext.performance_condition_end} (${workoutContext.performance_condition_end - workoutContext.performance_condition_start} point change)` : ''}
@@ -3353,8 +3372,8 @@ Adherence Metrics:
 - HR Drift: ${adherenceContext.hr_drift_bpm} bpm
 - Pace Variability: ${adherenceContext.pace_variability_pct}%
 
-Generate 4-6 observations in this style:
-"Maintained consistent pace averaging X:XX/mi throughout the Y-mile effort. Pace remained within X:XX-X:XX/mi range for Z% of the run."
+Generate 4-6 observations in this style (use ${workoutContext.pace_unit} and ${workoutContext.distance_unit} for units):
+"Maintained consistent pace averaging X:XX ${workoutContext.pace_unit} throughout the Y ${workoutContext.distance_unit} effort. Pace remained within X:XX-X:XX ${workoutContext.pace_unit} range for Z% of the run."
 "Heart rate averaged X bpm with gradual upward drift in the final Y minutes. HR peaked at Z bpm, suggesting accumulated fatigue."
 "Performance Condition declined from +X to -Y, a Z-point drop over N minutes, consistent with tempo-intensity efforts."
 
