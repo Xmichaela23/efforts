@@ -134,13 +134,14 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     console.log('🔍 Target workout has analysis?:', !!targetWorkout?.workout_analysis);
     console.log('🔍 Target workout analysis_status:', targetWorkout?.analysis_status);
     
-    // Check for new format (performance + detailed_analysis)
+    // Check for new format (performance + detailed_analysis + narrative_insights)
     const analysis = targetWorkout?.workout_analysis;
-    const hasNewFormat = analysis?.performance && analysis?.detailed_analysis;
-    console.log('🔍 Has new format?:', hasNewFormat);
+    const hasNewFormat = analysis?.performance && analysis?.detailed_analysis && analysis?.narrative_insights;
+    console.log('🔍 Has new format (with AI narrative)?:', hasNewFormat);
+    console.log('🔍 Has narrative_insights?:', !!analysis?.narrative_insights);
     
     if (targetWorkout?.workout_analysis && targetWorkout?.analysis_status === 'complete' && hasNewFormat) {
-      console.log(`✅ Analysis already complete with new format for workout ${workoutId}, just selecting it`);
+      console.log(`✅ Analysis already complete with AI narrative for workout ${workoutId}, just selecting it`);
       setSelectedWorkoutId(workoutId);
       return;
     }
@@ -724,19 +725,20 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                   console.log('🖱️ Analysis keys:', workout.workout_analysis ? Object.keys(workout.workout_analysis) : 'none');
                   
                   if (analyzingWorkout !== workout.id) {
-                    // Check if analysis has new format (performance + detailed_analysis)
+                    // Check if analysis has new format (performance + detailed_analysis + narrative_insights)
                     const analysis = workout.workout_analysis;
-                    const hasNewFormat = analysis?.performance && analysis?.detailed_analysis;
+                    const hasNewFormat = analysis?.performance && analysis?.detailed_analysis && analysis?.narrative_insights;
                     
-                    console.log('🖱️ Has new format (performance + detailed_analysis)?:', hasNewFormat);
+                    console.log('🖱️ Has new format (with AI narrative)?:', hasNewFormat);
                     console.log('🖱️ Has performance?:', !!analysis?.performance);
                     console.log('🖱️ Has detailed_analysis?:', !!analysis?.detailed_analysis);
+                    console.log('🖱️ Has narrative_insights?:', !!analysis?.narrative_insights);
                     
                     if (!analysis || !hasNewFormat) {
-                      console.log('🔄 No analysis or old format, re-analyzing workout:', workout.id);
+                      console.log('🔄 No analysis or missing AI narrative, re-analyzing workout:', workout.id);
                       analyzeWorkout(workout.id);
                     } else {
-                      console.log('✅ Analysis exists with new format, selecting workout:', workout.id);
+                      console.log('✅ Analysis exists with AI narrative, selecting workout:', workout.id);
                       setSelectedWorkoutId(workout.id);
                     }
                   } else {
