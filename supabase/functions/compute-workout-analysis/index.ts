@@ -1497,8 +1497,8 @@ Deno.serve(async (req) => {
       power_in_analysis: !!computed.analysis?.power
     });
 
-    // Add granular analysis for running workouts
-    let workoutAnalysis = null;
+    // Trigger granular analysis for running workouts
+    // NOTE: analyze-running-workout writes to workout_analysis independently
     console.log('🔍 Checking granular analysis conditions:', {
       type: w.type,
       planned_id: w.planned_id,
@@ -1508,276 +1508,27 @@ Deno.serve(async (req) => {
     
     if (w.type === 'run') {
       try {
-        console.log('🏃 Running granular analysis for running workout...');
+        console.log('🏃 Triggering analyze-running-workout...');
         
         // Call the dedicated analyze-running-workout function
-        const { data: runningAnalysis, error: runningError } = await supabase.functions.invoke('analyze-running-workout', {
+        // It will write to workout_analysis independently
+        const { error: runningError } = await supabase.functions.invoke('analyze-running-workout', {
           body: { workout_id: workout_id }
         });
         
         if (runningError) {
           console.error('❌ Running analysis failed:', runningError.message);
-          // Continue with basic analysis
         } else {
-          console.log('✅ Running analysis completed');
-          workoutAnalysis = runningAnalysis;
-        }
-        
-        // Load planned workout data for token parsing
-        let plannedWorkout = null;
-        if (w.planned_id) {
-          try {
-            const { data: plannedData } = await supabase
-              .from('planned_workouts')
-              .select('steps_preset, intervals')
-              .eq('id', w.planned_id)
-              .single();
-            plannedWorkout = plannedData;
-          } catch (error) {
-            console.log('⚠️ Could not load planned workout:', error);
-          }
-        }
-        
-        console.log('📋 Planned workout data:', {
-          found: !!plannedWorkout,
-          hasStepsPreset: !!plannedWorkout?.steps_preset,
-          stepsPresetLength: plannedWorkout?.steps_preset?.length,
-          hasIntervals: !!plannedWorkout?.intervals,
-          intervalsLength: plannedWorkout?.intervals?.length
-        });
-        
-        // Get user baselines for token parsing (with fallback)
-        let baselines = {};
-        try {
-          const { data: userBaselines } = await supabase
-            .from('user_baselines')
-            .select('performance_numbers')
-            .eq('user_id', w.user_id)
-            .single();
-          baselines = userBaselines?.performance_numbers || {};
-        } catch (error) {
-          console.log('⚠️ No user baselines found, using defaults');
-          // Use default baselines for analysis
-          baselines = {
-            fiveK_pace: 450, // 7:30/mi
-            easyPace: 540,   // 9:00/mi
-            tenK_pace: 480,  // 8:00/mi
-            marathon_pace: 600 // 10:00/mi
-          };
-        }
-        
-        console.log('📊 User baselines:', baselines);
-        
-        if (plannedWorkout?.steps_preset && plannedWorkout.steps_preset.length > 0) {
-          console.log('🏃 Parsing steps_preset tokens for running analysis');
-          
-          // Parse tokens to get structured workout segments
-          const parsedStructure = parseRunningTokens(plannedWorkout.steps_preset, baselines);
-          console.log('📊 Parsed structure:', parsedStructure.segments.length, 'segments');
-          
-          if (parsedStructure.segments.length > 0) {
-            // Check if this is a long run (single work segment) or interval workout
-            const workSegments = parsedStructure.segments.filter(s => s.type === 'work');
-            const isLongRun = workSegments.length === 1 && workSegments[0].duration && workSegments[0].duration > 3600; // > 60 min
-            
-            if (isLongRun) {
-              console.log('🏃 Long run detected - analyzing pace consistency');
-              
-              // Analyze long run: pace consistency, negative splits, drift
-              const longRunAnalysis = analyzeLongRun(computed, workSegments[0]);
-              
-              workoutAnalysis = {
-                adherence_percentage: longRunAnalysis.paceConsistency,
-                time_in_range_s: longRunAnalysis.timeInRange,
-                time_outside_range_s: longRunAnalysis.timeOutsideRange,
-                interval_breakdown: longRunAnalysis.segments,
-                performance_assessment: longRunAnalysis.performance_assessment,
-                primary_issues: longRunAnalysis.issues,
-                strengths: longRunAnalysis.strengths,
-                analysis_version: 'v1.0.0',
-                workout_type: 'long_run'
-              };
-              
-              console.log('✅ Long run analysis completed:', {
-                consistency: longRunAnalysis.paceConsistency,
-                performance: longRunAnalysis.performance_assessment,
-                issues: longRunAnalysis.issues.length
-              });
-            } else {
-              console.log('🏃 Interval workout detected - analyzing target adherence');
-              
-              // Convert parsed segments to the format expected by granular analysis
-              const convertedIntervals = parsedStructure.segments.map((segment: any, index: number) => {
-                return {
-                  type: segment.type,
-                  duration_s: segment.duration || 300,
-                  distance_m: segment.distance || null,
-                  pace_range: segment.target_pace ? {
-                    lower: segment.target_pace.lower,
-                    upper: segment.target_pace.upper
-                  } : null,
-                  power_range: null // Running doesn't use power
-                };
-              });
-              
-              console.log('🔄 Converted intervals:', convertedIntervals.length);
-              
-              // Run granular adherence analysis
-              const analysis = calculatePrescribedRangeAdherence(
-                computed.analysis?.intervals || [],
-                convertedIntervals,
-                computed.overall
-              );
-              
-              workoutAnalysis = {
-                adherence_percentage: analysis.overallAdherence,
-                time_in_range_s: analysis.timeInRange,
-                time_outside_range_s: analysis.timeOutsideRange,
-                interval_breakdown: analysis.intervalAnalysis,
-                performance_assessment: analysis.performance_assessment,
-                primary_issues: analysis.primaryIssues,
-                strengths: analysis.strengths,
-                analysis_version: 'v1.0.0',
-                workout_type: 'intervals'
-              };
-              
-              console.log('✅ Granular analysis completed:', {
-                adherence: analysis.overallAdherence,
-                grade: analysis.executionGrade,
-                issues: analysis.primaryIssues.length
-              });
-            }
-          }
-        } else if (plannedWorkout?.intervals && plannedWorkout.intervals.length > 0) {
-          // Fallback to old intervals structure if steps_preset is not available
-          console.log('🔄 Falling back to intervals structure');
-          
-          // Check if this is a long run (single steady effort) or interval workout
-          const isLongRun = plannedWorkout.intervals.length === 1 && 
-            (plannedWorkout.intervals[0].effortLabel?.toLowerCase().includes('steady') ||
-             plannedWorkout.intervals[0].effortLabel?.toLowerCase().includes('long') ||
-             plannedWorkout.intervals[0].effortLabel?.toLowerCase().includes('easy'));
-          
-          if (isLongRun) {
-            console.log('🏃 Long run detected (intervals fallback) - analyzing pace consistency');
-            
-            // Analyze long run: pace consistency, negative splits, drift
-            const longRunAnalysis = analyzeLongRun(computed, plannedWorkout.intervals[0]);
-            
-            workoutAnalysis = {
-              adherence_percentage: longRunAnalysis.paceConsistency,
-              time_in_range_s: longRunAnalysis.timeInRange,
-              time_outside_range_s: longRunAnalysis.timeOutsideRange,
-              interval_breakdown: longRunAnalysis.segments,
-              performance_assessment: longRunAnalysis.performance_assessment,
-              primary_issues: longRunAnalysis.issues,
-              strengths: longRunAnalysis.strengths,
-              analysis_version: 'v1.0.0',
-              workout_type: 'long_run'
-            };
-            
-            console.log('✅ Long run analysis completed (intervals fallback):', {
-              consistency: longRunAnalysis.paceConsistency,
-              performance: longRunAnalysis.performance_assessment,
-              issues: longRunAnalysis.issues.length
-            });
-          } else {
-            console.log('🏃 Interval workout detected (intervals fallback) - analyzing target adherence');
-            
-            // Convert planned intervals to the format expected by granular analysis
-            const convertedIntervals = plannedWorkout.intervals.map((interval: any, index: number) => {
-              // Extract pace range from bpmTarget or effortLabel
-              let paceRange = null;
-              if (interval.bpmTarget) {
-                // Convert BPM to pace range (rough approximation)
-                const bpm = interval.bpmTarget.split('-').map((b: string) => parseInt(b.trim()));
-                if (bpm.length === 2) {
-                  // Rough conversion: 150-160 BPM ≈ 6:00-7:00/mi pace
-                  const paceLower = 360 + (160 - bpm[1]) * 10; // seconds per mile
-                  const paceUpper = 360 + (160 - bpm[0]) * 10;
-                  paceRange = { lower: paceLower, upper: paceUpper };
-                }
-              }
-              
-              return {
-                type: interval.effortLabel?.toLowerCase() || 'work',
-                duration_s: interval.time ? parseTimeToSeconds(interval.time) : 300, // Default 5 min
-                pace_range: paceRange,
-                power_range: null
-              };
-            });
-            
-            console.log('🔄 Converted intervals (fallback):', convertedIntervals.length);
-            
-            // Run granular adherence analysis
-            const analysis = calculatePrescribedRangeAdherence(
-              computed.analysis?.intervals || [],
-              convertedIntervals,
-              computed.overall
-            );
-            
-            workoutAnalysis = {
-              adherence_percentage: analysis.overallAdherence,
-              time_in_range_s: analysis.timeInRange,
-              time_outside_range_s: analysis.timeOutsideRange,
-              interval_breakdown: analysis.intervalAnalysis,
-              performance_assessment: analysis.performance_assessment,
-              primary_issues: analysis.primaryIssues,
-              strengths: analysis.strengths,
-              analysis_version: 'v1.0.0',
-              workout_type: 'intervals'
-            };
-            
-            console.log('✅ Granular analysis completed (intervals fallback):', {
-              adherence: analysis.overallAdherence,
-              grade: analysis.executionGrade,
-              issues: analysis.primaryIssues.length
-            });
-          }
-        } else {
-          // No planned workout - create a simple analysis based on workout data
-          console.log('🏃 No planned workout found - creating basic analysis');
-          
-          // Create a simple long run analysis based on the workout's actual data
-          const basicAnalysis = analyzeLongRun(computed, {
-            type: 'work',
-            duration: computed.overall?.duration_s || 0,
-            target_pace: {
-              target: computed.overall?.avg_pace_s_per_mi || 600, // Default 10:00/mi
-              lower: (computed.overall?.avg_pace_s_per_mi || 600) * 0.9, // 10% faster
-              upper: (computed.overall?.avg_pace_s_per_mi || 600) * 1.1, // 10% slower
-              tolerance: 0.10
-            }
-          });
-          
-          workoutAnalysis = {
-            adherence_percentage: basicAnalysis.paceConsistency,
-            time_in_range_s: basicAnalysis.timeInRange,
-            time_outside_range_s: basicAnalysis.timeOutsideRange,
-            interval_breakdown: basicAnalysis.segments,
-            performance_assessment: basicAnalysis.performance_assessment,
-            primary_issues: basicAnalysis.issues,
-            strengths: basicAnalysis.strengths,
-            analysis_version: 'v1.0.0',
-            workout_type: 'long_run'
-          };
-          
-          console.log('✅ Basic analysis completed:', {
-            consistency: basicAnalysis.paceConsistency,
-            performance: basicAnalysis.performance_assessment,
-            issues: basicAnalysis.issues.length
-          });
+          console.log('✅ Running analysis triggered successfully');
         }
       } catch (error) {
-        console.error('❌ Granular analysis failed:', error);
+        console.error('❌ Failed to trigger running analysis:', error);
       }
     }
 
-    // Update workout with computed analysis and granular analysis
+    // Update workout with computed data only
+    // NOTE: analyze-running-workout handles workout_analysis separately
     const updateData = { computed };
-    if (workoutAnalysis) {
-      updateData.workout_analysis = workoutAnalysis;
-    }
     
     const { error: upErr } = await supabase
       .from('workouts')
@@ -1792,10 +1543,9 @@ Deno.serve(async (req) => {
       success: true, 
       analysisVersion: ANALYSIS_VERSION,
       debug: {
-        hasWorkoutAnalysis: !!workoutAnalysis,
         workoutType: w.type,
         plannedId: w.planned_id,
-        analysisData: workoutAnalysis
+        note: 'workout_analysis written by analyze-running-workout'
       }
     }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
   } catch (e: any) {

@@ -433,13 +433,9 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                             firstInsight.includes('0 bpm with a maximum heart rate of 0 bpm');
       
       if (hasInvalidData) {
-        console.warn('⚠️ AI narrative contains invalid data (0 miles/0 bpm), triggering re-analysis');
-        // Trigger re-analysis if not already analyzing
-        if (analyzingWorkout !== workoutWithAnalysis.id) {
-          console.log('🔄 Starting re-analysis for workout with bad data:', workoutWithAnalysis.id);
-          analyzeWorkout(workoutWithAnalysis.id);
-        }
-        // Return null to show "Analysis Not Available" while re-analyzing
+        console.warn('⚠️ AI narrative contains invalid data (0 miles/0 bpm) - showing as unavailable');
+        // Return null to show "Analysis Not Available"
+        // User needs to manually clear the bad data from DB and re-analyze
         return null;
       }
       
