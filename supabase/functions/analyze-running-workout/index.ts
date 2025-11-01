@@ -915,6 +915,24 @@ Deno.serve(async (req) => {
       detailedAnalysis = { error: 'Failed to generate detailed analysis', message: error.message };
     }
 
+    // 🤖 GENERATE AI NARRATIVE INSIGHTS
+    let narrativeInsights = null;
+    try {
+      console.log('🤖 Generating AI narrative insights...');
+      narrativeInsights = await generateAINarrativeInsights(
+        sensorData,
+        workout,
+        plannedWorkout,
+        enhancedAnalysis,
+        performance,
+        detailedAnalysis
+      );
+      console.log('✅ AI narrative generated:', narrativeInsights);
+    } catch (error) {
+      console.error('❌ AI narrative generation failed:', error);
+      narrativeInsights = null; // Continue without narrative if AI fails
+    }
+
     // Store enhanced intervals back to computed.intervals (single source of truth)
     // Store summary analysis in workout_analysis
     console.log('💾 [TIMING] Starting database update...');
@@ -954,7 +972,8 @@ Deno.serve(async (req) => {
         // DON'T spread existingAnalysis - replace entirely with new structure
         granular_analysis: enhancedAnalysis,
         performance: performance,
-        detailed_analysis: detailedAnalysis
+        detailed_analysis: detailedAnalysis,
+        narrative_insights: narrativeInsights  // AI-generated human-readable insights
       },
       analysis_status: 'complete',
       analyzed_at: new Date().toISOString()
@@ -3217,4 +3236,137 @@ function identifyPacePatterns(paceData: any[], workIntervals: any[]): any {
     patterns: patterns,
     summary: patterns.length > 0 ? patterns[0].description : 'No clear patterns detected'
   };
+}
+
+/**
+ * Generate AI-powered narrative insights from structured analysis data
+ * Converts metrics and patterns into human-readable observations
+ */
+async function generateAINarrativeInsights(
+  sensorData: any[],
+  workout: any,
+  plannedWorkout: any,
+  granularAnalysis: any,
+  performance: any,
+  detailedAnalysis: any
+): Promise<string[]> {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  
+  if (!openaiKey) {
+    console.warn('⚠️ OPENAI_API_KEY not set, skipping AI narrative generation');
+    return null;
+  }
+
+  // Build context for AI
+  const workoutContext = {
+    type: workout.type,
+    duration_minutes: Math.round((workout.moving_time || workout.duration) / 60),
+    distance_miles: workout.computed?.overall?.distance_mi || 0,
+    avg_pace_min_per_mi: workout.computed?.overall?.avg_pace_min_per_mi || 0,
+    avg_heart_rate: workout.computed?.overall?.avg_heart_rate_bpm || 0,
+    max_heart_rate: workout.computed?.overall?.max_heart_rate_bpm || 0,
+    aerobic_training_effect: workout.garmin_data?.trainingEffect || null,
+    anaerobic_training_effect: workout.garmin_data?.anaerobicTrainingEffect || null,
+    performance_condition_start: workout.garmin_data?.performanceCondition || null,
+    performance_condition_end: workout.garmin_data?.performanceConditionEnd || null,
+    stamina_start: workout.garmin_data?.staminaStart || null,
+    stamina_end: workout.garmin_data?.staminaEnd || null,
+    exercise_load: workout.garmin_data?.activityTrainingLoad || null
+  };
+
+  const adherenceContext = {
+    execution_adherence_pct: Math.round(performance.execution_adherence),
+    pace_adherence_pct: Math.round(performance.pace_adherence),
+    duration_adherence_pct: Math.round(performance.duration_adherence),
+    hr_drift_bpm: granularAnalysis.heart_rate_analysis?.hr_drift_bpm || 0,
+    pace_variability_pct: detailedAnalysis?.pacing_consistency?.pace_variability_percent || 0
+  };
+
+  const prompt = `You are analyzing a running workout. Generate 4-6 concise, data-driven observations based on the metrics below.
+
+CRITICAL RULES:
+- Write like "a chart in words" - factual observations only
+- NO motivational language ("great job", "keep it up")
+- NO subjective judgments ("slow", "bad", "should have")
+- NO generic advice ("run more", "push harder")
+- Focus on WHAT HAPPENED, not what should happen
+- Use specific numbers and time references
+- Describe patterns visible in the data
+
+Workout Profile:
+- Type: ${workoutContext.type}
+- Duration: ${workoutContext.duration_minutes} minutes
+- Distance: ${workoutContext.distance_miles.toFixed(2)} miles
+- Avg Pace: ${workoutContext.avg_pace_min_per_mi.toFixed(2)} min/mi
+- Avg HR: ${workoutContext.avg_heart_rate} bpm (Max: ${workoutContext.max_heart_rate} bpm)
+${workoutContext.aerobic_training_effect ? `- Aerobic TE: ${workoutContext.aerobic_training_effect} (Anaerobic: ${workoutContext.anaerobic_training_effect})` : ''}
+${workoutContext.performance_condition_start !== null ? `- Performance Condition: ${workoutContext.performance_condition_start} → ${workoutContext.performance_condition_end} (${workoutContext.performance_condition_end - workoutContext.performance_condition_start} point change)` : ''}
+${workoutContext.stamina_start !== null ? `- Stamina: ${workoutContext.stamina_start}% → ${workoutContext.stamina_end}% (${workoutContext.stamina_start - workoutContext.stamina_end}% depletion)` : ''}
+${workoutContext.exercise_load ? `- Exercise Load: ${workoutContext.exercise_load}` : ''}
+
+Adherence Metrics:
+- Execution: ${adherenceContext.execution_adherence_pct}%
+- Pace: ${adherenceContext.pace_adherence_pct}%
+- Duration: ${adherenceContext.duration_adherence_pct}%
+- HR Drift: ${adherenceContext.hr_drift_bpm} bpm
+- Pace Variability: ${adherenceContext.pace_variability_pct}%
+
+Generate 4-6 observations in this style:
+"Maintained consistent pace averaging X:XX/mi throughout the Y-mile effort. Pace remained within X:XX-X:XX/mi range for Z% of the run."
+"Heart rate averaged X bpm with gradual upward drift in the final Y minutes. HR peaked at Z bpm, suggesting accumulated fatigue."
+"Performance Condition declined from +X to -Y, a Z-point drop over N minutes, consistent with tempo-intensity efforts."
+
+Return ONLY a JSON array of strings, no other text:
+["observation 1", "observation 2", ...]`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a data analyst converting workout metrics into factual observations. Never use motivational language or subjective judgments.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content?.trim();
+    
+    if (!content) {
+      throw new Error('Empty response from OpenAI');
+    }
+
+    // Parse JSON array from response
+    const insights = JSON.parse(content);
+    
+    if (!Array.isArray(insights)) {
+      throw new Error('AI response was not an array');
+    }
+
+    console.log(`✅ Generated ${insights.length} AI narrative insights`);
+    return insights;
+
+  } catch (error) {
+    console.error('❌ AI narrative generation failed:', error);
+    throw error;
+  }
 }

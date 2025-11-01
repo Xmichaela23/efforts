@@ -419,7 +419,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       return null;
     }
     
-    console.log('✅ Converting performance + detailed_analysis to insights');
+    console.log('✅ Using AI-generated narrative insights');
+    
+    // 🤖 PREFER AI-GENERATED NARRATIVE INSIGHTS
+    if (analysis.narrative_insights && Array.isArray(analysis.narrative_insights) && analysis.narrative_insights.length > 0) {
+      console.log(`✅ Found ${analysis.narrative_insights.length} AI narrative insights`);
+      return {
+        insights: analysis.narrative_insights,
+        performance: analysis.performance
+      };
+    }
+    
+    // FALLBACK: Generate insights from structured data (only if AI narrative missing)
+    console.warn('⚠️ No AI narrative insights found, generating from structured data');
     const insights: string[] = [];
     
     const performance = analysis.performance;
