@@ -676,13 +676,15 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 }`}
                 onClick={() => {
                   if (analyzingWorkout !== workout.id) {
-                    // Only analyze if no analysis exists
+                    // Check if analysis has new format (performance + detailed_analysis)
                     const analysis = workout.workout_analysis;
-                    if (!analysis) {
-                      console.log('🔄 No analysis found, analyzing workout:', workout.id);
+                    const hasNewFormat = analysis?.performance && analysis?.detailed_analysis;
+                    
+                    if (!analysis || !hasNewFormat) {
+                      console.log('🔄 No analysis or old format, re-analyzing workout:', workout.id);
                       analyzeWorkout(workout.id);
                     } else {
-                      console.log('✅ Analysis exists, selecting workout:', workout.id);
+                      console.log('✅ Analysis exists with new format, selecting workout:', workout.id);
                       setSelectedWorkoutId(workout.id);
                     }
                   }
