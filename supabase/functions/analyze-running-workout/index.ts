@@ -941,20 +941,32 @@ Deno.serve(async (req) => {
       detailed_analysis: detailedAnalysis
     };
 
+    // Log what we're about to write
+    console.log('🔍 [PRE-UPDATE DEBUG] About to write to database:');
+    console.log('  - detailedAnalysis type:', typeof detailedAnalysis);
+    console.log('  - detailedAnalysis is null?:', detailedAnalysis === null);
+    console.log('  - detailedAnalysis keys:', detailedAnalysis ? Object.keys(detailedAnalysis) : 'N/A');
+    console.log('  - detailedAnalysis value:', JSON.stringify(detailedAnalysis, null, 2));
+    
+    const updatePayload = {
+      computed: minimalComputed,  // Lightweight update (no sensor data)
+      workout_analysis: {
+        // DON'T spread existingAnalysis - replace entirely with new structure
+        granular_analysis: enhancedAnalysis,
+        performance: performance,
+        detailed_analysis: detailedAnalysis
+      },
+      analysis_status: 'complete',
+      analyzed_at: new Date().toISOString()
+    };
+    
+    console.log('🔍 [PRE-UPDATE DEBUG] Full update payload workout_analysis keys:', 
+      Object.keys(updatePayload.workout_analysis));
+    
     // Single update with computed, workout_analysis, and status
     const { error: updateError } = await supabase
       .from('workouts')
-      .update({
-        computed: minimalComputed,  // Lightweight update (no sensor data)
-        workout_analysis: {
-          // DON'T spread existingAnalysis - replace entirely with new structure
-          granular_analysis: enhancedAnalysis,
-          performance: performance,
-          detailed_analysis: detailedAnalysis
-        },
-        analysis_status: 'complete',
-        analyzed_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq('id', workout_id);
 
     console.log('✅ [TIMING] Database update completed!');
@@ -984,9 +996,20 @@ Deno.serve(async (req) => {
       if (verifyError) {
         console.error('❌ Verification read failed:', verifyError);
       } else {
-        console.log('🔍 Verification - stored workout_analysis:', JSON.stringify(verifyData?.workout_analysis, null, 2));
-        console.log('🔍 Verification - performance exists:', !!verifyData?.workout_analysis?.performance);
-        console.log('🔍 Verification - granular_analysis exists:', !!verifyData?.workout_analysis?.granular_analysis);
+        console.log('✅ [POST-UPDATE VERIFY] workout_analysis keys in DB:', verifyData?.workout_analysis ? Object.keys(verifyData.workout_analysis) : 'NULL');
+        console.log('✅ [POST-UPDATE VERIFY] Has performance?:', !!verifyData?.workout_analysis?.performance);
+        console.log('✅ [POST-UPDATE VERIFY] Has granular_analysis?:', !!verifyData?.workout_analysis?.granular_analysis);
+        console.log('✅ [POST-UPDATE VERIFY] Has detailed_analysis?:', !!verifyData?.workout_analysis?.detailed_analysis);
+        
+        if (verifyData?.workout_analysis?.detailed_analysis) {
+          console.log('✅ [POST-UPDATE VERIFY] detailed_analysis keys:', Object.keys(verifyData.workout_analysis.detailed_analysis));
+        } else {
+          console.error('❌ [POST-UPDATE VERIFY] detailed_analysis is MISSING from database after write!');
+          console.error('❌ [POST-UPDATE VERIFY] This means either:');
+          console.error('   1. The update payload did not include it');
+          console.error('   2. A database trigger/constraint removed it');
+          console.error('   3. Supabase client serialization issue');
+        }
       }
     }
 

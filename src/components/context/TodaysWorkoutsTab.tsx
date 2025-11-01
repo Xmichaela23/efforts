@@ -119,14 +119,21 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
 
   // SIMPLIFIED: Only analyze if no existing analysis
   const analyzeWorkout = async (workoutId: string) => {
+    console.log('🚀 analyzeWorkout() called with ID:', workoutId);
+    
     // Prevent multiple calls
     if (analyzingRef.current.has(workoutId)) {
-      console.log(`Already analyzing workout: ${workoutId}`);
+      console.log(`⏸️ Already analyzing workout: ${workoutId}`);
       return;
     }
     
     // Check if analysis already exists AND is complete
     const targetWorkout = recentWorkouts.find(w => w.id === workoutId);
+    console.log('🔍 Target workout found:', !!targetWorkout);
+    console.log('🔍 Target workout type:', targetWorkout?.type);
+    console.log('🔍 Target workout has analysis?:', !!targetWorkout?.workout_analysis);
+    console.log('🔍 Target workout analysis_status:', targetWorkout?.analysis_status);
+    
     if (targetWorkout?.workout_analysis && targetWorkout?.analysis_status === 'complete') {
       console.log(`✅ Analysis already complete for workout ${workoutId}, just selecting it`);
       setSelectedWorkoutId(workoutId);
@@ -180,9 +187,22 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         clearTimeout(timeoutId);
       });
       pollingRef.current.clear();
+      analyzingRef.current.clear();
       console.log('🧹 Cleaned up polling timers');
     };
   }, []);
+  
+  // Clear analyzing state if workout is not in recent list
+  useEffect(() => {
+    if (analyzingWorkout && recentWorkouts.length > 0) {
+      const workoutExists = recentWorkouts.some(w => w.id === analyzingWorkout);
+      if (!workoutExists) {
+        console.log('⚠️ Clearing analyzing state for workout not in list:', analyzingWorkout);
+        setAnalyzingWorkout(null);
+        analyzingRef.current.delete(analyzingWorkout);
+      }
+    }
+  }, [analyzingWorkout, recentWorkouts]);
 
   useEffect(() => {
     if (!todayLoading) {
@@ -675,10 +695,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                     : 'hover:bg-gray-50 cursor-pointer'
                 }`}
                 onClick={() => {
+                  console.log('🖱️ CLICKED workout:', workout.id);
+                  console.log('🖱️ Currently analyzing:', analyzingWorkout);
+                  console.log('🖱️ Workout has analysis?:', !!workout.workout_analysis);
+                  console.log('🖱️ Analysis keys:', workout.workout_analysis ? Object.keys(workout.workout_analysis) : 'none');
+                  
                   if (analyzingWorkout !== workout.id) {
                     // Check if analysis has new format (performance + detailed_analysis)
                     const analysis = workout.workout_analysis;
                     const hasNewFormat = analysis?.performance && analysis?.detailed_analysis;
+                    
+                    console.log('🖱️ Has new format (performance + detailed_analysis)?:', hasNewFormat);
+                    console.log('🖱️ Has performance?:', !!analysis?.performance);
+                    console.log('🖱️ Has detailed_analysis?:', !!analysis?.detailed_analysis);
                     
                     if (!analysis || !hasNewFormat) {
                       console.log('🔄 No analysis or old format, re-analyzing workout:', workout.id);
@@ -687,6 +716,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                       console.log('✅ Analysis exists with new format, selecting workout:', workout.id);
                       setSelectedWorkoutId(workout.id);
                     }
+                  } else {
+                    console.log('⏸️ Already analyzing this workout, ignoring click');
                   }
                 }}
               >
