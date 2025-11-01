@@ -863,12 +863,12 @@ Deno.serve(async (req) => {
     // Get existing workout_analysis to preserve other fields
     const { data: existingWorkout } = await supabase
       .from('workouts')
-      .select('workout_analysis')
+      .select('id')
       .eq('id', workout_id)
       .single();
     
-    const existingAnalysis = existingWorkout?.workout_analysis || {};
-    console.log('🔍 Existing workout_analysis structure:', JSON.stringify(existingAnalysis, null, 2));
+    // No need to fetch existing analysis - we're replacing it entirely with new structure
+    console.log('🔍 Generating fresh workout_analysis with new structure');
     
     // 🎯 GARMIN-STYLE PERFORMANCE CALCULATION
     // Penalty-based execution scoring (honest assessment of workout compliance)
@@ -947,7 +947,7 @@ Deno.serve(async (req) => {
       .update({
         computed: minimalComputed,  // Lightweight update (no sensor data)
         workout_analysis: {
-          ...existingAnalysis,
+          // DON'T spread existingAnalysis - replace entirely with new structure
           granular_analysis: enhancedAnalysis,
           performance: performance,
           detailed_analysis: detailedAnalysis
