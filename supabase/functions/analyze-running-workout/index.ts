@@ -1710,8 +1710,87 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
   );
   
   if (mainSegments.length === 0) {
-    console.log('⚠️ No main segments found for steady-state analysis');
-    return createEmptyAdherence();
+    console.log('⚠️ No main segments found - analyzing as freeform run using actual workout data');
+    
+    // Analyze the entire workout as a single segment using actual data
+    // Calculate total time from sensor data or workout fields
+    const totalTimeSeconds = sensorData.length > 0 
+      ? (sensorData[sensorData.length - 1].elapsed_time_s || sensorData.length)
+      : (workout.moving_time * 60 || workout.duration * 60 || 0);
+    
+    // Calculate average pace and HR from sensor data
+    const validPaceSamples = sensorData.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
+    const avgPace = validPaceSamples.length > 0
+      ? validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validPaceSamples.length
+      : 0;
+    
+    const validHRSamples = sensorData.filter(s => s.heart_rate > 0);
+    const avgHR = validHRSamples.length > 0
+      ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length)
+      : 0;
+    const maxHR = validHRSamples.length > 0 ? Math.max(...validHRSamples.map(s => s.heart_rate)) : 0;
+    
+    // Calculate pace variability
+    const segments = [];
+    const segmentDuration = 120; // 2 minutes
+    for (let i = 0; i < sensorData.length; i += segmentDuration) {
+      const segmentSamples = sensorData.slice(i, i + segmentDuration);
+      const validSegmentPaces = segmentSamples.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
+      if (validSegmentPaces.length > 0) {
+        const segAvgPace = validSegmentPaces.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validSegmentPaces.length;
+        segments.push(segAvgPace);
+      }
+    }
+    
+    const stdDev = segments.length > 1 ? calculateStandardDeviation(segments) : 0;
+    const cv = avgPace > 0 ? stdDev / avgPace : 0;
+    
+    console.log('📊 Freeform run analysis:', {
+      totalTimeSeconds,
+      avgPace: avgPace.toFixed(1),
+      avgHR,
+      maxHR,
+      cv: (cv * 100).toFixed(1) + '%',
+      sensorSamples: sensorData.length
+    });
+    
+    return {
+      overall_adherence: 1.0, // No target to compare against
+      time_in_range_score: 1.0,
+      variability_score: cv,
+      smoothness_score: Math.max(0, 1 - cv),
+      pacing_variability: {
+        coefficient_of_variation: cv * 100,
+        avg_pace_change_per_min: stdDev,
+        num_surges: 0,
+        num_crashes: 0,
+        steadiness_score: Math.max(0, 100 - (cv * 100)),
+        avg_pace_change_seconds: stdDev
+      },
+      time_in_range_s: totalTimeSeconds,
+      time_outside_range_s: 0,
+      total_time_s: totalTimeSeconds,
+      samples_in_range: sensorData.length,
+      samples_outside_range: 0,
+      heart_rate_analysis: avgHR > 0 ? {
+        adherence_percentage: 100,
+        time_in_zone_s: totalTimeSeconds,
+        time_outside_zone_s: 0,
+        total_time_s: totalTimeSeconds,
+        samples_in_zone: validHRSamples.length,
+        samples_outside_zone: 0,
+        average_heart_rate: avgHR,
+        target_zone: null,
+        hr_drift_bpm: 0,
+        hr_consistency: 1 - cv
+      } : null,
+      pacing_analysis: {
+        time_in_range_score: 100,
+        variability_score: cv,
+        avg_pace_s_per_mi: avgPace
+      },
+      duration_adherence: null
+    };
   }
   
   // Break workout into ~1-2 minute segments for consistency analysis
