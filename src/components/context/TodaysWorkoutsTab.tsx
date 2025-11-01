@@ -428,7 +428,10 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       return {
         workout: workoutWithAnalysis,
         insights: analysis.narrative_insights,
-        performance: analysis.performance
+        performance: analysis.performance,
+        key_metrics: {},
+        red_flags: [],
+        is_yesterday: workoutWithAnalysis.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA')
       };
     }
     
