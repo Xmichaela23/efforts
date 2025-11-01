@@ -375,14 +375,17 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     console.log('🔍 Primary issues available:', !!analysis.primary_issues);
     
     // 🎯 STRICT MODE: Only accept new architecture (performance + detailed_analysis)
-    // No fallbacks - fail fast if data structure is wrong
+    // If old/incomplete analysis, trigger re-analysis
     if (!analysis.performance || !analysis.detailed_analysis) {
-      console.error('❌ INVALID ANALYSIS STRUCTURE:', {
+      console.warn('⚠️ OLD/INCOMPLETE ANALYSIS STRUCTURE:', {
         has_performance: !!analysis.performance,
         has_detailed_analysis: !!analysis.detailed_analysis,
-        actual_keys: Object.keys(analysis)
+        actual_keys: Object.keys(analysis),
+        workout_id: workoutWithAnalysis.id
       });
-      throw new Error('Analysis missing required fields: performance and detailed_analysis');
+      
+      // Return null to show "Analysis Not Available" and trigger re-analysis
+      return null;
     }
     
     console.log('✅ Converting performance + detailed_analysis to insights');
