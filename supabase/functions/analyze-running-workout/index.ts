@@ -1730,19 +1730,25 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
       : 0;
     const maxHR = validHRSamples.length > 0 ? Math.max(...validHRSamples.map(s => s.heart_rate)) : 0;
     
-    // Calculate pace variability
-    const segments = [];
-    const segmentDuration = 120; // 2 minutes
-    for (let i = 0; i < sensorData.length; i += segmentDuration) {
-      const segmentSamples = sensorData.slice(i, i + segmentDuration);
-      const validSegmentPaces = segmentSamples.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
-      if (validSegmentPaces.length > 0) {
-        const segAvgPace = validSegmentPaces.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validSegmentPaces.length;
-        segments.push(segAvgPace);
-      }
+    // Calculate HR drift (first 10% vs last 10% of workout)
+    let hrDrift = 0;
+    if (validHRSamples.length > 20) {
+      const firstTenPercent = Math.floor(validHRSamples.length * 0.1);
+      const lastTenPercent = Math.floor(validHRSamples.length * 0.1);
+      
+      const firstSegment = validHRSamples.slice(0, firstTenPercent);
+      const lastSegment = validHRSamples.slice(-lastTenPercent);
+      
+      const firstAvg = firstSegment.reduce((sum, s) => sum + s.heart_rate, 0) / firstSegment.length;
+      const lastAvg = lastSegment.reduce((sum, s) => sum + s.heart_rate, 0) / lastSegment.length;
+      
+      hrDrift = Math.round(lastAvg - firstAvg);
     }
     
-    const stdDev = segments.length > 1 ? calculateStandardDeviation(segments) : 0;
+    // Calculate pace variability from all valid pace samples (not segment averages)
+    // This captures true variability including walk breaks and surges
+    const allPaces = validPaceSamples.map(s => s.pace_s_per_mi);
+    const stdDev = allPaces.length > 1 ? calculateStandardDeviation(allPaces) : 0;
     const cv = avgPace > 0 ? stdDev / avgPace : 0;
     
     console.log('📊 Freeform run analysis:', {
@@ -1750,6 +1756,7 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
       avgPace: avgPace.toFixed(1),
       avgHR,
       maxHR,
+      hrDrift,
       cv: (cv * 100).toFixed(1) + '%',
       sensorSamples: sensorData.length
     });
@@ -1781,7 +1788,7 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
         samples_outside_zone: 0,
         average_heart_rate: avgHR,
         target_zone: null,
-        hr_drift_bpm: 0,
+        hr_drift_bpm: hrDrift,
         hr_consistency: 1 - cv
       } : null,
       pacing_analysis: {
