@@ -3428,7 +3428,7 @@ async function generateAINarrativeInsights(
     pace_adherence_pct: Math.round(performance.pace_adherence),
     duration_adherence_pct: Math.round(performance.duration_adherence),
     hr_drift_bpm: granularAnalysis.heart_rate_analysis?.hr_drift_bpm || 0,
-    pace_variability_pct: detailedAnalysis?.pacing_consistency?.pace_variability_percent || 0
+    pace_variability_pct: granularAnalysis.pacing_variability?.coefficient_of_variation || 0
   };
 
   const prompt = `You are analyzing a running workout. Generate 4-6 concise, data-driven observations based on the metrics below.
