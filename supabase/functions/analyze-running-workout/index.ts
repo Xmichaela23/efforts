@@ -3431,7 +3431,11 @@ async function generateAINarrativeInsights(
     pace_variability_pct: granularAnalysis.pacing_variability?.coefficient_of_variation || 0
   };
 
-  const prompt = `You are analyzing a running workout. Generate 4-6 concise, data-driven observations based on the metrics below.
+  // Determine if this is a planned workout or freeform run
+  const isPlannedWorkout = !!plannedWorkout;
+  
+  // Build prompt based on workout type
+  let prompt = `You are analyzing a running workout. Generate 4-6 concise, data-driven observations based on the metrics below.
 
 CRITICAL RULES:
 - Write like "a chart in words" - factual observations only
@@ -3452,19 +3456,38 @@ ${workoutContext.aerobic_training_effect ? `- Aerobic TE: ${workoutContext.aerob
 ${workoutContext.performance_condition_start !== null ? `- Performance Condition: ${workoutContext.performance_condition_start} → ${workoutContext.performance_condition_end} (${workoutContext.performance_condition_end - workoutContext.performance_condition_start} point change)` : ''}
 ${workoutContext.stamina_start !== null ? `- Stamina: ${workoutContext.stamina_start}% → ${workoutContext.stamina_end}% (${workoutContext.stamina_start - workoutContext.stamina_end}% depletion)` : ''}
 ${workoutContext.exercise_load ? `- Exercise Load: ${workoutContext.exercise_load}` : ''}
+`;
 
-Adherence Metrics:
+  if (isPlannedWorkout) {
+    // COMPARATIVE MODE: Include adherence metrics for planned workouts
+    prompt += `
+Adherence Metrics (vs. Planned Workout):
 - Execution: ${adherenceContext.execution_adherence_pct}%
 - Pace: ${adherenceContext.pace_adherence_pct}%
 - Duration: ${adherenceContext.duration_adherence_pct}%
 - HR Drift: ${adherenceContext.hr_drift_bpm} bpm
 - Pace Variability: ${adherenceContext.pace_variability_pct}%
 
-Generate 4-6 observations in this style (use ${workoutContext.pace_unit} and ${workoutContext.distance_unit} for units):
-"Maintained consistent pace averaging X:XX ${workoutContext.pace_unit} throughout the Y ${workoutContext.distance_unit} effort. Pace remained within X:XX-X:XX ${workoutContext.pace_unit} range for Z% of the run."
-"Heart rate averaged X bpm with gradual upward drift in the final Y minutes. HR peaked at Z bpm, suggesting accumulated fatigue."
-"Performance Condition declined from +X to -Y, a Z-point drop over N minutes, consistent with tempo-intensity efforts."
+Generate 4-6 observations comparing actual vs. planned performance:
+"Maintained pace averaging X:XX ${workoutContext.pace_unit}, achieving Y% adherence to prescribed Z:ZZ ${workoutContext.pace_unit} target."
+"Completed X of Y prescribed intervals, with pace adherence ranging from A% to B%."
+"Heart rate averaged X bpm with Y bpm drift, Z% within target zone."
+`;
+  } else {
+    // DESCRIPTIVE MODE: Pattern analysis for freeform runs
+    prompt += `
+Pattern Analysis (Freeform Run):
+- HR Drift: ${adherenceContext.hr_drift_bpm} bpm
+- Pace Variability: ${adherenceContext.pace_variability_pct.toFixed(1)}%
 
+Generate 4-6 observations describing patterns and stimulus:
+"Maintained pace averaging X:XX ${workoutContext.pace_unit} throughout the Y ${workoutContext.distance_unit} effort. Pace varied by Z%, with most segments between A:AA-B:BB ${workoutContext.pace_unit}."
+"Heart rate averaged X bpm with Y bpm drift over Z minutes. HR peaked at A bpm in the final segment."
+"Performance Condition declined from +X to -Y over Z minutes, indicating accumulated fatigue from sustained effort."
+`;
+  }
+
+  prompt += `
 Return ONLY a JSON array of strings, no other text:
 ["observation 1", "observation 2", ...]`;
 
