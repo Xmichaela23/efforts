@@ -3382,8 +3382,25 @@ async function generateAINarrativeInsights(
   const distanceUnit = userUnits === 'metric' ? 'km' : 'miles';
   const paceUnit = userUnits === 'metric' ? 'min/km' : 'min/mi';
   
-  const avgPace = distanceValue > 0 ? 
-    totalDurationMinutes / distanceValue : 0;
+  // Calculate average pace from sensor data (more accurate than duration/distance)
+  const validPaceSamples = sensorData.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
+  let avgPaceSeconds = 0;
+  if (validPaceSamples.length > 0) {
+    // Sensor data has pace_s_per_mi, convert to appropriate unit
+    const avgPacePerMile = validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validPaceSamples.length;
+    if (userUnits === 'metric') {
+      // Convert from s/mi to s/km: divide by 1.609344
+      avgPaceSeconds = avgPacePerMile / 1.609344;
+    } else {
+      avgPaceSeconds = avgPacePerMile;
+    }
+  } else {
+    // Fallback to simple calculation if no sensor data
+    avgPaceSeconds = distanceValue > 0 ? (totalDurationMinutes * 60) / distanceValue : 0;
+  }
+  
+  // Convert to minutes per unit (km or mile)
+  const avgPace = avgPaceSeconds / 60;
   
   const heartRates = sensorData.filter(s => s.heart_rate && s.heart_rate > 0).map(s => s.heart_rate);
   const avgHeartRate = heartRates.length > 0 ? 
