@@ -3382,21 +3382,18 @@ async function generateAINarrativeInsights(
   const distanceUnit = userUnits === 'metric' ? 'km' : 'miles';
   const paceUnit = userUnits === 'metric' ? 'min/km' : 'min/mi';
   
-  // Calculate average pace from sensor data (more accurate than duration/distance)
-  const validPaceSamples = sensorData.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
-  let avgPaceSeconds = 0;
-  if (validPaceSamples.length > 0) {
-    // Sensor data has pace_s_per_mi, convert to appropriate unit
-    const avgPacePerMile = validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validPaceSamples.length;
-    if (userUnits === 'metric') {
-      // Convert from s/mi to s/km: divide by 1.609344
-      avgPaceSeconds = avgPacePerMile / 1.609344;
-    } else {
-      avgPaceSeconds = avgPacePerMile;
-    }
-  } else {
-    // Fallback to simple calculation if no sensor data
-    avgPaceSeconds = distanceValue > 0 ? (totalDurationMinutes * 60) / distanceValue : 0;
+  // Use Garmin's computed average pace (same source as chart display)
+  let avgPaceSeconds = workout.computed?.overall?.avg_pace_s_per_mi || 0;
+  
+  // Convert to appropriate unit if needed
+  if (userUnits === 'metric' && avgPaceSeconds > 0) {
+    // Convert from s/mi to s/km: divide by 1.609344
+    avgPaceSeconds = avgPaceSeconds / 1.609344;
+  }
+  
+  // Fallback to duration/distance if no computed pace
+  if (avgPaceSeconds === 0 && distanceValue > 0) {
+    avgPaceSeconds = (totalDurationMinutes * 60) / distanceValue;
   }
   
   // Convert to minutes per unit (km or mile)
@@ -3412,6 +3409,14 @@ async function generateAINarrativeInsights(
     workout_moving_time_min: workout.moving_time,
     workout_duration_min: workout.duration,
     workout_type: workout.type
+  });
+  
+  console.log('🔍 [PACE CALCULATION] Pace source for AI:', {
+    computed_avg_pace_s_per_mi: workout.computed?.overall?.avg_pace_s_per_mi,
+    converted_to_seconds: avgPaceSeconds,
+    converted_to_minutes: avgPace,
+    user_units: userUnits,
+    pace_unit: paceUnit
   });
   
   console.log('🤖 [DEBUG] Calculated metrics:', {
