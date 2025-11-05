@@ -3382,18 +3382,37 @@ async function generateAINarrativeInsights(
   const distanceUnit = userUnits === 'metric' ? 'km' : 'miles';
   const paceUnit = userUnits === 'metric' ? 'min/km' : 'min/mi';
   
-  // Use Garmin's computed average pace (same source as chart display)
-  let avgPaceSeconds = workout.computed?.overall?.avg_pace_s_per_mi || 0;
+  // Calculate average pace from sensor data (matching chart calculation)
+  // Chart uses: average of all valid pace samples
+  const validPaceSamples = sensorData.filter(s => 
+    s.pace_s_per_km && 
+    Number.isFinite(s.pace_s_per_km) && 
+    s.pace_s_per_km > 0 && 
+    s.pace_s_per_km < 900  // Filter out unrealistic paces (15 min/km = 900 sec/km)
+  );
   
-  // Convert to appropriate unit if needed
-  if (userUnits === 'metric' && avgPaceSeconds > 0) {
-    // Convert from s/mi to s/km: divide by 1.609344
-    avgPaceSeconds = avgPaceSeconds / 1.609344;
-  }
-  
-  // Fallback to duration/distance if no computed pace
-  if (avgPaceSeconds === 0 && distanceValue > 0) {
-    avgPaceSeconds = (totalDurationMinutes * 60) / distanceValue;
+  let avgPaceSeconds = 0;
+  if (validPaceSamples.length > 0) {
+    // Calculate average pace in seconds per km from sensor data
+    const avgPacePerKm = validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_km, 0) / validPaceSamples.length;
+    
+    // Convert to user's preferred unit
+    if (userUnits === 'metric') {
+      avgPaceSeconds = avgPacePerKm;  // Already in s/km
+    } else {
+      avgPaceSeconds = avgPacePerKm * 1.609344;  // Convert s/km to s/mi
+    }
+  } else {
+    // Fallback: try computed pace
+    avgPaceSeconds = workout.computed?.overall?.avg_pace_s_per_mi || 0;
+    if (userUnits === 'metric' && avgPaceSeconds > 0) {
+      avgPaceSeconds = avgPaceSeconds / 1.609344;  // Convert s/mi to s/km
+    }
+    
+    // Final fallback: duration/distance
+    if (avgPaceSeconds === 0 && distanceValue > 0) {
+      avgPaceSeconds = (totalDurationMinutes * 60) / distanceValue;
+    }
   }
   
   // Convert to minutes per unit (km or mile)
@@ -3412,11 +3431,17 @@ async function generateAINarrativeInsights(
   });
   
   console.log('🔍 [PACE CALCULATION] Pace source for AI:', {
+    sensor_data_samples: sensorData.length,
+    valid_pace_samples: validPaceSamples.length,
+    avg_pace_s_per_km_from_samples: validPaceSamples.length > 0 ? 
+      validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_km, 0) / validPaceSamples.length : null,
     computed_avg_pace_s_per_mi: workout.computed?.overall?.avg_pace_s_per_mi,
-    converted_to_seconds: avgPaceSeconds,
-    converted_to_minutes: avgPace,
+    final_pace_seconds: avgPaceSeconds,
+    final_pace_minutes: avgPace,
     user_units: userUnits,
-    pace_unit: paceUnit
+    pace_unit: paceUnit,
+    expected_chart_value: '10:29 /mi (629 seconds)',
+    ai_will_report: `${Math.floor(avgPace)}:${String(Math.round((avgPace - Math.floor(avgPace)) * 60)).padStart(2, '0')} ${paceUnit}`
   });
   
   console.log('🤖 [DEBUG] Calculated metrics:', {
