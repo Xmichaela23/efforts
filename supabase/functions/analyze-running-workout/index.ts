@@ -3383,24 +3383,24 @@ async function generateAINarrativeInsights(
   const paceUnit = userUnits === 'metric' ? 'min/km' : 'min/mi';
   
   // Calculate average pace from sensor data (matching chart calculation)
-  // Chart uses: average of all valid pace samples
+  // Sensor data contains pace_s_per_mi (NOT pace_s_per_km)
   const validPaceSamples = sensorData.filter(s => 
-    s.pace_s_per_km && 
-    Number.isFinite(s.pace_s_per_km) && 
-    s.pace_s_per_km > 0 && 
-    s.pace_s_per_km < 900  // Filter out unrealistic paces (15 min/km = 900 sec/km)
+    s.pace_s_per_mi && 
+    Number.isFinite(s.pace_s_per_mi) && 
+    s.pace_s_per_mi > 0 && 
+    s.pace_s_per_mi < 1800  // Filter out unrealistic paces (<30 min/mi)
   );
   
   let avgPaceSeconds = 0;
   if (validPaceSamples.length > 0) {
-    // Calculate average pace in seconds per km from sensor data
-    const avgPacePerKm = validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_km, 0) / validPaceSamples.length;
+    // Calculate average pace in seconds per mile from sensor data
+    const avgPacePerMi = validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validPaceSamples.length;
     
     // Convert to user's preferred unit
-    if (userUnits === 'metric') {
-      avgPaceSeconds = avgPacePerKm;  // Already in s/km
+    if (userUnits === 'imperial') {
+      avgPaceSeconds = avgPacePerMi;  // Already in s/mi
     } else {
-      avgPaceSeconds = avgPacePerKm * 1.609344;  // Convert s/km to s/mi
+      avgPaceSeconds = avgPacePerMi / 1.609344;  // Convert s/mi to s/km
     }
   } else {
     // Fallback: try computed pace
@@ -3433,8 +3433,10 @@ async function generateAINarrativeInsights(
   console.log('🔍 [PACE CALCULATION] Pace source for AI:', {
     sensor_data_samples: sensorData.length,
     valid_pace_samples: validPaceSamples.length,
-    avg_pace_s_per_km_from_samples: validPaceSamples.length > 0 ? 
-      validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_km, 0) / validPaceSamples.length : null,
+    avg_pace_s_per_mi_from_samples: validPaceSamples.length > 0 ? 
+      (validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validPaceSamples.length) : null,
+    avg_pace_min_per_mi_from_samples: validPaceSamples.length > 0 ? 
+      ((validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validPaceSamples.length) / 60) : null,
     computed_avg_pace_s_per_mi: workout.computed?.overall?.avg_pace_s_per_mi,
     final_pace_seconds: avgPaceSeconds,
     final_pace_minutes: avgPace,
