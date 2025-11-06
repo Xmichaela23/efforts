@@ -3430,20 +3430,14 @@ async function generateAINarrativeInsights(
     workout_type: workout.type
   });
   
-  console.log('🔍 [PACE CALCULATION] Pace source for AI:', {
-    sensor_data_samples: sensorData.length,
-    valid_pace_samples: validPaceSamples.length,
-    avg_pace_s_per_mi_from_samples: validPaceSamples.length > 0 ? 
-      (validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validPaceSamples.length) : null,
-    avg_pace_min_per_mi_from_samples: validPaceSamples.length > 0 ? 
-      ((validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validPaceSamples.length) / 60) : null,
+  console.log('🔍 [PACE CALCULATION] Using computed.overall.avg_pace_s_per_mi:', {
     computed_avg_pace_s_per_mi: workout.computed?.overall?.avg_pace_s_per_mi,
     final_pace_seconds: avgPaceSeconds,
     final_pace_minutes: avgPace,
     user_units: userUnits,
     pace_unit: paceUnit,
-    expected_chart_value: '10:29 /mi (629 seconds)',
-    ai_will_report: `${Math.floor(avgPace)}:${String(Math.round((avgPace - Math.floor(avgPace)) * 60)).padStart(2, '0')} ${paceUnit}`
+    ai_will_report: `${Math.floor(avgPace)}:${String(Math.round((avgPace - Math.floor(avgPace)) * 60)).padStart(2, '0')} ${paceUnit}`,
+    note: 'This matches chart display which uses computed.overall.avg_pace_s_per_mi'
   });
   
   console.log('🤖 [DEBUG] Calculated metrics:', {
