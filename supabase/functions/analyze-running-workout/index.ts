@@ -3383,24 +3383,34 @@ async function generateAINarrativeInsights(
   const paceUnit = userUnits === 'metric' ? 'min/km' : 'min/mi';
   
   // Calculate average pace from sensor data (matching chart calculation)
-  // Sensor data contains pace_s_per_mi (NOT pace_s_per_km)
-  const validPaceSamples = sensorData.filter(s => 
-    s.pace_s_per_mi && 
-    Number.isFinite(s.pace_s_per_mi) && 
-    s.pace_s_per_mi > 0 && 
-    s.pace_s_per_mi < 1800  // Filter out unrealistic paces (<30 min/mi)
+  // IMPORTANT: Chart averages SPEED then converts to pace (not average of paces!)
+  // This is mathematically different and produces slightly different results
+  
+  // Extract valid speed samples from raw sensor data
+  const rawSensorData = workout.sensor_data?.samples || [];
+  const validSpeedSamples = rawSensorData.filter(s => 
+    s.speedMetersPerSecond && 
+    Number.isFinite(s.speedMetersPerSecond) && 
+    s.speedMetersPerSecond > 0.5 &&  // Filter out stationary/unrealistic speeds
+    s.speedMetersPerSecond < 10  // < 36 km/h (reasonable running speed)
   );
   
   let avgPaceSeconds = 0;
-  if (validPaceSamples.length > 0) {
-    // Calculate average pace in seconds per mile from sensor data
-    const avgPacePerMi = validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validPaceSamples.length;
+  if (validSpeedSamples.length > 0) {
+    // Average the speeds (m/s)
+    const avgSpeedMps = validSpeedSamples.reduce((sum, s) => sum + s.speedMetersPerSecond, 0) / validSpeedSamples.length;
     
-    // Convert to user's preferred unit
+    // Convert average speed to pace
     if (userUnits === 'imperial') {
-      avgPaceSeconds = avgPacePerMi;  // Already in s/mi
+      // Convert m/s to mph, then to min/mi
+      const speedMph = avgSpeedMps * 2.23694;
+      const paceMinPerMile = 60 / speedMph;
+      avgPaceSeconds = paceMinPerMile * 60;  // Convert to seconds
     } else {
-      avgPaceSeconds = avgPacePerMi / 1.609344;  // Convert s/mi to s/km
+      // Convert m/s to km/h, then to min/km
+      const speedKph = avgSpeedMps * 3.6;
+      const paceMinPerKm = 60 / speedKph;
+      avgPaceSeconds = paceMinPerKm * 60;  // Convert to seconds
     }
   } else {
     // Fallback: try computed pace
@@ -3430,14 +3440,21 @@ async function generateAINarrativeInsights(
     workout_type: workout.type
   });
   
-  console.log('🔍 [PACE CALCULATION] Using computed.overall.avg_pace_s_per_mi:', {
+  console.log('🔍 [PACE CALCULATION] Pace source for AI (matching chart):', {
+    raw_sensor_samples: rawSensorData.length,
+    valid_speed_samples: validSpeedSamples.length,
+    avg_speed_mps: validSpeedSamples.length > 0 ? 
+      (validSpeedSamples.reduce((sum, s) => sum + s.speedMetersPerSecond, 0) / validSpeedSamples.length) : null,
+    avg_speed_mph: validSpeedSamples.length > 0 ? 
+      ((validSpeedSamples.reduce((sum, s) => sum + s.speedMetersPerSecond, 0) / validSpeedSamples.length) * 2.23694) : null,
     computed_avg_pace_s_per_mi: workout.computed?.overall?.avg_pace_s_per_mi,
     final_pace_seconds: avgPaceSeconds,
     final_pace_minutes: avgPace,
     user_units: userUnits,
     pace_unit: paceUnit,
+    expected_chart_value: '10:29 /mi (629 seconds)',
     ai_will_report: `${Math.floor(avgPace)}:${String(Math.round((avgPace - Math.floor(avgPace)) * 60)).padStart(2, '0')} ${paceUnit}`,
-    note: 'This matches chart display which uses computed.overall.avg_pace_s_per_mi'
+    note: 'Chart averages SPEED then converts to pace (not average of paces)'
   });
   
   console.log('🤖 [DEBUG] Calculated metrics:', {
