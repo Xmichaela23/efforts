@@ -131,6 +131,14 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     const targetWorkout = recentWorkouts.find(w => w.id === workoutId);
     console.log('🔍 Target workout found:', !!targetWorkout);
     console.log('🔍 Target workout type:', targetWorkout?.type);
+    
+    // Skip analysis for mobility workouts - they don't need it
+    if (targetWorkout?.type === 'mobility' || targetWorkout?.type === 'mobility_session') {
+      console.log('⏭️ Skipping analysis for mobility workout');
+      setSelectedWorkoutId(workoutId);
+      return;
+    }
+    
     console.log('🔍 Target workout has analysis?:', !!targetWorkout?.workout_analysis);
     console.log('🔍 Target workout analysis_status:', targetWorkout?.analysis_status);
     
@@ -803,22 +811,27 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                   {(workout.type === 'swim' || workout.type === 'swimming') && workout.avg_heart_rate && (
                     <div>HR: {workout.avg_heart_rate} bpm</div>
                   )}
-                  {analyzingWorkout === workout.id ? (
-                    <div className="flex items-center gap-1 text-xs text-blue-600 font-medium">
-                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Analyzing...
-                    </div>
-                  ) : workout.workout_analysis ? (
-                    <div className="text-xs text-green-600 font-medium">
-                      View analysis
-                    </div>
-                  ) : (
-                    <div className="text-xs text-blue-600 font-medium">
-                      Tap to analyze
-                    </div>
+                  {/* Don't show analysis options for mobility workouts */}
+                  {workout.type !== 'mobility' && workout.type !== 'mobility_session' && (
+                    <>
+                      {analyzingWorkout === workout.id ? (
+                        <div className="flex items-center gap-1 text-xs text-blue-600 font-medium">
+                          <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Analyzing...
+                        </div>
+                      ) : workout.workout_analysis ? (
+                        <div className="text-xs text-green-600 font-medium">
+                          View analysis
+                        </div>
+                      ) : (
+                        <div className="text-xs text-blue-600 font-medium">
+                          Tap to analyze
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
