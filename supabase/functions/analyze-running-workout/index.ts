@@ -3470,12 +3470,17 @@ async function generateAINarrativeInsights(
     hr_samples: heartRates.length
   });
   
+  // Format pace as MM:SS for AI (not decimal minutes)
+  const paceMinutes = Math.floor(avgPace);
+  const paceSeconds = Math.round((avgPace - paceMinutes) * 60);
+  const paceFormatted = `${paceMinutes}:${String(paceSeconds).padStart(2, '0')}`;
+  
   const workoutContext = {
     type: workout.type,
     duration_minutes: totalDurationMinutes,
     distance: distanceValue,
     distance_unit: distanceUnit,
-    avg_pace: avgPace,
+    avg_pace: paceFormatted,  // Use MM:SS format, not decimal
     pace_unit: paceUnit,
     avg_heart_rate: avgHeartRate,
     max_heart_rate: maxHeartRate,
@@ -3519,7 +3524,7 @@ Workout Profile:
 - Type: ${workoutContext.type}
 - Duration: ${workoutContext.duration_minutes} minutes
 - Distance: ${workoutContext.distance.toFixed(2)} ${workoutContext.distance_unit}
-- Avg Pace: ${workoutContext.avg_pace.toFixed(2)} ${workoutContext.pace_unit}
+- Avg Pace: ${workoutContext.avg_pace} ${workoutContext.pace_unit}
 - Avg HR: ${workoutContext.avg_heart_rate} bpm (Max: ${workoutContext.max_heart_rate} bpm)
 ${workoutContext.aerobic_training_effect ? `- Aerobic TE: ${workoutContext.aerobic_training_effect} (Anaerobic: ${workoutContext.anaerobic_training_effect})` : ''}
 ${workoutContext.performance_condition_start !== null ? `- Performance Condition: ${workoutContext.performance_condition_start} → ${workoutContext.performance_condition_end} (${workoutContext.performance_condition_end - workoutContext.performance_condition_start} point change)` : ''}
