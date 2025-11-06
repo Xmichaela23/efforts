@@ -63,7 +63,8 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     // Use server-calculated max_pace (no client-side math)
     const max_pace_s_per_km = Number.isFinite(workoutData?.calculated_metrics?.max_pace_s_per_km) ? 
       Number(workoutData.calculated_metrics.max_pace_s_per_km) : 
-      (Number.isFinite(workoutData?.max_pace) ? Number(workoutData.max_pace) : null);
+      (Number.isFinite(workoutData?.metrics?.max_pace) ? Number(workoutData.metrics.max_pace) : 
+      (Number.isFinite(workoutData?.max_pace) ? Number(workoutData.max_pace) : null));
     const work_kj = Number.isFinite(workoutData?.total_work) ? Number(workoutData.total_work) : null;
     // Read from computed.analysis.power (server-calculated)
     const powerMetrics = workoutData?.computed?.analysis?.power;

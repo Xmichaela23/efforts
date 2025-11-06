@@ -268,11 +268,16 @@ function calculateComprehensiveMetrics(workout: any, plannedWorkout: any): Worko
  * Calculate max speed from sensor data
  */
 function calculateMaxSpeed(sensorData: any): number {
-  if (!sensorData || !Array.isArray(sensorData)) return 0;
+  // Handle both sensor_data as array or sensor_data.samples as array
+  const samples = Array.isArray(sensorData) ? sensorData : 
+                  (sensorData?.samples && Array.isArray(sensorData.samples)) ? sensorData.samples : 
+                  null;
+  
+  if (!samples || samples.length === 0) return 0;
   
   let maxSpeed = 0;
   
-  for (const sample of sensorData) {
+  for (const sample of samples) {
     const speed = sample.speedMetersPerSecond || 
                   sample.speedInMetersPerSecond || 
                   sample.enhancedSpeedInMetersPerSecond || 

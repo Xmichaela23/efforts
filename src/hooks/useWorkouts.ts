@@ -1418,6 +1418,12 @@ export const useWorkouts = () => {
           .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
           .catch(() => {});
       } catch {}
+      
+      // Calculate comprehensive metrics (fire-and-forget) for smart server architecture
+      try {
+        (supabase.functions.invoke as any)?.('calculate-workout-metrics', { body: { workout_id: data.id } } as any)
+          .catch(() => {});
+      } catch {}
       return newWorkout;
     } catch (err) {
       console.error("Error in addWorkout:", err);

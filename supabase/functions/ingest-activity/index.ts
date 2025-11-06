@@ -914,6 +914,29 @@ Deno.serve(async (req)=>{
         } catch (analysisErr) {
           console.error('[ingest-activity] compute-workout-analysis failed:', analysisErr);
         }
+        // Calculate comprehensive metrics (max pace, adherence, etc.) for smart server architecture
+        try {
+          const metricsUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calculate-workout-metrics`;
+          const metricsResp = await fetch(metricsUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${key}`,
+              'apikey': key
+            },
+            body: JSON.stringify({
+              workout_id: wid
+            })
+          });
+          if (!metricsResp.ok) {
+            const errText = await metricsResp.text();
+            console.error('[ingest-activity] calculate-workout-metrics returned non-OK status:', metricsResp.status, errText);
+          } else {
+            console.log('[ingest-activity] calculate-workout-metrics succeeded for workout:', wid);
+          }
+        } catch (metricsErr) {
+          console.error('[ingest-activity] calculate-workout-metrics failed:', metricsErr);
+        }
       }
     } catch  {}
     return new Response(JSON.stringify({

@@ -681,19 +681,19 @@ const formatMaxSpeed = (speedValue: any): string => {
          value: (Number.isFinite(norm.avg_pace_s_per_km as any) ? formatPace(norm.avg_pace_s_per_km as number, useImperial) : 'N/A'),
          unit: '/mi'
        },
-       {
-         label: 'Max Pace',
-         value: (() => {
-           const raw = workoutData.metrics?.max_pace || workoutData.max_pace;
-           const n = Number(raw);
-           if (!Number.isFinite(n) || n <= 0) return 'N/A';
-           const secPerKm = n < 30 ? n * 60 : n;
-           const secPerMile = secPerKm * 1.60934;
-           if (secPerMile < 360) return 'N/A'; // guard: unrealistic for walk/hike
-           return formatPace(raw);
-         })(),
-         unit: '/mi'
-       }
+      {
+        label: 'Max Pace',
+        value: (() => {
+          // Use normalized data from useWorkoutData hook (calculated_metrics)
+          const maxPaceSeconds = norm.max_pace_s_per_km;
+          if (!Number.isFinite(maxPaceSeconds as any) || !maxPaceSeconds || maxPaceSeconds <= 0) return 'N/A';
+          // Convert to per-mile if needed, then format
+          const secPerMile = maxPaceSeconds * 1.60934;
+          if (secPerMile < 360) return 'N/A'; // guard: unrealistic for walk/hike
+          return formatPace(maxPaceSeconds, useImperial);
+        })(),
+        unit: useImperial ? '/mi' : '/km'
+      }
      ];
    }
    
@@ -703,15 +703,15 @@ const formatMaxSpeed = (speedValue: any): string => {
       value: Number.isFinite(norm.max_hr as any) ? String(norm.max_hr) : 'N/A',
        unit: 'bpm'
      },
-     {
-       label: isRun ? 'Max Pace' : 'Max Speed',
-       value: isRun
-        ? formatPace(workoutData.metrics?.max_pace || (workoutData as any)?.max_pace)
-       : (Number.isFinite((workoutData as any)?.max_speed as any)
-          ? (() => { const kmh = Number((workoutData as any).max_speed); if (!Number.isFinite(kmh)) return 'N/A'; return useImperial ? `${(kmh*0.621371).toFixed(1)} mph` : `${kmh.toFixed(1)} km/h`; })()
-          : 'N/A'),
-       unit: isRun ? (useImperial ? '/mi' : '/km') : (useImperial ? 'mph' : 'km/h')
-     },
+    {
+      label: isRun ? 'Max Pace' : 'Max Speed',
+      value: isRun
+       ? (Number.isFinite(norm.max_pace_s_per_km as any) && norm.max_pace_s_per_km ? formatPace(norm.max_pace_s_per_km as number, useImperial) : 'N/A')
+      : (Number.isFinite((workoutData as any)?.max_speed as any)
+         ? (() => { const kmh = Number((workoutData as any).max_speed); if (!Number.isFinite(kmh)) return 'N/A'; return useImperial ? `${(kmh*0.621371).toFixed(1)} mph` : `${kmh.toFixed(1)} km/h`; })()
+         : 'N/A'),
+      unit: isRun ? (useImperial ? '/mi' : '/km') : (useImperial ? 'mph' : 'km/h')
+    },
     // Max cadence / stroke rate removed per request
    ];
 
