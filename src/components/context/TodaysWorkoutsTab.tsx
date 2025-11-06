@@ -777,11 +777,30 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                   </div>
                 </div>
                 <div className="text-xs text-[#666666] text-right">
-                  {/* Only show relevant metrics for each workout type */}
-                  {(workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike') && workout.avg_power && (
-                    <div>Power: {workout.avg_power}W</div>
+                  {/* Show type-specific metrics */}
+                  {(workout.type === 'run' || workout.type === 'running') && (
+                    <>
+                      {workout.computed?.overall?.avg_pace_s_per_mi && (
+                        <div>
+                          Pace: {Math.floor(workout.computed.overall.avg_pace_s_per_mi / 60)}:{String(Math.round(workout.computed.overall.avg_pace_s_per_mi % 60)).padStart(2, '0')}/mi
+                        </div>
+                      )}
+                      {workout.avg_heart_rate && (
+                        <div>HR: {workout.avg_heart_rate} bpm</div>
+                      )}
+                    </>
                   )}
-                  {(workout.type === 'run' || workout.type === 'running' || workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike' || workout.type === 'swim' || workout.type === 'swimming') && workout.avg_heart_rate && (
+                  {(workout.type === 'ride' || workout.type === 'cycling' || workout.type === 'bike') && (
+                    <>
+                      {workout.avg_power && (
+                        <div>Power: {workout.avg_power}W</div>
+                      )}
+                      {workout.avg_heart_rate && (
+                        <div>HR: {workout.avg_heart_rate} bpm</div>
+                      )}
+                    </>
+                  )}
+                  {(workout.type === 'swim' || workout.type === 'swimming') && workout.avg_heart_rate && (
                     <div>HR: {workout.avg_heart_rate} bpm</div>
                   )}
                   {analyzingWorkout === workout.id ? (
