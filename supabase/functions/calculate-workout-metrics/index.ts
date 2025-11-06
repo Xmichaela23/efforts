@@ -153,6 +153,29 @@ Deno.serve(async (req) => {
       plannedWorkout = planned;
     }
 
+    // Parse JSON fields if they're stored as strings
+    if (workout.sensor_data && typeof workout.sensor_data === 'string') {
+      try {
+        workout.sensor_data = JSON.parse(workout.sensor_data);
+      } catch (e) {
+        console.error('Failed to parse sensor_data:', e);
+      }
+    }
+    if (workout.computed && typeof workout.computed === 'string') {
+      try {
+        workout.computed = JSON.parse(workout.computed);
+      } catch (e) {
+        console.error('Failed to parse computed:', e);
+      }
+    }
+    if (workout.metrics && typeof workout.metrics === 'string') {
+      try {
+        workout.metrics = JSON.parse(workout.metrics);
+      } catch (e) {
+        console.error('Failed to parse metrics:', e);
+      }
+    }
+
     // Calculate comprehensive metrics
     const metrics = calculateComprehensiveMetrics(workout, plannedWorkout);
 
