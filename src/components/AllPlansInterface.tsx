@@ -1441,7 +1441,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       lastManualStatusRef.current = { planId: selectedPlanDetail.id, status: 'active' };
       
       // CRITICAL: Trigger calendar to reload so get-week can materialize workouts
-      // The calendar hooks listen for these events
       console.log('[handleResumePlan] Dispatching invalidation events to trigger rematerialization');
       try {
         window.dispatchEvent(new CustomEvent('week:invalidate'));
@@ -1449,11 +1448,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         window.dispatchEvent(new CustomEvent('planned:invalidate'));
       } catch {}
       
-      // Close detail view to force calendar refresh
-      setCurrentView('list');
-      setTimeout(() => {
-        if (onClose) onClose();
-      }, 100);
+      // Force reload the current week to trigger materialization
+      const key = `${selectedPlanDetail.id}:${selectedWeek}`;
+      weekCacheRef.current.delete(key);
+      setWeekLoading(true);
+      // Trigger re-fetch by clearing and re-setting selectedWeek
+      const currentWeek = selectedWeek;
+      setSelectedWeek(0);
+      setTimeout(() => setSelectedWeek(currentWeek), 0);
     } catch (error) {
       console.error('Error resuming plan:', error);
       alert('Failed to resume plan. Please try again.');
