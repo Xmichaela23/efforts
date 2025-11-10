@@ -1208,6 +1208,24 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       } catch {}
     })();
   }, [focusPlanId, focusWeek]);
+  
+  // Prevent detailedPlans updates from resetting the plan status
+  // When the plan status is manually changed (pause/resume), don't let prop updates override it
+  const lastManualStatusRef = useRef<{planId: string, status: string} | null>(null);
+  useEffect(() => {
+    if (selectedPlanDetail && lastManualStatusRef.current && 
+        lastManualStatusRef.current.planId === selectedPlanDetail.id &&
+        selectedPlanDetail.status !== lastManualStatusRef.current.status) {
+      // Plan status in selectedPlanDetail doesn't match our manual change
+      // This means detailedPlans prop updated and reset it
+      console.log('[useEffect] Detected status reset from prop update, restoring:', lastManualStatusRef.current.status);
+      setPlanStatus(lastManualStatusRef.current.status);
+      setSelectedPlanDetail((prev: any) => ({
+        ...prev,
+        status: lastManualStatusRef.current!.status
+      }));
+    }
+  }, [detailedPlans, selectedPlanDetail]);
 
   // Ensure week materialized on selection change with in-memory week cache
   useEffect(() => {
@@ -1371,6 +1389,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           paused_at: result.paused_at 
         };
       });
+      // Track manual status change to prevent prop updates from overriding
+      lastManualStatusRef.current = { planId: selectedPlanDetail.id, status: 'paused' };
       console.log('[handlePausePlan] State updates complete');
     } catch (error) {
       console.error('Error pausing plan:', error);
@@ -1410,6 +1430,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         paused_at: null,
         config: updates.config || prev.config
       }));
+      // Track manual status change to prevent prop updates from overriding
+      lastManualStatusRef.current = { planId: selectedPlanDetail.id, status: 'active' };
     } catch (error) {
       console.error('Error resuming plan:', error);
       alert('Failed to resume plan. Please try again.');
