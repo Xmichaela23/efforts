@@ -1358,8 +1358,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     try {
       const result = await pausePlan(selectedPlanDetail.id);
       console.log('Plan paused:', result);
-      // After pausePlan completes, it calls loadPlans() which updates detailedPlans
-      // Pull fresh plan data from detailedPlans
+      // pausePlan calls loadPlans() but parent needs time to re-render with new data
+      // Wait briefly then check for fresh data
+      await new Promise(resolve => setTimeout(resolve, 100));
       const freshPlan = detailedPlans[selectedPlanDetail.id];
       if (freshPlan) {
         setSelectedPlanDetail(freshPlan);
@@ -1399,8 +1400,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       }
       
       await updatePlan(selectedPlanDetail.id, updates);
-      // After updatePlan completes, it calls loadPlans() which updates detailedPlans
-      // Pull fresh plan data
+      // updatePlan calls loadPlans() but parent needs time to re-render with new data
+      // Wait briefly then check for fresh data
+      await new Promise(resolve => setTimeout(resolve, 100));
       const freshPlan = detailedPlans[selectedPlanDetail.id];
       if (freshPlan) {
         setSelectedPlanDetail(freshPlan);
