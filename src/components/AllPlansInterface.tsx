@@ -1356,15 +1356,22 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const handlePausePlan = async () => {
     if (!selectedPlanDetail || !pausePlan) return;
     try {
+      console.log('[handlePausePlan] Starting pause for plan:', selectedPlanDetail.id);
       const result = await pausePlan(selectedPlanDetail.id);
-      console.log('Plan paused:', result);
-      // Just update the status fields, keep everything else intact
+      console.log('[handlePausePlan] Pause result:', result);
+      
+      // Update local state
+      console.log('[handlePausePlan] Setting planStatus to paused');
       setPlanStatus('paused');
-      setSelectedPlanDetail((prev: any) => ({ 
-        ...prev, 
-        status: 'paused', 
-        paused_at: result.paused_at 
-      }));
+      setSelectedPlanDetail((prev: any) => {
+        console.log('[handlePausePlan] Updating selectedPlanDetail, prev status:', prev.status);
+        return {
+          ...prev, 
+          status: 'paused', 
+          paused_at: result.paused_at 
+        };
+      });
+      console.log('[handlePausePlan] State updates complete');
     } catch (error) {
       console.error('Error pausing plan:', error);
       alert('Failed to pause plan. Please try again.');
@@ -1642,17 +1649,25 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           </button>
           
           <div className="flex items-center gap-2">
-            {planStatus === 'active' ? (
-              <button onClick={handlePausePlan} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
-                <Pause className="h-4 w-4" />
-                Pause
-              </button>
-            ) : planStatus === 'paused' ? (
-              <button onClick={handleResumePlan} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
-                <Play className="h-4 w-4" />
-                Resume
-              </button>
-            ) : null}
+            {(() => {
+              console.log('[Button Render] planStatus:', planStatus, 'selectedPlanDetail.status:', selectedPlanDetail?.status);
+              if (planStatus === 'active') {
+                return (
+                  <button onClick={handlePausePlan} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
+                    <Pause className="h-4 w-4" />
+                    Pause
+                  </button>
+                );
+              } else if (planStatus === 'paused') {
+                return (
+                  <button onClick={handleResumePlan} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
+                    <Play className="h-4 w-4" />
+                    Resume
+                  </button>
+                );
+              }
+              return null;
+            })()}
 
             <div className="hidden sm:block">
               <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
