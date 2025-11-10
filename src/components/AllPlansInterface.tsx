@@ -1363,7 +1363,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       await new Promise(resolve => setTimeout(resolve, 100));
       const freshPlan = detailedPlans[selectedPlanDetail.id];
       if (freshPlan) {
-        setSelectedPlanDetail(freshPlan);
+        // Preserve weeks data when updating plan state
+        setSelectedPlanDetail({ ...freshPlan, weeks: selectedPlanDetail.weeks });
         setPlanStatus(freshPlan.status);
       } else {
         // Fallback if detailedPlans hasn't updated yet
@@ -1405,7 +1406,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       await new Promise(resolve => setTimeout(resolve, 100));
       const freshPlan = detailedPlans[selectedPlanDetail.id];
       if (freshPlan) {
-        setSelectedPlanDetail(freshPlan);
+        // Preserve weeks data when updating plan state
+        setSelectedPlanDetail({ ...freshPlan, weeks: selectedPlanDetail.weeks, config: updates.config || freshPlan.config });
         setPlanStatus(freshPlan.status);
       } else {
         // Fallback
