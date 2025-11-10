@@ -213,6 +213,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [baselines, setBaselines] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>(focusPlanId ? 'detail' : 'list');
   const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
+  
+  // DEBUG: Log every render and track selectedPlanDetail changes
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+  console.log('[RENDER]', renderCountRef.current, 'selectedPlanDetail:', selectedPlanDetail?.id, 'status:', selectedPlanDetail?.status);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [planStatus, setPlanStatus] = useState<string>('active');
@@ -1423,6 +1428,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       }
       
       await updatePlan(selectedPlanDetail.id, updates);
+      
       // Just update the status and config fields, keep everything else intact
       setPlanStatus('active');
       setSelectedPlanDetail((prev: any) => ({ 
@@ -1433,6 +1439,21 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       }));
       // Track manual status change to prevent prop updates from overriding
       lastManualStatusRef.current = { planId: selectedPlanDetail.id, status: 'active' };
+      
+      // CRITICAL: Trigger calendar to reload so get-week can materialize workouts
+      // The calendar hooks listen for these events
+      console.log('[handleResumePlan] Dispatching invalidation events to trigger rematerialization');
+      try {
+        window.dispatchEvent(new CustomEvent('week:invalidate'));
+        window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+      } catch {}
+      
+      // Close detail view to force calendar refresh
+      setCurrentView('list');
+      setTimeout(() => {
+        if (onClose) onClose();
+      }, 100);
     } catch (error) {
       console.error('Error resuming plan:', error);
       alert('Failed to resume plan. Please try again.');
