@@ -532,14 +532,15 @@ export default function PlanSelect() {
         return `${y}-${m}-${dd}`;
       };
       if (hasTriVars) {
-        if (!raceDate) { setError('Please choose a race date'); return; }
-        if (!weeksToRace || weeksToRace <= 0) { setError('Race date must be in the future'); return; }
-        const wtr = weeksToRace as number;
-        // Soft gate: bake with clamped duration, still allow saving
-        const clamp = (v:number, lo:number, hi:number) => Math.max(lo, Math.min(hi, v));
-        targetDurationWeeks = clamp(wtr, tMin as number, tMax as number);
-        const lastWeekMonday = mondayOf(raceDate);
-        derivedStartMonday = addDaysISO(lastWeekMonday, -7 * (targetDurationWeeks - 1));
+        if (raceDate && weeksToRace && weeksToRace <= 0) { setError('Race date must be in the future'); return; }
+        if (raceDate && weeksToRace) {
+          const wtr = weeksToRace as number;
+          // Soft gate: bake with clamped duration, still allow saving
+          const clamp = (v:number, lo:number, hi:number) => Math.max(lo, Math.min(hi, v));
+          targetDurationWeeks = clamp(wtr, tMin as number, tMax as number);
+          const lastWeekMonday = mondayOf(raceDate);
+          derivedStartMonday = addDaysISO(lastWeekMonday, -7 * (targetDurationWeeks - 1));
+        }
       }
 
       // If this is a tri blueprint (no sessions_by_week), compose/bake sessions first
@@ -1205,7 +1206,7 @@ export default function PlanSelect() {
             true && (
             <>
               <div>
-                <div className="text-xs text-gray-700 mb-1">Race date</div>
+                <div className="text-xs text-gray-700 mb-1">Race date (optional)</div>
                 <input type="date" value={raceDate} onChange={e=>setRaceDate(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
               </div>
               {Array.isArray(triVars.strengthTracks) && triVars.strengthTracks.length > 0 && (
@@ -1257,7 +1258,7 @@ export default function PlanSelect() {
         })()}
         {error && <div className="text-sm text-red-600">{error}</div>}
             <div>
-              <button onClick={save} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50" disabled={!raceDate}>
+              <button onClick={save} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50">
                 Save Plan
               </button>
             </div>
