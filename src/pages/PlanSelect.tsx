@@ -768,7 +768,15 @@ export default function PlanSelect() {
           
           // Filter strength exercises based on user equipment
           if ((String(s.discipline||s.type||'').toLowerCase() === 'strength') && Array.isArray(copy.strength_exercises) && copy.strength_exercises.length > 0) {
+            console.log('🏋️ Processing strength workout for equipment substitution');
+            console.log('🔍 Baselines:', baselines);
+            console.log('🔍 Equipment data:', baselines?.equipment);
+            console.log('🔍 Strength equipment:', baselines?.equipment?.strength);
+            console.log('🔍 Original exercises:', copy.strength_exercises);
+            
             const userEquipment = baselines?.equipment?.strength || [];
+            console.log('🔍 User equipment array:', userEquipment);
+            
             const hasBarbell = userEquipment.includes('Full barbell + plates') || userEquipment.includes('Squat rack or power cage') || userEquipment.includes('Full commercial gym access');
             const hasDumbbells = userEquipment.includes('Adjustable dumbbells') || userEquipment.includes('Fixed dumbbells') || userEquipment.includes('Full commercial gym access');
             const hasBench = userEquipment.includes('Bench (flat/adjustable)') || userEquipment.includes('Full commercial gym access');
@@ -839,7 +847,11 @@ export default function PlanSelect() {
               return ex;
             };
             
+            const originalExercises = [...copy.strength_exercises];
             copy.strength_exercises = copy.strength_exercises.map(substituteExercise).filter(Boolean);
+            console.log('✅ Equipment flags:', { hasBarbell, hasDumbbells, hasBench, hasPullUpBar, hasCable, hasKettlebells, hasResistanceBands, bodyweightOnly });
+            console.log('🔄 Substituted exercises:', copy.strength_exercises);
+            console.log('📊 Changes made:', originalExercises.length !== copy.strength_exercises.length || JSON.stringify(originalExercises) !== JSON.stringify(copy.strength_exercises));
           }
           
           outWeek.push(copy);
