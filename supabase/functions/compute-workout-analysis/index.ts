@@ -1190,9 +1190,16 @@ Deno.serve(async (req) => {
       return out;
     }
 
+    // Fix decisecond values (Garmin bug): if pace values > 1200, they're in deciseconds
+    const pace_s_per_km_fixed = pace_s_per_km.map((p: number | null) => {
+      if (p == null || !Number.isFinite(p)) return null;
+      // If pace > 1200 s/km (20 min/km), it's likely in deciseconds
+      return p > 1200 ? Math.round(p / 10) : p;
+    });
+  
     // Light smoothing for elevation and pace to reduce noise/spikes
     const elevation_sm = hasRows ? smoothEMA(elevation_m, 0.25) : [];
-  const pace_sm = hasRows ? smoothEMA(pace_s_per_km, 0.25) : [];
+  const pace_sm = hasRows ? smoothEMA(pace_s_per_km_fixed, 0.25) : [];
   const speed_sm = hasRows ? smoothEMA(speed_mps, 0.18) : [];
   const grade_sm = hasRows ? smoothEMA(grade_percent, 0.25) : [];
 

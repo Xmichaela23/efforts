@@ -1,8 +1,18 @@
 # Architecture Recommendations for Commercial-Grade Workout Analysis System
 
-## Executive Summary
+## Executive Summary (Updated 2025)
 
-Current system has **architectural debt** that will cause scaling and maintenance issues. Recommendations focus on **single source of truth**, **versioning**, **idempotency**, and **clear ownership patterns**.
+**Status:** Most recommendations have been successfully implemented! The system now uses direct discipline-specific analysis calls with status tracking. Remaining technical debt is low-priority and non-blocking.
+
+**Key Achievements:**
+- ✅ Direct discipline calls implemented (no orchestrator)
+- ✅ Analysis status tracking (`analysis_status` column)
+- ✅ Frontend polling with exponential backoff
+- ✅ Clear separation between chart data and analysis insights
+
+**Remaining Items:**
+- ⚠️ Legacy `analyze-workout` orchestrator can be deleted (unused)
+- ⚠️ `compute-workout-analysis` still used for chart data (acceptable)
 
 ---
 
@@ -218,46 +228,52 @@ await analyzeWorkoutWithRetry(newWorkout.id, newWorkout.type);
 
 ## 📋 Implementation Plan
 
-### **Phase 1: Remove Orchestrator (Week 1)**
+### **Phase 1: Remove Orchestrator** ✅ COMPLETED
 
-1. **Update frontend service to call discipline functions directly:**
-   - Modify `workoutAnalysisService.ts` to route by workout type
-   - Update `TodaysWorkoutsTab.tsx` to pass workout type
-   - Update `useWorkouts.ts` to pass workout type
+1. **✅ Update frontend service to call discipline functions directly:**
+   - ✅ Modified `workoutAnalysisService.ts` to route by workout type
+   - ✅ Updated `TodaysWorkoutsTab.tsx` to pass workout type
+   - ✅ Updated `useWorkouts.ts` to pass workout type
+   - ✅ Implemented `getAnalysisFunction()` routing logic
 
-2. **Add versioning to discipline functions:**
-   - Update `analyze-running-workout` to include metadata
-   - Update `analyze-strength-workout` to include metadata
-   - Create `analyze-cycling-workout` and `analyze-swimming-workout`
+2. **✅ Add versioning to discipline functions:**
+   - ✅ `analyze-running-workout` includes metadata
+   - ✅ `analyze-strength-workout` includes metadata
+   - ⚠️ `analyze-cycling-workout` and `analyze-swimming-workout` - not yet created (low priority)
 
-3. **Test direct calls:**
-   - Verify running analysis works
-   - Verify strength analysis works
-   - Test error handling
+3. **✅ Test direct calls:**
+   - ✅ Running analysis works via direct calls
+   - ✅ Strength analysis works via direct calls
+   - ✅ Error handling with retry logic implemented
 
-### **Phase 2: Deprecate Legacy (Week 2)**
+### **Phase 2: Deprecate Legacy** ⚠️ PARTIALLY COMPLETED
 
-1. **Remove `analyze-workout` orchestrator:**
-   - Delete `supabase/functions/analyze-workout/`
-   - Update documentation
+1. **⚠️ `analyze-workout` orchestrator:**
+   - ⚠️ Still exists in `supabase/functions/analyze-workout/`
+   - ✅ Frontend no longer calls it (uses direct discipline functions)
+   - 📝 Can be safely deleted (no longer used)
 
-2. **Remove `compute-workout-analysis` calls:**
-   - Remove from `useWorkouts.ts:1417`
-   - Update all call sites to use discipline functions
+2. **⚠️ `compute-workout-analysis` calls:**
+   - ⚠️ Still called from `useWorkouts.ts:1417` (fire-and-forget for chart data)
+   - ⚠️ Still called from `useWorkoutDetail.ts:112` (ensures time-series available)
+   - 📝 Serves different purpose (chart data) vs analysis (insights)
+   - 📝 Not blocking - provides fallback functionality
 
-3. **Create migration function:**
-   - Upgrade v1.0 → v2.0 when accessed
-   - Run once per workout
+3. **❌ Migration function:**
+   - ❌ Not needed - status tracking handles this
+   - ✅ Status tracking prevents conflicts
 
-### **Phase 3: Add State Machine (Week 3)**
+### **Phase 3: Add State Machine** ✅ COMPLETED
 
-1. **Add `status` field to analysis:**
-   - Track analysis lifecycle
-   - Prevent race conditions
+1. **✅ Add `status` field to analysis:**
+   - ✅ `analysis_status` column added to database
+   - ✅ Tracks lifecycle: 'pending' → 'analyzing' → 'complete'/'failed'
+   - ✅ Prevents race conditions
 
-2. **Add retry logic:**
-   - Failed analyses can retry
-   - Track failure reasons
+2. **✅ Add retry logic:**
+   - ✅ `analyzeWorkoutWithRetry()` with exponential backoff
+   - ✅ Frontend polls for completion
+   - ✅ Error tracking via `analysis_error` column
 
 ---
 

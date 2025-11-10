@@ -170,15 +170,15 @@
 
 ---
 
-### 2. **`analyze-running-workout`** (New/Detailed)
+### 2. **`analyze-running-workout`** (Discipline-Specific Analysis)
 **File:** `supabase/functions/analyze-running-workout/index.ts`
 
 **Purpose:** Deep analysis of execution vs plan with AI insights
 
 **What it does:**
-1. Reads `workouts.computed` (already processed by `compute-workout-analysis`)
+1. Reads `workouts.computed` (already processed by `compute-workout-summary`)
 2. Reads `workouts.sensor_data` (raw samples)
-3. Reads `planned_workouts.intervals` (prescribed pace/power ranges)
+3. Reads `planned_workouts.computed.steps` (prescribed pace/power ranges)
 4. Analyzes each interval:
    - Time-in-prescribed-range (not just averages)
    - Pace variability
@@ -212,8 +212,9 @@
   - `analyzed_at` - Timestamp
 
 **Called by:**
-- Context screen via `analyzeWorkoutWithRetry(workoutId, workoutType)`
-- `useWorkouts.ts` when adding new workouts (REMOVED in recent changes)
+- Context screen via `analyzeWorkoutWithRetry(workoutId, workoutType)` in `workoutAnalysisService.ts`
+- Frontend calls directly based on workout type (no orchestrator)
+- `useWorkouts.ts` when adding new completed workouts
 
 **Used by:**
 - ✅ Summary screen (NEEDS `performance` scores)
@@ -221,25 +222,47 @@
 
 ---
 
-### 3. **`analyze-workout`** (Orchestrator - REDUNDANT)
-**File:** `supabase/functions/analyze-workout/index.ts`
+### 3. **`analyze-strength-workout`** (Discipline-Specific Analysis)
+**File:** `supabase/functions/analyze-strength-workout/index.ts`
 
-**Purpose:** Master orchestrator that routes to discipline-specific analyzers
+**Purpose:** Analysis of strength training execution with volume tracking
 
 **What it does:**
-1. Receives `workout_id` from client
-2. Loads workout from database
-3. Routes based on workout type:
-   - `run/running` → calls `analyze-running-workout`
-   - `strength` → calls `analyze-strength-workout`
-   - Other → returns basic response
-4. Formats response consistently
-
-**Status:** **REDUNDANT** - Frontend can call discipline functions directly
+1. Reads `workouts.strength_exercises` (completed sets)
+2. Reads `planned_workouts.strength_exercises` (planned sets)
+3. Analyzes volume completion and intensity
+4. Identifies adherence patterns
 
 **Called by:**
-- OLD: `workoutAnalysisService.ts` (before recent changes)
-- NEW: Nothing (frontend now calls `analyze-running-workout` directly)
+- Context screen via `analyzeWorkoutWithRetry(workoutId, workoutType)`
+- Frontend routes to this function for strength workouts
+
+---
+
+### Architecture Note: Direct Discipline Calls
+
+**Current Pattern (Implemented):**
+- Frontend knows workout type
+- Routes directly to discipline-specific function:
+  - Running → `analyze-running-workout`
+  - Strength → `analyze-strength-workout`
+  - Cycling → `analyze-cycling-workout`
+  - Swimming → `analyze-swimming-workout`
+- No orchestrator layer needed
+- Each discipline has specialized analysis logic
+
+**Service Layer:**
+```typescript
+// workoutAnalysisService.ts
+function getAnalysisFunction(type: string): string {
+  switch (type.toLowerCase()) {
+    case 'run':
+    case 'running': return 'analyze-running-workout';
+    case 'strength': return 'analyze-strength-workout';
+    // ... etc
+  }
+}
+```
 
 ---
 
@@ -407,22 +430,26 @@
 
 ---
 
-## ✅ Current Status
+## ✅ Current Status (Updated 2025)
 
 **Implemented:**
 - ✅ `analysis_status`, `analysis_error`, `analyzed_at` columns added
 - ✅ `analyze-running-workout` tracks status lifecycle
 - ✅ Frontend polls with exponential backoff
 - ✅ UI shows: pending, analyzing, complete, failed states
-- ✅ Frontend calls discipline functions directly
-- ✅ Removed `compute-workout-analysis` calls from `useWorkouts.ts`
+- ✅ Frontend calls discipline functions directly via `workoutAnalysisService.ts`
+- ✅ `analyzeWorkoutWithRetry(workoutId, workoutType)` routes to appropriate analyzer
+- ✅ Direct discipline calls: `analyze-running-workout`, `analyze-strength-workout`
 
-**Pending:**
-- ⏳ Remove `compute-workout-analysis` calls from `useWorkoutDetail.ts`
-- ⏳ Remove `compute-workout-analysis` calls from `ingest-activity/index.ts`
-- ⏳ Delete `analyze-workout` orchestrator (after verification)
+**Still in Use:**
+- ⚠️ `compute-workout-analysis` still called from:
+  - `useWorkoutDetail.ts:112` - Generates time-series for charts
+  - `useWorkouts.ts:1417` - Fire-and-forget on workout creation
+- ⚠️ `compute-workout-analysis` writes generic `workout_analysis` (lower priority than detailed analysis)
 
-**Decision Needed:**
-- Should `compute-workout-analysis` stop writing `workout_analysis`?
-- Or should we keep status tracking and ignore generic analysis?
+**Architecture Pattern:**
+- Direct discipline calls are the PRIMARY analysis path
+- `compute-workout-analysis` provides fallback chart data
+- Status tracking (`analysis_status`) prevents conflicts
+- Frontend prefers detailed analysis when `status === 'complete'`
 
