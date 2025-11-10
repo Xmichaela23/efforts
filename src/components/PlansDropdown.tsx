@@ -111,7 +111,9 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
                 className="flex flex-col items-start hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
                 style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '50px'}}
               >
-                <span className="text-xs text-gray-500 mb-1">Completed:</span>
+                <span className="text-xs text-gray-500 mb-1">
+                  {plan.status === 'ended' ? 'Ended:' : 'Completed:'}
+                </span>
                 <span className="font-medium">{plan.name}</span>
               </DropdownMenuItem>
             ))}
