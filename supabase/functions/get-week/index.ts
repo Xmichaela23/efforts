@@ -269,22 +269,24 @@ Deno.serve(async (req)=>{
                 if (tags) insertRow.tags = tags;
                 if (exportHints) insertRow.export_hints = exportHints;
                 if (description) insertRow.description = description;
-                console.log('[get-week] Attempting upsert for:', key);
+                console.log('[get-week] Attempting insert for:', key);
                 try {
-                  await supabase.from('planned_workouts').upsert(insertRow, {
-                    onConflict: 'training_plan_id,week_number,day_number,date,type',
-                    ignoreDuplicates: true
-                  }).throwOnError();
-                  console.log('[get-week] Upsert successful for:', key);
-                  existsKey.add(key);
-                  if (debug && debugNotes.length < 50) debugNotes.push({
-                    where: 'upsert',
-                    iso,
-                    plan_id: String(plan.id),
-                    type: normType
-                  });
-                } catch (insertErr) {
-                  console.error('[get-week] Upsert FAILED for:', key, 'error:', insertErr);
+                  const { error: insertErr } = await supabase.from('planned_workouts').insert(insertRow);
+                  // Ignore duplicate key errors (code 23505) - these are expected with concurrent requests
+                  if (insertErr && insertErr.code !== '23505') {
+                    console.error('[get-week] Insert FAILED for:', key, 'error:', insertErr);
+                  } else {
+                    console.log('[get-week] Insert successful for:', key);
+                    existsKey.add(key);
+                    if (debug && debugNotes.length < 50) debugNotes.push({
+                      where: 'insert',
+                      iso,
+                      plan_id: String(plan.id),
+                      type: normType
+                    });
+                  }
+                } catch (err) {
+                  console.error('[get-week] Insert exception for:', key, 'error:', err);
                 }
               }
             }
