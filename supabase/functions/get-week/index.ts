@@ -174,9 +174,12 @@ Deno.serve(async (req)=>{
               durWeeks
             });
             // For each date in range, see if plan covers it and ensure a row per authored session
+            console.log('[get-week] Processing plan:', plan.id, 'dates:', dates.length, 'startIso:', startIso);
             for (const iso of dates){
               const wk = weekNumberFor(iso, startIso);
+              console.log('[get-week] Date:', iso, 'week:', wk, 'durWeeks:', durWeeks);
               if (!(wk >= 1 && (durWeeks ? wk <= durWeeks : true))) {
+                console.log('[get-week] Skipping date', iso, '- out of bounds');
                 if (debug && debugNotes.length < 50) debugNotes.push({
                   where: 'skip_range',
                   iso,
@@ -186,8 +189,10 @@ Deno.serve(async (req)=>{
                 continue;
               }
               const dayName = String(dayNameFromISO(iso));
+              console.log('[get-week] Date:', iso, 'day:', dayName, 'looking for week', wk, 'in sessions_by_week');
               // Be tolerant of structure: array preferred; object -> flatten values; single -> box
               let weekArrRaw = sessionsByWeek?.[String(wk)];
+              console.log('[get-week] weekArrRaw for week', wk, ':', weekArrRaw ? 'EXISTS' : 'NULL', 'type:', Array.isArray(weekArrRaw) ? 'array' : typeof weekArrRaw);
               let weekArr = [];
               if (Array.isArray(weekArrRaw)) weekArr = weekArrRaw;
               else if (weekArrRaw && typeof weekArrRaw === 'object') {
@@ -200,9 +205,14 @@ Deno.serve(async (req)=>{
                   weekArrRaw
                 ];
               }
-              if (!weekArr.length) continue;
+              console.log('[get-week] weekArr.length:', weekArr.length);
+              if (!weekArr.length) {
+                console.log('[get-week] Skipping - no sessions in weekArr');
+                continue;
+              }
               // Find all sessions authored for this day
               const daySessions = weekArr.filter((s)=>String(s?.day) === dayName);
+              console.log('[get-week] daySessions for', dayName, ':', daySessions.length, 'found');
               if (!daySessions.length) continue;
               for (const s of daySessions){
                 // Normalize type (include mobility). If unknown, skip instead of defaulting to run.
@@ -227,7 +237,11 @@ Deno.serve(async (req)=>{
                   continue;
                 }
                 const key = `${String(plan.id)}|${iso}|${normType}`;
-                if (existsKey.has(key)) continue;
+                console.log('[get-week] Checking key:', key, 'exists:', existsKey.has(key));
+                if (existsKey.has(key)) {
+                  console.log('[get-week] Skipping - workout already exists');
+                  continue;
+                }
                 // Build minimal row preserving authored fields
                 const stepsPreset = Array.isArray(s?.steps_preset) ? s.steps_preset : undefined;
                 const workoutStructure = s?.workout_structure && typeof s.workout_structure === 'object' ? s.workout_structure : undefined;
@@ -236,6 +250,7 @@ Deno.serve(async (req)=>{
                 const tags = Array.isArray(s?.tags) ? s.tags : undefined;
                 const exportHints = s?.export_hints && typeof s.export_hints === 'object' ? s.export_hints : undefined;
                 const description = typeof s?.description === 'string' ? s.description : typeof s?.title === 'string' ? s.title : undefined;
+                const name = typeof s?.name === 'string' ? s.name : typeof s?.title === 'string' ? s.title : `${normType.charAt(0).toUpperCase() + normType.slice(1)} - Week ${wk}`;
                 const insertRow = {
                   user_id: userId,
                   training_plan_id: plan.id,
@@ -243,6 +258,7 @@ Deno.serve(async (req)=>{
                   day_number: dayIndex[dayName] || 1,
                   date: iso,
                   type: normType,
+                  name: name,
                   workout_status: 'planned',
                   source: 'training_plan'
                 };
@@ -253,18 +269,23 @@ Deno.serve(async (req)=>{
                 if (tags) insertRow.tags = tags;
                 if (exportHints) insertRow.export_hints = exportHints;
                 if (description) insertRow.description = description;
+                console.log('[get-week] Attempting upsert for:', key);
                 try {
-                  await supabase.from('planned_workouts').insert(insertRow, {
-                    returning: 'minimal'
+                  await supabase.from('planned_workouts').upsert(insertRow, {
+                    onConflict: 'training_plan_id,week_number,day_number,date,type',
+                    ignoreDuplicates: true
                   }).throwOnError();
+                  console.log('[get-week] Upsert successful for:', key);
                   existsKey.add(key);
                   if (debug && debugNotes.length < 50) debugNotes.push({
-                    where: 'insert',
+                    where: 'upsert',
                     iso,
                     plan_id: String(plan.id),
                     type: normType
                   });
-                } catch  {}
+                } catch (insertErr) {
+                  console.error('[get-week] Upsert FAILED for:', key, 'error:', insertErr);
+                }
               }
             }
           } catch  {}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { normalizePlannedSession, normalizeStructuredSession } from '@/services/plans/normalizer';
 import { resolveTargets } from '@/services/plans/targets';
 import { expand } from '@/services/plans/expander';
@@ -209,6 +210,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 }) => {
   // Planned workouts are sourced via unified server paths now
   const plannedWorkouts: any[] = [];
+  const queryClient = useQueryClient();
   const { loadUserBaselines, updatePlan, pausePlan, endPlan } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>(focusPlanId ? 'detail' : 'list');
@@ -1441,11 +1443,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       lastManualStatusRef.current = { planId: selectedPlanDetail.id, status: 'active' };
       
       // CRITICAL: Trigger calendar to reload so get-week can materialize workouts
-      console.log('[handleResumePlan] Dispatching invalidation events to trigger rematerialization');
+      console.log('[handleResumePlan] Invalidating queries to trigger rematerialization');
       try {
-        window.dispatchEvent(new CustomEvent('week:invalidate'));
-        window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+        // Use React Query's built-in invalidation - it automatically deduplicates concurrent requests
+        queryClient.invalidateQueries({ queryKey: ['weekUnified'] });
       } catch {}
       
       // Force reload the current week to trigger materialization
