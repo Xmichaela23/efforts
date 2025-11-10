@@ -603,8 +603,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase.functions.invoke('pause-plan', { body: { plan_id: String(planId) } }) as any;
       if (error) throw error as any;
       if (!data?.success) throw new Error(data?.error || 'Failed to pause plan');
-      // Don't call loadPlans() - let local state handle it to avoid race conditions
-      // await loadPlans();
+      
+      // Optimistically update detailedPlans to prevent stale reads
+      if (detailedPlans[planId]) {
+        detailedPlans[planId] = {
+          ...detailedPlans[planId],
+          status: 'paused',
+          paused_at: data.paused_at
+        };
+      }
+      
       try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
       return data;
     } catch (error) {
@@ -617,9 +625,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data, error } = await supabase.from('plans').update(updates).eq('id', planId).select().single();
       if (error) throw error;
-      // Don't call loadPlans() for status-only updates to avoid race conditions
-      // The component manages local state
-      // await loadPlans();
+      
+      // Optimistically update detailedPlans to prevent stale reads
+      if (detailedPlans[planId]) {
+        detailedPlans[planId] = {
+          ...detailedPlans[planId],
+          ...updates
+        };
+      }
+      
       try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
     } catch (error) {
       console.error('Error in updatePlan:', error);
