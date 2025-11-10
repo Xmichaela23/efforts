@@ -1358,19 +1358,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     try {
       const result = await pausePlan(selectedPlanDetail.id);
       console.log('Plan paused:', result);
-      // pausePlan calls loadPlans() but parent needs time to re-render with new data
-      // Wait briefly then check for fresh data
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const freshPlan = detailedPlans[selectedPlanDetail.id];
-      if (freshPlan) {
-        // Preserve weeks data when updating plan state
-        setSelectedPlanDetail({ ...freshPlan, weeks: selectedPlanDetail.weeks });
-        setPlanStatus(freshPlan.status);
-      } else {
-        // Fallback if detailedPlans hasn't updated yet
-        setPlanStatus('paused');
-        setSelectedPlanDetail({ ...selectedPlanDetail, status: 'paused', paused_at: result.paused_at });
-      }
+      // Just update the status fields, keep everything else intact
+      setPlanStatus('paused');
+      setSelectedPlanDetail((prev: any) => ({ 
+        ...prev, 
+        status: 'paused', 
+        paused_at: result.paused_at 
+      }));
     } catch (error) {
       console.error('Error pausing plan:', error);
       alert('Failed to pause plan. Please try again.');
@@ -1401,19 +1395,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       }
       
       await updatePlan(selectedPlanDetail.id, updates);
-      // updatePlan calls loadPlans() but parent needs time to re-render with new data
-      // Wait briefly then check for fresh data
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const freshPlan = detailedPlans[selectedPlanDetail.id];
-      if (freshPlan) {
-        // Preserve weeks data when updating plan state
-        setSelectedPlanDetail({ ...freshPlan, weeks: selectedPlanDetail.weeks, config: updates.config || freshPlan.config });
-        setPlanStatus(freshPlan.status);
-      } else {
-        // Fallback
-        setPlanStatus('active');
-        setSelectedPlanDetail({ ...selectedPlanDetail, status: 'active', ...updates });
-      }
+      // Just update the status and config fields, keep everything else intact
+      setPlanStatus('active');
+      setSelectedPlanDetail((prev: any) => ({ 
+        ...prev, 
+        status: 'active',
+        paused_at: null,
+        config: updates.config || prev.config
+      }));
     } catch (error) {
       console.error('Error resuming plan:', error);
       alert('Failed to resume plan. Please try again.');
