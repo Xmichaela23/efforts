@@ -166,6 +166,12 @@
                   { "type": "null" }
                 ]
               },
+              "duration_seconds": {
+                "oneOf": [
+                  { "type": "integer", "minimum": 1 },
+                  { "type": "null" }
+                ]
+              },
               "weight": {
                 "oneOf": [
                   { "type": "number", "minimum": 0 },
