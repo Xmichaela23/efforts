@@ -482,8 +482,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       const { data: plans, error } = await supabase.from('plans').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
       if (error) return;
-      const active = plans?.filter(p => p.status === 'active').map(plan => ({ ...plan, currentWeek: plan.current_week })) || [];
-      const completed = plans?.filter(p => p.status === 'completed').map(plan => ({ ...plan, currentWeek: plan.current_week })) || [];
+      const active = plans?.filter(p => p.status === 'active' || p.status === 'paused').map(plan => ({ ...plan, currentWeek: plan.current_week })) || [];
+      const completed = plans?.filter(p => p.status === 'completed' || p.status === 'ended').map(plan => ({ ...plan, currentWeek: plan.current_week })) || [];
       setCurrentPlans(active);
       setCompletedPlans(completed);
       const detailed: any = {};
