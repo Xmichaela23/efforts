@@ -42,12 +42,14 @@ interface Plan {
   duration?: number;
   level?: string;
   goal?: string;
-  status: 'active' | 'completed';
+  status: 'active' | 'paused' | 'ended' | 'completed';
   current_week?: number;
   created_date?: string;
   total_workouts?: number;
   weeks?: any;
   user_id?: string;
+  paused_at?: string;
+  config?: any;
 }
 
 interface BaselineData {
@@ -124,6 +126,7 @@ interface AppContextType {
   plansLoading: boolean;
   addPlan: (plan: any) => Promise<void>;
   deletePlan: (planId: string) => Promise<void>;
+  endPlan: (planId: string) => Promise<any>;
   updatePlan: (planId: string, updates: any) => Promise<void>;
   refreshPlans: () => Promise<void>;
   saveUserBaselines: (data: BaselineData) => Promise<void>;
@@ -574,11 +577,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const endPlan = async (planId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated to end plans');
+      // Server function: end plan and delete future planned workouts
+      const { data, error } = await supabase.functions.invoke('end-plan', { body: { plan_id: String(planId) } }) as any;
+      if (error) throw error as any;
+      if (!data?.success) throw new Error(data?.error || 'Failed to end plan');
+      await loadPlans();
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      return data;
+    } catch (error) {
+      console.error('Error in endPlan:', error);
+      throw error;
+    }
+  };
+
   const updatePlan = async (planId: string, updates: any) => {
     try {
       const { data, error } = await supabase.from('plans').update(updates).eq('id', planId).select().single();
       if (error) throw error;
       await loadPlans();
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
     } catch (error) {
       console.error('Error in updatePlan:', error);
       throw error;
@@ -682,6 +703,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         plansLoading,
         addPlan,
         deletePlan,
+        endPlan,
         updatePlan,
         refreshPlans: loadPlans,
         saveUserBaselines,

@@ -209,7 +209,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 }) => {
   // Planned workouts are sourced via unified server paths now
   const plannedWorkouts: any[] = [];
-  const { loadUserBaselines } = useAppContext();
+  const { loadUserBaselines, updatePlan, endPlan } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>(focusPlanId ? 'detail' : 'list');
   const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
@@ -1337,6 +1337,69 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     }
   };
 
+  const handleEndPlan = async () => {
+    if (!selectedPlanDetail || !endPlan) return;
+    try {
+      const result = await endPlan(selectedPlanDetail.id);
+      console.log('Plan ended:', result);
+      // Update local state to reflect ended status
+      setPlanStatus('ended');
+      setSelectedPlanDetail({ ...selectedPlanDetail, status: 'ended' });
+      // Optionally go back to list view
+      // handleBack();
+    } catch (error) {
+      console.error('Error ending plan:', error);
+      alert('Failed to end plan. Please try again.');
+    }
+  };
+
+  const handlePausePlan = async () => {
+    if (!selectedPlanDetail || !updatePlan) return;
+    try {
+      await updatePlan(selectedPlanDetail.id, { 
+        status: 'paused',
+        paused_at: new Date().toISOString()
+      });
+      setPlanStatus('paused');
+      setSelectedPlanDetail({ ...selectedPlanDetail, status: 'paused' });
+    } catch (error) {
+      console.error('Error pausing plan:', error);
+      alert('Failed to pause plan. Please try again.');
+    }
+  };
+
+  const handleResumePlan = async () => {
+    if (!selectedPlanDetail || !updatePlan) return;
+    try {
+      // Calculate how long the plan was paused
+      const pausedAt = selectedPlanDetail.paused_at ? new Date(selectedPlanDetail.paused_at) : null;
+      const now = new Date();
+      
+      // If we have a pause timestamp and a config with start date, adjust it
+      let updates: any = { status: 'active', paused_at: null };
+      
+      if (pausedAt && selectedPlanDetail.config?.user_selected_start_date) {
+        const pauseDurationDays = Math.floor((now.getTime() - pausedAt.getTime()) / (1000 * 60 * 60 * 24));
+        const originalStart = new Date(selectedPlanDetail.config.user_selected_start_date);
+        const newStart = new Date(originalStart);
+        newStart.setDate(newStart.getDate() + pauseDurationDays);
+        
+        // Update config with new start date
+        updates.config = {
+          ...selectedPlanDetail.config,
+          user_selected_start_date: newStart.toISOString().split('T')[0]
+        };
+      }
+      
+      await updatePlan(selectedPlanDetail.id, updates);
+      setPlanStatus('active');
+      setSelectedPlanDetail({ ...selectedPlanDetail, status: 'active', ...updates });
+    } catch (error) {
+      console.error('Error resuming plan:', error);
+      alert('Failed to resume plan. Please try again.');
+    }
+  };
+
   const handleAdjustmentSubmit = async () => {
     if (!adjustmentInput.trim() || isProcessingAdjustment) return;
     
@@ -1571,16 +1634,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           
           <div className="flex items-center gap-2">
             {planStatus === 'active' ? (
-              <button onClick={() => setPlanStatus('paused')} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
+              <button onClick={handlePausePlan} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
                 <Pause className="h-4 w-4" />
                 Pause
               </button>
-            ) : (
-              <button onClick={() => setPlanStatus('active')} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
+            ) : planStatus === 'paused' ? (
+              <button onClick={handleResumePlan} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
                 <Play className="h-4 w-4" />
                 Resume
               </button>
-            )}
+            ) : null}
 
             <div className="hidden sm:block">
               <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
@@ -1597,6 +1660,30 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               <Edit className="h-4 w-4" />
               Modify
             </button>
+            
+            {(planStatus === 'active' || planStatus === 'paused') && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button className="flex items-center gap-2 px-3 py-2 text-orange-600 hover:text-orange-700 transition-colors">
+                    End Plan
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>End Plan Early</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to end "{selectedPlanDetail.name}"? This will remove all future planned workouts but keep your completed workouts for comparison. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleEndPlan} className="bg-orange-600 hover:bg-orange-700">
+                      End Plan
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             
             <AlertDialog>
               <AlertDialogTrigger asChild>
