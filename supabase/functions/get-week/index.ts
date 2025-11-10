@@ -124,7 +124,9 @@ Deno.serve(async (req)=>{
     // On-demand materialization (scoped strictly to [fromISO, toISO])
     try {
       // Load user's active plans with an explicit start date and non-empty sessions
+      console.log('[get-week] Looking for active plans for user:', userId, 'date range:', fromISO, 'to', toISO);
       const { data: plans, error: plansErr } = await supabase.from('plans').select('id,user_id,status,config,duration_weeks,sessions_by_week').eq('user_id', userId).eq('status', 'active');
+      console.log('[get-week] Found plans:', plans?.length || 0, 'Error:', plansErr?.message || 'none');
       if (!plansErr && Array.isArray(plans) && plans.length) {
         if (debug) debugNotes.push({
           where: 'plans',
