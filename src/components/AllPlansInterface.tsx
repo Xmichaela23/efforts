@@ -1358,8 +1358,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     try {
       const result = await pausePlan(selectedPlanDetail.id);
       console.log('Plan paused:', result);
-      setPlanStatus('paused');
-      setSelectedPlanDetail({ ...selectedPlanDetail, status: 'paused', paused_at: result.paused_at });
+      // After pausePlan completes, it calls loadPlans() which updates detailedPlans
+      // Pull fresh plan data from detailedPlans
+      const freshPlan = detailedPlans[selectedPlanDetail.id];
+      if (freshPlan) {
+        setSelectedPlanDetail(freshPlan);
+        setPlanStatus(freshPlan.status);
+      } else {
+        // Fallback if detailedPlans hasn't updated yet
+        setPlanStatus('paused');
+        setSelectedPlanDetail({ ...selectedPlanDetail, status: 'paused', paused_at: result.paused_at });
+      }
     } catch (error) {
       console.error('Error pausing plan:', error);
       alert('Failed to pause plan. Please try again.');
@@ -1390,8 +1399,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       }
       
       await updatePlan(selectedPlanDetail.id, updates);
-      setPlanStatus('active');
-      setSelectedPlanDetail({ ...selectedPlanDetail, status: 'active', ...updates });
+      // After updatePlan completes, it calls loadPlans() which updates detailedPlans
+      // Pull fresh plan data
+      const freshPlan = detailedPlans[selectedPlanDetail.id];
+      if (freshPlan) {
+        setSelectedPlanDetail(freshPlan);
+        setPlanStatus(freshPlan.status);
+      } else {
+        // Fallback
+        setPlanStatus('active');
+        setSelectedPlanDetail({ ...selectedPlanDetail, status: 'active', ...updates });
+      }
     } catch (error) {
       console.error('Error resuming plan:', error);
       alert('Failed to resume plan. Please try again.');
