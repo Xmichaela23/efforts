@@ -765,6 +765,83 @@ export default function PlanSelect() {
           const isBikeText = /\b(bike|ride|cycling)\b/i.test(String(s.discipline||s.type||''));
           if (desc && isBikeText) desc = mapBike(desc);
           const copy = { ...expanded, description: desc };
+          
+          // Filter strength exercises based on user equipment
+          if ((String(s.discipline||s.type||'').toLowerCase() === 'strength') && Array.isArray(copy.strength_exercises) && copy.strength_exercises.length > 0) {
+            const userEquipment = baselines?.equipment?.strength || [];
+            const hasBarbell = userEquipment.includes('Full barbell + plates') || userEquipment.includes('Squat rack or power cage') || userEquipment.includes('Full commercial gym access');
+            const hasDumbbells = userEquipment.includes('Adjustable dumbbells') || userEquipment.includes('Fixed dumbbells') || userEquipment.includes('Full commercial gym access');
+            const hasBench = userEquipment.includes('Bench (flat/adjustable)') || userEquipment.includes('Full commercial gym access');
+            const hasPullUpBar = userEquipment.includes('Pull-up bar') || userEquipment.includes('Full commercial gym access');
+            const hasCable = userEquipment.includes('Cable machine/functional trainer') || userEquipment.includes('Full commercial gym access');
+            const hasKettlebells = userEquipment.includes('Kettlebells') || userEquipment.includes('Full commercial gym access');
+            const hasResistanceBands = userEquipment.includes('Resistance bands');
+            const bodyweightOnly = userEquipment.includes('Bodyweight only') || userEquipment.length === 0;
+            
+            // Equipment substitution map
+            const substituteExercise = (ex: any): any => {
+              const name = String(ex.name || '').toLowerCase();
+              
+              // Barbell exercises
+              if (name.includes('barbell') || name.includes('bench press') || (name.includes('squat') && !name.includes('goblet'))) {
+                if (!hasBarbell) {
+                  // Substitute barbell exercises
+                  if (name.includes('bench press')) {
+                    if (hasDumbbells) return { ...ex, name: ex.name.replace(/Barbell |Bench Press/gi, 'Dumbbell Press') };
+                    if (bodyweightOnly) return { ...ex, name: 'Push-ups' };
+                  }
+                  if (name.includes('squat')) {
+                    if (hasDumbbells) return { ...ex, name: 'Goblet Squat' };
+                    if (bodyweightOnly) return { ...ex, name: 'Bodyweight Squat' };
+                  }
+                  if (name.includes('barbell row')) {
+                    if (hasDumbbells) return { ...ex, name: 'Dumbbell Row' };
+                    if (hasCable) return { ...ex, name: 'Cable Row' };
+                    if (bodyweightOnly) return { ...ex, name: 'Inverted Row' };
+                  }
+                  if (name.includes('overhead press') || name.includes('ohp')) {
+                    if (hasDumbbells) return { ...ex, name: 'Dumbbell Overhead Press' };
+                    if (bodyweightOnly) return { ...ex, name: 'Pike Push-ups' };
+                  }
+                  if (name.includes('deadlift')) {
+                    if (hasDumbbells) return { ...ex, name: 'Dumbbell Romanian Deadlift' };
+                    if (bodyweightOnly) return { ...ex, name: 'Single Leg Deadlift' };
+                  }
+                  // If no suitable substitute, keep as is (user may have alternate equipment)
+                }
+              }
+              
+              // Cable exercises
+              if ((name.includes('cable') || name.includes('lat pulldown')) && !hasCable) {
+                if (name.includes('face pull')) {
+                  if (hasResistanceBands) return { ...ex, name: 'Band Face Pulls' };
+                  if (bodyweightOnly) return { ...ex, name: 'Reverse Flyes' };
+                }
+                if (name.includes('lat pulldown')) {
+                  if (hasPullUpBar) return { ...ex, name: 'Pull-ups' };
+                  if (hasResistanceBands) return { ...ex, name: 'Band Lat Pulldowns' };
+                  if (bodyweightOnly) return { ...ex, name: 'Inverted Rows' };
+                }
+                if (name.includes('cable row')) {
+                  if (hasDumbbells) return { ...ex, name: 'Dumbbell Row' };
+                  if (hasResistanceBands) return { ...ex, name: 'Band Row' };
+                }
+              }
+              
+              // Dumbbell exercises when only bodyweight
+              if (name.includes('dumbbell') && bodyweightOnly) {
+                if (name.includes('press')) return { ...ex, name: 'Push-ups' };
+                if (name.includes('row')) return { ...ex, name: 'Inverted Row' };
+                if (name.includes('curl')) return { ...ex, name: 'Chin-ups (or Inverted Rows)' };
+                if (name.includes('lateral raise')) return { ...ex, name: 'Lateral Raises (bodyweight)' };
+              }
+              
+              return ex;
+            };
+            
+            copy.strength_exercises = copy.strength_exercises.map(substituteExercise).filter(Boolean);
+          }
+          
           outWeek.push(copy);
         }
         (mapped.sessions_by_week as any)[wkNum] = outWeek;
