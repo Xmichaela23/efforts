@@ -9,7 +9,8 @@ import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 interface LoggedSet {
-  reps: number;
+  reps?: number;              // Optional - used for rep-based exercises
+  duration_seconds?: number;  // Optional - used for duration-based exercises (planks, holds, carries)
   weight: number;
   rir?: number;
   completed: boolean;
@@ -35,9 +36,16 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
   return exercises
     .filter(ex => ex.name.trim() && ex.sets.length > 0)
     .reduce((total, exercise) => {
-      // Count all sets that have actual reps (weight can be 0 for bodyweight exercises)
-      const setsWithData = exercise.sets.filter(set => set.reps > 0);
-      const exerciseVolume = setsWithData.reduce((sum, set) => sum + (set.reps * set.weight), 0);
+      const exerciseVolume = exercise.sets.reduce((sum, set) => {
+        // For duration-based exercises, volume = duration_seconds * weight
+        // For rep-based exercises, volume = reps * weight
+        if (set.duration_seconds && set.duration_seconds > 0) {
+          return sum + (set.duration_seconds * set.weight);
+        } else if (set.reps && set.reps > 0) {
+          return sum + (set.reps * set.weight);
+        }
+        return sum;
+      }, 0);
       return total + exerciseVolume;
     }, 0);
 };
@@ -1003,13 +1011,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
         name: exercise.name || '',
         expanded: true,
-        sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => ({
-          reps: exercise.reps || 0,
-          weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
-          barType: 'standard',
-          rir: undefined,
-          completed: false
-        }))
+        sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => {
+          const baseSet: LoggedSet = {
+            weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
+            barType: 'standard',
+            rir: undefined,
+            completed: false
+          };
+          // Duration-based exercises (planks, holds, carries)
+          if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
+            baseSet.duration_seconds = exercise.duration_seconds;
+          } else {
+            // Rep-based exercises (traditional lifts)
+            baseSet.reps = exercise.reps || 0;
+          }
+          return baseSet;
+        })
       }));
       
       setExercises(prePopulatedExercises);
@@ -1107,7 +1124,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
             name: exercise.name || '',
             expanded: true,
-            sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0), barType: 'standard', rir: undefined, completed: false }))
+            sets: Array.from({ length: exercise.sets || 3 }, () => {
+              const baseSet: LoggedSet = {
+                weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
+                barType: 'standard',
+                rir: undefined,
+                completed: false
+              };
+              // Duration-based exercises (planks, holds, carries)
+              if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
+                baseSet.duration_seconds = exercise.duration_seconds;
+              } else {
+                // Rep-based exercises (traditional lifts)
+                baseSet.reps = exercise.reps || 0;
+              }
+              return baseSet;
+            })
           }));
           const isPlaceholder = (arr: LoggedExercise[]) => {
             if (!Array.isArray(arr) || arr.length !== 1) return false;
@@ -1181,13 +1213,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             if (ns === 0 && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
               try { (navigator as any).vibrate?.(50); } catch {}
             }
+            
+            // For duration timers (key format: `${exerciseId}-set-${setIndex}`), update the set's actual duration
+            if (k.includes('-set-')) {
+              const parts = k.split('-set-');
+              if (parts.length === 2) {
+                const exId = parts[0];
+                const setIdx = parseInt(parts[1], 10);
+                if (!isNaN(setIdx)) {
+                  // Update the set's duration_seconds to reflect the actual time achieved
+                  const ex = exercises.find(e => e.id === exId);
+                  if (ex && ex.sets[setIdx] && ex.sets[setIdx].duration_seconds !== undefined) {
+                    // When timer reaches 0, record the original target duration as completed
+                    if (ns === 0) {
+                      // Timer finished - mark the set as completed
+                      updateSet(exId, setIdx, { completed: true });
+                    }
+                  }
+                }
+              }
+            }
           }
         });
         return copy;
       });
     }, 1000);
     return () => window.clearInterval(id);
-  }, [timers]);
+  }, [timers, exercises]);
 
   // Tick addon timers
   useEffect(() => {
@@ -1575,7 +1627,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       .filter(ex => ex.name.trim())
       .map(ex => ({ 
         ...ex, 
-        sets: ex.sets.filter(s => s.reps > 0 || s.weight > 0 || s.completed) // Keep sets with data OR completed status
+        sets: ex.sets.filter(s => {
+          // Valid set has reps, duration_seconds, weight, or is marked completed
+          return (s.reps && s.reps > 0) || (s.duration_seconds && s.duration_seconds > 0) || s.weight > 0 || s.completed;
+        })
       }))
       .filter(ex => ex.sets.length > 0);
 
@@ -1586,9 +1641,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       name: ex.name,
       nameTrimmed: ex.name.trim(),
       setsCount: ex.sets.length,
-      setsWithReps: ex.sets.filter(s => s.reps > 0).length,
-      setsData: ex.sets.map(s => ({ reps: s.reps, weight: s.weight, completed: s.completed })),
-      isValid: ex.name.trim() && ex.sets.filter(s => s.reps > 0).length > 0
+      setsWithReps: ex.sets.filter(s => s.reps && s.reps > 0).length,
+      setsWithDuration: ex.sets.filter(s => s.duration_seconds && s.duration_seconds > 0).length,
+      setsData: ex.sets.map(s => ({ reps: s.reps, duration_seconds: s.duration_seconds, weight: s.weight, completed: s.completed })),
+      isValid: ex.name.trim() && ex.sets.filter(s => (s.reps && s.reps > 0) || (s.duration_seconds && s.duration_seconds > 0)).length > 0
     })));
 
     if (validExercises.length === 0) {
@@ -2141,16 +2197,83 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-6 text-xs text-gray-500 text-right">{setIndex + 1}</div>
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={set.reps === 0 ? '' : set.reps.toString()}
-                        onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                        className="h-9 text-center text-sm border-gray-300 flex-1"
-                        style={{ fontSize: '16px' }}
-                        placeholder="Reps"
-                      />
+                      
+                      {/* Duration-based exercises show timer, rep-based show input */}
+                      {set.duration_seconds !== undefined ? (
+                        // DURATION-BASED EXERCISE (e.g., Plank, Farmer Walks)
+                        <div className="flex items-center gap-1 flex-1">
+                          <button
+                            onClick={() => {
+                              const key = `${exercise.id}-set-${setIndex}`;
+                              const cur = set.duration_seconds || 60;
+                              const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
+                              setEditingTimerKey(key);
+                              setEditingTimerValue(prefill);
+                            }}
+                            className="h-9 px-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white"
+                          >
+                            {formatSeconds(set.duration_seconds || 60)}
+                          </button>
+                          <button
+                            onClick={() => {
+                              const key = `${exercise.id}-set-${setIndex}`;
+                              // Create or update timer state for this duration set
+                              const currentDuration = set.duration_seconds || 60;
+                              setTimers(prev => ({ ...prev, [key]: { seconds: currentDuration, running: true } }));
+                            }}
+                            className="h-9 px-2 text-xs rounded-md border border-gray-300 text-gray-600 bg-white"
+                          >
+                            Start
+                          </button>
+                          
+                          {/* Duration timer editor (reuse existing modal) */}
+                          {editingTimerKey === `${exercise.id}-set-${setIndex}` && (
+                            <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
+                              <input
+                                type="tel"
+                                value={editingTimerValue}
+                                onChange={(e)=>setEditingTimerValue(e.target.value)}
+                                placeholder="mm:ss or 60"
+                                className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
+                              />
+                              <div className="flex items-center justify-between mt-3 gap-3">
+                                <button
+                                  onClick={() => {
+                                    const parsed = parseTimerInput(editingTimerValue);
+                                    if (parsed !== null) {
+                                      // Update the set's duration_seconds
+                                      updateSet(exercise.id, setIndex, { duration_seconds: parsed });
+                                      setEditingTimerKey(null);
+                                    }
+                                  }}
+                                  className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => setEditingTimerKey(null)}
+                                  className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                >
+                                  Close
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        // REP-BASED EXERCISE (e.g., Squat, Bench Press)
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={set.reps === 0 || set.reps === undefined ? '' : set.reps.toString()}
+                          onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
+                          className="h-9 text-center text-sm border-gray-300 flex-1"
+                          style={{ fontSize: '16px' }}
+                          placeholder="Reps"
+                        />
+                      )}
+                      
                       <Input
                         type="number"
                         inputMode="numeric"

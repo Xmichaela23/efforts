@@ -78,7 +78,8 @@ interface WorkoutData {
   strength_exercises?: Array<{
     name: string;
     sets: number;
-    reps: number | string;
+    reps?: number | string;
+    duration_seconds?: number; // For duration-based exercises like planks, holds, carries
     weight?: string;
   }>;
   mobility_exercises?: Array<{
@@ -148,6 +149,15 @@ function getStrengthIntensity(exercises: any[]): number {
   const intensities = exercises.map(ex => {
     let base = 0.75;
     
+    // Duration-based exercises (planks, holds, carries) are moderate endurance work
+    if (ex.duration_seconds && ex.duration_seconds > 0) {
+      base = INTENSITY_FACTORS.strength.core_;
+      // Longer holds are slightly more intense
+      if (ex.duration_seconds > 90) base *= 1.05;
+      return base;
+    }
+    
+    // Rep-based exercises (traditional lifts)
     if (ex.weight && ex.weight.includes('% 1RM')) {
       const pct = parseInt(ex.weight);
       const roundedPct = Math.floor(pct / 5) * 5;

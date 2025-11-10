@@ -406,9 +406,16 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           // Handle standard format
           const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
           const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
+          const durationNum = typeof ex.duration_seconds === 'number' ? ex.duration_seconds : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.duration_seconds)||0), 0) / setsArr.length) : 0);
           const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
           const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
-          return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum };
+          const result: any = { name: ex.name, sets: setsNum, weight: weightNum };
+          if (durationNum > 0) {
+            result.duration_seconds = durationNum;
+          } else {
+            result.reps = repsNum;
+          }
+          return result;
         });
       }
     }

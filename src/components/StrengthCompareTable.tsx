@@ -1,7 +1,7 @@
 import React from 'react';
 
-export interface StrengthSet { reps: number; weight: number; rir?: number; completed?: boolean }
-export interface StrengthExercise { name: string; sets?: number; reps?: number; weight?: number; setsArray?: StrengthSet[] }
+export interface StrengthSet { reps?: number; duration_seconds?: number; weight: number; rir?: number; completed?: boolean }
+export interface StrengthExercise { name: string; sets?: number; reps?: number; duration_seconds?: number; weight?: number; setsArray?: StrengthSet[] }
 
 function normalizeName(raw: string): string {
   // Keep only minimal normalization to avoid merging distinct movements
@@ -12,8 +12,13 @@ function normalizeName(raw: string): string {
 }
 
 function calcVolume(sets: StrengthSet[]): number {
-  return sets.filter(s => (s.reps || 0) > 0)
-    .reduce((sum, s) => sum + (s.reps || 0) * (s.weight || 0), 0);
+  return sets.filter(s => (s.reps && s.reps > 0) || (s.duration_seconds && s.duration_seconds > 0))
+    .reduce((sum, s) => {
+      // Duration-based: volume = duration_seconds * weight
+      // Rep-based: volume = reps * weight
+      const multiplier = s.duration_seconds || s.reps || 0;
+      return sum + multiplier * (s.weight || 0);
+    }, 0);
 }
 
 function avg<T extends number>(vals: T[]): number { if (!vals.length) return 0; return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length); }
@@ -32,8 +37,9 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
     const isBodyweight = /dip|chin\-?ups?|pull\-?ups?|push\-?ups?|plank/.test(k);
     const pSets = (p?.sets || 0);
     const pReps = (p?.reps || 0);
+    const pDuration = (p?.duration_seconds || 0);
     const pW = (p?.weight || 0);
-    const pVol = pSets * pReps * pW;
+    const pVol = pSets * (pDuration || pReps) * pW;
     const cSetsArrRaw = (c as any)?.setsArray as StrengthSet[] | undefined;
     const cSetsArr = Array.isArray(cSetsArrRaw)
       ? cSetsArrRaw.filter((s:any)=> s && typeof s === 'object') // do not drop zero-weight/zero-rep sets
@@ -44,11 +50,19 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
     const cVol = Array.isArray(cSetsArr) ? calcVolume(cSetsArr) : 0;
     const status: 'matched'|'skipped'|'swapped' = p && c ? 'matched' : (p && !c ? 'skipped' : (!p && c ? 'swapped' : 'matched'));
     // Build 1:1 planned vs completed sets
-    const plannedSets: StrengthSet[] = Array.from({ length: Math.max(0, pSets) }, () => ({ reps: pReps, weight: pW }));
+    const plannedSets: StrengthSet[] = Array.from({ length: Math.max(0, pSets) }, () => {
+      const set: StrengthSet = { weight: pW };
+      if (pDuration > 0) {
+        set.duration_seconds = pDuration;
+      } else {
+        set.reps = pReps;
+      }
+      return set;
+    });
     const completedSets: StrengthSet[] = cSetsArr;
     const maxLen = Math.max(plannedSets.length, completedSets.length);
     const pairs = Array.from({ length: maxLen }, (_, i) => ({ planned: plannedSets[i], completed: completedSets[i] }));
-    return { name: p?.name || c?.name || k, pSets, pReps, pW, pVol, cSets, cRepsAvg, cWAvg, cVol, status, pairs, isBodyweight } as any;
+    return { name: p?.name || c?.name || k, pSets, pReps, pDuration, pW, pVol, cSets, cRepsAvg, cWAvg, cVol, status, pairs, isBodyweight } as any;
   });
 
   const totals = rows.reduce((acc, r)=>({ pVol: acc.pVol + r.pVol, cVol: acc.cVol + r.cVol, pSets: acc.pSets + r.pSets, cSets: acc.cSets + r.cSets }), { pVol:0, cVol:0, pSets:0, cSets:0 });
@@ -70,8 +84,20 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
             {r.pairs.map((pair: any, idx: number) => {
               const p = pair.planned as StrengthSet | undefined;
               const c = pair.completed as StrengthSet | undefined;
+              const formatSeconds = (s: number) => {
+                const mins = Math.floor(s / 60);
+                const secs = s % 60;
+                return mins > 0 ? `${mins}:${String(secs).padStart(2,'0')}` : `${s}s`;
+              };
               const fmt = (s?: StrengthSet, isBw?: boolean) => {
-                if (!s || (!s.reps && !s.weight)) return '—';
+                if (!s || (!s.reps && !s.duration_seconds && !s.weight)) return '—';
+                // Duration-based exercises (planks, carries)
+                if (s.duration_seconds && s.duration_seconds > 0) {
+                  const durationTxt = formatSeconds(s.duration_seconds);
+                  const showWt = !isBw && typeof s.weight === 'number' && s.weight > 0;
+                  return showWt ? `${durationTxt} @ ${Math.round(s.weight as number)} lb` : durationTxt;
+                }
+                // Rep-based exercises
                 const repsTxt = String(s.reps || 0);
                 const showWt = !isBw && typeof s.weight === 'number' && s.weight > 0;
                 return showWt ? `${repsTxt} @ ${Math.round(s.weight as number)} lb` : repsTxt;
