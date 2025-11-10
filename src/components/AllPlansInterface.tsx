@@ -1209,23 +1209,22 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     })();
   }, [focusPlanId, focusWeek]);
   
-  // Prevent detailedPlans updates from resetting the plan status
-  // When the plan status is manually changed (pause/resume), don't let prop updates override it
+  // Prevent ANY updates from resetting the plan status when we've manually changed it
   const lastManualStatusRef = useRef<{planId: string, status: string} | null>(null);
   useEffect(() => {
+    console.log('[useEffect-statusGuard] Checking status. selectedPlanDetail:', selectedPlanDetail?.status, 'lastManualStatus:', lastManualStatusRef.current?.status);
     if (selectedPlanDetail && lastManualStatusRef.current && 
         lastManualStatusRef.current.planId === selectedPlanDetail.id &&
         selectedPlanDetail.status !== lastManualStatusRef.current.status) {
       // Plan status in selectedPlanDetail doesn't match our manual change
-      // This means detailedPlans prop updated and reset it
-      console.log('[useEffect] Detected status reset from prop update, restoring:', lastManualStatusRef.current.status);
+      console.log('[useEffect-statusGuard] ⚠️ DETECTED STATUS RESET! From', selectedPlanDetail.status, 'back to', lastManualStatusRef.current.status);
       setPlanStatus(lastManualStatusRef.current.status);
       setSelectedPlanDetail((prev: any) => ({
         ...prev,
         status: lastManualStatusRef.current!.status
       }));
     }
-  }, [detailedPlans, selectedPlanDetail]);
+  }, [selectedPlanDetail]);
 
   // Ensure week materialized on selection change with in-memory week cache
   useEffect(() => {
