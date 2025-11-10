@@ -548,6 +548,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   };
 
   const handlePlanClick = async (planId: string) => {
+    console.log('[handlePlanClick] Opening plan:', planId, 'current selectedPlanDetail:', selectedPlanDetail?.id);
     // Guard: if we already have this plan open in detail view, skip expensive re-load
     if (selectedPlanDetail?.id === planId && currentView === 'detail') {
       return;
@@ -961,6 +962,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       setSelectedPlanDetail(pd);
       setSelectedWeek(calculatedCurrentWeek);
       
+      console.log('[handlePlanClick] Setting status from plan data:', pd.status || 'active');
       setPlanStatus(pd.status || 'active');
       setCurrentView('detail');
     } else {
