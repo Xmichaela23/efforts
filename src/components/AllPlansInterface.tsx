@@ -209,7 +209,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 }) => {
   // Planned workouts are sourced via unified server paths now
   const plannedWorkouts: any[] = [];
-  const { loadUserBaselines, updatePlan, endPlan } = useAppContext();
+  const { loadUserBaselines, updatePlan, pausePlan, endPlan } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>(focusPlanId ? 'detail' : 'list');
   const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
@@ -1354,14 +1354,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   };
 
   const handlePausePlan = async () => {
-    if (!selectedPlanDetail || !updatePlan) return;
+    if (!selectedPlanDetail || !pausePlan) return;
     try {
-      await updatePlan(selectedPlanDetail.id, { 
-        status: 'paused',
-        paused_at: new Date().toISOString()
-      });
+      const result = await pausePlan(selectedPlanDetail.id);
+      console.log('Plan paused:', result);
       setPlanStatus('paused');
-      setSelectedPlanDetail({ ...selectedPlanDetail, status: 'paused' });
+      setSelectedPlanDetail({ ...selectedPlanDetail, status: 'paused', paused_at: result.paused_at });
     } catch (error) {
       console.error('Error pausing plan:', error);
       alert('Failed to pause plan. Please try again.');

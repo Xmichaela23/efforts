@@ -23,33 +23,42 @@ Successfully implemented the "End Plan" feature along with fixing the existing P
 - Added `paused_at` timestamp column to track when plan was paused
   - Used to calculate pause duration and adjust plan dates on resume
 
-### 2. New Edge Function: `end-plan`
-**File:** `supabase/functions/end-plan/index.ts`
+### 2. New Edge Functions
 
-- Creates an edge function that:
-  - Sets the plan status to `'ended'`
-  - Deletes all future planned workouts (where `date >= today`)
-  - Preserves past planned workouts for historical comparison
-  - Returns the number of workouts deleted
+**`pause-plan`** - `supabase/functions/pause-plan/index.ts`
+- Sets the plan status to `'paused'`
+- Records `paused_at` timestamp
+- Deletes all future planned workouts (where `date >= today`)
+- Preserves past planned workouts for historical comparison
+- Returns the number of workouts deleted
+
+**`end-plan`** - `supabase/functions/end-plan/index.ts`
+- Sets the plan status to `'ended'`
+- Deletes all future planned workouts (where `date >= today`)
+- Preserves past planned workouts for historical comparison
+- Returns the number of workouts deleted
+- Similar to pause but permanent (not meant to be resumed)
 
 ### 3. AppContext Updates
 **File:** `src/contexts/AppContext.tsx`
 
 **Added:**
-- `endPlan(planId: string)` function - calls the edge function and refreshes data
+- `pausePlan(planId: string)` function - calls pause-plan edge function and refreshes data
+- `endPlan(planId: string)` function - calls end-plan edge function and refreshes data
 - Updated `updatePlan()` to invalidate week cache after updates
-- Updated `Plan` type interface to include new status options
+- Updated `Plan` type interface to include new status options and `paused_at` field
 
 **Exported in Context:**
+- `pausePlan` - available to all components via `useAppContext()`
 - `endPlan` - available to all components via `useAppContext()`
 
 ### 4. UI Implementation
 **File:** `src/components/AllPlansInterface.tsx`
 
 **Added Handlers:**
-- `handleEndPlan()` - Ends the plan and updates local state
-- `handlePausePlan()` - Pauses the plan (now persists to database!)
-- `handleResumePlan()` - Resumes a paused plan
+- `handlePausePlan()` - Calls pausePlan edge function, deletes future workouts
+- `handleResumePlan()` - Adjusts timeline dates and reactivates plan
+- `handleEndPlan()` - Calls endPlan edge function, permanently ends plan
 
 **UI Changes:**
 - **Pause/Resume buttons** now actually work (previously only changed local state)
@@ -94,13 +103,20 @@ UI updates to show ended state
 ```
 User clicks "Pause"
   ↓
-Frontend calls updatePlan(planId, { status: 'paused', paused_at: now })
+Frontend calls pausePlan(planId)
   ↓
-Database updates plan status and records pause timestamp
+Edge function pause-plan:
+  - Calculates today's date
+  - Deletes planned_workouts where date >= today AND training_plan_id = planId
+  - Updates plans.status to 'paused' and paused_at to now
+  ↓
+Frontend receives response with deleted_count and paused_at
+  ↓
+Local state updates (plan status, paused_at timestamp)
   ↓
 Week cache invalidates
   ↓
-get-week function stops materializing workouts (only 'active' plans)
+get-week stops materializing new workouts (only 'active' plans)
   ↓
 UI updates to show "Resume" button
 ```
@@ -144,13 +160,19 @@ Plan continues from correct week with adjusted timeline
    - The `get-week` function already filters by `status='active'`
    - No additional code needed - paused/ended plans automatically stop creating workouts
 
-4. **Smart Date Adjustment on Resume**
+4. **Pause Deletes Future Workouts**
+   - When paused: Delete all future workouts (date >= today)
+   - Solves "where do I pick up?" problem - user picks up at current week
+   - When resumed: Workouts rematerialize from current week forward
+   - Prevents confusion from outdated workout dates
+
+5. **Smart Date Adjustment on Resume**
    - When paused: Store `paused_at` timestamp
    - When resumed: Calculate pause duration and shift plan start date forward
    - Example: Pause for 2 weeks → plan start shifts forward 2 weeks → Week 3 workouts now appear in correct calendar position
    - **No user input needed** - system handles all date math automatically (matches design principles)
 
-5. **UI Consistency**
+6. **UI Consistency**
    - Orange color for "End Plan" (warning but not destructive)
    - Red color reserved for "Delete" (fully destructive)
    - Clear confirmation dialogs explaining each action
@@ -162,8 +184,8 @@ Plan continues from correct week with adjusted timeline
 
 Before deploying, test:
 
-- [ ] Run database migration: `supabase db push`
-- [ ] Deploy edge function: `supabase functions deploy end-plan`
+- [x] Run database migration: `supabase db push`
+- [x] Deploy edge functions: `supabase functions deploy pause-plan end-plan`
 - [ ] Test Pause button:
   - [ ] Persists status='paused' to database
   - [ ] Records paused_at timestamp

@@ -127,6 +127,7 @@ interface AppContextType {
   addPlan: (plan: any) => Promise<void>;
   deletePlan: (planId: string) => Promise<void>;
   endPlan: (planId: string) => Promise<any>;
+  pausePlan: (planId: string) => Promise<any>;
   updatePlan: (planId: string, updates: any) => Promise<void>;
   refreshPlans: () => Promise<void>;
   saveUserBaselines: (data: BaselineData) => Promise<void>;
@@ -594,6 +595,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const pausePlan = async (planId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated to pause plans');
+      // Server function: pause plan and delete future planned workouts
+      const { data, error } = await supabase.functions.invoke('pause-plan', { body: { plan_id: String(planId) } }) as any;
+      if (error) throw error as any;
+      if (!data?.success) throw new Error(data?.error || 'Failed to pause plan');
+      await loadPlans();
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      return data;
+    } catch (error) {
+      console.error('Error in pausePlan:', error);
+      throw error;
+    }
+  };
+
   const updatePlan = async (planId: string, updates: any) => {
     try {
       const { data, error } = await supabase.from('plans').update(updates).eq('id', planId).select().single();
@@ -704,6 +722,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addPlan,
         deletePlan,
         endPlan,
+        pausePlan,
         updatePlan,
         refreshPlans: loadPlans,
         saveUserBaselines,
