@@ -229,6 +229,20 @@ function repScaleFor(reps?: number | string): number {
   return 0.85;
 }
 
+// Extract percentage from weight string (e.g., "30% 1RM" -> 0.30)
+function extractPercentageFromWeight(weight: any): number | undefined {
+  try {
+    const s = String(weight || '').trim().toLowerCase();
+    if (!s) return undefined;
+    // Match "70% 1RM" or "70%" or "0.7 1rm"
+    let m = s.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
+    if (m) return parseFloat(m[1]) / 100;
+    m = s.match(/([0-9]+(?:\.[0-9]+)?)\s*1\s*rm/);
+    if (m) return parseFloat(m[1]) / 100;
+  } catch {}
+  return undefined;
+}
+
 // Map percentage intensity to band resistance level
 function getBandResistanceFromPercentage(originalPercent: number): string {
   if (originalPercent <= 35) return "Light Band";
@@ -498,13 +512,22 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           const reps = (typeof ex?.reps==='number'? ex.reps : undefined);
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
           
-          // Get percentage for band resistance guidance
-          const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+          // Get percentage for band resistance guidance (from percent_1rm field OR weight string)
+          let percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+          if (!percentRaw) {
+            // Try to extract from weight string (e.g., "30% 1RM")
+            percentRaw = extractPercentageFromWeight((ex as any)?.weight);
+          }
           
           // Apply equipment substitution with percentage for intelligent band guidance
           const substituted = substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
           const name = substituted.name;
           const equipmentNotes = substituted.notes;
+          
+          // Debug band exercises
+          if (name.toLowerCase().includes('band') && originalName.toLowerCase().includes('face pull')) {
+            console.log(`🎯 Face Pulls substitution:`, { originalName, weight: (ex as any)?.weight, extractedPercent: percentRaw, finalNotes: equipmentNotes });
+          }
           
           // Band exercises: skip weight calculation, just use resistance notes
           const isBandExercise = String(name).toLowerCase().includes('band');
@@ -562,8 +585,12 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           const reps = (typeof ex?.reps==='number'? ex.reps : (typeof ex?.reps==='string'? ex.reps : undefined));
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
           
-          // Get percentage for band resistance guidance
-          const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+          // Get percentage for band resistance guidance (from percent_1rm field OR weight string)
+          let percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+          if (!percentRaw) {
+            // Try to extract from weight string (e.g., "30% 1RM")
+            percentRaw = extractPercentageFromWeight((ex as any)?.weight);
+          }
           
           // Apply equipment substitution with percentage for intelligent band guidance
           const substituted = substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
