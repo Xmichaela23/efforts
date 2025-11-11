@@ -847,26 +847,56 @@ export default function PlanSelect() {
               const ohpOrm = bn.overheadPress1RM || oneRMs.overhead;
               const squatOrm = bn.squat || oneRMs.squat;
               const deadliftOrm = bn.deadlift || oneRMs.deadlift;
+              console.log(`🔍 1RMs for calc: bench=${benchOrm}, ohp=${ohpOrm}, squat=${squatOrm}, deadlift=${deadliftOrm}`);
               
               // Band exercises - provide resistance guidance instead of weight
               if (n.includes('band')) {
                 if (n.includes('face pull')) return { notes: 'Use light-medium resistance band' };
                 if (n.includes('lateral raise') || n.includes('front raise')) return { notes: 'Use light resistance band' };
                 if (n.includes('row')) return { notes: 'Use medium-heavy resistance band' };
+                if (n.includes('leg curl')) return { notes: 'Use medium resistance band' };
+                if (n.includes('pull') || n.includes('pushdown')) return { notes: 'Use medium resistance band' };
                 return { notes: 'Use appropriate resistance band' };
               }
               
-              // Calculate weight from 1RMs using accessory ratios
-              if (n.includes('barbell row') && benchOrm) return { weight: round(benchOrm * 0.90) };
-              if (n.includes('lateral raise') && ohpOrm) return { weight: round(ohpOrm * 0.35) };
-              if (n.includes('front raise') && ohpOrm) return { weight: round(ohpOrm * 0.40) };
-              if (n.includes('face pull') && benchOrm) return { weight: round(benchOrm * 0.35) };
-              if (n.includes('reverse fly') && benchOrm) return { weight: round(benchOrm * 0.30) };
-              if ((n.includes('romanian deadlift') || n.includes('rdl')) && deadliftOrm) return { weight: round(deadliftOrm * 0.70) };
-              if (n.includes('hip thrust') && deadliftOrm) return { weight: round(deadliftOrm * 0.80) };
-              if (n.includes('bulgarian split squat') && squatOrm) return { weight: round(squatOrm * 0.30) };
-              if (n.includes('goblet squat') && squatOrm) return { weight: round(squatOrm * 0.40) };
-              if (n.includes('lunge') && squatOrm) return { weight: round(squatOrm * 0.35) };
+              // Calculate weight from 1RMs using accessory ratios (matching materialize-plan)
+              // Upper body pull (bench reference)
+              if (n.includes('barbell row') || n.includes('bent over row') || n.includes('pendlay')) { if (benchOrm) return { weight: round(benchOrm * 0.90) }; }
+              if (n.includes('t bar row') || n.includes('t-bar row')) { if (benchOrm) return { weight: round(benchOrm * 0.80) }; }
+              if (n.includes('chest supported row')) { if (benchOrm) return { weight: round(benchOrm * 0.85) }; }
+              if (n.includes('cable row')) { if (benchOrm) return { weight: round(benchOrm * 0.70) }; }
+              if (n.includes('lat pulldown') || n.includes('pulldown')) { if (benchOrm) return { weight: round(benchOrm * 0.65) }; }
+              if (n.includes('inverted row')) { if (benchOrm) return { weight: round(benchOrm * 0.65) }; }
+              if (n.includes('face pull')) { if (benchOrm) return { weight: round(benchOrm * 0.35) }; }
+              if (n.includes('reverse fly')) { if (benchOrm) return { weight: round(benchOrm * 0.30) }; }
+              // Upper body push (bench reference)
+              if (n.includes('dip')) { if (benchOrm) return { weight: round(benchOrm * 0.90) }; }
+              if (n.includes('incline bench')) { if (benchOrm) return { weight: round(benchOrm * 0.85) }; }
+              if (n.includes('close grip bench')) { if (benchOrm) return { weight: round(benchOrm * 0.90) }; }
+              if (n.includes('dumbbell bench') || n.includes('db bench')) { if (benchOrm) return { weight: round(benchOrm * 0.75) }; }
+              if (n.includes('dumbbell fly') || n.includes('db fly')) { if (benchOrm) return { weight: round(benchOrm * 0.45) }; }
+              if (n.includes('cable fly')) { if (benchOrm) return { weight: round(benchOrm * 0.40) }; }
+              // Shoulders (overhead reference)
+              if (n.includes('lateral raise')) { if (ohpOrm) return { weight: round(ohpOrm * 0.35) }; }
+              if (n.includes('front raise')) { if (ohpOrm) return { weight: round(ohpOrm * 0.40) }; }
+              if (n.includes('rear delt fly')) { if (ohpOrm) return { weight: round(ohpOrm * 0.30) }; }
+              if (n.includes('dumbbell shoulder press') || n.includes('db shoulder press')) { if (ohpOrm) return { weight: round(ohpOrm * 0.65) }; }
+              if (n.includes('tricep extension')) { if (ohpOrm) return { weight: round(ohpOrm * 0.40) }; }
+              // Hip dominant (deadlift reference)
+              if (n.includes('hip thrust')) { if (deadliftOrm) return { weight: round(deadliftOrm * 0.80) }; }
+              if (n.includes('romanian deadlift') || n.includes('rdl')) { if (deadliftOrm) return { weight: round(deadliftOrm * 0.70) }; }
+              if (n.includes('good morning')) { if (deadliftOrm) return { weight: round(deadliftOrm * 0.45) }; }
+              if (n.includes('single leg rdl')) { if (deadliftOrm) return { weight: round(deadliftOrm * 0.25) }; }
+              if (n.includes('glute bridge')) { if (deadliftOrm) return { weight: round(deadliftOrm * 0.60) }; }
+              if (n.includes('leg curl')) { if (deadliftOrm) return { weight: round(deadliftOrm * 0.60) }; }
+              // Knee dominant (squat reference)
+              if (n.includes('bulgarian split squat')) { if (squatOrm) return { weight: round(squatOrm * 0.30) }; }
+              if (n.includes('lunge')) { if (squatOrm) return { weight: round(squatOrm * 0.35) }; }
+              if (n.includes('goblet squat')) { if (squatOrm) return { weight: round(squatOrm * 0.40) }; }
+              if (n.includes('step up')) { if (squatOrm) return { weight: round(squatOrm * 0.25) }; }
+              if (n.includes('leg press')) { if (squatOrm) return { weight: round(squatOrm * 1.20) }; }
+              if (n.includes('leg extension')) { if (squatOrm) return { weight: round(squatOrm * 0.55) }; }
+              if (n.includes('front squat')) { if (squatOrm) return { weight: round(squatOrm * 0.85) }; }
               
               return {};
             };
@@ -924,6 +954,19 @@ export default function PlanSelect() {
                 }
               }
               
+              // Machine exercises (leg curl, leg extension, etc.)
+              if (name.includes('leg curl')) {
+                // Leg curls require a machine - substitute with alternatives
+                if (hasResistanceBands) result.name = 'Band Leg Curls';
+                else result.name = 'Nordic Curls';
+              }
+              
+              if (name.includes('leg extension')) {
+                // Leg extensions require a machine - substitute with alternatives
+                if (hasDumbbells) result.name = 'Bulgarian Split Squats';
+                else result.name = 'Bodyweight Lunges';
+              }
+              
               // Lateral Raises (typically require dumbbells or bands)
               if (name.includes('lateral raise')) {
                 if (name.includes('dumbbell') || name.includes('band') || name.includes('cable')) {
@@ -953,6 +996,7 @@ export default function PlanSelect() {
               // Always calculate for accessories, even if they have a percentage string
               if (result.sets && result.reps) {
                 const calc = calculateAccessoryWeight(result.name, result.sets, result.reps);
+                console.log(`💪 Accessory calc for "${result.name}":`, calc, 'Before:', result.weight, 'After will be:', calc.weight !== undefined ? calc.weight : result.weight);
                 // Apply calculated weight if we got one (overrides percentage strings)
                 if (calc.weight !== undefined) {
                   result.weight = calc.weight;
@@ -964,6 +1008,7 @@ export default function PlanSelect() {
                     result.notes = calc.notes;
                   }
                 }
+                console.log(`✅ After calc for "${result.name}":`, { weight: result.weight, notes: result.notes });
               }
               
               return result;
