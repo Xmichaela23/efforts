@@ -851,12 +851,12 @@ export default function PlanSelect() {
               
               // Band exercises - provide resistance guidance instead of weight
               if (n.includes('band')) {
-                if (n.includes('face pull')) return { notes: 'Use light-medium resistance band' };
-                if (n.includes('lateral raise') || n.includes('front raise')) return { notes: 'Use light resistance band' };
-                if (n.includes('row')) return { notes: 'Use medium-heavy resistance band' };
-                if (n.includes('leg curl')) return { notes: 'Use medium resistance band' };
-                if (n.includes('pull') || n.includes('pushdown')) return { notes: 'Use medium resistance band' };
-                return { notes: 'Use appropriate resistance band' };
+                if (n.includes('face pull')) return { weight: 0, notes: 'light-medium resistance' };
+                if (n.includes('lateral raise') || n.includes('front raise')) return { weight: 0, notes: 'light resistance' };
+                if (n.includes('row')) return { weight: 0, notes: 'medium-heavy resistance' };
+                if (n.includes('leg curl')) return { weight: 0, notes: 'medium resistance' };
+                if (n.includes('pull') || n.includes('pushdown')) return { weight: 0, notes: 'medium resistance' };
+                return { weight: 0, notes: 'appropriate resistance' };
               }
               
               // Calculate weight from 1RMs using accessory ratios (matching materialize-plan)
@@ -1000,13 +1000,17 @@ export default function PlanSelect() {
                 // Apply calculated weight if we got one (overrides percentage strings)
                 if (calc.weight !== undefined) {
                   result.weight = calc.weight;
-                }
-                // Add notes for band exercises
-                if (calc.notes) {
-                  // Only append notes if not already in the name
-                  if (!result.name.includes(calc.notes)) {
+                  // For dumbbell exercises, add "per hand" clarification
+                  const isDumbbell = result.name.toLowerCase().includes('dumbbell') || result.name.toLowerCase().includes('db ');
+                  if (isDumbbell && typeof result.weight === 'number' && result.weight > 0) {
+                    const perHand = Math.round(result.weight / 2);
+                    result.notes = calc.notes || `${perHand} lb per hand`;
+                  } else if (calc.notes) {
                     result.notes = calc.notes;
                   }
+                } else if (calc.notes) {
+                  // Band exercises without calculated weight
+                  result.notes = calc.notes;
                 }
                 console.log(`✅ After calc for "${result.name}":`, { weight: result.weight, notes: result.notes });
               }
