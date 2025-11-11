@@ -2337,8 +2337,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           );
                         }
                         
-                        // Dumbbell/Barbell exercises: Show weight input with contextual placeholder
-                        const placeholder = exerciseType === 'dumbbell' ? 'Weight (each)' : 'Weight';
+                        // Dumbbell exercises: Show weight input with persistent label
+                        if (exerciseType === 'dumbbell') {
+                          return (
+                            <div className="flex flex-col flex-1">
+                              <Input
+                                type="number"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={set.weight === 0 ? '' : set.weight.toString()}
+                                onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
+                                className="h-9 text-center text-sm border-gray-300"
+                                style={{ fontSize: '16px' }}
+                                placeholder="Weight"
+                              />
+                              <span className="text-[10px] text-gray-500 text-center mt-0.5">(each hand)</span>
+                            </div>
+                          );
+                        }
+                        
+                        // Barbell exercises: Standard weight input
                         return (
                           <Input
                             type="number"
@@ -2348,7 +2366,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
                             className="h-9 text-center text-sm border-gray-300 flex-1"
                             style={{ fontSize: '16px' }}
-                            placeholder={placeholder}
+                            placeholder="Weight"
                           />
                         );
                       })()}
