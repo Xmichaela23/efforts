@@ -61,6 +61,23 @@ function pctWeight(oneRm: number | null, pct?: number): number | undefined {
   return round5(oneRm * pct);
 }
 
+// Smart exercise type detection (matches client-side logic)
+function isDumbbellExercise(exerciseName: string): boolean {
+  const name = exerciseName.toLowerCase();
+  
+  // Explicit dumbbell naming
+  if (name.includes('dumbbell') || name.includes('db ')) return true;
+  
+  // Common dumbbell exercise patterns
+  const dbPatterns = [
+    'bicep curl', 'biceps curl', 'hammer curl', 'concentration curl',
+    'lateral raise', 'front raise', 'chest fly', 'chest flye',
+    'arnold press', 'goblet squat', 'bulgarian split squat'
+  ];
+  
+  return dbPatterns.some(p => name.includes(p));
+}
+
 function parseWeightInput(input: any, oneRm: number | null): { weight?: number; percent_1rm?: number } {
   try {
     if (typeof input === 'number' && isFinite(input) && input >= 0) return { weight: Math.round(input) };
@@ -549,6 +566,12 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
               const scaled = inferred1RM * percentRaw * repScaleFor(reps);
               prescribed = round5(scaled);
             }
+            
+            // For dumbbell exercises: divide by 2 to get per-hand weight
+            if (prescribed != null && isDumbbellExercise(name)) {
+              prescribed = round5(prescribed / 2);
+            }
+            
             percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
             resolved_from = pick.ref || undefined;
           }
@@ -616,6 +639,12 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
               const scaled = inferred1RM * (percentRaw as number) * repScaleFor(typeof reps==='number'? reps : undefined);
               prescribed = round5(scaled);
             }
+            
+            // For dumbbell exercises: divide by 2 to get per-hand weight
+            if (prescribed != null && isDumbbellExercise(name)) {
+              prescribed = round5(prescribed / 2);
+            }
+            
             percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
             resolved_from = pick.ref || undefined;
           }
