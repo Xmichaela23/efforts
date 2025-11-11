@@ -949,11 +949,21 @@ export default function PlanSelect() {
                 else if (name.includes('curl')) result.name = 'Chin-ups (or Inverted Rows)';
               }
               
-              // Calculate and add weight/notes if not already present
-              if (!result.weight && result.sets && result.reps) {
+              // Calculate and add weight/notes for accessory exercises
+              // Always calculate for accessories, even if they have a percentage string
+              if (result.sets && result.reps) {
                 const calc = calculateAccessoryWeight(result.name, result.sets, result.reps);
-                if (calc.weight) result.weight = calc.weight;
-                if (calc.notes) result.name = `${result.name} — ${calc.notes}`;
+                // Apply calculated weight if we got one (overrides percentage strings)
+                if (calc.weight !== undefined) {
+                  result.weight = calc.weight;
+                }
+                // Add notes for band exercises
+                if (calc.notes) {
+                  // Only append notes if not already in the name
+                  if (!result.name.includes(calc.notes)) {
+                    result.notes = calc.notes;
+                  }
+                }
               }
               
               return result;

@@ -302,7 +302,8 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           if (typeof e?.weight==='string' && e.weight.trim()) return e.weight.trim();
           return undefined;
         })();
-        return `${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}`;
+        const notes = e?.notes ? ` (${String(e.notes).trim()})` : '';
+        return `${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}${notes}`;
       });
     } catch { return []; }
   })();
