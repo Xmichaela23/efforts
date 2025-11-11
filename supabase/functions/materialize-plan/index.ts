@@ -490,22 +490,32 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           const name = substituted.name;
           const equipmentNotes = substituted.notes;
           
-          // Resolve base 1RM and accessory ratio using substituted name
-          const pick = pickPrimary1RMAndBase(name, baselines as any);
-          const base1RM = pick.base;
-          const ratio = pick.ratio;
-          // Calculate inferred 1RM by applying ratio to base (e.g., Barbell Row = Bench × 0.90)
-          const inferred1RM = (base1RM != null && ratio != null) ? base1RM * ratio : base1RM;
-          const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
-          const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
+          // Band exercises: skip weight calculation, just use resistance notes
+          const isBandExercise = String(name).toLowerCase().includes('band');
+          
           let prescribed: number | undefined = undefined;
-          if (parsed.weight != null) prescribed = parsed.weight;
-          else if (inferred1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
-            const scaled = inferred1RM * percentRaw * repScaleFor(reps);
-            prescribed = round5(scaled);
+          let percent_1rm: number | undefined = undefined;
+          let resolved_from: string | undefined = undefined;
+          
+          if (!isBandExercise) {
+            // Resolve base 1RM and accessory ratio using substituted name
+            const pick = pickPrimary1RMAndBase(name, baselines as any);
+            const base1RM = pick.base;
+            const ratio = pick.ratio;
+            // Calculate inferred 1RM by applying ratio to base (e.g., Barbell Row = Bench × 0.90)
+            const inferred1RM = (base1RM != null && ratio != null) ? base1RM * ratio : base1RM;
+            const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+            const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
+            if (parsed.weight != null) prescribed = parsed.weight;
+            else if (inferred1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
+              const scaled = inferred1RM * percentRaw * repScaleFor(reps);
+              prescribed = round5(scaled);
+            }
+            percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
+            resolved_from = pick.ref || undefined;
           }
-          const percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
-          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from: pick.ref || undefined, notes: equipmentNotes } as any;
+          
+          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from, notes: equipmentNotes } as any;
           steps.push({ id: uid(), kind:'strength', strength });
         }
         return { steps, total_s: 0 };
@@ -539,21 +549,31 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           const name = substituted.name;
           const equipmentNotes = substituted.notes;
           
-          const pick = pickPrimary1RMAndBase(name, baselines as any);
-          const base1RM = pick.base;
-          const ratio = pick.ratio;
-          // Calculate inferred 1RM by applying ratio to base (e.g., Barbell Row = Bench × 0.90)
-          const inferred1RM = (base1RM != null && ratio != null) ? base1RM * ratio : base1RM;
-          const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
-          const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
+          // Band exercises: skip weight calculation, just use resistance notes
+          const isBandExercise = String(name).toLowerCase().includes('band');
+          
           let prescribed: number | undefined = undefined;
-          if (parsed.weight != null) prescribed = parsed.weight;
-          else if (inferred1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
-            const scaled = inferred1RM * (percentRaw as number) * repScaleFor(typeof reps==='number'? reps : undefined);
-            prescribed = round5(scaled);
+          let percent_1rm: number | undefined = undefined;
+          let resolved_from: string | undefined = undefined;
+          
+          if (!isBandExercise) {
+            const pick = pickPrimary1RMAndBase(name, baselines as any);
+            const base1RM = pick.base;
+            const ratio = pick.ratio;
+            // Calculate inferred 1RM by applying ratio to base (e.g., Barbell Row = Bench × 0.90)
+            const inferred1RM = (base1RM != null && ratio != null) ? base1RM * ratio : base1RM;
+            const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+            const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
+            if (parsed.weight != null) prescribed = parsed.weight;
+            else if (inferred1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
+              const scaled = inferred1RM * (percentRaw as number) * repScaleFor(typeof reps==='number'? reps : undefined);
+              prescribed = round5(scaled);
+            }
+            percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
+            resolved_from = pick.ref || undefined;
           }
-          const percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
-          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from: pick.ref || undefined, notes: equipmentNotes } as any;
+          
+          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from, notes: equipmentNotes } as any;
           steps.push({ id: uid(), kind:'strength', strength });
         }
         return { steps, total_s: 0 };
