@@ -12,6 +12,7 @@ interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
   duration_seconds?: number;  // Optional - used for duration-based exercises (planks, holds, carries)
   weight: number;
+  resistance_level?: string;  // Optional - used for band exercises: "Light", "Medium", "Heavy", "Extra Heavy"
   rir?: number;
   completed: boolean;
   barType?: string;
@@ -48,6 +49,28 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
       }, 0);
       return total + exerciseVolume;
     }, 0);
+};
+
+// Smart exercise type detection from name
+const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' => {
+  const name = exerciseName.toLowerCase();
+  
+  // Band exercises
+  if (name.includes('band') || name.includes('banded')) return 'band';
+  
+  // Dumbbell exercises
+  if (name.includes('dumbbell') || name.includes('db ')) return 'dumbbell';
+  
+  // Common dumbbell exercise patterns
+  const dbPatterns = [
+    'bicep curl', 'biceps curl', 'hammer curl', 'concentration curl',
+    'lateral raise', 'front raise', 'chest fly', 'chest flye',
+    'arnold press', 'goblet squat', 'bulgarian split squat'
+  ];
+  if (dbPatterns.some(p => name.includes(p))) return 'dumbbell';
+  
+  // Default: barbell
+  return 'barbell';
 };
 
 // Readiness Check Banner Component
@@ -782,6 +805,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (!steps.length) return [];
       const byName: Record<string, LoggedExercise> = {};
       const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
+      
+      // Helper to extract resistance level from notes
+      const extractResistance = (notes: string | undefined): string | undefined => {
+        if (!notes) return undefined;
+        const noteStr = String(notes).toLowerCase();
+        if (noteStr.includes('light')) return 'Light';
+        if (noteStr.includes('medium')) return 'Medium';
+        if (noteStr.includes('heavy') && !noteStr.includes('extra')) return 'Heavy';
+        if (noteStr.includes('extra heavy')) return 'Extra Heavy';
+        return undefined;
+      };
+      
       for (const st of steps) {
         const s = st?.strength || {};
         const name = String(s?.name || '').trim();
@@ -791,6 +826,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const isAmrap = typeof repsRaw === 'string' && /amrap/i.test(repsRaw);
         const weightNum = typeof s?.weight === 'number' ? round5(s.weight) : 0;
         const sets = Number(s?.sets) || 0;
+        const notes = s?.notes;
+        const exerciseType = getExerciseType(name);
+        const resistanceLevel = exerciseType === 'band' ? extractResistance(notes) : undefined;
+        
         if (!byName[name]) {
           byName[name] = {
             id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -807,7 +846,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         for (let i=0;i<targetSets;i+=1) {
           byName[name].sets.push({
             reps: isAmrap ? 0 : reps,
-            weight: weightNum,
+            weight: exerciseType === 'band' ? 0 : weightNum,
+            resistance_level: resistanceLevel,
             rir: null,
             done: false,
             amrap: isAmrap === true,
@@ -2274,16 +2314,44 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         />
                       )}
                       
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={set.weight === 0 ? '' : set.weight.toString()}
-                        onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                        className="h-9 text-center text-sm border-gray-300 flex-1"
-                        style={{ fontSize: '16px' }}
-                        placeholder="Weight"
-                      />
+                      {(() => {
+                        const exerciseType = getExerciseType(exercise.name);
+                        
+                        // Band exercises: Show resistance dropdown
+                        if (exerciseType === 'band') {
+                          return (
+                            <Select
+                              value={set.resistance_level || 'Medium'}
+                              onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
+                            >
+                              <SelectTrigger className="h-9 text-center text-sm border-gray-300 flex-1">
+                                <SelectValue placeholder="Resistance" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
+                                <SelectItem value="Light">Light</SelectItem>
+                                <SelectItem value="Medium">Medium</SelectItem>
+                                <SelectItem value="Heavy">Heavy</SelectItem>
+                                <SelectItem value="Extra Heavy">Extra Heavy</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          );
+                        }
+                        
+                        // Dumbbell/Barbell exercises: Show weight input with contextual placeholder
+                        const placeholder = exerciseType === 'dumbbell' ? 'Weight (each)' : 'Weight';
+                        return (
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={set.weight === 0 ? '' : set.weight.toString()}
+                            onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
+                            className="h-9 text-center text-sm border-gray-300 flex-1"
+                            style={{ fontSize: '16px' }}
+                            placeholder={placeholder}
+                          />
+                        );
+                      })()}
                       <Input
                         type="number"
                         inputMode="numeric"
@@ -2310,44 +2378,61 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <button
-                        onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                        className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700"
-                      >
-                        Plates
-                        {expandedPlates[`${exercise.id}-${setIndex}`] ? (
-                          <ChevronUp className="h-3 w-3" />
-                        ) : (
-                          <ChevronDown className="h-3 w-3" />
-                        )}
-                      </button>
-                      <Select
-                        value={set.barType || 'standard'}
-                        onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
-                      >
-                        <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
-                          <SelectItem value="standard">Barbell (45lb)</SelectItem>
-                          <SelectItem value="womens">Women's (33lb)</SelectItem>
-                          <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
-                          <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
-                          <SelectItem value="trap">Trap/Hex (60lb)</SelectItem>
-                          <SelectItem value="cambered">Cambered (55lb)</SelectItem>
-                          <SelectItem value="swiss">Swiss/Football (35lb)</SelectItem>
-                          <SelectItem value="technique">Technique (15lb)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {expandedPlates[`${exercise.id}-${setIndex}`] && (
-                      <PlateMath
-                        weight={set.weight}
-                        barType={set.barType || 'standard'}
-                        useImperial={true}
-                      />
-                    )}
+                    {(() => {
+                      const exerciseType = getExerciseType(exercise.name);
+                      // Only show Plates/Barbell UI for barbell exercises
+                      if (exerciseType === 'barbell') {
+                        return (
+                          <div className="flex items-center justify-between mt-0.5">
+                            <button
+                              onClick={() => togglePlateCalc(exercise.id, setIndex)}
+                              className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700"
+                            >
+                              Plates
+                              {expandedPlates[`${exercise.id}-${setIndex}`] ? (
+                                <ChevronUp className="h-3 w-3" />
+                              ) : (
+                                <ChevronDown className="h-3 w-3" />
+                              )}
+                            </button>
+                            <Select
+                              value={set.barType || 'standard'}
+                              onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
+                            >
+                              <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
+                                <SelectItem value="standard">Barbell (45lb)</SelectItem>
+                                <SelectItem value="womens">Women's (33lb)</SelectItem>
+                                <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
+                                <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
+                                <SelectItem value="trap">Trap/Hex (60lb)</SelectItem>
+                                <SelectItem value="cambered">Cambered (55lb)</SelectItem>
+                                <SelectItem value="swiss">Swiss/Football (35lb)</SelectItem>
+                                <SelectItem value="technique">Technique (15lb)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        );
+                      }
+                      // For dumbbells and bands: no equipment UI
+                      return null;
+                    })()}
+                    {(() => {
+                      const exerciseType = getExerciseType(exercise.name);
+                      // Only show PlateMath for barbell exercises
+                      if (exerciseType === 'barbell' && expandedPlates[`${exercise.id}-${setIndex}`]) {
+                        return (
+                          <PlateMath
+                            weight={set.weight}
+                            barType={set.barType || 'standard'}
+                            useImperial={true}
+                          />
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 ))}
                 
