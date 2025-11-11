@@ -1,0 +1,49 @@
+/**
+ * Single source of truth for strength exercise display formatting
+ * Extracted from existing StructuredPlannedView logic
+ */
+
+/**
+ * Format a strength exercise for display
+ * Used by PlannedWorkoutSummary and StructuredPlannedView
+ * 
+ * @param exercise - Exercise object with name, sets, reps, weight, notes
+ * @param units - 'imperial' (lb) or 'metric' (kg), defaults to 'imperial'
+ */
+export function formatStrengthExercise(
+  exercise: any,
+  units: 'imperial' | 'metric' = 'imperial'
+): string {
+  // Extract name
+  const name = String(exercise?.name || 'Exercise').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  // Extract sets
+  const sets = Math.max(1, Number(exercise?.sets || exercise?.setsCount || 0));
+  
+  // Extract reps (can be number or string like "AMRAP")
+  const reps = (() => {
+    const r = exercise?.reps || exercise?.repCount;
+    if (typeof r === 'string') return r.toUpperCase();
+    if (typeof r === 'number') return Math.max(1, Math.round(r));
+    return undefined;
+  })();
+  
+  // Extract weight
+  const wt = Number(exercise?.weight || exercise?.load || 0);
+  const unit = units === 'metric' ? ' kg' : ' lb';
+  
+  // Check if exercise is bodyweight (by name pattern)
+  const normName = name.toLowerCase().replace(/[\s-]/g, '');
+  const isBw = /^(?:.*(?:dip|chinup|pullup|pushup|plank).*)$/.test(normName);
+  
+  // Extract notes (band resistance, etc.)
+  const notes = exercise?.notes ? ` (${String(exercise.notes).trim()})` : '';
+  
+  // Build display string
+  const parts: string[] = [name];
+  if (sets > 0 && reps != null) parts.push(`${sets}×${reps}`);
+  if (wt > 0 && !isBw) parts.push(`@ ${Math.round(wt)}${unit}`);
+  
+  return parts.join(' ') + notes;
+}
+

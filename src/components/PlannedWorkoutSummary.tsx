@@ -2,6 +2,7 @@ import React from 'react';
 import { normalizePlannedSession, Baselines as NormalizerBaselines, ExportHints } from '@/services/plans/normalizer';
 import { normalizeStructuredSession } from '@/services/plans/normalizer';
 import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
+import { formatStrengthExercise } from '@/utils/strengthFormatter';
 
 type Baselines = NormalizerBaselines | Record<string, any> | null | undefined;
 
@@ -281,36 +282,27 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
       const cSteps: any[] = Array.isArray(compD?.steps) ? compD.steps : [];
       const comp = cSteps.filter(st => String((st as any)?.kind||'').toLowerCase()==='strength').map((st:any)=> st?.strength).filter(Boolean) as any[];
       const asLines = (arr:any[]) => arr.map((s:any)=>{
-        const name = String(s?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
-        const sets = Math.max(1, Number(s?.sets)||1);
-        const repsVal:any = (():any=>{ const r=s?.reps; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
-        const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
-        const wt = (():string|undefined=>{ const w=s?.weight; if (typeof w==='number') return w===0?'BW':`${Math.round(w)} lb`; return undefined; })();
-        const notes = s?.notes ? ` (${String(s.notes).trim()})` : '';
-        
-        // Debug: Log band exercises to see what data we're receiving
-        if (name.toLowerCase().includes('band')) {
-          console.log('🎸 [CLIENT] Displaying band exercise:', { name, notes: s?.notes, hasNotes: !!s?.notes, fullObject: s });
-        }
-        
-        return `${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}${notes}`;
+        // Use shared formatter for consistent display
+        return formatStrengthExercise(s, 'imperial');
       });
       if (comp.length) return asLines(comp);
       // Fallback: authored exercises
       const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
       if (!ex.length) return [];
       return ex.map((e:any)=>{
-        const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
-        const sets = Math.max(1, Number(e?.sets)||1);
-        const repsVal:any = (():any=>{ const r=e?.reps||e?.rep; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
-        const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
-        const wt = (():string|undefined=>{
-          if (typeof e?.weight==='number') return e.weight===0?'BW':`${Math.round(e.weight)} lb`;
-          if (typeof e?.weight==='string' && e.weight.trim()) return e.weight.trim();
-          return undefined;
-        })();
-        const notes = e?.notes ? ` (${String(e.notes).trim()})` : '';
-        return `${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}${notes}`;
+        // Fallback for non-materialized exercises - use shared formatter
+        // Special handling for string weights (e.g., "70% 1RM" from raw JSON)
+        if (typeof e?.weight === 'string' && e.weight.trim()) {
+          // Keep string weights as-is for raw exercises
+          const formatted = formatStrengthExercise(e, 'imperial');
+          const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+          const sets = Math.max(1, Number(e?.sets)||1);
+          const repsVal:any = (():any=>{ const r=e?.reps||e?.rep; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
+          const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
+          const notes = e?.notes ? ` (${String(e.notes).trim()})` : '';
+          return `${name} ${sets}×${repTxt} — ${e.weight.trim()}${notes}`;
+        }
+        return formatStrengthExercise(e, 'imperial');
       });
     } catch { return []; }
   })();

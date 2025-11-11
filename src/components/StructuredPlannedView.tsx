@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
+import { formatStrengthExercise } from '@/utils/strengthFormatter';
 
 type StructuredPlannedViewProps = {
   workout: any;
@@ -181,19 +182,10 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           }
         }
 
-        // Strength step formatting
+        // Strength step formatting (using shared formatter)
         if (st?.strength && typeof st.strength==='object') {
-          const nm = String(st.strength.name||'Strength');
-          const sets = Number(st.strength.sets||st.strength.setsCount||0);
-          const reps = ((): number|string|undefined=>{ const r=st.strength.reps||st.strength.repCount; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
-          const wt = Number(st.strength.weight||st.strength.load||0);
-          const unit = (String((workout as any)?.units||'').toLowerCase()==='metric') ? ' kg' : ' lb';
-          const normNm = nm.toLowerCase().replace(/[\s-]/g,'');
-          const isBw = /^(?:.*(?:dip|chinup|pullup|pushup|plank).*)$/.test(normNm);
-          const parts: string[] = [nm];
-          if (sets>0 && reps!=null) parts.push(`${sets}×${reps}`);
-          if (wt>0 && !isBw) parts.push(`@ ${Math.round(wt)}${unit}`);
-          lines.push(parts.join(' '));
+          const units = (String((workout as any)?.units||'').toLowerCase()==='metric') ? 'metric' : 'imperial';
+          lines.push(formatStrengthExercise(st.strength, units));
           return;
         }
 
