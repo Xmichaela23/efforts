@@ -287,6 +287,12 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
         const wt = (():string|undefined=>{ const w=s?.weight; if (typeof w==='number') return w===0?'BW':`${Math.round(w)} lb`; return undefined; })();
         const notes = s?.notes ? ` (${String(s.notes).trim()})` : '';
+        
+        // Debug: Log band exercises to see what data we're receiving
+        if (name.toLowerCase().includes('band')) {
+          console.log('🎸 [CLIENT] Displaying band exercise:', { name, notes: s?.notes, hasNotes: !!s?.notes, fullObject: s });
+        }
+        
         return `${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}${notes}`;
       });
       if (comp.length) return asLines(comp);

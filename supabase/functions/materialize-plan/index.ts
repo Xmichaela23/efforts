@@ -229,8 +229,16 @@ function repScaleFor(reps?: number | string): number {
   return 0.85;
 }
 
+// Map percentage intensity to band resistance level
+function getBandResistanceFromPercentage(originalPercent: number): string {
+  if (originalPercent <= 35) return "Light Band";
+  if (originalPercent <= 55) return "Medium Band";
+  if (originalPercent <= 75) return "Heavy Band";
+  return "Extra Heavy Band";
+}
+
 // Equipment substitution based on user's available equipment
-function substituteExerciseForEquipment(exerciseName: string, userEquipment: string[]): { name: string; notes?: string } {
+function substituteExerciseForEquipment(exerciseName: string, userEquipment: string[], percentOf1RM?: number): { name: string; notes?: string } {
   const name = String(exerciseName || '').toLowerCase();
   const equipment = Array.isArray(userEquipment) ? userEquipment : [];
   
@@ -251,7 +259,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   if (name.includes('face pull') && !hasCable) {
     if (hasResistanceBands) {
       resultName = 'Band Face Pulls';
-      notes = 'light-medium resistance';
+      notes = percentOf1RM ? getBandResistanceFromPercentage(percentOf1RM * 100) : 'light-medium resistance';
     } else if (hasDumbbells) {
       resultName = 'Bent-Over Reverse Flyes';
     } else if (bodyweightOnly) {
@@ -265,7 +273,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
       resultName = 'Nordic Curls';
     } else if (hasResistanceBands) {
       resultName = 'Band Leg Curls';
-      notes = 'medium resistance';
+      notes = percentOf1RM ? getBandResistanceFromPercentage(percentOf1RM * 100) : 'medium resistance';
     } else {
       resultName = 'Nordic Curls';
     }
@@ -284,7 +292,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
     if (name.includes('dumbbell') && !hasDumbbells) {
       if (hasResistanceBands) {
         resultName = exerciseName.replace(/Dumbbell/gi, 'Band');
-        notes = 'light resistance';
+        notes = percentOf1RM ? getBandResistanceFromPercentage(percentOf1RM * 100) : 'light resistance';
       } else if (bodyweightOnly) {
         resultName = 'Scaption (bodyweight shoulder raises)';
       }
@@ -293,7 +301,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
         resultName = exerciseName.replace(/Cable/gi, 'Dumbbell');
       } else if (hasResistanceBands) {
         resultName = exerciseName.replace(/Cable/gi, 'Band');
-        notes = 'light resistance';
+        notes = percentOf1RM ? getBandResistanceFromPercentage(percentOf1RM * 100) : 'light resistance';
       }
     } else if (!name.includes('dumbbell') && !name.includes('band') && !name.includes('cable')) {
       // No equipment specified - default to dumbbell or substitute
@@ -301,26 +309,31 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
         resultName = `Dumbbell ${exerciseName}`;
       } else if (hasResistanceBands) {
         resultName = `Band ${exerciseName}`;
-        notes = 'light resistance';
+        notes = percentOf1RM ? getBandResistanceFromPercentage(percentOf1RM * 100) : 'light resistance';
       } else if (bodyweightOnly) {
         resultName = 'Scaption (bodyweight shoulder raises)';
       }
     }
   }
   
-  // Add band notes for any band exercises that don't already have them
+  // Add band notes for any band exercises that don't already have them (fallback)
   const finalName = String(resultName).toLowerCase();
   if (finalName.includes('band') && !notes) {
-    if (finalName.includes('face pull')) {
-      notes = 'light-medium resistance';
-    } else if (finalName.includes('leg curl')) {
-      notes = 'medium resistance';
-    } else if (finalName.includes('lateral raise') || finalName.includes('front raise')) {
-      notes = 'light resistance';
-    } else if (finalName.includes('row')) {
-      notes = 'medium-heavy resistance';
-    } else if (finalName.includes('pull') || finalName.includes('pushdown')) {
-      notes = 'medium resistance';
+    if (percentOf1RM) {
+      notes = getBandResistanceFromPercentage(percentOf1RM * 100);
+    } else {
+      // Legacy fallback if no percentage provided
+      if (finalName.includes('face pull')) {
+        notes = 'light-medium resistance';
+      } else if (finalName.includes('leg curl')) {
+        notes = 'medium resistance';
+      } else if (finalName.includes('lateral raise') || finalName.includes('front raise')) {
+        notes = 'light resistance';
+      } else if (finalName.includes('row')) {
+        notes = 'medium-heavy resistance';
+      } else if (finalName.includes('pull') || finalName.includes('pushdown')) {
+        notes = 'medium resistance';
+      }
     }
   }
   
@@ -485,8 +498,11 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           const reps = (typeof ex?.reps==='number'? ex.reps : undefined);
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
           
-          // Apply equipment substitution
-          const substituted = substituteExerciseForEquipment(originalName, userEquipment);
+          // Get percentage for band resistance guidance
+          const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+          
+          // Apply equipment substitution with percentage for intelligent band guidance
+          const substituted = substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
           const name = substituted.name;
           const equipmentNotes = substituted.notes;
           
@@ -504,7 +520,6 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             const ratio = pick.ratio;
             // Calculate inferred 1RM by applying ratio to base (e.g., Barbell Row = Bench × 0.90)
             const inferred1RM = (base1RM != null && ratio != null) ? base1RM * ratio : base1RM;
-            const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
             const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
             if (parsed.weight != null) prescribed = parsed.weight;
             else if (inferred1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
@@ -516,6 +531,9 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           }
           
           const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from, notes: equipmentNotes } as any;
+          if (name.toLowerCase().includes('band')) {
+            console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
+          }
           steps.push({ id: uid(), kind:'strength', strength });
         }
         return { steps, total_s: 0 };
@@ -544,8 +562,11 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           const reps = (typeof ex?.reps==='number'? ex.reps : (typeof ex?.reps==='string'? ex.reps : undefined));
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
           
-          // Apply equipment substitution
-          const substituted = substituteExerciseForEquipment(originalName, userEquipment);
+          // Get percentage for band resistance guidance
+          const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
+          
+          // Apply equipment substitution with percentage for intelligent band guidance
+          const substituted = substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
           const name = substituted.name;
           const equipmentNotes = substituted.notes;
           
@@ -562,7 +583,6 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             const ratio = pick.ratio;
             // Calculate inferred 1RM by applying ratio to base (e.g., Barbell Row = Bench × 0.90)
             const inferred1RM = (base1RM != null && ratio != null) ? base1RM * ratio : base1RM;
-            const percentRaw = (typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : (typeof ex?.load?.percent_1rm === 'number' ? ex.load.percent_1rm : undefined));
             const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
             if (parsed.weight != null) prescribed = parsed.weight;
             else if (inferred1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
@@ -574,6 +594,9 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           }
           
           const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from, notes: equipmentNotes } as any;
+          if (name.toLowerCase().includes('band')) {
+            console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
+          }
           steps.push({ id: uid(), kind:'strength', strength });
         }
         return { steps, total_s: 0 };
@@ -1063,6 +1086,13 @@ Deno.serve(async (req) => {
           // Recalculate total from v3 steps (which have calculated durations for distance-based steps)
           const actualTotal = v3.reduce((sum:number, st:any) => sum + (Number(st?.seconds) || 0), 0);
           const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: actualTotal }, total_duration_seconds: actualTotal, duration: Math.max(1, Math.round(actualTotal/60)) };
+          
+          // Debug: Log band exercises before DB write
+          const bandSteps = v3.filter((st:any) => st?.kind === 'strength' && st?.strength?.name?.toLowerCase().includes('band'));
+          if (bandSteps.length > 0) {
+            console.log(`💾 Writing ${bandSteps.length} band exercises to DB:`, bandSteps.map((st:any) => ({ name: st.strength.name, notes: st.strength.notes })));
+          }
+          
           await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
           count += 1;
         }
