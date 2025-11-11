@@ -842,11 +842,11 @@ export default function PlanSelect() {
             const calculateAccessoryWeight = (exerciseName: string, sets: number, reps: number): { weight?: number; notes?: string } => {
               const n = exerciseName.toLowerCase();
               const round = (w: number) => Math.round(w / 5) * 5;
-              const bn = baselines?.performance_numbers || {};
-              const benchOrm = bn.bench || oneRMs.bench;
-              const ohpOrm = bn.overheadPress1RM || oneRMs.overhead;
-              const squatOrm = bn.squat || oneRMs.squat;
-              const deadliftOrm = bn.deadlift || oneRMs.deadlift;
+              const bn = baselines?.performanceNumbers || {};
+              const benchOrm = bn.bench || 0;
+              const ohpOrm = bn.overheadPress1RM || 0;
+              const squatOrm = bn.squat || 0;
+              const deadliftOrm = bn.deadlift || 0;
               console.log(`🔍 1RMs for calc: bench=${benchOrm}, ohp=${ohpOrm}, squat=${squatOrm}, deadlift=${deadliftOrm}`);
               
               // Band exercises - provide resistance guidance instead of weight
