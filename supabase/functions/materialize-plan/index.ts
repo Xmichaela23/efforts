@@ -229,6 +229,104 @@ function repScaleFor(reps?: number | string): number {
   return 0.85;
 }
 
+// Equipment substitution based on user's available equipment
+function substituteExerciseForEquipment(exerciseName: string, userEquipment: string[]): { name: string; notes?: string } {
+  const name = String(exerciseName || '').toLowerCase();
+  const equipment = Array.isArray(userEquipment) ? userEquipment : [];
+  
+  const hasBarbell = equipment.includes('Full barbell + plates') || equipment.includes('Squat rack or power cage') || equipment.includes('Full commercial gym access');
+  const hasDumbbells = equipment.includes('Adjustable dumbbells') || equipment.includes('Fixed dumbbells') || equipment.includes('Full commercial gym access');
+  const hasBench = equipment.includes('Bench (flat/adjustable)') || equipment.includes('Full commercial gym access');
+  const hasPullUpBar = equipment.includes('Pull-up bar') || equipment.includes('Full commercial gym access');
+  const hasCable = equipment.includes('Cable machine/functional trainer') || equipment.includes('Full commercial gym access');
+  const hasKettlebells = equipment.includes('Kettlebells') || equipment.includes('Full commercial gym access');
+  const hasResistanceBands = equipment.includes('Resistance bands');
+  const hasGymAccess = equipment.includes('Full commercial gym access');
+  const bodyweightOnly = equipment.includes('Bodyweight only') || equipment.length === 0;
+  
+  let resultName = exerciseName;
+  let notes: string | undefined = undefined;
+  
+  // Face Pulls (typically require cable)
+  if (name.includes('face pull') && !hasCable) {
+    if (hasResistanceBands) {
+      resultName = 'Band Face Pulls';
+      notes = 'light-medium resistance';
+    } else if (hasDumbbells) {
+      resultName = 'Bent-Over Reverse Flyes';
+    } else if (bodyweightOnly) {
+      resultName = 'Reverse Flyes (bodyweight)';
+    }
+  }
+  
+  // Machine exercises - only substitute if no gym access
+  if (name.includes('leg curl') && !hasGymAccess) {
+    if (hasBarbell) {
+      resultName = 'Nordic Curls';
+    } else if (hasResistanceBands) {
+      resultName = 'Band Leg Curls';
+      notes = 'medium resistance';
+    } else {
+      resultName = 'Nordic Curls';
+    }
+  }
+  
+  if (name.includes('leg extension') && !hasGymAccess) {
+    if (hasDumbbells) {
+      resultName = 'Bulgarian Split Squats';
+    } else {
+      resultName = 'Bodyweight Lunges';
+    }
+  }
+  
+  // Lateral Raises
+  if (name.includes('lateral raise')) {
+    if (name.includes('dumbbell') && !hasDumbbells) {
+      if (hasResistanceBands) {
+        resultName = exerciseName.replace(/Dumbbell/gi, 'Band');
+        notes = 'light resistance';
+      } else if (bodyweightOnly) {
+        resultName = 'Scaption (bodyweight shoulder raises)';
+      }
+    } else if (name.includes('cable') && !hasCable) {
+      if (hasDumbbells) {
+        resultName = exerciseName.replace(/Cable/gi, 'Dumbbell');
+      } else if (hasResistanceBands) {
+        resultName = exerciseName.replace(/Cable/gi, 'Band');
+        notes = 'light resistance';
+      }
+    } else if (!name.includes('dumbbell') && !name.includes('band') && !name.includes('cable')) {
+      // No equipment specified - default to dumbbell or substitute
+      if (hasDumbbells) {
+        resultName = `Dumbbell ${exerciseName}`;
+      } else if (hasResistanceBands) {
+        resultName = `Band ${exerciseName}`;
+        notes = 'light resistance';
+      } else if (bodyweightOnly) {
+        resultName = 'Scaption (bodyweight shoulder raises)';
+      }
+    }
+  }
+  
+  // Add band notes for any band exercises that don't already have them
+  const finalName = String(resultName).toLowerCase();
+  if (finalName.includes('band') && !notes) {
+    if (finalName.includes('face pull')) {
+      notes = 'light-medium resistance';
+    } else if (finalName.includes('leg curl')) {
+      notes = 'medium resistance';
+    } else if (finalName.includes('lateral raise') || finalName.includes('front raise')) {
+      notes = 'light resistance';
+    } else if (finalName.includes('row')) {
+      notes = 'medium-heavy resistance';
+    } else if (finalName.includes('pull') || finalName.includes('pushdown')) {
+      notes = 'medium resistance';
+    }
+  }
+  
+  return { name: resultName, notes };
+}
+
 function parseIntSafe(s?: string | number | null): number | null { const n = typeof s === 'number' ? s : parseInt(String(s||''), 10); return Number.isFinite(n) ? n : null; }
 
 function uid(): string { try { return crypto.randomUUID(); } catch { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; } }
@@ -379,11 +477,20 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         ? rawStrength
         : (typeof rawStrength === 'string' ? (()=>{ try { return JSON.parse(rawStrength); } catch { return []; } })() : []);
       if (Array.isArray(exs) && exs.length > 0) {
+        // Get user equipment for substitution
+        const userEquipment: string[] = Array.isArray((baselines as any)?.equipment?.strength) ? (baselines as any).equipment.strength : [];
+        
         for (const ex of exs) {
-          const name = String(ex?.name||'exercise');
+          const originalName = String(ex?.name||'exercise');
           const reps = (typeof ex?.reps==='number'? ex.reps : undefined);
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
-          // Resolve base 1RM and accessory ratio
+          
+          // Apply equipment substitution
+          const substituted = substituteExerciseForEquipment(originalName, userEquipment);
+          const name = substituted.name;
+          const equipmentNotes = substituted.notes;
+          
+          // Resolve base 1RM and accessory ratio using substituted name
           const pick = pickPrimary1RMAndBase(name, baselines as any);
           const base1RM = pick.base;
           const ratio = pick.ratio;
@@ -398,7 +505,7 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             prescribed = round5(scaled);
           }
           const percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
-          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from: pick.ref || undefined } as any;
+          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from: pick.ref || undefined, notes: equipmentNotes } as any;
           steps.push({ id: uid(), kind:'strength', strength });
         }
         return { steps, total_s: 0 };
@@ -419,10 +526,19 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         ? rawStrength
         : (typeof rawStrength === 'string' ? (()=>{ try { return JSON.parse(rawStrength); } catch { return []; } })() : []);
       if (exs.length) {
+        // Get user equipment for substitution
+        const userEquipment: string[] = Array.isArray((baselines as any)?.equipment?.strength) ? (baselines as any).equipment.strength : [];
+        
         for (const ex of exs) {
-          const name = String(ex?.name||'exercise');
+          const originalName = String(ex?.name||'exercise');
           const reps = (typeof ex?.reps==='number'? ex.reps : (typeof ex?.reps==='string'? ex.reps : undefined));
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
+          
+          // Apply equipment substitution
+          const substituted = substituteExerciseForEquipment(originalName, userEquipment);
+          const name = substituted.name;
+          const equipmentNotes = substituted.notes;
+          
           const pick = pickPrimary1RMAndBase(name, baselines as any);
           const base1RM = pick.base;
           const ratio = pick.ratio;
@@ -437,7 +553,7 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             prescribed = round5(scaled);
           }
           const percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
-          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from: pick.ref || undefined } as any;
+          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from: pick.ref || undefined, notes: equipmentNotes } as any;
           steps.push({ id: uid(), kind:'strength', strength });
         }
         return { steps, total_s: 0 };

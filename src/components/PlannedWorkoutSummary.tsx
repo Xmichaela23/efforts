@@ -286,7 +286,8 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         const repsVal:any = (():any=>{ const r=s?.reps; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
         const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
         const wt = (():string|undefined=>{ const w=s?.weight; if (typeof w==='number') return w===0?'BW':`${Math.round(w)} lb`; return undefined; })();
-        return `${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}`;
+        const notes = s?.notes ? ` (${String(s.notes).trim()})` : '';
+        return `${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}${notes}`;
       });
       if (comp.length) return asLines(comp);
       // Fallback: authored exercises
