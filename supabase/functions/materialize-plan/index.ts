@@ -10,7 +10,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-type Baselines = { ftp?: number; fiveK_pace?: any; fiveKPace?: any; fiveK?: any; easyPace?: any; easy_pace?: any };
+type Baselines = { ftp?: number; fiveK_pace?: any; fiveKPace?: any; fiveK?: any; easyPace?: any; easy_pace?: any; equipment?: any };
 
 function parsePaceToSecPerMi(v: any): number | null {
   try {
@@ -1015,10 +1015,14 @@ Deno.serve(async (req) => {
     const userId = rows[0]?.user_id;
     let baselines: Baselines = {};
     try {
-      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).maybeSingle();
-      baselines = (ub?.performance_numbers || {}) as any;
+      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, equipment').eq('user_id', userId).maybeSingle();
+      baselines = {
+        ...(ub?.performance_numbers || {}),
+        equipment: ub?.equipment || {}
+      } as any;
       console.log(`🔍 [FTP DEBUG] User ${userId} baselines:`, baselines);
       console.log(`🔍 [FTP DEBUG] FTP value:`, baselines?.ftp);
+      console.log(`🔍 [EQUIPMENT DEBUG] Equipment:`, baselines?.equipment);
     } catch (e) {
       console.error(`❌ [FTP DEBUG] Error loading baselines:`, e);
     }
