@@ -399,7 +399,7 @@ export default function PlanSelect() {
             return (sess && sess.day) ? String(sess.day) : fallback;
           };
           setLongRunDay(prev => prev || findDay('long_run', 'Sunday'));
-          setLongRideDay(prev => prev || findDay('long_ride', 'Saturday'));
+          setLongRideDay(prev => prev || findDay('long_ride', 'Sunday'));
         } catch {}
         setStartDate(computeNextMonday());
         setLoading(false);
