@@ -168,19 +168,51 @@ function pickPrimary1RMAndBase(name: string, baselines: any): { base: number | n
   const overhead = Number.isFinite(baselines?.overheadPress1RM ?? baselines?.ohp ?? baselines?.overhead) ? (baselines?.overheadPress1RM ?? baselines?.ohp ?? baselines?.overhead) as number : null;
   const unilateral = /(single|bulgarian|split|one arm|one leg|unilateral|pistol)/i.test(n);
 
+  // Get accessory ratio for all exercises
+  const ratio = getAccessoryRatio(n);
+  
   // Direct primary lifts
   if (n.includes('bench')) return { base: bench, ref: 'bench', ratio: 1.0, unilateral };
-  if (n.includes('squat')) return { base: squat, ref: 'squat', ratio: 1.0, unilateral };
+  if (n.includes('squat') && !n.includes('goblet')) return { base: squat, ref: 'squat', ratio: 1.0, unilateral };
   if (n.includes('deadlift') || n.includes('dead_lift')) return { base: deadlift, ref: 'deadlift', ratio: 1.0, unilateral };
-  if (n.includes('overhead') || n.includes('ohp') || (n.includes('press') && !n.includes('bench'))) return { base: overhead, ref: 'overhead', ratio: 1.0, unilateral };
+  if (n.includes('overhead') || n.includes('ohp')) return { base: overhead, ref: 'overhead', ratio: 1.0, unilateral };
+  if (n.includes('push press')) return { base: overhead, ref: 'overhead', ratio, unilateral };
 
   // Accessory aliases
-  const ratio = getAccessoryRatio(n);
+  
+  // Upper body pull (bench reference)
   if (n.includes('row')) return { base: bench, ref: 'bench', ratio, unilateral };
+  if (n.includes('pulldown') || n.includes('pull down')) return { base: bench, ref: 'bench', ratio, unilateral };
+  if (n.includes('pullup') || n.includes('pull up') || n.includes('pull-up')) return { base: bench, ref: 'bench', ratio, unilateral };
+  if (n.includes('chinup') || n.includes('chin up') || n.includes('chin-up')) return { base: bench, ref: 'bench', ratio, unilateral };
+  if (n.includes('face pull')) return { base: bench, ref: 'bench', ratio, unilateral };
+  if (n.includes('reverse fly') || n.includes('reverse flye')) return { base: bench, ref: 'bench', ratio, unilateral };
+  
+  // Upper body push (bench reference)
   if (n.includes('dip')) return { base: bench, ref: 'bench', ratio, unilateral };
+  if (n.includes('incline')) return { base: bench, ref: 'bench', ratio, unilateral };
+  if (n.includes('fly') || n.includes('flye')) return { base: bench, ref: 'bench', ratio, unilateral };
+  if (n.includes('dumbbell') && (n.includes('press') || n.includes('bench'))) return { base: bench, ref: 'bench', ratio, unilateral };
+  
+  // Shoulders (overhead reference)
+  if (n.includes('lateral raise')) return { base: overhead, ref: 'overhead', ratio, unilateral };
+  if (n.includes('front raise')) return { base: overhead, ref: 'overhead', ratio, unilateral };
+  if (n.includes('rear delt')) return { base: overhead, ref: 'overhead', ratio, unilateral };
+  if (n.includes('shoulder')) return { base: overhead, ref: 'overhead', ratio, unilateral };
+  if (n.includes('tricep')) return { base: overhead, ref: 'overhead', ratio, unilateral };
+  
+  // Hip dominant (deadlift reference)
   if (n.includes('hip thrust')) return { base: deadlift, ref: 'deadlift', ratio, unilateral };
-  if (n.includes('lunge') || n.includes('split squat') || n.includes('goblet') || n.includes('step up')) return { base: squat, ref: 'squat', ratio, unilateral };
   if (n.includes('rdl') || n.includes('romanian')) return { base: deadlift, ref: 'deadlift', ratio, unilateral };
+  if (n.includes('sumo')) return { base: deadlift, ref: 'deadlift', ratio, unilateral };
+  if (n.includes('good morning')) return { base: deadlift, ref: 'deadlift', ratio, unilateral };
+  if (n.includes('leg curl')) return { base: deadlift, ref: 'deadlift', ratio, unilateral };
+  if (n.includes('glute bridge')) return { base: deadlift, ref: 'deadlift', ratio, unilateral };
+  
+  // Knee dominant (squat reference)
+  if (n.includes('lunge') || n.includes('split squat') || n.includes('goblet') || n.includes('step up')) return { base: squat, ref: 'squat', ratio, unilateral };
+  if (n.includes('leg press')) return { base: squat, ref: 'squat', ratio, unilateral };
+  if (n.includes('leg extension')) return { base: squat, ref: 'squat', ratio, unilateral };
 
   // Unknown
   return { base: null, ref: null, ratio: 1.0, unilateral };
