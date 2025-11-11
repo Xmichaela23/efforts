@@ -819,12 +819,15 @@ export default function PlanSelect() {
                 }
               }
               
+              // Face Pulls (typically require cable)
+              if (name.includes('face pull') && !hasCable) {
+                if (hasResistanceBands) return { ...ex, name: 'Band Face Pulls' };
+                if (hasDumbbells) return { ...ex, name: 'Bent-Over Reverse Flyes' };
+                if (bodyweightOnly) return { ...ex, name: 'Reverse Flyes (bodyweight)' };
+              }
+              
               // Cable exercises
               if ((name.includes('cable') || name.includes('lat pulldown')) && !hasCable) {
-                if (name.includes('face pull')) {
-                  if (hasResistanceBands) return { ...ex, name: 'Band Face Pulls' };
-                  if (bodyweightOnly) return { ...ex, name: 'Reverse Flyes' };
-                }
                 if (name.includes('lat pulldown')) {
                   if (hasPullUpBar) return { ...ex, name: 'Pull-ups' };
                   if (hasResistanceBands) return { ...ex, name: 'Band Lat Pulldowns' };
