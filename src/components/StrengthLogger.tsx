@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Plus, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 
 interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
@@ -1723,6 +1724,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         });
       } catch { return []; }
     };
+    // Create unified metadata (single source of truth)
+    const workoutMetadata = createWorkoutMetadata({
+      session_rpe: typeof extra?.rpe === 'number' ? extra.rpe : undefined,
+      notes: extra?.notes,
+      readiness: readinessData || undefined
+    });
+
     const completedWorkout = isMobilityMode ? {
       id: scheduledWorkout?.id || Date.now().toString(),
       name: scheduledWorkout?.name || `Mobility - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
@@ -1733,11 +1741,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       mobility_exercises: mobilityFromSets(),
       workout_status: 'completed' as const,
       completedManually: true,
-      notes: extra?.notes,
-      rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
+      workout_metadata: workoutMetadata,
       addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence })),
-      planned_id: sourcePlannedId || undefined,
-      readiness: readinessData || undefined
+      planned_id: sourcePlannedId || undefined
     } : {
       id: scheduledWorkout?.id || Date.now().toString(),
       name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
@@ -1750,11 +1756,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       strength_exercises: validExercises,
       workout_status: 'completed' as const,
       completedManually: true,
-      notes: extra?.notes,
-      rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
+      workout_metadata: workoutMetadata,
       addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence })),
-      planned_id: sourcePlannedId || undefined,
-      readiness: readinessData || undefined
+      planned_id: sourcePlannedId || undefined
     };
 
     console.log('🔍 Saving completed workout:', completedWorkout);

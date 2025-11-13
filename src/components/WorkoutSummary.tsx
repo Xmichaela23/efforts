@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompareTable from './StrengthCompareTable';
 import CompletedTab from './CompletedTab';
+import { getSessionRPE, getWorkoutNotes } from '@/utils/workoutMetadata';
 
 interface WorkoutSummaryProps {
   workout: any;
@@ -90,8 +91,8 @@ export default function WorkoutSummary({ workout, completed = null, onClose, onD
   };
 
   const isCompleted = workoutStatus === 'completed';
-  const hasNotes = workout.notes || workout.description;
-  const rpeValue = typeof workout?.rpe === 'number' ? workout.rpe : null;
+  const hasNotes = getWorkoutNotes(workout) || workout.description;
+  const rpeValue = getSessionRPE(workout) ?? null;
 
   return (
     <div className="p-3 space-y-4" style={{listStyle: 'none', listStyleType: 'none'}}>
@@ -212,7 +213,7 @@ export default function WorkoutSummary({ workout, completed = null, onClose, onD
               </button>
               {notesExpanded && (
                 <div className="text-gray-600 whitespace-pre-wrap">
-                  {workout.notes || workout.description}
+                  {getWorkoutNotes(workout) || workout.description}
                 </div>
               )}
             </div>

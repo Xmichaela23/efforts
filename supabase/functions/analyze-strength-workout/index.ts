@@ -680,9 +680,12 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   
   console.log(`📊 PROGRESSION: Analyzed ${Object.keys(progressionData).length} exercises`);
   
-  // Analyze Session RPE and Readiness data
-  const sessionRPEData = analyzeSessionRPE(workout.session_rpe);
-  const readinessData = analyzeReadinessCheck(workout.readiness);
+  // Analyze Session RPE and Readiness data (from unified workout_metadata)
+  const workoutMetadata = workout.workout_metadata || {};
+  const sessionRPE = workoutMetadata.session_rpe ?? workout.session_rpe ?? null;
+  const readiness = workoutMetadata.readiness ?? workout.readiness ?? null;
+  const sessionRPEData = analyzeSessionRPE(sessionRPE);
+  const readinessData = analyzeReadinessCheck(readiness);
   
   console.log(`📊 SESSION RPE: ${sessionRPEData ? 'Available' : 'Not provided'}`);
   console.log(`📊 READINESS: ${readinessData ? 'Available' : 'Not provided'}`);
@@ -967,7 +970,7 @@ Deno.serve(async (req) => {
     // Get workout data
     const { data: workout, error: workoutError } = await supabase
       .from('workouts')
-      .select('*, strength_exercises, planned_id, session_rpe, readiness')
+      .select('*, strength_exercises, planned_id, workout_metadata, session_rpe, readiness')
       .eq('id', workout_id)
       .single();
     

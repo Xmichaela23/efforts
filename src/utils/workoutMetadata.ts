@@ -1,0 +1,77 @@
+/**
+ * Unified workout metadata structure - single source of truth
+ * 
+ * This replaces scattered fields (rpe, notes, readiness) with a unified
+ * JSONB structure stored in workout_metadata column.
+ */
+
+export interface WorkoutMetadata {
+  session_rpe?: number;  // Session RPE (1-10) from "Workout Complete!" popup
+  notes?: string;         // User notes about the workout
+  readiness?: {           // Pre-workout readiness check-in
+    energy: number;       // Energy level (1-10)
+    soreness: number;     // Muscle soreness (1-10)
+    sleep: number;        // Sleep hours (0-12)
+  };
+}
+
+/**
+ * Extract metadata from workout object
+ * 
+ * NOTE: Server normalizes old fields into workout_metadata in useWorkouts.ts
+ * Client just reads the normalized field - no business logic here (dumb client)
+ */
+export function getWorkoutMetadata(workout: any): WorkoutMetadata {
+  // Server has already normalized old fields into workout_metadata
+  return workout?.workout_metadata || {};
+}
+
+/**
+ * Get session RPE from workout (with backward compatibility)
+ */
+export function getSessionRPE(workout: any): number | undefined {
+  const meta = getWorkoutMetadata(workout);
+  return meta.session_rpe;
+}
+
+/**
+ * Get notes from workout (with backward compatibility)
+ */
+export function getWorkoutNotes(workout: any): string | undefined {
+  const meta = getWorkoutMetadata(workout);
+  return meta.notes;
+}
+
+/**
+ * Get readiness data from workout (with backward compatibility)
+ */
+export function getWorkoutReadiness(workout: any): { energy: number; soreness: number; sleep: number } | undefined {
+  const meta = getWorkoutMetadata(workout);
+  return meta.readiness;
+}
+
+/**
+ * Create metadata object from individual fields (for saving)
+ */
+export function createWorkoutMetadata(params: {
+  session_rpe?: number;
+  notes?: string;
+  readiness?: { energy: number; soreness: number; sleep: number };
+}): WorkoutMetadata {
+  const metadata: WorkoutMetadata = {};
+  
+  if (typeof params.session_rpe === 'number') {
+    metadata.session_rpe = params.session_rpe;
+  }
+  
+  if (params.notes && typeof params.notes === 'string' && params.notes.trim().length > 0) {
+    metadata.notes = params.notes.trim();
+  }
+  
+  if (params.readiness && typeof params.readiness === 'object') {
+    metadata.readiness = params.readiness;
+  }
+  
+  return metadata;
+}
+

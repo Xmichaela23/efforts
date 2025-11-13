@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import StrengthCompareTable from './StrengthCompareTable';
 import { useAppContext } from '@/contexts/AppContext';
 import { Dumbbell } from 'lucide-react';
+import { getSessionRPE, getWorkoutNotes, getWorkoutReadiness } from '@/utils/workoutMetadata';
 
 interface StrengthCompletedViewProps {
   workoutData: any;
@@ -204,13 +205,13 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
             <Dumbbell className="h-5 w-5 text-gray-600" />
             <h1 className="text-xl font-semibold text-gray-900">{workoutData.name}</h1>
           </div>
-          {(typeof workoutData?.rpe === 'number' || (workoutData?.notes && String(workoutData.notes).trim().length > 0)) && (
+          {(getSessionRPE(workoutData) !== undefined || getWorkoutNotes(workoutData)) && (
             <div className="flex items-center gap-4 text-sm text-gray-700">
-              {typeof workoutData?.rpe === 'number' && (
-                <div className="px-2 py-1 rounded bg-gray-100">RPE: {workoutData.rpe}</div>
+              {getSessionRPE(workoutData) !== undefined && (
+                <div className="px-2 py-1 rounded bg-gray-100">RPE: {getSessionRPE(workoutData)}</div>
               )}
-              {workoutData?.notes && String(workoutData.notes).trim().length > 0 && (
-                <div className="hidden sm:block max-w-[360px] truncate" title={workoutData.notes}>Notes: {workoutData.notes}</div>
+              {getWorkoutNotes(workoutData) && (
+                <div className="hidden sm:block max-w-[360px] truncate" title={getWorkoutNotes(workoutData)}>Notes: {getWorkoutNotes(workoutData)}</div>
               )}
             </div>
           )}
@@ -238,10 +239,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
       </div>
 
       {/* Notes (expanded block on mobile/smaller screens) */}
-      {workoutData?.notes && String(workoutData.notes).trim().length > 0 && (
+      {getWorkoutNotes(workoutData) && (
         <div className="p-3 bg-gray-50 rounded-md sm:hidden">
           <div className="text-sm text-gray-900 font-medium mb-1">Notes</div>
-          <div className="text-sm text-gray-700 whitespace-pre-wrap">{workoutData.notes}</div>
+          <div className="text-sm text-gray-700 whitespace-pre-wrap">{getWorkoutNotes(workoutData)}</div>
         </div>
       )}
 
@@ -328,41 +329,49 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
       )}
 
       {/* Session RPE Section */}
-      {workoutData.session_rpe && (
-        <div className="py-4">
-          <h3 className="font-medium text-gray-900 mb-2">Session RPE</h3>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-gray-900">{workoutData.session_rpe}</span>
-            <span className="text-sm text-gray-600">
-              {workoutData.session_rpe <= 3 ? 'Light' :
-               workoutData.session_rpe <= 5 ? 'Moderate' :
-               workoutData.session_rpe <= 7 ? 'Hard' :
-               workoutData.session_rpe <= 9 ? 'Very Hard' : 'Maximal'}
-            </span>
+      {(() => {
+        const sessionRPE = getSessionRPE(workoutData);
+        if (sessionRPE === undefined) return null;
+        return (
+          <div className="py-4">
+            <h3 className="font-medium text-gray-900 mb-2">Session RPE</h3>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold text-gray-900">{sessionRPE}</span>
+              <span className="text-sm text-gray-600">
+                {sessionRPE <= 3 ? 'Light' :
+                 sessionRPE <= 5 ? 'Moderate' :
+                 sessionRPE <= 7 ? 'Hard' :
+                 sessionRPE <= 9 ? 'Very Hard' : 'Maximal'}
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Readiness Check Section */}
-      {workoutData.readiness && (
-        <div className="py-4">
-          <h3 className="font-medium text-gray-900 mb-2">Pre-Workout Readiness</h3>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <div className="text-gray-600">Energy</div>
-              <div className="font-medium">{workoutData.readiness.energy}/10</div>
-            </div>
-            <div>
-              <div className="text-gray-600">Soreness</div>
-              <div className="font-medium">{workoutData.readiness.soreness}/10</div>
-            </div>
-            <div>
-              <div className="text-gray-600">Sleep</div>
-              <div className="font-medium">{workoutData.readiness.sleep}h</div>
+      {(() => {
+        const readiness = getWorkoutReadiness(workoutData);
+        if (!readiness) return null;
+        return (
+          <div className="py-4">
+            <h3 className="font-medium text-gray-900 mb-2">Pre-Workout Readiness</h3>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <div className="text-gray-600">Energy</div>
+                <div className="font-medium">{readiness.energy}/10</div>
+              </div>
+              <div>
+                <div className="text-gray-600">Soreness</div>
+                <div className="font-medium">{readiness.soreness}/10</div>
+              </div>
+              <div>
+                <div className="text-gray-600">Sleep</div>
+                <div className="font-medium">{readiness.sleep}h</div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Notes Section */}
       {workoutData.userComments && (

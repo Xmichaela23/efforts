@@ -132,6 +132,7 @@ export interface Workout {
   deviceInfo?: any;
   metrics?: any;
   computed?: any;
+  workout_metadata?: any; // Unified metadata: { session_rpe?, notes?, readiness? }
   // Run-specific fields
   avg_pace?: number;
   max_pace?: number;
@@ -689,7 +690,41 @@ export const useWorkouts = () => {
             return typeof (w as any).swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any).swim_data;
           } catch { return (w as any).swim_data; }
         })(),
-        pool_length: w.pool_length
+        pool_length: w.pool_length,
+        // Server-side normalization: Merge old fields into unified workout_metadata
+        workout_metadata: (() => {
+          try {
+            const parsed = typeof (w as any).workout_metadata === 'string' 
+              ? JSON.parse((w as any).workout_metadata) 
+              : ((w as any).workout_metadata || {});
+            
+            // Normalize old fields into workout_metadata (server-side transformation)
+            if (!parsed.session_rpe && (typeof (w as any).rpe === 'number' || typeof (w as any).session_rpe === 'number')) {
+              parsed.session_rpe = (w as any).rpe || (w as any).session_rpe;
+            }
+            if (!parsed.notes && (w as any).notes && typeof (w as any).notes === 'string') {
+              parsed.notes = (w as any).notes;
+            }
+            if (!parsed.readiness && (w as any).readiness && typeof (w as any).readiness === 'object') {
+              parsed.readiness = (w as any).readiness;
+            }
+            
+            return parsed;
+          } catch { 
+            // Fallback: create normalized metadata from old fields
+            const normalized: any = {};
+            if (typeof (w as any).rpe === 'number' || typeof (w as any).session_rpe === 'number') {
+              normalized.session_rpe = (w as any).rpe || (w as any).session_rpe;
+            }
+            if ((w as any).notes && typeof (w as any).notes === 'string') {
+              normalized.notes = (w as any).notes;
+            }
+            if ((w as any).readiness && typeof (w as any).readiness === 'object') {
+              normalized.readiness = (w as any).readiness;
+            }
+            return normalized;
+          }
+        })()
       }));
 
       // Quiet logs
@@ -1238,6 +1273,9 @@ export const useWorkouts = () => {
         gps_track: workoutData.gps_track ? JSON.stringify(workoutData.gps_track) : null,
         sensor_data: workoutData.sensor_data ? JSON.stringify(workoutData.sensor_data) : null,
         swim_data: (workoutData as any).swim_data ? JSON.stringify((workoutData as any).swim_data) : null,
+        
+        // Unified workout metadata (single source of truth)
+        workout_metadata: (workoutData as any).workout_metadata ? JSON.stringify((workoutData as any).workout_metadata) : null,
       };
 
       console.log("Saving workout with ALL FIT data:", toSave);
@@ -1245,7 +1283,7 @@ export const useWorkouts = () => {
       const { data, error } = await supabase
         .from("workouts")
         .insert([toSave])
-        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,created_at,updated_at')
+        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,workout_metadata,created_at,updated_at')
         .single();
 
       if (error) {
@@ -1332,6 +1370,40 @@ export const useWorkouts = () => {
         total_cycles: data.total_cycles,
         deviceInfo: data.device_info,
         computed: (() => { try { return typeof (data as any).computed === 'string' ? JSON.parse((data as any).computed) : (data as any).computed; } catch { return (data as any).computed; } })(),
+        // Server-side normalization: Merge old fields into unified workout_metadata
+        workout_metadata: (() => {
+          try {
+            const parsed = typeof (data as any).workout_metadata === 'string' 
+              ? JSON.parse((data as any).workout_metadata) 
+              : ((data as any).workout_metadata || {});
+            
+            // Normalize old fields into workout_metadata (server-side transformation)
+            if (!parsed.session_rpe && (typeof (data as any).rpe === 'number' || typeof (data as any).session_rpe === 'number')) {
+              parsed.session_rpe = (data as any).rpe || (data as any).session_rpe;
+            }
+            if (!parsed.notes && (data as any).notes && typeof (data as any).notes === 'string') {
+              parsed.notes = (data as any).notes;
+            }
+            if (!parsed.readiness && (data as any).readiness && typeof (data as any).readiness === 'object') {
+              parsed.readiness = (data as any).readiness;
+            }
+            
+            return parsed;
+          } catch { 
+            // Fallback: create normalized metadata from old fields
+            const normalized: any = {};
+            if (typeof (data as any).rpe === 'number' || typeof (data as any).session_rpe === 'number') {
+              normalized.session_rpe = (data as any).rpe || (data as any).session_rpe;
+            }
+            if ((data as any).notes && typeof (data as any).notes === 'string') {
+              normalized.notes = (data as any).notes;
+            }
+            if ((data as any).readiness && typeof (data as any).readiness === 'object') {
+              normalized.readiness = (data as any).readiness;
+            }
+            return normalized;
+          }
+        })(),
         metrics: {
           avg_heart_rate: data.avg_heart_rate,
           max_heart_rate: data.max_heart_rate,
@@ -1503,13 +1575,14 @@ export const useWorkouts = () => {
       if (updates.threshold_power !== undefined) updateObject.threshold_power = updates.threshold_power;
       if (updates.total_cycles !== undefined) updateObject.total_cycles = updates.total_cycles;
       if (updates.deviceInfo !== undefined) updateObject.device_info = updates.deviceInfo;
+      if ((updates as any).workout_metadata !== undefined) updateObject.workout_metadata = JSON.stringify((updates as any).workout_metadata);
 
       const { data, error } = await supabase
         .from("workouts")
         .update(updateObject)
         .eq("id", id)
         .eq("user_id", user.id)
-        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,created_at,updated_at')
+        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,workout_metadata,created_at,updated_at')
         .single();
 
       if (error) throw error;
@@ -1581,6 +1654,40 @@ export const useWorkouts = () => {
         total_cycles: data.total_cycles,
         deviceInfo: data.device_info,
         computed: (() => { try { return typeof (data as any).computed === 'string' ? JSON.parse((data as any).computed) : (data as any).computed; } catch { return (data as any).computed; } })(),
+        // Server-side normalization: Merge old fields into unified workout_metadata
+        workout_metadata: (() => {
+          try {
+            const parsed = typeof (data as any).workout_metadata === 'string' 
+              ? JSON.parse((data as any).workout_metadata) 
+              : ((data as any).workout_metadata || {});
+            
+            // Normalize old fields into workout_metadata (server-side transformation)
+            if (!parsed.session_rpe && (typeof (data as any).rpe === 'number' || typeof (data as any).session_rpe === 'number')) {
+              parsed.session_rpe = (data as any).rpe || (data as any).session_rpe;
+            }
+            if (!parsed.notes && (data as any).notes && typeof (data as any).notes === 'string') {
+              parsed.notes = (data as any).notes;
+            }
+            if (!parsed.readiness && (data as any).readiness && typeof (data as any).readiness === 'object') {
+              parsed.readiness = (data as any).readiness;
+            }
+            
+            return parsed;
+          } catch { 
+            // Fallback: create normalized metadata from old fields
+            const normalized: any = {};
+            if (typeof (data as any).rpe === 'number' || typeof (data as any).session_rpe === 'number') {
+              normalized.session_rpe = (data as any).rpe || (data as any).session_rpe;
+            }
+            if ((data as any).notes && typeof (data as any).notes === 'string') {
+              normalized.notes = (data as any).notes;
+            }
+            if ((data as any).readiness && typeof (data as any).readiness === 'object') {
+              normalized.readiness = (data as any).readiness;
+            }
+            return normalized;
+          }
+        })(),
         metrics: {
           avg_heart_rate: data.avg_heart_rate,
           max_heart_rate: data.max_heart_rate,
