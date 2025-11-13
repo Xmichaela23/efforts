@@ -2340,7 +2340,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // Dumbbell exercises: Show weight input with persistent label
                         if (exerciseType === 'dumbbell') {
                           return (
-                            <div className="flex flex-col flex-1">
+                            <div className="flex-1 relative">
                               <Input
                                 type="number"
                                 inputMode="numeric"
@@ -2351,7 +2351,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 style={{ fontSize: '16px' }}
                                 placeholder="Weight"
                               />
-                              <span className="text-[10px] text-gray-500 text-center mt-0.5">(each hand)</span>
+                              <div className="absolute left-0 right-0 top-full text-[10px] text-gray-500 text-center mt-0.5">(each hand)</div>
                             </div>
                           );
                         }
