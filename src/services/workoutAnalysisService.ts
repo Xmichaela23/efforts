@@ -32,7 +32,17 @@ export async function analyzeWorkout(workoutId: string, workoutType: string): Pr
     });
     
     if (error) {
-      throw new Error(`Analysis error: ${error.message}`);
+      console.error('❌ Edge function invoke error:', {
+        functionName,
+        workoutId,
+        error: error.message,
+        errorDetails: error
+      });
+      throw new Error(`Analysis error: ${error.message || 'Failed to send a request to the Edge Function'}`);
+    }
+    
+    if (!data) {
+      throw new Error('No data returned from analysis function');
     }
     
     // Extract the analysis results from the discipline function response

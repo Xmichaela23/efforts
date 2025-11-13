@@ -944,13 +944,31 @@ ANALYSIS REQUIREMENTS:
 
 // Main edge function handler
 Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+      }
+    });
+  }
+
   try {
-    const { workout_id } = await req.json();
+    const body = await req.json();
+    const { workout_id } = body;
     
     if (!workout_id) {
       return new Response(JSON.stringify({ error: 'workout_id is required' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+        }
       });
     }
     
@@ -1035,17 +1053,29 @@ Deno.serve(async (req) => {
     
     return new Response(JSON.stringify(analysis), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+      }
     });
     
   } catch (error) {
     console.error('Error in strength workout analysis:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
-      message: error.message 
+      message: errorMessage 
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+      }
     });
   }
 });
