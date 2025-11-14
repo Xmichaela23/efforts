@@ -36,9 +36,37 @@ export async function analyzeWorkout(workoutId: string, workoutType: string): Pr
         functionName,
         workoutId,
         error: error.message,
-        errorDetails: error
+        errorDetails: error,
+        errorContext: error.context,
+        errorStatus: error.status,
+        responseData: data // Check if error response body is in data
       });
-      throw new Error(`Analysis error: ${error.message || 'Failed to send a request to the Edge Function'}`);
+      
+      // Try to extract error message from response body if available
+      let errorMessage = error.message || 'Failed to send a request to the Edge Function';
+      
+      // Supabase may return error response body in data even when error is set
+      if (data && typeof data === 'object') {
+        const responseError = (data as any).error || (data as any).message;
+        if (responseError) {
+          errorMessage = String(responseError);
+        }
+      }
+      
+      // If we have error context, try to get more details
+      if (error.context && typeof error.context === 'object') {
+        const contextMsg = (error.context as any).message || (error.context as any).error;
+        if (contextMsg) {
+          errorMessage = String(contextMsg);
+        }
+      }
+      
+      // If error has a status, include it
+      if (error.status) {
+        errorMessage = `Analysis error (${error.status}): ${errorMessage}`;
+      }
+      
+      throw new Error(`Analysis error: ${errorMessage}`);
     }
     
     if (!data) {
