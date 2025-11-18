@@ -111,9 +111,30 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           if (displayYards) { const yd = Math.round(x / 0.9144); return `${yd} yd`; }
           return `${x} m`;
         }
-        // For runs/bikes: show as authored (meters), no conversion
-        // Plans are authored in meters and should display as authored
-        return `${Math.round(x)} m`;
+        // For runs/bikes: convert based on plan units
+        const planUnits = String((workout as any)?.units||'').toLowerCase();
+        if (planUnits === 'metric') {
+          // Metric: show km for longer distances, m for shorter
+          if (x >= 1000) {
+            const km = (x / 1000).toFixed(1);
+            return `${km} km`;
+          }
+          return `${x} m`;
+        } else {
+          // Imperial: convert meters to miles
+          const miles = x / 1609.34;
+          if (miles < 0.1) {
+            // Very short distances: show in yards
+            const yards = Math.round(x / 0.9144);
+            return `${yards} yd`;
+          } else if (miles < 1) {
+            // Less than a mile: show with 2 decimals
+            return `${miles.toFixed(2)} mi`;
+          } else {
+            // One mile or more: show with 1 decimal
+            return `${miles.toFixed(1)} mi`;
+          }
+        }
       };
       const niceKind = (k:string)=>{
         const t = String(k||'').toLowerCase();

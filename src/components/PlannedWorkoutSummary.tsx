@@ -318,6 +318,32 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
       const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
       const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
       const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+      const fmtDist = (meters:number)=>{
+        const m = Math.max(1, Math.round(Number(meters)||0));
+        const planUnits = String((workout as any)?.units||'').toLowerCase();
+        if (planUnits === 'metric') {
+          // Metric: show km for longer distances, m for shorter
+          if (m >= 1000) {
+            const km = (m / 1000).toFixed(1);
+            return `${km} km`;
+          }
+          return `${m} m`;
+        } else {
+          // Imperial: convert meters to miles
+          const miles = m / 1609.34;
+          if (miles < 0.1) {
+            // Very short distances: show in yards
+            const yards = Math.round(m / 0.9144);
+            return `${yards} yd`;
+          } else if (miles < 1) {
+            // Less than a mile: show with 2 decimals
+            return `${miles.toFixed(2)} mi`;
+          } else {
+            // One mile or more: show with 1 decimal
+            return `${miles.toFixed(1)} mi`;
+          }
+        }
+      };
       const paceStrWithRange = (paceTarget?: string, kind?: string, paceRange?: any) => {
         try {
           // Priority 1: Use server-processed pace_range object
@@ -369,7 +395,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         }
         if (isWork(st)) {
           const workLabel = (()=>{
-            if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) return `${Math.round(st.distanceMeters)} m`;
+            if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) return fmtDist(st.distanceMeters);
             if (typeof st?.seconds==='number' && st.seconds>0) return fmtTime(st.seconds);
             return 'interval';
           })();
@@ -379,7 +405,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           const hasRec = next && isRec(next);
           const restLabel = hasRec ? (()=>{
             if (typeof next?.seconds==='number' && next.seconds>0) return fmtTime(next.seconds);
-            if (typeof next?.distanceMeters==='number' && next.distanceMeters>0) return `${Math.round(next.distanceMeters)} m`;
+            if (typeof next?.distanceMeters==='number' && next.distanceMeters>0) return fmtDist(next.distanceMeters);
             return 'rest';
           })() : undefined;
           const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery', next?.pace_range) : undefined;
@@ -388,10 +414,10 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           while (j < steps.length) {
             const a = steps[j]; const b = steps[j+1];
             if (!isWork(a)) break;
-            const aLabel = (typeof a?.distanceMeters==='number' && a.distanceMeters>0) ? `${Math.round(a.distanceMeters)} m` : (typeof a?.seconds==='number' ? fmtTime(a.seconds) : 'interval');
+            const aLabel = (typeof a?.distanceMeters==='number' && a.distanceMeters>0) ? fmtDist(a.distanceMeters) : (typeof a?.seconds==='number' ? fmtTime(a.seconds) : 'interval');
             const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind, a?.pace_range);
             const aPow = powerStr(a);
-            const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? `${Math.round(b.distanceMeters)} m` : 'rest')) : undefined;
+            const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? fmtDist(b.distanceMeters) : 'rest')) : undefined;
             const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery', b?.pace_range) : undefined;
             const bPow = (b && isRec(b)) ? powerStr(b) : undefined;
             const sameWork = (aLabel===workLabel) && (aPace===workPace) && (aPow===workPower);
@@ -407,7 +433,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           i = j; continue;
         }
         if (typeof st?.seconds==='number') { out.push(`1 × ${fmtTime(st.seconds)}`); i+=1; continue; }
-        if (typeof st?.distanceMeters==='number') { out.push(`1 × ${Math.round(st.distanceMeters)} m`); i+=1; continue; }
+        if (typeof st?.distanceMeters==='number') { out.push(`1 × ${fmtDist(st.distanceMeters)}`); i+=1; continue; }
         i += 1;
       }
       return out;
