@@ -3,7 +3,7 @@
 export type RunPreset =
   | { kind: 'steady'; duration_s: number; target?: string }
   | { kind: 'interval'; reps: number; work: { duration_s?: number; dist_m?: number; target?: string }; rest?: { duration_s?: number; dist_m?: number } }
-  | { kind: 'tempo'; dist_m: number; target?: string }
+  | { kind: 'tempo'; dist_m?: number; duration_s?: number; target?: string }
   | { kind: 'longrun'; duration_s: number; target?: string };
 
 export type BikePreset = RunPreset; // reuse structure for simplicity
@@ -35,6 +35,9 @@ export const PRESETS: Record<string, Preset> = {
   run_easy_35min: { kind: 'steady', duration_s: 35 * 60, target: '{easy_pace}' },
   run_easy_40min: { kind: 'steady', duration_s: 40 * 60, target: '{easy_pace}' },
   run_easy_45min: { kind: 'steady', duration_s: 45 * 60, target: '{easy_pace}' },
+  run_easy_50min: { kind: 'steady', duration_s: 50 * 60, target: '{easy_pace}' },
+  run_easy_55min: { kind: 'steady', duration_s: 55 * 60, target: '{easy_pace}' },
+  run_easy_60min: { kind: 'steady', duration_s: 60 * 60, target: '{easy_pace}' },
 
   // Cruise intervals
   'cruise_4x1_5mi_5kpace_plus0:10_R3min': { kind: 'interval', reps: 4, work: { dist_m: 2414, target: '{5k_pace}+0:10' }, rest: { duration_s: 180 } },
@@ -46,11 +49,13 @@ export const PRESETS: Record<string, Preset> = {
   // Tempo
   'tempo_4mi_5kpace_plus0:45': { kind: 'tempo', dist_m: 6437, target: '{5k_pace}+0:45' },
   'tempo_5mi_5kpace_plus0:45': { kind: 'tempo', dist_m: 8047, target: '{5k_pace}+0:45' },
+  'tempo_5mi_5kpace_plus1:00': { kind: 'tempo', dist_m: 8047, target: '{5k_pace}+1:00' },
   'tempo_6mi_5kpace_plus0:40': { kind: 'tempo', dist_m: 9656, target: '{5k_pace}+0:40' },
   'tempo_7mi_5kpace_plus0:40': { kind: 'tempo', dist_m: 11265, target: '{5k_pace}+0:40' },
   'tempo_7mi_5kpace_plus0:35': { kind: 'tempo', dist_m: 11265, target: '{5k_pace}+0:35' },
   'tempo_8mi_5kpace_plus0:35': { kind: 'tempo', dist_m: 12875, target: '{5k_pace}+0:35' },
   'tempo_4mi_5kpace_plus1:00': { kind: 'tempo', dist_m: 6437, target: '{5k_pace}+1:00' },
+  'tempo_30min_5kpace_plus1:00': { kind: 'tempo', duration_s: 30 * 60, target: '{5k_pace}+1:00' },
 
   // Long runs
   longrun_70min_easypace: { kind: 'longrun', duration_s: 70 * 60, target: '{easy_pace}' },

@@ -588,11 +588,34 @@ function calculateOverallReadiness(energy: number | null, soreness: number | nul
 // Main strength workout analysis function
 async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBaselines: any, supabase: any): Promise<any> {
   console.log('🔍 STRENGTH ANALYSIS START');
+  console.log('🔍 Workout data:', {
+    id: workout?.id,
+    type: workout?.type,
+    has_strength_exercises: !!workout?.strength_exercises,
+    strength_exercises_type: typeof workout?.strength_exercises,
+    strength_exercises_preview: typeof workout?.strength_exercises === 'string' 
+      ? workout.strength_exercises.substring(0, 100) 
+      : Array.isArray(workout?.strength_exercises) 
+        ? `Array(${workout.strength_exercises.length})` 
+        : workout?.strength_exercises
+  });
   
-  // Parse strength exercises
-  const executedExercises = parseStrengthExercises(workout.strength_exercises);
-  const plannedExercises = plannedWorkout ? 
-    parseStrengthExercises(plannedWorkout.strength_exercises) : [];
+  // Parse strength exercises with error handling
+  let executedExercises: any[] = [];
+  try {
+    executedExercises = parseStrengthExercises(workout?.strength_exercises);
+  } catch (e) {
+    console.error('❌ Failed to parse executed exercises:', e);
+    throw new Error(`Failed to parse strength exercises: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  
+  let plannedExercises: any[] = [];
+  try {
+    plannedExercises = plannedWorkout ? parseStrengthExercises(plannedWorkout.strength_exercises) : [];
+  } catch (e) {
+    console.warn('⚠️ Failed to parse planned exercises:', e);
+    plannedExercises = [];
+  }
   
   console.log(`🔍 STRENGTH DEBUG: Parsed ${executedExercises.length} executed exercises`);
   console.log(`🔍 PLANNED DEBUG: Parsed ${plannedExercises.length} planned exercises`);
@@ -681,7 +704,19 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   console.log(`📊 PROGRESSION: Analyzed ${Object.keys(progressionData).length} exercises`);
   
   // Analyze Session RPE and Readiness data (from unified workout_metadata)
-  const workoutMetadata = workout.workout_metadata || {};
+  // Parse workout_metadata if it's a string (JSONB from database)
+  let workoutMetadata: any = {};
+  try {
+    if (typeof workout.workout_metadata === 'string') {
+      workoutMetadata = JSON.parse(workout.workout_metadata);
+    } else if (workout.workout_metadata && typeof workout.workout_metadata === 'object') {
+      workoutMetadata = workout.workout_metadata;
+    }
+  } catch (e) {
+    console.warn('Failed to parse workout_metadata:', e);
+    workoutMetadata = {};
+  }
+  
   const sessionRPE = workoutMetadata.session_rpe ?? workout.session_rpe ?? null;
   const readiness = workoutMetadata.readiness ?? workout.readiness ?? null;
   const sessionRPEData = analyzeSessionRPE(sessionRPE);
@@ -956,9 +991,12 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Declare workout_id outside try block so it's accessible in catch
+  let workout_id: string | undefined;
+  
   try {
     const body = await req.json();
-    const { workout_id } = body;
+    workout_id = body.workout_id;
     
     if (!workout_id) {
       return new Response(JSON.stringify({ error: 'workout_id is required' }), {
@@ -975,9 +1013,9 @@ Deno.serve(async (req) => {
     console.log(`=== STRENGTH WORKOUT ANALYSIS START ===`);
     console.log(`Analyzing strength workout: ${workout_id}`);
     
-    // Initialize Supabase client
+    // Initialize Supabase client with service role key to bypass RLS
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Missing Supabase configuration');
@@ -985,15 +1023,78 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Get workout data
-    const { data: workout, error: workoutError } = await supabase
+    // Validate user authentication (extract from Authorization header)
+    const authH = req.headers.get('Authorization') || '';
+    const token = authH.startsWith('Bearer ') ? authH.slice(7) : null;
+    
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Missing authentication token' }), {
+        status: 401,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+        }
+      });
+    }
+    
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+    if (userErr || !userData?.user?.id) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid authentication token' }), {
+        status: 401,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+        }
+      });
+    }
+    
+    const requestingUserId = userData.user.id;
+    
+    // Get workout data - try with workout_metadata first, fallback if column doesn't exist
+    let workout: any = null;
+    let workoutError: any = null;
+    
+    // First try to get workout with workout_metadata
+    const resultWithMetadata = await supabase
       .from('workouts')
       .select('*, strength_exercises, planned_id, workout_metadata, session_rpe, readiness')
       .eq('id', workout_id)
-      .single();
+      .maybeSingle();
+    
+    if (resultWithMetadata.error && resultWithMetadata.error.message?.includes('workout_metadata')) {
+      // Column doesn't exist, try without it
+      console.log('⚠️ workout_metadata column not available, fetching without it');
+      const resultWithoutMetadata = await supabase
+        .from('workouts')
+        .select('*, strength_exercises, planned_id, session_rpe, readiness')
+        .eq('id', workout_id)
+        .maybeSingle();
+      workout = resultWithoutMetadata.data;
+      workoutError = resultWithoutMetadata.error;
+    } else {
+      workout = resultWithMetadata.data;
+      workoutError = resultWithMetadata.error;
+    }
     
     if (workoutError || !workout) {
-      throw new Error(`Workout not found: ${workoutError?.message}`);
+      throw new Error(`Workout not found: ${workoutError?.message || 'No workout found'}`);
+    }
+    
+    // Verify user has permission to access this workout
+    if (workout.user_id !== requestingUserId) {
+      return new Response(JSON.stringify({ error: 'Forbidden: You do not have access to this workout' }), {
+        status: 403,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+        }
+      });
     }
     
     // Check if it's a strength workout
@@ -1009,6 +1110,19 @@ Deno.serve(async (req) => {
     
     console.log(`Workout type: ${workout.type}`);
     console.log(`Workout date: ${workout.date}`);
+    
+    // Set analysis status to 'analyzing' at start
+    const { error: statusError } = await supabase
+      .from('workouts')
+      .update({ 
+        analysis_status: 'analyzing',
+        analysis_error: null 
+      })
+      .eq('id', workout_id);
+
+    if (statusError) {
+      console.warn('⚠️ Failed to set analyzing status:', statusError.message);
+    }
     
     // Get user baselines
     const { data: baselinesData, error: baselinesError } = await supabase
@@ -1051,6 +1165,58 @@ Deno.serve(async (req) => {
     console.log('Status:', analysis.status);
     console.log('Insights count:', analysis.insights?.length || 0);
     
+    // Transform analysis result to match expected structure (like running workouts)
+    // Client expects: performance (object), detailed_analysis (object), narrative_insights (array)
+    const performance = {
+      overall_adherence: analysis.overall_adherence?.exercise_completion_rate || 0,
+      set_completion_rate: analysis.overall_adherence?.set_completion_rate || 0,
+      exercises_planned: analysis.overall_adherence?.exercises_planned || 0,
+      exercises_executed: analysis.overall_adherence?.exercises_executed || 0,
+      sets_planned: analysis.overall_adherence?.sets_planned || 0,
+      sets_executed: analysis.overall_adherence?.sets_executed || 0
+    };
+    
+    const detailedAnalysis = {
+      exercise_adherence: analysis.exercise_adherence || [],
+      overall_adherence: analysis.overall_adherence || {},
+      progression_data: analysis.progression_data || {},
+      plan_metadata: analysis.plan_metadata || null,
+      session_rpe: analysis.session_rpe || null,
+      readiness: analysis.readiness || null,
+      workout_summary: {
+        total_exercises: analysis.overall_adherence?.exercises_executed || 0,
+        exercises_planned: analysis.overall_adherence?.exercises_planned || 0,
+        exercise_completion_rate: analysis.overall_adherence?.exercise_completion_rate || 0,
+        sets_completion_rate: analysis.overall_adherence?.set_completion_rate || 0
+      }
+    };
+    
+    // Save analysis results to database
+    const updatePayload = {
+      workout_analysis: {
+        performance: performance,
+        detailed_analysis: detailedAnalysis,
+        narrative_insights: analysis.insights || [], // AI-generated insights
+        insights: analysis.insights || [], // Keep for backward compatibility
+        strengths: [], // Extract from progression_data if needed
+        red_flags: [] // Extract from adherence if needed
+      },
+      analysis_status: 'complete',
+      analyzed_at: new Date().toISOString()
+    };
+    
+    const { error: updateError } = await supabase
+      .from('workouts')
+      .update(updatePayload)
+      .eq('id', workout_id);
+    
+    if (updateError) {
+      console.error('❌ Failed to save analysis to database:', updateError);
+      // Still return the analysis even if DB update fails
+    } else {
+      console.log('✅ Analysis saved successfully to database');
+    }
+    
     return new Response(JSON.stringify(analysis), {
       status: 200,
       headers: { 
@@ -1062,12 +1228,31 @@ Deno.serve(async (req) => {
     });
     
   } catch (error) {
-    console.error('Error in strength workout analysis:', error);
+    console.error('❌ Error in strength workout analysis:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('❌ Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    
+    // Set analysis status to 'failed' and capture error message
+    try {
+      await supabase
+        .from('workouts')
+        .update({ 
+          analysis_status: 'failed',
+          analysis_error: error instanceof Error ? error.message : 'Internal server error'
+        })
+        .eq('id', workout_id);
+    } catch (statusError) {
+      console.error('❌ Failed to set error status:', statusError);
+    }
+    
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
     
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
-      message: errorMessage 
+      message: errorMessage,
+      stack: errorStack,
+      workout_id: workout_id // workout_id is in outer scope
     }), {
       status: 500,
       headers: { 

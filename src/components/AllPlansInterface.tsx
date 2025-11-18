@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { normalizePlannedSession, normalizeStructuredSession } from '@/services/plans/normalizer';
-import { resolveTargets } from '@/services/plans/targets';
-import { expand } from '@/services/plans/expander';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

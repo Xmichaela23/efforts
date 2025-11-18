@@ -397,7 +397,7 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
   if (/run_easy_\d+min/.test(lower)) {
     const m = lower.match(/run_easy_(\d+)min/); const sec = m ? parseInt(m[1],10)*60 : 1800; out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }
-  // Tempo: tempo_25min_5kpace_plus0:45
+  // Tempo: tempo_25min_5kpace_plus0:45 (duration-based)
   if (/tempo_\d+min/.test(lower)) {
     const m = lower.match(/tempo_(\d+)min_5kpace(?:_plus(\d+):(\d+))?/);
     const sec = m ? parseInt(m[1],10)*60 : 1500;
@@ -405,6 +405,19 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
     const plus = (m && m[2] && m[3]) ? (parseInt(m[2],10)*60 + parseInt(m[3],10)) : 0;
     const pace = (fkp!=null) ? (fkp + plus) : undefined;
     out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: pace }); return out;
+  }
+  // Tempo: tempo_5mi_5kpace_plus1:00 (distance-based)
+  if (/tempo_\d+mi/.test(lower)) {
+    const m = lower.match(/tempo_(\d+)mi_5kpace(?:_plus(\d+):(\d+))?/);
+    if (m) {
+      const miles = parseInt(m[1],10);
+      const dist_m = Math.round(miles * 1609.34);
+      const fkp = secPerMiFromBaseline(baselines,'fivek');
+      const plus = (m[2] && m[3]) ? (parseInt(m[2],10)*60 + parseInt(m[3],10)) : 0;
+      const pace = (fkp!=null) ? (fkp + plus) : undefined;
+      out.push({ id: uid(), kind:'work', distance_m: dist_m, pace_sec_per_mi: pace });
+      return out;
+    }
   }
   // Intervals: interval_5x800m_5kpace_r90s, interval_6x800m_5kpace_r120, interval_4x1mi_5kpace_R2min
   if (/interval_\d+x/.test(lower)) {

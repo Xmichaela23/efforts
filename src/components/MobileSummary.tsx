@@ -1647,10 +1647,19 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const fmtDeltaTime = (s:number) => { const sign = s>=0 ? '+' : '−'; const v = Math.abs(Math.round(s)); const m=Math.floor(v/60); const ss=v%60; return `${sign}${m}:${String(ss).padStart(2,'0')}`; };
             const fmtDeltaPer100 = (s:number) => { const faster = s>0; const v = Math.abs(s); const m=Math.floor(v/60); const ss=Math.round(v%60); return `${m?`${m}m `:''}${ss}s/${swimUnit==='yd'?'100yd':'100m'} ${faster? 'faster' : 'slower'}`.trim(); };
 
-            // Use server-computed overall execution score
-            const executionScore = (completed as any)?.computed?.overall?.execution_score;
+            // Use server-computed metrics from workout_analysis.performance (new unified source)
+            const performance = (completed as any)?.workout_analysis?.performance;
+            const executionScore = Number.isFinite(performance?.execution_adherence) 
+              ? Math.round(performance.execution_adherence)
+              : ((completed as any)?.computed?.overall?.execution_score || null);
+            const paceAdherence = Number.isFinite(performance?.pace_adherence)
+              ? Math.round(performance.pace_adherence)
+              : pacePct;
+            const durationAdherence = Number.isFinite(performance?.duration_adherence)
+              ? Math.round(performance.duration_adherence)
+              : durationPct;
             
-            const anyVal = (pacePct!=null) || (durationPct!=null) || (executionScore!=null);
+            const anyVal = (paceAdherence!=null && paceAdherence > 0) || (durationAdherence!=null && durationAdherence > 0) || (executionScore!=null && executionScore > 0);
             if (!anyVal) return null;
 
             // Get contextual message
@@ -1669,8 +1678,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 <div className="flex items-center justify-center gap-6 text-center mb-3">
                   <div className="flex items-end gap-3">
                     {chip('Execution', executionScore, 'Overall adherence', 'pace')}
-                    {chip('Pace', pacePct, paceDeltaSec!=null ? fmtDeltaPer100(paceDeltaSec) : '—', 'pace')}
-                    {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
+                    {chip('Pace', paceAdherence, paceDeltaSec!=null ? fmtDeltaPer100(paceDeltaSec) : '—', 'pace')}
+                    {chip('Duration', durationAdherence, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
                   </div>
                 </div>
                 

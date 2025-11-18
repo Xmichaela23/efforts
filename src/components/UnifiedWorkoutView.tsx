@@ -221,7 +221,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           } catch {}
           return;
         }
-        // Server-first: if steps missing, materialize on server (tokens/structure/description)
+        // Server materialization: if steps missing, materialize on server
         try {
           const pid = String((linkedPlanned as any)?.id || '');
           if (pid) {
@@ -232,58 +232,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               return;
             }
           }
-        } catch {}
-
-        // Fallback: client expansion from steps tokens (last resort)
-        try {
-          const readStepsPresetLocal = (src: any): string[] | undefined => {
-            try {
-              if (Array.isArray(src)) return src as string[];
-              if (src && typeof src === 'object') return src as string[];
-              if (typeof src === 'string' && src.trim().length) {
-                const parsed = JSON.parse(src);
-                return Array.isArray(parsed) ? (parsed as string[]) : undefined;
-              }
-            } catch {}
-            return undefined;
-          };
-          // Refresh the latest planned row first
-          let row = linkedPlanned as any;
-          try {
-            const { data } = await supabase.from('planned_workouts').select('*').eq('id', String((linkedPlanned as any).id)).maybeSingle();
-            if (data) row = data;
-          } catch {}
-          let stepsPreset = readStepsPresetLocal((row as any)?.steps_preset);
-          const rowHasV3 = (() => { try { return Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length>0 && Number((row as any)?.computed?.total_duration_seconds) > 0; } catch { return false; }})();
-          const needsInlineHydrate = !rowHasV3 && Array.isArray(stepsPreset) && stepsPreset.length>0;
-          if (needsInlineHydrate) {
-            const { data: { user } } = await supabase.auth.getUser();
-            let baselines: any = {};
-            try {
-              const { data: ub } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user?.id || '').maybeSingle();
-              baselines = ub?.performance_numbers || {};
-            } catch {}
-            const { expand } = await import('@/services/plans/expander');
-            const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
-            const atomic: any[] = expand(stepsPreset || [], (row as any).main, (row as any).tags);
-            const resolved0: any[] = resolveTargets(atomic as any, baselines, ((row as any).export_hints || {}), String((row as any).type||'').toLowerCase());
-            // Guarantee stable IDs on all steps (required for server mapping)
-            const resolved: any[] = (resolved0 || []).map((st:any)=> ({ id: st?.id || (typeof crypto!=='undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`), ...st }));
-            if (Array.isArray(resolved) && resolved.length) {
-              const total = totalDurationSeconds(resolved as any);
-              const update = { computed: { normalization_version: 'v3', steps: resolved, total_duration_seconds: total }, duration: Math.round(total/60) } as any;
-              await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
-              const authoritativeTotal = Number((row as any)?.total_duration_seconds);
-              const merged = { ...row, ...(Number.isFinite(authoritativeTotal) && authoritativeTotal>0 ? { total_duration_seconds: authoritativeTotal } : {}), ...update };
-              setLinkedPlanned(merged);
-              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-              // Enhanced analysis will be triggered when user opens Summary tab
-              return;
-            }
-          }
-        } catch {}
-
-        // Fallback removed: server now materializes; rely on materialize-plan when needed
+        } catch (err) {
+          console.warn('[UnifiedWorkoutView] Server materialization failed:', err);
+        }
       } catch {}
     };
     // When switching to Summary tab, try a materialize pass
@@ -485,39 +436,24 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           } catch {}
         }
         
-        // Skip client-side hydration for strength workouts
-        const needsHydrate = !rowHasV3 && !isStrength && Array.isArray(stepsPreset) && stepsPreset.length>0;
-
-        if (needsHydrate) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) { setHydratedPlanned(row); return; }
-          let baselines: any = {};
+        // Server materialization: if steps missing, materialize on server
+        if (!rowHasV3) {
           try {
-            const { data: ub } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).maybeSingle();
-            baselines = ub?.performance_numbers || {};
-          } catch {}
-          try {
-            const { expand } = await import('@/services/plans/expander');
-            const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
-            const atomic: any[] = expand(stepsPreset || [], (row as any).main, (row as any).tags);
-            const resolved: any[] = resolveTargets(atomic as any, baselines, ((row as any).export_hints || {}), String((row as any).type||'').toLowerCase());
-            if (Array.isArray(resolved) && resolved.length) {
-              const total = totalDurationSeconds(resolved as any);
-              const update = {
-                computed: { normalization_version: 'v3', steps: resolved, total_duration_seconds: total },
-                duration: Math.round(total/60)
-              } as any;
-              await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
-              // Preserve authoritative DB total_duration_seconds if present on row
-              const authoritativeTotal = Number((row as any)?.total_duration_seconds);
-              setHydratedPlanned({ ...row, ...(Number.isFinite(authoritativeTotal) && authoritativeTotal>0 ? { total_duration_seconds: authoritativeTotal } : {}), ...update });
-              // Delay invalidate event to ensure state update completes first
-              setTimeout(() => {
-                try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-              }, 100);
-              return;
+            const pid = String((row as any)?.id || '');
+            if (pid) {
+              await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
+              const { data: refreshed } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
+              if (refreshed) {
+                setHydratedPlanned(refreshed);
+                setTimeout(() => {
+                  try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                }, 100);
+                return;
+              }
             }
-          } catch {}
+          } catch (err) {
+            console.warn('[UnifiedWorkoutView] Server materialization failed:', err);
+          }
         }
         setHydratedPlanned(row);
       } catch { setHydratedPlanned(null); }
