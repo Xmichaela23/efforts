@@ -232,6 +232,19 @@ function getPaceToleranceForSegment(interval: any, plannedStep: any, plannedWork
   // Convert tolerance percentage to decimal (e.g., 5% -> 0.05)
   // SEGMENT_CONFIG has tolerance as percentage, but we need decimal for multiplication
   const tolerancePercent = config?.tolerance || 5; // Default to 5% if unknown
+  
+  // Debug logging for tempo detection
+  if (interval.role === 'work') {
+    const workoutName = plannedWorkout?.name || plannedWorkout?.description || 'unknown';
+    const distanceMi = interval.executed?.distance_m 
+      ? interval.executed.distance_m / 1609.34
+      : (interval.planned?.distance_m ? interval.planned.distance_m / 1609.34 : 0);
+    const durationMin = interval.executed?.duration_s 
+      ? interval.executed.duration_s / 60 
+      : (interval.planned?.duration_s ? interval.planned.duration_s / 60 : 0);
+    console.log(`🔍 [TEMPO DETECT] Work segment: type=${segmentType}, tolerance=${tolerancePercent}%, workout="${workoutName}", distance=${distanceMi.toFixed(1)}mi, duration=${durationMin.toFixed(1)}min`);
+  }
+  
   return tolerancePercent / 100; // Convert to decimal
 }
 
