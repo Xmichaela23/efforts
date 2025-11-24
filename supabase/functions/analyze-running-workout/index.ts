@@ -942,9 +942,15 @@ Deno.serve(async (req) => {
         if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
           const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
           // Priority: Use planned target pace (workout-specific) over range midpoint (baseline)
-          const centerPace = interval.planned?.target_pace_s_per_mi || 
-                             plannedStep?.pace_sec_per_mi || 
+          // Check multiple possible locations for the planned pace
+          const plannedPaceFromInterval = interval.planned?.target_pace_s_per_mi;
+          const plannedPaceFromStep = plannedStep?.pace_sec_per_mi;
+          const centerPace = plannedPaceFromInterval || 
+                             plannedPaceFromStep || 
                              midpoint;
+          
+          console.log(`🔍 [CENTER DEBUG] Recalculating range - interval.planned.target_pace_s_per_mi=${plannedPaceFromInterval}, plannedStep.pace_sec_per_mi=${plannedPaceFromStep}, midpoint=${midpoint}, using centerPace=${centerPace}`);
+          
           const lower = Math.round(centerPace * (1 - tolerance));
           const upper = Math.round(centerPace * (1 + tolerance));
           console.log(`⚠️ [FIX] Recalculated too-tight range ${plannedStep.pace_range.lower}-${plannedStep.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance) centered on ${centerPace}s/mi`);
@@ -1004,9 +1010,15 @@ Deno.serve(async (req) => {
         if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
           const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
           // Priority: Use planned target pace (workout-specific) over range midpoint (baseline)
-          const centerPace = interval.planned?.target_pace_s_per_mi || 
-                             plannedStep?.pace_sec_per_mi || 
+          // Check multiple possible locations for the planned pace
+          const plannedPaceFromInterval = interval.planned?.target_pace_s_per_mi;
+          const plannedPaceFromStep = plannedStep?.pace_sec_per_mi;
+          const centerPace = plannedPaceFromInterval || 
+                             plannedPaceFromStep || 
                              midpoint;
+          
+          console.log(`🔍 [CENTER DEBUG] Recalculating pace_range - interval.planned.target_pace_s_per_mi=${plannedPaceFromInterval}, plannedStep.pace_sec_per_mi=${plannedPaceFromStep}, midpoint=${midpoint}, using centerPace=${centerPace}`);
+          
           const lower = Math.round(centerPace * (1 - tolerance));
           const upper = Math.round(centerPace * (1 + tolerance));
           console.log(`⚠️ [FIX] Recalculated too-tight pace_range ${interval.pace_range.lower}-${interval.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance) centered on ${centerPace}s/mi`);
