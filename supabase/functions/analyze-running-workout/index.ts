@@ -159,7 +159,7 @@ const SEGMENT_CONFIG: Record<SegmentType, SegmentConfig> = {
 /**
  * Infer segment type from interval data and planned step
  */
-function inferSegmentType(segment: any, plannedStep: any): SegmentType {
+function inferSegmentType(segment: any, plannedStep: any, plannedWorkout?: any): SegmentType {
   const role = segment.role;
   const token = plannedStep?.token || '';
   
@@ -179,13 +179,42 @@ function inferSegmentType(segment: any, plannedStep: any): SegmentType {
       return 'cruise_interval'; // Between interval and tempo
     }
     
-    // Fallback: infer from duration
-    const durationMin = segment.executed?.duration_s ? segment.executed.duration_s / 60 : 0;
+    // Check workout description for tempo keywords
+    const workoutDesc = (plannedWorkout?.description || plannedWorkout?.name || '').toLowerCase();
+    if (workoutDesc.includes('tempo') || workoutDesc.includes('threshold') || workoutDesc.includes('marathon pace')) {
+      return 'tempo';
+    }
+    
+    // Check planned step description
+    const stepDesc = (plannedStep?.description || plannedStep?.label || '').toLowerCase();
+    if (stepDesc.includes('tempo') || stepDesc.includes('threshold')) {
+      return 'tempo';
+    }
+    
+    // Infer from duration and distance
+    const durationMin = segment.executed?.duration_s 
+      ? segment.executed.duration_s / 60 
+      : (segment.planned?.duration_s ? segment.planned.duration_s / 60 : 0);
+    const distanceMi = segment.executed?.distance_m 
+      ? segment.executed.distance_m / 1609.34
+      : (segment.planned?.distance_m ? segment.planned.distance_m / 1609.34 : 0);
+    
+    // Tempo characteristics: long continuous effort
+    // - Duration > 20 minutes OR
+    // - Distance > 3 miles OR  
+    // - Single long work segment (not multiple intervals)
+    if (durationMin > 20 || distanceMi > 3) {
+      return 'tempo'; // Long sustained effort = tempo
+    }
+    
     if (durationMin <= 8) {
       return 'work_interval'; // Short = interval
-    } else {
-      return 'tempo'; // Long = tempo
     }
+    
+    // Default for medium-length work: check if it's part of intervals (multiple work segments)
+    // If this is the only work segment or one of few, likely tempo
+    // Otherwise, default to interval
+    return 'tempo'; // Default to tempo for ambiguous cases (safer - wider tolerance)
   }
   
   return 'easy_run'; // Default fallback
@@ -196,8 +225,8 @@ function inferSegmentType(segment: any, plannedStep: any): SegmentType {
  * Quality/intervals: ±4-5% (tighter)
  * Easy/tempo: ±6-8% (looser)
  */
-function getPaceToleranceForSegment(interval: any, plannedStep: any): number {
-  const segmentType = inferSegmentType(interval, plannedStep);
+function getPaceToleranceForSegment(interval: any, plannedStep: any, plannedWorkout?: any): number {
+  const segmentType = inferSegmentType(interval, plannedStep, plannedWorkout);
   const config = SEGMENT_CONFIG[segmentType];
   
   // Convert tolerance percentage to decimal (e.g., 5% -> 0.05)
@@ -315,7 +344,7 @@ function calculateGarminExecutionScore(segments: any[], plannedWorkout: any): Wo
   // Add segment type inference to each segment
   const segmentsWithTypes = segments.map((segment, idx) => {
     const plannedStep = plannedWorkout?.computed?.steps?.[idx] || {};
-    const segmentType = inferSegmentType(segment, plannedStep);
+    const segmentType = inferSegmentType(segment, plannedStep, plannedWorkout);
     return {
       ...segment,
       type: segmentType,
@@ -876,7 +905,7 @@ Deno.serve(async (req) => {
         // ✅ FIX: Check for zero-width range
         if (plannedStep.pace_range.lower === plannedStep.pace_range.upper && plannedStep.pace_range.lower > 0) {
           const singlePace = plannedStep.pace_range.lower;
-          const tolerance = getPaceToleranceForSegment(interval, plannedStep);
+          const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
           const lower = Math.round(singlePace * (1 - tolerance));
           const upper = Math.round(singlePace * (1 + tolerance));
           console.log(`⚠️ [FIX] Expanded zero-width range ${singlePace}-${singlePace} to ${lower}-${upper}s/mi`);
@@ -892,12 +921,12 @@ Deno.serve(async (req) => {
         const rangeWidth = plannedStep.pace_range.upper - plannedStep.pace_range.lower;
         const midpoint = (plannedStep.pace_range.lower + plannedStep.pace_range.upper) / 2;
         const actualTolerance = rangeWidth / midpoint;
-        const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep);
+        const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
         
         // If actual tolerance is less than 60% of expected, recalculate with proper tolerance
         // This catches cases where materialize-plan used 2% but should have used 6-8% for tempo
         if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
-          const tolerance = getPaceToleranceForSegment(interval, plannedStep);
+          const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
           const lower = Math.round(midpoint * (1 - tolerance));
           const upper = Math.round(midpoint * (1 + tolerance));
           console.log(`⚠️ [FIX] Recalculated too-tight range ${plannedStep.pace_range.lower}-${plannedStep.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance)`);
@@ -921,7 +950,7 @@ Deno.serve(async (req) => {
       // ✅ FIX: If interval has planned.target_pace_s_per_mi but no range, create range with appropriate tolerance
       const singlePace = interval.planned?.target_pace_s_per_mi;
       if (singlePace && !interval.pace_range?.lower && !interval.target_pace?.lower) {
-        const tolerance = getPaceToleranceForSegment(interval, plannedStep);
+        const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
         const lower = Math.round(singlePace * (1 - tolerance));
         const upper = Math.round(singlePace * (1 + tolerance));
         return {
@@ -934,7 +963,7 @@ Deno.serve(async (req) => {
       // ✅ FIX: Check if pace_range exists but has zero width (lower === upper)
       if (interval.pace_range?.lower === interval.pace_range?.upper && interval.pace_range?.lower > 0) {
         const singlePace = interval.pace_range.lower;
-        const tolerance = getPaceToleranceForSegment(interval, plannedStep);
+        const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
         const lower = Math.round(singlePace * (1 - tolerance));
         const upper = Math.round(singlePace * (1 + tolerance));
         console.log(`⚠️ [FIX] Expanded zero-width pace_range ${singlePace}-${singlePace} to ${lower}-${upper}s/mi`);
@@ -950,11 +979,11 @@ Deno.serve(async (req) => {
         const rangeWidth = interval.pace_range.upper - interval.pace_range.lower;
         const midpoint = (interval.pace_range.lower + interval.pace_range.upper) / 2;
         const actualTolerance = rangeWidth / midpoint;
-        const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep);
+        const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
         
         // If actual tolerance is less than 60% of expected, recalculate with proper tolerance
         if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
-          const tolerance = getPaceToleranceForSegment(interval, plannedStep);
+          const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
           const lower = Math.round(midpoint * (1 - tolerance));
           const upper = Math.round(midpoint * (1 + tolerance));
           console.log(`⚠️ [FIX] Recalculated too-tight pace_range ${interval.pace_range.lower}-${interval.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance)`);
@@ -969,7 +998,7 @@ Deno.serve(async (req) => {
       // ✅ FIX: Check target_pace object for zero width
       if (interval.target_pace?.lower === interval.target_pace?.upper && interval.target_pace?.lower > 0) {
         const singlePace = interval.target_pace.lower;
-        const tolerance = getPaceToleranceForSegment(interval, plannedStep);
+        const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
         const lower = Math.round(singlePace * (1 - tolerance));
         const upper = Math.round(singlePace * (1 + tolerance));
         console.log(`⚠️ [FIX] Expanded zero-width target_pace ${singlePace}-${singlePace} to ${lower}-${upper}s/mi`);
@@ -2371,7 +2400,7 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
   const expandSinglePaceToRange = (singlePace: number): { lower: number; upper: number } => {
     // Find planned step to determine tolerance
     const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.planned_step_id);
-    const tolerance = getPaceToleranceForSegment(interval, plannedStep);
+    const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
     return {
       lower: Math.round(singlePace * (1 - tolerance)),
       upper: Math.round(singlePace * (1 + tolerance))
@@ -2445,7 +2474,7 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
     console.warn(`⚠️ [FIX] Invalid range detected: ${targetLower}-${targetUpper}, expanding...`);
     const center = targetLower; // Use lower as center
     const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.planned_step_id);
-    const tolerance = getPaceToleranceForSegment(interval, plannedStep);
+    const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
     targetLower = Math.round(center * (1 - tolerance));
     targetUpper = Math.round(center * (1 + tolerance));
   }
