@@ -439,10 +439,13 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       
       if (hasInvalidData) {
         console.warn('⚠️ AI narrative contains invalid data (0 miles/0 bpm) - showing as unavailable');
+        console.warn('⚠️ First insight:', firstInsight);
         // Return null to show "Analysis Not Available"
         // User needs to manually clear the bad data from DB and re-analyze
         return null;
       }
+      
+      console.log('✅ AI narrative insights are valid, using them');
       
       return {
         workout: workoutWithAnalysis,
@@ -457,6 +460,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     
     // FALLBACK: Generate insights from structured data (only if AI narrative missing)
     console.warn('⚠️ No AI narrative insights found, generating from structured data');
+    console.warn('⚠️ Analysis keys:', analysis ? Object.keys(analysis) : 'no analysis');
+    console.warn('⚠️ narrative_insights:', analysis?.narrative_insights);
+    console.warn('⚠️ narrative_insights type:', typeof analysis?.narrative_insights);
+    console.warn('⚠️ narrative_insights is array:', Array.isArray(analysis?.narrative_insights));
+    console.warn('⚠️ narrative_insights length:', analysis?.narrative_insights?.length);
     const insights: string[] = [];
     
     const performance = analysis.performance;
