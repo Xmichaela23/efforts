@@ -1,3 +1,13 @@
+/**
+ * @deprecated This hook performs client-side analysis which is no longer used.
+ * All analysis is now performed server-side in analyze-running-workout edge function.
+ * 
+ * Use server-side data instead:
+ * - workout.workout_analysis.performance.execution_adherence
+ * - workout.workout_analysis.performance.pace_adherence
+ * - workout.workout_analysis.performance.duration_adherence
+ */
+
 import { useMemo } from 'react';
 import { calculateExecutionPercentage } from '@/services/metrics/adherence';
 
@@ -13,6 +23,8 @@ export const useExecutionScore = (
   plannedSteps: any[],
   executedIntervals: any[]
 ): ExecutionResult => {
+  console.warn('⚠️ useExecutionScore is deprecated. Use server-side workout_analysis.performance instead.');
+  
   return useMemo(() => {
     if (!Array.isArray(plannedSteps) || !plannedSteps.length || !Array.isArray(executedIntervals) || !executedIntervals.length) {
       return { score: null, methodLabel: '', pairs: [], totalWeight: 0 };
@@ -107,5 +119,3 @@ export const useExecutionScore = (
     return { score, methodLabel, pairs, totalWeight };
   }, [workoutType, plannedSteps, executedIntervals]);
 };
-
-

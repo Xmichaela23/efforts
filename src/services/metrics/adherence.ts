@@ -1,4 +1,19 @@
+/**
+ * @deprecated This file contains legacy client-side analysis code.
+ * All analysis is now performed server-side in analyze-running-workout edge function.
+ * This file is kept for reference but should not be used for new code.
+ * 
+ * Server-side analysis provides:
+ * - workout_analysis.performance.execution_adherence
+ * - workout_analysis.performance.pace_adherence
+ * - workout_analysis.performance.duration_adherence
+ * - workout_analysis.granular_analysis (time-in-range calculations)
+ */
+
 export const calculateExecutionPercentage = (plannedStep: any, executedStep: any): number | null => {
+  // DEPRECATED: Use server-side analysis instead
+  console.warn('⚠️ calculateExecutionPercentage is deprecated. Use server-side workout_analysis.performance instead.');
+  
   if (!executedStep) return null;
 
   try {
@@ -113,5 +128,3 @@ export const calculateExecutionPercentage = (plannedStep: any, executedStep: any
 
   return null;
 };
-
-

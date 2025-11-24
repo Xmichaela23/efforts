@@ -1453,10 +1453,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           console.log('🎯 [FRONTEND] Execution:', executionAdherence, 'Pace:', paceAdherence, 'Duration:', durationAdherence);
           
           // Convert to display format with fallbacks
+          // ✅ FIX: Convert to display format - use null instead of 0 when analysis unavailable
           const finalExecutionScore = Number.isFinite(executionAdherence) ? Math.round(executionAdherence) : 
-            (Number.isFinite(Number(compOverall?.execution_score)) ? Math.round(Number(compOverall?.execution_score)) : 0);
-          const finalPacePct = Number.isFinite(paceAdherence) ? Math.round(paceAdherence) : 0;
-          const finalDurationPct = Number.isFinite(durationAdherence) ? Math.round(durationAdherence) : 0;
+            (Number.isFinite(Number(compOverall?.execution_score)) ? Math.round(Number(compOverall.execution_score)) : null);
+          const finalPacePct = Number.isFinite(paceAdherence) ? Math.round(paceAdherence) : null;
+          const finalDurationPct = Number.isFinite(durationAdherence) ? Math.round(durationAdherence) : null;
           const finalDistPct = null;  // Not used in Garmin formula
           
           console.log('🔍 [UNIFIED DEBUG] Using workout_analysis data:', {
@@ -1469,8 +1470,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             finalDurationPct
           });
           
-          // If nothing to show, skip (but allow 0 values to show)
-          const anyVal = (finalPacePct > 0) || (finalDurationPct > 0) || (finalDistPct != null) || (finalExecutionScore > 0);
+          // ✅ FIX: Check for any valid values (including 0, but not null)
+          const anyVal = (finalPacePct != null && finalPacePct >= 0) || 
+                        (finalDurationPct != null && finalDurationPct >= 0) || 
+                        (finalDistPct != null) || 
+                        (finalExecutionScore != null && finalExecutionScore >= 0);
           console.log('🔍 [ADHERENCE DEBUG] anyVal:', anyVal, 'hideTopAdherence:', hideTopAdherence);
           if (!anyVal || hideTopAdherence) return null;
 
@@ -1652,18 +1656,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const executionScore = Number.isFinite(performance?.execution_adherence) 
               ? Math.round(performance.execution_adherence)
               : ((completed as any)?.computed?.overall?.execution_score || null);
+            // ✅ FIX: Only use server-side granular analysis, no fallback to client calculations
             const paceAdherence = Number.isFinite(performance?.pace_adherence)
               ? Math.round(performance.pace_adherence)
-              : pacePct;
+              : null;
             const durationAdherence = Number.isFinite(performance?.duration_adherence)
               ? Math.round(performance.duration_adherence)
-              : durationPct;
+              : null;
             
-            const anyVal = (paceAdherence!=null && paceAdherence > 0) || (durationAdherence!=null && durationAdherence > 0) || (executionScore!=null && executionScore > 0);
+            // ✅ FIX: Check for any valid values (including 0, but not null)
+            const anyVal = (paceAdherence != null && paceAdherence >= 0) || 
+                          (durationAdherence != null && durationAdherence >= 0) || 
+                          (executionScore != null && executionScore >= 0);
             if (!anyVal) return null;
 
-            // Get contextual message
-            const message = getContextualMessage(workoutIntent, durationPct, null, pacePct, 'swim');
+            // ✅ FIX: Use server-side values for contextual message instead of client calculations
+            const message = getContextualMessage(workoutIntent, durationAdherence, null, paceAdherence, 'swim');
 
             return (
               <div className="w-full pt-1 pb-2">
@@ -1793,10 +1801,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             // Use server-computed overall execution score
             const executionScore = (completed as any)?.computed?.overall?.execution_score;
             
-            const anyVal = (powerPct!=null) || (durationPct!=null) || (executionScore!=null);
+            // ✅ FIX: Check for any valid values
+            const anyVal = (powerPct != null) || (durationPct != null) || (executionScore != null);
             if (!anyVal) return null;
 
-            // Get contextual message (treat power like pace for bikes)
+            // Note: For bikes, we still use client-calculated powerPct/durationPct since 
+            // granular analysis is primarily for running. This is acceptable for now.
             const message = getContextualMessage(workoutIntent, durationPct, null, powerPct, 'bike');
 
             return (
@@ -2133,10 +2143,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               return null;
             };
             
-            const pct = getEnhancedAdherence() || 
-              (hasServerComputed && shouldShowPercentage(st) && row?.executed?.adherence_percentage) 
-                ? Math.round(Number(row.executed.adherence_percentage)) 
-                : null;
+            // ✅ FIX: Only use granular analysis, no fallback to average-based calculations
+            const pct = getEnhancedAdherence() || null;
             // Planned label: prioritize server-computed label, fallback to simple client-side generation
             const plannedLabel = (() => {
               // Priority 1: Use server-computed planned_label if available
