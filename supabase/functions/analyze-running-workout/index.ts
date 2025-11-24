@@ -938,11 +938,16 @@ Deno.serve(async (req) => {
         
         // If actual tolerance is less than 60% of expected, recalculate with proper tolerance
         // This catches cases where materialize-plan used 2% but should have used 6-8% for tempo
+        // ✅ CRITICAL: Use planned.target_pace_s_per_mi as center (workout-specific pace) instead of midpoint (baseline)
         if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
           const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-          const lower = Math.round(midpoint * (1 - tolerance));
-          const upper = Math.round(midpoint * (1 + tolerance));
-          console.log(`⚠️ [FIX] Recalculated too-tight range ${plannedStep.pace_range.lower}-${plannedStep.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance)`);
+          // Priority: Use planned target pace (workout-specific) over range midpoint (baseline)
+          const centerPace = interval.planned?.target_pace_s_per_mi || 
+                             plannedStep?.pace_sec_per_mi || 
+                             midpoint;
+          const lower = Math.round(centerPace * (1 - tolerance));
+          const upper = Math.round(centerPace * (1 + tolerance));
+          console.log(`⚠️ [FIX] Recalculated too-tight range ${plannedStep.pace_range.lower}-${plannedStep.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance) centered on ${centerPace}s/mi`);
           return {
             ...interval,
             pace_range: { lower, upper },
@@ -995,11 +1000,16 @@ Deno.serve(async (req) => {
         const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
         
         // If actual tolerance is less than 60% of expected, recalculate with proper tolerance
+        // ✅ CRITICAL: Use planned.target_pace_s_per_mi as center (workout-specific pace) instead of midpoint (baseline)
         if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
           const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-          const lower = Math.round(midpoint * (1 - tolerance));
-          const upper = Math.round(midpoint * (1 + tolerance));
-          console.log(`⚠️ [FIX] Recalculated too-tight pace_range ${interval.pace_range.lower}-${interval.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance)`);
+          // Priority: Use planned target pace (workout-specific) over range midpoint (baseline)
+          const centerPace = interval.planned?.target_pace_s_per_mi || 
+                             plannedStep?.pace_sec_per_mi || 
+                             midpoint;
+          const lower = Math.round(centerPace * (1 - tolerance));
+          const upper = Math.round(centerPace * (1 + tolerance));
+          console.log(`⚠️ [FIX] Recalculated too-tight pace_range ${interval.pace_range.lower}-${interval.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance) centered on ${centerPace}s/mi`);
           return {
             ...interval,
             pace_range: { lower, upper },
