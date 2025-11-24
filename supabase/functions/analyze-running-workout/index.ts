@@ -143,11 +143,14 @@ interface WorkoutExecutionAnalysis {
 }
 
 // Garmin-style execution scoring configuration
+// Tolerance guidelines:
+// - Quality/intervals: ±4-5% (tighter) - work_interval uses 5%
+// - Easy/tempo: ±6-8% (looser) - tempo uses 7%, easy_run uses 8%
 const SEGMENT_CONFIG: Record<SegmentType, SegmentConfig> = {
   warmup: { tolerance: 10, weight: 0.5 },
   cooldown: { tolerance: 10, weight: 0.3 },
   work_interval: { tolerance: 5, weight: 1.0 },
-  tempo: { tolerance: 4, weight: 1.0 },
+  tempo: { tolerance: 7, weight: 1.0 }, // ±7% for tempo (looser than intervals)
   cruise_interval: { tolerance: 5, weight: 0.9 },
   recovery_jog: { tolerance: 15, weight: 0.7 },
   easy_run: { tolerance: 8, weight: 0.6 }
@@ -883,6 +886,28 @@ Deno.serve(async (req) => {
             target_pace: { lower, upper }
           };
         }
+        
+        // ✅ FIX: Check for asymmetric/too-tight ranges (e.g., 2% tolerance when should be 6-8%)
+        // Detect if range is too tight by checking if it's less than expected tolerance
+        const rangeWidth = plannedStep.pace_range.upper - plannedStep.pace_range.lower;
+        const midpoint = (plannedStep.pace_range.lower + plannedStep.pace_range.upper) / 2;
+        const actualTolerance = rangeWidth / midpoint;
+        const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep);
+        
+        // If actual tolerance is less than 60% of expected, recalculate with proper tolerance
+        // This catches cases where materialize-plan used 2% but should have used 6-8% for tempo
+        if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
+          const tolerance = getPaceToleranceForSegment(interval, plannedStep);
+          const lower = Math.round(midpoint * (1 - tolerance));
+          const upper = Math.round(midpoint * (1 + tolerance));
+          console.log(`⚠️ [FIX] Recalculated too-tight range ${plannedStep.pace_range.lower}-${plannedStep.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance)`);
+          return {
+            ...interval,
+            pace_range: { lower, upper },
+            target_pace: { lower, upper }
+          };
+        }
+        
         return {
           ...interval,
           pace_range: plannedStep.pace_range,
@@ -918,6 +943,27 @@ Deno.serve(async (req) => {
           pace_range: { lower, upper },
           target_pace: { lower, upper }
         };
+      }
+      
+      // ✅ FIX: Check for asymmetric/too-tight ranges in existing pace_range
+      if (interval.pace_range?.lower && interval.pace_range?.upper && interval.pace_range.lower < interval.pace_range.upper) {
+        const rangeWidth = interval.pace_range.upper - interval.pace_range.lower;
+        const midpoint = (interval.pace_range.lower + interval.pace_range.upper) / 2;
+        const actualTolerance = rangeWidth / midpoint;
+        const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep);
+        
+        // If actual tolerance is less than 60% of expected, recalculate with proper tolerance
+        if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
+          const tolerance = getPaceToleranceForSegment(interval, plannedStep);
+          const lower = Math.round(midpoint * (1 - tolerance));
+          const upper = Math.round(midpoint * (1 + tolerance));
+          console.log(`⚠️ [FIX] Recalculated too-tight pace_range ${interval.pace_range.lower}-${interval.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance)`);
+          return {
+            ...interval,
+            pace_range: { lower, upper },
+            target_pace: { lower, upper }
+          };
+        }
       }
       
       // ✅ FIX: Check target_pace object for zero width
