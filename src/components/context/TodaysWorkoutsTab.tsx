@@ -450,6 +450,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         performance: analysis.performance,
         key_metrics: {},
         red_flags: [],
+        mile_by_mile_terrain: analysis.mile_by_mile_terrain || null,  // Include mile-by-mile terrain data
         is_yesterday: workoutWithAnalysis.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA')
       };
     }
@@ -614,6 +615,18 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                   </div>
                 ))}
               </div>
+
+              {/* Mile-by-Mile Terrain Analysis */}
+              {analysisMetrics.mile_by_mile_terrain && analysisMetrics.mile_by_mile_terrain.section && (
+                <div className="mt-4">
+                  <div className="text-sm font-medium text-gray-800 mb-2">
+                    Mile-by-Mile Terrain Breakdown
+                  </div>
+                  <div className="text-xs text-gray-600 whitespace-pre-line bg-blue-50 rounded p-3 font-mono">
+                    {analysisMetrics.mile_by_mile_terrain.section}
+                  </div>
+                </div>
+              )}
 
               {/* Red Flags */}
               {analysisMetrics.red_flags.length > 0 && (
