@@ -2158,8 +2158,20 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               // For runs/walks, use universal pace selection logic
               const isRunOrWalk = /run|walk/i.test(sportType);
               if (isRunOrWalk) {
-                const secPerMi = getDisplayPace(hydratedCompleted || completed, row);
-                console.log(`🔍 [PACE DEBUG] isRunOrWalk: ${isRunOrWalk}, secPerMi: ${secPerMi}, overall: ${(hydratedCompleted || completed)?.computed?.overall?.avg_pace_s_per_mi}, metrics: ${(hydratedCompleted || completed)?.metrics?.avg_pace_s_per_mi}`);
+                // For overall row (idx === 0), ALWAYS use overall pace, not interval pace
+                // This ensures we use the correct server-computed pace from moving_time
+                const workout = hydratedCompleted || completed;
+                let secPerMi: number | null = null;
+                if (idx === 0) {
+                  // Overall row: use ONLY overall pace (no interval fallback)
+                  const overallPace = Number(workout?.computed?.overall?.avg_pace_s_per_mi);
+                  if (Number.isFinite(overallPace) && overallPace > 0) {
+                    secPerMi = overallPace;
+                  }
+                } else {
+                  // Individual intervals: use getDisplayPace (which checks interval first, then overall)
+                  secPerMi = getDisplayPace(workout, row);
+                }
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
                   return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
                 }
@@ -2192,15 +2204,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             })();
 
             const timeCell = (() => {
-              if (!hasServerComputed || !row) {
-                // For first row (overall), show overall workout time - ONLY use moving time
-                if (idx === 0) {
-                  const overall = (completed as any)?.computed?.overall || {};
-                  const dur = Number(overall?.duration_s_moving);
-                  if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
-                }
+              // For overall row (idx === 0), ALWAYS use overall moving time, not interval duration
+              if (idx === 0) {
+                const overall = (completed as any)?.computed?.overall || {};
+                const dur = Number(overall?.duration_s_moving);
+                if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
                 return '—';
               }
+              // For individual intervals, use interval duration
+              if (!hasServerComputed || !row) return '—';
               const dur = row?.executed?.duration_s; return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
             })();
 
