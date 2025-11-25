@@ -3674,9 +3674,19 @@ function generateMileByMileTerrainBreakdown(
         ? mileSplits.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / mileSplits.length 
         : 0);
   
+  // Time-based adherence (from granular analysis)
+  const timeBasedAdherence = granularAnalysis?.overall_adherence != null
+    ? Math.round(granularAnalysis.overall_adherence * 100)
+    : null;
+  
   // Miles in range percentage
   const inRangePct = Math.round((milesInRange / mileSplits.length) * 100);
-  sectionText += `- ${milesInRange} of ${mileSplits.length} miles within range (${inRangePct}%)\n`;
+  
+  // Add both metrics
+  if (timeBasedAdherence != null) {
+    sectionText += `- Time spent in range: ${timeBasedAdherence}% (${timeBasedAdherence >= 50 ? 'good' : timeBasedAdherence >= 30 ? 'moderate' : 'poor'} overall pace judgment)\n`;
+  }
+  sectionText += `- Complete miles in range: ${milesInRange} of ${mileSplits.length} (${inRangePct}%${inRangePct >= 50 ? ' - good consistency' : inRangePct >= 30 ? ' - moderate consistency' : ' - poor consistency'})\n`;
   
   // Average pace vs range - check if within 5 seconds for "essentially within range"
   if (isRangeWorkout && targetLower && targetUpper) {
@@ -3746,14 +3756,18 @@ function generateMileByMileTerrainBreakdown(
     ? (avgPaceS < targetLower && (targetLower - avgPaceS) <= 5) || (avgPaceS > targetUpper && (avgPaceS - targetUpper) <= 5)
     : false;
   
+  // Build overall assessment referencing both metrics
+  const timeBasedNote = timeBasedAdherence != null ? `The ${timeBasedAdherence}% time-in-range shows you know the right effort` : '';
+  const mileBasedNote = `but only ${milesInRange} of ${mileSplits.length} complete miles within range indicates ${timeBasedAdherence != null && timeBasedAdherence > inRangePct ? 'difficulty sustaining that effort steadily' : 'pacing instability'}`;
+  
   if (inRangePct >= 75) {
-    sectionText += `- Overall: Excellent pace discipline for easy run\n`;
+    sectionText += `- Overall: Excellent pace discipline for easy run${timeBasedAdherence != null ? `. ${timeBasedNote}, and ${mileBasedNote}.` : '.'}\n`;
   } else if (inRangePct >= 50) {
     if (avgPaceInRange || avgPaceNearRange) {
       const paceStatus = avgPaceInRange ? 'within range' : 'essentially within range';
-      sectionText += `- Overall: Good average pace control (${avgPaceFormatted}/mi ${paceStatus}). Primary opportunity: improve mile-to-mile consistency—only ${milesInRange} of ${mileSplits.length} miles within range suggests pacing instability.\n`;
+      sectionText += `- Overall: Good average pace control (${avgPaceFormatted}/mi ${paceStatus}). Primary opportunity: improve mile-to-mile consistency—${mileBasedNote}.${timeBasedAdherence != null ? ` ${timeBasedNote}.` : ''}\n`;
     } else {
-      sectionText += `- Overall: Good pace discipline for easy run\n`;
+      sectionText += `- Overall: Good pace discipline for easy run${timeBasedAdherence != null ? `. ${timeBasedNote}, but ${mileBasedNote}.` : '.'}\n`;
     }
   } else {
     // Low in-range percentage - acknowledge strengths first
@@ -3764,9 +3778,9 @@ function generateMileByMileTerrainBreakdown(
       const paceNote = avgPaceInRange 
         ? `within range (${avgPaceFormatted} vs ${formatPace(targetLower!)}-${formatPace(targetUpper!)}/mi)`
         : `essentially within range (${avgPaceFormatted}, just ${deltaSec}s ${avgPaceS < targetLower! ? 'faster' : 'slower'} than target)`;
-      sectionText += `- Overall: Excellent average pace control (${paceNote}). Primary opportunity: improve mile-to-mile consistency—only ${milesInRange} of ${mileSplits.length} miles within range indicates pacing instability across the run.\n`;
+      sectionText += `- Overall: Excellent average pace control (${paceNote}). Primary opportunity: improve mile-to-mile consistency—${mileBasedNote}.${timeBasedAdherence != null ? ` ${timeBasedNote}.` : ''}\n`;
     } else {
-      sectionText += `- Overall: Needs improvement - focus on staying within range\n`;
+      sectionText += `- Overall: Needs improvement - focus on staying within range${timeBasedAdherence != null ? `. ${timeBasedNote}, but ${mileBasedNote}.` : '.'}\n`;
     }
   }
   
@@ -4152,11 +4166,17 @@ ${(() => {
     paceStatus = 'outside';
   }
   
-  return `"Maintained pace averaging X:XX ${workoutContext.pace_unit}, ${paceStatus} the prescribed range of ${plannedPaceInfo.range}. Pace varied by A%${(() => {
-    const cv = adherenceContext.pace_variability_pct || 0;
-    const workoutType = plannedPaceInfo?.workoutType || '';
-    const isEasyRun = workoutType.toLowerCase().includes('easy') || workoutType.toLowerCase().includes('aerobic');
-    
+  // Calculate time-based and mile-based adherence for display
+  const timeBasedAdherence = adherenceContext.pace_adherence_pct || 0;
+  const mileByMile = detailedAnalysis?.mile_by_mile_terrain;
+  const milesInRange = mileByMile?.miles_in_range || 0;
+  const totalMiles = mileByMile?.total_miles || mileByMile?.splits?.length || 0;
+  const mileBasedAdherence = totalMiles > 0 ? Math.round((milesInRange / totalMiles) * 100) : 0;
+  const cv = adherenceContext.pace_variability_pct || 0;
+  const workoutType = plannedPaceInfo?.workoutType || '';
+  const isEasyRun = workoutType.toLowerCase().includes('easy') || workoutType.toLowerCase().includes('aerobic');
+  
+  const variabilityContext = (() => {
     if (isEasyRun) {
       if (cv < 15) {
         return ' (excellent consistency for easy run)';
@@ -4174,13 +4194,16 @@ ${(() => {
         return ' (high variability, indicates pacing issues)';
       }
     }
-  })()}, with ${(() => {
-    const mileByMile = detailedAnalysis?.mile_by_mile_terrain;
-    if (mileByMile && mileByMile.miles_in_range !== undefined) {
-      return `${mileByMile.miles_in_range} of ${mileByMile.total_miles || mileByMile.splits?.length || 'Y'}`;
-    }
-    return 'X of Y';
-  })()} miles within range."`;
+  })();
+  
+  return `"Maintained pace averaging X:XX ${workoutContext.pace_unit}, ${paceStatus} the prescribed range of ${plannedPaceInfo.range}.
+
+PACE EXECUTION METRICS:
+- Time in range: ${timeBasedAdherence}% (spent ${timeBasedAdherence >= 50 ? 'majority' : timeBasedAdherence >= 30 ? 'significant portion' : 'minority'} of workout at target pace)
+- Mile-by-mile consistency: ${mileBasedAdherence}% (only ${milesInRange} of ${totalMiles} complete miles within range)
+- Pace variability: ${cv.toFixed(0)}%${variabilityContext}
+
+Analysis: The ${timeBasedAdherence >= 50 ? 'high' : timeBasedAdherence >= 30 ? 'moderate' : 'low'} time-based adherence (${timeBasedAdherence}%) combined with ${mileBasedAdherence >= 50 ? 'good' : mileBasedAdherence >= 30 ? 'moderate' : 'low'} mile-by-mile consistency (${mileBasedAdherence}%) indicates ${timeBasedAdherence > mileBasedAdherence ? 'you frequently hit the correct pace throughout the run but couldn\'t maintain it steadily. This pattern suggests surging and fading within individual miles rather than sustained effort control' : mileBasedAdherence > timeBasedAdherence ? 'consistent pacing within complete miles, though some time was spent outside the target range' : 'mixed pacing execution with both time-based and mile-based metrics showing similar adherence'}."`;
 })()}
 "Mile-by-mile breakdown: [CRITICAL: Use the PRE-CALCULATED mile categorization data from the MILE-BY-MILE CATEGORIZATION section above. Report EXACTLY which miles were within range, faster than range start, or slower than range end as shown in that section. Do NOT recalculate - copy the mile numbers directly from the pre-calculated data.]"
 ` : plannedPaceInfo?.type === 'single' && plannedPaceInfo.target && plannedPaceInfo.targetSeconds ? `
