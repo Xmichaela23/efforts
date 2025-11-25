@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
+import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle } from 'lucide-react';
 
 export type CalendarEvent = {
@@ -188,6 +189,7 @@ export default function WorkoutCalendar({
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
+  const { useImperial } = useAppContext();
 
   // Week bounds for planned fetch
   const weekStart = startOfWeek(referenceDate);
@@ -641,7 +643,46 @@ export default function WorkoutCalendar({
                     </div>
                   </div>
                   
-                  
+                  {/* Distance Totals - server-provided */}
+                  {weeklyStats.distances && (
+                    <div className="space-y-1 pt-1 border-t border-gray-200">
+                      {/* Run Distance */}
+                      {weeklyStats.distances.run_meters > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600">Run:</span>
+                          <span className="font-medium text-gray-700">
+                            {useImperial 
+                              ? `${(weeklyStats.distances.run_meters / 1609.34).toFixed(1)} mi`
+                              : `${(weeklyStats.distances.run_meters / 1000).toFixed(1)} km`}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Swim Distance */}
+                      {weeklyStats.distances.swim_meters > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600">Swim:</span>
+                          <span className="font-medium text-gray-700">
+                            {useImperial
+                              ? `${Math.round(weeklyStats.distances.swim_meters / 0.9144)} yd`
+                              : `${Math.round(weeklyStats.distances.swim_meters)} m`}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Cycling Distance */}
+                      {weeklyStats.distances.cycling_meters > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600">Bike:</span>
+                          <span className="font-medium text-gray-700">
+                            {useImperial
+                              ? `${(weeklyStats.distances.cycling_meters / 1609.34).toFixed(1)} mi`
+                              : `${(weeklyStats.distances.cycling_meters / 1000).toFixed(1)} km`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

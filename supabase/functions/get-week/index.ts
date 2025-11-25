@@ -985,12 +985,60 @@ Deno.serve(async (req)=>{
       workloadCompleted = totalCompleted;
     }
 
+    // Calculate distance totals for completed workouts
+    let runMeters = 0;
+    let swimMeters = 0;
+    let cyclingMeters = 0;
+    try {
+      // Get completed workouts with distance data
+      const { data: completedWorkoutsWithDistance } = await supabase
+        .from('workouts')
+        .select('type, computed')
+        .eq('user_id', userId)
+        .gte('date', fromISO)
+        .lte('date', toISO)
+        .eq('workout_status', 'completed');
+      
+      if (completedWorkoutsWithDistance) {
+        completedWorkoutsWithDistance.forEach((workout: any) => {
+          const type = String(workout?.type || '').toLowerCase();
+          // Parse computed JSON if it's a string
+          let computed = workout.computed;
+          if (typeof computed === 'string') {
+            try {
+              computed = JSON.parse(computed);
+            } catch {
+              computed = null;
+            }
+          }
+          const distanceM = computed?.overall?.distance_m;
+          
+          if (typeof distanceM === 'number' && distanceM > 0) {
+            if (type === 'run' || type === 'walk') {
+              runMeters += distanceM;
+            } else if (type === 'swim') {
+              swimMeters += distanceM;
+            } else if (type === 'ride' || type === 'bike') {
+              cyclingMeters += distanceM;
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Failed to calculate distance totals:', error);
+    }
+
     const warningsOut = errors.concat(debugNotes);
     const responseData = {
       items: itemsWithAI,
       weekly_stats: {
         planned: workloadPlanned,
-        completed: workloadCompleted
+        completed: workloadCompleted,
+        distances: {
+          run_meters: runMeters,
+          swim_meters: swimMeters,
+          cycling_meters: cyclingMeters
+        }
       }
     };
     if (trainingPlanContext) responseData.training_plan_context = trainingPlanContext;
