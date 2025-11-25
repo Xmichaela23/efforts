@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAppContext } from '../../contexts/AppContext';
 import { useWeekUnified } from '../../hooks/useWeekUnified';
@@ -75,11 +75,17 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
           .single();
         
         if (updatedWorkout) {
-          setRecentWorkouts(prev => 
-            prev.map(w => w.id === workoutId ? updatedWorkout : w)
-          );
-          // Set as selected workout to display the analysis
-          setSelectedWorkoutId(workoutId);
+          setRecentWorkouts(prev => {
+            // Only update if the workout actually changed
+            const existing = prev.find(w => w.id === workoutId);
+            if (existing?.workout_analysis === updatedWorkout.workout_analysis && 
+                existing?.analysis_status === updatedWorkout.analysis_status) {
+              return prev; // No change, return same array to prevent re-render
+            }
+            return prev.map(w => w.id === workoutId ? updatedWorkout : w);
+          });
+          // Only set selected if not already selected (prevents unnecessary re-render)
+          setSelectedWorkoutId(prev => prev === workoutId ? prev : workoutId);
         }
         return;
       }
@@ -142,7 +148,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     
     if (targetWorkout?.workout_analysis && targetWorkout?.analysis_status === 'complete' && hasNewFormat) {
       console.log(`✅ Analysis already complete with AI narrative for workout ${workoutId}, just selecting it`);
-      setSelectedWorkoutId(workoutId);
+      setSelectedWorkoutId(prev => prev === workoutId ? prev : workoutId);
       return;
     }
     
@@ -199,50 +205,39 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
   }, []);
   
   // Clear analyzing state if workout is not in recent list
+  // Use ref to track last recentWorkouts to prevent unnecessary checks
+  const lastRecentWorkoutsForCleanupRef = useRef<any[]>([]);
   useEffect(() => {
     if (analyzingWorkout && recentWorkouts.length > 0) {
-      const workoutExists = recentWorkouts.some(w => w.id === analyzingWorkout);
-      if (!workoutExists) {
-        console.log('⚠️ Clearing analyzing state for workout not in list:', analyzingWorkout);
-        setAnalyzingWorkout(null);
-        analyzingRef.current.delete(analyzingWorkout);
+      // Only check if recentWorkouts actually changed
+      const workoutsChanged = lastRecentWorkoutsForCleanupRef.current.length !== recentWorkouts.length ||
+        lastRecentWorkoutsForCleanupRef.current.some((w, i) => !recentWorkouts[i] || w.id !== recentWorkouts[i].id);
+      
+      if (workoutsChanged) {
+        lastRecentWorkoutsForCleanupRef.current = recentWorkouts;
+        const workoutExists = recentWorkouts.some(w => w.id === analyzingWorkout);
+        if (!workoutExists) {
+          console.log('⚠️ Clearing analyzing state for workout not in list:', analyzingWorkout);
+          setAnalyzingWorkout(null);
+          analyzingRef.current.delete(analyzingWorkout);
+        }
       }
+    } else if (recentWorkouts.length > 0) {
+      lastRecentWorkoutsForCleanupRef.current = recentWorkouts;
     }
   }, [analyzingWorkout, recentWorkouts]);
 
-  useEffect(() => {
-    if (!todayLoading) {
-      loadRecentWorkouts();
-    }
-  }, [todayLoading, focusWorkoutId]);
-
-  // Auto-select workout when focusWorkoutId is provided
-  useEffect(() => {
-    if (focusWorkoutId && recentWorkouts.length > 0) {
-      const targetWorkout = recentWorkouts.find(w => w.id === focusWorkoutId);
-      if (targetWorkout) {
-        // Check if we need to analyze (no analysis, or old generic analysis, or failed)
-        const needsAnalysis = !targetWorkout.workout_analysis || 
-                             targetWorkout.analysis_status !== 'complete';
-        
-        if (needsAnalysis) {
-          console.log('🔄 Analyzing focus workout:', focusWorkoutId);
-          analyzeWorkout(focusWorkoutId);
-        } else {
-          console.log('✅ Analysis complete for focus workout, displaying:', focusWorkoutId);
-          setSelectedWorkoutId(focusWorkoutId);
-        }
-      }
-    }
-  }, [focusWorkoutId, recentWorkouts]);
-
-  const loadRecentWorkouts = async () => {
+  // Memoize loadRecentWorkouts to prevent unnecessary re-creations
+  const loadRecentWorkouts = useCallback(async () => {
     try {
       setLoading(true);
       
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       // Load most recent completed workouts (last 14 days to catch more workouts)
       // Use user's local timezone for date range calculation
@@ -260,6 +255,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
 
       if (loadError) {
         console.error('❌ Error loading workouts:', loadError);
+        setLoading(false);
+        return;
       }
 
       // Filter out mobility workouts - they don't need analysis
@@ -277,7 +274,22 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         performance_assessment: w.workout_analysis?.performance_assessment
       })));
       
-      setRecentWorkouts(filteredData);
+      setRecentWorkouts(prev => {
+        // Only update if data actually changed (prevent unnecessary re-renders)
+        const prevIds = new Set(prev.map(w => w.id));
+        const newIds = new Set(filteredData.map(w => w.id));
+        if (prevIds.size === newIds.size && 
+            Array.from(prevIds).every(id => newIds.has(id)) &&
+            prev.every(pw => {
+              const nw = filteredData.find(w => w.id === pw.id);
+              return nw && 
+                     pw.workout_analysis === nw.workout_analysis &&
+                     pw.analysis_status === nw.analysis_status;
+            })) {
+          return prev; // No changes, return same array
+        }
+        return filteredData;
+      });
       
       // If we have a focusWorkoutId but it's not in the recent workouts, load it specifically
       if (focusWorkoutId && recentData && !recentData.find(w => w.id === focusWorkoutId)) {
@@ -295,16 +307,80 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
             date: focusWorkout.date,
             has_analysis: !!focusWorkout.workout_analysis
           });
-          setRecentWorkouts(prev => [focusWorkout, ...prev]);
+          setRecentWorkouts(prev => {
+            // Check if already in list
+            if (prev.find(w => w.id === focusWorkoutId)) {
+              return prev;
+            }
+            return [focusWorkout, ...prev];
+          });
         }
       }
-
+      
+      setLoading(false);
     } catch (error) {
-      console.error('Error loading recent workouts:', error);
-    } finally {
+      console.error('❌ Error loading recent workouts:', error);
       setLoading(false);
     }
-  };
+  }, [focusWorkoutId]);
+
+  useEffect(() => {
+    if (!todayLoading) {
+      loadRecentWorkouts();
+    }
+  }, [todayLoading, loadRecentWorkouts]);
+
+  // Auto-select workout when focusWorkoutId is provided
+  // Use ref to track if we've already processed this focusWorkoutId to prevent loops
+  const processedFocusRef = useRef<string | null>(null);
+  const lastRecentWorkoutsRef = useRef<any[]>([]);
+  
+  useEffect(() => {
+    // Only process if focusWorkoutId changed, not when recentWorkouts updates
+    if (focusWorkoutId && recentWorkouts.length > 0) {
+      // Skip if we already processed this focusWorkoutId AND recentWorkouts hasn't meaningfully changed
+      const recentWorkoutsChanged = lastRecentWorkoutsRef.current.length !== recentWorkouts.length ||
+        lastRecentWorkoutsRef.current.some((w, i) => {
+          const newW = recentWorkouts[i];
+          return !newW || w.id !== newW.id || 
+                 w.workout_analysis !== newW.workout_analysis ||
+                 w.analysis_status !== newW.analysis_status;
+        });
+      
+      if (processedFocusRef.current === focusWorkoutId && !recentWorkoutsChanged) {
+        return; // Already processed and no meaningful change
+      }
+      
+      lastRecentWorkoutsRef.current = recentWorkouts;
+      
+      const targetWorkout = recentWorkouts.find(w => w.id === focusWorkoutId);
+      if (targetWorkout) {
+        // Only update processedFocusRef if focusWorkoutId actually changed
+        if (processedFocusRef.current !== focusWorkoutId) {
+          processedFocusRef.current = focusWorkoutId;
+        }
+        
+        // Check if we need to analyze (no analysis, or old generic analysis, or failed)
+        const analysis = targetWorkout.workout_analysis;
+        const hasNewFormat = analysis?.performance && analysis?.detailed_analysis && analysis?.narrative_insights;
+        const needsAnalysis = !targetWorkout.workout_analysis || 
+                             targetWorkout.analysis_status !== 'complete' ||
+                             !hasNewFormat;
+        
+        if (needsAnalysis && !analyzingRef.current.has(focusWorkoutId)) {
+          console.log('🔄 Analyzing focus workout:', focusWorkoutId);
+          analyzeWorkout(focusWorkoutId);
+        } else if (!needsAnalysis) {
+          // Only update selectedWorkoutId if it's different (prevents unnecessary re-render)
+          setSelectedWorkoutId(prev => prev === focusWorkoutId ? prev : focusWorkoutId);
+        }
+      }
+    } else if (!focusWorkoutId) {
+      // Reset refs when focusWorkoutId is cleared
+      processedFocusRef.current = null;
+      lastRecentWorkoutsRef.current = [];
+    }
+  }, [focusWorkoutId, recentWorkouts]);
 
   const getWorkoutIcon = (type: string): string => {
     switch (type.toLowerCase()) {
@@ -783,7 +859,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                       analyzeWorkout(workout.id);
                     } else {
                       console.log('✅ Analysis exists with AI narrative, selecting workout:', workout.id);
-                      setSelectedWorkoutId(workout.id);
+                      setSelectedWorkoutId(prev => prev === workout.id ? prev : workout.id);
                     }
                   } else {
                     console.log('⏸️ Already analyzing this workout, ignoring click');

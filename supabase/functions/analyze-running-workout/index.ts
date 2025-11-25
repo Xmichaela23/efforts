@@ -1147,6 +1147,61 @@ Deno.serve(async (req) => {
 
     console.log('✅ Performance calculated:', performance);
 
+    // Extract planned pace info early so it can be passed to detailed analysis
+    let plannedPaceInfo: {
+      type: 'range' | 'single';
+      range?: string;
+      lower?: number;
+      upper?: number;
+      target?: string;
+      targetSeconds?: number;
+      workoutType: string;
+    } | null = null;
+    
+    if (plannedWorkout?.computed?.steps) {
+      const workSteps = plannedWorkout.computed.steps.filter((step: any) =>
+        (step.kind === 'work' || step.role === 'work') && step.pace_range
+      );
+
+      if (workSteps.length > 0) {
+        const paceRanges = workSteps.map((step: any) => ({
+          lower: step.pace_range.lower,
+          upper: step.pace_range.upper
+        }));
+
+        const firstRange = paceRanges[0];
+        const isRangeWorkout = firstRange.lower !== firstRange.upper;
+
+        const formatPace = (seconds: number): string => {
+          const minutes = Math.floor(seconds / 60);
+          const secs = Math.round(seconds % 60);
+          return `${minutes}:${String(secs).padStart(2, '0')}`;
+        };
+
+        const paceUnit = userUnits === 'metric' ? 'min/km' : 'min/mi';
+
+        if (isRangeWorkout) {
+          plannedPaceInfo = {
+            type: 'range',
+            range: `${formatPace(firstRange.lower)}-${formatPace(firstRange.upper)} ${paceUnit}`,
+            lower: firstRange.lower,
+            upper: firstRange.upper,
+            workoutType: 'easy/aerobic run (variability expected)'
+          };
+        } else {
+          plannedPaceInfo = {
+            type: 'single',
+            target: `${formatPace(firstRange.lower)} ${paceUnit}`,
+            targetSeconds: firstRange.lower,
+            workoutType: 'tempo/interval run (consistency critical)'
+          };
+        }
+        
+        console.log('🎯 [PLANNED PACE] Extracted pace info:', JSON.stringify(plannedPaceInfo));
+        console.log('🎯 [PLANNED PACE] Lower:', plannedPaceInfo?.lower, 'Upper:', plannedPaceInfo?.upper);
+      }
+    }
+
     // 🚀 ENHANCED DETAILED ANALYSIS - Chart-like insights
     console.log('🚀 Starting detailed analysis generation...');
     console.log('🔍 Sensor data length:', sensorData.length);
@@ -1155,7 +1210,7 @@ Deno.serve(async (req) => {
     
     let detailedAnalysis = null;
     try {
-      detailedAnalysis = generateDetailedChartAnalysis(sensorData, computedIntervals, enhancedAnalysis);
+      detailedAnalysis = generateDetailedChartAnalysis(sensorData, computedIntervals, enhancedAnalysis, plannedPaceInfo);
       console.log('📊 Detailed analysis generated successfully:', JSON.stringify(detailedAnalysis, null, 2));
     } catch (error) {
       console.error('❌ Detailed analysis generation failed:', error);
@@ -1230,7 +1285,8 @@ Deno.serve(async (req) => {
         granular_analysis: enhancedAnalysis,
         performance: performance,
         detailed_analysis: detailedAnalysis,
-        narrative_insights: narrativeInsights  // AI-generated human-readable insights
+        narrative_insights: narrativeInsights,  // AI-generated human-readable insights
+        mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null  // Include terrain breakdown
       },
       analysis_status: 'complete',
       analyzed_at: new Date().toISOString()
@@ -1542,11 +1598,20 @@ function extractSensorData(data: any): any[] {
       return null; // Filter out samples with no valid pace data
     }
 
+    // Extract elevation from various possible field names
+    const elevationM = sample.elevation 
+      ?? sample.elevationInMeters 
+      ?? sample.elevation_m 
+      ?? sample.elev_m 
+      ?? sample.altitude 
+      ?? null;
+    
     return {
       timestamp: sample.timestamp || index,
       pace_s_per_mi: pace_s_per_mi,
       power_w: sample.power || null,
       heart_rate: sample.heartRate || sample.heart_rate || null,
+      elevation_m: elevationM != null && Number.isFinite(elevationM) ? Number(elevationM) : null,
       duration_s: 1,
       data_source: dataSource
     };
@@ -2589,7 +2654,7 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
  * Generate detailed, chart-like analysis with specific metrics
  * Provides actionable insights similar to Garmin Connect analysis
  */
-function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], granularAnalysis: any): any {
+function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], granularAnalysis: any, plannedPaceInfo: any): any {
   console.log('📊 Generating detailed chart analysis...');
   
   // Extract work intervals for detailed analysis
@@ -2608,6 +2673,9 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
   // Pacing consistency analysis
   const pacingConsistency = analyzePacingConsistency(sensorData, workIntervals);
   
+  // Generate mile-by-mile terrain breakdown - PASS plannedPaceInfo
+  const mileByMileTerrain = generateMileByMileTerrainBreakdown(sensorData, intervals, granularAnalysis, plannedPaceInfo);
+  
   return {
     speed_fluctuations: speedAnalysis,
     heart_rate_recovery: hrRecoveryAnalysis,
@@ -2620,7 +2688,8 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
         workIntervals.reduce((sum, i) => sum + (i.pace_adherence || 0), 0) / workIntervals.length : 0,
       pace_variability: granularAnalysis.pacing_analysis?.pacing_variability || 0,
       hr_drift: granularAnalysis.heart_rate_analysis?.hr_drift_bpm || 0
-    }
+    },
+    mile_by_mile_terrain: mileByMileTerrain
   };
 }
 
@@ -2906,6 +2975,355 @@ function identifyPacePatterns(paceData: any[], workIntervals: any[]): any {
 }
 
 /**
+ * Generate detailed mile-by-mile breakdown with pace analysis and comparison to target range
+ */
+function generateMileByMileTerrainBreakdown(sensorData: any[], intervals: any[], granularAnalysis: any, plannedPaceInfo: any): any {
+  console.log(`🔍 [MILE BREAKDOWN] Starting function. Sensor data: ${sensorData.length} samples, Intervals: ${intervals.length}`);
+  
+  if (sensorData.length === 0) {
+    console.log('⚠️ [MILE BREAKDOWN] No sensor data');
+    return null;
+  }
+  
+  // Extract work intervals
+  const workIntervals = intervals.filter(i => i.role === 'work' && i.executed);
+  console.log(`🔍 [MILE BREAKDOWN] Work intervals: ${workIntervals.length}`);
+  
+  if (workIntervals.length === 0) {
+    console.log('⚠️ [MILE BREAKDOWN] No work intervals found');
+    return null;
+  }
+  
+  // Get target pace range from plannedPaceInfo (passed from main function)
+  // Fallback to extracting from intervals if not provided
+  let targetLower: number | null = null;
+  let targetUpper: number | null = null;
+  let targetPaceS: number | null = null;
+  let isRangeWorkout = false;
+  
+  console.log(`🔍 [MILE BREAKDOWN] plannedPaceInfo received:`, plannedPaceInfo ? JSON.stringify(plannedPaceInfo) : 'null');
+  
+  if (plannedPaceInfo) {
+    console.log(`🔍 [MILE BREAKDOWN] plannedPaceInfo.type: ${plannedPaceInfo.type}`);
+    if (plannedPaceInfo.type === 'range') {
+      targetLower = plannedPaceInfo.lower || null;
+      targetUpper = plannedPaceInfo.upper || null;
+      isRangeWorkout = !!(targetLower && targetUpper && targetLower !== targetUpper);
+      console.log(`🔍 [MILE BREAKDOWN] Extracted from plannedPaceInfo: lower=${targetLower}, upper=${targetUpper}, isRange=${isRangeWorkout}`);
+    } else if (plannedPaceInfo.type === 'single') {
+      targetPaceS = plannedPaceInfo.targetSeconds || null;
+      console.log(`🔍 [MILE BREAKDOWN] Single target: ${targetPaceS}`);
+    }
+  }
+  
+  // Fallback: try to extract from intervals if plannedPaceInfo not available
+  if (!targetLower && !targetPaceS) {
+    console.log(`🔍 [MILE BREAKDOWN] Falling back to interval extraction`);
+    const paceRange = workIntervals[0]?.pace_range || workIntervals[0]?.target_pace || null;
+    console.log(`🔍 [MILE BREAKDOWN] paceRange from interval:`, paceRange);
+    targetLower = paceRange?.lower || null;
+    targetUpper = paceRange?.upper || null;
+    targetPaceS = paceRange?.lower && paceRange?.lower === paceRange?.upper ? paceRange.lower : null;
+    isRangeWorkout = !!(targetLower && targetUpper && targetLower !== targetUpper);
+    console.log(`🔍 [MILE BREAKDOWN] Extracted from interval: lower=${targetLower}, upper=${targetUpper}, isRange=${isRangeWorkout}`);
+  }
+  
+  // Get total distance from work intervals (distance is in executed object)
+  const totalDistanceM = workIntervals.reduce((sum, i) => sum + (i.executed?.distance_m || 0), 0);
+  const totalDistanceMi = totalDistanceM / 1609.34;
+  
+  console.log(`🔍 [MILE BREAKDOWN] Total distance: ${totalDistanceM.toFixed(2)}m (${totalDistanceMi.toFixed(2)} miles)`);
+  
+  if (totalDistanceMi < 0.5) {
+    console.log(`⚠️ [MILE BREAKDOWN] Distance too short: ${totalDistanceMi.toFixed(2)} miles`);
+    return null; // Too short for mile breakdown
+  }
+  
+  // Calculate cumulative distance from sensor samples
+  // Since extractSensorData doesn't preserve distance fields, calculate from pace and time
+  let cumulativeDistanceM = 0;
+  const samplesWithDistance = sensorData.map((sample, index) => {
+    // Calculate distance from pace and time (each sample is 1 second)
+    if (sample.pace_s_per_mi && sample.pace_s_per_mi > 0) {
+      const speedMps = 1609.34 / sample.pace_s_per_mi; // Convert pace (s/mi) to speed (m/s)
+      cumulativeDistanceM += speedMps * (sample.duration_s || 1); // Usually 1 second per sample
+    }
+    
+    return {
+      ...sample,
+      distance_m: cumulativeDistanceM
+    };
+  });
+  
+  console.log(`🔍 [MILE BREAKDOWN] Calculated cumulative distance: ${cumulativeDistanceM.toFixed(2)}m (${(cumulativeDistanceM / 1609.34).toFixed(2)} miles) from ${samplesWithDistance.length} samples`);
+  console.log(`🔍 [MILE BREAKDOWN] Total distance from intervals: ${totalDistanceM.toFixed(2)}m (${totalDistanceMi.toFixed(2)} miles)`);
+  
+  // Calculate mile splits
+  const mileSplits: any[] = [];
+  const miles = Math.floor(totalDistanceMi);
+  
+  for (let mile = 1; mile <= miles; mile++) {
+    const mileStartM = (mile - 1) * 1609.34;
+    const mileEndM = mile * 1609.34;
+    
+    // Find samples in this mile
+    const mileSamples = samplesWithDistance.filter(s => 
+      s.distance_m >= mileStartM && s.distance_m < mileEndM
+    );
+    
+    if (mileSamples.length === 0) continue;
+    
+    // Calculate average pace for this mile
+    const paces = mileSamples.map(s => s.pace_s_per_mi).filter(p => p && p > 0);
+    if (paces.length === 0) continue;
+    
+    const avgPaceS = paces.reduce((a, b) => a + b, 0) / paces.length;
+    
+    // Try to get elevation if available (check multiple field names)
+    const elevations = mileSamples
+      .map(s => s.elevation_m || s.elevation || s.elevationInMeters)
+      .filter(e => e != null && Number.isFinite(e));
+    
+    // Use first and last elevation values for the mile
+    const startElev = elevations.length > 0 ? elevations[0] : null;
+    const endElev = elevations.length > 0 ? elevations[elevations.length - 1] : null;
+    const elevGain = endElev != null && startElev != null ? Math.max(0, endElev - startElev) : null;
+    
+    // Calculate grade if elevation available
+    const distanceM = mileEndM - mileStartM;
+    const gradePercent = distanceM > 0 && startElev != null && endElev != null 
+      ? ((endElev - startElev) / distanceM) * 100 
+      : null;
+    
+    // Determine terrain type
+    let terrainType = 'flat';
+    if (gradePercent != null) {
+      if (Math.abs(gradePercent) > 0.5) {
+        terrainType = gradePercent > 0 ? 'uphill' : 'downhill';
+      }
+    }
+    
+    mileSplits.push({
+      mile: mile,
+      pace_s_per_mi: avgPaceS,
+      elevation_gain_m: elevGain,
+      grade_percent: gradePercent,
+      terrain_type: terrainType,
+      start_elevation_m: startElev,
+      end_elevation_m: endElev
+    });
+  }
+  
+  if (mileSplits.length === 0) {
+    console.log('⚠️ [MILE BREAKDOWN] No mile splits generated.');
+    console.log(`   - Total distance from intervals: ${totalDistanceMi.toFixed(2)} miles`);
+    console.log(`   - Calculated cumulative distance: ${cumulativeDistanceM.toFixed(2)}m (${(cumulativeDistanceM / 1609.34).toFixed(2)} miles)`);
+    console.log(`   - Samples: ${samplesWithDistance.length}`);
+    console.log(`   - First sample distance_m: ${samplesWithDistance[0]?.distance_m}`);
+    console.log(`   - Last sample distance_m: ${samplesWithDistance[samplesWithDistance.length - 1]?.distance_m}`);
+    return null;
+  }
+  
+  console.log(`✅ [MILE BREAKDOWN] Generated ${mileSplits.length} mile splits from ${samplesWithDistance.length} samples`);
+  
+  // Format as text section for UI display
+  const formatPace = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${minutes}:${String(secs).padStart(2, '0')}`;
+  };
+  
+  let sectionText = 'MILE-BY-MILE TERRAIN BREAKDOWN (Work Portion):\n\n';
+  
+  // Display target range or single target
+  if (isRangeWorkout && targetLower && targetUpper) {
+    sectionText += `Target range: ${formatPace(targetLower)}-${formatPace(targetUpper)}/mi\n\n`;
+  } else if (targetPaceS) {
+    sectionText += `Target pace: ${formatPace(targetPaceS)}/mi\n\n`;
+  } else if (targetLower) {
+    sectionText += `Target pace: ${formatPace(targetLower)}/mi\n\n`;
+  }
+  
+  // Calculate target pace for single-target comparisons (use midpoint for range workouts if no single target)
+  if (!targetPaceS && isRangeWorkout && targetLower && targetUpper) {
+    targetPaceS = (targetLower + targetUpper) / 2; // Use midpoint for range workouts when comparing
+  } else if (!targetPaceS && targetLower) {
+    targetPaceS = targetLower; // Use lower bound if no single target set
+  }
+  
+  // Analyze each mile
+  let milesInRange = 0;
+  const mileDetails: string[] = [];
+  const terrainStats: { [key: string]: { count: number; totalDelta: number } } = {};
+  
+  // Debug: Log range values
+  if (targetLower && targetUpper) {
+    console.log(`🔍 [MILE BREAKDOWN] Range: ${targetLower}s (${formatPace(targetLower)}) to ${targetUpper}s (${formatPace(targetUpper)})`);
+  } else if (targetPaceS) {
+    console.log(`🔍 [MILE BREAKDOWN] Target pace: ${targetPaceS}s (${formatPace(targetPaceS)})`);
+  } else {
+    console.log(`🔍 [MILE BREAKDOWN] No target pace range available`);
+  }
+  
+  mileSplits.forEach(split => {
+    const paceStr = formatPace(split.pace_s_per_mi);
+    const milePaceSeconds = split.pace_s_per_mi;
+    
+    // Compare to target
+    let comparison = '';
+    let deltaS = 0;
+    let inRange = false;
+    
+    if (isRangeWorkout && targetLower && targetUpper) {
+      // DEBUG: Log comparison for each mile
+      console.log(`🔍 [MILE ${split.mile}] Pace: ${paceStr} (${milePaceSeconds}s), Range: ${targetLower}-${targetUpper}s`);
+      console.log(`   Within? ${milePaceSeconds >= targetLower && milePaceSeconds <= targetUpper}`);
+      
+      // Compare to actual range bounds (both in seconds)
+      if (milePaceSeconds >= targetLower && milePaceSeconds <= targetUpper) {
+        comparison = 'Within range ✓';
+        inRange = true;
+        milesInRange++;
+        deltaS = 0; // In range, no delta
+        console.log(`   ✅ Mile ${split.mile} WITHIN RANGE`);
+      } else if (milePaceSeconds < targetLower) {
+        // Faster than range start (lower bound) - lower seconds = faster pace
+        deltaS = targetLower - milePaceSeconds;
+        const deltaMin = Math.floor(deltaS / 60);
+        const deltaSec = Math.round(deltaS % 60);
+        comparison = `${deltaMin}:${String(deltaSec).padStart(2, '0')} faster than range start`;
+        console.log(`   ⚡ Mile ${split.mile} FASTER by ${deltaS}s`);
+      } else {
+        // Slower than range end (upper bound) - higher seconds = slower pace
+        deltaS = milePaceSeconds - targetUpper;
+        const deltaMin = Math.floor(deltaS / 60);
+        const deltaSec = Math.round(deltaS % 60);
+        comparison = `${deltaMin}:${String(deltaSec).padStart(2, '0')} slower than range end`;
+        console.log(`   🐌 Mile ${split.mile} SLOWER by ${deltaS}s`);
+      }
+    } else if (targetPaceS) {
+      // Single target workout
+      deltaS = milePaceSeconds - targetPaceS;
+      const deltaAbs = Math.abs(deltaS);
+      const deltaMin = Math.floor(deltaAbs / 60);
+      const deltaSec = Math.round(deltaAbs % 60);
+      const sign = deltaS > 0 ? '+' : '-';
+      
+      if (deltaAbs < 5) {
+        comparison = 'On target';
+        inRange = true;
+        milesInRange++;
+      } else {
+        comparison = `${sign}${deltaMin}:${String(deltaSec).padStart(2, '0')} ${deltaS > 0 ? 'slower' : 'faster'} than target`;
+      }
+    }
+    
+    // Build terrain info if available
+    let terrainInfo = '';
+    if (split.grade_percent != null && split.elevation_gain_m != null) {
+      const gradeStr = split.grade_percent.toFixed(1);
+      const elevStr = Math.round(split.elevation_gain_m * 3.28084); // Convert to feet
+      terrainInfo = ` on ${split.terrain_type} (${gradeStr}% grade, +${elevStr}ft)`;
+    }
+    
+    // Always show target range for range workouts
+    let targetDisplay = '';
+    if (isRangeWorkout && targetLower && targetUpper) {
+      targetDisplay = `Target range: ${formatPace(targetLower)}-${formatPace(targetUpper)}/mi`;
+    } else if (targetPaceS) {
+      targetDisplay = `Target: ${formatPace(targetPaceS)}/mi`;
+    }
+    
+    mileDetails.push(`Mile ${split.mile}: ${paceStr}/mi${terrainInfo}\n${targetDisplay}\nStatus: ${comparison}`);
+  });
+  
+  console.log(`✅ [MILE BREAKDOWN] Final count: ${milesInRange} of ${mileSplits.length} miles within range`);
+  
+  sectionText += mileDetails.join('\n\n') + '\n\n';
+  
+  // Add pattern analysis
+  sectionText += 'PATTERN ANALYSIS:\n';
+  
+  // Calculate average pace
+  const avgPaceS = mileSplits.length > 0 
+    ? mileSplits.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / mileSplits.length 
+    : 0;
+  
+  // Miles in range percentage
+  const inRangePct = Math.round((milesInRange / mileSplits.length) * 100);
+  sectionText += `- ${milesInRange} of ${mileSplits.length} miles within range (${inRangePct}%)\n`;
+  
+  // Average pace vs range
+  if (isRangeWorkout && targetLower && targetUpper) {
+    if (avgPaceS >= targetLower && avgPaceS <= targetUpper) {
+      sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (within range ✓)\n`;
+    } else if (avgPaceS < targetLower) {
+      const delta = targetLower - avgPaceS;
+      const deltaMin = Math.floor(delta / 60);
+      const deltaSec = Math.round(delta % 60);
+      sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (${deltaMin}:${String(deltaSec).padStart(2, '0')} faster than range start)\n`;
+    } else {
+      const delta = avgPaceS - targetUpper;
+      const deltaMin = Math.floor(delta / 60);
+      const deltaSec = Math.round(delta % 60);
+      sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (${deltaMin}:${String(deltaSec).padStart(2, '0')} slower than range end)\n`;
+    }
+  } else if (targetPaceS) {
+    const delta = avgPaceS - targetPaceS;
+    const deltaAbs = Math.abs(delta);
+    const deltaMin = Math.floor(deltaAbs / 60);
+    const deltaSec = Math.round(deltaAbs % 60);
+    const sign = delta > 0 ? '+' : '-';
+    sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (${sign}${deltaMin}:${String(deltaSec).padStart(2, '0')} vs target)\n`;
+  }
+  
+  // Identify patterns - recalculate to ensure accuracy
+  const fastMiles = isRangeWorkout && targetLower 
+    ? mileSplits.filter(s => s.pace_s_per_mi < targetLower)
+    : [];
+  const slowMiles = isRangeWorkout && targetUpper 
+    ? mileSplits.filter(s => s.pace_s_per_mi > targetUpper)
+    : [];
+  const inRangeMiles = isRangeWorkout && targetLower && targetUpper
+    ? mileSplits.filter(s => s.pace_s_per_mi >= targetLower && s.pace_s_per_mi <= targetUpper)
+    : [];
+  
+  // Summary breakdown
+  if (isRangeWorkout) {
+    if (inRangeMiles.length > 0) {
+      const inRangeNumbers = inRangeMiles.map(s => s.mile).join(', ');
+      sectionText += `- Within range: Miles ${inRangeNumbers} (${inRangeMiles.length} of ${mileSplits.length})\n`;
+    }
+    if (fastMiles.length > 0) {
+      const fastMileNumbers = fastMiles.map(s => s.mile).join(', ');
+      sectionText += `- Faster than range: Miles ${fastMileNumbers} (${fastMiles.length} of ${mileSplits.length})\n`;
+    }
+    if (slowMiles.length > 0) {
+      const slowMileNumbers = slowMiles.map(s => s.mile).join(', ');
+      sectionText += `- Slower than range: Miles ${slowMileNumbers} (${slowMiles.length} of ${mileSplits.length})\n`;
+    }
+  }
+  
+  // Overall assessment
+  if (inRangePct >= 75) {
+    sectionText += `- Overall: Excellent pace discipline for easy run\n`;
+  } else if (inRangePct >= 50) {
+    sectionText += `- Overall: Good pace discipline for easy run\n`;
+  } else {
+    sectionText += `- Overall: Needs improvement - focus on staying within range\n`;
+  }
+  
+  return {
+    available: true,
+    section: sectionText,
+    splits: mileSplits,
+    total_miles: mileSplits.length,
+    miles_in_range: milesInRange,
+    average_pace_s_per_mi: avgPaceS
+  };
+}
+
+/**
  * Generate AI-powered narrative insights from structured analysis data
  * Converts metrics and patterns into human-readable observations
  */
@@ -2931,8 +3349,13 @@ async function generateAINarrativeInsights(
   // Calculate metrics from sensor data
   // Use workout-level fields for duration and distance
   // NOTE: Database stores distance in KM and moving_time in MINUTES (not meters/seconds!)
-  const totalDurationMinutes = workout.moving_time || workout.duration || 0;
-  const totalDurationSeconds = totalDurationMinutes * 60;
+  // ✅ FIX: Use moving time (not elapsed time) for pace calculations
+  // Priority: computed.overall.duration_s_moving (seconds) > moving_time (minutes) > duration (minutes, elapsed)
+  const movingTimeSeconds = workout.computed?.overall?.duration_s_moving 
+    || (workout.moving_time ? workout.moving_time * 60 : null)
+    || (workout.duration ? workout.duration * 60 : 0); // Last resort (elapsed time)
+  const totalDurationMinutes = movingTimeSeconds / 60;
+  const totalDurationSeconds = movingTimeSeconds;
   const totalDistanceKm = workout.distance || 0;
   
   // Convert distance based on user preference
@@ -2954,8 +3377,21 @@ async function generateAINarrativeInsights(
   );
   
   let avgPaceSeconds = 0;
-  if (validSpeedSamples.length > 0) {
-    // Average the speeds (m/s)
+  let paceCalculationMethod = 'unknown';
+  
+  // ✅ CRITICAL FIX: Always calculate from moving time and distance (never use computed_avg_pace_s_per_mi)
+  // We have the data - moving_time_seconds and distance - so use it directly
+  if (distanceValue > 0 && movingTimeSeconds > 0) {
+    // Calculate pace from moving time (CORRECT - uses moving time, not elapsed)
+    avgPaceSeconds = movingTimeSeconds / distanceValue;
+    
+    // Convert to metric if needed
+    if (userUnits === 'metric' && avgPaceSeconds > 0) {
+      avgPaceSeconds = avgPaceSeconds / 1.609344;  // Convert s/mi to s/km
+    }
+    paceCalculationMethod = 'from_moving_time';
+  } else if (validSpeedSamples.length > 0) {
+    // Fallback only if we don't have moving time/distance: Calculate from sensor speed samples
     const avgSpeedMps = validSpeedSamples.reduce((sum, s) => sum + s.speedMetersPerSecond, 0) / validSpeedSamples.length;
     
     // Convert average speed to pace
@@ -2970,17 +3406,12 @@ async function generateAINarrativeInsights(
       const paceMinPerKm = 60 / speedKph;
       avgPaceSeconds = paceMinPerKm * 60;  // Convert to seconds
     }
+    paceCalculationMethod = 'from_sensor_speed';
   } else {
-    // Fallback: try computed pace
-    avgPaceSeconds = workout.computed?.overall?.avg_pace_s_per_mi || 0;
-    if (userUnits === 'metric' && avgPaceSeconds > 0) {
-      avgPaceSeconds = avgPaceSeconds / 1.609344;  // Convert s/mi to s/km
-    }
-    
-    // Final fallback: duration/distance
-    if (avgPaceSeconds === 0 && distanceValue > 0) {
-      avgPaceSeconds = (totalDurationMinutes * 60) / distanceValue;
-    }
+    // Should never happen - we should always have moving time and distance
+    console.error('❌ [PACE CALC ERROR] No moving time or distance available - cannot calculate pace');
+    avgPaceSeconds = 0;
+    paceCalculationMethod = 'error_no_data';
   }
   
   // Convert to minutes per unit (km or mile)
@@ -2995,10 +3426,15 @@ async function generateAINarrativeInsights(
     workout_distance_km: workout.distance,
     workout_moving_time_min: workout.moving_time,
     workout_duration_min: workout.duration,
-    workout_type: workout.type
+    workout_type: workout.type,
+    computed_duration_s_moving: workout.computed?.overall?.duration_s_moving,
+    moving_time_seconds_used: movingTimeSeconds,
+    moving_time_source: workout.computed?.overall?.duration_s_moving 
+      ? 'computed.overall.duration_s_moving' 
+      : (workout.moving_time ? 'moving_time (minutes * 60)' : 'duration (elapsed, minutes * 60)')
   });
   
-  console.log('🔍 [PACE CALCULATION] Pace source for AI (matching chart):', {
+  console.log('🔍 [PACE CALCULATION] Pace source for AI:', {
     raw_sensor_samples: rawSensorData.length,
     valid_speed_samples: validSpeedSamples.length,
     avg_speed_mps: validSpeedSamples.length > 0 ? 
@@ -3006,13 +3442,15 @@ async function generateAINarrativeInsights(
     avg_speed_mph: validSpeedSamples.length > 0 ? 
       ((validSpeedSamples.reduce((sum, s) => sum + s.speedMetersPerSecond, 0) / validSpeedSamples.length) * 2.23694) : null,
     computed_avg_pace_s_per_mi: workout.computed?.overall?.avg_pace_s_per_mi,
-    final_pace_seconds: avgPaceSeconds,
+    moving_time_seconds: movingTimeSeconds,
+    distance_miles: distanceValue,
+    calculated_pace_seconds: avgPaceSeconds,
     final_pace_minutes: avgPace,
     user_units: userUnits,
     pace_unit: paceUnit,
-    expected_chart_value: '10:29 /mi (629 seconds)',
+    calculation_method: paceCalculationMethod,
     ai_will_report: `${Math.floor(avgPace)}:${String(Math.round((avgPace - Math.floor(avgPace)) * 60)).padStart(2, '0')} ${paceUnit}`,
-    note: 'Chart averages SPEED then converts to pace (not average of paces)'
+    note: validSpeedSamples.length > 0 ? 'Chart averages SPEED then converts to pace' : 'Calculated from moving_time / distance'
   });
   
   console.log('🤖 [DEBUG] Calculated metrics:', {
@@ -3064,6 +3502,69 @@ async function generateAINarrativeInsights(
   // Determine if this is a planned workout or freeform run
   const isPlannedWorkout = !!plannedWorkout;
   
+  // ✅ FIX BUG #2: Extract planned pace ranges from work segments
+  let plannedPaceInfo: {
+    type: 'range' | 'single';
+    range?: string;
+    lower?: number;
+    upper?: number;
+    target?: string;
+    targetSeconds?: number;
+    workoutType: string;
+  } | null = null;
+  
+  // Check if workout has intervals (for conditional AI prompt)
+  const hasIntervals = plannedWorkout?.computed?.steps?.some(
+    (step: any) => step.step_type === 'interval' || step.step_type === 'repeat'
+  ) || false;
+  
+  if (isPlannedWorkout && plannedWorkout?.computed?.steps) {
+    // Find all work segments with pace ranges
+    const workSteps = plannedWorkout.computed.steps.filter((step: any) => 
+      (step.kind === 'work' || step.role === 'work') && step.pace_range
+    );
+    
+    if (workSteps.length > 0) {
+      // Extract unique pace ranges (in case of repeated intervals)
+      const paceRanges = workSteps.map((step: any) => ({
+        lower: step.pace_range.lower,
+        upper: step.pace_range.upper
+      }));
+      
+      // Use the first work segment's pace range (most workouts have consistent pace targets)
+      const firstRange = paceRanges[0];
+      const isRangeWorkout = firstRange.lower !== firstRange.upper;
+      
+      // Helper to format seconds to MM:SS
+      const formatPace = (seconds: number): string => {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.round(seconds % 60);
+        return `${minutes}:${String(secs).padStart(2, '0')}`;
+      };
+      
+      if (isRangeWorkout) {
+        // Range workout (e.g., easy run: 10:17-10:43/mi)
+        plannedPaceInfo = {
+          type: 'range',
+          range: `${formatPace(firstRange.lower)}-${formatPace(firstRange.upper)} ${paceUnit}`,
+          lower: firstRange.lower,
+          upper: firstRange.upper,
+          workoutType: 'easy/aerobic run (variability expected)'
+        };
+      } else {
+        // Single target workout (e.g., tempo: 10:30/mi)
+        plannedPaceInfo = {
+          type: 'single',
+          target: `${formatPace(firstRange.lower)} ${paceUnit}`,
+          targetSeconds: firstRange.lower,
+          workoutType: 'tempo/interval run (consistency critical)'
+        };
+      }
+      
+      console.log('🎯 [PLANNED PACE] Extracted pace info:', plannedPaceInfo);
+    }
+  }
+  
   // Build prompt based on workout type
   let prompt = `You are analyzing a running workout. Generate 3-4 concise, data-driven observations based on the metrics below.
 
@@ -3099,10 +3600,87 @@ Adherence Metrics (vs. Planned Workout):
 - Duration: ${adherenceContext.duration_adherence_pct}%
 - HR Drift: ${adherenceContext.hr_drift_bpm} bpm
 - Pace Variability: ${adherenceContext.pace_variability_pct}%
+${plannedPaceInfo ? `
+Planned Workout Details:
+- Target Pace: ${plannedPaceInfo.type === 'range' ? plannedPaceInfo.range : plannedPaceInfo.target}
+- Workout Type: ${plannedPaceInfo.workoutType}
+` : ''}
+
+CRITICAL ANALYSIS RULES:
+${plannedPaceInfo?.type === 'range' ? `
+- This is a RANGE workout (${plannedPaceInfo.workoutType})
+- Compare each mile/segment to the RANGE (${plannedPaceInfo.range})
+- Miles within range are acceptable (not "too fast" or "too slow")
+- Miles faster than range start are "faster than range start" (not "faster than target")
+- Miles slower than range end are "slower than range end" (not "slower than target")
+- Average pace within range is GOOD execution (not a miss)
+- Variability is NORMAL for range workouts (not a problem)
+` : plannedPaceInfo?.type === 'single' ? `
+- This is a SINGLE-TARGET workout (${plannedPaceInfo.workoutType})
+- Compare each mile/segment to the EXACT TARGET (${plannedPaceInfo.target})
+- Consistency is CRITICAL - variability indicates pacing issues
+- Miles faster than target are "too fast"
+- Miles slower than target are "too slow"
+- Average pace should match target closely
+` : `
+- Compare actual performance to planned targets
+`}
+
+${(() => {
+  // Extract pre-calculated mile-by-mile categorization if available
+  const mileByMile = detailedAnalysis?.mile_by_mile_terrain;
+  if (mileByMile && mileByMile.available && mileByMile.splits && mileByMile.splits.length > 0) {
+    const milesInRange = mileByMile.miles_in_range || 0;
+    const totalMiles = mileByMile.total_miles || mileByMile.splits.length;
+    const inRangePct = totalMiles > 0 ? Math.round((milesInRange / totalMiles) * 100) : 0;
+    
+    // Extract mile categorizations from the section text (more reliable than parsing splits)
+    const sectionText = mileByMile.section || '';
+    const withinRangeMatch = sectionText.match(/Within range: Miles? ([^\n]+)/i);
+    const fasterMatch = sectionText.match(/Faster than range: Miles? ([^\n]+)/i);
+    const slowerMatch = sectionText.match(/Slower than range: Miles? ([^\n]+)/i);
+    
+    const withinRangeMiles = withinRangeMatch ? withinRangeMatch[1].trim() : 'None';
+    const fasterMiles = fasterMatch ? fasterMatch[1].trim() : 'None';
+    const slowerMiles = slowerMatch ? slowerMatch[1].trim() : 'None';
+    
+    return `
+MILE-BY-MILE CATEGORIZATION (PRE-CALCULATED - USE EXACTLY AS SHOWN):
+- ${milesInRange} of ${totalMiles} miles within range (${inRangePct}%)
+- Within range: ${withinRangeMiles}
+- Faster than range: ${fasterMiles}
+- Slower than range: ${slowerMiles}
+
+CRITICAL INSTRUCTION: When summarizing the mile-by-mile breakdown, use EXACTLY these pre-calculated categorizations. Do NOT recalculate which miles are in/out of range. Simply report these findings as-is. 
+
+When you write "Mile-by-mile breakdown:", you MUST use the exact mile numbers shown above:
+- If "Within range: Miles 4" is shown, say "Mile 4 was within range"
+- If "Faster than range: Miles 1, 2, 3, 6" is shown, say "Miles 1, 2, 3, 6 were faster than range start"
+- If "Slower than range: Miles 5, 7, 8" is shown, say "Miles 5, 7, 8 were slower than range end"
+
+Do NOT make up different mile numbers. Do NOT recalculate. Use the numbers provided above.
+
+`;
+  }
+  return '';
+})()}
 
 Generate 3-4 observations comparing actual vs. planned performance:
-"Maintained pace averaging X:XX ${workoutContext.pace_unit}, achieving Y% adherence to prescribed Z:ZZ ${workoutContext.pace_unit} target. Pace varied by A%, with most intervals between B:BB-C:CC ${workoutContext.pace_unit}."
-"Completed X of Y prescribed intervals, with pace adherence ranging from A% to B%. [Include any notable pattern like fading or consistent execution]"
+${plannedPaceInfo?.type === 'range' && plannedPaceInfo.range ? `
+"Maintained pace averaging X:XX ${workoutContext.pace_unit}, ${plannedPaceInfo.range.includes(workoutContext.avg_pace) ? 'within' : 'outside'} the prescribed range of ${plannedPaceInfo.range}. Pace varied by A%, with ${(() => {
+  const mileByMile = detailedAnalysis?.mile_by_mile_terrain;
+  if (mileByMile && mileByMile.miles_in_range !== undefined) {
+    return `${mileByMile.miles_in_range} of ${mileByMile.total_miles || mileByMile.splits?.length || 'Y'}`;
+  }
+  return 'X of Y';
+})()} miles within range."
+"Mile-by-mile breakdown: [CRITICAL: Use the PRE-CALCULATED mile categorization data from the MILE-BY-MILE CATEGORIZATION section above. Report EXACTLY which miles were within range, faster than range start, or slower than range end as shown in that section. Do NOT recalculate - copy the mile numbers directly from the pre-calculated data.]"
+` : plannedPaceInfo?.type === 'single' && plannedPaceInfo.target && plannedPaceInfo.targetSeconds ? `
+"Maintained pace averaging X:XX ${workoutContext.pace_unit}, ${Math.abs(parseFloat(workoutContext.avg_pace) - (plannedPaceInfo.targetSeconds / 60)) < 0.1 ? 'matching' : 'deviating from'} the prescribed target of ${plannedPaceInfo.target}. Pace varied by A%, indicating [consistent/inconsistent] pacing."
+` : `
+"Maintained pace averaging X:XX ${workoutContext.pace_unit}, achieving Y% adherence to prescribed pace target. Pace varied by A%, with most intervals between B:BB-C:CC ${workoutContext.pace_unit}."
+`}
+${hasIntervals ? `"Completed X of Y prescribed intervals, with pace adherence ranging from A% to B%. [Include any notable pattern like fading or consistent execution]"` : `"Pace adherence was consistent throughout the duration."`}
 "Heart rate averaged X bpm with Y bpm drift, peaking at Z bpm. [Add context like 'indicating accumulated fatigue' or 'suggesting good pacing']"
 `;
   } else {
