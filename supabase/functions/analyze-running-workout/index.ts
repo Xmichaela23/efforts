@@ -4255,17 +4255,27 @@ ${(() => {
 ${(() => {
   // Execution adherence summary (only if we have planned workout data)
   if (plannedWorkout) {
-    const plannedDurationMin = plannedWorkout?.computed?.total_duration_seconds 
-      ? Math.round(plannedWorkout.computed.total_duration_seconds / 60)
-      : (plannedWorkout?.computed?.steps?.length > 0
-          ? Math.round(plannedWorkout.computed.steps.reduce((sum: number, step: any) => sum + (step.duration_s || step.duration || 0), 0) / 60)
-          : 0);
-    const actualDurationMin = Math.round(workoutContext.duration_minutes);
-    
-    if (plannedDurationMin > 0) {
-      return `"Overall execution: ${adherenceContext.execution_adherence_pct}% (${adherenceContext.pace_adherence_pct}% pace adherence, ${adherenceContext.duration_adherence_pct}% duration adherence)."`;
-    }
     return `"Overall execution: ${adherenceContext.execution_adherence_pct}% (${adherenceContext.pace_adherence_pct}% pace adherence, ${adherenceContext.duration_adherence_pct}% duration adherence)."`;
+  }
+  return '';
+})()}
+
+REQUIRED OBSERVATIONS (MUST INCLUDE):
+${(() => {
+  let plannedDurationS = 0;
+  if (plannedWorkout?.computed?.total_duration_seconds) {
+    plannedDurationS = plannedWorkout.computed.total_duration_seconds;
+  } else if (plannedWorkout?.computed?.steps?.length > 0) {
+    plannedDurationS = plannedWorkout.computed.steps.reduce((sum: number, step: any) => {
+      return sum + (step.duration_s || step.duration || 0);
+    }, 0);
+  }
+  const plannedDurationMin = plannedDurationS > 0 ? Math.round(plannedDurationS / 60) : 0;
+  const actualDurationMin = Math.round(workoutContext.duration_minutes);
+  
+  if (plannedWorkout && plannedDurationMin > 0) {
+    return `- You MUST include this exact line: "Duration: ${actualDurationMin} of ${plannedDurationMin} minutes completed (${adherenceContext.duration_adherence_pct}% adherence)."
+- You MUST include this exact line: "Overall execution: ${adherenceContext.execution_adherence_pct}% (${adherenceContext.pace_adherence_pct}% pace adherence, ${adherenceContext.duration_adherence_pct}% duration adherence)."`;
   }
   return '';
 })()}
