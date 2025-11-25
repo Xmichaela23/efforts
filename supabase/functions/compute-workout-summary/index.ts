@@ -1136,16 +1136,39 @@ Deno.serve(async (req) => {
       }
 
       let overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
-      let overallSec    = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+      // For runs/walks/rides: Use moving_time, NOT elapsed time from timestamps
+      let overallSec = 0;
+      try {
+        // Priority 1: Use pre-computed moving duration if available
+        const prevComputed = (() => {
+          try {
+            return typeof w.computed === 'string' ? JSON.parse(w.computed) : (w.computed || {});
+          } catch {
+            return {};
+          }
+        })();
+        const prevDurationMoving = Number(prevComputed?.overall?.duration_s_moving);
+        if (Number.isFinite(prevDurationMoving) && prevDurationMoving > 0) {
+          overallSec = Math.round(prevDurationMoving);
+        }
+        // Priority 2: Use moving_time field (in minutes, convert to seconds)
+        if (!(overallSec > 0)) {
+          const mvMin = Number((w as any)?.moving_time);
+          if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+        }
+        // Priority 3: Last resort - timestamp difference (elapsed time, not ideal)
+        if (!(overallSec > 0)) {
+          overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+        }
+      } catch {}
 
     // For swims, use authoritative scalars first; then fill only if still missing
     try {
       const sportForOverall = String((w as any)?.type || '').toLowerCase();
       if (sportForOverall === 'swim') {
         const kmPri = Number((w as any)?.distance);
-        const mvPri = Number((w as any)?.moving_time);
+        // overallSec already set from moving_time above, don't override
         if (Number.isFinite(kmPri) && kmPri > 0) overallMeters = Math.round(kmPri * 1000);
-        if (Number.isFinite(mvPri) && mvPri > 0) overallSec = Math.round(mvPri * 60);
         if (!(overallMeters > 0)) {
           // 1) Sum lengths from swim_data
           try {
@@ -1302,15 +1325,39 @@ Deno.serve(async (req) => {
     const snapped = trySnapToLaps(plannedSteps, laps);
     if (snapped && snapped.length) {
       let overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
-      let overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+      // For runs/walks/rides: Use moving_time, NOT elapsed time from timestamps
+      let overallSec = 0;
+      try {
+        // Priority 1: Use pre-computed moving duration if available
+        const prevComputed = (() => {
+          try {
+            return typeof w.computed === 'string' ? JSON.parse(w.computed) : (w.computed || {});
+          } catch {
+            return {};
+          }
+        })();
+        const prevDurationMoving = Number(prevComputed?.overall?.duration_s_moving);
+        if (Number.isFinite(prevDurationMoving) && prevDurationMoving > 0) {
+          overallSec = Math.round(prevDurationMoving);
+        }
+        // Priority 2: Use moving_time field (in minutes, convert to seconds)
+        if (!(overallSec > 0)) {
+          const mvMin = Number((w as any)?.moving_time);
+          if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+        }
+        // Priority 3: Last resort - timestamp difference (elapsed time, not ideal)
+        if (!(overallSec > 0)) {
+          overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+        }
+      } catch {}
+      
       // For swims, use authoritative scalars first; then fill only if still missing
       try {
         const sportForOverall = String((w as any)?.type || '').toLowerCase();
         if (sportForOverall === 'swim') {
           const kmPri = Number((w as any)?.distance);
-          const mvPri = Number((w as any)?.moving_time);
+          // overallSec already set from moving_time above, don't override
           if (Number.isFinite(kmPri) && kmPri > 0) overallMeters = Math.round(kmPri * 1000);
-          if (Number.isFinite(mvPri) && mvPri > 0) overallSec = Math.round(mvPri * 60);
           if (!(overallMeters > 0)) {
             try {
               const swim = typeof (w as any)?.swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any)?.swim_data;
@@ -1728,15 +1775,47 @@ Deno.serve(async (req) => {
 
     // Overall rollups (optional)
     let overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
-    let overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+    // For runs/walks/rides: Use moving_time, NOT elapsed time from timestamps
+    // Timestamp difference (rows[last].t - rows[0].t) is elapsed time (includes stops)
+    // We need moving time for accurate pace calculations
+    let overallSec = 0;
+    try {
+      const sportForOverall = String((w as any)?.type || '').toLowerCase();
+      // Priority 1: Use pre-computed moving duration if available
+      const prevComputed = (() => {
+        try {
+          return typeof w.computed === 'string' ? JSON.parse(w.computed) : (w.computed || {});
+        } catch {
+          return {};
+        }
+      })();
+      const prevDurationMoving = Number(prevComputed?.overall?.duration_s_moving);
+      if (Number.isFinite(prevDurationMoving) && prevDurationMoving > 0) {
+        overallSec = Math.round(prevDurationMoving);
+      }
+      // Priority 2: Use moving_time field (in minutes, convert to seconds)
+      if (!(overallSec > 0)) {
+        const mvMin = Number((w as any)?.moving_time);
+        if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+      }
+      // Priority 3: For swims only, use timestamp difference (swims don't have stops)
+      if (sportForOverall === 'swim' && !(overallSec > 0)) {
+        overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+      }
+      // Priority 4: Last resort - timestamp difference (but this is elapsed time, not ideal)
+      if (!(overallSec > 0)) {
+        overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+      }
+    } catch {}
+    
     // For swims, use authoritative scalars first; then fill only if still missing
+    // Note: overallSec already set above from moving_time, but swims need additional distance handling
     try {
       const sportForOverall = String((w as any)?.type || '').toLowerCase();
       if (sportForOverall === 'swim') {
         const kmPri = Number((w as any)?.distance);
-        const mvPri = Number((w as any)?.moving_time);
+        // overallSec already set from moving_time above, don't override
         if (Number.isFinite(kmPri) && kmPri > 0) overallMeters = Math.round(kmPri * 1000);
-        if (Number.isFinite(mvPri) && mvPri > 0) overallSec = Math.round(mvPri * 60);
         if (!(overallMeters > 0)) {
           try {
             const swim = typeof (w as any)?.swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any)?.swim_data;

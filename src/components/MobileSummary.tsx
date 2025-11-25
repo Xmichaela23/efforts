@@ -685,13 +685,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       }
     }
     
-    // Priority 2: Use overall workout pace as fallback
-    const overallPace = Number(
-      workout?.computed?.overall?.avg_pace_s_per_mi ?? 
-      workout?.metrics?.avg_pace_s_per_mi ??
-      workout?.avg_pace_s_per_mi ??
-      workout?.metrics?.avg_pace
-    );
+    // Priority 2: Use ONLY server-computed overall pace (calculated from moving_time)
+    // NO fallbacks to metrics.avg_pace or other fields (they may be from elapsed time)
+    const overallPace = Number(workout?.computed?.overall?.avg_pace_s_per_mi);
     
     if (Number.isFinite(overallPace) && overallPace > 0) {
       return overallPace;
@@ -1423,13 +1419,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const km = Number((hydratedCompleted || completed)?.distance);
             return Number.isFinite(km) && km>0 ? Math.round(km * 1000) : null;
           })();
+          // ONLY use server-computed pace - NO fallbacks, NO client-side calculations
           const executedSecPerMi = (() => {
             const v = Number(compOverall?.avg_pace_s_per_mi);
-            if (Number.isFinite(v) && v>0) return v>1200 ? Math.round(v/10) : v;
-            if (executedSeconds && executedMeters) {
-              const miles = executedMeters / 1609.34; if (miles>0.01) return Math.round(executedSeconds / miles);
-            }
-            return null;
+            return Number.isFinite(v) && v > 0 ? v : null;
           })();
 
           // Use unified data source from workout_analysis
@@ -2181,11 +2174,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const distCell = (() => {
               if (!hasServerComputed || !row) {
                 if (idx !== 0) return '—';
+                // ONLY use server-computed distance - NO fallbacks
                 const overall = (completed as any)?.computed?.overall || {};
-                const distM = (completed as any)?.metrics?.distance_meters
-                  ?? overall.distance_m
-                  ?? ((typeof (completed as any)?.distance === 'number') ? (completed as any).distance * 1000 : undefined);
-                if (typeof distM === 'number' && distM > 0) {
+                const distM = Number(overall?.distance_m);
+                if (Number.isFinite(distM) && distM > 0) {
                   if (isSwimSport) return useImperial ? `${Math.round(distM/0.9144)} yd` : `${Math.round(distM)} m`;
                   const mi = distM / 1609.34; return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
                 }

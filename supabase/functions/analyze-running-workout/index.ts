@@ -1134,6 +1134,7 @@ Deno.serve(async (req) => {
       performance.duration_adherence = granularDurationAdherence !== null ? granularDurationAdherence : executionAnalysis.duration_adherence;
       
       // Execution adherence = combination of pace + duration (equal weight: 50% pace, 50% duration)
+      // Will be recalculated after plannedPaceInfo is extracted to include average pace adherence
       performance.execution_adherence = Math.round(
         (performance.pace_adherence * 0.5) + (performance.duration_adherence * 0.5)
       );
@@ -1141,7 +1142,7 @@ Deno.serve(async (req) => {
       console.log(`🎯 Using granular analysis for adherence scores`);
       console.log(`🎯 Granular pace adherence: ${granularPaceAdherence}% (from time-in-range)`);
       console.log(`🎯 Granular duration adherence: ${granularDurationAdherence}%`);
-      console.log(`🎯 Final execution score: ${performance.execution_adherence}% (pace: ${performance.pace_adherence}%, duration: ${performance.duration_adherence}%)`);
+      console.log(`🎯 Initial execution score: ${performance.execution_adherence}% (pace: ${performance.pace_adherence}%, duration: ${performance.duration_adherence}%)`);
       console.log(`🎯 Fallback execution analysis: pace=${executionAnalysis.pace_execution}%, duration=${executionAnalysis.duration_adherence}%`);
     }
 
@@ -1199,6 +1200,59 @@ Deno.serve(async (req) => {
         
         console.log('🎯 [PLANNED PACE] Extracted pace info:', JSON.stringify(plannedPaceInfo));
         console.log('🎯 [PLANNED PACE] Lower:', plannedPaceInfo?.lower, 'Upper:', plannedPaceInfo?.upper);
+        
+        // Recalculate execution score with average pace adherence weighting
+        if (plannedPaceInfo && plannedPaceInfo.type === 'range' && plannedPaceInfo.lower && plannedPaceInfo.upper) {
+          // Get workout-level average pace
+          const workoutMovingTimeSeconds = workout?.computed?.overall?.duration_s_moving 
+            || (workout.moving_time ? workout.moving_time * 60 : null)
+            || (workout.duration ? workout.duration * 60 : 0);
+          const workoutDistanceKm = workout.distance || 0;
+          const workoutDistanceMi = workoutDistanceKm * 0.621371;
+          const workoutAvgPaceSeconds = (workoutMovingTimeSeconds > 0 && workoutDistanceMi > 0) 
+            ? workoutMovingTimeSeconds / workoutDistanceMi 
+            : null;
+          
+          if (workoutAvgPaceSeconds && workoutAvgPaceSeconds > 0) {
+            const targetLower = plannedPaceInfo.lower;
+            const targetUpper = plannedPaceInfo.upper;
+            
+            // Calculate average pace adherence score
+            let avgPaceAdherenceScore = performance.pace_adherence; // Default to time-in-range score
+            
+            // Check if average pace is within range
+            if (workoutAvgPaceSeconds >= targetLower && workoutAvgPaceSeconds <= targetUpper) {
+              avgPaceAdherenceScore = 100; // Perfect - within range
+            } else {
+              // Calculate how close to range (within 5s = 95%, within 10s = 90%, etc.)
+              let distanceFromRange = 0;
+              if (workoutAvgPaceSeconds < targetLower) {
+                distanceFromRange = targetLower - workoutAvgPaceSeconds;
+              } else {
+                distanceFromRange = workoutAvgPaceSeconds - targetUpper;
+              }
+              
+              // Score decreases by 1% per second away from range, but caps at 70% minimum
+              avgPaceAdherenceScore = Math.max(70, 100 - distanceFromRange);
+            }
+            
+            // Weighted execution score:
+            // - Average pace adherence: 40% (most important - did they hit the overall target?)
+            // - Time-in-range (mile-by-mile consistency): 30% (important but less than average)
+            // - Duration adherence: 30% (completing the workout)
+            performance.execution_adherence = Math.round(
+              (avgPaceAdherenceScore * 0.4) + 
+              (performance.pace_adherence * 0.3) + 
+              (performance.duration_adherence * 0.3)
+            );
+            
+            console.log(`🎯 [EXECUTION SCORE] Recalculated with average pace weighting:`);
+            console.log(`   - Average pace: ${(workoutAvgPaceSeconds / 60).toFixed(2)} min/mi, adherence: ${avgPaceAdherenceScore}%`);
+            console.log(`   - Time-in-range: ${performance.pace_adherence}%`);
+            console.log(`   - Duration: ${performance.duration_adherence}%`);
+            console.log(`   - Final execution score: ${performance.execution_adherence}%`);
+          }
+        }
       }
     }
 
@@ -1210,7 +1264,7 @@ Deno.serve(async (req) => {
     
     let detailedAnalysis = null;
     try {
-      detailedAnalysis = generateDetailedChartAnalysis(sensorData, computedIntervals, enhancedAnalysis, plannedPaceInfo);
+      detailedAnalysis = generateDetailedChartAnalysis(sensorData, computedIntervals, enhancedAnalysis, plannedPaceInfo, workout);
       console.log('📊 Detailed analysis generated successfully:', JSON.stringify(detailedAnalysis, null, 2));
     } catch (error) {
       console.error('❌ Detailed analysis generation failed:', error);
@@ -1605,7 +1659,7 @@ function extractSensorData(data: any): any[] {
       ?? sample.elev_m 
       ?? sample.altitude 
       ?? null;
-    
+
     return {
       timestamp: sample.timestamp || index,
       pace_s_per_mi: pace_s_per_mi,
@@ -2073,6 +2127,55 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   // Use the time-in-range score we already calculated above
   const avgPaceAdherence = timeInRangeScore * 100;
   
+  // Calculate HR drift for the entire workout (across all work intervals)
+  // Collect all samples from work intervals for HR drift calculation
+  const allWorkSamples: any[] = [];
+  for (const interval of workIntervals) {
+    if (interval.sample_idx_start !== undefined && interval.sample_idx_end !== undefined) {
+      const intervalSamples = sensorData.slice(interval.sample_idx_start, interval.sample_idx_end + 1);
+      allWorkSamples.push(...intervalSamples);
+    }
+  }
+  
+  // Calculate HR drift using the entire work period
+  let heartRateAnalysis = null;
+  if (allWorkSamples.length > 0) {
+    // Determine work period timestamps
+    const workStartTimestamp = allWorkSamples.length > 0 
+      ? (allWorkSamples[0].timestamp || allWorkSamples[0].elapsed_time_s || 0)
+      : undefined;
+    const workEndTimestamp = allWorkSamples.length > 0
+      ? (allWorkSamples[allWorkSamples.length - 1].timestamp || allWorkSamples[allWorkSamples.length - 1].elapsed_time_s || 0)
+      : undefined;
+    
+    const hrDriftResult = calculateHeartRateDrift(allWorkSamples, workStartTimestamp, workEndTimestamp);
+    
+    if (hrDriftResult.valid) {
+      // Calculate average HR from all work samples
+      const validHRSamples = allWorkSamples.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
+      const avgHR = validHRSamples.length > 0
+        ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length)
+        : 0;
+      const maxHR = validHRSamples.length > 0 ? Math.max(...validHRSamples.map(s => s.heart_rate)) : 0;
+      
+      heartRateAnalysis = {
+        adherence_percentage: 100, // Not applicable for interval workouts
+        time_in_zone_s: totalTime,
+        time_outside_zone_s: 0,
+        total_time_s: totalTime,
+        samples_in_zone: validHRSamples.length,
+        samples_outside_zone: 0,
+        average_heart_rate: avgHR,
+        target_zone: null,
+        hr_drift_bpm: hrDriftResult.drift_bpm,
+        early_avg_hr: hrDriftResult.early_avg_hr,
+        late_avg_hr: hrDriftResult.late_avg_hr,
+        hr_drift_interpretation: hrDriftResult.interpretation,
+        hr_consistency: 1 - (pacingVariability.coefficient_of_variation / 100) // Use pace variability as proxy
+      };
+    }
+  }
+  
   return {
     overall_adherence: avgPaceAdherence / 100, // Convert percentage to decimal for consistency
     time_in_range_score: timeInRangeScore,
@@ -2084,7 +2187,7 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
     total_time_s: totalTime,
     samples_in_range: totalSamples,
     samples_outside_range: 0,
-    heart_rate_analysis: null,
+    heart_rate_analysis: heartRateAnalysis,
     pacing_analysis: {
       time_in_range_score: avgPaceAdherence,
       variability_score: 0,
@@ -2137,20 +2240,17 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
       : 0;
     const maxHR = validHRSamples.length > 0 ? Math.max(...validHRSamples.map(s => s.heart_rate)) : 0;
     
-    // Calculate HR drift (first 10% vs last 10% of workout)
-    let hrDrift = 0;
-    if (validHRSamples.length > 20) {
-      const firstTenPercent = Math.floor(validHRSamples.length * 0.1);
-      const lastTenPercent = Math.floor(validHRSamples.length * 0.1);
-      
-      const firstSegment = validHRSamples.slice(0, firstTenPercent);
-      const lastSegment = validHRSamples.slice(-lastTenPercent);
-      
-      const firstAvg = firstSegment.reduce((sum, s) => sum + s.heart_rate, 0) / firstSegment.length;
-      const lastAvg = lastSegment.reduce((sum, s) => sum + s.heart_rate, 0) / lastSegment.length;
-      
-      hrDrift = Math.round(lastAvg - firstAvg);
-    }
+    // Calculate HR drift using proper time-window method
+    // Determine work period timestamps from sensor data
+    const workStartTimestamp = sensorData.length > 0 
+      ? (sensorData[0].timestamp || sensorData[0].elapsed_time_s || 0)
+      : undefined;
+    const workEndTimestamp = sensorData.length > 0
+      ? (sensorData[sensorData.length - 1].timestamp || sensorData[sensorData.length - 1].elapsed_time_s || 0)
+      : undefined;
+    
+    const hrDriftResult = calculateHeartRateDrift(sensorData, workStartTimestamp, workEndTimestamp);
+    const hrDrift = hrDriftResult.valid ? hrDriftResult.drift_bpm : 0;
     
     // Calculate pace variability from all valid pace samples (not segment averages)
     // This captures true variability including walk breaks and surges
@@ -2195,7 +2295,10 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
         samples_outside_zone: 0,
         average_heart_rate: avgHR,
         target_zone: null,
-        hr_drift_bpm: hrDrift,
+        hr_drift_bpm: hrDriftResult.valid ? hrDriftResult.drift_bpm : hrDrift,
+        early_avg_hr: hrDriftResult.valid ? hrDriftResult.early_avg_hr : null,
+        late_avg_hr: hrDriftResult.valid ? hrDriftResult.late_avg_hr : null,
+        hr_drift_interpretation: hrDriftResult.valid ? hrDriftResult.interpretation : null,
         hr_consistency: 1 - cv
       } : null,
       pacing_analysis: {
@@ -2285,6 +2388,57 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
     durationAdherencePct = Math.max(0, Math.min(100, durationAdherencePct)); // Clamp 0-100
   }
   
+  // Calculate HR drift for steady-state workouts with segments
+  // Collect all samples from main segments
+  const allSegmentSamples: any[] = [];
+  for (const segment of mainSegments) {
+    if (segment.sample_idx_start !== undefined && segment.sample_idx_end !== undefined) {
+      const segmentSamples = sensorData.slice(segment.sample_idx_start, segment.sample_idx_end + 1);
+      allSegmentSamples.push(...segmentSamples);
+    }
+  }
+  
+  // If no segment indices, use all sensor data
+  const samplesForHR = allSegmentSamples.length > 0 ? allSegmentSamples : sensorData;
+  
+  let heartRateAnalysis = null;
+  if (samplesForHR.length > 0) {
+    // Determine work period timestamps
+    const workStartTimestamp = samplesForHR.length > 0 
+      ? (samplesForHR[0].timestamp || samplesForHR[0].elapsed_time_s || 0)
+      : undefined;
+    const workEndTimestamp = samplesForHR.length > 0
+      ? (samplesForHR[samplesForHR.length - 1].timestamp || samplesForHR[samplesForHR.length - 1].elapsed_time_s || 0)
+      : undefined;
+    
+    const hrDriftResult = calculateHeartRateDrift(samplesForHR, workStartTimestamp, workEndTimestamp);
+    
+    if (hrDriftResult.valid) {
+      // Calculate average HR from all samples
+      const validHRSamples = samplesForHR.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
+      const avgHR = validHRSamples.length > 0
+        ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length)
+        : 0;
+      const maxHR = validHRSamples.length > 0 ? Math.max(...validHRSamples.map(s => s.heart_rate)) : 0;
+      
+      heartRateAnalysis = {
+        adherence_percentage: 100, // Not applicable for steady-state
+        time_in_zone_s: actualDurationSeconds,
+        time_outside_zone_s: 0,
+        total_time_s: actualDurationSeconds,
+        samples_in_zone: validHRSamples.length,
+        samples_outside_zone: 0,
+        average_heart_rate: avgHR,
+        target_zone: null,
+        hr_drift_bpm: hrDriftResult.drift_bpm,
+        early_avg_hr: hrDriftResult.early_avg_hr,
+        late_avg_hr: hrDriftResult.late_avg_hr,
+        hr_drift_interpretation: hrDriftResult.interpretation,
+        hr_consistency: 1 - cv // Use pace variability as proxy
+      };
+    }
+  }
+  
   return {
     overall_adherence: finalScore,
     time_in_range_score: paceAdherence,
@@ -2303,7 +2457,7 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
     total_time_s: 0,
     samples_in_range: 0,
     samples_outside_range: 0,
-    heart_rate_analysis: null,
+    heart_rate_analysis: heartRateAnalysis,
     pacing_analysis: {
       time_in_range_score: paceAdherence * 100, // Convert decimal to percentage
       variability_score: cv,
@@ -2464,18 +2618,255 @@ function calculateTimeInRangeAdherence(samples: any[], interval: any): number | 
 }
 
 /**
- * Calculate heart rate drift (increase over time)
+ * Calculate heart rate drift (increase over time) using proper time windows
+ * HR drift measures cardiovascular fatigue during sustained efforts by comparing
+ * early-run HR to late-run HR at the same effort level.
+ * 
+ * Algorithm:
+ * 1. Identify work period (exclude warmup/cooldown - skip first 3-5 min, last 3-5 min)
+ * 2. Early window: Minutes 5-15 of sustained work (10 min average)
+ * 3. Late window: Last 10 minutes of sustained work
+ * 4. Calculate drift = lateAvgHR - earlyAvgHR
+ * 
+ * @param sensorData Array of sensor samples with timestamp and heart_rate
+ * @param workStartTimestamp Start timestamp of work period (seconds)
+ * @param workEndTimestamp End timestamp of work period (seconds)
+ * @returns Object with drift_bpm, early_avg_hr, late_avg_hr, and interpretation
  */
-function calculateHeartRateDrift(hrValues: number[]): number {
-  if (hrValues.length < 10) return 0;
+function calculateHeartRateDrift(
+  sensorData: any[],
+  workStartTimestamp?: number,
+  workEndTimestamp?: number
+): { drift_bpm: number; early_avg_hr: number; late_avg_hr: number; interpretation: string; valid: boolean } {
+  console.log('🔍 [HR DRIFT DEBUG] Starting calculation...');
+  console.log('🔍 [HR DRIFT DEBUG] Total samples:', sensorData.length);
   
-  const firstThird = hrValues.slice(0, Math.floor(hrValues.length / 3));
-  const lastThird = hrValues.slice(-Math.floor(hrValues.length / 3));
+  // Filter to samples with valid HR data
+  const validHRSamples = sensorData.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
   
-  const firstAvg = firstThird.reduce((a, b) => a + b, 0) / firstThird.length;
-  const lastAvg = lastThird.reduce((a, b) => a + b, 0) / lastThird.length;
+  if (validHRSamples.length < 20) {
+    console.log('⚠️ [HR DRIFT DEBUG] Insufficient HR samples:', validHRSamples.length);
+    return {
+      drift_bpm: 0,
+      early_avg_hr: 0,
+      late_avg_hr: 0,
+      interpretation: 'Insufficient HR data',
+      valid: false
+    };
+  }
   
-  return lastAvg - firstAvg;
+  // Determine work period timestamps
+  // If not provided, use first and last sample timestamps
+  const firstSampleTimestamp = validHRSamples[0]?.timestamp || validHRSamples[0]?.elapsed_time_s || 0;
+  const lastSampleTimestamp = validHRSamples[validHRSamples.length - 1]?.timestamp || 
+                              validHRSamples[validHRSamples.length - 1]?.elapsed_time_s || 0;
+  
+  const workStart = workStartTimestamp !== undefined ? workStartTimestamp : firstSampleTimestamp;
+  const workEnd = workEndTimestamp !== undefined ? workEndTimestamp : lastSampleTimestamp;
+  
+  const workDurationMinutes = (workEnd - workStart) / 60;
+  console.log('🔍 [HR DRIFT DEBUG] Work start timestamp:', workStart);
+  console.log('🔍 [HR DRIFT DEBUG] Work end timestamp:', workEnd);
+  console.log('🔍 [HR DRIFT DEBUG] Work duration:', workDurationMinutes.toFixed(1), 'minutes');
+  
+  // Edge case: Workout too short for meaningful drift calculation
+  if (workDurationMinutes < 20) {
+    console.log('⚠️ [HR DRIFT DEBUG] Workout too short for drift calculation (< 20 minutes)');
+    return {
+      drift_bpm: 0,
+      early_avg_hr: 0,
+      late_avg_hr: 0,
+      interpretation: 'Workout too short for drift calculation',
+      valid: false
+    };
+  }
+  
+  // Step 1: Identify work period (exclude warmup/cooldown)
+  // Skip first 5 minutes (warmup/settling period)
+  // Skip last 5 minutes if there's a cooldown
+  const warmupSkipSeconds = 5 * 60; // 5 minutes
+  const cooldownSkipSeconds = 5 * 60; // 5 minutes
+  
+  const sustainedWorkStart = workStart + warmupSkipSeconds;
+  const sustainedWorkEnd = workEnd - cooldownSkipSeconds;
+  
+  // Ensure we have enough sustained work time (at least 15 minutes)
+  if ((sustainedWorkEnd - sustainedWorkStart) / 60 < 15) {
+    // If removing warmup/cooldown leaves < 15 min, use full period but skip first 3 min
+    const adjustedStart = workStart + (3 * 60);
+    const adjustedEnd = workEnd;
+    console.log('⚠️ [HR DRIFT DEBUG] Adjusted work period (too short after removing warmup/cooldown)');
+    console.log('🔍 [HR DRIFT DEBUG] Adjusted start:', adjustedStart, 'Adjusted end:', adjustedEnd);
+    
+    // Step 2: Define comparison windows
+    // Early window: Minutes 3-13 of sustained work (10 min average)
+    // Late window: Last 10 minutes of sustained work
+    const earlyWindowStart = adjustedStart + (3 * 60); // Start at minute 3
+    const earlyWindowEnd = adjustedStart + (13 * 60); // Through minute 13
+    const lateWindowStart = adjustedEnd - (10 * 60); // Last 10 minutes
+    const lateWindowEnd = adjustedEnd;
+    
+    console.log('🔍 [HR DRIFT DEBUG] Early window: samples from', earlyWindowStart, 'to', earlyWindowEnd);
+    console.log('🔍 [HR DRIFT DEBUG] Late window: samples from', lateWindowStart, 'to', lateWindowEnd);
+    
+    // Filter samples to windows
+    const earlyWindow = validHRSamples.filter(s => {
+      const timestamp = s.timestamp || s.elapsed_time_s || 0;
+      return timestamp >= earlyWindowStart && timestamp <= earlyWindowEnd;
+    });
+    
+    const lateWindow = validHRSamples.filter(s => {
+      const timestamp = s.timestamp || s.elapsed_time_s || 0;
+      return timestamp >= lateWindowStart && timestamp <= lateWindowEnd;
+    });
+    
+    console.log('🔍 [HR DRIFT DEBUG] Early window samples:', earlyWindow.length);
+    console.log('🔍 [HR DRIFT DEBUG] Late window samples:', lateWindow.length);
+    
+    if (earlyWindow.length < 10 || lateWindow.length < 10) {
+      console.log('⚠️ [HR DRIFT DEBUG] Insufficient HR data in comparison windows');
+      return {
+        drift_bpm: 0,
+        early_avg_hr: 0,
+        late_avg_hr: 0,
+        interpretation: 'Insufficient HR data in comparison windows',
+        valid: false
+      };
+    }
+    
+    // Step 3: Calculate average HR for each window
+    const earlyAvgHR = earlyWindow.reduce((sum, s) => sum + s.heart_rate, 0) / earlyWindow.length;
+    const lateAvgHR = lateWindow.reduce((sum, s) => sum + s.heart_rate, 0) / lateWindow.length;
+    
+    console.log('🔍 [HR DRIFT DEBUG] Early window HRs (first 20):', earlyWindow.slice(0, 20).map(s => s.heart_rate));
+    console.log('🔍 [HR DRIFT DEBUG] Late window HRs (first 20):', lateWindow.slice(0, 20).map(s => s.heart_rate));
+    console.log('🔍 [HR DRIFT DEBUG] Early average HR:', earlyAvgHR.toFixed(1));
+    console.log('🔍 [HR DRIFT DEBUG] Late average HR:', lateAvgHR.toFixed(1));
+    
+    // Step 4: Calculate drift
+    const hrDrift = Math.round(lateAvgHR - earlyAvgHR);
+    
+    // Step 5: Interpret
+    let interpretation = '';
+    if (hrDrift < 5) {
+      interpretation = 'Excellent stability (well-paced, fit, or conservative)';
+    } else if (hrDrift < 10) {
+      interpretation = 'Normal for sustained efforts';
+    } else if (hrDrift < 20) {
+      interpretation = 'Moderate drift (hot weather, dehydration, or long duration)';
+    } else {
+      interpretation = 'Significant drift (overpaced, environmental stress, or fatigue)';
+    }
+    
+    console.log('🔍 [HR DRIFT DEBUG] Calculated drift:', hrDrift, 'bpm');
+    console.log('🔍 [HR DRIFT DEBUG] Interpretation:', interpretation);
+    
+    // Calculate overall avg HR for context
+    const overallAvgHR = validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length;
+    const maxHR = Math.max(...validHRSamples.map(s => s.heart_rate));
+    console.log('🔍 [HR DRIFT DEBUG] Overall avg HR:', overallAvgHR.toFixed(1));
+    console.log('🔍 [HR DRIFT DEBUG] Overall max HR:', maxHR);
+    
+    return {
+      drift_bpm: hrDrift,
+      early_avg_hr: Math.round(earlyAvgHR),
+      late_avg_hr: Math.round(lateAvgHR),
+      interpretation,
+      valid: true
+    };
+  }
+  
+  // Step 2: Define comparison windows
+  // Early window: Minutes 5-15 of sustained work (10 min average)
+  // Late window: Last 10 minutes of sustained work
+  const earlyWindowStart = sustainedWorkStart + (5 * 60); // Start at minute 5 of sustained work
+  const earlyWindowEnd = sustainedWorkStart + (15 * 60); // Through minute 15
+  const lateWindowStart = sustainedWorkEnd - (10 * 60); // Last 10 minutes
+  const lateWindowEnd = sustainedWorkEnd;
+  
+  console.log('🔍 [HR DRIFT DEBUG] Early window: samples from', earlyWindowStart, 'to', earlyWindowEnd);
+  console.log('🔍 [HR DRIFT DEBUG] Late window: samples from', lateWindowStart, 'to', lateWindowEnd);
+  
+  // Filter samples to windows
+  const earlyWindow = validHRSamples.filter(s => {
+    const timestamp = s.timestamp || s.elapsed_time_s || 0;
+    return timestamp >= earlyWindowStart && timestamp <= earlyWindowEnd;
+  });
+  
+  const lateWindow = validHRSamples.filter(s => {
+    const timestamp = s.timestamp || s.elapsed_time_s || 0;
+    return timestamp >= lateWindowStart && timestamp <= lateWindowEnd;
+  });
+  
+  console.log('🔍 [HR DRIFT DEBUG] Early window samples:', earlyWindow.length);
+  console.log('🔍 [HR DRIFT DEBUG] Late window samples:', lateWindow.length);
+  
+  if (earlyWindow.length < 10 || lateWindow.length < 10) {
+    console.log('⚠️ [HR DRIFT DEBUG] Insufficient HR data in comparison windows');
+    return {
+      drift_bpm: 0,
+      early_avg_hr: 0,
+      late_avg_hr: 0,
+      interpretation: 'Insufficient HR data in comparison windows',
+      valid: false
+    };
+  }
+  
+  // Step 3: Calculate average HR for each window
+  const earlyAvgHR = earlyWindow.reduce((sum, s) => sum + s.heart_rate, 0) / earlyWindow.length;
+  const lateAvgHR = lateWindow.reduce((sum, s) => sum + s.heart_rate, 0) / lateWindow.length;
+  
+  console.log('🔍 [HR DRIFT DEBUG] Early window HRs (first 20):', earlyWindow.slice(0, 20).map(s => s.heart_rate));
+  console.log('🔍 [HR DRIFT DEBUG] Late window HRs (first 20):', lateWindow.slice(0, 20).map(s => s.heart_rate));
+  console.log('🔍 [HR DRIFT DEBUG] Early average HR:', earlyAvgHR.toFixed(1));
+  console.log('🔍 [HR DRIFT DEBUG] Late average HR:', lateAvgHR.toFixed(1));
+  
+  // Step 4: Calculate drift
+  const hrDrift = Math.round(lateAvgHR - earlyAvgHR);
+  
+  // Step 5: Interpret
+  let interpretation = '';
+  if (hrDrift < 5) {
+    interpretation = 'Excellent stability (well-paced, fit, or conservative)';
+  } else if (hrDrift < 10) {
+    interpretation = 'Normal for sustained efforts';
+  } else if (hrDrift < 20) {
+    interpretation = 'Moderate drift (hot weather, dehydration, or long duration)';
+  } else {
+    interpretation = 'Significant drift (overpaced, environmental stress, or fatigue)';
+  }
+  
+  console.log('🔍 [HR DRIFT DEBUG] Calculated drift:', hrDrift, 'bpm');
+  console.log('🔍 [HR DRIFT DEBUG] Interpretation:', interpretation);
+  
+  // Calculate overall avg HR for context
+  const overallAvgHR = validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length;
+  const maxHR = Math.max(...validHRSamples.map(s => s.heart_rate));
+  console.log('🔍 [HR DRIFT DEBUG] Overall avg HR:', overallAvgHR.toFixed(1));
+  console.log('🔍 [HR DRIFT DEBUG] Overall max HR:', maxHR);
+  
+  // Log HR progression every 10 minutes for verification
+  console.log('🔍 [HR DRIFT DEBUG] HR progression:');
+  for (let minute = 10; minute <= Math.floor(workDurationMinutes); minute += 10) {
+    const minuteStart = workStart + (minute * 60) - (5 * 60); // 5 min window centered on minute
+    const minuteEnd = workStart + (minute * 60) + (5 * 60);
+    const minuteSamples = validHRSamples.filter(s => {
+      const timestamp = s.timestamp || s.elapsed_time_s || 0;
+      return timestamp >= minuteStart && timestamp <= minuteEnd;
+    });
+    if (minuteSamples.length > 0) {
+      const minuteAvgHR = minuteSamples.reduce((sum, s) => sum + s.heart_rate, 0) / minuteSamples.length;
+      console.log(`🔍 [HR DRIFT DEBUG] Min ${minute}: ${minuteAvgHR.toFixed(1)} bpm`);
+    }
+  }
+  
+  return {
+    drift_bpm: hrDrift,
+    early_avg_hr: Math.round(earlyAvgHR),
+    late_avg_hr: Math.round(lateAvgHR),
+    interpretation,
+    valid: true
+  };
 }
 
 function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any): any {
@@ -2608,10 +2999,18 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
   const paceStdDev = Math.sqrt(paceValues.reduce((sum, v) => sum + Math.pow(v - avgPace, 2), 0) / paceValues.length);
   const paceVariation = avgPace > 0 ? (paceStdDev / avgPace) * 100 : 0;
   
-  // HR drift
-  const hrDrift = hrValues.length >= 10 
-    ? calculateHeartRateDrift(hrValues)
-    : 0;
+  // HR drift - Calculate for this interval's samples
+  // Note: For interval workouts, HR drift should ideally be calculated across the entire work period,
+  // not per-interval. This per-interval calculation is a fallback.
+  const intervalStartTimestamp = samples.length > 0 
+    ? (samples[0].timestamp || samples[0].elapsed_time_s || 0)
+    : undefined;
+  const intervalEndTimestamp = samples.length > 0
+    ? (samples[samples.length - 1].timestamp || samples[samples.length - 1].elapsed_time_s || 0)
+    : undefined;
+  
+  const hrDriftResult = calculateHeartRateDrift(samples, intervalStartTimestamp, intervalEndTimestamp);
+  const hrDrift = hrDriftResult.valid ? hrDriftResult.drift_bpm : 0;
   
   // Cadence consistency (coefficient of variation)
   const avgCadence = cadenceValues.length > 0 
@@ -2654,7 +3053,7 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
  * Generate detailed, chart-like analysis with specific metrics
  * Provides actionable insights similar to Garmin Connect analysis
  */
-function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], granularAnalysis: any, plannedPaceInfo: any): any {
+function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], granularAnalysis: any, plannedPaceInfo: any, workout?: any): any {
   console.log('📊 Generating detailed chart analysis...');
   
   // Extract work intervals for detailed analysis
@@ -2673,8 +3072,25 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
   // Pacing consistency analysis
   const pacingConsistency = analyzePacingConsistency(sensorData, workIntervals);
   
-  // Generate mile-by-mile terrain breakdown - PASS plannedPaceInfo
-  const mileByMileTerrain = generateMileByMileTerrainBreakdown(sensorData, intervals, granularAnalysis, plannedPaceInfo);
+  // Calculate workout-level average pace (from moving_time/distance) to pass to mile breakdown
+  // This ensures consistency between AI narrative and pattern analysis
+  const workoutMovingTimeSeconds = workout?.computed?.overall?.duration_s_moving 
+    || (workout?.moving_time ? workout.moving_time * 60 : null)
+    || (workout?.duration ? workout.duration * 60 : 0);
+  const workoutDistanceKm = workout?.distance || 0;
+  const workoutDistanceMi = workoutDistanceKm * 0.621371;
+  const workoutAvgPaceSeconds = (workoutMovingTimeSeconds > 0 && workoutDistanceMi > 0) 
+    ? workoutMovingTimeSeconds / workoutDistanceMi 
+    : null;
+  
+  // Generate mile-by-mile terrain breakdown - PASS plannedPaceInfo and workout-level average pace
+  const mileByMileTerrain = generateMileByMileTerrainBreakdown(
+    sensorData, 
+    intervals, 
+    granularAnalysis, 
+    plannedPaceInfo,
+    workoutAvgPaceSeconds
+  );
   
   return {
     speed_fluctuations: speedAnalysis,
@@ -2977,7 +3393,13 @@ function identifyPacePatterns(paceData: any[], workIntervals: any[]): any {
 /**
  * Generate detailed mile-by-mile breakdown with pace analysis and comparison to target range
  */
-function generateMileByMileTerrainBreakdown(sensorData: any[], intervals: any[], granularAnalysis: any, plannedPaceInfo: any): any {
+function generateMileByMileTerrainBreakdown(
+  sensorData: any[], 
+  intervals: any[], 
+  granularAnalysis: any, 
+  plannedPaceInfo: any,
+  workoutAvgPaceSeconds?: number | null
+): any {
   console.log(`🔍 [MILE BREAKDOWN] Starting function. Sensor data: ${sensorData.length} samples, Intervals: ${intervals.length}`);
   
   if (sensorData.length === 0) {
@@ -3135,7 +3557,7 @@ function generateMileByMileTerrainBreakdown(sensorData: any[], intervals: any[],
   
   let sectionText = 'MILE-BY-MILE TERRAIN BREAKDOWN (Work Portion):\n\n';
   
-  // Display target range or single target
+  // Display target range or single target once at the top
   if (isRangeWorkout && targetLower && targetUpper) {
     sectionText += `Target range: ${formatPace(targetLower)}-${formatPace(targetUpper)}/mi\n\n`;
   } else if (targetPaceS) {
@@ -3181,7 +3603,7 @@ function generateMileByMileTerrainBreakdown(sensorData: any[], intervals: any[],
       
       // Compare to actual range bounds (both in seconds)
       if (milePaceSeconds >= targetLower && milePaceSeconds <= targetUpper) {
-        comparison = 'Within range ✓';
+        comparison = '✓ Within range';
         inRange = true;
         milesInRange++;
         deltaS = 0; // In range, no delta
@@ -3210,7 +3632,7 @@ function generateMileByMileTerrainBreakdown(sensorData: any[], intervals: any[],
       const sign = deltaS > 0 ? '+' : '-';
       
       if (deltaAbs < 5) {
-        comparison = 'On target';
+        comparison = '✓ On target';
         inRange = true;
         milesInRange++;
       } else {
@@ -3226,15 +3648,15 @@ function generateMileByMileTerrainBreakdown(sensorData: any[], intervals: any[],
       terrainInfo = ` on ${split.terrain_type} (${gradeStr}% grade, +${elevStr}ft)`;
     }
     
-    // Always show target range for range workouts
-    let targetDisplay = '';
-    if (isRangeWorkout && targetLower && targetUpper) {
-      targetDisplay = `Target range: ${formatPace(targetLower)}-${formatPace(targetUpper)}/mi`;
-    } else if (targetPaceS) {
-      targetDisplay = `Target: ${formatPace(targetPaceS)}/mi`;
+    // Format comparison with arrow and checkmark for within range
+    let statusLine = '';
+    if (inRange) {
+      statusLine = `→ ✓ Within range`;
+    } else {
+      statusLine = `→ ${comparison}`;
     }
     
-    mileDetails.push(`Mile ${split.mile}: ${paceStr}/mi${terrainInfo}\n${targetDisplay}\nStatus: ${comparison}`);
+    mileDetails.push(`Mile ${split.mile}: ${paceStr}/mi${terrainInfo}\n${statusLine}`);
   });
   
   console.log(`✅ [MILE BREAKDOWN] Final count: ${milesInRange} of ${mileSplits.length} miles within range`);
@@ -3244,16 +3666,19 @@ function generateMileByMileTerrainBreakdown(sensorData: any[], intervals: any[],
   // Add pattern analysis
   sectionText += 'PATTERN ANALYSIS:\n';
   
-  // Calculate average pace
-  const avgPaceS = mileSplits.length > 0 
-    ? mileSplits.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / mileSplits.length 
-    : 0;
+  // Calculate average pace - use workout-level pace if available (consistent with AI narrative)
+  // Otherwise fall back to averaging mile splits
+  const avgPaceS = workoutAvgPaceSeconds != null && workoutAvgPaceSeconds > 0
+    ? workoutAvgPaceSeconds
+    : (mileSplits.length > 0 
+        ? mileSplits.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / mileSplits.length 
+        : 0);
   
   // Miles in range percentage
   const inRangePct = Math.round((milesInRange / mileSplits.length) * 100);
   sectionText += `- ${milesInRange} of ${mileSplits.length} miles within range (${inRangePct}%)\n`;
   
-  // Average pace vs range
+  // Average pace vs range - check if within 5 seconds for "essentially within range"
   if (isRangeWorkout && targetLower && targetUpper) {
     if (avgPaceS >= targetLower && avgPaceS <= targetUpper) {
       sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (within range ✓)\n`;
@@ -3261,12 +3686,20 @@ function generateMileByMileTerrainBreakdown(sensorData: any[], intervals: any[],
       const delta = targetLower - avgPaceS;
       const deltaMin = Math.floor(delta / 60);
       const deltaSec = Math.round(delta % 60);
-      sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (${deltaMin}:${String(deltaSec).padStart(2, '0')} faster than range start)\n`;
+      if (delta <= 5) {
+        sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (essentially within range, just ${deltaSec}s faster than range start)\n`;
+      } else {
+        sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (${deltaMin}:${String(deltaSec).padStart(2, '0')} faster than range start)\n`;
+      }
     } else {
       const delta = avgPaceS - targetUpper;
       const deltaMin = Math.floor(delta / 60);
       const deltaSec = Math.round(delta % 60);
-      sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (${deltaMin}:${String(deltaSec).padStart(2, '0')} slower than range end)\n`;
+      if (delta <= 5) {
+        sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (essentially within range, just ${deltaSec}s slower than range end)\n`;
+      } else {
+        sectionText += `- Average pace: ${formatPace(avgPaceS)}/mi (${deltaMin}:${String(deltaSec).padStart(2, '0')} slower than range end)\n`;
+      }
     }
   } else if (targetPaceS) {
     const delta = avgPaceS - targetPaceS;
@@ -3304,13 +3737,37 @@ function generateMileByMileTerrainBreakdown(sensorData: any[], intervals: any[],
     }
   }
   
-  // Overall assessment
+  // Overall assessment - lead with strengths, frame weaknesses as opportunities
+  const avgPaceFormatted = formatPace(avgPaceS);
+  const avgPaceInRange = isRangeWorkout && targetLower && targetUpper 
+    ? (avgPaceS >= targetLower && avgPaceS <= targetUpper)
+    : false;
+  const avgPaceNearRange = isRangeWorkout && targetLower && targetUpper
+    ? (avgPaceS < targetLower && (targetLower - avgPaceS) <= 5) || (avgPaceS > targetUpper && (avgPaceS - targetUpper) <= 5)
+    : false;
+  
   if (inRangePct >= 75) {
     sectionText += `- Overall: Excellent pace discipline for easy run\n`;
   } else if (inRangePct >= 50) {
-    sectionText += `- Overall: Good pace discipline for easy run\n`;
+    if (avgPaceInRange || avgPaceNearRange) {
+      const paceStatus = avgPaceInRange ? 'within range' : 'essentially within range';
+      sectionText += `- Overall: Good average pace control (${avgPaceFormatted}/mi ${paceStatus}). Primary opportunity: improve mile-to-mile consistency—only ${milesInRange} of ${mileSplits.length} miles within range suggests pacing instability.\n`;
+    } else {
+      sectionText += `- Overall: Good pace discipline for easy run\n`;
+    }
   } else {
-    sectionText += `- Overall: Needs improvement - focus on staying within range\n`;
+    // Low in-range percentage - acknowledge strengths first
+    if (avgPaceInRange || avgPaceNearRange) {
+      const paceStatus = avgPaceInRange ? 'within range' : 'essentially within range';
+      const delta = avgPaceS < targetLower! ? targetLower! - avgPaceS : (avgPaceS > targetUpper! ? avgPaceS - targetUpper! : 0);
+      const deltaSec = Math.round(delta);
+      const paceNote = avgPaceInRange 
+        ? `within range (${avgPaceFormatted} vs ${formatPace(targetLower!)}-${formatPace(targetUpper!)}/mi)`
+        : `essentially within range (${avgPaceFormatted}, just ${deltaSec}s ${avgPaceS < targetLower! ? 'faster' : 'slower'} than target)`;
+      sectionText += `- Overall: Excellent average pace control (${paceNote}). Primary opportunity: improve mile-to-mile consistency—only ${milesInRange} of ${mileSplits.length} miles within range indicates pacing instability across the run.\n`;
+    } else {
+      sectionText += `- Overall: Needs improvement - focus on staying within range\n`;
+    }
   }
   
   return {
@@ -3667,21 +4124,120 @@ Do NOT make up different mile numbers. Do NOT recalculate. Use the numbers provi
 
 Generate 3-4 observations comparing actual vs. planned performance:
 ${plannedPaceInfo?.type === 'range' && plannedPaceInfo.range ? `
-"Maintained pace averaging X:XX ${workoutContext.pace_unit}, ${plannedPaceInfo.range.includes(workoutContext.avg_pace) ? 'within' : 'outside'} the prescribed range of ${plannedPaceInfo.range}. Pace varied by A%, with ${(() => {
-  const mileByMile = detailedAnalysis?.mile_by_mile_terrain;
-  if (mileByMile && mileByMile.miles_in_range !== undefined) {
-    return `${mileByMile.miles_in_range} of ${mileByMile.total_miles || mileByMile.splits?.length || 'Y'}`;
+${(() => {
+  // Parse average pace from MM:SS format to seconds
+  // workoutContext.avg_pace is formatted as "10:15" (MM:SS)
+  const paceStr = workoutContext.avg_pace || '0:00';
+  const paceParts = paceStr.split(':');
+  const paceMinutes = parseInt(paceParts[0] || '0', 10);
+  const paceSeconds = parseInt(paceParts[1] || '0', 10);
+  const avgPaceSeconds = (paceMinutes * 60) + paceSeconds;
+  
+  const targetLower = plannedPaceInfo.lower || 0;
+  const targetUpper = plannedPaceInfo.upper || 0;
+  const inRange = avgPaceSeconds >= targetLower && avgPaceSeconds <= targetUpper;
+  const deltaFromLower = targetLower > 0 ? Math.abs(avgPaceSeconds - targetLower) : 999;
+  const deltaFromUpper = targetUpper > 0 ? Math.abs(avgPaceSeconds - targetUpper) : 999;
+  const minDelta = Math.min(deltaFromLower, deltaFromUpper);
+  const essentiallyInRange = !inRange && minDelta <= 5;
+  
+  let paceStatus = '';
+  if (inRange) {
+    paceStatus = 'within';
+  } else if (essentiallyInRange) {
+    const deltaSec = Math.round(minDelta);
+    const direction = avgPaceSeconds < targetLower ? 'faster' : 'slower';
+    paceStatus = `essentially within (just ${deltaSec}s ${direction} than range ${avgPaceSeconds < targetLower ? 'start' : 'end'})`;
+  } else {
+    paceStatus = 'outside';
   }
-  return 'X of Y';
-})()} miles within range."
+  
+  return `"Maintained pace averaging X:XX ${workoutContext.pace_unit}, ${paceStatus} the prescribed range of ${plannedPaceInfo.range}. Pace varied by A%${(() => {
+    const cv = adherenceContext.pace_variability_pct || 0;
+    const workoutType = plannedPaceInfo?.workoutType || '';
+    const isEasyRun = workoutType.toLowerCase().includes('easy') || workoutType.toLowerCase().includes('aerobic');
+    
+    if (isEasyRun) {
+      if (cv < 15) {
+        return ' (excellent consistency for easy run)';
+      } else if (cv < 25) {
+        return ' (normal variability for easy run)';
+      } else {
+        return ' (high variability for easy run, suggests pacing inconsistency rather than terrain influence)';
+      }
+    } else {
+      if (cv < 10) {
+        return ' (excellent consistency)';
+      } else if (cv < 20) {
+        return ' (moderate variability)';
+      } else {
+        return ' (high variability, indicates pacing issues)';
+      }
+    }
+  })()}, with ${(() => {
+    const mileByMile = detailedAnalysis?.mile_by_mile_terrain;
+    if (mileByMile && mileByMile.miles_in_range !== undefined) {
+      return `${mileByMile.miles_in_range} of ${mileByMile.total_miles || mileByMile.splits?.length || 'Y'}`;
+    }
+    return 'X of Y';
+  })()} miles within range."`;
+})()}
 "Mile-by-mile breakdown: [CRITICAL: Use the PRE-CALCULATED mile categorization data from the MILE-BY-MILE CATEGORIZATION section above. Report EXACTLY which miles were within range, faster than range start, or slower than range end as shown in that section. Do NOT recalculate - copy the mile numbers directly from the pre-calculated data.]"
 ` : plannedPaceInfo?.type === 'single' && plannedPaceInfo.target && plannedPaceInfo.targetSeconds ? `
 "Maintained pace averaging X:XX ${workoutContext.pace_unit}, ${Math.abs(parseFloat(workoutContext.avg_pace) - (plannedPaceInfo.targetSeconds / 60)) < 0.1 ? 'matching' : 'deviating from'} the prescribed target of ${plannedPaceInfo.target}. Pace varied by A%, indicating [consistent/inconsistent] pacing."
 ` : `
 "Maintained pace averaging X:XX ${workoutContext.pace_unit}, achieving Y% adherence to prescribed pace target. Pace varied by A%, with most intervals between B:BB-C:CC ${workoutContext.pace_unit}."
 `}
-${hasIntervals ? `"Completed X of Y prescribed intervals, with pace adherence ranging from A% to B%. [Include any notable pattern like fading or consistent execution]"` : `"Pace adherence was consistent throughout the duration."`}
-"Heart rate averaged X bpm with Y bpm drift, peaking at Z bpm. [Add context like 'indicating accumulated fatigue' or 'suggesting good pacing']"
+${hasIntervals ? `"Completed X of Y prescribed intervals, with pace adherence ranging from A% to B%. [Include any notable pattern like fading or consistent execution]"` : `"Pace control varied significantly mile-to-mile, with only ${(() => {
+  const mileByMile = detailedAnalysis?.mile_by_mile_terrain;
+  if (mileByMile && mileByMile.miles_in_range !== undefined) {
+    return `${mileByMile.miles_in_range} of ${mileByMile.total_miles || mileByMile.splits?.length || 'Y'}`;
+  }
+  return 'X of Y';
+})()} miles falling within the target range, though average pace remained excellent."`}
+${(() => {
+  const hrAnalysis = granularAnalysis?.heart_rate_analysis;
+  const hrDrift = hrAnalysis?.hr_drift_bpm || 0;
+  const earlyHR = hrAnalysis?.early_avg_hr;
+  const lateHR = hrAnalysis?.late_avg_hr;
+  const interpretation = hrAnalysis?.hr_drift_interpretation;
+  
+  if (earlyHR && lateHR) {
+    return `"Heart rate averaged X bpm with ${hrDrift > 0 ? '+' : ''}${hrDrift} bpm drift (${earlyHR} bpm early → ${lateHR} bpm late), ${interpretation ? interpretation.toLowerCase() : 'indicating normal cardiovascular response'}. Peaked at Z bpm."`;
+  } else {
+    const driftContext = hrDrift === 0 ? 'Indicates remarkably stable cardiovascular response' : 
+                        hrDrift < 5 ? 'Indicates excellent pacing and cardiovascular stability' : 
+                        hrDrift < 10 ? 'Indicates normal cardiovascular response for sustained effort' : 
+                        hrDrift < 20 ? 'Indicates moderate cardiovascular drift, possibly due to environmental factors or accumulated fatigue' : 
+                        'Indicates significant cardiovascular drift, suggesting overpacing or environmental stress';
+    return `"Heart rate averaged X bpm with ${hrDrift > 0 ? '+' : ''}${hrDrift} bpm drift, peaking at Z bpm. ${driftContext}."`;
+  }
+})()}
+${(() => {
+  // Calculate planned duration in minutes for display (same approach as duration adherence calculation)
+  let plannedDurationS = 0;
+  if (plannedWorkout?.computed?.total_duration_seconds) {
+    plannedDurationS = plannedWorkout.computed.total_duration_seconds;
+  } else if (plannedWorkout?.computed?.steps?.length > 0) {
+    plannedDurationS = plannedWorkout.computed.steps.reduce((sum: number, step: any) => {
+      return sum + (step.duration_s || step.duration || 0);
+    }, 0);
+  }
+  const plannedDurationMin = plannedDurationS > 0 ? Math.round(plannedDurationS / 60) : 0;
+  const actualDurationMin = Math.round(workoutContext.duration_minutes);
+  
+  if (plannedDurationMin > 0) {
+    return `"Duration: ${actualDurationMin} of ${plannedDurationMin} minutes completed (${adherenceContext.duration_adherence_pct}% adherence)."`;
+  }
+  return '';
+})()}
+${(() => {
+  // Execution adherence summary (only if we have planned workout data)
+  if (plannedWorkout) {
+    return `"Execution adherence was ${adherenceContext.execution_adherence_pct}%, with pace adherence at ${adherenceContext.pace_adherence_pct}% and duration adherence at ${adherenceContext.duration_adherence_pct}%."`;
+  }
+  return '';
+})()}
 `;
   } else {
     // DESCRIPTIVE MODE: Pattern analysis for freeform runs
@@ -3692,7 +4248,24 @@ Pattern Analysis (Freeform Run):
 
 Generate 3-4 observations describing patterns and stimulus:
 "Maintained pace averaging X:XX ${workoutContext.pace_unit} throughout the Y ${workoutContext.distance_unit} effort. Pace varied by Z%, with most segments between A:AA-B:BB ${workoutContext.pace_unit}."
-"Heart rate averaged X bpm with Y bpm drift over Z minutes, peaking at A bpm in the final segment. [Add interpretation like 'indicating accumulated fatigue' or 'suggesting sustained effort']"
+${(() => {
+  const hrAnalysis = granularAnalysis?.heart_rate_analysis;
+  const hrDrift = hrAnalysis?.hr_drift_bpm || 0;
+  const earlyHR = hrAnalysis?.early_avg_hr;
+  const lateHR = hrAnalysis?.late_avg_hr;
+  const interpretation = hrAnalysis?.hr_drift_interpretation;
+  
+  if (earlyHR && lateHR) {
+    return `"Heart rate averaged X bpm with ${hrDrift > 0 ? '+' : ''}${hrDrift} bpm drift (${earlyHR} bpm early → ${lateHR} bpm late) over Z minutes, ${interpretation ? interpretation.toLowerCase() : 'indicating normal cardiovascular response'}. Peaked at A bpm."`;
+  } else {
+    const driftContext = hrDrift === 0 ? 'Indicates remarkably stable cardiovascular response' : 
+                        hrDrift < 5 ? 'Indicates excellent pacing and cardiovascular stability' : 
+                        hrDrift < 10 ? 'Indicates normal cardiovascular response for sustained effort' : 
+                        hrDrift < 20 ? 'Indicates moderate cardiovascular drift, possibly due to environmental factors or accumulated fatigue' : 
+                        'Indicates significant cardiovascular drift, suggesting overpacing or environmental stress';
+    return `"Heart rate averaged X bpm with ${hrDrift > 0 ? '+' : ''}${hrDrift} bpm drift over Z minutes, peaking at A bpm. ${driftContext}."`;
+  }
+})()}
 "Performance Condition declined from +X to -Y over Z minutes, reflecting accumulated fatigue from the sustained effort."
 `;
   }
