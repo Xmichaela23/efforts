@@ -1413,10 +1413,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           // Executed totals
           const compOverall = (hydratedCompleted || completed)?.computed?.overall || {};
           const executedSeconds = (() => {
-            const s = Number(compOverall?.duration_s_moving ?? compOverall?.duration_s);
-            if (Number.isFinite(s) && s>0) return s;
-            const fromResolver = resolveMovingSeconds(hydratedCompleted || completed);
-            return Number.isFinite(fromResolver as any) && (fromResolver as number) > 0 ? (fromResolver as number) : null;
+            // ONLY use moving time - no fallbacks
+            const s = Number(compOverall?.duration_s_moving);
+            return Number.isFinite(s) && s > 0 ? s : null;
           })();
           const executedMeters = (() => {
             const m = Number(compOverall?.distance_m);
@@ -1610,10 +1609,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             // Executed totals
             const compOverall = (hydratedCompleted || completed)?.computed?.overall || {};
             const executedSeconds = (() => {
-              const s = Number(compOverall?.duration_s_moving ?? compOverall?.duration_s);
-              if (Number.isFinite(s) && s>0) return s;
-              const fromResolver = resolveMovingSeconds(hydratedCompleted || completed);
-              return Number.isFinite(fromResolver as any) && (fromResolver as number) > 0 ? (fromResolver as number) : null;
+              // ONLY use moving time - no fallbacks
+              const s = Number(compOverall?.duration_s_moving);
+              return Number.isFinite(s) && s > 0 ? s : null;
             })();
             const executedMeters = (() => {
               const m = Number(compOverall?.distance_m);
@@ -1770,10 +1768,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
             const compOverall = (hydratedCompleted || completed)?.computed?.overall || {};
             const executedSeconds = (() => {
-              const s = Number(compOverall?.duration_s_moving ?? compOverall?.duration_s);
-              if (Number.isFinite(s) && s>0) return s;
-              const fromResolver = resolveMovingSeconds(hydratedCompleted || completed);
-              return Number.isFinite(fromResolver as any) && (fromResolver as number) > 0 ? (fromResolver as number) : null;
+              // ONLY use moving time - no fallbacks
+              const s = Number(compOverall?.duration_s_moving);
+              return Number.isFinite(s) && s > 0 ? s : null;
             })();
 
             const powerPct = (plannedWatts && executedWatts) ? Math.round((executedWatts / plannedWatts) * 100) : null;
@@ -1925,7 +1922,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             })();
             
             const executedMeters = Number(compOverall?.distance_m) || (Number((completed as any)?.distance) * 1000) || 0;
-            const executedSeconds = Number(compOverall?.duration_s_moving) || (Number((completed as any)?.moving_time) * 60) || 0;
+            // ONLY use moving time - no fallbacks
+            const executedSeconds = Number(compOverall?.duration_s_moving) || 0;
             
             const distPct = plannedTotalMeters > 0 ? Math.round((executedMeters / plannedTotalMeters) * 100) : null;
             const timePct = plannedTotalSeconds > 0 ? Math.round((executedSeconds / plannedTotalSeconds) * 100) : null;
@@ -2203,13 +2201,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
             const timeCell = (() => {
               if (!hasServerComputed || !row) {
-                // For first row (overall), show overall workout time
+                // For first row (overall), show overall workout time - ONLY use moving time
                 if (idx === 0) {
                   const overall = (completed as any)?.computed?.overall || {};
-                  const dur = Number(overall?.duration_s_moving ?? overall?.duration_s);
+                  const dur = Number(overall?.duration_s_moving);
                   if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
-                  const fromResolver = resolveMovingSeconds(completed);
-                  if (Number.isFinite(fromResolver as any) && (fromResolver as number) > 0) return fmtTime(fromResolver as number);
                 }
                 return '—';
               }
