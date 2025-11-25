@@ -3756,31 +3756,34 @@ function generateMileByMileTerrainBreakdown(
     ? (avgPaceS < targetLower && (targetLower - avgPaceS) <= 5) || (avgPaceS > targetUpper && (avgPaceS - targetUpper) <= 5)
     : false;
   
-  // Build overall assessment referencing both metrics
-  const timeBasedNote = timeBasedAdherence != null ? `The ${timeBasedAdherence}% time-in-range shows you know the right effort` : '';
-  const mileBasedNote = `but only ${milesInRange} of ${mileSplits.length} complete miles within range indicates ${timeBasedAdherence != null && timeBasedAdherence > inRangePct ? 'difficulty sustaining that effort steadily' : 'pacing instability'}`;
-  
+  // Build overall assessment referencing both metrics with polished phrasing
   if (inRangePct >= 75) {
-    sectionText += `- Overall: Excellent pace discipline for easy run${timeBasedAdherence != null ? `. ${timeBasedNote}, and ${mileBasedNote}.` : '.'}\n`;
+    sectionText += `- Overall: Excellent pace discipline for easy run${timeBasedAdherence != null ? `. The ${timeBasedAdherence}% time-in-range demonstrates consistent execution.` : '.'}\n`;
   } else if (inRangePct >= 50) {
     if (avgPaceInRange || avgPaceNearRange) {
       const paceStatus = avgPaceInRange ? 'within range' : 'essentially within range';
-      sectionText += `- Overall: Good average pace control (${avgPaceFormatted}/mi ${paceStatus}). Primary opportunity: improve mile-to-mile consistency—${mileBasedNote}.${timeBasedAdherence != null ? ` ${timeBasedNote}.` : ''}\n`;
+      sectionText += `- Overall: Good average pace control (${avgPaceFormatted}/mi ${paceStatus}). Primary opportunity: improve mile-to-mile consistency—only ${milesInRange} of ${mileSplits.length} complete miles within range (${inRangePct}%) suggests pacing instability.${timeBasedAdherence != null ? ` The ${timeBasedAdherence}% time-in-range shows good pace judgment.` : ''}\n`;
     } else {
-      sectionText += `- Overall: Good pace discipline for easy run${timeBasedAdherence != null ? `. ${timeBasedNote}, but ${mileBasedNote}.` : '.'}\n`;
+      sectionText += `- Overall: Good pace discipline for easy run${timeBasedAdherence != null ? `. The ${timeBasedAdherence}% time-in-range demonstrates good pace judgment, but only ${milesInRange} of ${mileSplits.length} complete miles within range (${inRangePct}%) reveals inconsistent execution.` : '.'}\n`;
     }
   } else {
-    // Low in-range percentage - acknowledge strengths first
+    // Low in-range percentage - acknowledge strengths first, then explain the discrepancy
     if (avgPaceInRange || avgPaceNearRange) {
       const paceStatus = avgPaceInRange ? 'within range' : 'essentially within range';
       const delta = avgPaceS < targetLower! ? targetLower! - avgPaceS : (avgPaceS > targetUpper! ? avgPaceS - targetUpper! : 0);
       const deltaSec = Math.round(delta);
       const paceNote = avgPaceInRange 
-        ? `within range (${avgPaceFormatted} vs ${formatPace(targetLower!)}-${formatPace(targetUpper!)}/mi)`
-        : `essentially within range (${avgPaceFormatted}, just ${deltaSec}s ${avgPaceS < targetLower! ? 'faster' : 'slower'} than target)`;
-      sectionText += `- Overall: Excellent average pace control (${paceNote}). Primary opportunity: improve mile-to-mile consistency—${mileBasedNote}.${timeBasedAdherence != null ? ` ${timeBasedNote}.` : ''}\n`;
+        ? `${avgPaceFormatted}, within range`
+        : `${avgPaceFormatted}, essentially within target`;
+      
+      if (timeBasedAdherence != null && timeBasedAdherence > inRangePct) {
+        // Explain the discrepancy: high time-based but low mile-based indicates surge-and-fade
+        sectionText += `- Overall: Excellent average pace control (${paceNote}). The ${timeBasedAdherence}% time-in-range demonstrates good pace judgment, but only ${milesInRange} of ${mileSplits.length} complete miles within range (${inRangePct}%) reveals inconsistent execution within individual miles. This discrepancy indicates a surge-and-fade pattern—hitting the correct pace intermittently throughout each mile rather than maintaining steady effort. Primary opportunity: develop more consistent rhythm within each mile, not just achieving the right average pace.\n`;
+      } else {
+        sectionText += `- Overall: Excellent average pace control (${paceNote}). Primary opportunity: improve mile-to-mile consistency—only ${milesInRange} of ${mileSplits.length} complete miles within range (${inRangePct}%) indicates pacing instability across the run.${timeBasedAdherence != null ? ` The ${timeBasedAdherence}% time-in-range shows good pace judgment.` : ''}\n`;
+      }
     } else {
-      sectionText += `- Overall: Needs improvement - focus on staying within range${timeBasedAdherence != null ? `. ${timeBasedNote}, but ${mileBasedNote}.` : '.'}\n`;
+      sectionText += `- Overall: Needs improvement - focus on staying within range${timeBasedAdherence != null ? `. The ${timeBasedAdherence}% time-in-range shows some pace judgment, but only ${milesInRange} of ${mileSplits.length} complete miles within range (${inRangePct}%) reveals inconsistent execution.` : '.'}\n`;
     }
   }
   
@@ -4198,12 +4201,7 @@ ${(() => {
   
   return `"Maintained pace averaging X:XX ${workoutContext.pace_unit}, ${paceStatus} the prescribed range of ${plannedPaceInfo.range}.
 
-PACE EXECUTION METRICS:
-- Time in range: ${timeBasedAdherence}% (spent ${timeBasedAdherence >= 50 ? 'majority' : timeBasedAdherence >= 30 ? 'significant portion' : 'minority'} of workout at target pace)
-- Mile-by-mile consistency: ${mileBasedAdherence}% (only ${milesInRange} of ${totalMiles} complete miles within range)
-- Pace variability: ${cv.toFixed(0)}%${variabilityContext}
-
-Analysis: The ${timeBasedAdherence >= 50 ? 'high' : timeBasedAdherence >= 30 ? 'moderate' : 'low'} time-based adherence (${timeBasedAdherence}%) combined with ${mileBasedAdherence >= 50 ? 'good' : mileBasedAdherence >= 30 ? 'moderate' : 'low'} mile-by-mile consistency (${mileBasedAdherence}%) indicates ${timeBasedAdherence > mileBasedAdherence ? 'you frequently hit the correct pace throughout the run but couldn\'t maintain it steadily. This pattern suggests surging and fading within individual miles rather than sustained effort control' : mileBasedAdherence > timeBasedAdherence ? 'consistent pacing within complete miles, though some time was spent outside the target range' : 'mixed pacing execution with both time-based and mile-based metrics showing similar adherence'}."`;
+Pace control varied significantly mile-to-mile, with only ${milesInRange} of ${totalMiles} miles falling within the target range, though average pace remained excellent."`;
 })()}
 "Mile-by-mile breakdown: [CRITICAL: Use the PRE-CALCULATED mile categorization data from the MILE-BY-MILE CATEGORIZATION section above. Report EXACTLY which miles were within range, faster than range start, or slower than range end as shown in that section. Do NOT recalculate - copy the mile numbers directly from the pre-calculated data.]"
 ` : plannedPaceInfo?.type === 'single' && plannedPaceInfo.target && plannedPaceInfo.targetSeconds ? `
@@ -4257,7 +4255,17 @@ ${(() => {
 ${(() => {
   // Execution adherence summary (only if we have planned workout data)
   if (plannedWorkout) {
-    return `"Execution adherence was ${adherenceContext.execution_adherence_pct}%, with pace adherence at ${adherenceContext.pace_adherence_pct}% and duration adherence at ${adherenceContext.duration_adherence_pct}%."`;
+    const plannedDurationMin = plannedWorkout?.computed?.total_duration_seconds 
+      ? Math.round(plannedWorkout.computed.total_duration_seconds / 60)
+      : (plannedWorkout?.computed?.steps?.length > 0
+          ? Math.round(plannedWorkout.computed.steps.reduce((sum: number, step: any) => sum + (step.duration_s || step.duration || 0), 0) / 60)
+          : 0);
+    const actualDurationMin = Math.round(workoutContext.duration_minutes);
+    
+    if (plannedDurationMin > 0) {
+      return `"Overall execution: ${adherenceContext.execution_adherence_pct}% (${adherenceContext.pace_adherence_pct}% pace adherence, ${adherenceContext.duration_adherence_pct}% duration adherence)."`;
+    }
+    return `"Overall execution: ${adherenceContext.execution_adherence_pct}% (${adherenceContext.pace_adherence_pct}% pace adherence, ${adherenceContext.duration_adherence_pct}% duration adherence)."`;
   }
   return '';
 })()}
