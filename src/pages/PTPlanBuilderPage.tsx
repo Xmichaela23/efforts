@@ -14,150 +14,130 @@ type ParsedItem = {
   cues?: string;
 };
 
+/**
+ * Deterministic parser for exercise lines
+ * Uses clear, prioritized rules in order:
+ * 1. Extract structured data (sets, reps, weight) using regex patterns
+ * 2. Extract notes using explicit separators (colon, cue:, focus:)
+ * 3. Extract name by removing structured data and notes
+ * 
+ * All patterns are deterministic regex - no AI or ML involved
+ */
 function parseLine(line: string): ParsedItem | null {
   const raw = String(line || '').trim();
   if (!raw) return null;
-  // Strip leading bullets/dashes
+  
+  // Step 1: Clean input
   const cleaned = raw.replace(/^[-•\s]+/, '').trim();
   const out: ParsedItem = { name: cleaned, perSide: /per\s*side/i.test(cleaned) };
   
-  // Extract sets x reps like 3x8 or 3 x 8 (before extracting other parts)
-  let sr = cleaned.match(/(\d+)\s*x\s*(\d+)/i);
-  if (sr) { out.sets = parseInt(sr[1], 10); out.reps = parseInt(sr[2], 10); }
-  // "3 sets of 8" or "2-3 sets of 20" pattern
-  if (!sr) {
-    const so = cleaned.match(/(\d+(?:-\d+)?)\s*sets?\s*of\s*(\d+)/i);
-    if (so) { 
-      const setsStr = so[1];
-      // Handle "2-3 sets" by taking the first number
-      const setsMatch = setsStr.match(/^(\d+)/);
-      out.sets = setsMatch ? parseInt(setsMatch[1], 10) : parseInt(setsStr, 10);
-      out.reps = parseInt(so[2], 10); 
-    }
+  // Step 2: Extract structured data (sets, reps, weight) - deterministic patterns
+  // Pattern 2a: "3x8" or "3 x 8"
+  const setsRepsPattern1 = cleaned.match(/(\d+)\s*x\s*(\d+)/i);
+  if (setsRepsPattern1) {
+    out.sets = parseInt(setsRepsPattern1[1], 10);
+    out.reps = parseInt(setsRepsPattern1[2], 10);
   }
-  // "until your left glute BURNS" or "2 sets until..." pattern
-  if (!sr && !out.sets) {
-    const untilMatch = cleaned.match(/(\d+)\s*sets?\s+until/i);
-    if (untilMatch) {
-      out.sets = parseInt(untilMatch[1], 10);
-    }
-  }
-  // weight like 20 lb|lbs|kg or (10-30 lbs)
-  const w = cleaned.match(/(\d+(?:-\d+)?)\s*(lb|lbs|kg)\b/i);
-  if (w) {
-    const weightStr = w[1];
-    // Handle "10-30 lbs" by taking the first number or average
-    const weightMatch = weightStr.match(/^(\d+)(?:-(\d+))?/);
-    if (weightMatch) {
-      if (weightMatch[2]) {
-        // Range: take average or first number
-        out.weight = parseFloat(weightMatch[1]);
-      } else {
-        out.weight = parseFloat(weightMatch[1]);
-      }
-      out.unit = /kg/i.test(w[2]) ? 'kg' : 'lb';
+  
+  // Pattern 2b: "3 sets of 8" or "2-3 sets of 20"
+  if (!setsRepsPattern1) {
+    const setsRepsPattern2 = cleaned.match(/(\d+)(?:-\d+)?\s*sets?\s*of\s*(\d+)/i);
+    if (setsRepsPattern2) {
+      out.sets = parseInt(setsRepsPattern2[1], 10);
+      out.reps = parseInt(setsRepsPattern2[2], 10);
     }
   }
   
-  // Extract exercise name and notes
-  // Strategy: Find where sets/reps/weight patterns are, everything before is name+notes, after is notes
-  let namePart = cleaned;
+  // Pattern 2c: "2 sets until..." (sets only, no reps)
+  if (!setsRepsPattern1 && !out.sets) {
+    const setsUntilPattern = cleaned.match(/(\d+)\s*sets?\s+until/i);
+    if (setsUntilPattern) {
+      out.sets = parseInt(setsUntilPattern[1], 10);
+    }
+  }
+  
+  // Pattern 2d: Weight - "20 lbs" or "(10-30 lbs)" or "25 lb"
+  const weightPattern = cleaned.match(/(?:\(|^|\s)(\d+)(?:-(\d+))?\s*(lb|lbs|kg)\b/i);
+  if (weightPattern) {
+    out.weight = parseFloat(weightPattern[1]);
+    out.unit = /kg/i.test(weightPattern[3]) ? 'kg' : 'lb';
+  }
+  
+  // Step 3: Extract notes using explicit separators (deterministic)
   let notesPart = '';
+  let namePart = cleaned;
   
-  // Check for explicit cue: or focus: patterns
-  const cueMatch = cleaned.match(/(?:cue|focus)\s*:\s*(.+)$/i);
-  if (cueMatch) {
-    notesPart = cueMatch[1].trim();
+  // Rule 3a: Explicit "cue:" or "focus:" patterns (highest priority)
+  const explicitCuePattern = cleaned.match(/(?:cue|focus)\s*:\s*(.+)$/i);
+  if (explicitCuePattern) {
+    notesPart = explicitCuePattern[1].trim();
     namePart = cleaned.replace(/,?\s*(?:cue|focus)\s*:.*$/i, '').trim();
-  } else {
-    // Look for colon separator (exercise name: notes/instructions)
-    // But be careful - colons can appear in numbered lists like "1) knees out, 2) gently..."
-    const colonMatch = cleaned.match(/^([^:]+?):\s*((?:\d+\)\s*[^:]+(?:,\s*\d+\)\s*[^:]+)*|[^:]+)$)/);
-    if (colonMatch) {
-      namePart = colonMatch[1].trim();
-      notesPart = colonMatch[2].trim();
-    }
   }
   
-  // If no colon separator, try to extract notes from descriptive text before sets/reps
+  // Rule 3b: Colon separator "exercise: notes" (but not numbered lists)
   if (!notesPart) {
-    // Find the position of sets/reps patterns
-    const setsRepsMatch = cleaned.match(/(\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+))/i);
-    const untilMatch = cleaned.match(/(\d+\s*sets?\s+until)/i);
-    
-    if (setsRepsMatch || untilMatch) {
-      const matchPos = setsRepsMatch ? setsRepsMatch.index! : untilMatch!.index!;
-      const beforeSets = cleaned.substring(0, matchPos).trim();
-      const afterSets = cleaned.substring(matchPos + (setsRepsMatch ? setsRepsMatch[0].length : untilMatch![0].length)).trim();
-      
-      // Extract name from beforeSets (remove weight ranges in parentheses, descriptive text)
-      // Name is typically the first few words before commas or descriptive text
-      const beforeParts = beforeSets.split(',');
-      if (beforeParts.length > 1) {
-        // First part is likely the name, rest might be notes
-        namePart = beforeParts[0].trim();
-        const potentialNotes = beforeParts.slice(1).join(',').trim();
-        // Check if potential notes don't contain sets/reps/weight patterns
-        if (!potentialNotes.match(/\d+\s*x\s*\d+|\d+\s*sets?\s*of\s*\d+|\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i)) {
-          notesPart = potentialNotes;
-        }
-      } else {
-        namePart = beforeSets;
-      }
-      
-      // Also check afterSets for additional notes (like "until your left glute BURNS, and match reps")
+    // Match colon but exclude numbered lists like "1) item, 2) item"
+    const colonPattern = cleaned.match(/^([^:]+?):\s*((?:\d+\)\s*[^:]+(?:,\s*\d+\)\s*[^:]+)*|[^:]+)$)/);
+    if (colonPattern) {
+      namePart = colonPattern[1].trim();
+      notesPart = colonPattern[2].trim();
+    }
+  }
+  
+  // Rule 3c: Text after sets/reps pattern (like "until X, and match Y")
+  if (!notesPart) {
+    const setsRepsMatch = cleaned.match(/(\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+|\s+until))/i);
+    if (setsRepsMatch && setsRepsMatch.index !== undefined) {
+      const afterSets = cleaned.substring(setsRepsMatch.index + setsRepsMatch[0].length).trim();
       if (afterSets && !afterSets.match(/^\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+)/i)) {
-        if (notesPart) {
-          notesPart += ', ' + afterSets;
-        } else {
-          notesPart = afterSets;
+        notesPart = afterSets;
+      }
+    }
+  }
+  
+  // Rule 3d: Descriptive text between commas (before sets/reps/weight)
+  if (!notesPart) {
+    const commaParts = cleaned.split(',');
+    if (commaParts.length > 1) {
+      // Find where structured data starts
+      let structuredDataIndex = -1;
+      for (let i = 0; i < commaParts.length; i++) {
+        if (commaParts[i].match(/\d+\s*x\s*\d+|\d+\s*sets?\s*of\s*\d+|\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i)) {
+          structuredDataIndex = i;
+          break;
         }
       }
-    } else {
-      // No sets/reps found, try comma-based extraction
-      const commaParts = cleaned.split(',');
-      if (commaParts.length > 1) {
-        // Look for weight pattern to identify where name ends
-        let nameEndIndex = 0;
-        for (let i = 0; i < commaParts.length; i++) {
-          if (commaParts[i].match(/\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i)) {
-            nameEndIndex = i;
-            break;
-          }
-        }
-        if (nameEndIndex > 0) {
+      if (structuredDataIndex > 1) {
+        // Everything between first part and structured data is notes
+        notesPart = commaParts.slice(1, structuredDataIndex).join(',').trim();
+        namePart = commaParts[0].trim();
+      } else if (structuredDataIndex === -1 && commaParts.length > 1) {
+        // No structured data found, check if last part is descriptive
+        const lastPart = commaParts[commaParts.length - 1].trim();
+        if (!lastPart.match(/^\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i)) {
+          notesPart = commaParts.slice(1).join(',').trim();
           namePart = commaParts[0].trim();
-          notesPart = commaParts.slice(1, nameEndIndex + 1).join(',').trim();
-        } else {
-          // No weight found, assume first part is name, rest might be notes
-          namePart = commaParts[0].trim();
-          const rest = commaParts.slice(1).join(',').trim();
-          // Only use as notes if it doesn't look like structured data
-          if (rest && !rest.match(/^\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+)/i)) {
-            notesPart = rest;
-          }
         }
       }
     }
   }
   
-  // Clean name (remove parsed tokens, parenthetical weight ranges, and extra descriptive text)
+  // Step 4: Clean name (remove all structured data and notes)
   let name = namePart
-    .replace(/\([^)]*\)/g, '') // Remove parenthetical content like "(10-30 lbs)" or "(or chair)"
-    .replace(/,?\s*cue\s*:.*/i, '')
-    .replace(/,?\s*focus\s*:.*/i, '')
-    .replace(/\b\d+\s*x\s*\d+\b/i, '')
-    .replace(/\b\d+(?:-\d+)?\s*sets?\s*of\s*\d+\b/i, '')
-    .replace(/\b\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i, '')
-    .replace(/\bper\s*side\b/i, '')
-    .replace(/\bswitches?\b/i, '')
-    .replace(/\beach\s+side\b/i, '')
+    .replace(/\([^)]*\)/g, '') // Remove parentheses (weight ranges, alternatives)
+    .replace(/,?\s*(?:cue|focus)\s*:.*/i, '') // Remove explicit cues
+    .replace(/\b\d+\s*x\s*\d+\b/i, '') // Remove sets x reps
+    .replace(/\b\d+(?:-\d+)?\s*sets?\s*of\s*\d+\b/i, '') // Remove "sets of"
+    .replace(/\b\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i, '') // Remove weight
+    .replace(/\bper\s*side\b/i, '') // Remove "per side"
+    .replace(/\beach\s+side\b/i, '') // Remove "each side"
+    .replace(/\bswitches?\b/i, '') // Remove "switches"
     .replace(/--+/g, ' ') // Remove double dashes
-    .replace(/[,;]/g, ' ')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/[,;]/g, ' ') // Replace commas/semicolons with spaces
+    .replace(/\s{2,}/g, ' ') // Collapse multiple spaces
     .trim();
   
-  // Clean up notes
+  // Step 5: Clean notes (remove any structured data that leaked in)
   if (notesPart) {
     notesPart = notesPart
       .replace(/\b\d+\s*x\s*\d+\b/i, '')
@@ -169,10 +149,10 @@ function parseLine(line: string): ParsedItem | null {
       .trim();
   }
   
+  // Step 6: Finalize
   if (!name) name = raw;
   out.name = name.charAt(0).toUpperCase() + name.slice(1);
   
-  // Store all descriptive text (cues + any other notes) in cues field
   if (notesPart) {
     out.cues = notesPart;
   }
