@@ -4099,7 +4099,15 @@ Planned Workout Details:
 ` : ''}
 
 CRITICAL ANALYSIS RULES:
-${plannedPaceInfo?.type === 'range' ? `
+${hasIntervals ? `
+- This is an INTERVAL workout with work intervals and recovery periods
+- Focus on work interval performance (pace adherence, consistency across intervals)
+- Do NOT compare overall average pace to work interval pace (overall includes warmup/recovery/cooldown)
+- Report interval completion (X of Y intervals completed)
+- Report pace adherence range across work intervals
+- Note any fading pattern (pace getting slower) or consistency across intervals
+- Do NOT analyze mile-by-mile breakdown for interval workouts
+` : plannedPaceInfo?.type === 'range' ? `
 - This is a RANGE workout (${plannedPaceInfo.workoutType})
 - Compare each mile/segment to the RANGE (${plannedPaceInfo.range})
 - Miles within range are acceptable (not "too fast" or "too slow")
@@ -4118,8 +4126,68 @@ ${plannedPaceInfo?.type === 'range' ? `
 - Compare actual performance to planned targets
 `}
 
-${(() => {
-  // Extract pre-calculated mile-by-mile categorization if available
+${hasIntervals ? (() => {
+  // For interval workouts, include planned workout structure and interval breakdown data
+  const steps = plannedWorkout?.computed?.steps || [];
+  const plannedWorkSteps = steps.filter((step: any) => 
+    (step.kind === 'work' || step.role === 'work' || step.step_type === 'interval') && 
+    (step.pace_range || step.target_pace)
+  );
+  
+  // Helper function to format pace from seconds
+  const formatPace = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${minutes}:${String(secs).padStart(2, '0')}`;
+  };
+  
+  const paceUnit = userUnits === 'metric' ? 'min/km' : 'min/mi';
+  
+  // Build planned workout description
+  let plannedWorkoutDesc = '';
+  if (plannedWorkSteps.length > 0) {
+    const firstWorkStep = plannedWorkSteps[0];
+    const plannedPace = firstWorkStep.pace_range 
+      ? `${formatPace(firstWorkStep.pace_range.lower)}-${formatPace(firstWorkStep.pace_range.upper)} ${paceUnit}`
+      : firstWorkStep.target_pace 
+        ? `${formatPace(firstWorkStep.target_pace)} ${paceUnit}`
+        : 'target pace';
+    const plannedDuration = firstWorkStep.duration_s ? `${Math.round(firstWorkStep.duration_s / 60)} min` : '';
+    const plannedDistance = firstWorkStep.distance_m ? `${(firstWorkStep.distance_m / 1609.34).toFixed(2)} mi` : '';
+    
+    plannedWorkoutDesc = `Planned: ${plannedWorkSteps.length} work intervals`;
+    if (plannedDistance) plannedWorkoutDesc += ` of ${plannedDistance} each`;
+    if (plannedDuration) plannedWorkoutDesc += ` (${plannedDuration} each)`;
+    plannedWorkoutDesc += ` at ${plannedPace}`;
+  }
+  
+  const intervalBreakdown = detailedAnalysis?.interval_breakdown;
+  if (intervalBreakdown && intervalBreakdown.available && intervalBreakdown.intervals && intervalBreakdown.intervals.length > 0) {
+    const intervals = intervalBreakdown.intervals;
+    const paceAdherences = intervals.map((i: any) => i.pace_adherence_percent || 0).filter((p: number) => p > 0);
+    const avgPaceAdherence = paceAdherences.length > 0 
+      ? Math.round(paceAdherences.reduce((sum: number, p: number) => sum + p, 0) / paceAdherences.length)
+      : 0;
+    
+    return `
+PLANNED WORKOUT STRUCTURE:
+${plannedWorkoutDesc || 'Interval workout with work and recovery segments'}
+
+INTERVAL BREAKDOWN (PRE-CALCULATED - USE EXACTLY AS SHOWN):
+- Completed ${intervals.length} of ${plannedWorkSteps.length} planned work intervals
+- Average pace adherence: ${avgPaceAdherence}%
+- Pace adherence range: ${paceAdherences.length > 0 ? `${Math.min(...paceAdherences)}% to ${Math.max(...paceAdherences)}%` : 'N/A'}
+
+CRITICAL INSTRUCTION: For interval workouts, focus on work interval performance compared to the planned workout structure above. Do NOT analyze overall pace or mile-by-mile breakdown. Report interval completion and pace adherence as shown above.
+
+`;
+  }
+  return plannedWorkoutDesc ? `
+PLANNED WORKOUT STRUCTURE:
+${plannedWorkoutDesc}
+` : '';
+})() : (() => {
+  // For continuous runs, include mile-by-mile categorization
   const mileByMile = detailedAnalysis?.mile_by_mile_terrain;
   if (mileByMile && mileByMile.available && mileByMile.splits && mileByMile.splits.length > 0) {
     const milesInRange = mileByMile.miles_in_range || 0;
@@ -4163,7 +4231,8 @@ ${(() => {
   // For interval workouts, analyze work intervals separately
   // Don't compare overall average pace to work interval pace (overall includes warmup/recovery/cooldown)
   const intervalBreakdown = detailedAnalysis?.interval_breakdown;
-  const workIntervals = intervalBreakdown?.intervals?.filter((i: any) => i.interval_type === 'work' || i.role === 'work') || [];
+  // generateIntervalBreakdown only includes work intervals, so all intervals in breakdown are work intervals
+  const workIntervals = intervalBreakdown?.intervals || [];
   const completedIntervals = workIntervals.filter((i: any) => i.actual_duration_s > 0 || i.actual_pace_min_per_mi > 0);
   // Use workSteps from outer scope (defined above)
   const steps = plannedWorkout?.computed?.steps || [];
@@ -4193,6 +4262,11 @@ ${(() => {
     patternNote = 'Pace remained consistent across all intervals.';
   } else {
     patternNote = 'Pace varied across intervals.';
+  }
+  
+  if (workIntervals.length === 0) {
+    // Fallback if interval breakdown not available
+    return `"Completed ${completedIntervals.length} of ${totalPlannedIntervals} prescribed work intervals."`;
   }
   
   return `"Completed ${completedIntervals.length} of ${totalPlannedIntervals} prescribed work intervals. Work interval pace adherence ranged from ${minPaceAdherence}% to ${maxPaceAdherence}% (average ${avgPaceAdherence}%). ${patternNote}"`;
