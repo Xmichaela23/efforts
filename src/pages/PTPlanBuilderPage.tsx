@@ -97,18 +97,22 @@ function parseLine(line: string): ParsedItem | null {
   
   // Rule 3b: Colon separator "exercise: notes" (but not numbered lists)
   if (!notesPart) {
-    // Match colon but exclude numbered lists like "1) item, 2) item"
-    // Handle cases like "exercise: notes" or "exercise, 2 sets: notes"
+    // Match colon but handle numbered lists specially
     // Look for colon that's not part of a numbered list
     const colonIndex = cleaned.indexOf(':');
     if (colonIndex > 0) {
       const beforeColon = cleaned.substring(0, colonIndex).trim();
       const afterColon = cleaned.substring(colonIndex + 1).trim();
       
-      // Check if it's a numbered list pattern
+      // Check if it's a numbered list pattern like "1) item, 2) item"
       const isNumberedList = /^\d+\)/.test(afterColon);
       
-      if (!isNumberedList && afterColon) {
+      if (isNumberedList) {
+        // It's a numbered list - extract name and all numbered items as notes
+        namePart = beforeColon;
+        notesPart = afterColon;
+      } else if (afterColon) {
+        // Regular colon-separated notes
         namePart = beforeColon;
         notesPart = afterColon;
         // Remove sets/reps from namePart if they're there
@@ -119,22 +123,24 @@ function parseLine(line: string): ParsedItem | null {
   
   // Rule 3c: Text after sets/reps pattern (like "until X, and match Y")
   if (!notesPart) {
-    // Match patterns like "2 sets until", "3x8", "3 sets of 8"
-    // Use a more specific pattern that captures the full "sets until" phrase
-    const setsRepsMatch = cleaned.match(/(\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*(?:of\s*\d+|until\s+[^,]+)))/i);
-    if (setsRepsMatch && setsRepsMatch.index !== undefined) {
-      const matchEnd = setsRepsMatch.index + setsRepsMatch[0].length;
-      const afterSets = cleaned.substring(matchEnd).trim();
-      
-      // If the match includes "until", extract everything after "until" as notes
-      if (setsRepsMatch[0].match(/until/i)) {
-        const untilMatch = cleaned.match(/\d+\s*sets?\s+until\s+(.+)/i);
-        if (untilMatch) {
-          notesPart = untilMatch[1].trim();
+    // Match "2 sets until X" pattern specifically
+    const untilMatch = cleaned.match(/\d+\s*sets?\s+until\s+(.+)/i);
+    if (untilMatch) {
+      notesPart = untilMatch[1].trim();
+      // Extract name part before "sets until"
+      const beforeUntil = cleaned.substring(0, untilMatch.index).trim();
+      namePart = beforeUntil;
+    } else {
+      // Match other sets/reps patterns like "3x8", "3 sets of 8"
+      const setsRepsMatch = cleaned.match(/(\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+))/i);
+      if (setsRepsMatch && setsRepsMatch.index !== undefined) {
+        const matchEnd = setsRepsMatch.index + setsRepsMatch[0].length;
+        const afterSets = cleaned.substring(matchEnd).trim();
+        
+        if (afterSets && !afterSets.match(/^\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+)/i)) {
+          // Extract text after sets/reps as notes
+          notesPart = afterSets;
         }
-      } else if (afterSets && !afterSets.match(/^\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+)/i)) {
-        // Regular sets/reps pattern - extract text after
-        notesPart = afterSets;
       }
     }
   }
@@ -164,7 +170,7 @@ function parseLine(line: string): ParsedItem | null {
           const remainingParts = commaParts.slice(1);
           const hasStructured = remainingParts.some(p => p.trim().match(/\d+\s*x\s*\d+|\d+\s*sets?\s*(?:of\s*\d+|until)|\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i));
           if (!hasStructured && remainingParts.length > 0) {
-            // All remaining parts are descriptive text
+            // All remaining parts are descriptive text - extract as notes
             notesPart = remainingParts.join(',').trim();
           }
         }
@@ -175,8 +181,7 @@ function parseLine(line: string): ParsedItem | null {
         const isWeightOnly = lastPart.match(/^\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i);
         
         if (!isWeightOnly) {
-          // All parts after first are likely descriptive
-          // But check if first part contains structured data
+          // Check if first part contains structured data
           const firstPart = commaParts[0].trim();
           const firstHasStructured = firstPart.match(/\d+\s*x\s*\d+|\d+\s*sets?\s*(?:of\s*\d+|until)/i);
           
@@ -184,6 +189,13 @@ function parseLine(line: string): ParsedItem | null {
             // First part is name, rest is notes
             notesPart = commaParts.slice(1).join(',').trim();
             namePart = commaParts[0].trim();
+          }
+        } else {
+          // Last part is weight, everything before last is name+notes
+          // Extract name from first part, notes from middle parts
+          if (commaParts.length > 2) {
+            namePart = commaParts[0].trim();
+            notesPart = commaParts.slice(1, -1).join(',').trim();
           }
         }
       }
@@ -195,15 +207,34 @@ function parseLine(line: string): ParsedItem | null {
     .replace(/\([^)]*\)/g, '') // Remove parentheses (weight ranges, alternatives)
     .replace(/,?\s*(?:cue|focus)\s*:.*/i, '') // Remove explicit cues
     .replace(/\b\d+\s*x\s*\d+\b/i, '') // Remove sets x reps
-    .replace(/\b\d+(?:-\d+)?\s*sets?\s*(?:of\s*\d+|until)/i, '') // Remove "sets of" or "sets until"
+    .replace(/\b\d+(?:-\d+)?\s*sets?\s*(?:of\s*\d+|until\s+[^,]+)/i, '') // Remove "sets of" or "sets until [text]"
     .replace(/\b\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i, '') // Remove weight
     .replace(/\bper\s*side\b/i, '') // Remove "per side"
     .replace(/\beach\s+side\b/i, '') // Remove "each side"
     .replace(/\bswitches?\b/i, '') // Remove "switches"
+    .replace(/\bseconds?\b/i, '') // Remove "seconds" or "second"
+    .replace(/\bsec\b/i, '') // Remove "sec"
+    .replace(/\d+\)\s*/g, '') // Remove numbered list items like "1) "
     .replace(/--+/g, ' ') // Remove double dashes
     .replace(/[,;]/g, ' ') // Replace commas/semicolons with spaces
     .replace(/\s{2,}/g, ' ') // Collapse multiple spaces
     .trim();
+  
+  // Also remove any notes text that might have leaked into the name
+  // This handles cases where notes weren't properly extracted
+  if (notesPart) {
+    // Remove notes text from name if it appears there
+    // Split notes into phrases and remove each from name
+    const notesPhrases = notesPart.split(',').map(p => p.trim()).filter(p => p.length > 5);
+    notesPhrases.forEach(phrase => {
+      // Create a regex that matches the phrase as a whole or individual significant words
+      const significantWords = phrase.split(/\s+/).filter(w => w.length > 3);
+      significantWords.forEach(word => {
+        const wordRegex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+        name = name.replace(wordRegex, '').replace(/\s{2,}/g, ' ').trim();
+      });
+    });
+  }
   
   // Step 5: Clean notes (remove any structured data that leaked in)
   if (notesPart) {
