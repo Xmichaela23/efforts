@@ -3324,7 +3324,7 @@ function generateIntervalBreakdown(workIntervals: any[]): any {
   sectionText += `- Fair (70-79%): ${summary.fair} intervals\n`;
   sectionText += `- Poor (<70%): ${summary.poor} intervals\n`;
 
-  return {
+  const result = {
     available: true,
     intervals: breakdown,
     section: sectionText,  // Add section text for UI display
@@ -3337,6 +3337,11 @@ function generateIntervalBreakdown(workIntervals: any[]): any {
       poor_performance_intervals: summary.poor
     }
   };
+  
+  console.log(`✅ [INTERVAL BREAKDOWN] Generated section for ${breakdown.length} intervals, section length: ${sectionText.length} chars`);
+  console.log(`🔍 [INTERVAL BREAKDOWN] Section preview: ${sectionText.substring(0, 200)}...`);
+  
+  return result;
 }
 
 /**
