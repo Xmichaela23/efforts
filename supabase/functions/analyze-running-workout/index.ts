@@ -3083,8 +3083,13 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
     ? workoutMovingTimeSeconds / workoutDistanceMi 
     : null;
   
-  // Generate mile-by-mile terrain breakdown - PASS plannedPaceInfo and workout-level average pace
-  const mileByMileTerrain = generateMileByMileTerrainBreakdown(
+  // Detect if this is an interval workout (multiple work segments or alternating work/recovery)
+  // Interval workouts should NOT have mile-by-mile breakdown - use interval breakdown instead
+  const isIntervalWorkout = workIntervals.length > 1 || 
+    (workIntervals.length >= 1 && recoveryIntervals.length >= 1 && intervals.length > 2);
+  
+  // Generate mile-by-mile terrain breakdown ONLY for continuous runs (not interval workouts)
+  const mileByMileTerrain = isIntervalWorkout ? null : generateMileByMileTerrainBreakdown(
     sensorData, 
     intervals, 
     granularAnalysis, 
