@@ -2414,12 +2414,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // Rest timer should only show when:
                   // 1. Not duration-based exercise
                   // 2. Not the first set (rest happens between sets)
-                  // 3. Previous set is completed (rest happens after completing a set)
-                  // 4. There are multiple sets (no rest needed if only one set)
+                  // 3. There are multiple sets (no rest needed if only one set)
+                  // Note: Rest timer shows between sets to help guide rest periods
                   const showRestTimer = !isDurationBased && 
                     setIndex > 0 && 
-                    exercise.sets.length > 1 &&
-                    exercise.sets[setIndex - 1]?.completed;
+                    exercise.sets.length > 1;
                   
                   return (
                     <div key={setIndex} className="mb-1 last:mb-0">
