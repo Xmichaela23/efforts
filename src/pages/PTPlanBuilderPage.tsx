@@ -32,23 +32,25 @@ function parseLine(line: string): ParsedItem | null {
   const out: ParsedItem = { name: cleaned, perSide: /per\s*side/i.test(cleaned) };
   
   // Step 2: Extract structured data (sets, reps, weight) - deterministic patterns
-  // Pattern 2a: "3x8" or "3 x 8"
-  const setsRepsPattern1 = cleaned.match(/(\d+)\s*x\s*(\d+)/i);
+  // Multiple patterns handle different input variations - all deterministic regex
+  
+  // Pattern 2a: "3x8" or "3 x 8" or "3×8" (multiplication symbol)
+  const setsRepsPattern1 = cleaned.match(/(\d+)\s*[x×]\s*(\d+)/i);
   if (setsRepsPattern1) {
     out.sets = parseInt(setsRepsPattern1[1], 10);
     out.reps = parseInt(setsRepsPattern1[2], 10);
   }
   
-  // Pattern 2b: "3 sets of 8" or "2-3 sets of 20"
+  // Pattern 2b: "3 sets of 8" or "2-3 sets of 20" or "3 sets x 8"
   if (!setsRepsPattern1) {
-    const setsRepsPattern2 = cleaned.match(/(\d+)(?:-\d+)?\s*sets?\s*of\s*(\d+)/i);
+    const setsRepsPattern2 = cleaned.match(/(\d+)(?:-\d+)?\s*sets?\s*(?:of|x)\s*(\d+)/i);
     if (setsRepsPattern2) {
       out.sets = parseInt(setsRepsPattern2[1], 10);
       out.reps = parseInt(setsRepsPattern2[2], 10);
     }
   }
   
-  // Pattern 2c: "2 sets until..." (sets only, no reps)
+  // Pattern 2c: "2 sets until..." or "2 sets of until..." (sets only, no reps)
   if (!setsRepsPattern1 && !out.sets) {
     const setsUntilPattern = cleaned.match(/(\d+)\s*sets?\s+until/i);
     if (setsUntilPattern) {
@@ -56,11 +58,30 @@ function parseLine(line: string): ParsedItem | null {
     }
   }
   
-  // Pattern 2d: Weight - "20 lbs" or "(10-30 lbs)" or "25 lb"
+  // Pattern 2d: Duration-based "2-3 sets of 20 seconds" or "3x20s"
+  if (!setsRepsPattern1 && !out.sets) {
+    const durationPattern = cleaned.match(/(\d+)(?:-\d+)?\s*(?:sets?\s*of|x)\s*(\d+)\s*(?:seconds?|sec|s)\b/i);
+    if (durationPattern) {
+      out.sets = parseInt(durationPattern[1], 10);
+      // Store duration in notes since we don't have a duration field in ParsedItem
+      if (!out.cues) out.cues = `${durationPattern[2]} seconds`;
+    }
+  }
+  
+  // Pattern 2e: Weight - "20 lbs" or "(10-30 lbs)" or "25 lb" or "20kg"
   const weightPattern = cleaned.match(/(?:\(|^|\s)(\d+)(?:-(\d+))?\s*(lb|lbs|kg)\b/i);
   if (weightPattern) {
     out.weight = parseFloat(weightPattern[1]);
     out.unit = /kg/i.test(weightPattern[3]) ? 'kg' : 'lb';
+  }
+  
+  // Pattern 2f: Weight with @ symbol "exercise @ 20 lbs" or "exercise - 20 lbs"
+  if (!weightPattern) {
+    const weightAtPattern = cleaned.match(/[@—–-]\s*(\d+)(?:-(\d+))?\s*(lb|lbs|kg)\b/i);
+    if (weightAtPattern) {
+      out.weight = parseFloat(weightAtPattern[1]);
+      out.unit = /kg/i.test(weightAtPattern[3]) ? 'kg' : 'lb';
+    }
   }
   
   // Step 3: Extract notes using explicit separators (deterministic)
