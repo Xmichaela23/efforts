@@ -77,6 +77,41 @@ const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' 
   return 'barbell';
 };
 
+// Check if exercise is a main compound lift
+const isMainCompound = (exerciseName: string): boolean => {
+  const name = exerciseName.toLowerCase();
+  // Main compounds: squat, deadlift, bench, overhead press
+  return /squat|deadlift|bench|overhead|ohp/.test(name) && 
+         !/goblet|bulgarian|split|romanian|sumo|stiff/.test(name);
+};
+
+// Calculate rest time based on exercise type and reps
+const calculateRestTime = (exerciseName: string, reps: number | undefined): number => {
+  if (!reps || reps === 0) return 90; // Default 90 seconds
+  
+  const isCompound = isMainCompound(exerciseName);
+  
+  if (isCompound) {
+    // Main Compounds:
+    // 3-5 reps: 150 sec (2:30)
+    // 6-8 reps: 120 sec (2:00)
+    if (reps >= 3 && reps <= 5) return 150;
+    if (reps >= 6 && reps <= 8) return 120;
+    // Default for compounds outside range
+    return 120;
+  } else {
+    // Accessories:
+    // 6-10 reps: 90 sec (1:30)
+    // 10-15 reps: 75 sec (1:15)
+    // 15+ reps or time-based: 60 sec (1:00)
+    if (reps >= 6 && reps < 10) return 90;
+    if (reps >= 10 && reps < 15) return 75;
+    if (reps >= 15) return 60;
+    // Default for accessories outside range
+    return 90;
+  }
+};
+
 // Readiness Check Banner Component
 interface ReadinessCheckBannerProps {
   isExpanded: boolean;
@@ -1049,7 +1084,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (exs.length) {
         setExercises(exs);
         exercisesLoadedFromWorkout = true;
-        exercisesLoadedFromWorkout = true;
+        // Initialize rest timers for pre-populated exercises
+        setTimeout(() => {
+          exs.forEach((exercise, exIndex) => {
+            exercise.sets.forEach((set, setIndex) => {
+              if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
+                const restTime = calculateRestTime(exercise.name, set.reps);
+                const restTimerKey = `${exercise.id}-${setIndex}`;
+                setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
+              }
+            });
+          });
+        }, 100);
         setIsInitialized(true);
         return;
       }
@@ -1095,6 +1141,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       console.log('📝 Final prePopulatedExercises:', JSON.stringify(prePopulatedExercises, null, 2));
       setExercises(prePopulatedExercises);
       exercisesLoadedFromWorkout = true;
+      // Initialize rest timers for pre-populated exercises
+      setTimeout(() => {
+        prePopulatedExercises.forEach((exercise) => {
+          exercise.sets.forEach((set, setIndex) => {
+            if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
+              const restTime = calculateRestTime(exercise.name, set.reps);
+              const restTimerKey = `${exercise.id}-${setIndex}`;
+              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
+            }
+          });
+        });
+      }, 100);
     } else if (workoutToLoad && ((workoutToLoad as any).steps_preset?.length > 0 || typeof (workoutToLoad as any).rendered_description === 'string' || typeof (workoutToLoad as any).description === 'string')) {
       // Fallback: parse rendered_description first, then description
       const stepsArr: string[] = Array.isArray((workoutToLoad as any).steps_preset) ? (workoutToLoad as any).steps_preset : [];
@@ -1106,6 +1164,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         console.log('📝 Parsed exercises from description');
         setExercises(parsed);
         exercisesLoadedFromWorkout = true;
+        // Initialize rest timers for parsed exercises
+        setTimeout(() => {
+          parsed.forEach((exercise) => {
+            exercise.sets.forEach((set, setIndex) => {
+              if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
+                const restTime = calculateRestTime(exercise.name, set.reps);
+                const restTimerKey = `${exercise.id}-${setIndex}`;
+                setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
+              }
+            });
+          });
+        }, 100);
         if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
       } else {
         console.log('🆕 Starting with empty exercise for manual logging');
@@ -1572,7 +1642,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const updatedExercises = exercises.map(exercise => {
       if (exercise.id === exerciseId) {
         const newSets = [...exercise.sets];
-        newSets[setIndex] = { ...newSets[setIndex], ...updates };
+        const updatedSet = { ...newSets[setIndex], ...updates };
+        newSets[setIndex] = updatedSet;
+        
+        // Auto-calculate rest time when reps change (for rep-based exercises)
+        if ('reps' in updates && updatedSet.reps !== undefined && updatedSet.duration_seconds === undefined) {
+          const restTime = calculateRestTime(exercise.name, updatedSet.reps);
+          const restTimerKey = `${exerciseId}-${setIndex}`;
+          // Only set if timer doesn't exist or is at default value
+          setTimers(prev => {
+            const current = prev[restTimerKey];
+            if (!current || current.seconds === 90) {
+              return { ...prev, [restTimerKey]: { seconds: restTime, running: false } };
+            }
+            return prev;
+          });
+        }
+        
         return { ...exercise, sets: newSets };
       }
       return exercise;
@@ -1600,6 +1686,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           completed: false
         };
         const updatedExercise = { ...exercise, sets: [...exercise.sets, newSet] };
+        
+        // Auto-calculate rest time for the new set if it has reps
+        if (newSet.reps && newSet.reps > 0 && newSet.duration_seconds === undefined) {
+          const restTime = calculateRestTime(exercise.name, newSet.reps);
+          const restTimerKey = `${exerciseId}-${updatedExercise.sets.length - 1}`;
+          setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
+        }
+        
         console.log('✅ New exercise with sets:', updatedExercise.sets.length);
         return updatedExercise;
       }
@@ -2247,20 +2341,41 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           <button
                             onClick={() => {
                               const key = restTimerKey;
-                              const cur = restTimer?.seconds ?? 90;
+                              // Calculate rest time based on previous set's reps
+                              const prevSet = exercise.sets[setIndex - 1];
+                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, prevSet.reps)
+                                : 90;
+                              const cur = restTimer?.seconds ?? calculatedRest;
                               const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
                               setEditingTimerKey(key);
                               setEditingTimerValue(prefill);
                             }}
-                            onContextMenu={(e) => { e.preventDefault(); setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: 90, running: false } })); }}
+                            onContextMenu={(e) => { 
+                              e.preventDefault(); 
+                              const prevSet = exercise.sets[setIndex - 1];
+                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, prevSet.reps)
+                                : 90;
+                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: calculatedRest, running: false } })); 
+                            }}
                             className="h-7 px-2 text-xs rounded-md border border-gray-300 text-gray-700 bg-white"
                             aria-label="Rest timer"
                           >
-                            {formatSeconds(restTimer?.seconds ?? 90)}
+                            {formatSeconds(restTimer?.seconds ?? (() => {
+                              const prevSet = exercise.sets[setIndex - 1];
+                              return prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, prevSet.reps)
+                                : 90;
+                            })())}
                           </button>
                           <button
                             onClick={() => {
-                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: (prev[restTimerKey]?.seconds ?? 90) || 90, running: true } }));
+                              const prevSet = exercise.sets[setIndex - 1];
+                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, prevSet.reps)
+                                : 90;
+                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: (prev[restTimerKey]?.seconds ?? calculatedRest) || calculatedRest, running: true } }));
                             }}
                             className="h-7 px-2 text-xs rounded-md border border-gray-300 text-gray-600 bg-white"
                             aria-label="Start rest timer"
