@@ -386,7 +386,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const isBodyweightMove = (raw?: string): boolean => {
     try {
       const n = String(raw || '').toLowerCase().replace(/[\s-]/g,'');
-      return /dip|chinup|pullup|pushup|plank/.test(n);
+      return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls/.test(n);
     } catch { return false; }
   };
 
@@ -2650,6 +2650,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           return null;
                         }
                         
+                        // Bodyweight exercises don't need weight input (e.g., Nordic Curls, pull-ups, push-ups)
+                        if (isBodyweightMove(exercise.name)) {
+                          return null;
+                        }
+                        
                         const exerciseType = getExerciseType(exercise.name);
                         
                         // Band exercises: Show resistance dropdown
@@ -2705,11 +2710,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           />
                         );
                       })()}
-                      {/* RIR input - hidden for mobility mode */}
+                      {/* RIR input - hidden for mobility mode and duration-based exercises */}
                       {(() => {
                         const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                         const isMobilityMode = loggerMode === 'mobility';
-                        if (isMobilityMode) return null;
+                        // Duration-based exercises (planks, holds, carries) don't use RIR
+                        if (isMobilityMode || isDurationBased) return null;
                         return (
                           <Input
                             type="number"
@@ -2742,6 +2748,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     {(() => {
                       // Duration-based exercises don't need equipment selection (bodyweight)
                       if (isDurationBased) {
+                        return null;
+                      }
+                      // Bodyweight exercises don't need equipment selection (e.g., Nordic Curls, pull-ups, push-ups)
+                      if (isBodyweightMove(exercise.name)) {
                         return null;
                       }
                       const exerciseType = getExerciseType(exercise.name);
@@ -2787,6 +2797,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     {(() => {
                       // Duration-based exercises don't need plate math (bodyweight)
                       if (isDurationBased) {
+                        return null;
+                      }
+                      // Bodyweight exercises don't need plate math (e.g., Nordic Curls, pull-ups, push-ups)
+                      if (isBodyweightMove(exercise.name)) {
                         return null;
                       }
                       const exerciseType = getExerciseType(exercise.name);
