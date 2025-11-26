@@ -2297,65 +2297,46 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       <div className="flex items-center gap-2">
                         <div className="w-6 text-xs text-gray-500 text-right">{setIndex + 1}</div>
                         
-                        {/* Duration-based exercises show prominent timer UI */}
+                        {/* Duration-based exercises show timer input, rep-based show reps input */}
                         {isDurationBased ? (
-                          // DURATION-BASED EXERCISE - Prominent timer UI
-                          <div className="flex-1 flex items-center gap-2">
-                            {/* Large prominent timer display */}
-                            <div className="flex-1 flex items-center gap-2 bg-gray-50 border-2 border-gray-300 rounded-lg px-4 py-3">
-                              <div className="flex-1 text-center">
-                                <div className="text-xs text-gray-600 mb-0.5">Duration</div>
-                                <div className={`text-2xl font-mono font-semibold ${isDurationRunning ? 'text-blue-600' : 'text-gray-900'}`}>
-                                  {formatSeconds(currentDurationSeconds)}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                {!isDurationRunning ? (
-                                  <button
-                                    onClick={() => {
-                                      const currentDuration = set.duration_seconds || 60;
-                                      setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds: currentDuration, running: true } }));
-                                    }}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
-                                  >
-                                    Start
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      setTimers(prev => ({ ...prev, [durationTimerKey]: { ...prev[durationTimerKey], running: false } }));
-                                    }}
-                                    className="px-4 py-2 bg-yellow-500 text-white rounded-md text-sm font-medium hover:bg-yellow-600"
-                                  >
-                                    Pause
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => {
-                                    const currentDuration = set.duration_seconds || 60;
-                                    setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds: currentDuration, running: false } }));
-                                  }}
-                                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300"
-                                >
-                                  Reset
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    const cur = set.duration_seconds || 60;
-                                    const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
-                                    setEditingTimerKey(durationTimerKey);
-                                    setEditingTimerValue(prefill);
-                                  }}
-                                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300"
-                                >
-                                  Edit
-                                </button>
-                              </div>
-                            </div>
+                          // DURATION-BASED EXERCISE - Simple timer display matching reps input style
+                          <div className="flex-1 flex items-center gap-1 relative">
+                            <button
+                              onClick={() => {
+                                const cur = set.duration_seconds || 60;
+                                const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
+                                setEditingTimerKey(durationTimerKey);
+                                setEditingTimerValue(prefill);
+                              }}
+                              className={`h-9 px-2 text-sm rounded-md border border-gray-300 flex-1 text-center ${isDurationRunning ? 'text-blue-600 border-blue-300' : 'text-gray-700 bg-white'}`}
+                              style={{ fontSize: '16px' }}
+                            >
+                              {formatSeconds(currentDurationSeconds)}
+                            </button>
+                            {!isDurationRunning ? (
+                              <button
+                                onClick={() => {
+                                  const currentDuration = set.duration_seconds || 60;
+                                  setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds: currentDuration, running: true } }));
+                                }}
+                                className="h-9 px-2 text-xs rounded-md border border-gray-300 text-gray-600 bg-white"
+                              >
+                                Start
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setTimers(prev => ({ ...prev, [durationTimerKey]: { ...prev[durationTimerKey], running: false } }));
+                                }}
+                                className="h-9 px-2 text-xs rounded-md border border-gray-300 text-gray-600 bg-white"
+                              >
+                                Pause
+                              </button>
+                            )}
                             
                             {/* Duration timer editor modal */}
                             {editingTimerKey === durationTimerKey && (
-                              <div className="absolute top-16 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
+                              <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
                                 <input
                                   type="tel"
                                   value={editingTimerValue}
@@ -2386,7 +2367,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 </div>
                               </div>
                             )}
-                            
                           </div>
                         ) : (
                         // REP-BASED EXERCISE (e.g., Squat, Bench Press)
@@ -2573,9 +2553,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   if (isMobilityMode || exercise.notes) {
                     return (
                       <div className="mt-3 pt-3 border-t border-gray-200">
-                        <Label htmlFor={`notes-${exercise.id}`} className="text-sm font-medium text-gray-700 mb-2 block">
-                          Notes
-                        </Label>
                         <Textarea
                           id={`notes-${exercise.id}`}
                           value={exercise.notes || ''}
