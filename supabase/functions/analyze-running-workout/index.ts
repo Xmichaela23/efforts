@@ -3988,9 +3988,27 @@ async function generateAINarrativeInsights(
   } | null = null;
   
   // Check if workout has intervals (for conditional AI prompt)
-  const hasIntervals = plannedWorkout?.computed?.steps?.some(
-    (step: any) => step.step_type === 'interval' || step.step_type === 'repeat'
-  ) || false;
+  // An interval workout has:
+  // 1. Multiple work segments with pace targets, OR
+  // 2. Alternating work/recovery pattern, OR
+  // 3. Explicit step_type === 'interval' || 'repeat'
+  const steps = plannedWorkout?.computed?.steps || [];
+  const workSteps = steps.filter((step: any) => 
+    (step.kind === 'work' || step.role === 'work' || step.step_type === 'interval') && 
+    (step.pace_range || step.target_pace)
+  );
+  const recoverySteps = steps.filter((step: any) => 
+    step.kind === 'recovery' || step.role === 'recovery'
+  );
+  
+  // Multiple work segments = interval workout
+  // OR explicit interval/repeat step_type
+  // OR alternating work/recovery pattern (at least 2 work segments)
+  const hasIntervals = workSteps.length > 1 || 
+    steps.some((step: any) => step.step_type === 'interval' || step.step_type === 'repeat') ||
+    (workSteps.length >= 1 && recoverySteps.length >= 1 && steps.length > 2);
+  
+  console.log(`🔍 [INTERVAL DETECTION] Work steps: ${workSteps.length}, Recovery steps: ${recoverySteps.length}, Total steps: ${steps.length}, hasIntervals: ${hasIntervals}`);
   
   if (isPlannedWorkout && plannedWorkout?.computed?.steps) {
     // Find all work segments with pace ranges
@@ -4140,7 +4158,40 @@ Do NOT make up different mile numbers. Do NOT recalculate. Use the numbers provi
 })()}
 
 Generate 3-4 observations comparing actual vs. planned performance:
-${plannedPaceInfo?.type === 'range' && plannedPaceInfo.range ? `
+${hasIntervals ? `
+${(() => {
+  // For interval workouts, analyze work intervals separately
+  // Don't compare overall average pace to work interval pace (overall includes warmup/recovery/cooldown)
+  const intervalBreakdown = detailedAnalysis?.interval_breakdown;
+  const workIntervals = intervalBreakdown?.intervals?.filter((i: any) => i.interval_type === 'work' || i.role === 'work') || [];
+  const completedIntervals = workIntervals.filter((i: any) => i.actual_duration_s > 0 || i.actual_pace_min_per_mi > 0);
+  const totalPlannedIntervals = workSteps.length;
+  
+  // Calculate average pace adherence across work intervals
+  const paceAdherences = workIntervals.map((i: any) => i.pace_adherence_percent || 0).filter((p: number) => p > 0);
+  const avgPaceAdherence = paceAdherences.length > 0 
+    ? Math.round(paceAdherences.reduce((sum: number, p: number) => sum + p, 0) / paceAdherences.length)
+    : 0;
+  const minPaceAdherence = paceAdherences.length > 0 ? Math.min(...paceAdherences) : 0;
+  const maxPaceAdherence = paceAdherences.length > 0 ? Math.max(...paceAdherences) : 0;
+  
+  // Check for fading pattern (pace getting slower)
+  const paces = workIntervals.map((i: any) => i.actual_pace_min_per_mi).filter((p: number) => p > 0);
+  const isFading = paces.length >= 3 && paces[0] < paces[paces.length - 1];
+  const isConsistent = paces.length > 0 && (Math.max(...paces) - Math.min(...paces)) < 0.1; // Less than 6 seconds difference
+  
+  let patternNote = '';
+  if (isFading) {
+    patternNote = 'Pace faded across intervals, with later intervals slower than early ones.';
+  } else if (isConsistent) {
+    patternNote = 'Pace remained consistent across all intervals.';
+  } else {
+    patternNote = 'Pace varied across intervals.';
+  }
+  
+  return `"Completed ${completedIntervals.length} of ${totalPlannedIntervals} prescribed work intervals. Work interval pace adherence ranged from ${minPaceAdherence}% to ${maxPaceAdherence}% (average ${avgPaceAdherence}%). ${patternNote}"`;
+})()}
+` : plannedPaceInfo?.type === 'range' && plannedPaceInfo.range ? `
 ${(() => {
   // Parse average pace from MM:SS format to seconds
   // workoutContext.avg_pace is formatted as "10:15" (MM:SS)
@@ -4203,19 +4254,19 @@ ${(() => {
 
 Pace control varied significantly mile-to-mile, with only ${milesInRange} of ${totalMiles} miles falling within the target range, though average pace remained excellent."`;
 })()}
-"Mile-by-mile breakdown: [CRITICAL: Use the PRE-CALCULATED mile categorization data from the MILE-BY-MILE CATEGORIZATION section above. Report EXACTLY which miles were within range, faster than range start, or slower than range end as shown in that section. Do NOT recalculate - copy the mile numbers directly from the pre-calculated data.]"
+${hasIntervals ? `` : `"Mile-by-mile breakdown: [CRITICAL: Use the PRE-CALCULATED mile categorization data from the MILE-BY-MILE CATEGORIZATION section above. Report EXACTLY which miles were within range, faster than range start, or slower than range end as shown in that section. Do NOT recalculate - copy the mile numbers directly from the pre-calculated data.]"`}
 ` : plannedPaceInfo?.type === 'single' && plannedPaceInfo.target && plannedPaceInfo.targetSeconds ? `
 "Maintained pace averaging X:XX ${workoutContext.pace_unit}, ${Math.abs(parseFloat(workoutContext.avg_pace) - (plannedPaceInfo.targetSeconds / 60)) < 0.1 ? 'matching' : 'deviating from'} the prescribed target of ${plannedPaceInfo.target}. Pace varied by A%, indicating [consistent/inconsistent] pacing."
 ` : `
 "Maintained pace averaging X:XX ${workoutContext.pace_unit}, achieving Y% adherence to prescribed pace target. Pace varied by A%, with most intervals between B:BB-C:CC ${workoutContext.pace_unit}."
 `}
-${hasIntervals ? `"Completed X of Y prescribed intervals, with pace adherence ranging from A% to B%. [Include any notable pattern like fading or consistent execution]"` : `"Pace control varied significantly mile-to-mile, with only ${(() => {
-  const mileByMile = detailedAnalysis?.mile_by_mile_terrain;
-  if (mileByMile && mileByMile.miles_in_range !== undefined) {
-    return `${mileByMile.miles_in_range} of ${mileByMile.total_miles || mileByMile.splits?.length || 'Y'}`;
-  }
-  return 'X of Y';
-})()} miles falling within the target range, though average pace remained excellent."`}
+${hasIntervals ? `` : `"Pace control varied significantly mile-to-mile, with only ${(() => {
+    const mileByMile = detailedAnalysis?.mile_by_mile_terrain;
+    if (mileByMile && mileByMile.miles_in_range !== undefined) {
+      return `${mileByMile.miles_in_range} of ${mileByMile.total_miles || mileByMile.splits?.length || 'Y'}`;
+    }
+    return 'X of Y';
+  })()} miles falling within the target range, though average pace remained excellent."`}
 ${(() => {
   const hrAnalysis = granularAnalysis?.heart_rate_analysis;
   const hrDrift = hrAnalysis?.hr_drift_bpm || 0;
