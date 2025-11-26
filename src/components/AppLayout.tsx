@@ -637,7 +637,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             const parsed = raw.map((m: any) => {
               const name = String(m?.name || '').trim() || 'Mobility';
               const notes = String(m?.description || m?.notes || '').trim();
-              console.log('📝 AppLayout parsing exercise:', { name, notes, description: m?.description, m_notes: m?.notes, full_m: m });
+              console.log('📝 AppLayout parsing exercise:', { name, notes, description: m?.description, m_notes: m?.notes, duration_seconds: m?.duration_seconds, full_m: m });
+              
+              // Check if this is a duration-based exercise (has duration_seconds)
+              if (typeof m?.duration_seconds === 'number' && m.duration_seconds > 0) {
+                const sets = m.sets || 1;
+                const w = typeof m?.weight === 'number' && Number.isFinite(m.weight) ? m.weight : 
+                         (typeof m?.weight === 'string' ? (parseFloat(m.weight) || 0) : 0);
+                const result = { name, sets, duration_seconds: m.duration_seconds, weight: w, notes };
+                console.log('📝 AppLayout parsed result (duration-based):', result);
+                return result;
+              }
+              
+              // Otherwise, parse as rep-based exercise
               const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
               let sets = 1; let reps = 8;
               const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
@@ -651,7 +663,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 if (Number.isFinite(pw)) w = pw;
               }
               const result = { name, sets, reps, weight: w, notes };
-              console.log('📝 AppLayout parsed result:', result);
+              console.log('📝 AppLayout parsed result (rep-based):', result);
               return result;
             });
             setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: mob?.planned?.name || 'Mobility Session', date: today, strength_exercises: parsed } as any);
@@ -697,6 +709,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             const parsed = raw.map((m: any) => {
               const name = String(m?.name || '').trim() || 'Mobility';
               const notes = String(m?.description || m?.notes || '').trim();
+              
+              // Check if this is a duration-based exercise (has duration_seconds)
+              if (typeof m?.duration_seconds === 'number' && m.duration_seconds > 0) {
+                const sets = m.sets || 1;
+                let w = 0;
+                if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
+                  w = m.weight;
+                } else if (typeof m?.weight === 'string') {
+                  const pw = parseFloat(m.weight);
+                  if (Number.isFinite(pw)) w = pw;
+                }
+                return { name, sets, duration_seconds: m.duration_seconds, weight: w, notes };
+              }
+              
+              // Otherwise, parse as rep-based exercise
               const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
               let sets = 1; let reps = 8;
               const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);

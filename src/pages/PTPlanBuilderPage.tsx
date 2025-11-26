@@ -8,6 +8,7 @@ type ParsedItem = {
   name: string;
   sets?: number;
   reps?: number;
+  duration_seconds?: number;  // For duration-based exercises (planks, holds, etc.)
   perSide?: boolean;
   weight?: number;
   unit?: 'lb' | 'kg';
@@ -18,8 +19,15 @@ type ParsedItem = {
  * Deterministic parser for exercise lines
  * Uses clear, prioritized rules in order:
  * 1. Extract structured data (sets, reps, weight) using regex patterns
- * 2. Extract notes using explicit separators (colon, cue:, focus:)
+ * 2. Extract notes using explicit separators (pipe |, colon :, cue:, focus:)
  * 3. Extract name by removing structured data and notes
+ * 
+ * Preferred format (cleanest, most reliable):
+ *   Exercise name — sets/reps/weight | notes
+ * 
+ * Examples:
+ *   - Red superband kickbacks — 2×15 each side, 10-30 lb band | do left until it BURNS, match reps on right
+ *   - Side plank with top leg elevated — 3×20 seconds each side, bodyweight | top leg on bench, bottom leg floating
  * 
  * All patterns are deterministic regex - no AI or ML involved
  */
@@ -59,25 +67,26 @@ function parseLine(line: string): ParsedItem | null {
   }
   
   // Pattern 2d: Duration-based "2-3 sets of 20 seconds" or "3x20s"
-  // Extract sets/reps but don't interfere with notes extraction
+  // For duration-based exercises, store duration_seconds instead of reps
   if (!setsRepsPattern1 && !out.sets) {
     const durationPattern = cleaned.match(/(\d+)(?:-\d+)?\s*(?:sets?\s*of|x)\s*(\d+)\s*(?:seconds?|sec|s)\b/i);
     if (durationPattern) {
       out.sets = parseInt(durationPattern[1], 10);
-      out.reps = parseInt(durationPattern[2], 10);
+      out.duration_seconds = parseInt(durationPattern[2], 10);  // Store as duration, not reps
+      // Don't set reps for duration-based exercises
     }
   }
   
-  // Pattern 2e: Weight - "20 lbs" or "(10-30 lbs)" or "25 lb" or "20kg"
-  const weightPattern = cleaned.match(/(?:\(|^|\s)(\d+)(?:-(\d+))?\s*(lb|lbs|kg)\b/i);
+  // Pattern 2e: Weight - "20 lbs" or "(10-30 lbs)" or "25 lb" or "20kg" or "10-30 lb band"
+  const weightPattern = cleaned.match(/(?:\(|^|\s)(\d+)(?:-(\d+))?\s*(lb|lbs|kg)(?:\s+band)?\b/i);
   if (weightPattern) {
     out.weight = parseFloat(weightPattern[1]);
     out.unit = /kg/i.test(weightPattern[3]) ? 'kg' : 'lb';
   }
   
-  // Pattern 2f: Weight with @ symbol "exercise @ 20 lbs" or "exercise - 20 lbs"
+  // Pattern 2f: Weight with @ symbol or dash "exercise @ 20 lbs" or "exercise — 20 lbs"
   if (!weightPattern) {
-    const weightAtPattern = cleaned.match(/[@—–-]\s*(\d+)(?:-(\d+))?\s*(lb|lbs|kg)\b/i);
+    const weightAtPattern = cleaned.match(/[@—–-]\s*(\d+)(?:-(\d+))?\s*(lb|lbs|kg)(?:\s+band)?\b/i);
     if (weightAtPattern) {
       out.weight = parseFloat(weightAtPattern[1]);
       out.unit = /kg/i.test(weightAtPattern[3]) ? 'kg' : 'lb';
@@ -88,14 +97,43 @@ function parseLine(line: string): ParsedItem | null {
   let notesPart = '';
   let namePart = cleaned;
   
-  // Rule 3a: Explicit "cue:" or "focus:" patterns (highest priority)
-  const explicitCuePattern = cleaned.match(/(?:cue|focus)\s*:\s*(.+)$/i);
-  if (explicitCuePattern) {
-    notesPart = explicitCuePattern[1].trim();
-    namePart = cleaned.replace(/,?\s*(?:cue|focus)\s*:.*$/i, '').trim();
+  // Rule 3a: Pipe separator "exercise — sets/reps/weight | notes" (highest priority - cleanest format)
+  // Preferred format: Name — Sets/Reps/Weight | Notes
+  const pipeIndex = cleaned.indexOf('|');
+  if (pipeIndex > 0) {
+    const beforePipe = cleaned.substring(0, pipeIndex).trim();
+    const afterPipe = cleaned.substring(pipeIndex + 1).trim();
+    if (afterPipe) {
+      notesPart = afterPipe;
+      // Extract name from before pipe - look for em dash separator
+      const dashIndex = beforePipe.search(/[—–-]/);
+      if (dashIndex > 0) {
+        // Format: "Name — sets/reps/weight"
+        namePart = beforePipe.substring(0, dashIndex).trim();
+      } else {
+        // No dash - remove sets/reps/weight from namePart manually
+        namePart = beforePipe;
+        namePart = namePart.replace(/\b\d+\s*x\s*\d+\b/i, '').trim();
+        namePart = namePart.replace(/\b\d+\s*sets?\s*(?:of\s*\d+|until)/i, '').trim();
+        namePart = namePart.replace(/\b\d+(?:-\d+)?\s*(?:lb|lbs|kg)(?:\s+band)?\b/i, '').trim();
+        namePart = namePart.replace(/\bbodyweight\b/i, '').trim();
+        namePart = namePart.replace(/\beach\s+side\b/i, '').trim();
+        namePart = namePart.replace(/\bper\s*side\b/i, '').trim();
+        namePart = namePart.replace(/\bseconds?\b/i, '').trim();
+      }
+    }
   }
   
-  // Rule 3b: Colon separator "exercise: notes" (but not numbered lists)
+  // Rule 3b: Explicit "cue:" or "focus:" patterns
+  if (!notesPart) {
+    const explicitCuePattern = cleaned.match(/(?:cue|focus)\s*:\s*(.+)$/i);
+    if (explicitCuePattern) {
+      notesPart = explicitCuePattern[1].trim();
+      namePart = cleaned.replace(/,?\s*(?:cue|focus)\s*:.*$/i, '').trim();
+    }
+  }
+  
+  // Rule 3c: Colon separator "exercise: notes" (but not numbered lists)
   if (!notesPart) {
     // Match colon but handle numbered lists specially
     // Look for colon that's not part of a numbered list
@@ -121,7 +159,23 @@ function parseLine(line: string): ParsedItem | null {
     }
   }
   
-  // Rule 3c: Text after sets/reps pattern (like "until X, and match Y")
+  // Rule 3d: Em dash separator "exercise — sets/reps/weight" format (without pipe)
+  if (!notesPart) {
+    // Look for em dash (—) or en dash (–) or double dash (--)
+    const dashMatch = cleaned.match(/[—–-]{1,2}\s*(.+)/);
+    if (dashMatch) {
+      const afterDash = dashMatch[1].trim();
+      // Check if it looks like structured data (sets/reps/weight)
+      const looksLikeStructured = afterDash.match(/^\d+\s*(?:x\s*\d+|sets?\s*(?:of\s*\d+|until))/i);
+      if (!looksLikeStructured && afterDash.length > 10) {
+        // Doesn't look like structured data and is substantial - might be notes
+        namePart = cleaned.substring(0, dashMatch.index).trim();
+        notesPart = afterDash;
+      }
+    }
+  }
+  
+  // Rule 3e: Text after sets/reps pattern (like "until X, and match Y")
   if (!notesPart) {
     // Match "2 sets until X" pattern specifically
     const untilMatch = cleaned.match(/\d+\s*sets?\s+until\s+(.+)/i);
@@ -145,7 +199,7 @@ function parseLine(line: string): ParsedItem | null {
     }
   }
   
-  // Rule 3d: Descriptive text between commas (before sets/reps/weight)
+  // Rule 3f: Descriptive text between commas (before sets/reps/weight)
   if (!notesPart) {
     const commaParts = cleaned.split(',');
     if (commaParts.length > 1) {
@@ -327,15 +381,25 @@ export default function MobilityPlanBuilderPage() {
         type: 'mobility',
         description: 'Mobility session',
         mobility_exercises: items.map(ii=>{
-          const exerciseData = {
+          const exerciseData: any = {
             name: ii.name,
-            duration: (ii.sets && ii.reps) ? `${ii.sets}x${ii.reps}${ii.perSide?' per side':''}` : (ii.reps? `${ii.reps} reps`:'2-3 minutes'),
             description: ii.cues || '',
             // Preserve parsed load for downstream prefilling
             weight: typeof (ii as any).weight === 'number' ? (ii as any).weight : undefined,
             unit: (ii as any).unit || undefined
           };
-          console.log(`📝 Plan builder storing exercise:`, exerciseData, `(cues="${ii.cues}")`);
+          // For duration-based exercises, store duration_seconds
+          if (ii.duration_seconds !== undefined) {
+            exerciseData.duration_seconds = ii.duration_seconds;
+            exerciseData.duration = `${ii.sets || 1}x${ii.duration_seconds} seconds${ii.perSide?' per side':''}`;
+          } else if (ii.sets && ii.reps) {
+            exerciseData.duration = `${ii.sets}x${ii.reps}${ii.perSide?' per side':''}`;
+          } else if (ii.reps) {
+            exerciseData.duration = `${ii.reps} reps`;
+          } else {
+            exerciseData.duration = '2-3 minutes';
+          }
+          console.log(`📝 Plan builder storing exercise:`, exerciseData, `(cues="${ii.cues}", duration_seconds=${ii.duration_seconds})`);
           return exerciseData;
         })
       }));
@@ -396,7 +460,10 @@ export default function MobilityPlanBuilderPage() {
       </div>
       <div className="space-y-2">
         <label className="text-sm">Exercises (one per line)</label>
-        <textarea rows={6} className="border rounded px-2 py-2 w-full" value={text} onChange={(e)=>setText(e.target.value)} placeholder={"Example:\nbridge marching, 3x8, cue: slow\nbird dog rows, 20 lb, 2x8 per side, cue: kick back straight\nsingle leg RDL rows, 25 lb, 2x12 per side, cue: weight same side as working leg"} />
+        <div className="text-xs text-gray-500 mb-1">
+          Preferred format: <span className="font-mono">Exercise name — sets/reps/weight | notes</span>
+        </div>
+        <textarea rows={8} className="border rounded px-2 py-2 w-full font-mono text-sm" value={text} onChange={(e)=>setText(e.target.value)} placeholder={"Example:\nRed superband kickbacks — 2×15 each side, 10-30 lb band | do left until it BURNS, match reps on right\nRed superband half step-outs — 2×15 each side, 10-30 lb band | band perpendicular to chest, arms fully extended\nSide plank with top leg elevated — 3×20 seconds each side, bodyweight | top leg on bench, bottom leg floating\nBird dog rows — 2×8 per side, 20 lb | focus on kicking back leg straight back\nSingle leg RDL rows — 2×12 per side, 25 lb | weight on same side as kicked-back leg"} />
       </div>
       <div className="space-y-2">
         <label className="text-sm">Preview</label>
