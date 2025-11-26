@@ -107,7 +107,8 @@ function parseLine(line: string): ParsedItem | null {
   
   // Rule 3c: Text after sets/reps pattern (like "until X, and match Y")
   if (!notesPart) {
-    const setsRepsMatch = cleaned.match(/(\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+|\s+until))/i);
+    // Match patterns like "2 sets until", "3x8", "3 sets of 8"
+    const setsRepsMatch = cleaned.match(/(\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*(?:of\s*\d+|until)))/i);
     if (setsRepsMatch && setsRepsMatch.index !== undefined) {
       const afterSets = cleaned.substring(setsRepsMatch.index + setsRepsMatch[0].length).trim();
       if (afterSets && !afterSets.match(/^\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+)/i)) {
