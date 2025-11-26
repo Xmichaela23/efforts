@@ -168,9 +168,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           
           // Otherwise, parse as rep-based exercise
           const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
-          let sets = m.sets || 1; let reps = 8;
-          const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
-          if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||8; }
+          let sets = m.sets || 1;
+          let reps: number | undefined = undefined;
+          
+          // Check if exercise has explicit reps
+          if (typeof m?.reps === 'number' && m.reps > 0) {
+            reps = m.reps;
+          } else {
+            // Try to parse reps from duration string (e.g., "2x8" or "2 sets of 8")
+            const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
+            if (mr) {
+              sets = parseInt(mr[1],10)||1;
+              reps = parseInt(mr[2],10)||undefined;
+            } else {
+              // Check if duration string indicates sets only (e.g., "2 sets" without reps)
+              const setsOnlyMatch = durTxt.match(/(\d+)\s*sets?/i);
+              if (setsOnlyMatch) {
+                sets = parseInt(setsOnlyMatch[1],10)||1;
+                // Don't set reps - leave undefined for "until" patterns
+              }
+            }
+          }
           // Use preserved load if present, else parse from free text
           let w = 0;
           if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
@@ -183,7 +201,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             const mw = blob.match(/(\d+(?:\.\d+)?)\s*(lb|lbs|kg)\b/i);
             if (mw) { const pw = parseFloat(mw[1]); if (Number.isFinite(pw)) w = pw; }
           }
-          return { name, sets, reps, weight: w, notes };
+          return { name, sets, reps: reps !== undefined ? reps : undefined, weight: w, notes };
         });
         const plannedForStrength = { ...planned, type: 'strength', strength_exercises: parsed, logger_mode: 'mobility' } as any;
         setLoggerScheduledWorkout(plannedForStrength);

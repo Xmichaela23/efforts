@@ -1394,10 +1394,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 } else if (isDurationBasedExercise(exercise.name) && exercise.reps && exercise.reps > 0) {
                   // Convert reps to duration_seconds for duration-based exercises (e.g., "Planks 3×60" where 60 is seconds, not reps)
                   baseSet.duration_seconds = exercise.reps;
-                } else {
-                  // Rep-based exercises (traditional lifts)
-                  baseSet.reps = exercise.reps || 0;
+                } else if (exercise.reps !== undefined && exercise.reps > 0) {
+                  // Rep-based exercises (traditional lifts) - only set reps if they exist
+                  baseSet.reps = exercise.reps;
                 }
+                // If no reps and not duration-based, leave reps undefined (for "until" patterns)
                 return baseSet;
               })
             };
