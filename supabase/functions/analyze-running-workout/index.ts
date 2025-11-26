@@ -4165,7 +4165,13 @@ ${(() => {
   const intervalBreakdown = detailedAnalysis?.interval_breakdown;
   const workIntervals = intervalBreakdown?.intervals?.filter((i: any) => i.interval_type === 'work' || i.role === 'work') || [];
   const completedIntervals = workIntervals.filter((i: any) => i.actual_duration_s > 0 || i.actual_pace_min_per_mi > 0);
-  const totalPlannedIntervals = workSteps.length;
+  // Use workSteps from outer scope (defined above)
+  const steps = plannedWorkout?.computed?.steps || [];
+  const plannedWorkSteps = steps.filter((step: any) => 
+    (step.kind === 'work' || step.role === 'work' || step.step_type === 'interval') && 
+    (step.pace_range || step.target_pace)
+  );
+  const totalPlannedIntervals = plannedWorkSteps.length;
   
   // Calculate average pace adherence across work intervals
   const paceAdherences = workIntervals.map((i: any) => i.pace_adherence_percent || 0).filter((p: number) => p > 0);
