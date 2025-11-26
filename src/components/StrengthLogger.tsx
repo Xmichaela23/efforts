@@ -386,7 +386,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const isBodyweightMove = (raw?: string): boolean => {
     try {
       const n = String(raw || '').toLowerCase().replace(/[\s-]/g,'');
-      return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls/.test(n);
+      return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls|swissballwalk|swissball|walkout/.test(n);
     } catch { return false; }
   };
 
@@ -1161,10 +1161,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             } else if (isDurationBasedExercise(exercise.name) && exercise.reps && exercise.reps > 0) {
               // Convert reps to duration_seconds for duration-based exercises (e.g., "Planks 3×60" where 60 is seconds, not reps)
               baseSet.duration_seconds = exercise.reps;
-            } else {
-              // Rep-based exercises (traditional lifts)
-              baseSet.reps = exercise.reps || 0;
+            } else if (exercise.reps !== undefined && exercise.reps > 0) {
+              // Rep-based exercises (traditional lifts) - only set reps if they exist
+              baseSet.reps = exercise.reps;
             }
+            // If no reps and not duration-based, leave reps undefined (for "until" patterns)
             return baseSet;
           })
         };
@@ -1282,7 +1283,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   name: cleanName || '',
                   notes: rawNotes || undefined,
                   expanded: true,
-                  sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
+                  sets: Array.from({ length: exercise.sets || 3 }, () => {
+                    const baseSet: LoggedSet = {
+                      weight: exercise.weight || 0,
+                      barType: 'standard',
+                      rir: undefined,
+                      completed: false
+                    };
+                    // Only set reps if they exist (for "until" patterns, reps should be undefined)
+                    if (exercise.reps !== undefined && exercise.reps > 0) {
+                      baseSet.reps = exercise.reps;
+                    }
+                    // Check for duration-based exercises
+                    if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
+                      baseSet.duration_seconds = exercise.duration_seconds;
+                    } else if (isDurationBasedExercise(exercise.name) && exercise.reps && exercise.reps > 0) {
+                      baseSet.duration_seconds = exercise.reps;
+                    }
+                    return baseSet;
+                  })
                 };
               });
               if (pre.length) { 

@@ -53,8 +53,20 @@ function parseLine(line: string): ParsedItem | null {
     // Don't set reps for duration-based exercises
   }
   
-  // Pattern 2b: "3x8" or "3 x 8" or "3×8" (multiplication symbol) - only if not duration
-  if (!durationPattern) {
+  // Pattern 2d: "2 sets until..." or "2 sets of until..." (sets only, no reps)
+  // This pattern takes priority - if we have "sets until", don't try to extract reps
+  // Check this BEFORE Pattern 2b/2c to prevent reps extraction
+  if (!durationPattern && !out.sets) {
+    const setsUntilPattern = cleaned.match(/(\d+)\s*sets?\s+until/i);
+    if (setsUntilPattern) {
+      out.sets = parseInt(setsUntilPattern[1], 10);
+      // Don't set reps for "until" patterns - it's descriptive (e.g., "until glute burns")
+      // This prevents Pattern 2b/2c from trying to extract reps
+    }
+  }
+  
+  // Pattern 2b: "3x8" or "3 x 8" or "3×8" (multiplication symbol) - only if not duration and not "until" pattern
+  if (!durationPattern && !out.sets) {
     const setsRepsPattern1 = cleaned.match(/(\d+)(?:-\d+)?\s*[x×]\s*(\d+)/i);
     if (setsRepsPattern1) {
       out.sets = parseInt(setsRepsPattern1[1], 10);
@@ -71,16 +83,9 @@ function parseLine(line: string): ParsedItem | null {
     }
   }
   
-  // Pattern 2d: "2 sets until..." or "2 sets of until..." (sets only, no reps)
-  if (!durationPattern && !out.sets) {
-    const setsUntilPattern = cleaned.match(/(\d+)\s*sets?\s+until/i);
-    if (setsUntilPattern) {
-      out.sets = parseInt(setsUntilPattern[1], 10);
-    }
-  }
-  
   // Pattern 2e: Weight - "20 lbs" or "(10-30 lbs)" or "25 lb" or "20kg" or "10-30 lb band"
-  const weightPattern = cleaned.match(/(?:\(|^|\s)(\d+)(?:-(\d+))?\s*(lb|lbs|kg)(?:\s+band)?\b/i);
+  // Match weight even if preceded by comma (e.g., "..., 10-30 lb band")
+  const weightPattern = cleaned.match(/(?:\(|^|\s|,)\s*(\d+)(?:-(\d+))?\s*(lb|lbs|kg)(?:\s+band)?\b/i);
   if (weightPattern) {
     out.weight = parseFloat(weightPattern[1]);
     out.unit = /kg/i.test(weightPattern[3]) ? 'kg' : 'lb';
@@ -120,11 +125,36 @@ function parseLine(line: string): ParsedItem | null {
       if (dashIndex > 0) {
         // Format: "Name — sets/reps/weight"
         namePart = beforePipe.substring(0, dashIndex).trim();
+        // Also extract structured data from after the dash (before pipe) for proper parsing
+        const afterDash = beforePipe.substring(dashIndex + 1).trim();
+        // Re-run pattern matching on afterDash to ensure sets/weight are extracted
+        // Pattern 2d: "2 sets until..." (sets only, no reps)
+        if (!out.sets) {
+          const setsUntilPattern = afterDash.match(/(\d+)\s*sets?\s+until/i);
+          if (setsUntilPattern) {
+            out.sets = parseInt(setsUntilPattern[1], 10);
+          }
+        }
+        // Pattern 2e: Weight - check afterDash for weight patterns (handle commas)
+        if (!out.weight) {
+          const weightPatternAfterDash = afterDash.match(/(?:\(|^|\s|,)\s*(\d+)(?:-(\d+))?\s*(lb|lbs|kg)(?:\s+band)?\b/i);
+          if (weightPatternAfterDash) {
+            out.weight = parseFloat(weightPatternAfterDash[1]);
+            out.unit = /kg/i.test(weightPatternAfterDash[3]) ? 'kg' : 'lb';
+            // If it's a weight range (has second number), store the full range text for notes
+            if (weightPatternAfterDash[2]) {
+              const fullMatch = weightPatternAfterDash[0];
+              const hasBand = /band/i.test(fullMatch);
+              const fullRange = `${weightPatternAfterDash[1]}-${weightPatternAfterDash[2]} ${weightPatternAfterDash[3]}${hasBand ? ' band' : ''}`;
+              out.weightRange = fullRange;
+            }
+          }
+        }
       } else {
         // No dash - remove sets/reps/weight from namePart manually
         namePart = beforePipe;
         namePart = namePart.replace(/\b\d+\s*x\s*\d+\b/i, '').trim();
-        namePart = namePart.replace(/\b\d+\s*sets?\s*(?:of\s*\d+|until)/i, '').trim();
+        namePart = namePart.replace(/\b\d+\s*sets?\s*(?:of\s*\d+|until\s+[^,|]+)/i, '').trim();
         namePart = namePart.replace(/\b\d+(?:-\d+)?\s*(?:lb|lbs|kg)(?:\s+band)?\b/i, '').trim();
         namePart = namePart.replace(/\bbodyweight\b/i, '').trim();
         namePart = namePart.replace(/\beach\s+side\b/i, '').trim();
@@ -271,8 +301,11 @@ function parseLine(line: string): ParsedItem | null {
     .replace(/\([^)]*\)/g, '') // Remove parentheses (weight ranges, alternatives)
     .replace(/,?\s*(?:cue|focus)\s*:.*/i, '') // Remove explicit cues
     .replace(/\b\d+\s*x\s*\d+\b/i, '') // Remove sets x reps
-    .replace(/\b\d+(?:-\d+)?\s*sets?\s*(?:of\s*\d+|until\s+[^,]+)/i, '') // Remove "sets of" or "sets until [text]"
-    .replace(/\b\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i, '') // Remove weight
+    .replace(/\b\d+(?:-\d+)?\s*sets?\s+until\s+[^,|]+/i, '') // Remove "sets until [text]" (more aggressive)
+    .replace(/\b\d+(?:-\d+)?\s*sets?\s*(?:of\s*\d+)/i, '') // Remove "sets of [number]"
+    .replace(/\b\d+(?:-\d+)?\s*(?:lb|lbs|kg)(?:\s+band)?\b/i, '') // Remove weight (including "band")
+    .replace(/\buntil\s+[^,|]+/gi, '') // Remove any remaining "until [text]" patterns (case insensitive, global)
+    .replace(/\bglute\s+burns?\b/gi, '') // Remove "glute burns" or "glute burn"
     .replace(/\bper\s*side\b/i, '') // Remove "per side"
     .replace(/\beach\s+side\b/i, '') // Remove "each side"
     .replace(/\bswitches?\b/i, '') // Remove "switches"
@@ -414,6 +447,10 @@ export default function MobilityPlanBuilderPage() {
           } else if (ii.sets && ii.reps) {
             exerciseData.sets = ii.sets;  // Store sets for rep-based exercises too
             exerciseData.duration = `${ii.sets}x${ii.reps}${ii.perSide?' per side':''}`;
+          } else if (ii.sets && !ii.reps) {
+            // Sets without reps (e.g., "2 sets until glute burns") - store sets but no reps
+            exerciseData.sets = ii.sets;
+            exerciseData.duration = `${ii.sets} sets${ii.perSide?' per side':''}`;
           } else if (ii.reps) {
             exerciseData.duration = `${ii.reps} reps`;
           } else {
