@@ -1552,10 +1552,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (exercise.id === exerciseId) {
         console.log('✅ Found exercise, current sets:', exercise.sets.length);
         const lastSet = exercise.sets[exercise.sets.length - 1];
+        const exerciseType = getExerciseType(exercise.name);
         const newSet: LoggedSet = {
           reps: lastSet?.reps || 0,
           weight: lastSet?.weight || 0,
           barType: lastSet?.barType || 'standard',
+          resistance_level: exerciseType === 'band' ? (lastSet?.resistance_level || 'Light') : lastSet?.resistance_level,
           rir: undefined,
           completed: false
         };
@@ -2325,7 +2327,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (exerciseType === 'band') {
                           return (
                             <Select
-                              value={set.resistance_level || 'Medium'}
+                              value={set.resistance_level || 'Light'}
                               onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
                             >
                               <SelectTrigger className="h-9 text-center text-sm border-gray-300 flex-1">

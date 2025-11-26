@@ -120,14 +120,21 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (workoutToLoad && Array.isArray(mobAny) && mobAny.length > 0) {
       console.log('📝 Pre-populating with planned mobility workout exercises');
       // Pre-populate with scheduled workout data
-      const prePopulatedExercises: LoggedMobilityExercise[] = mobAny.map((exercise: any, index: number) => ({
-        id: `mob-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-        name: exercise.name || '',
-        plannedDuration: exercise.duration || exercise.plannedDuration || '2-3 minutes',
-        notes: exercise.description || exercise.notes || '',
-        completed: false,
-        expanded: true
-      }));
+      const prePopulatedExercises: LoggedMobilityExercise[] = mobAny.map((exercise: any, index: number) => {
+        // Extract notes separately - ensure they don't end up in the name
+        const rawName = String(exercise.name || '').trim();
+        const rawNotes = String(exercise.description || exercise.notes || '').trim();
+        // Clean name - remove any notes that might have been concatenated
+        const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
+        return {
+          id: `mob-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+          name: cleanName || '',
+          plannedDuration: exercise.duration || exercise.plannedDuration || '2-3 minutes',
+          notes: rawNotes,
+          completed: false,
+          expanded: true
+        };
+      });
       
       setExercises(prePopulatedExercises);
     } else {
@@ -508,14 +515,18 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
                           />
                         </div>
                       </div>
-                      <div>
-                        <Label htmlFor={`notes-${exercise.id}`}>Notes</Label>
+                      {/* Notes section - separate and clearly visible */}
+                      <div className="pt-2 border-t border-gray-200">
+                        <Label htmlFor={`notes-${exercise.id}`} className="text-sm font-medium text-gray-700">
+                          Notes
+                        </Label>
                         <Textarea
                           id={`notes-${exercise.id}`}
                           value={exercise.notes || ''}
                           onChange={(e) => updateExercise(exercise.id, { notes: e.target.value })}
                           placeholder="How did it feel? Any modifications?"
-                          rows={2}
+                          rows={3}
+                          className="mt-2"
                         />
                       </div>
                     </div>
