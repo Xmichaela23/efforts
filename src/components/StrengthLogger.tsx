@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Plus, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
@@ -24,6 +26,7 @@ interface LoggedExercise {
   name: string;
   sets: LoggedSet[];
   expanded?: boolean;
+  notes?: string;
 }
 
 interface StrengthLoggerProps {
@@ -832,6 +835,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const resistanceLevel = exerciseType === 'band' ? extractResistance(notes) : undefined;
         
         if (!byName[name]) {
+          // Extract notes separately - ensure they don't end up in the name
+          const rawNotes = String(notes || '').trim();
           byName[name] = {
             id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             name,
@@ -839,7 +844,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             sets: [] as LoggedSet[],
             timer: 90,
             unit: 'lb',
-            notes: '',
+            notes: rawNotes || undefined,
             rir: null,
           } as LoggedExercise;
         }
@@ -1048,27 +1053,35 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (workoutToLoad && workoutToLoad.strength_exercises && workoutToLoad.strength_exercises.length > 0) {
       console.log('📝 Pre-populating with planned workout exercises');
       // Pre-populate with scheduled workout data
-      const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => ({
-        id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-        name: exercise.name || '',
-        expanded: true,
-        sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => {
-          const baseSet: LoggedSet = {
-            weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
-            barType: 'standard',
-            rir: undefined,
-            completed: false
-          };
-          // Duration-based exercises (planks, holds, carries)
-          if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
-            baseSet.duration_seconds = exercise.duration_seconds;
-          } else {
-            // Rep-based exercises (traditional lifts)
-            baseSet.reps = exercise.reps || 0;
-          }
-          return baseSet;
-        })
-      }));
+      const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => {
+        // Extract notes separately - ensure they don't end up in the name
+        const rawName = String(exercise.name || '').trim();
+        const rawNotes = String(exercise.notes || exercise.description || '').trim();
+        // Clean name - remove any notes that might have been concatenated
+        const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
+        return {
+          id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+          name: cleanName || '',
+          notes: rawNotes || undefined,
+          expanded: true,
+          sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => {
+            const baseSet: LoggedSet = {
+              weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
+              barType: 'standard',
+              rir: undefined,
+              completed: false
+            };
+            // Duration-based exercises (planks, holds, carries)
+            if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
+              baseSet.duration_seconds = exercise.duration_seconds;
+            } else {
+              // Rep-based exercises (traditional lifts)
+              baseSet.reps = exercise.reps || 0;
+            }
+            return baseSet;
+          })
+        };
+      });
       
       setExercises(prePopulatedExercises);
     } else if (workoutToLoad && ((workoutToLoad as any).steps_preset?.length > 0 || typeof (workoutToLoad as any).rendered_description === 'string' || typeof (workoutToLoad as any).description === 'string')) {
@@ -1125,12 +1138,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // If steps did not map, try strength_exercises pass-through
             const se: any[] = Array.isArray(plannedStrength?.planned?.strength_exercises) ? plannedStrength.planned.strength_exercises : [];
             if (se.length) {
-              const pre: LoggedExercise[] = se.map((exercise: any, index: number) => ({
-                id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-                name: exercise.name || '',
-                expanded: true,
-                sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
-              }));
+              const pre: LoggedExercise[] = se.map((exercise: any, index: number) => {
+                const rawName = String(exercise.name || '').trim();
+                const rawNotes = String(exercise.notes || exercise.description || '').trim();
+                const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
+                return {
+                  id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+                  name: cleanName || '',
+                  notes: rawNotes || undefined,
+                  expanded: true,
+                  sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
+                };
+              });
               if (pre.length) { setExercises(prev => (isPlaceholder(prev) ? pre : (prev.length? prev: pre))); return; }
             }
           }
@@ -1161,27 +1180,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (exs.length) { setExercises(prev=> isPlaceholder(prev) ? exs : (prev.length? prev: exs)); return; }
         }
         if (Array.isArray((data as any).strength_exercises) && (data as any).strength_exercises.length>0) {
-          const pre: LoggedExercise[] = (data as any).strength_exercises.map((exercise: any, index: number) => ({
-            id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-            name: exercise.name || '',
-            expanded: true,
-            sets: Array.from({ length: exercise.sets || 3 }, () => {
-              const baseSet: LoggedSet = {
-                weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
-                barType: 'standard',
-                rir: undefined,
-                completed: false
-              };
-              // Duration-based exercises (planks, holds, carries)
-              if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
-                baseSet.duration_seconds = exercise.duration_seconds;
-              } else {
-                // Rep-based exercises (traditional lifts)
-                baseSet.reps = exercise.reps || 0;
-              }
-              return baseSet;
-            })
-          }));
+          const pre: LoggedExercise[] = (data as any).strength_exercises.map((exercise: any, index: number) => {
+            const rawName = String(exercise.name || '').trim();
+            const rawNotes = String(exercise.notes || exercise.description || '').trim();
+            const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
+            return {
+              id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+              name: cleanName || '',
+              notes: rawNotes || undefined,
+              expanded: true,
+              sets: Array.from({ length: exercise.sets || 3 }, () => {
+                const baseSet: LoggedSet = {
+                  weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
+                  barType: 'standard',
+                  rir: undefined,
+                  completed: false
+                };
+                // Duration-based exercises (planks, holds, carries)
+                if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
+                  baseSet.duration_seconds = exercise.duration_seconds;
+                } else {
+                  // Rep-based exercises (traditional lifts)
+                  baseSet.reps = exercise.reps || 0;
+                }
+                return baseSet;
+              })
+            };
+          });
           const isPlaceholder = (arr: LoggedExercise[]) => {
             if (!Array.isArray(arr) || arr.length !== 1) return false;
             const e = arr[0] as any;
@@ -1720,8 +1745,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const rep = Array.isArray(ex.sets) && ex.sets.length>0 ? (ex.sets[0].reps || 0) : 0;
           const dur = ex.sets && ex.sets.length ? `${ex.sets.length}x${rep}` : undefined;
           const w0 = Array.isArray(ex.sets) && ex.sets.length>0 ? Number(ex.sets[0].weight||0) : 0;
-          const payload:any = { name: ex.name, duration: dur, description: '' } as any;
+          const payload:any = { name: ex.name, duration: dur, description: ex.notes || '' } as any;
           if (Number.isFinite(w0) && w0>0) { payload.weight = w0; payload.unit = 'lb'; }
+          // Preserve notes separately
+          if (ex.notes) { payload.notes = ex.notes; }
           return payload;
         });
       } catch { return []; }
@@ -2473,6 +2500,39 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <Plus className="h-3.5 w-3.5 mr-2" />
                   Add Set
                 </Button>
+                
+                {/* Notes section - collapsible, shown when exercise is expanded */}
+                {(() => {
+                  const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+                  const isMobilityMode = loggerMode === 'mobility';
+                  // Show notes section for mobility mode, or if notes exist
+                  if (isMobilityMode || exercise.notes) {
+                    return (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <Label htmlFor={`notes-${exercise.id}`} className="text-sm font-medium text-gray-700 mb-2 block">
+                          Notes
+                        </Label>
+                        <Textarea
+                          id={`notes-${exercise.id}`}
+                          value={exercise.notes || ''}
+                          onChange={(e) => {
+                            const updatedExercises = exercises.map(ex => 
+                              ex.id === exercise.id 
+                                ? { ...ex, notes: e.target.value }
+                                : ex
+                            );
+                            setExercises(updatedExercises);
+                            saveSessionProgress(updatedExercises, attachedAddons, notesText, notesRpe);
+                          }}
+                          placeholder="How did it feel? Any modifications?"
+                          rows={3}
+                          className="text-sm"
+                        />
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             )}
           </div>
