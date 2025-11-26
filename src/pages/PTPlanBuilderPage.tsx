@@ -59,12 +59,12 @@ function parseLine(line: string): ParsedItem | null {
   }
   
   // Pattern 2d: Duration-based "2-3 sets of 20 seconds" or "3x20s"
+  // Extract sets/reps but don't interfere with notes extraction
   if (!setsRepsPattern1 && !out.sets) {
     const durationPattern = cleaned.match(/(\d+)(?:-\d+)?\s*(?:sets?\s*of|x)\s*(\d+)\s*(?:seconds?|sec|s)\b/i);
     if (durationPattern) {
       out.sets = parseInt(durationPattern[1], 10);
-      // Store duration in notes since we don't have a duration field in ParsedItem
-      if (!out.cues) out.cues = `${durationPattern[2]} seconds`;
+      out.reps = parseInt(durationPattern[2], 10);
     }
   }
   
@@ -98,20 +98,42 @@ function parseLine(line: string): ParsedItem | null {
   // Rule 3b: Colon separator "exercise: notes" (but not numbered lists)
   if (!notesPart) {
     // Match colon but exclude numbered lists like "1) item, 2) item"
-    const colonPattern = cleaned.match(/^([^:]+?):\s*((?:\d+\)\s*[^:]+(?:,\s*\d+\)\s*[^:]+)*|[^:]+)$)/);
-    if (colonPattern) {
-      namePart = colonPattern[1].trim();
-      notesPart = colonPattern[2].trim();
+    // Handle cases like "exercise: notes" or "exercise, 2 sets: notes"
+    // Look for colon that's not part of a numbered list
+    const colonIndex = cleaned.indexOf(':');
+    if (colonIndex > 0) {
+      const beforeColon = cleaned.substring(0, colonIndex).trim();
+      const afterColon = cleaned.substring(colonIndex + 1).trim();
+      
+      // Check if it's a numbered list pattern
+      const isNumberedList = /^\d+\)/.test(afterColon);
+      
+      if (!isNumberedList && afterColon) {
+        namePart = beforeColon;
+        notesPart = afterColon;
+        // Remove sets/reps from namePart if they're there
+        namePart = namePart.replace(/\b\d+\s*(?:x\s*\d+|sets?\s*(?:of\s*\d+|until))/i, '').trim();
+      }
     }
   }
   
   // Rule 3c: Text after sets/reps pattern (like "until X, and match Y")
   if (!notesPart) {
     // Match patterns like "2 sets until", "3x8", "3 sets of 8"
-    const setsRepsMatch = cleaned.match(/(\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*(?:of\s*\d+|until)))/i);
+    // Use a more specific pattern that captures the full "sets until" phrase
+    const setsRepsMatch = cleaned.match(/(\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*(?:of\s*\d+|until\s+[^,]+)))/i);
     if (setsRepsMatch && setsRepsMatch.index !== undefined) {
-      const afterSets = cleaned.substring(setsRepsMatch.index + setsRepsMatch[0].length).trim();
-      if (afterSets && !afterSets.match(/^\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+)/i)) {
+      const matchEnd = setsRepsMatch.index + setsRepsMatch[0].length;
+      const afterSets = cleaned.substring(matchEnd).trim();
+      
+      // If the match includes "until", extract everything after "until" as notes
+      if (setsRepsMatch[0].match(/until/i)) {
+        const untilMatch = cleaned.match(/\d+\s*sets?\s+until\s+(.+)/i);
+        if (untilMatch) {
+          notesPart = untilMatch[1].trim();
+        }
+      } else if (afterSets && !afterSets.match(/^\d+(?:-\d+)?\s*(?:x\s*\d+|sets?\s*of\s*\d+)/i)) {
+        // Regular sets/reps pattern - extract text after
         notesPart = afterSets;
       }
     }
@@ -121,24 +143,48 @@ function parseLine(line: string): ParsedItem | null {
   if (!notesPart) {
     const commaParts = cleaned.split(',');
     if (commaParts.length > 1) {
-      // Find where structured data starts
+      // Find where structured data starts (sets/reps/weight)
       let structuredDataIndex = -1;
       for (let i = 0; i < commaParts.length; i++) {
-        if (commaParts[i].match(/\d+\s*x\s*\d+|\d+\s*sets?\s*of\s*\d+|\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i)) {
+        const part = commaParts[i].trim();
+        if (part.match(/\d+\s*x\s*\d+|\d+\s*sets?\s*(?:of\s*\d+|until)|\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i)) {
           structuredDataIndex = i;
           break;
         }
       }
+      
       if (structuredDataIndex > 1) {
         // Everything between first part and structured data is notes
         notesPart = commaParts.slice(1, structuredDataIndex).join(',').trim();
         namePart = commaParts[0].trim();
-      } else if (structuredDataIndex === -1 && commaParts.length > 1) {
-        // No structured data found, check if last part is descriptive
+      } else if (structuredDataIndex === 0) {
+        // Structured data is in first part, check if there's descriptive text after
+        if (commaParts.length > 1) {
+          // Check if remaining parts are descriptive (not structured)
+          const remainingParts = commaParts.slice(1);
+          const hasStructured = remainingParts.some(p => p.trim().match(/\d+\s*x\s*\d+|\d+\s*sets?\s*(?:of\s*\d+|until)|\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i));
+          if (!hasStructured && remainingParts.length > 0) {
+            // All remaining parts are descriptive text
+            notesPart = remainingParts.join(',').trim();
+          }
+        }
+      } else if (structuredDataIndex === -1) {
+        // No structured data found in any comma part
+        // Check if last part looks like structured data (weight only)
         const lastPart = commaParts[commaParts.length - 1].trim();
-        if (!lastPart.match(/^\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i)) {
-          notesPart = commaParts.slice(1).join(',').trim();
-          namePart = commaParts[0].trim();
+        const isWeightOnly = lastPart.match(/^\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i);
+        
+        if (!isWeightOnly) {
+          // All parts after first are likely descriptive
+          // But check if first part contains structured data
+          const firstPart = commaParts[0].trim();
+          const firstHasStructured = firstPart.match(/\d+\s*x\s*\d+|\d+\s*sets?\s*(?:of\s*\d+|until)/i);
+          
+          if (!firstHasStructured && commaParts.length > 1) {
+            // First part is name, rest is notes
+            notesPart = commaParts.slice(1).join(',').trim();
+            namePart = commaParts[0].trim();
+          }
         }
       }
     }
@@ -149,7 +195,7 @@ function parseLine(line: string): ParsedItem | null {
     .replace(/\([^)]*\)/g, '') // Remove parentheses (weight ranges, alternatives)
     .replace(/,?\s*(?:cue|focus)\s*:.*/i, '') // Remove explicit cues
     .replace(/\b\d+\s*x\s*\d+\b/i, '') // Remove sets x reps
-    .replace(/\b\d+(?:-\d+)?\s*sets?\s*of\s*\d+\b/i, '') // Remove "sets of"
+    .replace(/\b\d+(?:-\d+)?\s*sets?\s*(?:of\s*\d+|until)/i, '') // Remove "sets of" or "sets until"
     .replace(/\b\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i, '') // Remove weight
     .replace(/\bper\s*side\b/i, '') // Remove "per side"
     .replace(/\beach\s+side\b/i, '') // Remove "each side"
@@ -163,11 +209,15 @@ function parseLine(line: string): ParsedItem | null {
   if (notesPart) {
     notesPart = notesPart
       .replace(/\b\d+\s*x\s*\d+\b/i, '')
-      .replace(/\b\d+(?:-\d+)?\s*sets?\s*of\s*\d+\b/i, '')
+      .replace(/\b\d+(?:-\d+)?\s*sets?\s*(?:of\s*\d+|until)/i, '')
       .replace(/\b\d+(?:-\d+)?\s*(?:lb|lbs|kg)\b/i, '')
       .replace(/\bper\s*side\b/i, '')
       .replace(/\beach\s+side\b/i, '')
       .replace(/--+/g, ' ')
+      .replace(/\bseconds?\b/i, '') // Remove standalone "seconds" word
+      .replace(/\bsec\b/i, '') // Remove standalone "sec"
+      .replace(/\bs\b/i, '') // Remove standalone "s" (but be careful - might remove other words)
+      .replace(/\s{2,}/g, ' ') // Collapse multiple spaces
       .trim();
   }
   
