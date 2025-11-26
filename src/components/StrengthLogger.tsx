@@ -987,6 +987,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     setShowSuggestions(false);
     
     let workoutToLoad = scheduledWorkout;
+    // Track if we successfully loaded exercises from the passed workout
+    let exercisesLoadedFromWorkout = false;
 
     // If no scheduled workout provided, do a FRESH check for selected date's planned workout
     if (!workoutToLoad) {
@@ -1046,10 +1048,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }
       if (exs.length) {
         setExercises(exs);
+        exercisesLoadedFromWorkout = true;
+        exercisesLoadedFromWorkout = true;
         setIsInitialized(true);
         return;
       }
     }
+    
     if (workoutToLoad && workoutToLoad.strength_exercises && workoutToLoad.strength_exercises.length > 0) {
       console.log('📝 Pre-populating with planned workout exercises');
       console.log('📝 Raw strength_exercises:', JSON.stringify(workoutToLoad.strength_exercises, null, 2));
@@ -1089,6 +1094,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       
       console.log('📝 Final prePopulatedExercises:', JSON.stringify(prePopulatedExercises, null, 2));
       setExercises(prePopulatedExercises);
+      exercisesLoadedFromWorkout = true;
     } else if (workoutToLoad && ((workoutToLoad as any).steps_preset?.length > 0 || typeof (workoutToLoad as any).rendered_description === 'string' || typeof (workoutToLoad as any).description === 'string')) {
       // Fallback: parse rendered_description first, then description
       const stepsArr: string[] = Array.isArray((workoutToLoad as any).steps_preset) ? (workoutToLoad as any).steps_preset : [];
@@ -1099,6 +1105,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (parsed.length > 0) {
         console.log('📝 Parsed exercises from description');
         setExercises(parsed);
+        exercisesLoadedFromWorkout = true;
         if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
       } else {
         console.log('🆕 Starting with empty exercise for manual logging');
@@ -1113,9 +1120,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     
     setIsInitialized(true);
     // Direct fetch as a safety net (prefer unified get-week → computed steps)
+    // Only run safety net if we didn't successfully load exercises from the passed workout
     const _mode1 = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
-    if (_mode1 === 'mobility') {
-      // In mobility mode, avoid safety-net fetches that might overwrite mobility content
+    if (_mode1 === 'mobility' || exercisesLoadedFromWorkout) {
+      // In mobility mode or if we already loaded exercises, avoid safety-net fetches that might overwrite content
       return;
     }
     (async () => {
@@ -2221,10 +2229,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const isDurationRunning = durationTimer?.running || false;
                   const currentDurationSeconds = durationTimer?.seconds ?? (set.duration_seconds || 60);
                   
+                  // Rest timer should only show when:
+                  // 1. Not duration-based exercise
+                  // 2. Not the first set (rest happens between sets)
+                  // 3. Previous set is completed (rest happens after completing a set)
+                  // 4. There are multiple sets (no rest needed if only one set)
+                  const showRestTimer = !isDurationBased && 
+                    setIndex > 0 && 
+                    exercise.sets.length > 1 &&
+                    exercise.sets[setIndex - 1]?.completed;
+                  
                   return (
                     <div key={setIndex} className="mb-1 last:mb-0">
-                      {/* Rest timer - hidden for duration-based exercises, shown for rep-based */}
-                      {!isDurationBased && (
+                      {/* Rest timer - only show when rest is actually needed */}
+                      {showRestTimer && (
                         <div className="flex items-center gap-2 mb-0.5 ml-8 relative">
                           <button
                             onClick={() => {
