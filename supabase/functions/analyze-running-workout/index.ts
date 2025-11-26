@@ -3278,16 +3278,63 @@ function generateIntervalBreakdown(workIntervals: any[]): any {
     };
   });
   
+  // Generate formatted section text for UI display (similar to mile-by-mile breakdown)
+  const formatPace = (paceMinPerMi: number): string => {
+    if (paceMinPerMi <= 0) return 'N/A';
+    const minutes = Math.floor(paceMinPerMi);
+    const seconds = Math.round((paceMinPerMi - minutes) * 60);
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  };
+  
+  const formatDuration = (seconds: number): string => {
+    if (seconds <= 0) return 'N/A';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+  };
+  
+  let sectionText = 'INTERVAL-BY-INTERVAL BREAKDOWN:\n\n';
+  breakdown.forEach((interval) => {
+    const plannedPace = formatPace(interval.planned_pace_min_per_mi);
+    const actualPace = formatPace(interval.actual_pace_min_per_mi);
+    const plannedDur = formatDuration(interval.planned_duration_s);
+    const actualDur = formatDuration(interval.actual_duration_s);
+    
+    sectionText += `Interval ${interval.interval_number}:\n`;
+    sectionText += `  Planned: ${plannedDur} @ ${plannedPace}/mi\n`;
+    sectionText += `  Actual: ${actualDur} @ ${actualPace}/mi\n`;
+    sectionText += `  Pace adherence: ${interval.pace_adherence_percent}%\n`;
+    sectionText += `  Duration adherence: ${interval.duration_adherence_percent}%\n`;
+    sectionText += `  Performance score: ${interval.performance_score}%\n\n`;
+  });
+  
+  const summary = breakdown.reduce((acc, i) => {
+    acc.total += i.performance_score;
+    if (i.performance_score >= 90) acc.high++;
+    else if (i.performance_score >= 80) acc.good++;
+    else if (i.performance_score >= 70) acc.fair++;
+    else acc.poor++;
+    return acc;
+  }, { total: 0, high: 0, good: 0, fair: 0, poor: 0 });
+  
+  sectionText += `SUMMARY:\n`;
+  sectionText += `- Average performance: ${Math.round(summary.total / breakdown.length)}%\n`;
+  sectionText += `- High (≥90%): ${summary.high} intervals\n`;
+  sectionText += `- Good (80-89%): ${summary.good} intervals\n`;
+  sectionText += `- Fair (70-79%): ${summary.fair} intervals\n`;
+  sectionText += `- Poor (<70%): ${summary.poor} intervals\n`;
+
   return {
     available: true,
     intervals: breakdown,
+    section: sectionText,  // Add section text for UI display
     summary: {
-      average_performance_score: Math.round(breakdown.reduce((sum, i) => sum + i.performance_score, 0) / breakdown.length),
+      average_performance_score: Math.round(summary.total / breakdown.length),
       total_intervals: breakdown.length,
-      high_performance_intervals: breakdown.filter(i => i.performance_score >= 90).length,
-      good_performance_intervals: breakdown.filter(i => i.performance_score >= 80 && i.performance_score < 90).length,
-      fair_performance_intervals: breakdown.filter(i => i.performance_score >= 70 && i.performance_score < 80).length,
-      poor_performance_intervals: breakdown.filter(i => i.performance_score < 70).length
+      high_performance_intervals: summary.high,
+      good_performance_intervals: summary.good,
+      fair_performance_intervals: summary.fair,
+      poor_performance_intervals: summary.poor
     }
   };
 }

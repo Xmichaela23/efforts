@@ -712,6 +712,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 </div>
               )}
 
+              {/* Interval Breakdown (for interval workouts) */}
+              {analysisMetrics.workout?.workout_analysis?.detailed_analysis?.interval_breakdown?.available && 
+               analysisMetrics.workout?.workout_analysis?.detailed_analysis?.interval_breakdown?.section && (
+                <div className="mt-4">
+                  <div className="text-sm font-medium text-gray-800 mb-2">
+                    Interval-by-Interval Breakdown
+                  </div>
+                  <div className="text-xs text-gray-600 whitespace-pre-line bg-blue-50 rounded p-3 font-mono">
+                    {analysisMetrics.workout.workout_analysis.detailed_analysis.interval_breakdown.section}
+                  </div>
+                </div>
+              )}
+
               {/* Red Flags */}
               {analysisMetrics.red_flags.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
