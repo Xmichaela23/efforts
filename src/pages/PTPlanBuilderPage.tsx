@@ -41,39 +41,40 @@ function parseLine(line: string): ParsedItem | null {
   
   // Step 2: Extract structured data (sets, reps, weight) - deterministic patterns
   // Multiple patterns handle different input variations - all deterministic regex
+  // IMPORTANT: Check duration patterns FIRST to avoid treating "2-3×20 seconds" as reps
   
-  // Pattern 2a: "3x8" or "3 x 8" or "3×8" (multiplication symbol)
-  const setsRepsPattern1 = cleaned.match(/(\d+)\s*[x×]\s*(\d+)/i);
-  if (setsRepsPattern1) {
-    out.sets = parseInt(setsRepsPattern1[1], 10);
-    out.reps = parseInt(setsRepsPattern1[2], 10);
+  // Pattern 2a: Duration-based "2-3 sets of 20 seconds" or "3x20s" or "2-3×20 seconds"
+  // For duration-based exercises, store duration_seconds instead of reps
+  const durationPattern = cleaned.match(/(\d+)(?:-\d+)?\s*(?:sets?\s*of|[x×])\s*(\d+)\s*(?:seconds?|sec|s)\b/i);
+  if (durationPattern) {
+    out.sets = parseInt(durationPattern[1], 10);
+    out.duration_seconds = parseInt(durationPattern[2], 10);  // Store as duration, not reps
+    // Don't set reps for duration-based exercises
   }
   
-  // Pattern 2b: "3 sets of 8" or "2-3 sets of 20" or "3 sets x 8"
-  if (!setsRepsPattern1) {
-    const setsRepsPattern2 = cleaned.match(/(\d+)(?:-\d+)?\s*sets?\s*(?:of|x)\s*(\d+)/i);
-    if (setsRepsPattern2) {
-      out.sets = parseInt(setsRepsPattern2[1], 10);
-      out.reps = parseInt(setsRepsPattern2[2], 10);
+  // Pattern 2b: "3x8" or "3 x 8" or "3×8" (multiplication symbol) - only if not duration
+  if (!durationPattern) {
+    const setsRepsPattern1 = cleaned.match(/(\d+)(?:-\d+)?\s*[x×]\s*(\d+)/i);
+    if (setsRepsPattern1) {
+      out.sets = parseInt(setsRepsPattern1[1], 10);
+      out.reps = parseInt(setsRepsPattern1[2], 10);
+    }
+    
+    // Pattern 2c: "3 sets of 8" or "2-3 sets of 20" or "3 sets x 8"
+    if (!setsRepsPattern1) {
+      const setsRepsPattern2 = cleaned.match(/(\d+)(?:-\d+)?\s*sets?\s*(?:of|x)\s*(\d+)/i);
+      if (setsRepsPattern2) {
+        out.sets = parseInt(setsRepsPattern2[1], 10);
+        out.reps = parseInt(setsRepsPattern2[2], 10);
+      }
     }
   }
   
-  // Pattern 2c: "2 sets until..." or "2 sets of until..." (sets only, no reps)
-  if (!setsRepsPattern1 && !out.sets) {
+  // Pattern 2d: "2 sets until..." or "2 sets of until..." (sets only, no reps)
+  if (!durationPattern && !out.sets) {
     const setsUntilPattern = cleaned.match(/(\d+)\s*sets?\s+until/i);
     if (setsUntilPattern) {
       out.sets = parseInt(setsUntilPattern[1], 10);
-    }
-  }
-  
-  // Pattern 2d: Duration-based "2-3 sets of 20 seconds" or "3x20s"
-  // For duration-based exercises, store duration_seconds instead of reps
-  if (!setsRepsPattern1 && !out.sets) {
-    const durationPattern = cleaned.match(/(\d+)(?:-\d+)?\s*(?:sets?\s*of|x)\s*(\d+)\s*(?:seconds?|sec|s)\b/i);
-    if (durationPattern) {
-      out.sets = parseInt(durationPattern[1], 10);
-      out.duration_seconds = parseInt(durationPattern[2], 10);  // Store as duration, not reps
-      // Don't set reps for duration-based exercises
     }
   }
   
