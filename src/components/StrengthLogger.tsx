@@ -1052,14 +1052,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
     if (workoutToLoad && workoutToLoad.strength_exercises && workoutToLoad.strength_exercises.length > 0) {
       console.log('📝 Pre-populating with planned workout exercises');
+      console.log('📝 Raw strength_exercises:', JSON.stringify(workoutToLoad.strength_exercises, null, 2));
       // Pre-populate with scheduled workout data
       const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => {
         // Extract notes separately - ensure they don't end up in the name
         const rawName = String(exercise.name || '').trim();
         const rawNotes = String(exercise.notes || exercise.description || '').trim();
+        console.log(`📝 Exercise ${index}: name="${rawName}", notes="${rawNotes}", description="${exercise.description}", exercise.notes="${exercise.notes}"`);
         // Clean name - remove any notes that might have been concatenated
         const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
-        return {
+        const result = {
           id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
           name: cleanName || '',
           notes: rawNotes || undefined,
@@ -1081,8 +1083,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             return baseSet;
           })
         };
+        console.log(`📝 Created exercise:`, result);
+        return result;
       });
       
+      console.log('📝 Final prePopulatedExercises:', JSON.stringify(prePopulatedExercises, null, 2));
       setExercises(prePopulatedExercises);
     } else if (workoutToLoad && ((workoutToLoad as any).steps_preset?.length > 0 || typeof (workoutToLoad as any).rendered_description === 'string' || typeof (workoutToLoad as any).description === 'string')) {
       // Fallback: parse rendered_description first, then description

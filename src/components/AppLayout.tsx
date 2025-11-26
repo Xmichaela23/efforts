@@ -637,6 +637,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             const parsed = raw.map((m: any) => {
               const name = String(m?.name || '').trim() || 'Mobility';
               const notes = String(m?.description || m?.notes || '').trim();
+              console.log('📝 AppLayout parsing exercise:', { name, notes, description: m?.description, m_notes: m?.notes, full_m: m });
               const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
               let sets = 1; let reps = 8;
               const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
@@ -649,7 +650,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 const pw = parseFloat(m.weight);
                 if (Number.isFinite(pw)) w = pw;
               }
-              return { name, sets, reps, weight: w, notes };
+              const result = { name, sets, reps, weight: w, notes };
+              console.log('📝 AppLayout parsed result:', result);
+              return result;
             });
             setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: mob?.planned?.name || 'Mobility Session', date: today, strength_exercises: parsed } as any);
           } else {

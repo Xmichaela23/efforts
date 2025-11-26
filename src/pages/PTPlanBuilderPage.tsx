@@ -176,6 +176,9 @@ function parseLine(line: string): ParsedItem | null {
   
   if (notesPart) {
     out.cues = notesPart;
+    console.log(`📝 Parser extracted notes for "${out.name}": "${notesPart}"`);
+  } else {
+    console.log(`📝 Parser found no notes for "${out.name}"`);
   }
   
   return out;
@@ -241,14 +244,18 @@ export default function MobilityPlanBuilderPage() {
         name: 'Mobility Session',
         type: 'mobility',
         description: 'Mobility session',
-        mobility_exercises: items.map(ii=>({
-          name: ii.name,
-          duration: (ii.sets && ii.reps) ? `${ii.sets}x${ii.reps}${ii.perSide?' per side':''}` : (ii.reps? `${ii.reps} reps`:'2-3 minutes'),
-          description: ii.cues || '',
-          // Preserve parsed load for downstream prefilling
-          weight: typeof (ii as any).weight === 'number' ? (ii as any).weight : undefined,
-          unit: (ii as any).unit || undefined
-        }))
+        mobility_exercises: items.map(ii=>{
+          const exerciseData = {
+            name: ii.name,
+            duration: (ii.sets && ii.reps) ? `${ii.sets}x${ii.reps}${ii.perSide?' per side':''}` : (ii.reps? `${ii.reps} reps`:'2-3 minutes'),
+            description: ii.cues || '',
+            // Preserve parsed load for downstream prefilling
+            weight: typeof (ii as any).weight === 'number' ? (ii as any).weight : undefined,
+            unit: (ii as any).unit || undefined
+          };
+          console.log(`📝 Plan builder storing exercise:`, exerciseData, `(cues="${ii.cues}")`);
+          return exerciseData;
+        })
       }));
       const arr = sessionsByWeek[String(w)] || [];
       arr.push({ day: dayFull, type: 'mobility', name: 'Mobility Session', description: 'Mobility session', mobility_exercises: normalized[0]?.mobility_exercises || [] });
