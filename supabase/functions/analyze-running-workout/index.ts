@@ -3066,8 +3066,13 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
   // Heart rate recovery analysis
   const hrRecoveryAnalysis = analyzeHeartRateRecovery(sensorData, workIntervals, recoveryIntervals);
   
-  // Interval-by-interval breakdown
-  const intervalBreakdown = generateIntervalBreakdown(workIntervals);
+  // Get overall pace adherence from granular analysis for comparison
+  const overallPaceAdherence = granularAnalysis?.overall_adherence 
+    ? Math.round(granularAnalysis.overall_adherence * 100)
+    : undefined;
+  
+  // Interval-by-interval breakdown (pass all intervals for warmup/recovery/cooldown analysis)
+  const intervalBreakdown = generateIntervalBreakdown(workIntervals, intervals, overallPaceAdherence);
   
   // Pacing consistency analysis
   const pacingConsistency = analyzePacingConsistency(sensorData, workIntervals);
@@ -3247,8 +3252,11 @@ function analyzeHeartRateRecovery(sensorData: any[], workIntervals: any[], recov
 
 /**
  * Generate detailed interval-by-interval breakdown
+ * @param workIntervals - Array of work interval objects
+ * @param allIntervals - Array of all intervals (including warmup/recovery/cooldown) for context analysis
+ * @param overallPaceAdherence - Overall pace adherence percentage for comparison
  */
-function generateIntervalBreakdown(workIntervals: any[]): any {
+function generateIntervalBreakdown(workIntervals: any[], allIntervals?: any[], overallPaceAdherence?: number): any {
   if (workIntervals.length === 0) {
     return { available: false, message: 'No work intervals to analyze' };
   }
@@ -3323,7 +3331,163 @@ function generateIntervalBreakdown(workIntervals: any[]): any {
     return `${mins}:${String(secs).padStart(2, '0')}`;
   };
   
-  let sectionText = 'INTERVAL-BY-INTERVAL BREAKDOWN:\n\n';
+  const formatPaceRange = (lower: number, upper: number): string => {
+    if (lower <= 0 || upper <= 0) return 'N/A';
+    const lowerMin = Math.floor(lower / 60);
+    const lowerSec = Math.round(lower % 60);
+    const upperMin = Math.floor(upper / 60);
+    const upperSec = Math.round(upper % 60);
+    return `${lowerMin}:${String(lowerSec).padStart(2, '0')}-${upperMin}:${String(upperSec).padStart(2, '0')}/mi`;
+  };
+  
+  const formatPaceFromSeconds = (seconds: number): string => {
+    if (seconds <= 0) return 'N/A';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins}:${String(secs).padStart(2, '0')}/mi`;
+  };
+  
+  // Calculate summary first (needed for coaching insight)
+  const summary = breakdown.reduce((acc, i) => {
+    acc.total += i.performance_score;
+    if (i.performance_score >= 90) acc.high++;
+    else if (i.performance_score >= 80) acc.good++;
+    else if (i.performance_score >= 70) acc.fair++;
+    else acc.poor++;
+    return acc;
+  }, { total: 0, high: 0, good: 0, fair: 0, poor: 0 });
+  
+  // Analyze warmup, recovery, and cooldown segments for pacing analysis
+  let pacingAnalysisText = '';
+  let coachingInsightText = '';
+  
+  if (allIntervals && allIntervals.length > 0) {
+    const warmupInterval = allIntervals.find((i: any) => (i.role === 'warmup' || i.kind === 'warmup') && i.executed);
+    const recoveryIntervals = allIntervals.filter((i: any) => (i.role === 'recovery' || i.kind === 'recovery') && i.executed);
+    const cooldownInterval = allIntervals.find((i: any) => (i.role === 'cooldown' || i.kind === 'cooldown') && i.executed);
+    
+    // Calculate work interval average adherence
+    const workIntervalAdherence = breakdown.length > 0
+      ? Math.round(breakdown.reduce((sum, i) => sum + i.pace_adherence_percent, 0) / breakdown.length)
+      : 0;
+    
+    // Analyze warmup
+    let warmupAnalysis = '';
+    if (warmupInterval) {
+      const warmupPlannedPace = warmupInterval.planned?.target_pace_s_per_mi || warmupInterval.planned?.pace_range?.lower || 0;
+      const warmupActualPace = warmupInterval.executed?.avg_pace_s_per_mi || 0;
+      const warmupPlannedRange = warmupInterval.planned?.pace_range;
+      
+      if (warmupPlannedRange && warmupActualPace > 0) {
+        const warmupRangeLower = warmupPlannedRange.lower || 0;
+        const warmupRangeUpper = warmupPlannedRange.upper || 0;
+        const warmupActualFormatted = formatPaceFromSeconds(warmupActualPace);
+        const warmupRangeFormatted = formatPaceRange(warmupRangeLower, warmupRangeUpper);
+        const warmupDelta = warmupActualPace < warmupRangeLower 
+          ? Math.round((warmupRangeLower - warmupActualPace) / 60) 
+          : warmupActualPace > warmupRangeUpper 
+            ? Math.round((warmupActualPace - warmupRangeUpper) / 60)
+            : 0;
+        const warmupStatus = warmupActualPace < warmupRangeLower ? 'too fast' : warmupActualPace > warmupRangeUpper ? 'too slow' : 'within range';
+        
+        warmupAnalysis = `- Warmup (${formatDuration(warmupInterval.planned?.duration_s || 0)}): ${warmupActualFormatted} actual vs ${warmupRangeFormatted} prescribed - ${warmupStatus}`;
+        if (warmupDelta > 0) {
+          warmupAnalysis += ` (${warmupDelta}s/mi ${warmupActualPace < warmupRangeLower ? 'faster' : 'slower'} than prescribed)`;
+        }
+      } else if (warmupPlannedPace > 0 && warmupActualPace > 0) {
+        const warmupActualFormatted = formatPaceFromSeconds(warmupActualPace);
+        const warmupPlannedFormatted = formatPaceFromSeconds(warmupPlannedPace);
+        warmupAnalysis = `- Warmup (${formatDuration(warmupInterval.planned?.duration_s || 0)}): ${warmupActualFormatted} actual vs ${warmupPlannedFormatted} prescribed`;
+      }
+    }
+    
+    // Analyze recovery intervals
+    let recoveryAnalysis = '';
+    if (recoveryIntervals.length > 0) {
+      const recoveryAdherences = recoveryIntervals.map((rec: any) => {
+        const recPlannedPace = rec.planned?.target_pace_s_per_mi || rec.planned?.pace_range?.lower || 0;
+        const recActualPace = rec.executed?.avg_pace_s_per_mi || 0;
+        if (recPlannedPace > 0 && recActualPace > 0) {
+          const recDelta = Math.abs(recActualPace - recPlannedPace);
+          return Math.max(0, 100 - (recDelta / recPlannedPace) * 100);
+        }
+        return 0;
+      }).filter((a: number) => a > 0);
+      
+      const avgRecoveryAdherence = recoveryAdherences.length > 0
+        ? Math.round(recoveryAdherences.reduce((sum: number, a: number) => sum + a, 0) / recoveryAdherences.length)
+        : 0;
+      
+      recoveryAnalysis = `- Recovery jogs (${recoveryIntervals.length}x ${formatDuration(recoveryIntervals[0]?.planned?.duration_s || 0)}): ~${avgRecoveryAdherence}% adherence - ${avgRecoveryAdherence >= 90 ? 'well controlled' : avgRecoveryAdherence >= 70 ? 'acceptable' : 'needs attention'}`;
+    }
+    
+    // Analyze cooldown
+    let cooldownAnalysis = '';
+    if (cooldownInterval) {
+      const cooldownPlannedPace = cooldownInterval.planned?.target_pace_s_per_mi || cooldownInterval.planned?.pace_range?.lower || 0;
+      const cooldownActualPace = cooldownInterval.executed?.avg_pace_s_per_mi || 0;
+      const cooldownPlannedRange = cooldownInterval.planned?.pace_range;
+      
+      if (cooldownPlannedRange && cooldownActualPace > 0) {
+        const cooldownRangeLower = cooldownPlannedRange.lower || 0;
+        const cooldownRangeUpper = cooldownPlannedRange.upper || 0;
+        const cooldownActualFormatted = formatPaceFromSeconds(cooldownActualPace);
+        const cooldownRangeFormatted = formatPaceRange(cooldownRangeLower, cooldownRangeUpper);
+        const inRange = cooldownActualPace >= cooldownRangeLower && cooldownActualPace <= cooldownRangeUpper;
+        
+        cooldownAnalysis = `- Cooldown (${formatDuration(cooldownInterval.planned?.duration_s || 0)}): ${cooldownActualFormatted} - ${inRange ? 'within prescribed range' : 'outside prescribed range'}`;
+      } else if (cooldownPlannedPace > 0 && cooldownActualPace > 0) {
+        const cooldownActualFormatted = formatPaceFromSeconds(cooldownActualPace);
+        const cooldownPlannedFormatted = formatPaceFromSeconds(cooldownPlannedPace);
+        cooldownAnalysis = `- Cooldown (${formatDuration(cooldownInterval.planned?.duration_s || 0)}): ${cooldownActualFormatted} vs ${cooldownPlannedFormatted} prescribed`;
+      }
+    }
+    
+    // Generate PACING ANALYSIS section if we have overall pace adherence and work interval adherence
+    if (overallPaceAdherence !== undefined && workIntervalAdherence > 0 && overallPaceAdherence < workIntervalAdherence - 10) {
+      pacingAnalysisText = `PACING ANALYSIS:\n\nThe discrepancy between work interval adherence (${workIntervalAdherence}%) and overall pace adherence (${overallPaceAdherence}%) indicates excellent execution during hard efforts but pacing issues in easy segments. Analysis of individual segments:\n\n`;
+      
+      if (warmupAnalysis) pacingAnalysisText += `${warmupAnalysis}\n`;
+      pacingAnalysisText += `- Work intervals (${breakdown.length}x 0.50 mi): ${workIntervalAdherence}% adherence - excellent\n`;
+      if (recoveryAnalysis) pacingAnalysisText += `${recoveryAnalysis}\n`;
+      if (cooldownAnalysis) pacingAnalysisText += `${cooldownAnalysis}\n\n`;
+      
+      // Add explanation about warmup if it was too fast
+      if (warmupInterval && warmupInterval.executed?.avg_pace_s_per_mi && warmupInterval.planned?.pace_range) {
+        const warmupActual = warmupInterval.executed.avg_pace_s_per_mi;
+        const warmupRangeLower = warmupInterval.planned.pace_range.lower || 0;
+        if (warmupActual < warmupRangeLower) {
+          const deltaSec = Math.round((warmupRangeLower - warmupActual) / 60);
+          pacingAnalysisText += `The too-fast warmup (${deltaSec}s/mi faster than prescribed) reduced overall pace adherence despite excellent work interval execution.\n\n`;
+        }
+      }
+    }
+    
+    // Generate COACHING INSIGHT section
+    const avgPerformance = breakdown.length > 0 ? Math.round(summary.total / breakdown.length) : 0;
+    if (avgPerformance >= 90) {
+      coachingInsightText = `COACHING INSIGHT:\nOutstanding interval execution with remarkably consistent pacing (${breakdown.map((i: any) => i.pace_adherence_percent).join('-')}% adherence) across all ${breakdown.length} work efforts. This demonstrates excellent pace judgment and control during hard efforts.\n\n`;
+      
+      // Add warmup/recovery guidance if needed
+      if (warmupInterval && warmupInterval.executed?.avg_pace_s_per_mi && warmupInterval.planned?.pace_range) {
+        const warmupActual = warmupInterval.executed.avg_pace_s_per_mi;
+        const warmupRangeLower = warmupInterval.planned.pace_range.lower || 0;
+        if (warmupActual < warmupRangeLower) {
+          const warmupActualFormatted = formatPaceFromSeconds(warmupActual);
+          const warmupRangeFormatted = formatPaceRange(warmupInterval.planned.pace_range.lower, warmupInterval.planned.pace_range.upper);
+          coachingInsightText += `Primary opportunity: honor prescribed easy pacing during warmup and recovery segments. The warmup at ${warmupActualFormatted} was run significantly faster than the ${warmupRangeFormatted} prescription. While this may feel good in the moment, running these segments too fast can:\n`;
+          coachingInsightText += `- Reduce the quality of subsequent intervals\n`;
+          coachingInsightText += `- Limit recovery between hard efforts\n`;
+          coachingInsightText += `- Increase injury risk over time\n`;
+          coachingInsightText += `- Defeat the purpose of structured interval training\n\n`;
+          coachingInsightText += `The prescribed easy pace allows you to arrive at each work interval fully prepared to hit the target pace, rather than starting with accumulated fatigue.\n\n`;
+        }
+      }
+    }
+  }
+  
+  let sectionText = pacingAnalysisText;
+  sectionText += 'INTERVAL-BY-INTERVAL BREAKDOWN:\n\n';
   breakdown.forEach((interval) => {
     const plannedPace = formatPace(interval.planned_pace_min_per_mi);
     const actualPace = formatPace(interval.actual_pace_min_per_mi);
@@ -3338,21 +3502,17 @@ function generateIntervalBreakdown(workIntervals: any[]): any {
     sectionText += `  Performance score: ${interval.performance_score}%\n\n`;
   });
   
-  const summary = breakdown.reduce((acc, i) => {
-    acc.total += i.performance_score;
-    if (i.performance_score >= 90) acc.high++;
-    else if (i.performance_score >= 80) acc.good++;
-    else if (i.performance_score >= 70) acc.fair++;
-    else acc.poor++;
-    return acc;
-  }, { total: 0, high: 0, good: 0, fair: 0, poor: 0 });
-  
   sectionText += `SUMMARY:\n`;
   sectionText += `- Average performance: ${Math.round(summary.total / breakdown.length)}%\n`;
   sectionText += `- High (≥90%): ${summary.high} intervals\n`;
   sectionText += `- Good (80-89%): ${summary.good} intervals\n`;
   sectionText += `- Fair (70-79%): ${summary.fair} intervals\n`;
   sectionText += `- Poor (<70%): ${summary.poor} intervals\n`;
+  
+  // Add coaching insight section
+  if (coachingInsightText) {
+    sectionText += `\n${coachingInsightText}`;
+  }
 
   const result = {
     available: true,
