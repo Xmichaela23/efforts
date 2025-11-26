@@ -20,10 +20,8 @@ function parseLine(line: string): ParsedItem | null {
   // Strip leading bullets/dashes
   const cleaned = raw.replace(/^[-•\s]+/, '').trim();
   const out: ParsedItem = { name: cleaned, perSide: /per\s*side/i.test(cleaned) };
-  // cues
-  const cueMatch = cleaned.match(/(?:cue|focus)\s*:\s*(.+)$/i);
-  if (cueMatch) out.cues = cueMatch[1].trim();
-  // sets x reps like 3x8 or 3 x 8
+  
+  // Extract sets x reps like 3x8 or 3 x 8 (before extracting other parts)
   let sr = cleaned.match(/(\d+)\s*x\s*(\d+)/i);
   if (sr) { out.sets = parseInt(sr[1], 10); out.reps = parseInt(sr[2], 10); }
   // "3 sets of 8" pattern
@@ -37,8 +35,67 @@ function parseLine(line: string): ParsedItem | null {
     out.weight = parseFloat(w[1]);
     out.unit = /kg/i.test(w[2]) ? 'kg' : 'lb';
   }
-  // Clean name (remove parsed tokens)
-  let name = cleaned
+  
+  // Extract exercise name (everything before the first colon, or before sets/reps/weight if no colon)
+  // Also handle explicit "cue:" or "focus:" patterns
+  let namePart = cleaned;
+  let notesPart = '';
+  
+  // Check for explicit cue: or focus: patterns
+  const cueMatch = cleaned.match(/(?:cue|focus)\s*:\s*(.+)$/i);
+  if (cueMatch) {
+    notesPart = cueMatch[1].trim();
+    namePart = cleaned.replace(/,?\s*(?:cue|focus)\s*:.*$/i, '').trim();
+  } else {
+    // Look for colon separator (exercise name: notes/instructions)
+    const colonMatch = cleaned.match(/^([^:]+?):\s*(.+)$/);
+    if (colonMatch) {
+      namePart = colonMatch[1].trim();
+      notesPart = colonMatch[2].trim();
+    }
+  }
+  
+  // Extract descriptive text that comes after the exercise name but before sets/reps/weight
+  // This captures things like "same focus as above, ensure the weight is..."
+  if (!notesPart) {
+    // Try to find descriptive text between the name and the sets/reps/weight
+    // Remove sets/reps/weight patterns to find what's left
+    const withoutSetsReps = namePart
+      .replace(/\b\d+\s*x\s*\d+\b/i, '')
+      .replace(/\b\d+\s*sets?\s*of\s*\d+\b/i, '')
+      .replace(/\b\d+(?:\.\d+)?\s*(?:lb|lbs|kg)\b/i, '')
+      .trim();
+    
+    // If there's still text after removing the name basics, it might be notes
+    // But we need to be careful not to include the exercise name itself
+    // For now, we'll extract notes from the full line after removing structured data
+    const fullWithoutStructured = cleaned
+      .replace(/\b\d+\s*x\s*\d+\b/i, '')
+      .replace(/\b\d+\s*sets?\s*of\s*\d+\b/i, '')
+      .replace(/\b\d+(?:\.\d+)?\s*(?:lb|lbs|kg)\b/i, '')
+      .replace(/\bper\s*side\b/i, '')
+      .trim();
+    
+    // If the name part has extra descriptive text (commas, etc.), extract it
+    const nameWords = namePart.split(/\s+/);
+    if (nameWords.length > 3) {
+      // Look for patterns like "exercise name, descriptive text, sets"
+      const commaParts = namePart.split(',');
+      if (commaParts.length > 1) {
+        // First part is likely the name, rest might be notes
+        const potentialName = commaParts[0].trim();
+        const potentialNotes = commaParts.slice(1).join(',').trim();
+        // Check if potential notes don't contain sets/reps patterns
+        if (!potentialNotes.match(/\d+\s*x\s*\d+|\d+\s*sets?\s*of\s*\d+/i)) {
+          namePart = potentialName;
+          notesPart = potentialNotes;
+        }
+      }
+    }
+  }
+  
+  // Clean name (remove parsed tokens and extra descriptive text)
+  let name = namePart
     .replace(/\(.+?\)/g, '')
     .replace(/,?\s*cue\s*:.*/i, '')
     .replace(/,?\s*focus\s*:.*/i, '')
@@ -50,8 +107,60 @@ function parseLine(line: string): ParsedItem | null {
     .replace(/[,;]/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
+  
+  // If we extracted notes from the name part, clean them up
+  if (notesPart) {
+    // Remove sets/reps/weight from notes if they got in there
+    notesPart = notesPart
+      .replace(/\b\d+\s*x\s*\d+\b/i, '')
+      .replace(/\b\d+\s*sets?\s*of\s*\d+\b/i, '')
+      .replace(/\b\d+(?:\.\d+)?\s*(?:lb|lbs|kg)\b/i, '')
+      .replace(/\bper\s*side\b/i, '')
+      .trim();
+  } else {
+    // Try to extract descriptive text that comes after commas in the original line
+    // This handles cases like "exercise name, descriptive text, 2x12"
+    const commaParts = cleaned.split(',');
+    if (commaParts.length > 1) {
+      // Find the part that contains sets/reps to identify where the name ends
+      let nameEndIndex = 0;
+      for (let i = 0; i < commaParts.length; i++) {
+        if (commaParts[i].match(/\d+\s*x\s*\d+|\d+\s*sets?\s*of\s*\d+/i)) {
+          nameEndIndex = i;
+          break;
+        }
+      }
+      // Everything before the sets/reps part that's not the first part might be notes
+      if (nameEndIndex > 1) {
+        notesPart = commaParts.slice(1, nameEndIndex).join(',').trim();
+      } else if (nameEndIndex === 0 && commaParts.length > 1) {
+        // No sets/reps found, check if last part is descriptive
+        const lastPart = commaParts[commaParts.length - 1].trim();
+        if (!lastPart.match(/\d+(?:\.\d+)?\s*(?:lb|lbs|kg)\b/i)) {
+          // Last part doesn't look like weight, might be notes
+          notesPart = commaParts.slice(1).join(',').trim();
+        }
+      }
+      // Clean up notes
+      if (notesPart) {
+        notesPart = notesPart
+          .replace(/\b\d+\s*x\s*\d+\b/i, '')
+          .replace(/\b\d+\s*sets?\s*of\s*\d+\b/i, '')
+          .replace(/\b\d+(?:\.\d+)?\s*(?:lb|lbs|kg)\b/i, '')
+          .replace(/\bper\s*side\b/i, '')
+          .trim();
+      }
+    }
+  }
+  
   if (!name) name = raw;
   out.name = name.charAt(0).toUpperCase() + name.slice(1);
+  
+  // Store all descriptive text (cues + any other notes) in cues field
+  if (notesPart) {
+    out.cues = notesPart;
+  }
+  
   return out;
 }
 
