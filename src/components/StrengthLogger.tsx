@@ -1825,7 +1825,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const lastSet = exercise.sets[exercise.sets.length - 1];
         const exerciseType = getExerciseType(exercise.name);
         const newSet: LoggedSet = {
-          reps: lastSet?.reps || 0,
+          reps: lastSet?.reps ?? undefined, // Preserve undefined for "until" patterns
           weight: lastSet?.weight || 0,
           barType: lastSet?.barType || 'standard',
           resistance_level: exerciseType === 'band' ? (lastSet?.resistance_level || 'Light') : lastSet?.resistance_level,
@@ -2652,16 +2652,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </div>
                         ) : (
                         // REP-BASED EXERCISE (e.g., Squat, Bench Press)
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={set.reps === 0 || set.reps === undefined ? '' : set.reps.toString()}
-                          onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                          className="h-9 text-center text-sm border-gray-300 flex-1"
-                          style={{ fontSize: '16px' }}
-                          placeholder="Reps"
-                        />
+                        // Hide reps input if no reps are prescribed (for "until" patterns)
+                        set.reps === undefined ? null : (
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={set.reps === 0 ? '' : set.reps.toString()}
+                            onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
+                            className="h-9 text-center text-sm border-gray-300 flex-1"
+                            style={{ fontSize: '16px' }}
+                            placeholder="Reps"
+                          />
+                        )
                       )}
                       
                       {(() => {
