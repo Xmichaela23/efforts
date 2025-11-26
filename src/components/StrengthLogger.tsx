@@ -1217,7 +1217,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               const blankSets = sets.length === 0 || sets.every((s:any)=> (Number(s?.reps)||0)===0 && (Number(s?.weight)||0)===0 && !s?.completed);
               return blankName && blankSets;
             };
-            if (exs.length) { setExercises(prev=> isPlaceholder(prev) ? exs : (prev.length? prev: exs)); return; }
+            if (exs.length) { 
+              setExercises(prev=> {
+                const final = isPlaceholder(prev) ? exs : (prev.length? prev: exs);
+                // Initialize rest timers for loaded exercises
+                setTimeout(() => {
+                  final.forEach((exercise) => {
+                    exercise.sets.forEach((set, setIndex) => {
+                      if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
+                        const restTime = calculateRestTime(exercise.name, set.reps);
+                        const restTimerKey = `${exercise.id}-${setIndex}`;
+                        setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
+                      }
+                    });
+                  });
+                }, 100);
+                return final;
+              }); 
+              return; 
+            }
             // If steps did not map, try strength_exercises pass-through
             const se: any[] = Array.isArray(plannedStrength?.planned?.strength_exercises) ? plannedStrength.planned.strength_exercises : [];
             if (se.length) {
@@ -1233,7 +1251,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
                 };
               });
-              if (pre.length) { setExercises(prev => (isPlaceholder(prev) ? pre : (prev.length? prev: pre))); return; }
+              if (pre.length) { 
+                setExercises(prev => {
+                  const final = isPlaceholder(prev) ? pre : (prev.length? prev: pre);
+                  // Initialize rest timers for loaded exercises
+                  setTimeout(() => {
+                    final.forEach((exercise) => {
+                      exercise.sets.forEach((set, setIndex) => {
+                        if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
+                          const restTime = calculateRestTime(exercise.name, set.reps);
+                          const restTimerKey = `${exercise.id}-${setIndex}`;
+                          setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
+                        }
+                      });
+                    });
+                  }, 100);
+                  return final;
+                }); 
+                return; 
+              }
             }
           }
         } catch {}
@@ -1260,7 +1296,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             const blankSets = sets.length === 0 || sets.every((s:any)=> (Number(s?.reps)||0)===0 && (Number(s?.weight)||0)===0 && !s?.completed);
             return blankName && blankSets;
           };
-          if (exs.length) { setExercises(prev=> isPlaceholder(prev) ? exs : (prev.length? prev: exs)); return; }
+          if (exs.length) { 
+            setExercises(prev=> {
+              const final = isPlaceholder(prev) ? exs : (prev.length? prev: exs);
+              // Initialize rest timers for loaded exercises
+              setTimeout(() => {
+                final.forEach((exercise) => {
+                  exercise.sets.forEach((set, setIndex) => {
+                    if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
+                      const restTime = calculateRestTime(exercise.name, set.reps);
+                      const restTimerKey = `${exercise.id}-${setIndex}`;
+                      setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
+                    }
+                  });
+                });
+              }, 100);
+              return final;
+            }); 
+            return; 
+          }
         }
         if (Array.isArray((data as any).strength_exercises) && (data as any).strength_exercises.length>0) {
           const pre: LoggedExercise[] = (data as any).strength_exercises.map((exercise: any, index: number) => {
@@ -1298,8 +1352,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             const blankSets = sets.length === 0 || sets.every((s:any)=> (Number(s?.reps)||0)===0 && (Number(s?.weight)||0)===0 && !s?.completed);
             return blankName && blankSets;
           };
-          if (pre.length>0) setExercises(prev => (isPlaceholder(prev) ? pre : (prev.length? prev : pre)));
-          return;
+          if (pre.length>0) {
+            setExercises(prev => {
+              const final = isPlaceholder(prev) ? pre : (prev.length? prev : pre);
+              // Initialize rest timers for loaded exercises
+              setTimeout(() => {
+                final.forEach((exercise) => {
+                  exercise.sets.forEach((set, setIndex) => {
+                    if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
+                      const restTime = calculateRestTime(exercise.name, set.reps);
+                      const restTimerKey = `${exercise.id}-${setIndex}`;
+                      setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
+                    }
+                  });
+                });
+              }, 100);
+              return final;
+            });
+            return;
+          }
         }
         const steps: string[] = Array.isArray((data as any).steps_preset) ? (data as any).steps_preset : [];
         const viaTok = parseStepsPreset(steps);
@@ -1313,7 +1384,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const blankSets = sets.length === 0 || sets.every((s:any)=> (Number(s?.reps)||0)===0 && (Number(s?.weight)||0)===0 && !s?.completed);
           return blankName && blankSets;
         };
-        if (parsed2.length>0) setExercises(prev => (isPlaceholder(prev) ? parsed2 : (prev.length? prev : parsed2)));
+        if (parsed2.length>0) {
+          setExercises(prev => {
+            const final = isPlaceholder(prev) ? parsed2 : (prev.length? prev: parsed2);
+            // Initialize rest timers for loaded exercises
+            setTimeout(() => {
+              final.forEach((exercise) => {
+                exercise.sets.forEach((set, setIndex) => {
+                  if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
+                    const restTime = calculateRestTime(exercise.name, set.reps);
+                    const restTimerKey = `${exercise.id}-${setIndex}`;
+                    setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
+                  }
+                });
+              });
+            }, 100);
+            return final;
+          });
+        }
         const or2 = extractOrOptions(src2);
         if (or2 && or2.length>1) setPendingOrOptions(prev => prev || or2);
       } catch {}
