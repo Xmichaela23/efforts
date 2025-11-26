@@ -389,11 +389,13 @@ export default function MobilityPlanBuilderPage() {
             weight: typeof (ii as any).weight === 'number' ? (ii as any).weight : undefined,
             unit: (ii as any).unit || undefined
           };
-          // For duration-based exercises, store duration_seconds
+          // For duration-based exercises, store duration_seconds and sets
           if (ii.duration_seconds !== undefined) {
             exerciseData.duration_seconds = ii.duration_seconds;
+            exerciseData.sets = ii.sets || 1;  // Store sets explicitly for duration-based exercises
             exerciseData.duration = `${ii.sets || 1}x${ii.duration_seconds} seconds${ii.perSide?' per side':''}`;
           } else if (ii.sets && ii.reps) {
+            exerciseData.sets = ii.sets;  // Store sets for rep-based exercises too
             exerciseData.duration = `${ii.sets}x${ii.reps}${ii.perSide?' per side':''}`;
           } else if (ii.reps) {
             exerciseData.duration = `${ii.reps} reps`;
