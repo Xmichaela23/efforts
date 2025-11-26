@@ -152,8 +152,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         const parsed = raw.map((m: any) => {
           const name = String(m?.name || '').trim() || 'Mobility';
           const notes = String(m?.description || m?.notes || '').trim();
+          
+          // Check if this is a duration-based exercise (has duration_seconds explicitly stored)
+          if (typeof m?.duration_seconds === 'number' && m.duration_seconds > 0) {
+            const sets = m.sets || 1;
+            let w = 0;
+            if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
+              w = m.weight;
+            } else if (typeof m?.weight === 'string') {
+              const pw = parseFloat(m.weight);
+              if (Number.isFinite(pw)) w = pw;
+            }
+            return { name, sets, duration_seconds: m.duration_seconds, weight: w, notes };
+          }
+          
+          // Otherwise, parse as rep-based exercise
           const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
-          let sets = 1; let reps = 8;
+          let sets = m.sets || 1; let reps = 8;
           const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
           if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||8; }
           // Use preserved load if present, else parse from free text
