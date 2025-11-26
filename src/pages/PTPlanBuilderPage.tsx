@@ -12,6 +12,7 @@ type ParsedItem = {
   perSide?: boolean;
   weight?: number;
   unit?: 'lb' | 'kg';
+  weightRange?: string;  // Store full weight range text like "10-30 lb band"
   cues?: string;
 };
 
@@ -83,6 +84,14 @@ function parseLine(line: string): ParsedItem | null {
   if (weightPattern) {
     out.weight = parseFloat(weightPattern[1]);
     out.unit = /kg/i.test(weightPattern[3]) ? 'kg' : 'lb';
+    // If it's a weight range (has second number), store the full range text for notes
+    if (weightPattern[2]) {
+      // Check if "band" appears in the original match
+      const fullMatch = weightPattern[0];
+      const hasBand = /band/i.test(fullMatch);
+      const fullRange = `${weightPattern[1]}-${weightPattern[2]} ${weightPattern[3]}${hasBand ? ' band' : ''}`;
+      out.weightRange = fullRange;
+    }
   }
   
   // Pattern 2f: Weight with @ symbol or dash "exercise @ 20 lbs" or "exercise — 20 lbs"
@@ -311,9 +320,17 @@ function parseLine(line: string): ParsedItem | null {
   if (!name) name = raw;
   out.name = name.charAt(0).toUpperCase() + name.slice(1);
   
-  if (notesPart) {
-    out.cues = notesPart;
-    console.log(`📝 Parser extracted notes for "${out.name}": "${notesPart}"`);
+  // Combine notes with weight range if present
+  let finalNotes = notesPart || '';
+  if (out.weightRange && finalNotes) {
+    finalNotes = `${out.weightRange}, ${finalNotes}`;
+  } else if (out.weightRange) {
+    finalNotes = out.weightRange;
+  }
+  
+  if (finalNotes) {
+    out.cues = finalNotes;
+    console.log(`📝 Parser extracted notes for "${out.name}": "${finalNotes}"`);
   } else {
     console.log(`📝 Parser found no notes for "${out.name}"`);
   }
