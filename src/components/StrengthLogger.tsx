@@ -616,6 +616,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const parseTimerInput = (raw: string): number | null => {
     if (!raw) return null;
     const txt = String(raw).trim().toLowerCase();
+    // :ss format (seconds only with colon prefix, e.g., ":60")
+    const colonSecs = txt.match(/^:(\d{1,3})$/);
+    if (colonSecs) {
+      return Math.min(1800, Math.max(0, parseInt(colonSecs[1], 10)));
+    }
     // mm:ss
     const m1 = txt.match(/^(\d{1,2}):([0-5]?\d)$/);
     if (m1) {
@@ -2425,6 +2430,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       {/* Rest timer - only show when rest is actually needed */}
                       {showRestTimer && (
                         <div className="flex items-center gap-2 mb-0.5 ml-8 relative">
+                          <span className="text-xs text-gray-500">Rest</span>
                           <button
                             onClick={() => {
                               const key = restTimerKey;
@@ -2524,14 +2530,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             <button
                               onClick={() => {
                                 const cur = set.duration_seconds || 60;
-                                const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
+                                const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : `:${String(cur).padStart(2,'0')}`;
                                 setEditingTimerKey(durationTimerKey);
                                 setEditingTimerValue(prefill);
                               }}
                               className={`h-9 px-2 text-sm rounded-md border border-gray-300 flex-1 text-center ${isDurationRunning ? 'text-blue-600 border-blue-300' : 'text-gray-700 bg-white'}`}
                               style={{ fontSize: '16px' }}
                             >
-                              {formatSeconds(currentDurationSeconds)}
+                              {currentDurationSeconds >= 60 
+                                ? formatSeconds(currentDurationSeconds)
+                                : `:${String(currentDurationSeconds).padStart(2,'0')}`}
                             </button>
                             {!isDurationRunning ? (
                               <button
@@ -2561,7 +2569,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   type="tel"
                                   value={editingTimerValue}
                                   onChange={(e)=>setEditingTimerValue(e.target.value)}
-                                  placeholder="mm:ss or 60"
+                                  placeholder=":60 or 1:00"
                                   className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
                                 />
                                 <div className="flex items-center justify-between mt-3 gap-3">
@@ -2603,6 +2611,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       )}
                       
                       {(() => {
+                        // Duration-based exercises don't need weight input (bodyweight)
+                        if (isDurationBased) {
+                          return null;
+                        }
+                        
                         const exerciseType = getExerciseType(exercise.name);
                         
                         // Band exercises: Show resistance dropdown
@@ -2693,6 +2706,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </button>
                     </div>
                     {(() => {
+                      // Duration-based exercises don't need equipment selection (bodyweight)
+                      if (isDurationBased) {
+                        return null;
+                      }
                       const exerciseType = getExerciseType(exercise.name);
                       // Only show Plates/Barbell UI for barbell exercises
                       if (exerciseType === 'barbell') {
@@ -2734,6 +2751,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       return null;
                     })()}
                     {(() => {
+                      // Duration-based exercises don't need plate math (bodyweight)
+                      if (isDurationBased) {
+                        return null;
+                      }
                       const exerciseType = getExerciseType(exercise.name);
                       // Only show PlateMath for barbell exercises
                       if (exerciseType === 'barbell' && expandedPlates[`${exercise.id}-${setIndex}`]) {
