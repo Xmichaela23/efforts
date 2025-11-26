@@ -3254,17 +3254,47 @@ function generateIntervalBreakdown(workIntervals: any[]): any {
   }
   
   const breakdown = workIntervals.map((interval, index) => {
+    // Extract planned values
     const plannedDuration = interval.planned?.duration_s || 0;
-    const actualDuration = interval.duration_s || 0;
-    const durationAdherence = plannedDuration > 0 ? (actualDuration / plannedDuration) * 100 : 0;
-    
-    // Calculate pace adherence
     const plannedPace = interval.planned?.target_pace_s_per_mi || 0;
-    const actualPace = interval.executed?.avg_pace_s_per_mi || 0;
-    const paceAdherence = plannedPace > 0 ? Math.max(0, 100 - Math.abs(actualPace - plannedPace) / plannedPace * 100) : 0;
     
-    // Calculate overall performance score (percentage only)
-    const overallScore = (durationAdherence + paceAdherence) / 2;
+    // Extract actual values from executed object
+    const actualDuration = interval.executed?.duration_s || interval.duration_s || 0;
+    const actualPace = interval.executed?.avg_pace_s_per_mi || 0;
+    
+    // Calculate duration adherence: how close actual is to planned (not just ratio)
+    // If planned is 250s and actual is 245s, adherence = 100 - |245-250|/250 * 100 = 98%
+    let durationAdherence = 0;
+    if (plannedDuration > 0 && actualDuration > 0) {
+      const durationDelta = Math.abs(actualDuration - plannedDuration);
+      durationAdherence = Math.max(0, 100 - (durationDelta / plannedDuration) * 100);
+    } else if (plannedDuration > 0 && actualDuration === 0) {
+      durationAdherence = 0; // No actual duration recorded
+    }
+    
+    // Calculate pace adherence: how close actual pace is to planned pace
+    let paceAdherence = 0;
+    if (plannedPace > 0 && actualPace > 0) {
+      const paceDelta = Math.abs(actualPace - plannedPace);
+      paceAdherence = Math.max(0, 100 - (paceDelta / plannedPace) * 100);
+    }
+    
+    // Calculate overall performance score
+    // Weight pace more heavily (70%) than duration (30%) for interval workouts
+    // Pace is more important than exact duration match
+    const overallScore = (paceAdherence * 0.7) + (durationAdherence * 0.3);
+    
+    // Debug logging for first interval
+    if (index === 0) {
+      console.log(`🔍 [INTERVAL BREAKDOWN DEBUG] Interval ${index + 1}:`);
+      console.log(`  Planned duration: ${plannedDuration}s (${Math.floor(plannedDuration/60)}:${String(Math.round(plannedDuration%60)).padStart(2,'0')})`);
+      console.log(`  Actual duration: ${actualDuration}s (${actualDuration > 0 ? `${Math.floor(actualDuration/60)}:${String(Math.round(actualDuration%60)).padStart(2,'0')}` : 'N/A'})`);
+      console.log(`  Planned pace: ${plannedPace}s/mi (${plannedPace > 0 ? `${Math.floor(plannedPace/60)}:${String(Math.round(plannedPace%60)).padStart(2,'0')}/mi` : 'N/A'})`);
+      console.log(`  Actual pace: ${actualPace}s/mi (${actualPace > 0 ? `${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi` : 'N/A'})`);
+      console.log(`  Pace adherence: ${Math.round(paceAdherence)}%`);
+      console.log(`  Duration adherence: ${Math.round(durationAdherence)}%`);
+      console.log(`  Performance score: ${Math.round(overallScore)}%`);
+    }
     
     return {
       interval_number: index + 1,
