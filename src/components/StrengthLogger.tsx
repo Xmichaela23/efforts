@@ -1058,7 +1058,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // Extract notes separately - ensure they don't end up in the name
         const rawName = String(exercise.name || '').trim();
         const rawNotes = String(exercise.notes || exercise.description || '').trim();
-        console.log(`📝 Exercise ${index}: name="${rawName}", notes="${rawNotes}", description="${exercise.description}", exercise.notes="${exercise.notes}"`);
+        console.log(`📝 Exercise ${index}: name="${rawName}", notes="${rawNotes}", duration_seconds=${exercise.duration_seconds}, sets=${exercise.sets}, reps=${exercise.reps}, full_exercise:`, exercise);
         // Clean name - remove any notes that might have been concatenated
         const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
         const result = {
