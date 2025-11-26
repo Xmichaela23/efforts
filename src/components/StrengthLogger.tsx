@@ -390,6 +390,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch { return false; }
   };
 
+  // Helper: detect duration-based exercises by name (planks, holds, carries)
+  const isDurationBasedExercise = (name: string): boolean => {
+    const n = String(name || '').toLowerCase();
+    return /plank|hold|carry|wall sit|iso|isometric|time|seconds?|sec/.test(n);
+  };
+
   // Helper: get RPE label
   const getRPELabel = (rpe: number): string => {
     if (rpe <= 3) return 'Light';
@@ -874,6 +880,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const exerciseType = getExerciseType(name);
         const resistanceLevel = exerciseType === 'band' ? extractResistance(notes) : undefined;
         
+        // Check if this is a duration-based exercise
+        // First check for explicit duration_seconds in the step data
+        const durationSeconds = s?.duration_seconds || st?.duration_seconds;
+        const isDurationExercise = durationSeconds !== undefined && durationSeconds > 0;
+        // Also check by name if no explicit duration_seconds but has reps (for legacy data)
+        // Convert if it's a duration-based exercise name and has reps (e.g., "Planks 3×60" where 60 is seconds)
+        const shouldConvertToDuration = !isDurationExercise && isDurationBasedExercise(name) && reps > 0 && !isAmrap;
+        
         if (!byName[name]) {
           // Extract notes separately - ensure they don't end up in the name
           const rawNotes = String(notes || '').trim();
@@ -890,14 +904,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         }
         const targetSets = Math.max(1, sets);
         for (let i=0;i<targetSets;i+=1) {
-          byName[name].sets.push({
-            reps: isAmrap ? 0 : reps,
+          const baseSet: any = {
             weight: exerciseType === 'band' ? 0 : weightNum,
             resistance_level: resistanceLevel,
             rir: null,
             done: false,
             amrap: isAmrap === true,
-          } as any);
+          };
+          
+          if (isDurationExercise) {
+            baseSet.duration_seconds = durationSeconds;
+          } else if (shouldConvertToDuration) {
+            // Convert reps to duration_seconds for duration-based exercises
+            baseSet.duration_seconds = reps;
+          } else {
+            baseSet.reps = isAmrap ? 0 : reps;
+          }
+          
+          byName[name].sets.push(baseSet);
         }
       }
       return Object.values(byName);
@@ -1130,8 +1154,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               completed: false
             };
             // Duration-based exercises (planks, holds, carries)
+            // Check if exercise has duration_seconds explicitly, OR if it's a duration-based exercise by name
+            // and has reps (which should be converted to duration_seconds)
             if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
               baseSet.duration_seconds = exercise.duration_seconds;
+            } else if (isDurationBasedExercise(exercise.name) && exercise.reps && exercise.reps > 0) {
+              // Convert reps to duration_seconds for duration-based exercises (e.g., "Planks 3×60" where 60 is seconds, not reps)
+              baseSet.duration_seconds = exercise.reps;
             } else {
               // Rep-based exercises (traditional lifts)
               baseSet.reps = exercise.reps || 0;
@@ -1339,8 +1368,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   completed: false
                 };
                 // Duration-based exercises (planks, holds, carries)
+                // Check if exercise has duration_seconds explicitly, OR if it's a duration-based exercise by name
+                // and has reps (which should be converted to duration_seconds)
                 if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
                   baseSet.duration_seconds = exercise.duration_seconds;
+                } else if (isDurationBasedExercise(exercise.name) && exercise.reps && exercise.reps > 0) {
+                  // Convert reps to duration_seconds for duration-based exercises (e.g., "Planks 3×60" where 60 is seconds, not reps)
+                  baseSet.duration_seconds = exercise.reps;
                 } else {
                   // Rep-based exercises (traditional lifts)
                   baseSet.reps = exercise.reps || 0;
