@@ -2548,7 +2548,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       return null;
                     })()}
                   </div>
-                ))}
+                  );
+                })}
                 
                 <Button 
                   onClick={(e) => {
