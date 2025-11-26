@@ -1629,7 +1629,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
     
-    // If set is not completed, show RIR prompt
+    // Check if we're in mobility mode - skip RIR prompt for mobility
+    const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+    const isMobilityMode = loggerMode === 'mobility';
+    
+    // If mobility mode, just mark as complete without RIR prompt
+    if (isMobilityMode) {
+      updateSet(exerciseId, setIndex, { completed: true });
+      return;
+    }
+    
+    // If set is not completed, show RIR prompt (for strength workouts)
     setCurrentRIRExercise(exerciseId);
     setCurrentRIRSet(setIndex);
     setSelectedRIR(null);
@@ -2202,116 +2212,51 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
             {(expandedExercises[exercise.id] !== false) && (
               <div className="px-3 py-1.5">
-                {exercise.sets.map((set, setIndex) => (
-                  <div key={setIndex} className="mb-1 last:mb-0">
-                    {/* Tiny rest timer above each set (tap to start/pause) */}
-                    <div className="flex items-center gap-2 mb-0.5 ml-8 relative">
-                      <button
-                        onClick={() => {
-                          const key = `${exercise.id}-${setIndex}`;
-                          const cur = timers[key]?.seconds ?? 90;
-                          const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
-                          setEditingTimerKey(key);
-                          setEditingTimerValue(prefill);
-                        }}
-                        onContextMenu={(e) => { e.preventDefault(); const key = `${exercise.id}-${setIndex}`; setTimers(prev => ({ ...prev, [key]: { seconds: 90, running: false } })); }}
-                        className="h-7 px-2 text-xs rounded-md border border-gray-300 text-gray-700 bg-white"
-                        aria-label="Rest timer"
-                      >
-                        {formatSeconds(timers[`${exercise.id}-${setIndex}`]?.seconds ?? 90)}
-                      </button>
-                      <button
-                        onClick={() => {
-                          const key = `${exercise.id}-${setIndex}`;
-                          setTimers(prev => ({ ...prev, [key]: { seconds: (prev[key]?.seconds ?? 90) || 90, running: true } }));
-                        }}
-                        className="h-7 px-2 text-xs rounded-md border border-gray-300 text-gray-600 bg-white"
-                        aria-label="Start rest timer"
-                      >
-                        Start
-                      </button>
-
-                      {editingTimerKey === `${exercise.id}-${setIndex}` && (
-                        <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
-                          <input
-                            type="tel"
-                            value={editingTimerValue}
-                            onChange={(e)=>setEditingTimerValue(e.target.value)}
-                            placeholder="mm:ss or 90"
-                            className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
-                          />
-                          <div className="flex items-center justify-between mt-3 gap-3">
-                            <button
-                              onClick={() => {
-                                const parsed = parseTimerInput(editingTimerValue);
-                                if (parsed !== null) {
-                                  setTimers(prev => ({ ...prev, [editingTimerKey!]: { seconds: parsed, running: false } }));
-                                  setEditingTimerKey(null);
-                                }
-                              }}
-                              className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (!editingTimerKey) return;
-                                setTimers(prev => ({ ...prev, [editingTimerKey]: { seconds: 0, running: false } }));
-                                setEditingTimerKey(null);
-                              }}
-                              className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                            >
-                              Clear
-                            </button>
-                            <button
-                              onClick={() => setEditingTimerKey(null)}
-                              className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                            >
-                              Close
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 text-xs text-gray-500 text-right">{setIndex + 1}</div>
-                      
-                      {/* Duration-based exercises show timer, rep-based show input */}
-                      {set.duration_seconds !== undefined ? (
-                        // DURATION-BASED EXERCISE (e.g., Plank, Farmer Walks)
-                        <div className="flex items-center gap-1 flex-1">
+                {exercise.sets.map((set, setIndex) => {
+                  const isDurationBased = set.duration_seconds !== undefined;
+                  const durationTimerKey = `${exercise.id}-set-${setIndex}`;
+                  const restTimerKey = `${exercise.id}-${setIndex}`;
+                  const durationTimer = timers[durationTimerKey];
+                  const restTimer = timers[restTimerKey];
+                  const isDurationRunning = durationTimer?.running || false;
+                  const currentDurationSeconds = durationTimer?.seconds ?? (set.duration_seconds || 60);
+                  
+                  return (
+                    <div key={setIndex} className="mb-1 last:mb-0">
+                      {/* Rest timer - hidden for duration-based exercises, shown for rep-based */}
+                      {!isDurationBased && (
+                        <div className="flex items-center gap-2 mb-0.5 ml-8 relative">
                           <button
                             onClick={() => {
-                              const key = `${exercise.id}-set-${setIndex}`;
-                              const cur = set.duration_seconds || 60;
+                              const key = restTimerKey;
+                              const cur = restTimer?.seconds ?? 90;
                               const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
                               setEditingTimerKey(key);
                               setEditingTimerValue(prefill);
                             }}
-                            className="h-9 px-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white"
+                            onContextMenu={(e) => { e.preventDefault(); setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: 90, running: false } })); }}
+                            className="h-7 px-2 text-xs rounded-md border border-gray-300 text-gray-700 bg-white"
+                            aria-label="Rest timer"
                           >
-                            {formatSeconds(set.duration_seconds || 60)}
+                            {formatSeconds(restTimer?.seconds ?? 90)}
                           </button>
                           <button
                             onClick={() => {
-                              const key = `${exercise.id}-set-${setIndex}`;
-                              // Create or update timer state for this duration set
-                              const currentDuration = set.duration_seconds || 60;
-                              setTimers(prev => ({ ...prev, [key]: { seconds: currentDuration, running: true } }));
+                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: (prev[restTimerKey]?.seconds ?? 90) || 90, running: true } }));
                             }}
-                            className="h-9 px-2 text-xs rounded-md border border-gray-300 text-gray-600 bg-white"
+                            className="h-7 px-2 text-xs rounded-md border border-gray-300 text-gray-600 bg-white"
+                            aria-label="Start rest timer"
                           >
                             Start
                           </button>
-                          
-                          {/* Duration timer editor (reuse existing modal) */}
-                          {editingTimerKey === `${exercise.id}-set-${setIndex}` && (
+
+                          {editingTimerKey === restTimerKey && (
                             <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
                               <input
                                 type="tel"
                                 value={editingTimerValue}
                                 onChange={(e)=>setEditingTimerValue(e.target.value)}
-                                placeholder="mm:ss or 60"
+                                placeholder="mm:ss or 90"
                                 className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
                               />
                               <div className="flex items-center justify-between mt-3 gap-3">
@@ -2319,14 +2264,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   onClick={() => {
                                     const parsed = parseTimerInput(editingTimerValue);
                                     if (parsed !== null) {
-                                      // Update the set's duration_seconds
-                                      updateSet(exercise.id, setIndex, { duration_seconds: parsed });
+                                      setTimers(prev => ({ ...prev, [editingTimerKey!]: { seconds: parsed, running: false } }));
                                       setEditingTimerKey(null);
                                     }
                                   }}
                                   className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
                                 >
                                   Save
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (!editingTimerKey) return;
+                                    setTimers(prev => ({ ...prev, [editingTimerKey]: { seconds: 0, running: false } }));
+                                    setEditingTimerKey(null);
+                                  }}
+                                  className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                >
+                                  Clear
                                 </button>
                                 <button
                                   onClick={() => setEditingTimerKey(null)}
@@ -2338,7 +2292,103 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             </div>
                           )}
                         </div>
-                      ) : (
+                      )}
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 text-xs text-gray-500 text-right">{setIndex + 1}</div>
+                        
+                        {/* Duration-based exercises show prominent timer UI */}
+                        {isDurationBased ? (
+                          // DURATION-BASED EXERCISE - Prominent timer UI
+                          <div className="flex-1 flex items-center gap-2">
+                            {/* Large prominent timer display */}
+                            <div className="flex-1 flex items-center gap-2 bg-gray-50 border-2 border-gray-300 rounded-lg px-4 py-3">
+                              <div className="flex-1 text-center">
+                                <div className="text-xs text-gray-600 mb-0.5">Duration</div>
+                                <div className={`text-2xl font-mono font-semibold ${isDurationRunning ? 'text-blue-600' : 'text-gray-900'}`}>
+                                  {formatSeconds(currentDurationSeconds)}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {!isDurationRunning ? (
+                                  <button
+                                    onClick={() => {
+                                      const currentDuration = set.duration_seconds || 60;
+                                      setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds: currentDuration, running: true } }));
+                                    }}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                                  >
+                                    Start
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setTimers(prev => ({ ...prev, [durationTimerKey]: { ...prev[durationTimerKey], running: false } }));
+                                    }}
+                                    className="px-4 py-2 bg-yellow-500 text-white rounded-md text-sm font-medium hover:bg-yellow-600"
+                                  >
+                                    Pause
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    const currentDuration = set.duration_seconds || 60;
+                                    setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds: currentDuration, running: false } }));
+                                  }}
+                                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300"
+                                >
+                                  Reset
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const cur = set.duration_seconds || 60;
+                                    const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
+                                    setEditingTimerKey(durationTimerKey);
+                                    setEditingTimerValue(prefill);
+                                  }}
+                                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* Duration timer editor modal */}
+                            {editingTimerKey === durationTimerKey && (
+                              <div className="absolute top-16 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
+                                <input
+                                  type="tel"
+                                  value={editingTimerValue}
+                                  onChange={(e)=>setEditingTimerValue(e.target.value)}
+                                  placeholder="mm:ss or 60"
+                                  className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
+                                />
+                                <div className="flex items-center justify-between mt-3 gap-3">
+                                  <button
+                                    onClick={() => {
+                                      const parsed = parseTimerInput(editingTimerValue);
+                                      if (parsed !== null) {
+                                        updateSet(exercise.id, setIndex, { duration_seconds: parsed });
+                                        setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds: parsed, running: false } }));
+                                        setEditingTimerKey(null);
+                                      }
+                                    }}
+                                    className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingTimerKey(null)}
+                                    className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                  >
+                                    Close
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            
+                          </div>
+                        ) : (
                         // REP-BASED EXERCISE (e.g., Squat, Bench Press)
                         <Input
                           type="number"
@@ -2408,18 +2458,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           />
                         );
                       })()}
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={set.rir || ''}
-                        onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                        className="h-9 text-center text-sm border-gray-300 w-16"
-                        min="0"
-                        max="5"
-                        style={{ fontSize: '16px' }}
-                        placeholder="RIR"
-                      />
+                      {/* RIR input - hidden for mobility mode */}
+                      {(() => {
+                        const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+                        const isMobilityMode = loggerMode === 'mobility';
+                        if (isMobilityMode) return null;
+                        return (
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={set.rir || ''}
+                            onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
+                            className="h-9 text-center text-sm border-gray-300 w-16"
+                            min="0"
+                            max="5"
+                            style={{ fontSize: '16px' }}
+                            placeholder="RIR"
+                          />
+                        );
+                      })()}
                       <button
                         onClick={() => handleSetComplete(exercise.id, setIndex)}
                         className={`text-xs px-2 py-1 rounded min-h-[28px] ${set.completed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}
