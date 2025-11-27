@@ -62,6 +62,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
           setAnalysisError('Analysis status unclear. Please try again.');
           analyzingRef.current.delete(workoutId);
           setAnalyzingWorkout(null);
+          // Reload workouts to clear stuck state
+          await loadRecentWorkouts();
           return;
         }
       }
@@ -80,25 +82,30 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         }
         
         // Reload workout data to get the complete analysis
+        // First try to update just this workout
         const { data: updatedWorkout } = await supabase
           .from('workouts')
-          .select('*, workout_analysis')
+          .select('*, workout_analysis, analysis_status')
           .eq('id', workoutId)
           .single();
         
         if (updatedWorkout) {
           setRecentWorkouts(prev => {
-            // Only update if the workout actually changed
-            const existing = prev.find(w => w.id === workoutId);
-            if (existing?.workout_analysis === updatedWorkout.workout_analysis && 
-                existing?.analysis_status === updatedWorkout.analysis_status) {
-              return prev; // No change, return same array to prevent re-render
-            }
-            return prev.map(w => w.id === workoutId ? updatedWorkout : w);
+            // Update the workout in the list
+            const updated = prev.map(w => w.id === workoutId ? updatedWorkout : w);
+            // Force a new array reference to trigger re-render
+            return [...updated];
           });
-          // Only set selected if not already selected (prevents unnecessary re-render)
-          setSelectedWorkoutId(prev => prev === workoutId ? prev : workoutId);
+          // Select the workout to show analysis
+          setSelectedWorkoutId(workoutId);
+        } else {
+          // If single workout fetch failed, reload entire list
+          console.log('⚠️ Single workout fetch failed, reloading entire list...');
+          await loadRecentWorkouts();
         }
+        
+        // Force a small delay to ensure state updates propagate
+        await new Promise(resolve => setTimeout(resolve, 100));
         return;
       }
 
@@ -114,6 +121,9 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
           clearTimeout(timeoutId);
           pollingRef.current.delete(workoutId);
         }
+        
+        // Reload workouts to reflect failed status
+        await loadRecentWorkouts();
         return;
       }
 
@@ -127,6 +137,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
             .from('workouts')
             .update({ analysis_status: 'pending' })
             .eq('id', workoutId);
+          // Reload workouts to reflect the reset
+          await loadRecentWorkouts();
         } catch (resetError) {
           console.error('❌ Failed to reset stuck status:', resetError);
         }
@@ -258,6 +270,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
   }, [analyzingWorkout, recentWorkouts]);
 
   // Memoize loadRecentWorkouts to prevent unnecessary re-creations
+  // Export it so it can be called from polling
   const loadRecentWorkouts = useCallback(async () => {
     try {
       setLoading(true);
