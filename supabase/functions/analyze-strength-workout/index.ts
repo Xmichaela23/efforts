@@ -1538,18 +1538,24 @@ Be specific with numbers and trends. Use historical progression data to identify
   }
 }
 
+// CORS helper function
+function corsHeaders(): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+    'Access-Control-Max-Age': '86400'
+  };
+}
+
 // Main edge function handler
 Deno.serve(async (req) => {
   // Handle CORS preflight requests FIRST - before any other logic
+  // This MUST be outside try-catch to ensure it always works
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
-        'Access-Control-Max-Age': '86400'
-      }
+      headers: corsHeaders()
     });
   }
 
@@ -1582,9 +1588,7 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { 
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+          ...corsHeaders()
         }
       });
     }
@@ -1611,9 +1615,7 @@ Deno.serve(async (req) => {
         status: 401,
         headers: { 
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+          ...corsHeaders()
         }
       });
     }
@@ -1669,9 +1671,7 @@ Deno.serve(async (req) => {
         status: 403,
         headers: { 
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+          ...corsHeaders()
         }
       });
     }
@@ -1683,7 +1683,10 @@ Deno.serve(async (req) => {
         workout_type: workout.type 
       }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          ...corsHeaders()
+        }
       });
     }
     
@@ -1809,10 +1812,7 @@ Deno.serve(async (req) => {
       status: 200,
       headers: { 
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
-        'Access-Control-Max-Age': '86400'
+        ...corsHeaders()
       }
     });
     
@@ -1872,10 +1872,7 @@ Deno.serve(async (req) => {
       status: 500,
       headers: { 
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
-        'Access-Control-Max-Age': '86400'
+        ...corsHeaders()
       }
     });
   }
