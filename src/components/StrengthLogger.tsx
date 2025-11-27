@@ -2110,6 +2110,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           console.error('❌ Auto-attach failed for workout:', workoutId, error);
         } else if (data?.attached) {
           console.log('✅ Auto-attached workout:', workoutId, data);
+          // Realtime subscription will automatically refresh via database triggers
         } else {
           console.log('ℹ️ No planned workout found to attach:', workoutId, data?.reason || 'unknown');
         }

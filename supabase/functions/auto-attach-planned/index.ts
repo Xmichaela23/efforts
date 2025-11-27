@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     console.log('[auto-attach-planned] Loading workout with ID:', workout_id);
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id,user_id,type,provider_sport,date,timestamp,distance,moving_time,avg_heart_rate,tss,intensity_factor,metrics,computed,planned_id')
+      .select('id,user_id,type,provider_sport,date,timestamp,distance,moving_time,avg_heart_rate,tss,intensity_factor,metrics,computed,planned_id,strength_exercises,mobility_exercises')
       .eq('id', workout_id)
       .maybeSingle();
     console.log('[auto-attach-planned] Query result - data:', w, 'error:', wErr);
@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
     const day = String(w.date || '').slice(0,10);
     const { data: plannedList } = await supabase
       .from('planned_workouts')
-      .select('id,user_id,type,date,name,computed,intervals,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment')
+      .select('id,user_id,type,date,name,computed,intervals,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment,strength_exercises,mobility_exercises')
       .eq('user_id', w.user_id)
       .eq('type', sport)
       .eq('date', day)
@@ -254,9 +254,73 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    // Compute workout stats (moving time and meters)
-    const wSec = Number(w.moving_time ? (typeof w.moving_time==='number' ? w.moving_time : 0) : 0);
+    // Filter candidates by date/type match (already filtered by query, but double-check)
+    candidates = candidates.filter((p: any) => {
+      const pdate = String((p as any).date || '').slice(0,10);
+      return pdate === day && String((p as any).type||'').toLowerCase() === sport;
+    });
+
+    // ===== STRENGTH/MOBILITY: Match by date + type only (no duration check) =====
+    if (sport === 'strength' || sport === 'mobility') {
+      console.log('[auto-attach-planned] Strength/mobility workout - matching by date + type only');
+      if (candidates.length === 0) {
+        return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+      // If multiple candidates, pick the first one (could enhance with exercise matching later)
+      const best = candidates[0];
+      console.log('[auto-attach-planned] Selected candidate:', best.id, 'from', candidates.length, 'candidates');
+      
+      // Link the workout
+      const prevCompletedId = (best as any)?.completed_workout_id as string | null | undefined;
+      if (prevCompletedId && prevCompletedId !== w.id) {
+        try {
+          await supabase.from('workouts').update({ planned_id: null }).eq('id', prevCompletedId);
+        } catch {}
+      }
+      await supabase
+        .from('planned_workouts')
+        .update({ workout_status: 'completed', completed_workout_id: w.id })
+        .eq('id', best.id)
+        .eq('user_id', w.user_id);
+      
+      const updates: any = { 
+        planned_id: best.id,
+        computed: w.computed ? { ...w.computed, planned_steps_light: null, intervals: [] } : null
+      };
+      await supabase
+        .from('workouts')
+        .update(updates)
+        .eq('id', w.id)
+        .eq('user_id', w.user_id);
+
+      // Ensure planned is materialized
+      try {
+        const baseUrl = Deno.env.get('SUPABASE_URL');
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        await fetch(`${baseUrl}/functions/v1/materialize-plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key },
+          body: JSON.stringify({ planned_workout_id: best.id })
+        });
+      } catch {}
+
+      // Compute server summary
+      try {
+        const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+      } catch {}
+
+      return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, mode: 'date_type_match' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    // ===== RUNS/RIDES/SWIMS: Match by date + type + duration (85-115% match) =====
+    // moving_time is stored in MINUTES, convert to seconds
+    const wSec = Number(w.moving_time && typeof w.moving_time==='number' ? w.moving_time * 60 : 0);
     const wMeters = Number(w.distance ? w.distance*1000 : 0);
+
+    console.log('[auto-attach-planned] Run/ride/swim workout - matching by date + type + duration');
+    console.log('[auto-attach-planned] Workout moving_time (minutes):', w.moving_time, 'converted to seconds:', wSec);
 
     // High-confidence selection rule: same day+type AND duration within 85%–115%
     // Compute planned seconds for each candidate and pick closest by percent diff
@@ -296,7 +360,7 @@ Deno.serve(async (req) => {
       const pSec = await ensureSeconds(p);
       console.log('[auto-attach-planned] Planned seconds:', pSec, 'Workout seconds:', wSec);
       if (!Number.isFinite(pSec) || pSec <= 0 || !Number.isFinite(wSec) || wSec <= 0) {
-        console.log('[auto-attach-planned] Skipping candidate - invalid duration');
+        console.log('[auto-attach-planned] Skipping candidate - invalid duration (planned:', pSec, 'workout:', wSec, ')');
         continue;
       }
       const pct = Math.abs(wSec - pSec) / Math.max(1, pSec);

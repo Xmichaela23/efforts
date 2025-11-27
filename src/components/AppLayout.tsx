@@ -488,6 +488,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             console.error('❌ Auto-attach failed for imported workout:', savedWorkout?.id, error);
           } else if (data?.attached) {
             console.log('✅ Auto-attached imported workout:', savedWorkout?.id, data);
+            // Realtime subscription will automatically refresh via database triggers
           } else {
             console.log('ℹ️ No planned workout found to attach:', savedWorkout?.id, data?.reason || 'unknown');
           }

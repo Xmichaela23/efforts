@@ -849,7 +849,7 @@ export const useWorkouts = () => {
     return () => { cancelled = true; };
   }, [authReady]);
 
-  // 🔔 Realtime: refresh when new Strava/Garmin/workouts rows arrive
+  // 🔔 Realtime: refresh when Strava/Garmin/workouts rows change (INSERT/UPDATE/DELETE)
   useEffect(() => {
     let channel: any;
     let mounted = true;
@@ -869,7 +869,8 @@ export const useWorkouts = () => {
             fetchWorkouts();
           }
         })
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'workouts', filter: `user_id=eq.${user.id}` }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${user.id}` }, () => {
+          // Listen for INSERT, UPDATE, DELETE - server handles all changes via realtime
           fetchWorkouts();
         })
         .subscribe();
@@ -1128,6 +1129,7 @@ export const useWorkouts = () => {
               console.error('❌ Auto-attach failed for Garmin workout:', savedWorkout?.id, error);
             } else if (data?.attached) {
               console.log('✅ Auto-attached Garmin workout:', savedWorkout?.id, data);
+              // Realtime subscription will automatically refresh via database triggers
             } else {
               console.log('ℹ️ No planned workout found to attach:', savedWorkout?.id, data?.reason || 'unknown');
             }

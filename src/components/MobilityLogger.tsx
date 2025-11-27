@@ -331,6 +331,7 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
           console.error('❌ Auto-attach failed for mobility workout:', workoutId, error);
         } else if (data?.attached) {
           console.log('✅ Auto-attached mobility workout:', workoutId, data);
+          // Realtime subscription will automatically refresh via database triggers
         } else {
           console.log('ℹ️ No planned workout found to attach:', workoutId, data?.reason || 'unknown');
         }

@@ -3762,48 +3762,59 @@ function analyzeIntraIntervalPacing(sensorData: any[], workIntervals: any[]): an
   const evenCount = splits.filter(s => Math.abs(s.split_seconds) <= 5).length;
   const negativeSplitCount = splits.filter(s => s.split_seconds < -5).length;
   
-  // Identify which intervals had negative splits vs fades
+  // Identify which intervals had negative splits vs significant fades
   const negativeSplitIntervals = splits.filter(s => s.split_seconds < -5).map(s => s.interval_number);
-  const fadeIntervals = splits.filter(s => s.split_seconds > 5).map(s => s.interval_number);
-  const evenIntervals = splits.filter(s => Math.abs(s.split_seconds) <= 5).map(s => s.interval_number);
+  const significantFadeIntervals = splits.filter(s => s.split_seconds > 10).map(s => s.interval_number); // >10s is significant fade
+  const minorFadeIntervals = splits.filter(s => s.split_seconds > 5 && s.split_seconds <= 10).map(s => s.interval_number);
   
-  // Analyze pattern: check if early intervals were better than later ones
-  const firstHalf = splits.slice(0, Math.ceil(splits.length / 2));
-  const secondHalf = splits.slice(Math.ceil(splits.length / 2));
-  const firstHalfAvg = firstHalf.reduce((sum, s) => sum + s.split_seconds, 0) / firstHalf.length;
-  const secondHalfAvg = secondHalf.reduce((sum, s) => sum + s.split_seconds, 0) / secondHalf.length;
-  const earlyBetter = firstHalfAvg < secondHalfAvg; // Lower is better (less fade)
-  
-  // Find the transition point where fades start (if any)
-  const lastGoodInterval = splits.findLastIndex(s => s.split_seconds <= 5);
-  const firstFadeInterval = splits.findIndex(s => s.split_seconds > 5);
+  // Separate "good" intervals (negative splits, even, or minor fade) from "bad" (significant fade)
+  const goodIntervals = splits.filter(s => s.split_seconds <= 10); // <=10s is acceptable
+  const badIntervals = splits.filter(s => s.split_seconds > 10); // >10s is significant fade
   
   let assessment = '';
-  if (negativeSplitCount >= 2 && fadeCount <= 2) {
-    // Multiple negative splits with minimal fading = excellent
-    assessment = 'excellent discipline - multiple negative splits demonstrate smart pacing control';
-  } else if (evenCount >= splits.length * 0.75) {
-    assessment = 'excellent - consistent pacing within intervals';
-  } else if (negativeSplitCount > 0 && fadeCount > 0) {
-    // Has both negative splits and fades - need to identify which intervals
-    const goodIntervals = splits.filter(s => s.split_seconds <= 5);
-    const badIntervals = splits.filter(s => s.split_seconds > 5);
-    
+  
+  if (negativeSplitCount > 0 && badIntervals.length > 0) {
+    // Has negative splits AND significant fades - identify the pattern
     if (goodIntervals.length >= 4 && badIntervals.length <= 2) {
-      // Most intervals were good, only last 1-2 faded
+      // Most intervals were good, only last 1-2 had significant fade
       const goodIntervalNums = goodIntervals.map(s => s.interval_number);
       const badIntervalNums = badIntervals.map(s => s.interval_number);
       const negativeSplitNums = negativeSplitIntervals.map(n => n).join(' & ');
       
-      assessment = `excellent discipline in first ${goodIntervals.length} intervals, with ${negativeSplitCount} impressive negative split${negativeSplitCount > 1 ? 's' : ''} (Interval${negativeSplitCount > 1 ? 's' : ''} ${negativeSplitNums}). Final ${badIntervals.length} interval${badIntervals.length > 1 ? 's' : ''} (${badIntervalNums.join(', ')}) showed fatigue fade (${badIntervals.map(s => `+${s.split_seconds}s`).join(', ')}) indicating accumulated stress from hard efforts. This pattern is normal and demonstrates smart pacing - executing early intervals with control rather than overpacing`;
+      // Sort interval numbers to check consecutiveness
+      goodIntervalNums.sort((a, b) => a - b);
+      badIntervalNums.sort((a, b) => a - b);
+      
+      // Check if good intervals are consecutive at the start
+      const goodIntervalsConsecutive = goodIntervalNums.length > 0 && 
+        goodIntervalNums.every((num, idx) => idx === 0 || num === goodIntervalNums[idx - 1] + 1);
+      const badIntervalsConsecutive = badIntervalNums.length > 0 &&
+        badIntervalNums.every((num, idx) => idx === 0 || num === badIntervalNums[idx - 1] + 1);
+      
+      // Check if all good intervals come before all bad intervals
+      const allGoodBeforeBad = badIntervalNums.length > 0 && goodIntervalNums.length > 0 &&
+        Math.min(...badIntervalNums) > Math.max(...goodIntervalNums);
+      
+      if (goodIntervalsConsecutive && badIntervalsConsecutive && allGoodBeforeBad) {
+        // Good intervals first, then fade intervals - perfect pattern
+        assessment = `excellent discipline in first ${goodIntervals.length} intervals, with ${negativeSplitCount} impressive negative split${negativeSplitCount > 1 ? 's' : ''} (Interval${negativeSplitCount > 1 ? 's' : ''} ${negativeSplitNums}). Final ${badIntervals.length} interval${badIntervals.length > 1 ? 's' : ''} (${badIntervalNums.join(', ')}) showed fatigue fade (${badIntervals.map(s => `+${s.split_seconds}s`).join(', ')}) indicating accumulated stress from hard efforts. This pattern is normal and demonstrates smart pacing - executing early intervals with control rather than overpacing`;
+      } else {
+        assessment = `excellent discipline with ${negativeSplitCount} impressive negative split${negativeSplitCount > 1 ? 's' : ''} (Interval${negativeSplitCount > 1 ? 's' : ''} ${negativeSplitNums}), though some intervals showed fade indicating room for pacing consistency`;
+      }
     } else {
       assessment = `excellent discipline with ${negativeSplitCount} negative split${negativeSplitCount > 1 ? 's' : ''} (Interval${negativeSplitCount > 1 ? 's' : ''} ${negativeSplitIntervals.join(' & ')}), though some intervals showed fade indicating room for pacing consistency`;
     }
+  } else if (negativeSplitCount >= 2 && fadeCount <= 2) {
+    // Multiple negative splits with minimal fading = excellent
+    assessment = 'excellent discipline - multiple negative splits demonstrate smart pacing control';
+  } else if (evenCount >= splits.length * 0.75) {
+    assessment = 'excellent - consistent pacing within intervals';
   } else if (fadeCount <= 2 && negativeSplitCount > 0) {
     assessment = 'excellent discipline in early intervals with negative splits, minimal fade overall';
-  } else if (earlyBetter && fadeCount <= Math.ceil(splits.length / 2)) {
-    // Early intervals were better, fatigue in later intervals is normal
-    assessment = `excellent discipline in first ${firstHalf.length} intervals, with ${negativeSplitCount > 0 ? 'negative splits and ' : ''}even pacing. Intervals ${secondHalf.length > 0 ? Math.ceil(splits.length / 2) + 1 : splits.length}-${splits.length} showed fatigue fade (${secondHalf.filter(s => s.split_seconds > 5).length} intervals) indicating accumulated stress from hard efforts. This pattern is normal and demonstrates smart pacing - executing early intervals with control rather than overpacing`;
+  } else if (badIntervals.length > 0 && goodIntervals.length >= 4) {
+    // Has significant fades but most intervals were good
+    const badIntervalNums = badIntervals.map(s => s.interval_number);
+    assessment = `excellent discipline in first ${goodIntervals.length} intervals. Final ${badIntervals.length} interval${badIntervals.length > 1 ? 's' : ''} (${badIntervalNums.join(', ')}) showed fatigue fade (${badIntervals.map(s => `+${s.split_seconds}s`).join(', ')}) indicating accumulated stress from hard efforts. This pattern is normal and demonstrates smart pacing - executing early intervals with control rather than overpacing`;
   } else if (fadeCount <= 2) {
     assessment = 'good - mostly even with minor adjustments';
   } else {

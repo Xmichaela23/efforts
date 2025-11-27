@@ -774,10 +774,11 @@ WORKOUT DETAILS:
 - Type: ${workout.type}
 - Duration: ${Math.round(workout.duration || 0)} minutes
 
-ENHANCED PLAN CONTEXT:`;
+PLANNED WORKOUT CONTEXT:`;
   
   if (planMetadata) {
     context += `
+✅ THIS WORKOUT IS ATTACHED TO A PLAN:
 - Plan Type: ${planMetadata.plan_type}
 - Phase: ${planMetadata.phase} (Week ${planMetadata.week}/${planMetadata.total_weeks})
 - Phase Focus: ${planMetadata.phase_focus}
@@ -796,9 +797,12 @@ ENHANCED PLAN CONTEXT:`;
       context += `
 - Plan Notes: ${planMetadata.plan_notes}`;
     }
+    
+    context += `
+- Planned Exercises: ${overallAdherence.exercises_planned} exercises planned`;
   } else {
     context += `
-- No planned workout context available`;
+⚠️ NO PLANNED WORKOUT: This workout was not attached to a planned workout. Analyze based on executed exercises only.`;
   }
   
   context += `
@@ -807,9 +811,13 @@ EXERCISE ADHERENCE:
 - Exercises Planned: ${overallAdherence.exercises_planned}
 - Exercises Executed: ${overallAdherence.exercises_executed}
 - Exercise Completion Rate: ${overallAdherence.exercise_completion_rate.toFixed(1)}%
+- Sets Planned: ${overallAdherence.sets_planned}
+- Sets Executed (marked complete): ${overallAdherence.sets_executed}
 - Set Completion Rate: ${overallAdherence.set_completion_rate.toFixed(1)}%
 - Weight Progression: ${overallAdherence.weight_progression.toFixed(1)}%
 - Volume Completion: ${overallAdherence.volume_completion.toFixed(1)}%
+
+NOTE: "Sets Executed" counts only sets marked as "completed=true". If exercises were logged but sets weren't marked complete, this will be 0 even if the workout was performed.
 
 EXERCISE DETAILS:`;
   
@@ -832,16 +840,31 @@ EXERCISE DETAILS:`;
   
   context += `
 
-PROGRESSION DATA:`;
+HISTORICAL PROGRESSION DATA (from last 20 workouts):`;
   
-  for (const [exerciseName, progression] of Object.entries(progressionData)) {
-    const prog = progression as any;
-    context += `
-- ${exerciseName}: ${prog.current_weight}${prog.current_weight_unit} (${prog.trend})`;
-    
-    if (prog.last_session) {
-      context += `, Last session: ${prog.last_session.weight}${prog.last_session.weight_unit} (${prog.last_session.change_direction})`;
+  if (Object.keys(progressionData).length > 0) {
+    for (const [exerciseName, progression] of Object.entries(progressionData)) {
+      const prog = progression as any;
+      context += `
+- ${exerciseName}: Current weight ${prog.current_weight}${prog.current_weight_unit} (${prog.trend} trend)`;
+      
+      if (prog.last_session) {
+        const change = prog.last_session.change;
+        const changeStr = change > 0 ? `+${change}` : `${change}`;
+        context += `, Last session: ${prog.last_session.weight}${prog.last_session.weight_unit} (${changeStr}${prog.last_session.weight_unit} ${prog.last_session.change_direction})`;
+      }
+      
+      if (prog.four_week_avg) {
+        const avgChange = prog.four_week_avg.change;
+        const avgChangeStr = avgChange > 0 ? `+${avgChange}` : `${avgChange}`;
+        context += `, 4-week avg: ${prog.four_week_avg.weight}${prog.four_week_avg.weight_unit} (${avgChangeStr}${prog.four_week_avg.weight_unit} vs avg)`;
+      }
+      
+      context += `, Status: ${prog.status}`;
     }
+  } else {
+    context += `
+- No historical data available (this may be first time performing these exercises)`;
   }
   
   // Add RIR analysis to context
@@ -919,10 +942,13 @@ READINESS CHECK: Not provided`;
   context += `
 
 ANALYSIS REQUIREMENTS:
-- Consider phase-appropriate progression (${planMetadata?.phase || 'unknown'} phase)
+- ${planMetadata ? 'THIS WORKOUT IS ATTACHED TO A PLAN - prioritize plan adherence and phase-appropriate progression' : 'THIS WORKOUT IS NOT ATTACHED TO A PLAN - analyze based on executed exercises only'}
+- Consider phase-appropriate progression (${planMetadata?.phase || 'N/A - no plan'} phase)
 - Understand endurance integration context (${planMetadata?.endurance_relationship || 'general strength'})
-- Focus on plan adherence when plan is available
-- Highlight weight progression relative to phase expectations
+- ${planMetadata ? 'Focus heavily on plan adherence - compare executed exercises to planned exercises' : 'No plan to compare against - focus on exercise execution and progression'}
+- Use HISTORICAL PROGRESSION DATA to compare current performance to past workouts
+- Highlight weight progression relative to phase expectations AND historical trends
+- Reference last session comparisons and 4-week averages when available
 - Note any missed or added exercises
 - Comment on RIR data quality and consistency if available
 - Consider Session RPE in context of workout difficulty
@@ -930,7 +956,12 @@ ANALYSIS REQUIREMENTS:
 - Consider deload week context if applicable
 - Keep insights factual and data-driven
 - Use ${userUnits} units consistently
-- Max 3 insights, each under 25 words`;
+- Max 3 insights, each under 25 words
+- IMPORTANT: If set completion rate is 0% but exercise completion is high, do NOT create contradictory statements
+- Instead, say something like: "All planned exercises were logged (${overallAdherence.exercises_executed}/${overallAdherence.exercises_planned}), but set completion data is incomplete" OR focus on what IS available (weight progression, RIR data, etc.)
+- Never say "exercises completed but no sets completed" - this is confusing and contradictory
+- If sets weren't marked complete, focus on other metrics like weight progression or RIR data instead
+- Keep statements clear and non-contradictory`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -944,7 +975,9 @@ ANALYSIS REQUIREMENTS:
         messages: [
           {
             role: 'system',
-            content: 'You are a strength training analysis expert. Provide concise, factual insights about workout execution and progression. Focus on data-driven observations, not coaching advice.'
+            content: `You are a strength training analysis expert. Provide concise, factual insights about workout execution and progression. Focus on data-driven observations, not coaching advice.
+
+CRITICAL: Avoid contradictory statements. If exercise completion is high but set completion is 0%, this means exercises were logged but sets weren't marked as "completed". In this case, focus on other available metrics (weight progression, RIR data, etc.) rather than creating confusing statements about "exercises completed but no sets completed".`
           },
           {
             role: 'user',
