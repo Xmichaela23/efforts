@@ -491,14 +491,31 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       console.log('🎯 Selected workout has no analysis yet - will show when analysis completes');
     }
 
-    console.log('🎯 Found workout with analysis:', workoutWithAnalysis ? {
+    console.log('🎯 Found workout:', workoutWithAnalysis ? {
       id: workoutWithAnalysis.id,
       type: workoutWithAnalysis.type,
       status: workoutWithAnalysis.workout_status,
-      performance: workoutWithAnalysis.workout_analysis?.performance_assessment
+      has_analysis: !!workoutWithAnalysis.workout_analysis,
+      analysis_status: workoutWithAnalysis.analysis_status,
+      performance: workoutWithAnalysis.workout_analysis?.performance
     } : 'NONE');
 
     if (!workoutWithAnalysis) {
+      return null;
+    }
+    
+    // Auto-trigger analysis if workout is completed but has no analysis and isn't already being analyzed
+    if (workoutWithAnalysis.status === 'completed' && 
+        !workoutWithAnalysis.workout_analysis && 
+        workoutWithAnalysis.analysis_status !== 'analyzing' &&
+        workoutWithAnalysis.analysis_status !== 'complete' &&
+        !analyzingRef.current.has(workoutWithAnalysis.id)) {
+      console.log('🔄 Auto-triggering analysis for completed workout without analysis:', workoutWithAnalysis.id);
+      // Trigger analysis in background (don't await)
+      analyzeWorkout(workoutWithAnalysis.id).catch(err => {
+        console.error('❌ Auto-analysis failed:', err);
+      });
+      // Return null to show loading state
       return null;
     }
     
