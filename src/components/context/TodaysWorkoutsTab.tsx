@@ -423,39 +423,27 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       console.log('🎯 Showing selected workout:', selectedWorkoutId, workoutWithAnalysis ? 'found' : 'not found');
     }
     
-    // If no selected workout, find the most recent with insights
+    // If no selected workout, show the MOST RECENT workout (by date), regardless of analysis status
+    // This ensures chronological order - most recent workout always shows first
     if (!workoutWithAnalysis) {
-      workoutWithAnalysis = recentWorkouts.find(workout => {
-        const analysis = workout.workout_analysis;
-        console.log('🔍 Checking workout for analysis:', {
-          id: workout.id,
-          type: workout.type,
-          has_analysis: !!analysis,
-          analysis_structure: analysis ? Object.keys(analysis) : 'none'
+      // Ensure workouts are sorted by date descending (most recent first)
+      const sortedWorkouts = [...recentWorkouts].sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        return dateB - dateA; // Descending order (newest first)
+      });
+      
+      // Show the most recent workout first (index 0)
+      workoutWithAnalysis = sortedWorkouts[0] || null;
+      
+      if (workoutWithAnalysis) {
+        console.log('🎯 Showing most recent workout by date:', {
+          id: workoutWithAnalysis.id,
+          date: workoutWithAnalysis.date,
+          type: workoutWithAnalysis.type,
+          has_analysis: !!workoutWithAnalysis.workout_analysis
         });
-        if (!analysis) return false;
-        
-        // Handle both old and new analysis data structures
-        const insights = analysis.insights || (analysis.workout_analysis && analysis.workout_analysis.insights);
-        
-        // NEW: Handle granular analysis structure (strengths + primary_issues)
-        const granularInsights = [];
-        if (analysis.strengths && analysis.strengths.length > 0) {
-          granularInsights.push(...analysis.strengths.map(s => `✅ ${s}`));
-        }
-        if (analysis.primary_issues && analysis.primary_issues.length > 0) {
-          granularInsights.push(...analysis.primary_issues.map(i => `⚠️ ${i}`));
-        }
-        
-        const hasInsights = (insights && insights.length > 0) || granularInsights.length > 0;
-        console.log('🔍 Analysis insights check:', { 
-          oldInsights: insights, 
-          granularInsights, 
-          hasInsights 
-        });
-        return hasInsights;
-      }) || recentWorkouts.find(workout => workout.workout_analysis); // Fallback to any analysis
-      console.log('🎯 Fallback to most recent with analysis');
+      }
     } else if (!workoutWithAnalysis.workout_analysis) {
       console.log('🎯 Selected workout has no analysis yet - will show when analysis completes');
     }

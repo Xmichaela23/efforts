@@ -521,6 +521,348 @@ async function getStrengthProgression(
   }
 }
 
+/**
+ * Generate comprehensive exercise-by-exercise breakdown
+ */
+function generateExerciseBreakdown(
+  exerciseAdherence: any[],
+  userUnits: string,
+  planUnits: string
+): any[] {
+  return exerciseAdherence
+    .filter(ex => ex.matched && ex.planned && ex.executed)
+    .map(ex => {
+      const planned = ex.planned;
+      const executed = ex.executed;
+      const adherence = ex.adherence;
+      
+      const plannedSets = Array.isArray(planned.sets) ? planned.sets : [];
+      const executedSets = Array.isArray(executed.sets) ? executed.sets : [];
+      const completedSets = executedSets.filter((s: any) => s.completed);
+      
+      // Calculate planned vs actual metrics
+      const plannedReps = plannedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
+      const actualReps = completedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
+      const plannedWeight = plannedSets.length > 0 ? plannedSets[0].weight || 0 : 0;
+      const actualWeight = completedSets.length > 0 ? completedSets[0].weight || 0 : 0;
+      
+      // Calculate volumes
+      const plannedVolume = plannedSets.reduce((sum: number, s: any) => 
+        sum + ((s.reps || 0) * (s.weight || 0)), 0);
+      const actualVolume = completedSets.reduce((sum: number, s: any) => 
+        sum + ((s.reps || 0) * (s.weight || 0)), 0);
+      
+      // Get RIR data
+      const plannedRIR = plannedSets.find((s: any) => s.rir != null)?.rir || null;
+      const executedRIRs = completedSets
+        .filter((s: any) => s.rir != null)
+        .map((s: any) => s.rir);
+      const avgRIR = executedRIRs.length > 0 
+        ? executedRIRs.reduce((sum: number, r: number) => sum + r, 0) / executedRIRs.length 
+        : null;
+      
+      // Calculate performance score (weight adherence 50%, RIR adherence 30%, set completion 20%)
+      const weightScore = Math.max(0, 100 - Math.abs(adherence.weight_progression || 0));
+      let performanceScore = 0;
+      if (adherence.set_completion > 0) {
+        const rirScore = adherence.rir_adherence != null 
+          ? Math.max(0, 100 - (adherence.rir_adherence * 20)) // RIR diff of 1 = 20% penalty
+          : 50; // Neutral if no RIR data
+        performanceScore = (weightScore * 0.5) + (rirScore * 0.3) + (adherence.set_completion * 0.2);
+      }
+      
+      return {
+        name: ex.name,
+        planned: {
+          sets: plannedSets.length,
+          reps: plannedReps,
+          weight: plannedWeight,
+          volume: plannedVolume,
+          rir: plannedRIR
+        },
+        actual: {
+          sets: completedSets.length,
+          reps: actualReps,
+          weight: actualWeight,
+          volume: actualVolume,
+          avg_rir: avgRIR,
+          rir_values: executedRIRs
+        },
+        adherence: {
+          set_completion: adherence.set_completion,
+          load_adherence: weightScore, // Percentage based on weight difference
+          rir_adherence: adherence.rir_adherence,
+          volume_completion: adherence.volume_completion
+        },
+        performance_score: Math.round(performanceScore)
+      };
+    });
+}
+
+/**
+ * Analyze RIR progression across sets for each exercise
+ */
+function analyzeRIRProgressionAcrossSets(exerciseAdherence: any[]): any {
+  const rirPatterns: any[] = [];
+  
+  for (const ex of exerciseAdherence) {
+    if (!ex.matched || !ex.executed) continue;
+    
+    const executedSets = Array.isArray(ex.executed.sets) ? ex.executed.sets : [];
+    const completedSets = executedSets.filter((s: any) => s.completed && s.rir != null);
+    
+    if (completedSets.length < 2) continue; // Need at least 2 sets with RIR
+    
+    const rirValues = completedSets.map((s: any) => s.rir);
+    const firstRIR = rirValues[0];
+    const lastRIR = rirValues[rirValues.length - 1];
+    const rirChange = lastRIR - firstRIR; // Positive = getting easier, negative = getting harder
+    
+    // Determine pattern
+    let pattern = 'consistent';
+    if (rirChange < -1) {
+      pattern = 'increasing difficulty';
+    } else if (rirChange > 1) {
+      pattern = 'decreasing difficulty';
+    } else if (Math.abs(rirChange) <= 1) {
+      pattern = 'consistent';
+    }
+    
+    rirPatterns.push({
+      exercise_name: ex.name,
+      rir_progression: rirValues.join(' → '),
+      first_rir: firstRIR,
+      last_rir: lastRIR,
+      rir_change: rirChange,
+      pattern: pattern,
+      assessment: getRIRPatternAssessment(pattern, rirChange, rirValues.length)
+    });
+  }
+  
+  return {
+    available: rirPatterns.length > 0,
+    patterns: rirPatterns
+  };
+}
+
+function getRIRPatternAssessment(pattern: string, rirChange: number, setCount: number): string {
+  if (pattern === 'increasing difficulty') {
+    return 'Good fatigue management. RIR decreased appropriately showing controlled stress accumulation.';
+  } else if (pattern === 'decreasing difficulty') {
+    return 'RIR increasing across sets may indicate insufficient load or incomplete effort. Consider increasing weight.';
+  } else {
+    return 'Very consistent RIR. May indicate load could be increased (RIR not changing suggests insufficient stress).';
+  }
+}
+
+/**
+ * Analyze volume and intensity distribution
+ */
+function analyzeVolumeAndIntensity(
+  exerciseAdherence: any[],
+  userUnits: string
+): any {
+  const matchedExercises = exerciseAdherence.filter(ex => ex.matched && ex.executed);
+  
+  let totalVolume = 0;
+  const exerciseVolumes: any[] = [];
+  const muscleGroups: Record<string, number> = {};
+  
+  for (const ex of matchedExercises) {
+    const executedSets = Array.isArray(ex.executed.sets) ? ex.executed.sets : [];
+    const completedSets = executedSets.filter((s: any) => s.completed);
+    
+    const exerciseVolume = completedSets.reduce((sum: number, s: any) => 
+      sum + ((s.reps || 0) * (s.weight || 0)), 0);
+    
+    totalVolume += exerciseVolume;
+    exerciseVolumes.push({
+      name: ex.name,
+      volume: exerciseVolume,
+      percentage: 0 // Will calculate after total
+    });
+    
+    // Categorize by muscle group (simple heuristic)
+    const name = ex.name.toLowerCase();
+    if (name.includes('squat') || name.includes('lunge') || name.includes('leg press')) {
+      muscleGroups['knee_dominant'] = (muscleGroups['knee_dominant'] || 0) + exerciseVolume;
+    } else if (name.includes('deadlift') || name.includes('hip') || name.includes('rdl') || name.includes('nordic')) {
+      muscleGroups['hip_dominant'] = (muscleGroups['hip_dominant'] || 0) + exerciseVolume;
+    } else if (name.includes('press') || name.includes('bench') || name.includes('shoulder')) {
+      muscleGroups['upper_push'] = (muscleGroups['upper_push'] || 0) + exerciseVolume;
+    } else if (name.includes('row') || name.includes('pull') || name.includes('lat')) {
+      muscleGroups['upper_pull'] = (muscleGroups['upper_pull'] || 0) + exerciseVolume;
+    } else {
+      muscleGroups['other'] = (muscleGroups['other'] || 0) + exerciseVolume;
+    }
+  }
+  
+  // Calculate percentages
+  exerciseVolumes.forEach(ev => {
+    ev.percentage = totalVolume > 0 ? (ev.volume / totalVolume) * 100 : 0;
+  });
+  
+  // Calculate muscle group percentages
+  const muscleGroupPercentages: Record<string, number> = {};
+  for (const [group, volume] of Object.entries(muscleGroups)) {
+    muscleGroupPercentages[group] = totalVolume > 0 ? (volume / totalVolume) * 100 : 0;
+  }
+  
+  return {
+    total_volume: totalVolume,
+    exercise_volumes: exerciseVolumes,
+    muscle_group_distribution: muscleGroupPercentages,
+    assessment: generateVolumeAssessment(muscleGroupPercentages, totalVolume)
+  };
+}
+
+function generateVolumeAssessment(muscleGroups: Record<string, number>, totalVolume: number): string {
+  const kneeDom = muscleGroups['knee_dominant'] || 0;
+  const hipDom = muscleGroups['hip_dominant'] || 0;
+  
+  if (kneeDom > 0 && hipDom > 0) {
+    const ratio = kneeDom / hipDom;
+    if (ratio > 1.5) {
+      return 'Knee-dominant focus. Consider adding more hip-dominant work for balance.';
+    } else if (ratio < 0.67) {
+      return 'Hip-dominant focus. Good posterior chain emphasis.';
+    } else {
+      return 'Good balance between knee and hip dominant movements.';
+    }
+  }
+  
+  return 'Volume distribution analysis available.';
+}
+
+/**
+ * Check data quality issues
+ */
+function checkDataQuality(exerciseAdherence: any[], executedExercises: any[]): any {
+  const issues: any[] = [];
+  
+  for (const ex of exerciseAdherence) {
+    if (!ex.executed) continue;
+    
+    const executedSets = Array.isArray(ex.executed.sets) ? ex.executed.sets : [];
+    const completedSets = executedSets.filter((s: any) => s.completed);
+    
+    // Check for missing RIR data
+    const setsWithRIR = completedSets.filter((s: any) => s.rir != null);
+    if (completedSets.length > 0 && setsWithRIR.length < completedSets.length) {
+      issues.push({
+        exercise: ex.name,
+        type: 'missing_rir',
+        severity: 'warning',
+        message: `Missing RIR data for ${completedSets.length - setsWithRIR.length} of ${completedSets.length} sets`
+      });
+    }
+    
+    // Check for suspiciously low weights (might be bodyweight or logging error)
+    const avgWeight = completedSets.length > 0
+      ? completedSets.reduce((sum: number, s: any) => sum + (s.weight || 0), 0) / completedSets.length
+      : 0;
+    
+    if (avgWeight > 0 && avgWeight < 5 && !ex.name.toLowerCase().includes('bodyweight')) {
+      issues.push({
+        exercise: ex.name,
+        type: 'low_weight',
+        severity: 'info',
+        message: `Average weight is ${avgWeight} lbs - verify if this is bodyweight or if logging needs correction`
+      });
+    }
+    
+    // Check for time-based exercises logged as reps
+    const hasDuration = completedSets.some((s: any) => s.duration_seconds && s.duration_seconds > 0);
+    const hasReps = completedSets.some((s: any) => s.reps && s.reps > 0);
+    
+    if (hasDuration && hasReps && ex.name.toLowerCase().includes('plank')) {
+      issues.push({
+        exercise: ex.name,
+        type: 'time_based_exercise',
+        severity: 'info',
+        message: 'Time-based exercise (plank) - ensure duration is logged, not reps'
+      });
+    }
+  }
+  
+  return {
+    available: issues.length > 0,
+    issues: issues,
+    summary: issues.length === 0 
+      ? 'All data complete' 
+      : `${issues.length} data quality ${issues.length === 1 ? 'issue' : 'issues'} detected`
+  };
+}
+
+/**
+ * Calculate comprehensive execution summary
+ */
+function calculateExecutionSummary(
+  exerciseAdherence: any[],
+  overallAdherence: any,
+  workout: any,
+  volumeAnalysis: any
+): any {
+  const matchedExercises = exerciseAdherence.filter(ex => ex.matched);
+  
+  // Calculate total reps
+  let totalRepsPlanned = 0;
+  let totalRepsExecuted = 0;
+  
+  for (const ex of matchedExercises) {
+    if (ex.planned && Array.isArray(ex.planned.sets)) {
+      totalRepsPlanned += ex.planned.sets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
+    }
+    if (ex.executed && Array.isArray(ex.executed.sets)) {
+      const completedSets = ex.executed.sets.filter((s: any) => s.completed);
+      totalRepsExecuted += completedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
+    }
+  }
+  
+  // Calculate average rest time (if available in workout metadata)
+  // This would need to be calculated from timestamps if available
+  
+  // Calculate overall execution score
+  const exerciseCompletion = overallAdherence.exercise_completion_rate || 0;
+  const setCompletion = overallAdherence.set_completion_rate || 0;
+  const loadAdherence = matchedExercises.length > 0
+    ? matchedExercises.reduce((sum: number, ex: any) => {
+        const weightScore = Math.max(0, 100 - Math.abs(ex.adherence.weight_progression || 0));
+        return sum + weightScore;
+      }, 0) / matchedExercises.length
+    : 0;
+  const rirAdherence = matchedExercises.filter(ex => ex.adherence.rir_adherence != null).length > 0
+    ? matchedExercises
+        .filter(ex => ex.adherence.rir_adherence != null)
+        .reduce((sum: number, ex: any) => {
+          const rirScore = Math.max(0, 100 - (ex.adherence.rir_adherence * 20));
+          return sum + rirScore;
+        }, 0) / matchedExercises.filter(ex => ex.adherence.rir_adherence != null).length
+    : 100; // Default to 100% if no RIR data
+  
+  const overallExecution = (exerciseCompletion * 0.3) + 
+                          (setCompletion * 0.2) + 
+                          (loadAdherence * 0.3) + 
+                          (rirAdherence * 0.2);
+  
+  return {
+    exercises_completed: overallAdherence.exercises_executed || 0,
+    exercises_planned: overallAdherence.exercises_planned || 0,
+    sets_completed: overallAdherence.sets_executed || 0,
+    sets_planned: overallAdherence.sets_planned || 0,
+    reps_completed: totalRepsExecuted,
+    reps_planned: totalRepsPlanned,
+    total_volume: volumeAnalysis.total_volume || 0,
+    session_duration: Math.round(workout.duration || 0),
+    exercise_completion_rate: exerciseCompletion,
+    set_completion_rate: setCompletion,
+    rep_completion_rate: totalRepsPlanned > 0 ? (totalRepsExecuted / totalRepsPlanned) * 100 : 0,
+    load_adherence: loadAdherence,
+    rir_adherence: rirAdherence,
+    overall_execution: Math.round(overallExecution)
+  };
+}
+
 // Helper function to analyze Session RPE data
 function analyzeSessionRPE(sessionRPE: number | null): any {
   if (sessionRPE === null || sessionRPE === undefined) {
@@ -686,7 +1028,7 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
       sum + ex.adherence.volume_completion, 0) / matchedExercises.length;
   }
   
-  // Get historical progression for each exercise
+  // Get historical progression for each exercise (enhanced with 4-week history)
   const progressionData: any = {};
   for (const exercise of executedExercises) {
     const progression = await getStrengthProgression(
@@ -702,6 +1044,26 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   }
   
   console.log(`📊 PROGRESSION: Analyzed ${Object.keys(progressionData).length} exercises`);
+  
+  // Generate comprehensive exercise-by-exercise breakdown
+  const exerciseBreakdown = generateExerciseBreakdown(exerciseAdherence, userUnits, planUnits);
+  
+  // Analyze RIR progression across sets for each exercise
+  const rirProgression = analyzeRIRProgressionAcrossSets(exerciseAdherence);
+  
+  // Analyze volume and intensity distribution
+  const volumeAnalysis = analyzeVolumeAndIntensity(exerciseAdherence, userUnits);
+  
+  // Check data quality
+  const dataQuality = checkDataQuality(exerciseAdherence, executedExercises);
+  
+  // Calculate comprehensive execution summary
+  const executionSummary = calculateExecutionSummary(
+    exerciseAdherence, 
+    overallAdherence, 
+    workout,
+    volumeAnalysis
+  );
   
   // Analyze Session RPE and Readiness data (from unified workout_metadata)
   // Parse workout_metadata if it's a string (JSONB from database)
@@ -734,7 +1096,12 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     planMetadata, 
     userUnits,
     sessionRPEData,
-    readinessData
+    readinessData,
+    executionSummary,
+    exerciseBreakdown,
+    rirProgression,
+    volumeAnalysis,
+    dataQuality
   );
   
   return {
@@ -746,7 +1113,13 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     session_rpe: sessionRPEData,
     readiness: readinessData,
     insights: insights,
-    units: userUnits
+    units: userUnits,
+    // New comprehensive analysis sections
+    execution_summary: executionSummary,
+    exercise_breakdown: exerciseBreakdown,
+    rir_progression: rirProgression,
+    volume_analysis: volumeAnalysis,
+    data_quality: dataQuality
   };
 }
 
@@ -759,7 +1132,12 @@ async function generateEnhancedStrengthInsights(
   planMetadata: EnhancedPlanContext | null,
   userUnits: string,
   sessionRPEData: any,
-  readinessData: any
+  readinessData: any,
+  executionSummary: any,
+  exerciseBreakdown: any[],
+  rirProgression: any,
+  volumeAnalysis: any,
+  dataQuality: any
 ): Promise<string[]> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
@@ -939,6 +1317,88 @@ READINESS CHECK:`;
 READINESS CHECK: Not provided`;
   }
   
+  // Add comprehensive execution summary
+  if (executionSummary) {
+    context += `
+
+EXECUTION SUMMARY:
+- Exercises completed: ${executionSummary.exercises_completed || 0}/${executionSummary.exercises_planned || 0} (${(executionSummary.exercise_completion_rate || 0).toFixed(0)}%)
+- Sets completed: ${executionSummary.sets_completed || 0}/${executionSummary.sets_planned || 0} (${(executionSummary.set_completion_rate || 0).toFixed(0)}%)
+- Reps completed: ${executionSummary.reps_completed || 0}/${executionSummary.reps_planned || 0} (${(executionSummary.rep_completion_rate || 0).toFixed(0)}%)
+- Total volume: ${(executionSummary.total_volume || 0).toLocaleString()} ${userUnits === 'imperial' ? 'lbs' : 'kg'}
+- Session duration: ${executionSummary.session_duration || 0} minutes
+- Load adherence: ${(executionSummary.load_adherence || 0).toFixed(0)}%
+- RIR adherence: ${(executionSummary.rir_adherence || 0).toFixed(0)}%
+- Overall execution: ${executionSummary.overall_execution || 0}%`;
+  }
+
+  // Add exercise-by-exercise breakdown
+  if (exerciseBreakdown && exerciseBreakdown.length > 0) {
+    context += `
+
+EXERCISE-BY-EXERCISE BREAKDOWN:`;
+    
+    for (const ex of exerciseBreakdown) {
+      context += `
+- ${ex.name}:`;
+      context += `
+  Planned: ${ex.planned.sets} sets × ${ex.planned.reps} reps @ ${ex.planned.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}${ex.planned.rir != null ? `, RIR ${ex.planned.rir}` : ''}`;
+      context += `
+  Actual: ${ex.actual.sets} sets × ${ex.actual.reps} reps @ ${ex.actual.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}${ex.actual.avg_rir != null ? `, RIR ${ex.actual.avg_rir.toFixed(1)}` : ''}`;
+      context += `
+  Load adherence: ${ex.adherence.load_adherence.toFixed(0)}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
+      context += `
+  Performance score: ${ex.performance_score}%`;
+    }
+  }
+
+  // Add RIR progression analysis
+  if (rirProgression && rirProgression.available && rirProgression.patterns && rirProgression.patterns.length > 0) {
+    context += `
+
+RIR PROGRESSION ACROSS SETS:`;
+    
+    for (const pattern of rirProgression.patterns) {
+      context += `
+- ${pattern.exercise_name}: ${pattern.rir_progression} (${pattern.pattern})`;
+      context += `
+  Assessment: ${pattern.assessment}`;
+    }
+  }
+
+  // Add volume and intensity analysis
+  if (volumeAnalysis && volumeAnalysis.total_volume > 0) {
+    context += `
+
+VOLUME & INTENSITY ANALYSIS:
+- Total volume: ${volumeAnalysis.total_volume.toLocaleString()} ${userUnits === 'imperial' ? 'lbs' : 'kg'}`;
+    
+    if (Object.keys(volumeAnalysis.muscle_group_distribution).length > 0) {
+      context += `
+- Muscle group distribution:`;
+      for (const [group, percentage] of Object.entries(volumeAnalysis.muscle_group_distribution)) {
+        const groupName = group.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+        context += `
+  ${groupName}: ${percentage.toFixed(1)}%`;
+      }
+    }
+    
+    context += `
+- Assessment: ${volumeAnalysis.assessment}`;
+  }
+
+  // Add data quality flags
+  if (dataQuality && dataQuality.available && dataQuality.issues && dataQuality.issues.length > 0) {
+    context += `
+
+DATA QUALITY NOTES:`;
+    
+    for (const issue of dataQuality.issues) {
+      context += `
+- ${issue.exercise}: ${issue.message} (${issue.severity})`;
+    }
+  }
+
   context += `
 
 ANALYSIS REQUIREMENTS:
@@ -956,7 +1416,20 @@ ANALYSIS REQUIREMENTS:
 - Consider deload week context if applicable
 - Keep insights factual and data-driven
 - Use ${userUnits} units consistently
-- Max 3 insights, each under 25 words
+- Provide comprehensive analysis covering:
+  1. EXECUTION SUMMARY: Highlight overall completion rates, volume, and execution score
+  2. EXERCISE-BY-EXERCISE BREAKDOWN: For each main lift, compare planned vs actual (sets, reps, weight, RIR), calculate adherence, and provide performance score
+  3. PROGRESSIVE OVERLOAD TRACKING: Use historical progression data to show 4-week trends, volume progression, and estimated 1RM changes
+  4. FATIGUE & RECOVERY ANALYSIS: Analyze RIR progression patterns across sets (increasing/decreasing/consistent difficulty)
+  5. VOLUME & INTENSITY ANALYSIS: Comment on volume distribution, muscle group balance, and training intensity
+  6. PLAN COMPLIANCE: Compare actual execution to planned workout (if plan exists)
+  7. DATA QUALITY FLAGS: Note any missing RIR data, incomplete sets, or logging issues
+  8. COACHING INSIGHTS: Provide actionable recommendations (e.g., "Ready for load increase", "Continue current progression", "Verify logging")
+- Format as structured sections with clear headings
+- Be specific with numbers (e.g., "85 lbs → 85 lbs → 85 lbs (0% progression)" not "stable")
+- Use progression data to identify plateaus and recommend load increases when RIR indicates capacity
+- Reference RIR patterns to assess fatigue management and load appropriateness
+- Max 5-7 insights covering all analysis sections
 - IMPORTANT: If set completion rate is 0% but exercise completion is high, do NOT create contradictory statements
 - Instead, say something like: "All planned exercises were logged (${overallAdherence.exercises_executed}/${overallAdherence.exercises_planned}), but set completion data is incomplete" OR focus on what IS available (weight progression, RIR data, etc.)
 - Never say "exercises completed but no sets completed" - this is confusing and contradictory
@@ -975,16 +1448,28 @@ ANALYSIS REQUIREMENTS:
         messages: [
           {
             role: 'system',
-            content: `You are a strength training analysis expert. Provide concise, factual insights about workout execution and progression. Focus on data-driven observations, not coaching advice.
+            content: `You are a strength training analysis expert. Provide comprehensive, structured analysis of workout execution, progression, and performance. Focus on data-driven observations with actionable insights.
 
-CRITICAL: Avoid contradictory statements. If exercise completion is high but set completion is 0%, this means exercises were logged but sets weren't marked as "completed". In this case, focus on other available metrics (weight progression, RIR data, etc.) rather than creating confusing statements about "exercises completed but no sets completed".`
+ANALYSIS STRUCTURE:
+1. EXECUTION SUMMARY: Overall completion metrics, volume, and execution score
+2. EXERCISE-BY-EXERCISE BREAKDOWN: Detailed planned vs actual comparison for each exercise
+3. PROGRESSIVE OVERLOAD TRACKING: 4-week progression trends, volume changes, and strength gains
+4. FATIGUE & RECOVERY ANALYSIS: RIR progression patterns and fatigue management assessment
+5. VOLUME & INTENSITY ANALYSIS: Volume distribution and muscle group balance
+6. PLAN COMPLIANCE: Adherence to training plan (if applicable)
+7. DATA QUALITY: Missing data flags and logging issues
+8. COACHING INSIGHTS: Actionable recommendations for next session
+
+CRITICAL: Avoid contradictory statements. If exercise completion is high but set completion is 0%, this means exercises were logged but sets weren't marked as "completed". In this case, focus on other available metrics (weight progression, RIR data, etc.) rather than creating confusing statements about "exercises completed but no sets completed".
+
+Be specific with numbers and trends. Use historical progression data to identify plateaus and recommend load increases when RIR indicates capacity.`
           },
           {
             role: 'user',
             content: context
           }
         ],
-        max_tokens: 300,
+        max_tokens: 800,
         temperature: 0.3
       })
     });
@@ -1221,7 +1706,13 @@ Deno.serve(async (req) => {
         exercises_planned: analysis.overall_adherence?.exercises_planned || 0,
         exercise_completion_rate: analysis.overall_adherence?.exercise_completion_rate || 0,
         sets_completion_rate: analysis.overall_adherence?.set_completion_rate || 0
-      }
+      },
+      // New comprehensive analysis sections
+      execution_summary: analysis.execution_summary || null,
+      exercise_breakdown: analysis.exercise_breakdown || [],
+      rir_progression: analysis.rir_progression || null,
+      volume_analysis: analysis.volume_analysis || null,
+      data_quality: analysis.data_quality || null
     };
     
     // Save analysis results to database
