@@ -846,14 +846,14 @@ function calculateExecutionSummary(
                           (rirAdherence * 0.2);
   
   return {
-    exercises_completed: overallAdherence.exercises_executed || 0,
-    exercises_planned: overallAdherence.exercises_planned || 0,
-    sets_completed: overallAdherence.sets_executed || 0,
-    sets_planned: overallAdherence.sets_planned || 0,
+    exercises_completed: overallAdherence?.exercises_executed || 0,
+    exercises_planned: overallAdherence?.exercises_planned || 0,
+    sets_completed: overallAdherence?.sets_executed || 0,
+    sets_planned: overallAdherence?.sets_planned || 0,
     reps_completed: totalRepsExecuted,
     reps_planned: totalRepsPlanned,
-    total_volume: volumeAnalysis.total_volume || 0,
-    session_duration: Math.round(workout.duration || 0),
+    total_volume: volumeAnalysis?.total_volume || 0,
+    session_duration: Math.round(workout?.duration || 0),
     exercise_completion_rate: exerciseCompletion,
     set_completion_rate: setCompletion,
     rep_completion_rate: totalRepsPlanned > 0 ? (totalRepsExecuted / totalRepsPlanned) * 100 : 0,
@@ -1046,24 +1046,67 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   console.log(`📊 PROGRESSION: Analyzed ${Object.keys(progressionData).length} exercises`);
   
   // Generate comprehensive exercise-by-exercise breakdown
-  const exerciseBreakdown = generateExerciseBreakdown(exerciseAdherence, userUnits, planUnits);
+  let exerciseBreakdown: any[] = [];
+  try {
+    exerciseBreakdown = generateExerciseBreakdown(exerciseAdherence, userUnits, planUnits);
+  } catch (e) {
+    console.error('❌ Error generating exercise breakdown:', e);
+    exerciseBreakdown = [];
+  }
   
   // Analyze RIR progression across sets for each exercise
-  const rirProgression = analyzeRIRProgressionAcrossSets(exerciseAdherence);
+  let rirProgression: any = null;
+  try {
+    rirProgression = analyzeRIRProgressionAcrossSets(exerciseAdherence);
+  } catch (e) {
+    console.error('❌ Error analyzing RIR progression:', e);
+    rirProgression = null;
+  }
   
   // Analyze volume and intensity distribution
-  const volumeAnalysis = analyzeVolumeAndIntensity(exerciseAdherence, userUnits);
+  let volumeAnalysis: any = { total_volume: 0, muscle_group_distribution: {}, assessment: 'Unable to calculate' };
+  try {
+    volumeAnalysis = analyzeVolumeAndIntensity(exerciseAdherence, userUnits);
+  } catch (e) {
+    console.error('❌ Error analyzing volume and intensity:', e);
+    volumeAnalysis = { total_volume: 0, muscle_group_distribution: {}, assessment: 'Unable to calculate' };
+  }
   
   // Check data quality
-  const dataQuality = checkDataQuality(exerciseAdherence, executedExercises);
+  let dataQuality: any = { available: false, issues: [] };
+  try {
+    dataQuality = checkDataQuality(exerciseAdherence, executedExercises);
+  } catch (e) {
+    console.error('❌ Error checking data quality:', e);
+    dataQuality = { available: false, issues: [] };
+  }
   
   // Calculate comprehensive execution summary
-  const executionSummary = calculateExecutionSummary(
-    exerciseAdherence, 
-    overallAdherence, 
-    workout,
-    volumeAnalysis
-  );
+  let executionSummary: any = null;
+  try {
+    executionSummary = calculateExecutionSummary(
+      exerciseAdherence, 
+      overallAdherence, 
+      workout,
+      volumeAnalysis
+    );
+  } catch (e) {
+    console.error('❌ Error calculating execution summary:', e);
+    executionSummary = {
+      exercises_completed: overallAdherence.exercises_executed || 0,
+      exercises_planned: overallAdherence.exercises_planned || 0,
+      sets_completed: overallAdherence.sets_executed || 0,
+      sets_planned: overallAdherence.sets_planned || 0,
+      total_volume: 0,
+      session_duration: Math.round(workout.duration || 0),
+      exercise_completion_rate: overallAdherence.exercise_completion_rate || 0,
+      set_completion_rate: overallAdherence.set_completion_rate || 0,
+      rep_completion_rate: 0,
+      load_adherence: 0,
+      rir_adherence: 0,
+      overall_execution: 0
+    };
+  }
   
   // Analyze Session RPE and Readiness data (from unified workout_metadata)
   // Parse workout_metadata if it's a string (JSONB from database)
@@ -1511,6 +1554,23 @@ Deno.serve(async (req) => {
 
   // Declare workout_id outside try block so it's accessible in catch
   let workout_id: string | undefined;
+  let supabase: any = null;
+  
+  // Wrapper to ensure status is always set, even if function crashes early
+  const ensureStatusSet = async (status: 'complete' | 'failed', error?: string) => {
+    if (!workout_id || !supabase) return;
+    try {
+      await supabase
+        .from('workouts')
+        .update({ 
+          analysis_status: status,
+          analysis_error: error || null
+        })
+        .eq('id', workout_id);
+    } catch (e) {
+      console.error('❌ Failed to set status in ensureStatusSet:', e);
+    }
+  };
   
   try {
     const body = await req.json();
@@ -1539,7 +1599,7 @@ Deno.serve(async (req) => {
       throw new Error('Missing Supabase configuration');
     }
     
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    supabase = createClient(supabaseUrl, supabaseKey);
     
     // Validate user authentication (extract from Authorization header)
     const authH = req.headers.get('Authorization') || '';
@@ -1707,12 +1767,12 @@ Deno.serve(async (req) => {
         exercise_completion_rate: analysis.overall_adherence?.exercise_completion_rate || 0,
         sets_completion_rate: analysis.overall_adherence?.set_completion_rate || 0
       },
-      // New comprehensive analysis sections
+      // New comprehensive analysis sections (with null safety)
       execution_summary: analysis.execution_summary || null,
-      exercise_breakdown: analysis.exercise_breakdown || [],
+      exercise_breakdown: Array.isArray(analysis.exercise_breakdown) ? analysis.exercise_breakdown : [],
       rir_progression: analysis.rir_progression || null,
-      volume_analysis: analysis.volume_analysis || null,
-      data_quality: analysis.data_quality || null
+      volume_analysis: analysis.volume_analysis || { total_volume: 0, muscle_group_distribution: {}, assessment: 'Unable to calculate' },
+      data_quality: analysis.data_quality || { available: false, issues: [] }
     };
     
     // Save analysis results to database
@@ -1741,6 +1801,9 @@ Deno.serve(async (req) => {
       console.log('✅ Analysis saved successfully to database');
     }
     
+    // Ensure status is set to complete before returning
+    await ensureStatusSet('complete');
+    
     return new Response(JSON.stringify(analysis), {
       status: 200,
       headers: { 
@@ -1752,21 +1815,47 @@ Deno.serve(async (req) => {
     });
     
   } catch (error) {
+    // Ensure status is set to failed, even if previous error handling failed
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    await ensureStatusSet('failed', errorMessage);
     console.error('❌ Error in strength workout analysis:', error);
     console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     console.error('❌ Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     
     // Set analysis status to 'failed' and capture error message
+    // Use a separate try-catch to ensure this always runs
+    let statusUpdateError = null;
     try {
-      await supabase
+      const { error: updateErr } = await supabase
         .from('workouts')
         .update({ 
           analysis_status: 'failed',
           analysis_error: error instanceof Error ? error.message : 'Internal server error'
         })
         .eq('id', workout_id);
+      
+      if (updateErr) {
+        statusUpdateError = updateErr;
+        console.error('❌ Failed to set error status:', updateErr);
+        // Try one more time with a simpler update
+        await supabase
+          .from('workouts')
+          .update({ analysis_status: 'failed' })
+          .eq('id', workout_id);
+      } else {
+        console.log('✅ Set analysis status to failed');
+      }
     } catch (statusError) {
-      console.error('❌ Failed to set error status:', statusError);
+      console.error('❌ Failed to set error status (second attempt):', statusError);
+      // Last resort: try to at least clear the analyzing status
+      try {
+        await supabase
+          .from('workouts')
+          .update({ analysis_status: 'pending' })
+          .eq('id', workout_id);
+      } catch (finalError) {
+        console.error('❌ Complete failure to update status:', finalError);
+      }
     }
     
     const errorMessage = error instanceof Error ? error.message : String(error);

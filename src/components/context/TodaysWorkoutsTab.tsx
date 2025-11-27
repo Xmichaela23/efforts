@@ -54,6 +54,18 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
 
       console.log(`🔍 Polling attempt ${attempt}: status = ${workout.analysis_status}`);
 
+      // Handle null/undefined status (might be stuck from previous crash)
+      if (!workout.analysis_status || workout.analysis_status === null) {
+        // If status is null after multiple attempts, assume it failed
+        if (attempt >= 3) {
+          console.warn('⚠️ Analysis status is null after multiple attempts, assuming failed');
+          setAnalysisError('Analysis status unclear. Please try again.');
+          analyzingRef.current.delete(workoutId);
+          setAnalyzingWorkout(null);
+          return;
+        }
+      }
+
       if (workout.analysis_status === 'complete') {
         console.log('✅ Analysis completed successfully!');
         analyzingRef.current.delete(workoutId);
@@ -106,6 +118,24 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       }
 
       // Still analyzing, schedule next poll
+      // If we've been polling for a while and status is still 'analyzing', it might be stuck
+      if (workout.analysis_status === 'analyzing' && attempt >= 5) {
+        console.warn(`⚠️ Analysis stuck in 'analyzing' state after ${attempt} attempts. Resetting status.`);
+        // Try to reset the status to allow retry
+        try {
+          await supabase
+            .from('workouts')
+            .update({ analysis_status: 'pending' })
+            .eq('id', workoutId);
+        } catch (resetError) {
+          console.error('❌ Failed to reset stuck status:', resetError);
+        }
+        setAnalysisError('Analysis appears to be stuck. Please try again.');
+        analyzingRef.current.delete(workoutId);
+        setAnalyzingWorkout(null);
+        return;
+      }
+      
       const delay = Math.min(baseDelay * Math.pow(1.5, attempt - 1), maxDelay);
       console.log(`⏳ Scheduling next poll in ${delay}ms (attempt ${attempt + 1})`);
       
