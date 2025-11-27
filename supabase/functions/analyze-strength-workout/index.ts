@@ -1540,14 +1540,15 @@ Be specific with numbers and trends. Use historical progression data to identify
 
 // Main edge function handler
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight requests FIRST - before any other logic
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+        'Access-Control-Max-Age': '86400'
       }
     });
   }
@@ -1810,7 +1811,8 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+        'Access-Control-Max-Age': '86400'
       }
     });
     
@@ -1872,7 +1874,8 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+        'Access-Control-Max-Age': '86400'
       }
     });
   }
