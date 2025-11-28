@@ -478,7 +478,7 @@ async function getStrengthProgression(
   userUnits: string
 ): Promise<any> {
   try {
-    // Get last 8 weeks of strength workouts
+    // Get last 8 weeks of strength workouts (reduced to 10 for faster queries)
     const { data: recentWorkouts, error } = await supabase
       .from('workouts')
       .select('id, date, strength_exercises, computed')
@@ -486,7 +486,7 @@ async function getStrengthProgression(
       .eq('type', 'strength')
       .lt('date', currentDate)
       .order('date', { ascending: false })
-      .limit(20);
+      .limit(10); // Reduced from 20 to 10 for faster queries
     
     if (error) {
       console.log('Error fetching recent workouts:', error);
@@ -1227,19 +1227,24 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   }
   
   // Get historical progression for each exercise (enhanced with 4-week history)
-  const progressionData: any = {};
-  for (const exercise of executedExercises) {
-    const progression = await getStrengthProgression(
+  // Parallelize queries for better performance
+  const progressionPromises = executedExercises.map(exercise => 
+    getStrengthProgression(
       supabase, 
       workout.user_id, 
       exercise.name, 
       workout.date, 
       userUnits
-    );
-    if (progression) {
-      progressionData[exercise.name] = progression;
+    )
+  );
+  
+  const progressionResults = await Promise.all(progressionPromises);
+  const progressionData: any = {};
+  executedExercises.forEach((exercise, index) => {
+    if (progressionResults[index]) {
+      progressionData[exercise.name] = progressionResults[index];
     }
-  }
+  });
   
   console.log(`📊 PROGRESSION: Analyzed ${Object.keys(progressionData).length} exercises`);
   
@@ -1486,31 +1491,19 @@ HISTORICAL PROGRESSION DATA (from last 20 workouts):`;
 - No historical data available (this may be first time performing these exercises)`;
   }
   
-  // Add RIR analysis to context
-  context += `
-
-RIR ANALYSIS:`;
-  
+  // Add RIR analysis to context (summarized)
   const exercisesWithRIR = exerciseAdherence.filter(ex => ex.matched && ex.adherence.avg_rir !== null);
   if (exercisesWithRIR.length > 0) {
+    const avgRIR = exercisesWithRIR.reduce((sum, ex) => sum + (ex.adherence.avg_rir || 0), 0) / exercisesWithRIR.length;
     context += `
-- Exercises with RIR data: ${exercisesWithRIR.length}`;
-    
-    for (const exercise of exercisesWithRIR) {
-      context += `
-- ${exercise.name}: Avg RIR ${exercise.adherence.avg_rir}`;
-      
-      if (exercise.adherence.rir_consistency !== null) {
-        context += ` (consistency: ${exercise.adherence.rir_consistency})`;
-      }
-      
-      if (exercise.adherence.rir_adherence !== null) {
-        context += `, adherence: ${exercise.adherence.rir_adherence}`;
-      }
-    }
+
+RIR ANALYSIS:
+- Exercises with RIR data: ${exercisesWithRIR.length}
+- Average RIR across all exercises: ${avgRIR.toFixed(1)}`;
   } else {
     context += `
-- No RIR data available`;
+
+RIR ANALYSIS: No RIR data available`;
   }
   
   // Add Session RPE to context
@@ -1768,7 +1761,7 @@ COACHING INSIGHT
       },
       signal: controller.signal,
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4-turbo-preview', // Faster than gpt-4
         messages: [
           {
             role: 'system',
@@ -1833,7 +1826,7 @@ Be extremely specific with numbers: "85 lbs → 85 lbs → 85 lbs (0% progressio
             content: context
           }
         ],
-        max_tokens: 3000, // Increased for comprehensive structured analysis
+        max_tokens: 2000, // Reduced for faster generation while maintaining quality
         temperature: 0.3
       })
     });
