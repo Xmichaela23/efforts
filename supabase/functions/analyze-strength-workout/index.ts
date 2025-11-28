@@ -1512,7 +1512,7 @@ Be specific with numbers and trends. Use historical progression data to identify
             content: context
           }
         ],
-        max_tokens: 800,
+        max_tokens: 1500, // Increased for comprehensive analysis
         temperature: 0.3
       })
     });
