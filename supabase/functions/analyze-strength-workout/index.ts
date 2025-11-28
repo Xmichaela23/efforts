@@ -1249,8 +1249,14 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   console.log(`📊 PROGRESSION: Analyzed ${Object.keys(progressionData).length} exercises`);
   
   // Generate comprehensive exercise-by-exercise breakdown
-  const exerciseBreakdown = generateExerciseBreakdown(exerciseAdherence, userUnits, planUnits);
-  console.log(`📊 EXERCISE BREAKDOWN: Generated ${exerciseBreakdown.length} exercises`);
+  let exerciseBreakdown: any[] = [];
+  try {
+    exerciseBreakdown = generateExerciseBreakdown(exerciseAdherence, userUnits, planUnits);
+    console.log(`📊 EXERCISE BREAKDOWN: Generated ${exerciseBreakdown.length} exercises`);
+  } catch (e) {
+    console.error('❌ Error generating exercise breakdown:', e);
+    exerciseBreakdown = [];
+  }
   
   // Analyze RIR progression across sets for each exercise
   let rirProgression: any = null;
@@ -2060,21 +2066,8 @@ Deno.serve(async (req) => {
       }
     }
     
-    // Analyze the strength workout with timeout protection
-    // Set a timeout of 2 minutes (120 seconds) for the entire analysis
-    const analysisPromise = analyzeStrengthWorkout(workout, plannedWorkout, userBaselines, supabase);
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Analysis timeout: Function took longer than 120 seconds')), 120000);
-    });
-    
-    let analysis: any;
-    try {
-      analysis = await Promise.race([analysisPromise, timeoutPromise]);
-    } catch (timeoutError) {
-      console.error('❌ Analysis timed out:', timeoutError);
-      await ensureStatusSet('failed', timeoutError instanceof Error ? timeoutError.message : 'Analysis timeout');
-      throw timeoutError;
-    }
+    // Analyze the strength workout
+    const analysis = await analyzeStrengthWorkout(workout, plannedWorkout, userBaselines, supabase);
     
     console.log('=== STRENGTH ANALYSIS COMPLETE ===');
     console.log('Status:', analysis.status);
