@@ -587,9 +587,9 @@ function generateExerciseBreakdown(
   return exerciseAdherence
     .filter(ex => ex.executed) // Only require executed, not matched
     .map(ex => {
-      const planned = ex.planned;
-      const executed = ex.executed;
-      const adherence = ex.adherence;
+      const planned = ex.planned || {};
+      const executed = ex.executed || {};
+      const adherence = ex.adherence || {};
       
       const plannedSets = Array.isArray(planned.sets) ? planned.sets : [];
       const executedSets = Array.isArray(executed.sets) ? executed.sets : [];
