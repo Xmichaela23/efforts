@@ -25,7 +25,10 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
 
   // Polling function with exponential backoff
   const pollAnalysisStatus = async (workoutId: string, attempt: number = 1): Promise<void> => {
-    const maxAttempts = 8;
+    // Get workout type to determine max attempts (strength takes longer)
+    const workout = recentWorkouts.find(w => w.id === workoutId);
+    const isStrengthWorkout = workout?.type === 'strength' || workout?.type === 'strength_training';
+    const maxAttempts = isStrengthWorkout ? 12 : 8; // Strength: ~30s total, Others: ~15s total
     const baseDelay = 500; // Start with 500ms
     const maxDelay = 5000; // Cap at 5 seconds
     
@@ -128,9 +131,14 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       }
 
       // Still analyzing, schedule next poll
-      // If we've been polling for a while and status is still 'analyzing', it might be stuck
-      if (workout.analysis_status === 'analyzing' && attempt >= 5) {
-        console.warn(`⚠️ Analysis stuck in 'analyzing' state after ${attempt} attempts. Resetting status.`);
+      // Strength analysis can take 30-60 seconds, so increase timeout for strength workouts
+      // Check workout type to determine appropriate timeout
+      const workoutType = recentWorkouts.find(w => w.id === workoutId)?.type;
+      const isStrengthWorkout = workoutType === 'strength' || workoutType === 'strength_training';
+      const maxAttemptsForType = isStrengthWorkout ? 12 : 8; // Strength: ~30s, Others: ~15s
+      
+      if (workout.analysis_status === 'analyzing' && attempt >= maxAttemptsForType) {
+        console.warn(`⚠️ Analysis stuck in 'analyzing' state after ${attempt} attempts (max: ${maxAttemptsForType}). Resetting status.`);
         // Try to reset the status to allow retry
         try {
           await supabase
