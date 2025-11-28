@@ -1729,13 +1729,14 @@ Be extremely specific with numbers: "85 lbs → 85 lbs → 85 lbs (0% progressio
     const data = await response.json();
     const content = data.choices[0]?.message?.content || '';
     
-    // Parse insights from response
-    const insights = content.split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !line.startsWith('#'))
-      .slice(0, 3);
+    // Return the full structured analysis as a single string
+    // Don't split it - the UI should display it as formatted text
+    if (!content || content.trim().length === 0) {
+      return ['Analysis completed - check metrics below'];
+    }
     
-    return insights.length > 0 ? insights : ['Analysis completed - check metrics below'];
+    // Return as single comprehensive narrative (like running workouts)
+    return [content.trim()];
     
   } catch (error) {
     console.log('Error generating strength insights:', error);
@@ -1989,7 +1990,7 @@ Deno.serve(async (req) => {
       workout_analysis: {
         performance: performance,
         detailed_analysis: detailedAnalysis,
-        narrative_insights: analysis.insights || [], // AI-generated insights
+        narrative_insights: Array.isArray(analysis.insights) ? analysis.insights : [analysis.insights || 'Analysis completed'], // AI-generated insights
         insights: analysis.insights || [], // Keep for backward compatibility
         strengths: [], // Extract from progression_data if needed
         red_flags: [] // Extract from adherence if needed
