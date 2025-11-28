@@ -478,17 +478,18 @@ async function getStrengthProgression(
                  (set.duration_seconds != null && set.duration_seconds > 0);
         });
         if (completedSets.length > 0) {
-          const avgWeight = completedSets.reduce((sum: number, set: any) => 
-            sum + (set.weight || 0), 0) / completedSets.length;
+          // Use actual weight from first set, not average (barbell training uses same weight per set)
+          const actualWeight = completedSets.length > 0 ? (completedSets[0].weight || 0) : 0;
           
-          exerciseHistory.push({
-            date: workout.date,
-            weight: avgWeight,
-            unit: exercise.unit || 'lbs',
-            sets: completedSets.length,
-            reps: completedSets.reduce((sum: number, set: any) => 
-              sum + (set.reps || 0), 0) / completedSets.length
-          });
+          if (actualWeight > 0) { // Only add if there's actual weight data
+            exerciseHistory.push({
+              date: workout.date,
+              weight: actualWeight, // Use actual weight, not average
+              unit: exercise.unit || 'lbs',
+              sets: completedSets.length,
+              reps: completedSets.length > 0 ? (completedSets[0].reps || 0) : 0 // Reps per set
+            });
+          }
         }
       }
     }
@@ -544,8 +545,10 @@ function generateExerciseBreakdown(
   userUnits: string,
   planUnits: string
 ): any[] {
+  // Include ALL exercises that were executed (not just matched ones)
+  // This ensures exercises like Nordic Curls that weren't planned still appear
   return exerciseAdherence
-    .filter(ex => ex.matched && ex.planned && ex.executed)
+    .filter(ex => ex.executed) // Only require executed, not matched
     .map(ex => {
       const planned = ex.planned;
       const executed = ex.executed;
@@ -573,20 +576,41 @@ function generateExerciseBreakdown(
       let plannedDuration = 0;
       let actualDuration = 0;
       
+      // Get per-set values for display (not totals)
+      let plannedRepsPerSet = 0;
+      let actualRepsPerSet = 0;
+      let plannedDurationPerSet = 0;
+      let actualDurationPerSet = 0;
+      
       if (isTimeBased) {
-        // For time-based exercises, use duration instead of reps
-        plannedDuration = plannedSets.reduce((sum: number, s: any) => sum + (s.duration_seconds || s.reps || 0), 0); // Some plans might store duration as "reps"
+        // For time-based exercises, use duration per set
+        plannedDurationPerSet = plannedSets.length > 0 
+          ? (plannedSets[0].duration_seconds || plannedSets[0].reps || 0) // Some plans store duration as "reps"
+          : 0;
+        actualDurationPerSet = completedSets.length > 0 
+          ? (completedSets[0].duration_seconds || 0)
+          : 0;
+        // For display, show total duration but note it's per-set
+        plannedDuration = plannedSets.reduce((sum: number, s: any) => sum + (s.duration_seconds || s.reps || 0), 0);
         actualDuration = completedSets.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0);
         plannedReps = plannedSets.length; // Count sets for time-based
         actualReps = completedSets.length; // Count sets for time-based
       } else {
-        // For rep-based exercises, use reps
+        // For rep-based exercises, get reps per set (not total)
+        plannedRepsPerSet = plannedSets.length > 0 ? (plannedSets[0].reps || 0) : 0;
+        actualRepsPerSet = completedSets.length > 0 ? (completedSets[0].reps || 0) : 0;
+        // Also calculate totals for adherence
         plannedReps = plannedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
         actualReps = completedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
       }
       
       const plannedWeight = plannedSets.length > 0 ? plannedSets[0].weight || 0 : 0;
-      const actualWeight = completedSets.length > 0 ? completedSets[0].weight || 0 : 0;
+      let actualWeight = completedSets.length > 0 ? completedSets[0].weight || 0 : 0;
+      
+      // For time-based exercises (planks), show "Bodyweight" instead of weight
+      if (isTimeBased && actualWeight < 10) {
+        actualWeight = 0; // Will be displayed as "Bodyweight"
+      }
       
       // Calculate volumes - exclude time-based exercises from volume calculation
       const plannedVolume = isTimeBased ? 0 : plannedSets.reduce((sum: number, s: any) => 
@@ -618,16 +642,20 @@ function generateExerciseBreakdown(
         is_time_based: isTimeBased,
         planned: {
           sets: plannedSets.length,
-          reps: plannedReps,
-          duration_seconds: plannedDuration,
+          reps: plannedReps, // Total reps for adherence calculation
+          reps_per_set: plannedRepsPerSet, // Per-set reps for display
+          duration_seconds: plannedDuration, // Total duration
+          duration_per_set: plannedDurationPerSet, // Per-set duration for display
           weight: plannedWeight,
           volume: plannedVolume,
           rir: plannedRIR
         },
         actual: {
           sets: completedSets.length,
-          reps: actualReps,
-          duration_seconds: actualDuration,
+          reps: actualReps, // Total reps for adherence calculation
+          reps_per_set: actualRepsPerSet, // Per-set reps for display
+          duration_seconds: actualDuration, // Total duration
+          duration_per_set: actualDurationPerSet, // Per-set duration for display
           weight: actualWeight,
           volume: actualVolume,
           avg_rir: avgRIR,
@@ -803,10 +831,16 @@ function checkDataQuality(exerciseAdherence: any[], executedExercises: any[]): a
     if (!ex.executed) continue;
     
     const executedSets = Array.isArray(ex.executed.sets) ? ex.executed.sets : [];
-    const completedSets = executedSets.filter((s: any) => s.completed);
+    // Use same completedSets logic as elsewhere - check for completed OR has data
+    const completedSets = executedSets.filter((s: any) => {
+      return s.completed === true || 
+             (s.reps != null && s.reps > 0) || 
+             (s.weight != null && s.weight > 0) ||
+             (s.duration_seconds != null && s.duration_seconds > 0);
+    });
     
     // Check for missing RIR data
-    const setsWithRIR = completedSets.filter((s: any) => s.rir != null);
+    const setsWithRIR = completedSets.filter((s: any) => s.rir != null && s.rir !== undefined);
     if (completedSets.length > 0 && setsWithRIR.length < completedSets.length) {
       issues.push({
         exercise: ex.name,
@@ -1036,6 +1070,19 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   
   console.log(`🔍 STRENGTH DEBUG: Parsed ${executedExercises.length} executed exercises`);
   console.log(`🔍 PLANNED DEBUG: Parsed ${plannedExercises.length} planned exercises`);
+  
+  // Debug planned exercises structure
+  if (plannedExercises.length > 0) {
+    console.log(`🔍 PLANNED EXERCISE DEBUG:`, JSON.stringify(plannedExercises[0], null, 2));
+  } else if (plannedWorkout) {
+    console.log(`🔍 PLANNED WORKOUT DEBUG:`, {
+      has_strength_exercises: !!plannedWorkout.strength_exercises,
+      strength_exercises_type: typeof plannedWorkout.strength_exercises,
+      strength_exercises_preview: typeof plannedWorkout.strength_exercises === 'string' 
+        ? plannedWorkout.strength_exercises.substring(0, 200)
+        : plannedWorkout.strength_exercises
+    });
+  }
   
   if (executedExercises.length === 0) {
     return {
@@ -1510,11 +1557,16 @@ EXERCISE-BY-EXERCISE BREAKDOWN:`;
         context += `
   Duration adherence: ${ex.planned.duration_seconds > 0 ? ((ex.actual.duration_seconds / ex.planned.duration_seconds) * 100).toFixed(0) : 'N/A'}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
       } else {
-        // Format for rep-based exercises
+        // Format for rep-based exercises - show per-set reps, not total
+        const plannedRepsDisplay = ex.planned.reps_per_set > 0 ? ex.planned.reps_per_set : ex.planned.reps;
+        const actualRepsDisplay = ex.actual.reps_per_set > 0 ? ex.actual.reps_per_set : ex.actual.reps;
+        const plannedWeightDisplay = ex.planned.weight > 0 ? `${ex.planned.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : '0lbs';
+        const actualWeightDisplay = ex.actual.weight > 0 ? `${ex.actual.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : 'Bodyweight';
+        
         context += `
-  Planned: ${ex.planned.sets} sets × ${ex.planned.reps} reps @ ${ex.planned.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}${ex.planned.rir != null ? `, RIR ${ex.planned.rir}` : ''}`;
+  Planned: ${ex.planned.sets} sets × ${plannedRepsDisplay} reps @ ${plannedWeightDisplay}${ex.planned.rir != null ? `, RIR ${ex.planned.rir}` : ''}`;
         context += `
-  Actual: ${ex.actual.sets} sets × ${ex.actual.reps} reps @ ${ex.actual.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}${ex.actual.avg_rir != null ? `, RIR ${ex.actual.avg_rir.toFixed(1)}` : ''}`;
+  Actual: ${ex.actual.sets} sets × ${actualRepsDisplay} reps @ ${actualWeightDisplay}${ex.actual.avg_rir != null ? `, RIR ${ex.actual.avg_rir.toFixed(1)}` : ''}`;
         context += `
   Load adherence: ${ex.adherence.load_adherence.toFixed(0)}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
       }
