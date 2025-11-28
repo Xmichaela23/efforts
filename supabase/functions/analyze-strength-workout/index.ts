@@ -335,7 +335,8 @@ function normalizeExerciseName(name: string): string {
     .replace(/[^\w\s]/g, '') // Remove special characters
     .replace(/\b(curls?|curl)\b/gi, 'curl') // Normalize "curl" variations
     .replace(/\b(squats?|squat)\b/gi, 'squat')
-    .replace(/\b(deadlifts?|deadlift)\b/gi, 'deadlift');
+    .replace(/\b(deadlifts?|deadlift)\b/gi, 'deadlift')
+    .replace(/\b(nordic\s*curl|nordic)\b/gi, 'nordic curl'); // Normalize Nordic Curls
 }
 
 // Helper function to match exercises between planned and executed
@@ -1623,15 +1624,63 @@ Assessment: Elevated soreness suggests incomplete recovery. Monitor performance 
 READINESS CHECK: Not provided`;
   }
   
-  // Add comprehensive execution summary
-  if (executionSummary) {
-    context += `
+  // Add comprehensive execution summary with readiness context FIRST
+  context += `
 
 
 ═══════════════════════════════════════════════════════════════
 EXECUTION SUMMARY
-═══════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════`;
+  
+  // Add readiness data prominently at the top
+  if (readinessData) {
+    context += `
 
+PRE-WORKOUT READINESS:`;
+    if (readinessData.energy !== null) {
+      context += `
+• Energy level: ${readinessData.energy}/10 (${readinessData.energy_level})`;
+    }
+    if (readinessData.soreness !== null) {
+      context += `
+• Muscle soreness: ${readinessData.soreness}/10 (${readinessData.soreness_level})`;
+    }
+    if (readinessData.sleep !== null) {
+      context += `
+• Sleep: ${readinessData.sleep}h (${readinessData.sleep_quality})`;
+    }
+    if (sessionRPEData) {
+      context += `
+• Session RPE: ${sessionRPEData.value}/10 (${sessionRPEData.intensity_level})`;
+    }
+    
+    const energyGood = readinessData.energy !== null && readinessData.energy >= 7;
+    const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 3;
+    const sleepAdequate = readinessData.sleep !== null && readinessData.sleep >= 7;
+    
+    if (energyGood && sorenessLow && sleepAdequate) {
+      context += `
+
+Assessment: Strong readiness indicators support progressive training loads.`;
+    } else if (readinessData.energy !== null && readinessData.energy < 6) {
+      context += `
+
+Assessment: Lower energy levels may impact performance. Consider maintaining current loads.`;
+    } else if (readinessData.soreness !== null && readinessData.soreness > 5) {
+      context += `
+
+Assessment: Elevated soreness suggests incomplete recovery. Monitor performance closely.`;
+    }
+  } else {
+    context += `
+
+PRE-WORKOUT READINESS: Not provided`;
+  }
+  
+  if (executionSummary) {
+    context += `
+
+SESSION COMPLETION:
 • Exercises completed: ${executionSummary.exercises_completed}/${executionSummary.exercises_planned} (${executionSummary.exercise_completion_rate.toFixed(0)}%)
 • Sets completed: ${executionSummary.sets_completed}/${executionSummary.sets_planned} (${executionSummary.set_completion_rate.toFixed(0)}%)
 • Reps completed: ${executionSummary.reps_completed}/${executionSummary.reps_planned} (${executionSummary.rep_completion_rate.toFixed(0)}%)
@@ -1699,13 +1748,28 @@ ${ex.name}:`;
         // Show set-by-set RIR pattern if available
         if (ex.actual.rir_values && Array.isArray(ex.actual.rir_values) && ex.actual.rir_values.length > 0) {
           const rirPattern = ex.actual.rir_values.map((r: number) => r != null ? r.toFixed(0) : 'N/A').join('-');
-          context += `
-  • RIR pattern across sets: ${rirPattern}`;
-          if (ex.actual.avg_rir != null) {
-            context += ` (avg: ${ex.actual.avg_rir.toFixed(1)})`;
+          const allZero = ex.actual.rir_values.every((r: number) => r === 0);
+          
+          if (allZero) {
+            context += `
+  • RIR pattern: ${rirPattern} ⚠️ FAILURE ON ALL SETS`;
+          } else {
+            context += `
+  • RIR pattern: ${rirPattern}`;
+            if (ex.actual.avg_rir != null) {
+              context += ` (avg: ${ex.actual.avg_rir.toFixed(1)})`;
+            }
           }
         } else if (ex.actual.avg_rir != null) {
           context += `, RIR ${ex.actual.avg_rir.toFixed(1)} average`;
+        }
+        
+        // Check if this exercise was matched (has planned data)
+        const isMatched = exerciseAdherence.find(e => e.name === ex.name)?.matched ?? false;
+        if (!isMatched && ex.planned && ex.planned.sets > 0) {
+          // This should have been matched - add note
+          context += `
+  ⚠️ Note: Exercise appears in plan but matching may have failed`;
         }
         
         context += `
@@ -1716,7 +1780,7 @@ ${ex.name}:`;
     }
   }
 
-  // Add RIR progression analysis
+  // Add RIR progression analysis with readiness context
   if (rirProgression && rirProgression.available && rirProgression.patterns && rirProgression.patterns.length > 0) {
     context += `
 
@@ -1725,6 +1789,29 @@ ${ex.name}:`;
 FATIGUE & RECOVERY ANALYSIS
 ═══════════════════════════════════════════════════════════════`;
     
+    // Add readiness context to fatigue analysis
+    if (readinessData) {
+      context += `
+
+Pre-workout recovery status:`;
+      if (readinessData.energy !== null) {
+        context += `
+• Energy: ${readinessData.energy}/10 (${readinessData.energy_level})`;
+      }
+      if (readinessData.soreness !== null) {
+        context += `
+• Soreness: ${readinessData.soreness}/10 (${readinessData.soreness_level})`;
+      }
+      if (readinessData.sleep !== null) {
+        context += `
+• Sleep: ${readinessData.sleep}h (${readinessData.sleep_quality})`;
+      }
+    }
+    
+    context += `
+
+Within-session fatigue patterns:`;
+    
     for (const pattern of rirProgression.patterns) {
       context += `
 
@@ -1732,8 +1819,31 @@ FATIGUE & RECOVERY ANALYSIS
 ${pattern.exercise_name}:`;
       context += `
   • RIR progression: ${pattern.rir_progression} (${pattern.pattern})`;
+      
+      // Check for failure pattern (all zeros)
+      const rirValues = pattern.rir_progression.split(/[-→]/).map((v: string) => parseFloat(v.trim()));
+      const allZero = rirValues.every((v: number) => v === 0);
+      
+      if (allZero) {
+        context += ` ⚠️ FAILURE ON ALL SETS`;
+      }
+      
       context += `
   • Assessment: ${pattern.assessment}`;
+      
+      // Add readiness-aware assessment
+      if (readinessData) {
+        const energyGood = readinessData.energy !== null && readinessData.energy >= 7;
+        const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 3;
+        
+        if (energyGood && sorenessLow && !allZero) {
+          context += `
+  • Readiness context: Given strong pre-workout readiness (Energy ${readinessData.energy}/10, minimal soreness ${readinessData.soreness}/10), this RIR pattern indicates capacity for load progression.`;
+        } else if (readinessData.energy !== null && readinessData.energy < 6 && !allZero) {
+          context += `
+  • Readiness context: Lower energy (${readinessData.energy}/10) may have impacted performance. Maintain current loads until recovery improves.`;
+        }
+      }
     }
   }
 
@@ -1907,11 +2017,13 @@ REQUIRED SECTIONS (generate ALL of these):
    - Specific recommendations to fix
 
 6. COACHING INSIGHT
-   - Key observations per exercise
-   - Specific load increase recommendations based on RIR and adherence
-   - Next session targets
+   - Key observations per exercise WITH readiness context
+   - Specific load increase recommendations based on RIR, adherence, AND readiness data
+   - Next session targets (adjust based on readiness indicators)
    - Data quality improvement suggestions
    - Note Session RPE if it significantly differs from objective metrics (RIR, load)
+   - CRITICAL: If RIR pattern shows 0-0-0 (failure), provide immediate safety recommendations
+   - CRITICAL: Contextualize ALL recommendations with readiness data - same performance means different things based on energy/soreness/sleep
 
 CRITICAL: Avoid contradictory statements. If exercise completion is high but set completion is 0%, focus on other available metrics (weight progression, RIR data, etc.) rather than creating confusing statements.
 
