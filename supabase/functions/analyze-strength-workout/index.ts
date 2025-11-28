@@ -1464,7 +1464,7 @@ EXERCISE DETAILS:`;
   
   context += `
 
-HISTORICAL PROGRESSION DATA (from last 20 workouts):`;
+HISTORICAL PROGRESSION DATA (from last 10 workouts):`;
   
   if (Object.keys(progressionData).length > 0) {
     for (const [exerciseName, progression] of Object.entries(progressionData)) {
