@@ -327,6 +327,17 @@ function normalizePlannedExercise(planned: any): any {
   };
 }
 
+// Helper function to normalize exercise names for matching
+function normalizeExerciseName(name: string): string {
+  return name.toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .replace(/[^\w\s]/g, '') // Remove special characters
+    .replace(/\b(curls?|curl)\b/gi, 'curl') // Normalize "curl" variations
+    .replace(/\b(squats?|squat)\b/gi, 'squat')
+    .replace(/\b(deadlifts?|deadlift)\b/gi, 'deadlift');
+}
+
 // Helper function to match exercises between planned and executed
 function matchExercises(plannedExercises: any[], executedExercises: any[]): any[] {
   const matches: any[] = [];
@@ -334,10 +345,21 @@ function matchExercises(plannedExercises: any[], executedExercises: any[]): any[
   for (const planned of plannedExercises) {
     // Normalize planned exercise to match executed format
     const normalizedPlanned = normalizePlannedExercise(planned);
+    const plannedNameNormalized = normalizeExerciseName(planned.name);
     
-    const executed = executedExercises.find(exec => 
-      exec.name.toLowerCase().trim() === planned.name.toLowerCase().trim()
+    // Try exact match first
+    let executed = executedExercises.find(exec => 
+      normalizeExerciseName(exec.name) === plannedNameNormalized
     );
+    
+    // If no exact match, try fuzzy matching (contains)
+    if (!executed) {
+      executed = executedExercises.find(exec => {
+        const execNameNormalized = normalizeExerciseName(exec.name);
+        return execNameNormalized.includes(plannedNameNormalized) || 
+               plannedNameNormalized.includes(execNameNormalized);
+      });
+    }
     
     if (executed) {
       matches.push({
@@ -358,17 +380,41 @@ function matchExercises(plannedExercises: any[], executedExercises: any[]): any[
   
   // Add any executed exercises that weren't planned
   for (const executed of executedExercises) {
-    const alreadyMatched = matches.some(match => 
-      match.name.toLowerCase().trim() === executed.name.toLowerCase().trim()
-    );
+    const executedNameNormalized = normalizeExerciseName(executed.name);
+    const alreadyMatched = matches.some(match => {
+      if (!match.planned) return false;
+      const matchNameNormalized = normalizeExerciseName(match.name);
+      return matchNameNormalized === executedNameNormalized ||
+             matchNameNormalized.includes(executedNameNormalized) ||
+             executedNameNormalized.includes(matchNameNormalized);
+    });
     
     if (!alreadyMatched) {
-      matches.push({
-        name: executed.name,
-        planned: null,
-        executed: executed,
-        matched: false
+      // Check if this executed exercise matches any planned exercise name
+      const matchingPlanned = plannedExercises.find(planned => {
+        const plannedNameNormalized = normalizeExerciseName(planned.name);
+        return plannedNameNormalized === executedNameNormalized ||
+               plannedNameNormalized.includes(executedNameNormalized) ||
+               executedNameNormalized.includes(plannedNameNormalized);
       });
+      
+      if (matchingPlanned) {
+        // Found a match - update the existing match entry
+        const existingMatch = matches.find(m => 
+          normalizeExerciseName(m.name) === normalizeExerciseName(matchingPlanned.name)
+        );
+        if (existingMatch && !existingMatch.executed) {
+          existingMatch.executed = executed;
+          existingMatch.matched = true;
+        }
+      } else {
+        matches.push({
+          name: executed.name,
+          planned: null,
+          executed: executed,
+          matched: false
+        });
+      }
     }
   }
   
@@ -1521,20 +1567,25 @@ SESSION RPE:
 SESSION RPE: Not provided`;
   }
   
-  // Add Readiness Check to context
+  // Add Readiness Check to context - CRITICAL for contextualizing performance
   if (readinessData) {
     context += `
 
-READINESS CHECK:`;
+
+═══════════════════════════════════════════════════════════════
+READINESS & CONTEXT
+═══════════════════════════════════════════════════════════════
+
+Pre-workout status:`;
     
     if (readinessData.energy !== null) {
       context += `
-- Energy: ${readinessData.energy}/10 (${readinessData.energy_level})`;
+- Energy level: ${readinessData.energy}/10 (${readinessData.energy_level})`;
     }
     
     if (readinessData.soreness !== null) {
       context += `
-- Soreness: ${readinessData.soreness}/10 (${readinessData.soreness_level})`;
+- Muscle soreness: ${readinessData.soreness}/10 (${readinessData.soreness_level})`;
     }
     
     if (readinessData.sleep !== null) {
@@ -1546,8 +1597,28 @@ READINESS CHECK:`;
       context += `
 - Overall Readiness: ${readinessData.overall_readiness}`;
     }
+    
+    // Add assessment based on readiness
+    const energyGood = readinessData.energy !== null && readinessData.energy >= 7;
+    const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 3;
+    const sleepAdequate = readinessData.sleep !== null && readinessData.sleep >= 7;
+    
+    if (energyGood && sorenessLow && sleepAdequate) {
+      context += `
+
+Assessment: Strong readiness indicators support progressive training loads.`;
+    } else if (readinessData.energy !== null && readinessData.energy < 6) {
+      context += `
+
+Assessment: Lower energy levels may impact performance. Consider maintaining current loads.`;
+    } else if (readinessData.soreness !== null && readinessData.soreness > 5) {
+      context += `
+
+Assessment: Elevated soreness suggests incomplete recovery. Monitor performance closely.`;
+    }
   } else {
     context += `
+
 
 READINESS CHECK: Not provided`;
   }
@@ -1588,14 +1659,24 @@ ${ex.name}:`;
       
       if (ex.is_time_based) {
         // Format for time-based exercises (planks, wall sits, etc.)
-        const plannedDurationStr = ex.planned.duration_seconds ? `${Math.round(ex.planned.duration_seconds)}s` : `${ex.planned.reps}s`;
-        const actualDurationStr = ex.actual.duration_seconds ? `${Math.round(ex.actual.duration_seconds)}s` : 'N/A';
+        // Show per-set duration, not total
+        const plannedDurationPerSet = ex.planned.duration_per_set || (ex.planned.duration_seconds && ex.planned.sets > 0 ? Math.round(ex.planned.duration_seconds / ex.planned.sets) : 0);
+        const actualDurationPerSet = ex.actual.duration_per_set || (ex.actual.duration_seconds && ex.actual.sets > 0 ? Math.round(ex.actual.duration_seconds / ex.actual.sets) : 0);
+        const plannedDurationTotal = ex.planned.duration_seconds || 0;
+        const actualDurationTotal = ex.actual.duration_seconds || 0;
+        
+        const plannedDurationStr = plannedDurationPerSet > 0 ? `${plannedDurationPerSet}s` : 'N/A';
+        const actualDurationStr = actualDurationPerSet > 0 ? `${actualDurationPerSet}s` : 'N/A';
+        const totalMinutes = Math.floor(plannedDurationTotal / 60);
+        const totalSeconds = plannedDurationTotal % 60;
+        const totalStr = totalMinutes > 0 ? `${totalMinutes}:${totalSeconds.toString().padStart(2, '0')}` : `${plannedDurationTotal}s`;
+        
         context += `
-  Planned: ${ex.planned.sets} sets × ${plannedDurationStr}${ex.planned.weight > 0 ? ` @ ${ex.planned.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : ''}${ex.planned.rir != null ? `, RIR ${ex.planned.rir}` : ''}`;
+  Planned: ${ex.planned.sets} sets × ${plannedDurationStr} (${totalStr} total)${ex.planned.weight > 0 ? ` @ ${ex.planned.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : ''}${ex.planned.rir != null ? `, RIR ${ex.planned.rir}` : ''}`;
         context += `
   Actual: ${ex.actual.sets} sets × ${actualDurationStr}${ex.actual.weight > 0 ? ` @ ${ex.actual.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : ''}${ex.actual.avg_rir != null ? `, RIR ${ex.actual.avg_rir.toFixed(1)}` : ''}`;
         context += `
-  Duration adherence: ${ex.planned.duration_seconds > 0 ? ((ex.actual.duration_seconds / ex.planned.duration_seconds) * 100).toFixed(0) : 'N/A'}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
+  Duration adherence: ${plannedDurationTotal > 0 ? ((actualDurationTotal / plannedDurationTotal) * 100).toFixed(0) : 'N/A'}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
       } else {
         // Format for rep-based exercises - show per-set reps, not total
         const plannedRepsDisplay = ex.planned.reps_per_set > 0 ? ex.planned.reps_per_set : (ex.planned.sets > 0 ? Math.round(ex.planned.reps / ex.planned.sets) : ex.planned.reps);
@@ -1613,7 +1694,20 @@ ${ex.name}:`;
         context += `
   • Planned: ${ex.planned.sets} sets × ${plannedRepsDisplay} reps @ ${plannedWeightDisplay}${plannedRIRDisplay}`;
         context += `
-  • Actual: ${ex.actual.sets} sets × ${actualRepsDisplay} reps @ ${actualWeightDisplay}${actualRIRDisplay}`;
+  • Actual: ${ex.actual.sets} sets × ${actualRepsDisplay} reps @ ${actualWeightDisplay}`;
+        
+        // Show set-by-set RIR pattern if available
+        if (ex.actual.rir_values && Array.isArray(ex.actual.rir_values) && ex.actual.rir_values.length > 0) {
+          const rirPattern = ex.actual.rir_values.map((r: number) => r != null ? r.toFixed(0) : 'N/A').join('-');
+          context += `
+  • RIR pattern across sets: ${rirPattern}`;
+          if (ex.actual.avg_rir != null) {
+            context += ` (avg: ${ex.actual.avg_rir.toFixed(1)})`;
+          }
+        } else if (ex.actual.avg_rir != null) {
+          context += `, RIR ${ex.actual.avg_rir.toFixed(1)} average`;
+        }
+        
         context += `
   • Load adherence: ${ex.adherence.load_adherence.toFixed(0)}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
         context += `
