@@ -1520,12 +1520,9 @@ ANALYSIS REQUIREMENTS:
 - Reference last session comparisons and 4-week averages when available
 - Note any missed or added exercises
 - Comment on RIR data quality and consistency if available
-- CRITICAL: Include Session RPE prominently in analysis - this is the user's "how did that feel" rating
-- Compare Session RPE to expected intensity based on load/RIR data
-- If Session RPE is higher than expected (e.g., RPE 8 but RIR 3-4), note potential fatigue or overreaching
-- If Session RPE is lower than expected (e.g., RPE 4 but RIR 1-2), note good recovery or conservative loading
+- Factor in Session RPE alongside RIR and adherence metrics (if provided)
+- Consider Session RPE in context of objective data (RIR, load, volume) - it's a subjective check, not primary metric
 - Factor in Readiness Check data for performance interpretation
-- Use Session RPE to validate or question the objective metrics (RIR, load, volume)
 - Consider deload week context if applicable
 - Keep insights factual and data-driven
 - Use ${userUnits} units consistently
@@ -1614,8 +1611,8 @@ REQUIRED SECTIONS (generate ALL of these):
    - "Completed X of Y sets (Z%)"
    - Total volume with comparison to planned
    - Session duration
-   - Session RPE (if provided): "How did that feel? X/10 (Y intensity)"
    - Overall execution score breakdown
+   - Session RPE (if provided) - include as supplementary context
 
 2. EXERCISE-BY-EXERCISE BREAKDOWN
    - For EACH exercise: Planned vs Actual (sets, reps, weight, RIR)
@@ -1643,11 +1640,10 @@ REQUIRED SECTIONS (generate ALL of these):
 
 6. COACHING INSIGHT
    - Key observations per exercise
-   - Session RPE interpretation: How does perceived difficulty compare to objective metrics?
-   - Specific load increase recommendations
+   - Specific load increase recommendations based on RIR and adherence
    - Next session targets
    - Data quality improvement suggestions
-   - Recovery recommendations based on Session RPE vs objective data
+   - Note Session RPE if it significantly differs from objective metrics (RIR, load)
 
 CRITICAL: Avoid contradictory statements. If exercise completion is high but set completion is 0%, focus on other available metrics (weight progression, RIR data, etc.) rather than creating confusing statements.
 
