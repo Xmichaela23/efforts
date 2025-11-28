@@ -1755,6 +1755,10 @@ COACHING INSIGHT
 ───────────────────────────────────────────────────────────────
 [Actionable recommendations: Load increases, progression protocol, data quality fixes, next session targets]`;
 
+  // Add timeout protection for OpenAI API call (60 seconds)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1762,6 +1766,7 @@ COACHING INSIGHT
         'Authorization': `Bearer ${openaiKey}`,
         'Content-Type': 'application/json',
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: 'gpt-4',
         messages: [
@@ -1837,6 +1842,8 @@ Be extremely specific with numbers: "85 lbs → 85 lbs → 85 lbs (0% progressio
       throw new Error(`OpenAI API error: ${response.status}`);
     }
     
+    clearTimeout(timeoutId);
+    
     const data = await response.json();
     const content = data.choices[0]?.message?.content || '';
     
@@ -1850,6 +1857,13 @@ Be extremely specific with numbers: "85 lbs → 85 lbs → 85 lbs (0% progressio
     return [content.trim()];
     
   } catch (error) {
+    clearTimeout(timeoutId);
+    
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error('❌ OpenAI API call timed out after 60 seconds');
+      return ['AI analysis timed out. The analysis took too long to generate. Please try again.'];
+    }
+    
     console.log('Error generating strength insights:', error);
     return ['AI analysis temporarily unavailable'];
   }
@@ -2057,8 +2071,21 @@ Deno.serve(async (req) => {
       }
     }
     
-    // Analyze the strength workout
-    const analysis = await analyzeStrengthWorkout(workout, plannedWorkout, userBaselines, supabase);
+    // Analyze the strength workout with timeout protection
+    // Set a timeout of 2 minutes (120 seconds) for the entire analysis
+    const analysisPromise = analyzeStrengthWorkout(workout, plannedWorkout, userBaselines, supabase);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Analysis timeout: Function took longer than 120 seconds')), 120000);
+    });
+    
+    let analysis: any;
+    try {
+      analysis = await Promise.race([analysisPromise, timeoutPromise]);
+    } catch (timeoutError) {
+      console.error('❌ Analysis timed out:', timeoutError);
+      await ensureStatusSet('failed', timeoutError instanceof Error ? timeoutError.message : 'Analysis timeout');
+      throw timeoutError;
+    }
     
     console.log('=== STRENGTH ANALYSIS COMPLETE ===');
     console.log('Status:', analysis.status);
