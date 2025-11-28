@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAppContext } from '../../contexts/AppContext';
 import { useWeekUnified } from '../../hooks/useWeekUnified';
-import { analyzeWorkoutWithRetry } from '../../services/workoutAnalysisService';
+import { analyzeWorkoutWithRetry, isWorkoutTypeSupported } from '../../services/workoutAnalysisService';
 
 interface TodaysWorkoutsTabProps {
   focusWorkoutId?: string | null;
@@ -505,17 +505,23 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     }
     
     // Auto-trigger analysis if workout is completed but has no analysis and isn't already being analyzed
-    if (workoutWithAnalysis.status === 'completed' && 
+    // Only trigger for supported workout types (run, strength, ride, swim)
+    const workoutStatus = workoutWithAnalysis.workout_status || workoutWithAnalysis.status;
+    const isSupportedType = isWorkoutTypeSupported(workoutWithAnalysis.type);
+    
+    if (workoutStatus === 'completed' && 
+        isSupportedType &&
         !workoutWithAnalysis.workout_analysis && 
         workoutWithAnalysis.analysis_status !== 'analyzing' &&
         workoutWithAnalysis.analysis_status !== 'complete' &&
         !analyzingRef.current.has(workoutWithAnalysis.id)) {
-      console.log('🔄 Auto-triggering analysis for completed workout without analysis:', workoutWithAnalysis.id);
+      console.log('🔄 Auto-triggering analysis for completed workout without analysis:', workoutWithAnalysis.id, 'type:', workoutWithAnalysis.type);
       // Trigger analysis in background (don't await)
-      analyzeWorkout(workoutWithAnalysis.id).catch(err => {
+      analyzeWorkoutWithRetry(workoutWithAnalysis.id, workoutWithAnalysis.type).catch(err => {
         console.error('❌ Auto-analysis failed:', err);
+        // Don't show spinner if analysis fails - let user see the "Tap to analyze" button
       });
-      // Return null to show loading state
+      // Return null to show loading state while analyzing
       return null;
     }
     
