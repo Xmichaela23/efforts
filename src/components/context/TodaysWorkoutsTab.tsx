@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAppContext } from '../../contexts/AppContext';
 import { useWeekUnified } from '../../hooks/useWeekUnified';
@@ -448,7 +448,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     }
   };
 
-  const getAnalysisMetrics = () => {
+  const getAnalysisMetrics = useCallback(() => {
     if (loading || recentWorkouts.length === 0) return null;
 
     console.log('🔍 All recent workouts:', recentWorkouts.map(w => ({
@@ -699,16 +699,21 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       workout: workoutWithAnalysis,
       is_yesterday: workoutWithAnalysis.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA')
     };
-  };
+  }, [recentWorkouts, selectedWorkoutId, analyzingWorkout]);
 
-  const analysisMetrics = getAnalysisMetrics();
+  // Memoize analysis metrics to prevent flickering during re-renders
+  const analysisMetrics = useMemo(() => {
+    return getAnalysisMetrics();
+  }, [recentWorkouts, selectedWorkoutId, analyzingWorkout, loading]);
   
-  // Debug: Log what we're about to display
-  console.log('🎨 UI Display Decision:', {
-    hasAnalysisMetrics: !!analysisMetrics,
-    insightsCount: analysisMetrics?.insights?.length || 0,
-    willShowInsights: analysisMetrics?.insights && analysisMetrics?.insights.length > 0
-  });
+  // Debug: Log what we're about to display (only when it changes)
+  useEffect(() => {
+    console.log('🎨 UI Display Decision:', {
+      hasAnalysisMetrics: !!analysisMetrics,
+      insightsCount: analysisMetrics?.insights?.length || 0,
+      willShowInsights: analysisMetrics?.insights && analysisMetrics?.insights.length > 0
+    });
+  }, [analysisMetrics]);
 
   return (
     <>
