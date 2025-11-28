@@ -561,16 +561,37 @@ function generateExerciseBreakdown(
                (s.duration_seconds != null && s.duration_seconds > 0);
       });
       
+      // Detect if this is a time-based exercise (planks, wall sits, etc.)
+      const isTimeBased = ex.name.toLowerCase().includes('plank') || 
+                          ex.name.toLowerCase().includes('wall sit') ||
+                          ex.name.toLowerCase().includes('hold') ||
+                          completedSets.some((s: any) => s.duration_seconds && s.duration_seconds > 0 && (!s.reps || s.reps === 0));
+      
       // Calculate planned vs actual metrics
-      const plannedReps = plannedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
-      const actualReps = completedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
+      let plannedReps = 0;
+      let actualReps = 0;
+      let plannedDuration = 0;
+      let actualDuration = 0;
+      
+      if (isTimeBased) {
+        // For time-based exercises, use duration instead of reps
+        plannedDuration = plannedSets.reduce((sum: number, s: any) => sum + (s.duration_seconds || s.reps || 0), 0); // Some plans might store duration as "reps"
+        actualDuration = completedSets.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0);
+        plannedReps = plannedSets.length; // Count sets for time-based
+        actualReps = completedSets.length; // Count sets for time-based
+      } else {
+        // For rep-based exercises, use reps
+        plannedReps = plannedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
+        actualReps = completedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
+      }
+      
       const plannedWeight = plannedSets.length > 0 ? plannedSets[0].weight || 0 : 0;
       const actualWeight = completedSets.length > 0 ? completedSets[0].weight || 0 : 0;
       
-      // Calculate volumes
-      const plannedVolume = plannedSets.reduce((sum: number, s: any) => 
+      // Calculate volumes - exclude time-based exercises from volume calculation
+      const plannedVolume = isTimeBased ? 0 : plannedSets.reduce((sum: number, s: any) => 
         sum + ((s.reps || 0) * (s.weight || 0)), 0);
-      const actualVolume = completedSets.reduce((sum: number, s: any) => 
+      const actualVolume = isTimeBased ? 0 : completedSets.reduce((sum: number, s: any) => 
         sum + ((s.reps || 0) * (s.weight || 0)), 0);
       
       // Get RIR data
@@ -594,9 +615,11 @@ function generateExerciseBreakdown(
       
       return {
         name: ex.name,
+        is_time_based: isTimeBased,
         planned: {
           sets: plannedSets.length,
           reps: plannedReps,
+          duration_seconds: plannedDuration,
           weight: plannedWeight,
           volume: plannedVolume,
           rir: plannedRIR
@@ -604,6 +627,7 @@ function generateExerciseBreakdown(
         actual: {
           sets: completedSets.length,
           reps: actualReps,
+          duration_seconds: actualDuration,
           weight: actualWeight,
           volume: actualVolume,
           avg_rir: avgRIR,
@@ -690,8 +714,22 @@ function analyzeVolumeAndIntensity(
   const muscleGroups: Record<string, number> = {};
   
   for (const ex of matchedExercises) {
+    // Skip time-based exercises from volume calculation
+    const isTimeBased = ex.name?.toLowerCase().includes('plank') || 
+                        ex.name?.toLowerCase().includes('wall sit') ||
+                        ex.name?.toLowerCase().includes('hold') ||
+                        (ex.executed && Array.isArray(ex.executed.sets) && 
+                         ex.executed.sets.some((s: any) => s.duration_seconds && s.duration_seconds > 0 && (!s.reps || s.reps === 0)));
+    
+    if (isTimeBased) continue; // Time-based exercises don't contribute to volume
+    
     const executedSets = Array.isArray(ex.executed.sets) ? ex.executed.sets : [];
-    const completedSets = executedSets.filter((s: any) => s.completed);
+    const completedSets = executedSets.filter((s: any) => {
+      return s.completed === true || 
+             (s.reps != null && s.reps > 0) || 
+             (s.weight != null && s.weight > 0) ||
+             (s.duration_seconds != null && s.duration_seconds > 0);
+    });
     
     const exerciseVolume = completedSets.reduce((sum: number, s: any) => 
       sum + ((s.reps || 0) * (s.weight || 0)), 0);
@@ -826,11 +864,21 @@ function calculateExecutionSummary(
 ): any {
   const matchedExercises = exerciseAdherence.filter(ex => ex.matched);
   
-  // Calculate total reps
+  // Calculate total reps (excluding time-based exercises)
   let totalRepsPlanned = 0;
   let totalRepsExecuted = 0;
   
   for (const ex of matchedExercises) {
+    // Check if this is a time-based exercise
+    const isTimeBased = ex.name?.toLowerCase().includes('plank') || 
+                        ex.name?.toLowerCase().includes('wall sit') ||
+                        ex.name?.toLowerCase().includes('hold') ||
+                        (ex.executed && Array.isArray(ex.executed.sets) && 
+                         ex.executed.sets.some((s: any) => s.duration_seconds && s.duration_seconds > 0 && (!s.reps || s.reps === 0)));
+    
+    // Skip time-based exercises from rep counting
+    if (isTimeBased) continue;
+    
     if (ex.planned && Array.isArray(ex.planned.sets)) {
       totalRepsPlanned += ex.planned.sets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
     }
@@ -1450,12 +1498,27 @@ EXERCISE-BY-EXERCISE BREAKDOWN:`;
     for (const ex of exerciseBreakdown) {
       context += `
 - ${ex.name}:`;
-      context += `
+      
+      if (ex.is_time_based) {
+        // Format for time-based exercises (planks, wall sits, etc.)
+        const plannedDurationStr = ex.planned.duration_seconds ? `${Math.round(ex.planned.duration_seconds)}s` : `${ex.planned.reps}s`;
+        const actualDurationStr = ex.actual.duration_seconds ? `${Math.round(ex.actual.duration_seconds)}s` : 'N/A';
+        context += `
+  Planned: ${ex.planned.sets} sets × ${plannedDurationStr}${ex.planned.weight > 0 ? ` @ ${ex.planned.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : ''}${ex.planned.rir != null ? `, RIR ${ex.planned.rir}` : ''}`;
+        context += `
+  Actual: ${ex.actual.sets} sets × ${actualDurationStr}${ex.actual.weight > 0 ? ` @ ${ex.actual.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : ''}${ex.actual.avg_rir != null ? `, RIR ${ex.actual.avg_rir.toFixed(1)}` : ''}`;
+        context += `
+  Duration adherence: ${ex.planned.duration_seconds > 0 ? ((ex.actual.duration_seconds / ex.planned.duration_seconds) * 100).toFixed(0) : 'N/A'}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
+      } else {
+        // Format for rep-based exercises
+        context += `
   Planned: ${ex.planned.sets} sets × ${ex.planned.reps} reps @ ${ex.planned.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}${ex.planned.rir != null ? `, RIR ${ex.planned.rir}` : ''}`;
-      context += `
+        context += `
   Actual: ${ex.actual.sets} sets × ${ex.actual.reps} reps @ ${ex.actual.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}${ex.actual.avg_rir != null ? `, RIR ${ex.actual.avg_rir.toFixed(1)}` : ''}`;
-      context += `
+        context += `
   Load adherence: ${ex.adherence.load_adherence.toFixed(0)}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
+      }
+      
       context += `
   Performance score: ${ex.performance_score}%`;
     }
