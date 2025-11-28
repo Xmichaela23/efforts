@@ -356,8 +356,15 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
   const plannedSets = Array.isArray(planned.sets) ? planned.sets : [];
   const executedSets = Array.isArray(executed.sets) ? executed.sets : [];
   
-  // Filter completed sets
-  const completedSets = executedSets.filter((set: any) => set.completed);
+  // Filter completed sets - a set is considered completed if:
+  // 1. Explicitly marked as completed=true, OR
+  // 2. Has reps/weight data indicating it was performed
+  const completedSets = executedSets.filter((set: any) => {
+    return set.completed === true || 
+           (set.reps != null && set.reps > 0) || 
+           (set.weight != null && set.weight > 0) ||
+           (set.duration_seconds != null && set.duration_seconds > 0);
+  });
   
   // Calculate set completion
   const setCompletion = plannedSets.length > 0 ? 
@@ -461,7 +468,13 @@ async function getStrengthProgression(
       );
       
       if (exercise && exercise.sets) {
-        const completedSets = exercise.sets.filter((set: any) => set.completed);
+        // A set is considered completed if explicitly marked OR has data indicating it was performed
+        const completedSets = exercise.sets.filter((set: any) => {
+          return set.completed === true || 
+                 (set.reps != null && set.reps > 0) || 
+                 (set.weight != null && set.weight > 0) ||
+                 (set.duration_seconds != null && set.duration_seconds > 0);
+        });
         if (completedSets.length > 0) {
           const avgWeight = completedSets.reduce((sum: number, set: any) => 
             sum + (set.weight || 0), 0) / completedSets.length;
@@ -538,7 +551,13 @@ function generateExerciseBreakdown(
       
       const plannedSets = Array.isArray(planned.sets) ? planned.sets : [];
       const executedSets = Array.isArray(executed.sets) ? executed.sets : [];
-      const completedSets = executedSets.filter((s: any) => s.completed);
+      // A set is considered completed if explicitly marked OR has data indicating it was performed
+      const completedSets = executedSets.filter((s: any) => {
+        return s.completed === true || 
+               (s.reps != null && s.reps > 0) || 
+               (s.weight != null && s.weight > 0) ||
+               (s.duration_seconds != null && s.duration_seconds > 0);
+      });
       
       // Calculate planned vs actual metrics
       const plannedReps = plannedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
@@ -1012,8 +1031,18 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
       (matchedExercises.length / plannedExercises.length) * 100 : 0,
     sets_planned: plannedExercises.reduce((sum: number, ex: any) => 
       sum + (Array.isArray(ex.sets) ? ex.sets.length : 0), 0),
-    sets_executed: executedExercises.reduce((sum: number, ex: any) => 
-      sum + (Array.isArray(ex.sets) ? ex.sets.filter((set: any) => set.completed).length : 0), 0),
+    sets_executed: executedExercises.reduce((sum: number, ex: any) => {
+      const sets = Array.isArray(ex.sets) ? ex.sets : [];
+      // Count sets that are completed OR have reps/weight data (indicating they were performed)
+      const completedCount = sets.filter((set: any) => {
+        // Set is completed if explicitly marked, OR if it has reps/weight data
+        return set.completed === true || 
+               (set.reps != null && set.reps > 0) || 
+               (set.weight != null && set.weight > 0) ||
+               (set.duration_seconds != null && set.duration_seconds > 0);
+      }).length;
+      return sum + completedCount;
+    }, 0),
     set_completion_rate: 0,
     weight_progression: 0,
     volume_completion: 0
