@@ -1571,6 +1571,7 @@ EXECUTION SUMMARY
   }
 
   // Add exercise-by-exercise breakdown
+  // Always include exercise data, even if breakdown is empty - use raw adherence data as fallback
   if (exerciseBreakdown && exerciseBreakdown.length > 0) {
     context += `
 
@@ -1617,6 +1618,62 @@ ${ex.name}:`;
   • Load adherence: ${ex.adherence.load_adherence.toFixed(0)}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
         context += `
   • Performance score: ${ex.performance_score}%`;
+      }
+    }
+  } else if (exerciseAdherence && exerciseAdherence.length > 0) {
+    // Fallback: If exerciseBreakdown is empty, include raw exercise adherence data
+    context += `
+
+
+═══════════════════════════════════════════════════════════════
+EXERCISE-BY-EXERCISE BREAKDOWN
+═══════════════════════════════════════════════════════════════`;
+    
+    for (const ex of exerciseAdherence) {
+      if (ex.executed) {
+        const sets = Array.isArray(ex.executed.sets) ? ex.executed.sets : [];
+        const completedSets = sets.filter((s: any) => 
+          s.completed === true || 
+          (s.reps != null && s.reps > 0) || 
+          (s.weight != null && s.weight > 0) ||
+          (s.duration_seconds != null && s.duration_seconds > 0)
+        );
+        
+        context += `
+
+
+${ex.name}:`;
+        context += `
+  • Sets completed: ${completedSets.length}`;
+        
+        if (completedSets.length > 0) {
+          const firstSet = completedSets[0];
+          if (firstSet.weight != null && firstSet.weight > 0) {
+            context += `
+  • Weight: ${firstSet.weight}${ex.executed.unit || userUnits === 'imperial' ? 'lbs' : 'kg'}`;
+          }
+          if (firstSet.reps != null && firstSet.reps > 0) {
+            context += `
+  • Reps per set: ${firstSet.reps}`;
+          }
+          if (firstSet.duration_seconds != null && firstSet.duration_seconds > 0) {
+            context += `
+  • Duration: ${Math.round(firstSet.duration_seconds)}s`;
+          }
+          if (firstSet.rir != null) {
+            context += `
+  • RIR: ${firstSet.rir}`;
+          }
+        }
+        
+        if (ex.planned) {
+          const plannedSets = Array.isArray(ex.planned.sets) ? ex.planned.sets : [];
+          context += `
+  • Planned sets: ${plannedSets.length}`;
+          if (plannedSets.length > 0 && plannedSets[0].weight != null) {
+            context += ` @ ${plannedSets[0].weight}${ex.planned.unit || userUnits === 'imperial' ? 'lbs' : 'kg'}`;
+          }
+        }
       }
     }
   }
@@ -1707,9 +1764,11 @@ ANALYSIS REQUIREMENTS:
 - Use progression data to identify plateaus and recommend load increases when RIR indicates capacity
 - Reference RIR patterns to assess fatigue management and load appropriateness
 - CRITICAL: You MUST generate a COMPREHENSIVE STRUCTURED ANALYSIS with ALL sections below
+- DO NOT say "not enough data" or "missing information" - use whatever data is provided above
 - DO NOT generate a simple summary paragraph - generate detailed sections with clear headings
 - Format your response as structured sections with clear separators (use ─ or = for section dividers)
 - Each section must be comprehensive and detailed, not just bullet points
+- If some data is missing, analyze what IS available and note what's missing in the DATA QUALITY FLAGS section
 - IMPORTANT: If set completion rate is 0% but exercise completion is high, do NOT create contradictory statements
 - Instead, say something like: "All planned exercises were logged (${overallAdherence.exercises_executed}/${overallAdherence.exercises_planned}), but set completion data is incomplete" OR focus on what IS available (weight progression, RIR data, etc.)
 - Never say "exercises completed but no sets completed" - this is confusing and contradictory
