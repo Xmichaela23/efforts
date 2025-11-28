@@ -1316,7 +1316,7 @@ EXERCISE DETAILS:`;
       if (exercise.adherence.rir_adherence !== null) {
         context += `, RIR adherence: ${exercise.adherence.rir_adherence}`;
       }
-    } else if (exercise.executed) {
+    } else if (exercise.executed && !exercise.planned) {
       context += `
 - ${exercise.name}: Added exercise (not planned)`;
     } else {
@@ -1538,12 +1538,47 @@ ANALYSIS REQUIREMENTS:
 - Be specific with numbers (e.g., "85 lbs → 85 lbs → 85 lbs (0% progression)" not "stable")
 - Use progression data to identify plateaus and recommend load increases when RIR indicates capacity
 - Reference RIR patterns to assess fatigue management and load appropriateness
-- Max 5-7 insights covering all analysis sections
+- CRITICAL: You MUST generate a COMPREHENSIVE STRUCTURED ANALYSIS with ALL sections below
+- DO NOT generate a simple summary paragraph - generate detailed sections with clear headings
+- Format your response as structured sections with clear separators (use ─ or = for section dividers)
+- Each section must be comprehensive and detailed, not just bullet points
 - IMPORTANT: If set completion rate is 0% but exercise completion is high, do NOT create contradictory statements
 - Instead, say something like: "All planned exercises were logged (${overallAdherence.exercises_executed}/${overallAdherence.exercises_planned}), but set completion data is incomplete" OR focus on what IS available (weight progression, RIR data, etc.)
 - Never say "exercises completed but no sets completed" - this is confusing and contradictory
 - If sets weren't marked complete, focus on other metrics like weight progression or RIR data instead
-- Keep statements clear and non-contradictory`;
+- Keep statements clear and non-contradictory
+
+REQUIRED OUTPUT FORMAT:
+
+═══════════════════════════════════════════════════════════════
+EXECUTION SUMMARY
+═══════════════════════════════════════════════════════════════
+[Detailed summary with specific numbers: X of Y exercises, X of Y sets, volume, duration, execution score]
+
+───────────────────────────────────────────────────────────────
+EXERCISE-BY-EXERCISE BREAKDOWN
+───────────────────────────────────────────────────────────────
+[For EACH exercise: Planned vs Actual, Load adherence, RIR adherence, Performance score, RIR pattern, Assessment]
+
+───────────────────────────────────────────────────────────────
+PROGRESSIVE OVERLOAD TRACKING
+───────────────────────────────────────────────────────────────
+[For each main lift: Last 3 sessions comparison, volume progression, estimated 1RM trends, Assessment with recommendations]
+
+───────────────────────────────────────────────────────────────
+FATIGUE & RECOVERY ANALYSIS
+───────────────────────────────────────────────────────────────
+[RIR progression patterns across sets for each exercise, fatigue management assessment]
+
+───────────────────────────────────────────────────────────────
+DATA QUALITY FLAGS
+───────────────────────────────────────────────────────────────
+[Any missing data, incomplete entries, logging issues with specific recommendations]
+
+───────────────────────────────────────────────────────────────
+COACHING INSIGHT
+───────────────────────────────────────────────────────────────
+[Actionable recommendations: Load increases, progression protocol, data quality fixes, next session targets]`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1557,28 +1592,66 @@ ANALYSIS REQUIREMENTS:
         messages: [
           {
             role: 'system',
-            content: `You are a strength training analysis expert. Provide comprehensive, structured analysis of workout execution, progression, and performance. Focus on data-driven observations with actionable insights.
+            content: `You are a strength training analysis expert. Generate COMPREHENSIVE, STRUCTURED analysis with detailed sections. DO NOT provide a simple summary paragraph - provide full structured analysis.
 
-ANALYSIS STRUCTURE:
-1. EXECUTION SUMMARY: Overall completion metrics, volume, and execution score
-2. EXERCISE-BY-EXERCISE BREAKDOWN: Detailed planned vs actual comparison for each exercise
-3. PROGRESSIVE OVERLOAD TRACKING: 4-week progression trends, volume changes, and strength gains
-4. FATIGUE & RECOVERY ANALYSIS: RIR progression patterns and fatigue management assessment
-5. VOLUME & INTENSITY ANALYSIS: Volume distribution and muscle group balance
-6. PLAN COMPLIANCE: Adherence to training plan (if applicable)
-7. DATA QUALITY: Missing data flags and logging issues
-8. COACHING INSIGHTS: Actionable recommendations for next session
+CRITICAL OUTPUT REQUIREMENTS:
+- Generate ALL sections below in structured format with clear headings
+- Use section dividers (════ or ───) to separate sections
+- Be extremely detailed and specific with numbers
+- Each exercise must have its own detailed breakdown
+- Include specific recommendations for each exercise
+- Reference historical progression data when available
+- Identify data quality issues explicitly
 
-CRITICAL: Avoid contradictory statements. If exercise completion is high but set completion is 0%, this means exercises were logged but sets weren't marked as "completed". In this case, focus on other available metrics (weight progression, RIR data, etc.) rather than creating confusing statements about "exercises completed but no sets completed".
+REQUIRED SECTIONS (generate ALL of these):
 
-Be specific with numbers and trends. Use historical progression data to identify plateaus and recommend load increases when RIR indicates capacity.`
+1. EXECUTION SUMMARY
+   - Specific numbers: "Completed X of Y exercises (Z%)"
+   - "Completed X of Y sets (Z%)"
+   - Total volume with comparison to planned
+   - Session duration
+   - Overall execution score breakdown
+
+2. EXERCISE-BY-EXERCISE BREAKDOWN
+   - For EACH exercise: Planned vs Actual (sets, reps, weight, RIR)
+   - Load adherence percentage
+   - RIR adherence and pattern
+   - Performance score
+   - Specific assessment with recommendations
+
+3. PROGRESSIVE OVERLOAD TRACKING
+   - Last 3 sessions comparison for each main lift
+   - Volume progression percentages
+   - Estimated 1RM trends
+   - Specific recommendations (e.g., "Increase to X lb next session")
+
+4. FATIGUE & RECOVERY ANALYSIS
+   - RIR progression pattern for each exercise (e.g., "4→3→3→3")
+   - Assessment of fatigue management
+   - Recovery capacity indicators
+
+5. DATA QUALITY FLAGS
+   - Missing RIR data
+   - Incomplete entries
+   - Logging issues (e.g., time-based exercises logged as reps)
+   - Specific recommendations to fix
+
+6. COACHING INSIGHT
+   - Key observations per exercise
+   - Specific load increase recommendations
+   - Next session targets
+   - Data quality improvement suggestions
+
+CRITICAL: Avoid contradictory statements. If exercise completion is high but set completion is 0%, focus on other available metrics (weight progression, RIR data, etc.) rather than creating confusing statements.
+
+Be extremely specific with numbers: "85 lbs → 85 lbs → 85 lbs (0% progression)" not "stable". Use historical progression data to identify plateaus and recommend load increases when RIR indicates capacity.`
           },
           {
             role: 'user',
             content: context
           }
         ],
-        max_tokens: 1500, // Increased for comprehensive analysis
+        max_tokens: 3000, // Increased for comprehensive structured analysis
         temperature: 0.3
       })
     });
