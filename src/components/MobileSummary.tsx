@@ -2205,10 +2205,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
             const timeCell = (() => {
               // For overall row (idx === 0), ALWAYS use overall moving time, not interval duration
-              if (idx === 0) {
-                const overall = (completed as any)?.computed?.overall || {};
+                if (idx === 0) {
+                  const overall = (completed as any)?.computed?.overall || {};
                 const dur = Number(overall?.duration_s_moving);
-                if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
+                  if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
                 return '—';
               }
               // For individual intervals, use interval duration

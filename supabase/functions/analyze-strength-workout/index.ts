@@ -1819,11 +1819,9 @@ Deno.serve(async (req) => {
   } catch (error) {
     // Ensure status is set to failed, even if previous error handling failed
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    
     await ensureStatusSet('failed', errorMessage);
     console.error('❌ Error in strength workout analysis:', error);
-    console.error('❌ Error stack:', errorStack || 'No stack trace');
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     console.error('❌ Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     
     // Set analysis status to 'failed' and capture error message
@@ -1834,7 +1832,7 @@ Deno.serve(async (req) => {
         .from('workouts')
         .update({ 
           analysis_status: 'failed',
-          analysis_error: errorMessage
+          analysis_error: error instanceof Error ? error.message : 'Internal server error'
         })
         .eq('id', workout_id);
       
@@ -1861,6 +1859,9 @@ Deno.serve(async (req) => {
         console.error('❌ Complete failure to update status:', finalError);
       }
     }
+    
+    // errorMessage already declared above, just get stack
+    const errorStack = error instanceof Error ? error.stack : undefined;
     
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
