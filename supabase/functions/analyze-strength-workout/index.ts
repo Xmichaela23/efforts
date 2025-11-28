@@ -367,8 +367,10 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
   });
   
   // Calculate set completion
+  // If no planned sets, but we have executed sets with data, consider it 100% (freestyle workout)
   const setCompletion = plannedSets.length > 0 ? 
-    (completedSets.length / plannedSets.length) * 100 : 0;
+    (completedSets.length / plannedSets.length) * 100 : 
+    (completedSets.length > 0 ? 100 : 0);
   
   // Calculate weight progression
   let weightProgression = 0;
@@ -833,7 +835,13 @@ function calculateExecutionSummary(
       totalRepsPlanned += ex.planned.sets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
     }
     if (ex.executed && Array.isArray(ex.executed.sets)) {
-      const completedSets = ex.executed.sets.filter((s: any) => s.completed);
+      // A set is considered completed if explicitly marked OR has data indicating it was performed
+      const completedSets = ex.executed.sets.filter((s: any) => {
+        return s.completed === true || 
+               (s.reps != null && s.reps > 0) || 
+               (s.weight != null && s.weight > 0) ||
+               (s.duration_seconds != null && s.duration_seconds > 0);
+      });
       totalRepsExecuted += completedSets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0);
     }
   }
@@ -1043,14 +1051,43 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
       }).length;
       return sum + completedCount;
     }, 0),
-    set_completion_rate: 0,
+    set_completion_rate: (() => {
+      // Calculate set completion rate directly from executed exercises
+      const totalPlannedSets = plannedExercises.reduce((sum: number, ex: any) => 
+        sum + (Array.isArray(ex.sets) ? ex.sets.length : 0), 0);
+      const totalCompletedSets = executedExercises.reduce((sum: number, ex: any) => {
+        const sets = Array.isArray(ex.sets) ? ex.sets : [];
+        const completedCount = sets.filter((set: any) => {
+          return set.completed === true || 
+                 (set.reps != null && set.reps > 0) || 
+                 (set.weight != null && set.weight > 0) ||
+                 (set.duration_seconds != null && set.duration_seconds > 0);
+        }).length;
+        return sum + completedCount;
+      }, 0);
+      return totalPlannedSets > 0 ? (totalCompletedSets / totalPlannedSets) * 100 : (totalCompletedSets > 0 ? 100 : 0);
+    })(),
     weight_progression: 0,
     volume_completion: 0
   };
   
   if (matchedExercises.length > 0) {
-    overallAdherence.set_completion_rate = matchedExercises.reduce((sum: number, ex: any) => 
-      sum + ex.adherence.set_completion, 0) / matchedExercises.length;
+    // Recalculate set_completion_rate from actual data, don't rely on individual adherence values
+    const totalPlannedSets = matchedExercises.reduce((sum: number, ex: any) => 
+      sum + (Array.isArray(ex.planned?.sets) ? ex.planned.sets.length : 0), 0);
+    const totalCompletedSets = matchedExercises.reduce((sum: number, ex: any) => {
+      const sets = Array.isArray(ex.executed?.sets) ? ex.executed.sets : [];
+      const completedCount = sets.filter((set: any) => {
+        return set.completed === true || 
+               (set.reps != null && set.reps > 0) || 
+               (set.weight != null && set.weight > 0) ||
+               (set.duration_seconds != null && set.duration_seconds > 0);
+      }).length;
+      return sum + completedCount;
+    }, 0);
+    overallAdherence.set_completion_rate = totalPlannedSets > 0 
+      ? (totalCompletedSets / totalPlannedSets) * 100 
+      : (totalCompletedSets > 0 ? 100 : 0);
     overallAdherence.weight_progression = matchedExercises.reduce((sum: number, ex: any) => 
       sum + ex.adherence.weight_progression, 0) / matchedExercises.length;
     overallAdherence.volume_completion = matchedExercises.reduce((sum: number, ex: any) => 
@@ -1394,14 +1431,14 @@ READINESS CHECK: Not provided`;
     context += `
 
 EXECUTION SUMMARY:
-- Exercises completed: ${executionSummary.exercises_completed || 0}/${executionSummary.exercises_planned || 0} (${(executionSummary.exercise_completion_rate || 0).toFixed(0)}%)
-- Sets completed: ${executionSummary.sets_completed || 0}/${executionSummary.sets_planned || 0} (${(executionSummary.set_completion_rate || 0).toFixed(0)}%)
-- Reps completed: ${executionSummary.reps_completed || 0}/${executionSummary.reps_planned || 0} (${(executionSummary.rep_completion_rate || 0).toFixed(0)}%)
-- Total volume: ${(executionSummary.total_volume || 0).toLocaleString()} ${userUnits === 'imperial' ? 'lbs' : 'kg'}
-- Session duration: ${executionSummary.session_duration || 0} minutes
-- Load adherence: ${(executionSummary.load_adherence || 0).toFixed(0)}%
-- RIR adherence: ${(executionSummary.rir_adherence || 0).toFixed(0)}%
-- Overall execution: ${executionSummary.overall_execution || 0}%`;
+- Exercises completed: ${executionSummary.exercises_completed}/${executionSummary.exercises_planned} (${executionSummary.exercise_completion_rate.toFixed(0)}%)
+- Sets completed: ${executionSummary.sets_completed}/${executionSummary.sets_planned} (${executionSummary.set_completion_rate.toFixed(0)}%)
+- Reps completed: ${executionSummary.reps_completed}/${executionSummary.reps_planned} (${executionSummary.rep_completion_rate.toFixed(0)}%)
+- Total volume: ${executionSummary.total_volume.toLocaleString()} ${userUnits === 'imperial' ? 'lbs' : 'kg'}
+- Session duration: ${executionSummary.session_duration} minutes
+- Load adherence: ${executionSummary.load_adherence.toFixed(0)}%
+- RIR adherence: ${executionSummary.rir_adherence.toFixed(0)}%
+- Overall execution: ${executionSummary.overall_execution}%`;
   }
 
   // Add exercise-by-exercise breakdown
@@ -1779,12 +1816,12 @@ Deno.serve(async (req) => {
     // Transform analysis result to match expected structure (like running workouts)
     // Client expects: performance (object), detailed_analysis (object), narrative_insights (array)
     const performance = {
-      overall_adherence: analysis.overall_adherence?.exercise_completion_rate || 0,
-      set_completion_rate: analysis.overall_adherence?.set_completion_rate || 0,
-      exercises_planned: analysis.overall_adherence?.exercises_planned || 0,
-      exercises_executed: analysis.overall_adherence?.exercises_executed || 0,
-      sets_planned: analysis.overall_adherence?.sets_planned || 0,
-      sets_executed: analysis.overall_adherence?.sets_executed || 0
+      overall_adherence: analysis.overall_adherence?.exercise_completion_rate ?? 0,
+      set_completion_rate: analysis.overall_adherence?.set_completion_rate ?? 0,
+      exercises_planned: analysis.overall_adherence?.exercises_planned ?? 0,
+      exercises_executed: analysis.overall_adherence?.exercises_executed ?? 0,
+      sets_planned: analysis.overall_adherence?.sets_planned ?? 0,
+      sets_executed: analysis.overall_adherence?.sets_executed ?? 0
     };
     
     const detailedAnalysis = {
@@ -1795,10 +1832,10 @@ Deno.serve(async (req) => {
       session_rpe: analysis.session_rpe || null,
       readiness: analysis.readiness || null,
       workout_summary: {
-        total_exercises: analysis.overall_adherence?.exercises_executed || 0,
-        exercises_planned: analysis.overall_adherence?.exercises_planned || 0,
-        exercise_completion_rate: analysis.overall_adherence?.exercise_completion_rate || 0,
-        sets_completion_rate: analysis.overall_adherence?.set_completion_rate || 0
+        total_exercises: analysis.overall_adherence?.exercises_executed ?? 0,
+        exercises_planned: analysis.overall_adherence?.exercises_planned ?? 0,
+        exercise_completion_rate: analysis.overall_adherence?.exercise_completion_rate ?? 0,
+        sets_completion_rate: analysis.overall_adherence?.set_completion_rate ?? 0
       },
       // New comprehensive analysis sections (with null safety)
       execution_summary: analysis.execution_summary || null,
