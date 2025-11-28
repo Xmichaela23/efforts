@@ -72,7 +72,8 @@ function isDumbbellExercise(exerciseName: string): boolean {
   const dbPatterns = [
     'bicep curl', 'biceps curl', 'hammer curl', 'concentration curl',
     'lateral raise', 'front raise', 'chest fly', 'chest flye',
-    'arnold press', 'goblet squat', 'bulgarian split squat'
+    'arnold press', 'goblet squat', 'bulgarian split squat',
+    'farmer walk', 'farmer walks'
   ];
   
   return dbPatterns.some(p => name.includes(p));

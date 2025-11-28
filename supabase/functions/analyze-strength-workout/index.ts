@@ -1915,12 +1915,15 @@ ANALYSIS REQUIREMENTS:
 - DO NOT generate a simple summary paragraph - generate detailed sections with clear headings
 - Format your response as structured sections with clear separators (use ─ or = for section dividers)
 - Each section must be comprehensive and detailed, not just bullet points
-- If some data is missing, analyze what IS available and note what's missing in the DATA QUALITY FLAGS section
+- CRITICAL: Reference pre-workout readiness data (Energy/Sleep/Soreness) in EVERY assessment section - this contextualizes ALL performance
+- CRITICAL: When RIR pattern shows 0-0-0 (all zeros), this indicates FAILURE - flag this as critical safety issue with specific recommendations
+- CRITICAL: If an exercise shows "added exercise" but has planned data above, it WAS planned - correct this in your analysis
 - IMPORTANT: If set completion rate is 0% but exercise completion is high, do NOT create contradictory statements
 - Instead, say something like: "All planned exercises were logged (${overallAdherence.exercises_executed}/${overallAdherence.exercises_planned}), but set completion data is incomplete" OR focus on what IS available (weight progression, RIR data, etc.)
 - Never say "exercises completed but no sets completed" - this is confusing and contradictory
 - If sets weren't marked complete, focus on other metrics like weight progression or RIR data instead
 - Keep statements clear and non-contradictory
+- Contextualize ALL recommendations based on readiness data - same RIR values mean completely different things depending on energy/soreness/sleep
 
 REQUIRED OUTPUT FORMAT:
 
@@ -1995,9 +1998,10 @@ REQUIRED SECTIONS (generate ALL of these):
 2. EXERCISE-BY-EXERCISE BREAKDOWN
    - For EACH exercise: Planned vs Actual (sets, reps, weight, RIR)
    - Load adherence percentage
-   - RIR adherence and pattern
+   - RIR adherence and pattern (if shows 0-0-0, flag as FAILURE with safety warnings)
    - Performance score
-   - Specific assessment with recommendations
+   - Specific assessment with recommendations CONTEXTUALIZED BY READINESS DATA
+   - If exercise shows "added" but has planned data, correct this - it WAS planned
 
 3. PROGRESSIVE OVERLOAD TRACKING
    - Last 3 sessions comparison for each main lift

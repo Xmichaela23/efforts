@@ -69,7 +69,8 @@ const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' 
   const dbPatterns = [
     'bicep curl', 'biceps curl', 'hammer curl', 'concentration curl',
     'lateral raise', 'front raise', 'chest fly', 'chest flye',
-    'arnold press', 'goblet squat', 'bulgarian split squat'
+    'arnold press', 'goblet squat', 'bulgarian split squat',
+    'farmer walk', 'farmer walks'
   ];
   if (dbPatterns.some(p => name.includes(p))) return 'dumbbell';
   
@@ -393,7 +394,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Helper: detect duration-based exercises by name (planks, holds, carries)
   const isDurationBasedExercise = (name: string): boolean => {
     const n = String(name || '').toLowerCase();
-    return /plank|hold|carry|wall sit|iso|isometric|time|seconds?|sec/.test(n);
+    return /plank|hold|carry|farmer|suitcase|wall sit|iso|isometric|time|seconds?|sec/.test(n);
   };
 
   // Helper: get RPE label
