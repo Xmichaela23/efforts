@@ -1017,7 +1017,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
             ))}
           </div>
         </div>
-      )}
+        ) : null;
+      })()}
 
       {/* Today's Workouts - Show Analysis Status */}
       {todayItems.length > 0 && (
