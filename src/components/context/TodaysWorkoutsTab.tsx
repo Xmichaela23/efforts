@@ -505,12 +505,13 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     }
     
     // Auto-trigger analysis if workout is completed but has no analysis and isn't already being analyzed
-    // Only trigger for supported workout types (run, strength, ride, swim)
+    // Only auto-trigger for workout types that have analyzers implemented (run, strength)
+    // Ride and swim analyzers not yet implemented, so don't auto-trigger
     const workoutStatus = workoutWithAnalysis.workout_status || workoutWithAnalysis.status;
-    const isSupportedType = isWorkoutTypeSupported(workoutWithAnalysis.type);
+    const hasAnalyzerImplemented = ['run', 'running', 'strength', 'strength_training'].includes(workoutWithAnalysis.type?.toLowerCase());
     
     if (workoutStatus === 'completed' && 
-        isSupportedType &&
+        hasAnalyzerImplemented &&
         !workoutWithAnalysis.workout_analysis && 
         workoutWithAnalysis.analysis_status !== 'analyzing' &&
         workoutWithAnalysis.analysis_status !== 'complete' &&
