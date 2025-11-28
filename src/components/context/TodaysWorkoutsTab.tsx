@@ -907,13 +907,20 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       )}
 
       {/* Recent Workouts */}
-      {recentWorkouts.length > 0 && (
-        <div className="px-2 mt-4">
-          <div className="text-sm text-[#666666] font-normal">
-            <div className="font-medium">Recent Workouts</div>
-          </div>
-          <div className="text-sm text-black mt-1 space-y-1">
-            {recentWorkouts.slice(0, 3).map((workout) => (
+      {recentWorkouts.length > 0 && (() => {
+        // Get the workout ID that's currently being shown in "Latest workout analysis"
+        const displayedWorkoutId = analysisMetrics?.workout?.id || selectedWorkoutId;
+        
+        // Filter out the workout that's already displayed in the analysis section
+        const filteredWorkouts = recentWorkouts.filter(w => w.id !== displayedWorkoutId);
+        
+        return filteredWorkouts.length > 0 ? (
+          <div className="px-2 mt-4">
+            <div className="text-sm text-[#666666] font-normal">
+              <div className="font-medium">Recent Workouts</div>
+            </div>
+            <div className="text-sm text-black mt-1 space-y-1">
+              {filteredWorkouts.slice(0, 3).map((workout) => (
               <div 
                 key={workout.id} 
                 className={`flex justify-between items-center py-2 px-2 rounded-lg transition-colors ${
