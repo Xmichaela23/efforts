@@ -293,11 +293,48 @@ async function extractEnhancedPlanMetadata(
   return extractEnhancedPlanContext(plannedWorkout, trainingPlan, weekNumber);
 }
 
+// Helper function to normalize planned exercise format
+// Planned format: {name, sets: 4, reps: 5, weight: 85}
+// Executed format: {name, sets: [{reps: 5, weight: 85}, ...]}
+function normalizePlannedExercise(planned: any): any {
+  // If already in executed format (has sets array), return as-is
+  if (Array.isArray(planned.sets)) {
+    return planned;
+  }
+  
+  // Convert flat format to nested format
+  const numSets = typeof planned.sets === 'number' ? planned.sets : 0;
+  const reps = planned.reps || 0;
+  const weight = typeof planned.weight === 'number' ? planned.weight : 0;
+  const durationSeconds = planned.duration_seconds || null;
+  const rir = planned.rir || null;
+  
+  // Create array of sets
+  const sets = [];
+  for (let i = 0; i < numSets; i++) {
+    sets.push({
+      reps: reps,
+      weight: weight,
+      duration_seconds: durationSeconds,
+      rir: rir,
+      completed: false // Planned sets are not completed
+    });
+  }
+  
+  return {
+    ...planned,
+    sets: sets
+  };
+}
+
 // Helper function to match exercises between planned and executed
 function matchExercises(plannedExercises: any[], executedExercises: any[]): any[] {
   const matches: any[] = [];
   
   for (const planned of plannedExercises) {
+    // Normalize planned exercise to match executed format
+    const normalizedPlanned = normalizePlannedExercise(planned);
+    
     const executed = executedExercises.find(exec => 
       exec.name.toLowerCase().trim() === planned.name.toLowerCase().trim()
     );
@@ -305,14 +342,14 @@ function matchExercises(plannedExercises: any[], executedExercises: any[]): any[
     if (executed) {
       matches.push({
         name: planned.name,
-        planned: planned,
+        planned: normalizedPlanned, // Use normalized version
         executed: executed,
         matched: true
       });
     } else {
       matches.push({
         name: planned.name,
-        planned: planned,
+        planned: normalizedPlanned, // Use normalized version
         executed: null,
         matched: false
       });
@@ -1525,26 +1562,35 @@ READINESS CHECK: Not provided`;
   if (executionSummary) {
     context += `
 
-EXECUTION SUMMARY:
-- Exercises completed: ${executionSummary.exercises_completed}/${executionSummary.exercises_planned} (${executionSummary.exercise_completion_rate.toFixed(0)}%)
-- Sets completed: ${executionSummary.sets_completed}/${executionSummary.sets_planned} (${executionSummary.set_completion_rate.toFixed(0)}%)
-- Reps completed: ${executionSummary.reps_completed}/${executionSummary.reps_planned} (${executionSummary.rep_completion_rate.toFixed(0)}%)
-- Total volume: ${executionSummary.total_volume.toLocaleString()} ${userUnits === 'imperial' ? 'lbs' : 'kg'}
-- Session duration: ${executionSummary.session_duration} minutes
-- Load adherence: ${executionSummary.load_adherence.toFixed(0)}%
-- RIR adherence: ${executionSummary.rir_adherence.toFixed(0)}%
-- Overall execution: ${executionSummary.overall_execution}%`;
+
+═══════════════════════════════════════════════════════════════
+EXECUTION SUMMARY
+═══════════════════════════════════════════════════════════════
+
+• Exercises completed: ${executionSummary.exercises_completed}/${executionSummary.exercises_planned} (${executionSummary.exercise_completion_rate.toFixed(0)}%)
+• Sets completed: ${executionSummary.sets_completed}/${executionSummary.sets_planned} (${executionSummary.set_completion_rate.toFixed(0)}%)
+• Reps completed: ${executionSummary.reps_completed}/${executionSummary.reps_planned} (${executionSummary.rep_completion_rate.toFixed(0)}%)
+• Total volume: ${executionSummary.total_volume.toLocaleString()} ${userUnits === 'imperial' ? 'lbs' : 'kg'}
+• Session duration: ${executionSummary.session_duration} minutes
+• Load adherence: ${executionSummary.load_adherence.toFixed(0)}%
+• RIR adherence: ${executionSummary.rir_adherence.toFixed(0)}%
+• Overall execution: ${executionSummary.overall_execution}%`;
   }
 
   // Add exercise-by-exercise breakdown
   if (exerciseBreakdown && exerciseBreakdown.length > 0) {
     context += `
 
-EXERCISE-BY-EXERCISE BREAKDOWN:`;
+
+═══════════════════════════════════════════════════════════════
+EXERCISE-BY-EXERCISE BREAKDOWN
+═══════════════════════════════════════════════════════════════`;
     
     for (const ex of exerciseBreakdown) {
       context += `
-- ${ex.name}:`;
+
+
+${ex.name}:`;
       
       if (ex.is_time_based) {
         // Format for time-based exercises (planks, wall sits, etc.)
@@ -1558,21 +1604,27 @@ EXERCISE-BY-EXERCISE BREAKDOWN:`;
   Duration adherence: ${ex.planned.duration_seconds > 0 ? ((ex.actual.duration_seconds / ex.planned.duration_seconds) * 100).toFixed(0) : 'N/A'}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
       } else {
         // Format for rep-based exercises - show per-set reps, not total
-        const plannedRepsDisplay = ex.planned.reps_per_set > 0 ? ex.planned.reps_per_set : ex.planned.reps;
-        const actualRepsDisplay = ex.actual.reps_per_set > 0 ? ex.actual.reps_per_set : ex.actual.reps;
-        const plannedWeightDisplay = ex.planned.weight > 0 ? `${ex.planned.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : '0lbs';
-        const actualWeightDisplay = ex.actual.weight > 0 ? `${ex.actual.weight}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : 'Bodyweight';
+        const plannedRepsDisplay = ex.planned.reps_per_set > 0 ? ex.planned.reps_per_set : (ex.planned.sets > 0 ? Math.round(ex.planned.reps / ex.planned.sets) : ex.planned.reps);
+        const actualRepsDisplay = ex.actual.reps_per_set > 0 ? ex.actual.reps_per_set : (ex.actual.sets > 0 ? Math.round(ex.actual.reps / ex.actual.sets) : ex.actual.reps);
+        
+        // Format weights - show "Bodyweight" for low weights (< 10 lbs) or 0
+        const plannedWeightValue = ex.planned.weight || 0;
+        const actualWeightValue = ex.actual.weight || 0;
+        const plannedWeightDisplay = plannedWeightValue >= 10 ? `${plannedWeightValue}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : (plannedWeightValue > 0 ? `${plannedWeightValue}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : '0lbs');
+        const actualWeightDisplay = actualWeightValue >= 10 ? `${actualWeightValue}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : (actualWeightValue > 0 && actualWeightValue < 10 ? `${actualWeightValue}${userUnits === 'imperial' ? 'lbs' : 'kg'}` : 'Bodyweight');
+        
+        const plannedRIRDisplay = ex.planned.rir != null ? `, RIR ${ex.planned.rir}` : '';
+        const actualRIRDisplay = ex.actual.avg_rir != null ? `, RIR ${ex.actual.avg_rir.toFixed(1)}` : '';
         
         context += `
-  Planned: ${ex.planned.sets} sets × ${plannedRepsDisplay} reps @ ${plannedWeightDisplay}${ex.planned.rir != null ? `, RIR ${ex.planned.rir}` : ''}`;
+  • Planned: ${ex.planned.sets} sets × ${plannedRepsDisplay} reps @ ${plannedWeightDisplay}${plannedRIRDisplay}`;
         context += `
-  Actual: ${ex.actual.sets} sets × ${actualRepsDisplay} reps @ ${actualWeightDisplay}${ex.actual.avg_rir != null ? `, RIR ${ex.actual.avg_rir.toFixed(1)}` : ''}`;
+  • Actual: ${ex.actual.sets} sets × ${actualRepsDisplay} reps @ ${actualWeightDisplay}${actualRIRDisplay}`;
         context += `
-  Load adherence: ${ex.adherence.load_adherence.toFixed(0)}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
+  • Load adherence: ${ex.adherence.load_adherence.toFixed(0)}%${ex.adherence.rir_adherence != null ? `, RIR adherence: ${ex.adherence.rir_adherence.toFixed(1)}` : ''}`;
+        context += `
+  • Performance score: ${ex.performance_score}%`;
       }
-      
-      context += `
-  Performance score: ${ex.performance_score}%`;
     }
   }
 
@@ -1580,13 +1632,20 @@ EXERCISE-BY-EXERCISE BREAKDOWN:`;
   if (rirProgression && rirProgression.available && rirProgression.patterns && rirProgression.patterns.length > 0) {
     context += `
 
-RIR PROGRESSION ACROSS SETS:`;
+
+═══════════════════════════════════════════════════════════════
+FATIGUE & RECOVERY ANALYSIS
+═══════════════════════════════════════════════════════════════`;
     
     for (const pattern of rirProgression.patterns) {
       context += `
-- ${pattern.exercise_name}: ${pattern.rir_progression} (${pattern.pattern})`;
+
+
+${pattern.exercise_name}:`;
       context += `
-  Assessment: ${pattern.assessment}`;
+  • RIR progression: ${pattern.rir_progression} (${pattern.pattern})`;
+      context += `
+  • Assessment: ${pattern.assessment}`;
     }
   }
 
