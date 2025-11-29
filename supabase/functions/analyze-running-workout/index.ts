@@ -1287,7 +1287,8 @@ Deno.serve(async (req) => {
         enhancedAnalysis,
         performance,
         detailedAnalysis,
-        userUnits
+        userUnits,
+        supabase
       );
       console.log('✅ [CRITICAL] AI narrative generated:', JSON.stringify(narrativeInsights));
       console.log('✅ [CRITICAL] AI narrative is array:', Array.isArray(narrativeInsights));
