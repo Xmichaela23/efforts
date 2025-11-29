@@ -4234,39 +4234,45 @@ async function generateAINarrativeInsights(
       const weekTag = plannedWorkout.tags?.find((t: string) => t.startsWith('week:'));
       const weekNumber = weekTag ? parseInt(weekTag.split(':')[1].split('_of_')[0]) : 1;
       
-      // Fetch training plan
+      // Fetch training plan with authorization check
       const { data: trainingPlan } = await supabase
         .from('training_plans')
         .select('*')
         .eq('id', plannedWorkout.training_plan_id)
+        .eq('user_id', workout.user_id) // Authorization: verify plan belongs to user
         .single();
       
       if (trainingPlan) {
-        // Parse phase from tags
-        const phaseTag = plannedWorkout.tags?.find((t: string) => t.startsWith('phase:'));
-        const phase = phaseTag ? phaseTag.split(':')[1].replace(/_/g, ' ') : null;
-        
-        // Get weekly summary
-        const weeklySummary = trainingPlan.config?.weekly_summaries?.[weekNumber] || 
-                              trainingPlan.weekly_summaries?.[weekNumber] || null;
-        
-        // Parse progression history from description (e.g., "5×800m → 6×800m → 4×1mi")
-        const progressionMatch = plannedWorkout.description?.match(/(\d+×\d+[a-z]+.*?→.*?\d+×\d+[a-z]+)/i);
-        const progressionHistory = progressionMatch ? progressionMatch[0].split('→').map(p => p.trim()) : null;
-        
-        planContext = {
-          plan_name: trainingPlan.name || 'Training Plan',
-          week: weekNumber,
-          total_weeks: trainingPlan.duration_weeks || 0,
-          phase: phase || 'unknown',
-          weekly_summary: weeklySummary,
-          progression_history: progressionHistory,
-          session_description: plannedWorkout.description || '',
-          session_tags: plannedWorkout.tags || [],
-          plan_description: trainingPlan.description || ''
-        };
-        
-        console.log('📋 PLAN CONTEXT EXTRACTED:', planContext);
+        // Double-check user ownership (defense in depth)
+        if (trainingPlan.user_id === workout.user_id) {
+          // Parse phase from tags
+          const phaseTag = plannedWorkout.tags?.find((t: string) => t.startsWith('phase:'));
+          const phase = phaseTag ? phaseTag.split(':')[1].replace(/_/g, ' ') : null;
+          
+          // Get weekly summary
+          const weeklySummary = trainingPlan.config?.weekly_summaries?.[weekNumber] || 
+                                trainingPlan.weekly_summaries?.[weekNumber] || null;
+          
+          // Parse progression history from description (e.g., "5×800m → 6×800m → 4×1mi")
+          const progressionMatch = plannedWorkout.description?.match(/(\d+×\d+[a-z]+.*?→.*?\d+×\d+[a-z]+)/i);
+          const progressionHistory = progressionMatch ? progressionMatch[0].split('→').map(p => p.trim()) : null;
+          
+          planContext = {
+            plan_name: trainingPlan.name || 'Training Plan',
+            week: weekNumber,
+            total_weeks: trainingPlan.duration_weeks || 0,
+            phase: phase || 'unknown',
+            weekly_summary: weeklySummary,
+            progression_history: progressionHistory,
+            session_description: plannedWorkout.description || '',
+            session_tags: plannedWorkout.tags || [],
+            plan_description: trainingPlan.description || ''
+          };
+          
+          console.log('📋 PLAN CONTEXT EXTRACTED:', planContext);
+        } else {
+          console.warn('⚠️ Training plan does not belong to user - skipping plan context');
+        }
       }
     } catch (error) {
       console.log('⚠️ Failed to extract plan context:', error);
