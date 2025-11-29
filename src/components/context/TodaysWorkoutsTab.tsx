@@ -274,7 +274,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     };
   }, []);
   
-  // Clear analyzing state if workout is not in recent list
+  // Clear analyzing state if workout is not in recent list OR if status is not actually 'analyzing'
   // Use ref to track last recentWorkouts to prevent unnecessary checks
   const lastRecentWorkoutsForCleanupRef = useRef<any[]>([]);
   useEffect(() => {
@@ -285,12 +285,29 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       
       if (workoutsChanged) {
         lastRecentWorkoutsForCleanupRef.current = recentWorkouts;
-      const workoutExists = recentWorkouts.some(w => w.id === analyzingWorkout);
-      if (!workoutExists) {
-        console.log('⚠️ Clearing analyzing state for workout not in list:', analyzingWorkout);
-        setAnalyzingWorkout(null);
-        analyzingRef.current.delete(analyzingWorkout);
-      }
+        const workout = recentWorkouts.find(w => w.id === analyzingWorkout);
+        
+        // Clear analyzing state if:
+        // 1. Workout doesn't exist in list, OR
+        // 2. Workout status is not actually 'analyzing' (might be 'complete', 'failed', or null)
+        if (!workout) {
+          console.log('⚠️ Clearing analyzing state for workout not in list:', analyzingWorkout);
+          setAnalyzingWorkout(null);
+          analyzingRef.current.delete(analyzingWorkout);
+          analysisStartTimeRef.current.delete(analyzingWorkout);
+        } else if (workout.analysis_status !== 'analyzing') {
+          console.log(`⚠️ Clearing analyzing state - workout status is '${workout.analysis_status}', not 'analyzing':`, analyzingWorkout);
+          setAnalyzingWorkout(null);
+          analyzingRef.current.delete(analyzingWorkout);
+          analysisStartTimeRef.current.delete(analyzingWorkout);
+          
+          // Clear any polling timers
+          const timeoutId = pollingRef.current.get(analyzingWorkout);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            pollingRef.current.delete(analyzingWorkout);
+          }
+        }
       }
     } else if (recentWorkouts.length > 0) {
       lastRecentWorkoutsForCleanupRef.current = recentWorkouts;
