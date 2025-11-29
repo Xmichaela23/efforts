@@ -17,6 +17,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const analyzingRef = useRef<Set<string>>(new Set());
   const pollingRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const analysisStartTimeRef = useRef<Map<string, number>>(new Map()); // Track when analysis started
 
   // Use unified API instead of direct table queries
   // Use user's local timezone for date calculations
@@ -74,6 +75,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       if (workout.analysis_status === 'complete') {
         console.log('✅ Analysis completed successfully!');
         analyzingRef.current.delete(workoutId);
+        analysisStartTimeRef.current.delete(workoutId);
         setAnalyzingWorkout(null);
         setAnalysisError(null);
         
@@ -116,6 +118,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         console.error('❌ Analysis failed:', workout.analysis_error);
         setAnalysisError(workout.analysis_error || 'Analysis failed. Please try again.');
         analyzingRef.current.delete(workoutId);
+        analysisStartTimeRef.current.delete(workoutId);
         setAnalyzingWorkout(null);
         
         // Clear polling timer
@@ -210,11 +213,26 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     try {
       analyzingRef.current.add(workoutId);
       setAnalyzingWorkout(workoutId);
+      analysisStartTimeRef.current.set(workoutId, Date.now()); // Track start time
       
       console.log(`🚀 Starting analysis for workout: ${workoutId} (type: ${targetWorkout.type})`);
       
       // Clear any previous errors
       setAnalysisError(null);
+      
+      // Set a maximum timeout (2 minutes) - if analysis takes longer, stop showing spinner
+      const maxAnalysisTime = 120000; // 2 minutes
+      setTimeout(() => {
+        if (analyzingRef.current.has(workoutId)) {
+          console.warn(`⚠️ Analysis timeout after ${maxAnalysisTime}ms for workout ${workoutId}`);
+          analyzingRef.current.delete(workoutId);
+          analysisStartTimeRef.current.delete(workoutId);
+          if (analyzingWorkout === workoutId) {
+            setAnalyzingWorkout(null);
+          }
+          setAnalysisError('Analysis is taking longer than expected. Please try again later.');
+        }
+      }, maxAnalysisTime);
       
       // Trigger analysis (fire and forget - don't wait for response)
       analyzeWorkoutWithRetry(workoutId, targetWorkout.type)
@@ -225,6 +243,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
           console.error('❌ Failed to submit analysis request:', error);
           setAnalysisError(error instanceof Error ? error.message : 'Failed to start analysis. Please try again.');
           analyzingRef.current.delete(workoutId);
+          analysisStartTimeRef.current.delete(workoutId);
           setAnalyzingWorkout(null);
         });
       
@@ -250,6 +269,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       });
       pollingRef.current.clear();
       analyzingRef.current.clear();
+      analysisStartTimeRef.current.clear();
       console.log('🧹 Cleaned up polling timers');
     };
   }, []);
@@ -265,12 +285,12 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       
       if (workoutsChanged) {
         lastRecentWorkoutsForCleanupRef.current = recentWorkouts;
-        const workoutExists = recentWorkouts.some(w => w.id === analyzingWorkout);
-        if (!workoutExists) {
-          console.log('⚠️ Clearing analyzing state for workout not in list:', analyzingWorkout);
-          setAnalyzingWorkout(null);
-          analyzingRef.current.delete(analyzingWorkout);
-        }
+      const workoutExists = recentWorkouts.some(w => w.id === analyzingWorkout);
+      if (!workoutExists) {
+        console.log('⚠️ Clearing analyzing state for workout not in list:', analyzingWorkout);
+        setAnalyzingWorkout(null);
+        analyzingRef.current.delete(analyzingWorkout);
+      }
       }
     } else if (recentWorkouts.length > 0) {
       lastRecentWorkoutsForCleanupRef.current = recentWorkouts;
@@ -292,6 +312,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
 
       // Load most recent completed workouts (last 14 days to catch more workouts)
       // Use user's local timezone for date range calculation
+      // IMPORTANT: Only show COMPLETED workouts, not planned ones
       const fourteenDaysAgo = new Date();
       fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
       const fourteenDaysAgoLocal = fourteenDaysAgo.toLocaleDateString('en-CA');
@@ -300,6 +321,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         .from('workouts')
         .select('*, workout_analysis, analysis_status')
         .eq('user_id', user.id)
+        .eq('workout_status', 'completed') // ONLY completed workouts
         .gte('date', fourteenDaysAgoLocal)
         .order('date', { ascending: false })
         .limit(10);
@@ -513,25 +535,28 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     }
     
     // Auto-trigger analysis if workout is completed but has no analysis and isn't already being analyzed
-    // Auto-trigger for workout types that have analyzers (run, strength, ride)
-    // Swim analyzer not yet implemented, so don't auto-trigger for swim
+    // Auto-trigger for workout types that have analyzers (run, strength, ride, swim)
+    // Only auto-trigger if we're NOT already showing a spinner for this workout
     const workoutStatus = workoutWithAnalysis.workout_status || workoutWithAnalysis.status;
-    const hasAnalyzerImplemented = ['run', 'running', 'strength', 'strength_training', 'ride', 'cycling', 'bike'].includes(workoutWithAnalysis.type?.toLowerCase());
+    const hasAnalyzerImplemented = ['run', 'running', 'strength', 'strength_training', 'ride', 'cycling', 'bike', 'swim', 'swimming'].includes(workoutWithAnalysis.type?.toLowerCase());
+    const isCurrentlyAnalyzing = analyzingWorkout === workoutWithAnalysis.id || analyzingRef.current.has(workoutWithAnalysis.id);
     
     if (workoutStatus === 'completed' && 
         hasAnalyzerImplemented &&
         !workoutWithAnalysis.workout_analysis && 
         workoutWithAnalysis.analysis_status !== 'analyzing' &&
         workoutWithAnalysis.analysis_status !== 'complete' &&
-        !analyzingRef.current.has(workoutWithAnalysis.id)) {
+        !isCurrentlyAnalyzing) {
       console.log('🔄 Auto-triggering analysis for completed workout without analysis:', workoutWithAnalysis.id, 'type:', workoutWithAnalysis.type);
-      // Trigger analysis in background (don't await)
-      analyzeWorkoutWithRetry(workoutWithAnalysis.id, workoutWithAnalysis.type).catch(err => {
-        console.error('❌ Auto-analysis failed:', err);
-        // Don't show spinner if analysis fails - let user see the "Tap to analyze" button
-      });
+      // Trigger analysis in background (don't await) and start polling
+      analyzeWorkout(workoutWithAnalysis.id);
       // Return null to show loading state while analyzing
       return null;
+    }
+    
+    // If analysis is in progress, show spinner
+    if (isCurrentlyAnalyzing && workoutWithAnalysis.analysis_status === 'analyzing') {
+      return null; // This will trigger the spinner UI
     }
     
     // If selected workout has no analysis yet, return null to show "Analysis Not Available"
@@ -716,11 +741,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
   
   // Debug: Log what we're about to display (only when it changes)
   useEffect(() => {
-    console.log('🎨 UI Display Decision:', {
-      hasAnalysisMetrics: !!analysisMetrics,
-      insightsCount: analysisMetrics?.insights?.length || 0,
-      willShowInsights: analysisMetrics?.insights && analysisMetrics?.insights.length > 0
-    });
+  console.log('🎨 UI Display Decision:', {
+    hasAnalysisMetrics: !!analysisMetrics,
+    insightsCount: analysisMetrics?.insights?.length || 0,
+    willShowInsights: analysisMetrics?.insights && analysisMetrics?.insights.length > 0
+  });
   }, [analysisMetrics]);
 
   return (
@@ -869,39 +894,59 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 Try again
               </button>
             </div>
-          ) : analyzingWorkout === selectedWorkoutId ? (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <div className="text-sm font-medium text-blue-800">
-                  Analyzing Workout...
+          ) : (() => {
+            // Only show spinner if:
+            // 1. We're tracking this workout as analyzing AND
+            // 2. Either it's the selected workout OR it's the workout being shown in analysisMetrics AND
+            // 3. Analysis started recently (within last 2 minutes) OR status is 'analyzing'
+            const currentAnalyzingId = analyzingWorkout;
+            const isSelectedWorkout = currentAnalyzingId === selectedWorkoutId;
+            const isShownWorkout = currentAnalyzingId === analysisMetrics?.workout?.id;
+            const analysisStartTime = currentAnalyzingId ? analysisStartTimeRef.current.get(currentAnalyzingId) : null;
+            const timeSinceStart = analysisStartTime ? Date.now() - analysisStartTime : Infinity;
+            const isRecent = timeSinceStart < 120000; // 2 minutes
+            
+            // Check if workout status is actually 'analyzing'
+            const workoutBeingAnalyzed = recentWorkouts.find(w => w.id === currentAnalyzingId);
+            const statusIsAnalyzing = workoutBeingAnalyzed?.analysis_status === 'analyzing';
+            
+            if (currentAnalyzingId && (isSelectedWorkout || isShownWorkout) && (isRecent || statusIsAnalyzing)) {
+              return (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <div className="text-sm font-medium text-blue-800">
+                      Analyzing Workout...
+                    </div>
+                  </div>
+                  <div className="text-xs text-blue-600 mt-1">
+                    This may take a few seconds. Analysis will appear automatically when complete.
+                  </div>
                 </div>
+              );
+            }
+            return (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <div className="text-sm font-medium text-gray-800">
+                  Analysis Not Available
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  No workout analysis found. Click "Analyze" to generate insights.
+                </div>
+                {selectedWorkoutId && (
+                  <button
+                    onClick={() => analyzeWorkout(selectedWorkoutId)}
+                    className="mt-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  >
+                    Analyze Workout
+                  </button>
+                )}
               </div>
-              <div className="text-xs text-blue-600 mt-1">
-                This may take a few seconds. Analysis will appear automatically when complete.
-              </div>
-            </div>
-          ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <div className="text-sm font-medium text-gray-800">
-                Analysis Not Available
-              </div>
-              <div className="text-xs text-gray-600 mt-1">
-                No workout analysis found. Click "Analyze" to generate insights.
-              </div>
-              {selectedWorkoutId && (
-                <button
-                  onClick={() => analyzeWorkout(selectedWorkoutId)}
-                  className="mt-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                >
-                  Analyze Workout
-                </button>
-              )}
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
       
@@ -928,11 +973,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         const filteredWorkouts = recentWorkouts.filter(w => w.id !== displayedWorkoutId);
         
         return filteredWorkouts.length > 0 ? (
-          <div className="px-2 mt-4">
-            <div className="text-sm text-[#666666] font-normal">
-              <div className="font-medium">Recent Workouts</div>
-            </div>
-            <div className="text-sm text-black mt-1 space-y-1">
+        <div className="px-2 mt-4">
+          <div className="text-sm text-[#666666] font-normal">
+            <div className="font-medium">Recent Workouts</div>
+          </div>
+          <div className="text-sm text-black mt-1 space-y-1">
               {filteredWorkouts.slice(0, 3).map((workout) => (
               <div 
                 key={workout.id} 
