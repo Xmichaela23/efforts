@@ -585,8 +585,9 @@ Deno.serve(async (req) => {
     if (workout.planned_id) {
       const { data: planned, error: plannedError } = await supabase
         .from('planned_workouts')
-        .select('id, intervals, steps_preset, computed, total_duration_seconds, description, tags, training_plan_id')
+        .select('id, intervals, steps_preset, computed, total_duration_seconds, description, tags, training_plan_id, user_id')
         .eq('id', workout.planned_id)
+        .eq('user_id', workout.user_id) // Authorization: verify planned workout belongs to user
         .single();
 
       if (plannedError) {

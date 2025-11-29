@@ -206,45 +206,57 @@ Deno.serve(async (req) => {
     if (workout.planned_id) {
       const { data: planned, error: plannedError } = await supabase
         .from('planned_workouts')
-        .select('id, intervals, steps_preset, computed, total_duration_seconds, description, tags, training_plan_id, pool_length_m, pool_unit')
+        .select('id, intervals, steps_preset, computed, total_duration_seconds, description, tags, training_plan_id, pool_length_m, pool_unit, user_id')
         .eq('id', workout.planned_id)
+        .eq('user_id', workout.user_id) // Authorization: verify planned workout belongs to user
         .single();
 
       if (!plannedError && planned) {
-        plannedWorkout = planned;
-        
-        // Extract plan-aware context
-        if (planned.training_plan_id) {
-          try {
-            const weekTag = planned.tags?.find((t: string) => t.startsWith('week:'));
-            const weekNumber = weekTag ? parseInt(weekTag.split(':')[1].split('_of_')[0]) : 1;
-            
-            const { data: trainingPlan } = await supabase
-              .from('training_plans')
-              .select('*')
-              .eq('id', planned.training_plan_id)
-              .single();
-            
-            if (trainingPlan) {
-              const { phase, week, totalWeeks } = parsePhaseFromTags(planned.tags || []);
-              const weeklySummary = trainingPlan.config?.weekly_summaries?.[weekNumber] || 
-                                    trainingPlan.weekly_summaries?.[weekNumber] || null;
-              const progressionHistory = parseProgressionHistory(planned.description || '');
+        // Verify planned workout belongs to user (authorization check)
+        if (planned.user_id && planned.user_id !== workout.user_id) {
+          console.warn('⚠️ Planned workout does not belong to user - skipping plan context');
+        } else {
+          plannedWorkout = planned;
+          
+          // Extract plan-aware context
+          if (planned.training_plan_id) {
+            try {
+              const weekTag = planned.tags?.find((t: string) => t.startsWith('week:'));
+              const weekNumber = weekTag ? parseInt(weekTag.split(':')[1].split('_of_')[0]) : 1;
               
-              planContext = {
-                plan_name: trainingPlan.name || 'Training Plan',
-                week: weekNumber,
-                total_weeks: trainingPlan.duration_weeks || 0,
-                phase: phase || 'unknown',
-                weekly_summary: weeklySummary,
-                progression_history: progressionHistory,
-                session_description: planned.description || '',
-                session_tags: planned.tags || [],
-                plan_description: trainingPlan.description || ''
-              };
+              const { data: trainingPlan } = await supabase
+                .from('training_plans')
+                .select('*')
+                .eq('id', planned.training_plan_id)
+                .eq('user_id', workout.user_id) // Authorization: verify plan belongs to user
+                .single();
+              
+              if (trainingPlan) {
+                // Double-check user ownership (defense in depth)
+                if (trainingPlan.user_id === workout.user_id) {
+                  const { phase, week, totalWeeks } = parsePhaseFromTags(planned.tags || []);
+                  const weeklySummary = trainingPlan.config?.weekly_summaries?.[weekNumber] || 
+                                        trainingPlan.weekly_summaries?.[weekNumber] || null;
+                  const progressionHistory = parseProgressionHistory(planned.description || '');
+                  
+                  planContext = {
+                    plan_name: trainingPlan.name || 'Training Plan',
+                    week: weekNumber,
+                    total_weeks: trainingPlan.duration_weeks || 0,
+                    phase: phase || 'unknown',
+                    weekly_summary: weeklySummary,
+                    progression_history: progressionHistory,
+                    session_description: planned.description || '',
+                    session_tags: planned.tags || [],
+                    plan_description: trainingPlan.description || ''
+                  };
+                } else {
+                  console.warn('⚠️ Training plan does not belong to user - skipping plan context');
+                }
+              }
+            } catch (error) {
+              console.log('⚠️ Failed to extract plan context:', error);
             }
-          } catch (error) {
-            console.log('⚠️ Failed to extract plan context:', error);
           }
         }
       }

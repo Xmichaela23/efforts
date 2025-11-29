@@ -347,6 +347,12 @@ async function extractEnhancedPlanMetadata(
 ): Promise<EnhancedPlanContext | null> {
   if (!plannedWorkout) return null;
   
+  // Verify planned workout belongs to user (authorization check)
+  if (plannedWorkout.user_id && plannedWorkout.user_id !== userId) {
+    console.warn('⚠️ Planned workout does not belong to user - skipping plan context');
+    return null;
+  }
+  
   // Get training plan if available
   let trainingPlan = null;
   if (plannedWorkout.training_plan_id) {
@@ -355,10 +361,16 @@ async function extractEnhancedPlanMetadata(
         .from('training_plans')
         .select('*')
         .eq('id', plannedWorkout.training_plan_id)
+        .eq('user_id', userId) // Authorization: verify plan belongs to user
         .single();
       
       if (!error && planData) {
-        trainingPlan = planData;
+        // Double-check user ownership (defense in depth)
+        if (planData.user_id === userId) {
+          trainingPlan = planData;
+        } else {
+          console.warn('⚠️ Training plan does not belong to user - skipping plan context');
+        }
       }
     } catch (error) {
       console.log('Failed to fetch training plan:', error);
@@ -2457,15 +2469,21 @@ Deno.serve(async (req) => {
       console.log(`Fetching planned workout: ${workout.planned_id}`);
       const { data: plannedData, error: plannedError } = await supabase
         .from('planned_workouts')
-        .select('*, strength_exercises, steps_preset, workout_structure')
+        .select('*, strength_exercises, steps_preset, workout_structure, user_id, training_plan_id')
         .eq('id', workout.planned_id)
+        .eq('user_id', workout.user_id) // Authorization: verify planned workout belongs to user
         .single();
       
       if (plannedError) {
         console.log(`Failed to fetch planned workout: ${plannedError.message}`);
       } else {
-        plannedWorkout = plannedData;
-        console.log(`Found planned workout: ${plannedWorkout?.name}`);
+        // Double-check user ownership (defense in depth)
+        if (plannedData.user_id === workout.user_id) {
+          plannedWorkout = plannedData;
+          console.log(`Found planned workout: ${plannedWorkout?.name}`);
+        } else {
+          console.warn('⚠️ Planned workout does not belong to user - skipping plan context');
+        }
       }
     }
     
