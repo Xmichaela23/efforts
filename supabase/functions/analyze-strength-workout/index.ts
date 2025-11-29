@@ -2098,15 +2098,19 @@ ANALYSIS REQUIREMENTS:
 - DO NOT generate a simple summary paragraph - generate detailed sections with clear headings
 - Format your response as structured sections with clear separators (use ─ or = for section dividers)
 - Each section must be comprehensive and detailed, not just bullet points
+- CRITICAL: Reference PLAN CONTEXT in ALL assessments - explain WHY exercises were programmed, whether performance matches plan expectations, and what's coming next week
+- CRITICAL: Compare actual RIR to target RIR from plan (if provided) - explain alignment or deviation
 - CRITICAL: Reference pre-workout readiness data (Energy/Sleep/Soreness) in EVERY assessment section - this contextualizes ALL performance
 - CRITICAL: When RIR pattern shows 0-0-0 (all zeros), this indicates FAILURE - flag this as critical safety issue with specific recommendations
 - CRITICAL: If an exercise shows "added exercise" but has planned data above, it WAS planned - correct this in your analysis
+- CRITICAL: DO NOT recommend changes that contradict the plan (e.g., "increase load" during programmed deload week)
+- CRITICAL: Always state what's programmed for next week and explain how current performance sets up that progression
 - IMPORTANT: If set completion rate is 0% but exercise completion is high, do NOT create contradictory statements
 - Instead, say something like: "All planned exercises were logged (${overallAdherence.exercises_executed}/${overallAdherence.exercises_planned}), but set completion data is incomplete" OR focus on what IS available (weight progression, RIR data, etc.)
 - Never say "exercises completed but no sets completed" - this is confusing and contradictory
 - If sets weren't marked complete, focus on other metrics like weight progression or RIR data instead
 - Keep statements clear and non-contradictory
-- Contextualize ALL recommendations based on readiness data - same RIR values mean completely different things depending on energy/soreness/sleep
+- Contextualize ALL recommendations based on readiness data AND plan context - same RIR values mean completely different things depending on energy/soreness/sleep AND phase expectations
 
 REQUIRED OUTPUT FORMAT:
 
@@ -2207,13 +2211,16 @@ REQUIRED SECTIONS (generate ALL of these):
    - Specific recommendations to fix
 
 6. COACHING INSIGHT
-   - Key observations per exercise WITH readiness context
-   - Specific load increase recommendations based on RIR, adherence, AND readiness data
-   - Next session targets (adjust based on readiness indicators)
+   - PLAN ADHERENCE: How well session matched plan expectations
+   - Key observations per exercise WITH readiness context AND plan context
+   - Specific recommendations based on RIR, adherence, readiness data, AND plan progression
+   - Next session targets FROM PLAN (do not contradict programmed progression)
+   - Conditional guidance: If readiness is poor, how to adjust while staying aligned with plan
    - Data quality improvement suggestions
    - Note Session RPE if it significantly differs from objective metrics (RIR, load)
    - CRITICAL: If RIR pattern shows 0-0-0 (failure), provide immediate safety recommendations
-   - CRITICAL: Contextualize ALL recommendations with readiness data - same performance means different things based on energy/soreness/sleep
+   - CRITICAL: Contextualize ALL recommendations with readiness data AND plan phase - same performance means different things based on energy/soreness/sleep AND phase expectations
+   - CRITICAL: Reference what's coming next week in plan - explain how current performance sets up that progression
 
 CRITICAL: Avoid contradictory statements. If exercise completion is high but set completion is 0%, focus on other available metrics (weight progression, RIR data, etc.) rather than creating confusing statements.
 
