@@ -4055,7 +4055,8 @@ async function generateAINarrativeInsights(
   granularAnalysis: any,
   performance: any,
   detailedAnalysis: any,
-  userUnits: 'metric' | 'imperial' = 'imperial'
+  userUnits: 'metric' | 'imperial' = 'imperial',
+  supabase: any = null
 ): Promise<string[]> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   
