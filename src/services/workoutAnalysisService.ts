@@ -108,7 +108,7 @@ function getAnalysisFunction(type: string): string {
       return 'analyze-cycling-workout';
     case 'swim':
     case 'swimming': 
-      return 'analyze-swimming-workout';
+      return 'analyze-swim-workout';
     default: 
       throw new Error(`No analyzer available for workout type: ${type}`);
   }
