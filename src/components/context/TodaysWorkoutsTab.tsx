@@ -321,21 +321,21 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         return;
       }
 
-      // Load most recent completed workouts (last 7 days for historical analysis)
+      // Load most recent completed workouts (last 14 days = 2 weeks for historical analysis)
       // Use user's local timezone for date range calculation
       // IMPORTANT: Only show COMPLETED workouts, not planned ones
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const sevenDaysAgoLocal = sevenDaysAgo.toLocaleDateString('en-CA');
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+      const fourteenDaysAgoLocal = fourteenDaysAgo.toLocaleDateString('en-CA');
       
       const { data: recentData, error: loadError } = await supabase
         .from('workouts')
         .select('*, workout_analysis, analysis_status')
         .eq('user_id', user.id)
         .eq('workout_status', 'completed') // ONLY completed workouts
-        .gte('date', sevenDaysAgoLocal)
+        .gte('date', fourteenDaysAgoLocal)
         .order('date', { ascending: false })
-        .limit(20); // Show more workouts from past week
+        .limit(50); // Show more workouts from past 2 weeks
 
       if (loadError) {
         console.error('❌ Error loading workouts:', loadError);
