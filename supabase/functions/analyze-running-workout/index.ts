@@ -585,7 +585,7 @@ Deno.serve(async (req) => {
     if (workout.planned_id) {
       const { data: planned, error: plannedError } = await supabase
         .from('planned_workouts')
-        .select('id, intervals, steps_preset, computed, total_duration_seconds')
+        .select('id, intervals, steps_preset, computed, total_duration_seconds, description, tags, training_plan_id')
         .eq('id', workout.planned_id)
         .single();
 
@@ -4223,6 +4223,53 @@ async function generateAINarrativeInsights(
   // Determine if this is a planned workout or freeform run
   const isPlannedWorkout = !!plannedWorkout;
   
+  // Extract plan-aware context if planned workout exists
+  let planContext: any = null;
+  if (plannedWorkout && plannedWorkout.training_plan_id) {
+    try {
+      // Get week number from tags or default to 1
+      const weekTag = plannedWorkout.tags?.find((t: string) => t.startsWith('week:'));
+      const weekNumber = weekTag ? parseInt(weekTag.split(':')[1].split('_of_')[0]) : 1;
+      
+      // Fetch training plan
+      const { data: trainingPlan } = await supabase
+        .from('training_plans')
+        .select('*')
+        .eq('id', plannedWorkout.training_plan_id)
+        .single();
+      
+      if (trainingPlan) {
+        // Parse phase from tags
+        const phaseTag = plannedWorkout.tags?.find((t: string) => t.startsWith('phase:'));
+        const phase = phaseTag ? phaseTag.split(':')[1].replace(/_/g, ' ') : null;
+        
+        // Get weekly summary
+        const weeklySummary = trainingPlan.config?.weekly_summaries?.[weekNumber] || 
+                              trainingPlan.weekly_summaries?.[weekNumber] || null;
+        
+        // Parse progression history from description (e.g., "5×800m → 6×800m → 4×1mi")
+        const progressionMatch = plannedWorkout.description?.match(/(\d+×\d+[a-z]+.*?→.*?\d+×\d+[a-z]+)/i);
+        const progressionHistory = progressionMatch ? progressionMatch[0].split('→').map(p => p.trim()) : null;
+        
+        planContext = {
+          plan_name: trainingPlan.name || 'Training Plan',
+          week: weekNumber,
+          total_weeks: trainingPlan.duration_weeks || 0,
+          phase: phase || 'unknown',
+          weekly_summary: weeklySummary,
+          progression_history: progressionHistory,
+          session_description: plannedWorkout.description || '',
+          session_tags: plannedWorkout.tags || [],
+          plan_description: trainingPlan.description || ''
+        };
+        
+        console.log('📋 PLAN CONTEXT EXTRACTED:', planContext);
+      }
+    } catch (error) {
+      console.log('⚠️ Failed to extract plan context:', error);
+    }
+  }
+  
   // ✅ FIX BUG #2: Extract planned pace ranges from work segments
   let plannedPaceInfo: {
     type: 'range' | 'single';
@@ -4317,6 +4364,10 @@ CRITICAL RULES:
 - Describe patterns visible in the data
 - Each observation should provide UNIQUE information - avoid repeating the same insight
 - Combine related metrics into single observations (e.g., HR average + drift + peak in one paragraph)
+${planContext ? `
+- CRITICAL: Reference plan context when available - explain WHY workout was programmed, whether performance matches plan expectations, and what's coming next week
+- Contextualize adherence relative to phase goals (e.g., Foundation Build vs Peak Strength)
+` : ''}
 
 Workout Profile:
 - Type: ${workoutContext.type}
@@ -4343,6 +4394,41 @@ ${plannedPaceInfo ? `
 Planned Workout Details:
 - Target Pace: ${plannedPaceInfo.type === 'range' ? plannedPaceInfo.range : plannedPaceInfo.target}
 - Workout Type: ${plannedPaceInfo.workoutType}
+` : ''}
+${planContext ? `
+
+═══════════════════════════════════════════════════════════════
+📋 PLAN CONTEXT
+═══════════════════════════════════════════════════════════════
+
+Plan: ${planContext.plan_name}
+Week: ${planContext.week} of ${planContext.total_weeks}
+Phase: ${planContext.phase}
+${planContext.weekly_summary?.focus ? `
+WEEK ${planContext.week} FOCUS:
+"${planContext.weekly_summary.focus}"
+` : ''}
+${planContext.weekly_summary?.key_workouts && planContext.weekly_summary.key_workouts.length > 0 ? `
+KEY WORKOUTS THIS WEEK:${planContext.weekly_summary.key_workouts.map((w: string) => `\n• ${w}`).join('')}
+` : ''}
+${planContext.weekly_summary?.notes ? `
+WEEK NOTES:
+${planContext.weekly_summary.notes}
+` : ''}
+${planContext.progression_history ? `
+PROGRESSION HISTORY:
+${planContext.progression_history.join(' → ')}
+` : ''}
+${planContext.session_description && planContext.session_description.length > 50 ? `
+SESSION DESCRIPTION:
+${planContext.session_description}
+` : ''}
+
+CRITICAL: Reference plan context in your analysis:
+- Explain WHY this workout was programmed (phase, week focus)
+- Compare performance to plan expectations
+- Reference what's coming next week if mentioned in plan
+- Contextualize adherence relative to phase goals
 ` : ''}
 
 CRITICAL ANALYSIS RULES:
