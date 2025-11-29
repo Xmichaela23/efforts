@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAppContext } from '../../contexts/AppContext';
-import { useWeekUnified } from '../../hooks/useWeekUnified';
 import { analyzeWorkoutWithRetry, isWorkoutTypeSupported } from '../../services/workoutAnalysisService';
 
 interface TodaysWorkoutsTabProps {
@@ -9,7 +7,6 @@ interface TodaysWorkoutsTabProps {
 }
 
 const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId }) => {
-  const { useImperial } = useAppContext();
   const [recentWorkouts, setRecentWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzingWorkout, setAnalyzingWorkout] = useState<string | null>(null);
@@ -19,10 +16,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
   const pollingRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const analysisStartTimeRef = useRef<Map<string, number>>(new Map()); // Track when analysis started
 
-  // Use unified API instead of direct table queries
-  // Use user's local timezone for date calculations
-  const today = new Date().toLocaleDateString('en-CA');
-  const { items: todayItems = [], loading: todayLoading } = useWeekUnified(today, today);
+  // Removed todayItems - we only show historical completed workouts, not planned ones
 
   // Polling function with exponential backoff
   const pollAnalysisStatus = async (workoutId: string, attempt: number = 1): Promise<void> => {
@@ -327,21 +321,21 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         return;
       }
 
-      // Load most recent completed workouts (last 14 days to catch more workouts)
+      // Load most recent completed workouts (last 7 days for historical analysis)
       // Use user's local timezone for date range calculation
       // IMPORTANT: Only show COMPLETED workouts, not planned ones
-      const fourteenDaysAgo = new Date();
-      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-      const fourteenDaysAgoLocal = fourteenDaysAgo.toLocaleDateString('en-CA');
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const sevenDaysAgoLocal = sevenDaysAgo.toLocaleDateString('en-CA');
       
       const { data: recentData, error: loadError } = await supabase
         .from('workouts')
         .select('*, workout_analysis, analysis_status')
         .eq('user_id', user.id)
         .eq('workout_status', 'completed') // ONLY completed workouts
-        .gte('date', fourteenDaysAgoLocal)
+        .gte('date', sevenDaysAgoLocal)
         .order('date', { ascending: false })
-        .limit(10);
+        .limit(20); // Show more workouts from past week
 
       if (loadError) {
         console.error('❌ Error loading workouts:', loadError);
@@ -415,10 +409,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
   }, [focusWorkoutId]);
 
   useEffect(() => {
-    if (!todayLoading) {
-      loadRecentWorkouts();
-    }
-  }, [todayLoading, loadRecentWorkouts]);
+    loadRecentWorkouts();
+  }, [loadRecentWorkouts]);
 
   // Auto-select workout when focusWorkoutId is provided
   // Use ref to track if we've already processed this focusWorkoutId to prevent loops
@@ -994,8 +986,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
           <div className="text-sm text-[#666666] font-normal">
             <div className="font-medium">Recent Workouts</div>
           </div>
-          <div className="text-sm text-black mt-1 space-y-1">
-              {filteredWorkouts.slice(0, 3).map((workout) => (
+            <div className="text-sm text-black mt-1 space-y-1">
+              {filteredWorkouts.map((workout) => (
               <div 
                 key={workout.id} 
                 className={`flex justify-between items-center py-2 px-2 rounded-lg transition-colors ${
@@ -1095,49 +1087,6 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         ) : null;
       })()}
 
-      {/* Today's Workouts - Show Analysis Status */}
-      {todayItems.length > 0 && (
-        <div className="px-2 mt-4">
-          <div className="text-sm text-[#666666] font-normal">
-            <div className="font-medium">Today's Workouts</div>
-          </div>
-          <div className="text-sm text-black mt-1 space-y-1">
-            {todayItems.map((item) => (
-              <div key={item.id} className="flex justify-between items-center py-2 px-2 rounded-lg bg-gray-50">
-                <div>
-                  <div className="font-medium">
-                    {item.planned?.name || `${item.planned?.type || 'Workout'} - PLANNED`}
-                  </div>
-                  <div className="text-xs text-[#666666]">
-                    {item.planned?.scheduled_time && `Status: ${item.completed ? 'Completed' : 'Planned'}`}
-                  </div>
-                </div>
-                <div className="text-xs text-[#666666] text-right">
-                  {item.planned?.distance_m && (
-                    <span>Distance: {useImperial ? `${(item.planned.distance_m * 0.000621371).toFixed(1)}mi` : `${(item.planned.distance_m / 1000).toFixed(1)}km`}</span>
-                  )}
-                  {item.planned?.duration_minutes && (
-                    <span className="ml-3">Duration: {item.planned.duration_minutes} min</span>
-                  )}
-                </div>
-                {item.completed && item.workout_analysis ? (
-                  <div className="text-xs text-green-600 font-medium mt-1">
-                    ✓ Analysis Complete
-                  </div>
-                ) : item.completed ? (
-                  <div className="text-xs text-blue-600 font-medium mt-1">
-                    Ready for Analysis
-                  </div>
-                ) : (
-                  <div className="text-xs text-gray-500 mt-1">
-                    Planned
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </>
   );
 };
