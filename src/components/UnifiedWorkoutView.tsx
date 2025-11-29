@@ -76,12 +76,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const dateIso = String((workout as any)?.date || '').slice(0,10);
   const { items: unifiedItems = [] } = useWeekUnified(dateIso, dateIso);
   
-  // Listen for workout invalidation events to refresh data
+  // Listen for workout invalidation events to refresh data (both singular and plural events)
   useEffect(() => {
     const handleWorkoutInvalidate = async () => {
       if (!isCompleted || !workout?.id) return;
       
-      console.log('🔄 [UnifiedWorkoutView] Refreshing workout data after analysis...');
+      console.log('🔄 [UnifiedWorkoutView] Refreshing workout data after auto-attach or realtime update...');
       try {
         // Fetch the updated workout data from the database
         const { data: refreshedWorkout, error } = await supabase
@@ -96,7 +96,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         }
         
         if (refreshedWorkout) {
-          console.log('✅ [UnifiedWorkoutView] Workout data refreshed, updating state');
+          console.log('✅ [UnifiedWorkoutView] Workout data refreshed, planned_id:', refreshedWorkout.planned_id);
           setUpdatedWorkoutData(refreshedWorkout);
         }
       } catch (error) {
@@ -104,15 +104,20 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       }
     };
     
+    // Listen for both singular (analysis) and plural (realtime) invalidation events
     window.addEventListener('workout:invalidate', handleWorkoutInvalidate);
-    return () => window.removeEventListener('workout:invalidate', handleWorkoutInvalidate);
+    window.addEventListener('workouts:invalidate', handleWorkoutInvalidate);
+    return () => {
+      window.removeEventListener('workout:invalidate', handleWorkoutInvalidate);
+      window.removeEventListener('workouts:invalidate', handleWorkoutInvalidate);
+    };
   }, [isCompleted, workout?.id]);
   
   // For planned workouts, use the same data structure as Today's Efforts
   const unifiedWorkout = (() => {
     if (isCompleted) {
-      // For completed workouts, use the original workout data
-      return workout;
+      // For completed workouts, prefer updatedWorkoutData (refreshed after auto-attach) over workout prop
+      return updatedWorkoutData || workout;
     }
     
     // For planned workouts, find the matching item in unified data and use the same structure as Today's Efforts
@@ -150,12 +155,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   })();
 
   // Fetch current planned_id from database to ensure we have the latest state
-  // Use planned_id from unified API data instead of direct database query
+  // Use planned_id from unified API data or updatedWorkoutData (refreshed after auto-attach)
   useEffect(() => {
-    const plannedId = (unifiedWorkout as any)?.planned_id || null;
-    console.log('🔍 Using planned_id from unified API:', plannedId);
+    // Prefer updatedWorkoutData (refreshed from DB) over workout prop (may be stale)
+    const sourceWorkout = updatedWorkoutData || unifiedWorkout;
+    const plannedId = (sourceWorkout as any)?.planned_id || null;
+    console.log('🔍 Using planned_id from:', updatedWorkoutData ? 'updatedWorkoutData' : 'unifiedWorkout', plannedId);
     setCurrentPlannedId(plannedId);
-  }, [(unifiedWorkout as any)?.planned_id]);
+  }, [(unifiedWorkout as any)?.planned_id, updatedWorkoutData?.planned_id]);
 
   // Phase 1: On-demand completed detail hydration (gps/sensors) with fallback to context object
   const wid = String((workout as any)?.id || '');
@@ -177,8 +184,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         return; 
       }
 
+      // Use updatedWorkoutData if available (refreshed after auto-attach), otherwise workout prop
+      const sourceWorkout = updatedWorkoutData || workout;
+      
       // 1) If workout has planned_id, fetch it directly from the database (single source of truth)
-      const pid = (workout as any)?.planned_id as string | undefined;
+      const pid = (sourceWorkout as any)?.planned_id as string | undefined || currentPlannedId;
       if (pid) {
         try {
           const { data: plannedRow } = await supabase
@@ -198,7 +208,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       // 2) No planned_id - clear linked state
       setLinkedPlanned(null);
     })();
-  }, [isCompleted, workout?.id, (workout as any)?.planned_id]);
+  }, [isCompleted, workout?.id, (workout as any)?.planned_id, updatedWorkoutData?.planned_id, currentPlannedId]);
 
   // Auto-materialize planned row if Summary is opened and computed steps are missing
   useEffect(() => {
@@ -634,7 +644,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // ✅ REMOVED: All client-side analysis code
   // Client is now UI-only - all analysis comes from server (workout_analysis.performance)
-  const isLinked = Boolean((workout as any)?.planned_id) || Boolean(linkedPlanned?.id);
+  // Use updatedWorkoutData if available (refreshed after auto-attach), otherwise fall back to workout prop
+  const sourceWorkout = updatedWorkoutData || workout;
+  const isLinked = Boolean((sourceWorkout as any)?.planned_id) || Boolean(currentPlannedId) || Boolean(linkedPlanned?.id);
 
   return (
     <div className="w-full h-full flex flex-col">
