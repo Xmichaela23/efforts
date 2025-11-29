@@ -872,6 +872,8 @@ export const useWorkouts = () => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${user.id}` }, () => {
           // Listen for INSERT, UPDATE, DELETE - server handles all changes via realtime
           fetchWorkouts();
+          // Dispatch invalidation event so components can refresh (e.g., UnifiedWorkoutView, AppLayout)
+          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
         })
         .subscribe();
     })();
