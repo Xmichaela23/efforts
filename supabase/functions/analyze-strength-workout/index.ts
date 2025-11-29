@@ -47,6 +47,23 @@ interface EnhancedPlanContext {
   weekly_focus: string;
   key_workouts: string[];
   plan_notes: string;
+  
+  // Plan-aware context (NEW)
+  session_description?: string;
+  session_tags?: string[];
+  plan_description?: string;
+  weekly_summary?: {
+    focus?: string;
+    key_workouts?: string[];
+    notes?: string;
+    hard_sessions?: number;
+  } | null;
+  progression_history?: string[] | null;
+  target_rir?: string | null;
+  parsed_phase?: string;
+  parsed_week?: number;
+  parsed_total_weeks?: number;
+  exercise_notes?: Record<string, string>;
 }
 
 /**
@@ -264,6 +281,64 @@ function parseStrengthExercises(exercises: any): any[] {
 }
 
 // Helper function to extract enhanced plan metadata from workout and training plan
+// Parse progression history from description (e.g., "70% → 72% → 75%")
+function parseProgressionHistory(description: string): string[] | null {
+  if (!description) return null;
+  const match = description.match(/(\d+%.*?→.*?\d+%)/);
+  if (!match) return null;
+  return match[0].split('→').map(p => p.trim());
+}
+
+// Parse target RIR from description or tags
+function parseTargetRIR(description: string, tags: string[]): string | null {
+  // Try description first
+  if (description) {
+    const match = description.match(/target RIR (\d+-?\d*)/i);
+    if (match) return match[1];
+  }
+  // Try tags
+  if (tags && Array.isArray(tags)) {
+    const rirTag = tags.find((t: string) => t.startsWith('target_rir:'));
+    if (rirTag) return rirTag.split(':')[1];
+  }
+  return null;
+}
+
+// Parse phase info from tags
+function parsePhaseFromTags(tags: string[]): { phase: string | null, week: string | null, totalWeeks: string | null } {
+  if (!tags || !Array.isArray(tags)) return { phase: null, week: null, totalWeeks: null };
+  
+  const phaseTag = tags.find((t: string) => t.startsWith('phase:'));
+  const phase = phaseTag ? phaseTag.split(':')[1].replace(/_/g, ' ') : null;
+  
+  const weekTag = tags.find((t: string) => t.startsWith('week:'));
+  let week: string | null = null;
+  let totalWeeks: string | null = null;
+  if (weekTag) {
+    const parts = weekTag.split(':')[1].split('_of_');
+    week = parts[0];
+    totalWeeks = parts[1];
+  }
+  
+  return { phase, week, totalWeeks };
+}
+
+// Parse exercise-specific notes from description
+function parseExerciseNotes(description: string): Record<string, string> {
+  const notes: Record<string, string> = {};
+  if (!description) return notes;
+  
+  // Match patterns like "EXERCISE_NAME: details"
+  const matches = description.matchAll(/([A-Z][A-Z\s]+):\s*([^.]+)/g);
+  for (const match of matches) {
+    const exercise = match[1].trim();
+    const note = match[2].trim();
+    notes[exercise] = note;
+  }
+  
+  return notes;
+}
+
 async function extractEnhancedPlanMetadata(
   plannedWorkout: any, 
   supabase: any, 
@@ -290,7 +365,48 @@ async function extractEnhancedPlanMetadata(
     }
   }
   
-  return extractEnhancedPlanContext(plannedWorkout, trainingPlan, weekNumber);
+  const baseContext = extractEnhancedPlanContext(plannedWorkout, trainingPlan, weekNumber);
+  
+  // Extract additional plan-aware context
+  const sessionDescription = plannedWorkout.description || '';
+  const sessionTags = plannedWorkout.tags || [];
+  const planDescription = trainingPlan?.description || '';
+  
+  // Parse weekly summary if available
+  let weeklySummary = null;
+  if (trainingPlan?.config?.weekly_summaries && trainingPlan.config.weekly_summaries[weekNumber]) {
+    weeklySummary = trainingPlan.config.weekly_summaries[weekNumber];
+  } else if (trainingPlan?.weekly_summaries && trainingPlan.weekly_summaries[weekNumber]) {
+    weeklySummary = trainingPlan.weekly_summaries[weekNumber];
+  }
+  
+  // Parse progression history
+  const progressionHistory = parseProgressionHistory(sessionDescription);
+  
+  // Parse target RIR
+  const targetRIR = parseTargetRIR(sessionDescription, sessionTags);
+  
+  // Parse phase info
+  const { phase: parsedPhase, week: parsedWeek, totalWeeks: parsedTotalWeeks } = parsePhaseFromTags(sessionTags);
+  
+  // Parse exercise-specific notes
+  const exerciseNotes = parseExerciseNotes(sessionDescription);
+  
+  // Enhance context with parsed data
+  return {
+    ...baseContext,
+    // Add plan-aware fields
+    session_description: sessionDescription,
+    session_tags: sessionTags,
+    plan_description: planDescription,
+    weekly_summary: weeklySummary,
+    progression_history: progressionHistory,
+    target_rir: targetRIR,
+    parsed_phase: parsedPhase || baseContext.phase,
+    parsed_week: parsedWeek ? parseInt(parsedWeek) : weekNumber,
+    parsed_total_weeks: parsedTotalWeeks ? parseInt(parsedTotalWeeks) : baseContext.total_weeks,
+    exercise_notes: exerciseNotes
+  };
 }
 
 // Helper function to normalize planned exercise format
@@ -1450,27 +1566,94 @@ PLANNED WORKOUT CONTEXT:`;
   
   if (planMetadata) {
     context += `
-✅ THIS WORKOUT IS ATTACHED TO A PLAN:
+
+
+═══════════════════════════════════════════════════════════════
+📋 PLAN CONTEXT
+═══════════════════════════════════════════════════════════════
+
+Plan: ${planMetadata.plan_type || 'Training Plan'}
+Week: ${planMetadata.parsed_week || planMetadata.week} of ${planMetadata.parsed_total_weeks || planMetadata.total_weeks}
+Phase: ${planMetadata.parsed_phase || planMetadata.phase}`;
+    
+    // Add weekly summary if available
+    if (planMetadata.weekly_summary) {
+      if (planMetadata.weekly_summary.focus) {
+        context += `
+
+WEEK ${planMetadata.parsed_week || planMetadata.week} FOCUS:
+"${planMetadata.weekly_summary.focus}"`;
+      }
+      
+      if (planMetadata.weekly_summary.key_workouts && planMetadata.weekly_summary.key_workouts.length > 0) {
+        context += `
+
+KEY WORKOUTS THIS WEEK:`;
+        for (const workout of planMetadata.weekly_summary.key_workouts) {
+          context += `
+• ${workout}`;
+        }
+      }
+      
+      if (planMetadata.weekly_summary.notes) {
+        context += `
+
+WEEK NOTES:
+${planMetadata.weekly_summary.notes}`;
+      }
+    }
+    
+    // Add progression history if available
+    if (planMetadata.progression_history && planMetadata.progression_history.length > 0) {
+      context += `
+
+STRENGTH PROGRESSION HISTORY:
+${planMetadata.progression_history.join(' → ')}`;
+    }
+    
+    // Add target RIR if available
+    if (planMetadata.target_rir) {
+      context += `
+
+TARGET RIR (from plan): ${planMetadata.target_rir}`;
+    }
+    
+    // Add exercise-specific notes
+    if (planMetadata.exercise_notes && Object.keys(planMetadata.exercise_notes).length > 0) {
+      context += `
+
+EXERCISE-SPECIFIC PLAN NOTES:`;
+      for (const [exercise, note] of Object.entries(planMetadata.exercise_notes)) {
+        context += `
+• ${exercise}: ${note}`;
+      }
+    }
+    
+    // Add session description if it contains useful context
+    if (planMetadata.session_description && planMetadata.session_description.length > 50) {
+      context += `
+
+SESSION DESCRIPTION:
+${planMetadata.session_description}`;
+    }
+    
+    // Add plan description for big-picture context
+    if (planMetadata.plan_description) {
+      context += `
+
+OVERALL PLAN CONTEXT:
+${planMetadata.plan_description}`;
+    }
+    
+    context += `
+
+PLAN METADATA:
 - Plan Type: ${planMetadata.plan_type}
-- Phase: ${planMetadata.phase} (Week ${planMetadata.week}/${planMetadata.total_weeks})
 - Phase Focus: ${planMetadata.phase_focus}
 - Progression Rate: ${(planMetadata.phase_progression_rate * 100).toFixed(1)}% per week
 - Strength Type: ${planMetadata.strength_type}
 - Endurance Integration: ${planMetadata.endurance_relationship}
-- Weekly Focus: ${planMetadata.weekly_focus}
-- Deload Week: ${planMetadata.deload_week ? 'Yes' : 'No'}`;
-    
-    if (planMetadata.key_workouts.length > 0) {
-      context += `
-- Key Workouts: ${planMetadata.key_workouts.join(', ')}`;
-    }
-    
-    if (planMetadata.plan_notes) {
-      context += `
-- Plan Notes: ${planMetadata.plan_notes}`;
-    }
-    
-    context += `
+- Deload Week: ${planMetadata.deload_week ? 'Yes' : 'No'}
 - Planned Exercises: ${overallAdherence.exercises_planned} exercises planned`;
   } else {
     context += `
@@ -1999,8 +2182,11 @@ REQUIRED SECTIONS (generate ALL of these):
    - For EACH exercise: Planned vs Actual (sets, reps, weight, RIR)
    - Load adherence percentage
    - RIR adherence and pattern (if shows 0-0-0, flag as FAILURE with safety warnings)
+   - Compare actual RIR to target RIR from plan (if provided)
    - Performance score
-   - Specific assessment with recommendations CONTEXTUALIZED BY READINESS DATA
+   - PLAN ALIGNMENT ASSESSMENT: Does performance match plan expectations? Reference phase, progression history, target RIR
+   - Specific assessment with recommendations CONTEXTUALIZED BY READINESS DATA AND PLAN CONTEXT
+   - NEXT SESSION (Per Plan): What's programmed for next week and why
    - If exercise shows "added" but has planned data, correct this - it WAS planned
 
 3. PROGRESSIVE OVERLOAD TRACKING
