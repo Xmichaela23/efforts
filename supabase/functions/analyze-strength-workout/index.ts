@@ -282,11 +282,27 @@ function parseStrengthExercises(exercises: any): any[] {
 
 // Helper function to extract enhanced plan metadata from workout and training plan
 // Parse progression history from description (e.g., "70% → 72% → 75%")
-function parseProgressionHistory(description: string): string[] | null {
-  if (!description) return null;
-  const match = description.match(/(\d+%.*?→.*?\d+%)/);
-  if (!match) return null;
-  return match[0].split('→').map(p => p.trim());
+// Parse progression history from description or structured tags
+function parseProgressionHistory(description: string, tags: string[]): string[] | null {
+  // First try structured tag (most reliable)
+  if (tags && Array.isArray(tags)) {
+    const loadProgressionTag = tags.find((t: string) => t.startsWith('load_progression:'));
+    if (loadProgressionTag) {
+      const progression = loadProgressionTag.split(':')[1];
+      // Format: "70_72_75_70_77_78_80_80" -> ["70%", "72%", "75%", ...]
+      return progression.split('_').map(p => `${p}%`);
+    }
+  }
+  
+  // Fallback to description parsing (e.g., "70%→72%→75%")
+  if (description) {
+    const match = description.match(/(\d+%.*?→.*?\d+%)/);
+    if (match) {
+      return match[0].split('→').map(p => p.trim());
+    }
+  }
+  
+  return null;
 }
 
 // Parse target RIR from description or tags
@@ -354,11 +370,13 @@ async function extractEnhancedPlanMetadata(
   }
   
   // Get training plan if available
+  // NOTE: planned_workouts.training_plan_id references the 'plans' table, not 'training_plans'
   let trainingPlan = null;
   if (plannedWorkout.training_plan_id) {
     try {
+      // Try 'plans' table first (current system)
       const { data: planData, error } = await supabase
-        .from('training_plans')
+        .from('plans')
         .select('*')
         .eq('id', plannedWorkout.training_plan_id)
         .eq('user_id', userId) // Authorization: verify plan belongs to user
@@ -370,6 +388,19 @@ async function extractEnhancedPlanMetadata(
           trainingPlan = planData;
         } else {
           console.warn('⚠️ Training plan does not belong to user - skipping plan context');
+        }
+      } else if (error) {
+        // Fallback: try 'training_plans' table (legacy)
+        console.log('⚠️ Plan not found in plans table, trying training_plans...');
+        const { data: legacyPlanData, error: legacyError } = await supabase
+          .from('training_plans')
+          .select('*')
+          .eq('id', plannedWorkout.training_plan_id)
+          .eq('user_id', userId)
+          .single();
+        
+        if (!legacyError && legacyPlanData && legacyPlanData.user_id === userId) {
+          trainingPlan = legacyPlanData;
         }
       }
     } catch (error) {
@@ -392,8 +423,8 @@ async function extractEnhancedPlanMetadata(
     weeklySummary = trainingPlan.weekly_summaries[weekNumber];
   }
   
-  // Parse progression history
-  const progressionHistory = parseProgressionHistory(sessionDescription);
+  // Parse progression history (from structured tag or description)
+  const progressionHistory = parseProgressionHistory(sessionDescription, sessionTags);
   
   // Parse target RIR
   const targetRIR = parseTargetRIR(sessionDescription, sessionTags);

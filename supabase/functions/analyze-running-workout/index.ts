@@ -4235,12 +4235,31 @@ async function generateAINarrativeInsights(
       const weekNumber = weekTag ? parseInt(weekTag.split(':')[1].split('_of_')[0]) : 1;
       
       // Fetch training plan with authorization check
-      const { data: trainingPlan } = await supabase
-        .from('training_plans')
+      // NOTE: planned_workouts.training_plan_id references the 'plans' table, not 'training_plans'
+      let trainingPlan = null;
+      const { data: planData, error: planError } = await supabase
+        .from('plans')
         .select('*')
         .eq('id', plannedWorkout.training_plan_id)
         .eq('user_id', workout.user_id) // Authorization: verify plan belongs to user
         .single();
+      
+      if (!planError && planData) {
+        trainingPlan = planData;
+      } else if (planError) {
+        // Fallback: try 'training_plans' table (legacy)
+        console.log('⚠️ Plan not found in plans table, trying training_plans...');
+        const { data: legacyPlanData } = await supabase
+          .from('training_plans')
+          .select('*')
+          .eq('id', plannedWorkout.training_plan_id)
+          .eq('user_id', workout.user_id)
+          .single();
+        
+        if (legacyPlanData) {
+          trainingPlan = legacyPlanData;
+        }
+      }
       
       if (trainingPlan) {
         // Double-check user ownership (defense in depth)
@@ -4253,9 +4272,29 @@ async function generateAINarrativeInsights(
           const weeklySummary = trainingPlan.config?.weekly_summaries?.[weekNumber] || 
                                 trainingPlan.weekly_summaries?.[weekNumber] || null;
           
-          // Parse progression history from description (e.g., "5×800m → 6×800m → 4×1mi")
-          const progressionMatch = plannedWorkout.description?.match(/(\d+×\d+[a-z]+.*?→.*?\d+×\d+[a-z]+)/i);
-          const progressionHistory = progressionMatch ? progressionMatch[0].split('→').map(p => p.trim()) : null;
+          // Parse progression history from structured tags or description
+          let progressionHistory: string[] | null = null;
+          const tags = plannedWorkout.tags || [];
+          
+          // Try structured tags first (most reliable)
+          const intensityProgressionTag = tags.find((t: string) => t.startsWith('intensity_progression:'));
+          const volumeProgressionTag = tags.find((t: string) => t.startsWith('volume_progression:'));
+          
+          if (intensityProgressionTag) {
+            // Format: "5x800_5x800_6x800_none_6x800_none_4x1mi_none"
+            const progression = intensityProgressionTag.split(':')[1];
+            progressionHistory = progression.split('_').filter(p => p !== 'none').map(p => p.replace(/x/g, '×'));
+          } else if (volumeProgressionTag) {
+            // Format: "90_100_110_80_120_130_140_150" -> ["90min", "100min", ...]
+            const progression = volumeProgressionTag.split(':')[1];
+            progressionHistory = progression.split('_').map(p => `${p}min`);
+          } else {
+            // Fallback to description parsing (e.g., "5×800m → 6×800m → 4×1mi")
+            const progressionMatch = plannedWorkout.description?.match(/(\d+×\d+[a-z]+.*?→.*?\d+×\d+[a-z]+)/i);
+            if (progressionMatch) {
+              progressionHistory = progressionMatch[0].split('→').map(p => p.trim());
+            }
+          }
           
           planContext = {
             plan_name: trainingPlan.name || 'Training Plan',
@@ -4264,6 +4303,8 @@ async function generateAINarrativeInsights(
             phase: phase || 'unknown',
             weekly_summary: weeklySummary,
             progression_history: progressionHistory,
+            intensity_progression: intensityProgressionTag ? intensityProgressionTag.split(':')[1] : null,
+            volume_progression: volumeProgressionTag ? volumeProgressionTag.split(':')[1] : null,
             session_description: plannedWorkout.description || '',
             session_tags: plannedWorkout.tags || [],
             plan_description: trainingPlan.description || ''
@@ -4852,3 +4893,4 @@ Return ONLY a JSON array of strings, no other text:
     throw error;
   }
 }
+

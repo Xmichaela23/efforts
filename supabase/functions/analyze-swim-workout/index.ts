@@ -44,12 +44,27 @@ function corsHeaders(): Record<string, string> {
   };
 }
 
-// Parse progression history from description (e.g., "400yd → 800yd → 1200yd")
-function parseProgressionHistory(description: string): string[] | null {
-  if (!description) return null;
-  const match = description.match(/(\d+[a-z]+.*?→.*?\d+[a-z]+)/i);
-  if (!match) return null;
-  return match[0].split('→').map(p => p.trim());
+// Parse progression history from description or structured tags
+function parseProgressionHistory(description: string, tags?: string[]): string[] | null {
+  // First try structured tag if available (for future-proofing)
+  if (tags && Array.isArray(tags)) {
+    const progressionTag = tags.find((t: string) => t.startsWith('progression:') || t.startsWith('volume_progression:'));
+    if (progressionTag) {
+      const progression = progressionTag.split(':')[1];
+      // Format depends on tag type - could be "400yd_800yd_1200yd" or similar
+      return progression.split('_').map(p => p.trim());
+    }
+  }
+  
+  // Fallback to description parsing (e.g., "400yd → 800yd → 1200yd")
+  if (description) {
+    const match = description.match(/(\d+[a-z]+.*?→.*?\d+[a-z]+)/i);
+    if (match) {
+      return match[0].split('→').map(p => p.trim());
+    }
+  }
+  
+  return null;
 }
 
 // Parse phase info from tags
@@ -224,12 +239,31 @@ Deno.serve(async (req) => {
               const weekTag = planned.tags?.find((t: string) => t.startsWith('week:'));
               const weekNumber = weekTag ? parseInt(weekTag.split(':')[1].split('_of_')[0]) : 1;
               
-              const { data: trainingPlan } = await supabase
+            // NOTE: planned_workouts.training_plan_id references the 'plans' table, not 'training_plans'
+            let trainingPlan = null;
+            const { data: planData, error: planError } = await supabase
+              .from('plans')
+              .select('*')
+              .eq('id', planned.training_plan_id)
+              .eq('user_id', workout.user_id) // Authorization: verify plan belongs to user
+              .single();
+            
+            if (!planError && planData) {
+              trainingPlan = planData;
+            } else if (planError) {
+              // Fallback: try 'training_plans' table (legacy)
+              console.log('⚠️ Plan not found in plans table, trying training_plans...');
+              const { data: legacyPlanData } = await supabase
                 .from('training_plans')
                 .select('*')
                 .eq('id', planned.training_plan_id)
-                .eq('user_id', workout.user_id) // Authorization: verify plan belongs to user
+                .eq('user_id', workout.user_id)
                 .single();
+              
+              if (legacyPlanData) {
+                trainingPlan = legacyPlanData;
+              }
+            }
               
               if (trainingPlan) {
                 // Double-check user ownership (defense in depth)
@@ -237,7 +271,7 @@ Deno.serve(async (req) => {
                   const { phase, week, totalWeeks } = parsePhaseFromTags(planned.tags || []);
                   const weeklySummary = trainingPlan.config?.weekly_summaries?.[weekNumber] || 
                                         trainingPlan.weekly_summaries?.[weekNumber] || null;
-                  const progressionHistory = parseProgressionHistory(planned.description || '');
+                  const progressionHistory = parseProgressionHistory(planned.description || '', planned.tags || []);
                   
                   planContext = {
                     plan_name: trainingPlan.name || 'Training Plan',
