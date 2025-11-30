@@ -218,13 +218,20 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
         throw new Error('User must be authenticated to save connection');
       }
 
+      console.log('🔐 [GarminConnect] Saving tokens for user_id:', session.user.id);
+
       // Check if connection already exists for this user
-      const { data: existing } = await supabaseClient
+      const { data: existing, error: selectError } = await supabaseClient
         .from('user_connections')
-        .select('id')
+        .select('id, user_id')
         .eq('user_id', session.user.id)
         .eq('provider', 'garmin')
         .maybeSingle();
+
+      if (selectError) {
+        console.error('❌ [GarminConnect] Error checking existing connection:', selectError);
+      }
+      console.log('🔐 [GarminConnect] Existing connection:', existing ? `Found id=${existing.id}` : 'Not found');
 
       const connectionData = {
         user_id: session.user.id,
@@ -241,16 +248,30 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
       
       if (existing) {
         // Update existing connection
-        await supabaseClient
+        console.log('🔐 [GarminConnect] Updating existing connection id=', existing.id, 'for user_id=', session.user.id);
+        const { error: updateError } = await supabaseClient
           .from('user_connections')
           .update(connectionData)
           .eq('id', existing.id)
           .eq('user_id', session.user.id);
+        
+        if (updateError) {
+          console.error('❌ [GarminConnect] Update error:', updateError);
+          throw updateError;
+        }
+        console.log('✅ [GarminConnect] Successfully updated connection');
       } else {
         // Insert new connection
-        await supabaseClient
+        console.log('🔐 [GarminConnect] Inserting new connection for user_id=', session.user.id);
+        const { error: insertError } = await supabaseClient
           .from('user_connections')
           .insert(connectionData);
+        
+        if (insertError) {
+          console.error('❌ [GarminConnect] Insert error:', insertError);
+          throw insertError;
+        }
+        console.log('✅ [GarminConnect] Successfully inserted new connection');
       }
         
     } catch (error) {

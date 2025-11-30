@@ -595,13 +595,20 @@ const Connections: React.FC = () => {
       
       // Persist Garmin OAuth tokens to user_connections
       try {
+        console.log('🔐 [Garmin Connect] Saving tokens for user_id:', session.user.id);
+        
         // Check if connection already exists for this user
-        const { data: existing } = await supabase
+        const { data: existing, error: selectError } = await supabase
           .from('user_connections')
-          .select('id')
+          .select('id, user_id')
           .eq('user_id', session.user.id)
           .eq('provider', 'garmin')
           .maybeSingle();
+
+        if (selectError) {
+          console.error('❌ [Garmin Connect] Error checking existing connection:', selectError);
+        }
+        console.log('🔐 [Garmin Connect] Existing connection:', existing ? `Found id=${existing.id}` : 'Not found');
 
         const connectionData = {
           user_id: session.user.id,
@@ -617,16 +624,30 @@ const Connections: React.FC = () => {
 
         if (existing) {
           // Update existing connection
-          await supabase
+          console.log('🔐 [Garmin Connect] Updating existing connection id=', existing.id, 'for user_id=', session.user.id);
+          const { error: updateError } = await supabase
             .from('user_connections')
             .update(connectionData)
             .eq('id', existing.id)
             .eq('user_id', session.user.id);
+          
+          if (updateError) {
+            console.error('❌ [Garmin Connect] Update error:', updateError);
+            throw updateError;
+          }
+          console.log('✅ [Garmin Connect] Successfully updated connection');
         } else {
           // Insert new connection
-          await supabase
+          console.log('🔐 [Garmin Connect] Inserting new connection for user_id=', session.user.id);
+          const { error: insertError } = await supabase
             .from('user_connections')
             .insert(connectionData);
+          
+          if (insertError) {
+            console.error('❌ [Garmin Connect] Insert error:', insertError);
+            throw insertError;
+          }
+          console.log('✅ [Garmin Connect] Successfully inserted new connection');
         }
 
         // Try to enrich with Garmin user_id (non-fatal)
@@ -645,8 +666,13 @@ const Connections: React.FC = () => {
                 .eq('user_id', session.user.id);
             }
           }
-        } catch {}
-      } catch (_) {}
+        } catch (enrichError) {
+          console.warn('⚠️ [Garmin Connect] Failed to enrich with Garmin user_id (non-fatal):', enrichError);
+        }
+      } catch (saveError) {
+        console.error('❌ [Garmin Connect] CRITICAL: Failed to save Garmin tokens:', saveError);
+        throw saveError; // Re-throw so user knows something went wrong
+      }
 
       // Set both state and localStorage with the new token
       setGarminAccessToken(tokenData.access_token);
