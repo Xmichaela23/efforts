@@ -322,107 +322,12 @@ const handleGarminOAuthSuccess = async (code: string) => {
 
     const tokenData = await tokenResponse.json();
     
-    // Log what the edge function returned - CRITICAL DEBUG INFO
+    // Log what the edge function returned
     console.log('🔐 [TrainingBaselines] Edge function response for user_id:', session.user.id);
-    console.log('🔐 [TrainingBaselines] Full tokenData object keys:', Object.keys(tokenData));
-    console.log('🔐 [TrainingBaselines] Token from edge function - access_token starts with:', tokenData.access_token?.substring(0, 30), 'refresh_token starts with:', tokenData.refresh_token?.substring(0, 30));
-    console.log('🔐 [TrainingBaselines] Token lengths - access_token:', tokenData.access_token?.length, 'refresh_token:', tokenData.refresh_token?.length);
-    console.log('🔐 [TrainingBaselines] OAuth code used:', code.substring(0, 20) + '...', 'codeVerifier used:', codeVerifier.substring(0, 20) + '...');
-
-    // CRITICAL: Persist Garmin OAuth tokens to user_connections so server can fetch single-activity TE
-    try {
-      console.log('🔐 [TrainingBaselines] Saving tokens for user_id:', session.user.id);
-      
-      // Check if connection already exists for this user
-      const { data: existing, error: selectError } = await supabase
-        .from('user_connections')
-        .select('id, user_id, access_token')
-        .eq('user_id', session.user.id)
-        .eq('provider', 'garmin')
-        .maybeSingle();
-
-      if (selectError) {
-        console.error('❌ [TrainingBaselines] Error checking existing connection:', selectError);
-      }
-      console.log('🔐 [TrainingBaselines] Existing connection:', existing ? `Found id=${existing.id}, existing token starts with: ${existing.access_token?.substring(0, 30)}` : 'Not found');
-
-      const connectionData = {
-        user_id: session.user.id,
-        provider: 'garmin',
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        expires_at: tokenData.expires_at || new Date(Date.now() + (Number(tokenData.expires_in || 0) * 1000)).toISOString(),
-        connection_data: {
-          ...(typeof tokenData.scope === 'string' ? { scope: tokenData.scope } : {}),
-          token_type: tokenData.token_type || 'bearer'
-        }
-      };
-
-      if (existing) {
-        // Update existing connection
-        console.log('🔐 [TrainingBaselines] Updating existing connection id=', existing.id, 'for user_id=', session.user.id);
-        console.log('🔐 [TrainingBaselines] About to save - new token starts with:', connectionData.access_token?.substring(0, 30));
-        const { error: updateError } = await supabase
-          .from('user_connections')
-          .update(connectionData)
-          .eq('id', existing.id)
-          .eq('user_id', session.user.id);
-        
-        if (updateError) {
-          console.error('❌ [TrainingBaselines] Update error:', updateError);
-          throw updateError;
-        }
-        console.log('✅ [TrainingBaselines] Successfully updated connection');
-        
-        // Verify what actually got saved
-        const { data: verify } = await supabase
-          .from('user_connections')
-          .select('id, user_id, access_token, refresh_token')
-          .eq('id', existing.id)
-          .maybeSingle();
-        console.log('🔍 [TrainingBaselines] VERIFICATION - Saved access_token starts with:', verify?.access_token?.substring(0, 30), 'refresh_token starts with:', verify?.refresh_token?.substring(0, 30), 'for user_id:', verify?.user_id);
-      } else {
-        // Insert new connection
-        console.log('🔐 [TrainingBaselines] Inserting new connection for user_id=', session.user.id);
-        console.log('🔐 [TrainingBaselines] About to insert - token starts with:', connectionData.access_token?.substring(0, 30));
-        const { error: insertError, data: insertedData } = await supabase
-          .from('user_connections')
-          .insert(connectionData)
-          .select('id, user_id, access_token, refresh_token');
-        
-        if (insertError) {
-          console.error('❌ [TrainingBaselines] Insert error:', insertError);
-          throw insertError;
-        }
-        console.log('✅ [TrainingBaselines] Successfully inserted new connection');
-        if (insertedData && insertedData[0]) {
-          console.log('🔍 [TrainingBaselines] VERIFICATION - Inserted access_token starts with:', insertedData[0].access_token?.substring(0, 30), 'refresh_token starts with:', insertedData[0].refresh_token?.substring(0, 30), 'for user_id:', insertedData[0].user_id);
-        }
-      }
-
-      // Try to enrich with Garmin user_id (non-fatal)
-      try {
-        const path = '/wellness-api/rest/user/id';
-        const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${tokenData.access_token}`;
-        const respUser = await fetch(url, { headers: { 'Authorization': `Bearer ${session.access_token}` } });
-        if (respUser.ok) {
-          const body = await respUser.json();
-          const garminUserId = body?.userId;
-          if (garminUserId) {
-            await supabase
-              .from('user_connections')
-              .update({ connection_data: { scope: tokenData.scope, token_type: tokenData.token_type || 'bearer', user_id: garminUserId, access_token: tokenData.access_token } })
-              .eq('provider', 'garmin')
-              .eq('user_id', session.user.id);
-          }
-        }
-      } catch (enrichError) {
-        console.warn('⚠️ [TrainingBaselines] Failed to enrich with Garmin user_id (non-fatal):', enrichError);
-      }
-    } catch (saveError) {
-      console.error('❌ [TrainingBaselines] CRITICAL: Failed to save Garmin tokens:', saveError);
-      throw saveError; // Re-throw so user knows something went wrong
-    }
+    console.log('🔐 [TrainingBaselines] Token from edge function - access_token starts with:', tokenData.access_token?.substring(0, 30));
+    
+    // Edge function already saved tokens to database with correct user_id
+    // No need to save again - that would cause race conditions and potential overwrites
 
     // CRITICAL: Set both state and localStorage with the new token
     setGarminAccessToken(tokenData.access_token);

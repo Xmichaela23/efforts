@@ -593,123 +593,12 @@ const Connections: React.FC = () => {
 
       const tokenData = await tokenResponse.json();
       
-      // Log what the edge function returned - CRITICAL DEBUG INFO
-      console.log('🔐 [Garmin Connect] Edge function response for user_id:', session.user.id);
-      console.log('🔐 [Garmin Connect] Full tokenData object keys:', Object.keys(tokenData));
-      console.log('🔐 [Garmin Connect] Token from edge function - access_token starts with:', tokenData.access_token?.substring(0, 30), 'refresh_token starts with:', tokenData.refresh_token?.substring(0, 30));
-      console.log('🔐 [Garmin Connect] Token lengths - access_token:', tokenData.access_token?.length, 'refresh_token:', tokenData.refresh_token?.length);
-      console.log('🔐 [Garmin Connect] OAuth code used:', code.substring(0, 20) + '...', 'codeVerifier used:', codeVerifier.substring(0, 20) + '...');
+      // Log what the edge function returned
+      console.log('🔐 [Connections] Edge function response for user_id:', session.user.id);
+      console.log('🔐 [Connections] Token from edge function - access_token starts with:', tokenData.access_token?.substring(0, 30));
       
-      // Persist Garmin OAuth tokens to user_connections
-      try {
-        console.log('🔐 [Garmin Connect] Saving tokens for user_id:', session.user.id);
-        
-        // Check if connection already exists for this user
-        const { data: existing, error: selectError } = await supabase
-          .from('user_connections')
-          .select('id, user_id, access_token')
-          .eq('user_id', session.user.id)
-          .eq('provider', 'garmin')
-          .maybeSingle();
-
-        if (selectError) {
-          console.error('❌ [Garmin Connect] Error checking existing connection:', selectError);
-        }
-        console.log('🔐 [Garmin Connect] Existing connection:', existing ? `Found id=${existing.id}, existing token starts with: ${existing.access_token?.substring(0, 30)}` : 'Not found');
-
-        const connectionData = {
-          user_id: session.user.id,
-          provider: 'garmin',
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
-          expires_at: tokenData.expires_at || new Date(Date.now() + (Number(tokenData.expires_in || 0) * 1000)).toISOString(),
-          connection_data: {
-            ...(typeof tokenData.scope === 'string' ? { scope: tokenData.scope } : {}),
-            token_type: tokenData.token_type || 'bearer'
-          }
-        };
-
-        if (existing) {
-          // Update existing connection
-          console.log('🔐 [Garmin Connect] Updating existing connection id=', existing.id, 'for user_id=', session.user.id);
-          console.log('🔐 [Garmin Connect] About to save - new token starts with:', connectionData.access_token?.substring(0, 30));
-          const { error: updateError } = await supabase
-            .from('user_connections')
-            .update(connectionData)
-            .eq('id', existing.id)
-            .eq('user_id', session.user.id);
-          
-          if (updateError) {
-            console.error('❌ [Garmin Connect] Update error:', updateError);
-            throw updateError;
-          }
-          console.log('✅ [Garmin Connect] Successfully updated connection');
-          
-          // Verify what actually got saved
-          const { data: verify } = await supabase
-            .from('user_connections')
-            .select('id, user_id, access_token, refresh_token')
-            .eq('id', existing.id)
-            .maybeSingle();
-          console.log('🔍 [Garmin Connect] VERIFICATION - Saved access_token starts with:', verify?.access_token?.substring(0, 30), 'refresh_token starts with:', verify?.refresh_token?.substring(0, 30), 'for user_id:', verify?.user_id);
-        } else {
-          // Insert new connection
-          console.log('🔐 [Garmin Connect] Inserting new connection for user_id=', session.user.id);
-          console.log('🔐 [Garmin Connect] About to insert - token starts with:', connectionData.access_token?.substring(0, 30));
-          const { error: insertError, data: insertedData } = await supabase
-            .from('user_connections')
-            .insert(connectionData)
-            .select('id, user_id, access_token, refresh_token');
-          
-          if (insertError) {
-            console.error('❌ [Garmin Connect] Insert error:', insertError);
-            throw insertError;
-          }
-          console.log('✅ [Garmin Connect] Successfully inserted new connection');
-          if (insertedData && insertedData[0]) {
-            console.log('🔍 [Garmin Connect] VERIFICATION - Inserted access_token starts with:', insertedData[0].access_token?.substring(0, 30), 'refresh_token starts with:', insertedData[0].refresh_token?.substring(0, 30), 'for user_id:', insertedData[0].user_id);
-          }
-        }
-
-        // Try to enrich with Garmin user_id (non-fatal)
-        try {
-          const path = '/wellness-api/rest/user/id';
-          const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${tokenData.access_token}`;
-          const respUser = await fetch(url, { headers: { 'Authorization': `Bearer ${session.access_token}` } });
-          if (respUser.ok) {
-            const body = await respUser.json();
-            const garminUserId = body?.userId;
-            if (garminUserId) {
-              console.log('🔐 [Garmin Connect] Enriching with Garmin user_id:', garminUserId, 'for app user_id:', session.user.id);
-              const { error: enrichError } = await supabase
-                .from('user_connections')
-                .update({ connection_data: { scope: tokenData.scope, token_type: tokenData.token_type || 'bearer', user_id: garminUserId, access_token: tokenData.access_token } })
-                .eq('provider', 'garmin')
-                .eq('user_id', session.user.id);
-              if (enrichError) {
-                console.error('❌ [Garmin Connect] Enrich error:', enrichError);
-              } else {
-                console.log('✅ [Garmin Connect] Successfully enriched connection with Garmin user_id');
-                // Verify enrichment didn't overwrite anything
-                const { data: verifyAfterEnrich } = await supabase
-                  .from('user_connections')
-                  .select('id, user_id, access_token, refresh_token, connection_data')
-                  .eq('user_id', session.user.id)
-                  .eq('provider', 'garmin')
-                  .maybeSingle();
-                console.log('🔍 [Garmin Connect] After enrichment - access_token starts with:', verifyAfterEnrich?.access_token?.substring(0, 30), 'garmin_user_id in connection_data:', verifyAfterEnrich?.connection_data?.user_id);
-              }
-            }
-          } else {
-            console.warn('⚠️ [Garmin Connect] Failed to fetch Garmin user_id:', respUser.status, await respUser.text());
-          }
-        } catch (enrichError) {
-          console.error('❌ [Garmin Connect] Error during Garmin user_id enrichment:', enrichError);
-        }
-      } catch (saveError) {
-        console.error('❌ [Garmin Connect] CRITICAL: Failed to save Garmin tokens:', saveError);
-        throw saveError; // Re-throw so user knows something went wrong
-      }
+      // Edge function already saved tokens to database with correct user_id
+      // No need to save again - that would cause race conditions and potential overwrites
 
       // Set both state and localStorage with the new token
       setGarminAccessToken(tokenData.access_token);
