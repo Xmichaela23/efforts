@@ -207,7 +207,19 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
 
   const saveConnectionData = async (tokenData: any) => {
     try {
+      // Get user session to ensure we save with correct user_id
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseClient = createClient(
+        'https://yyriamwvtvzlkumqrvpm.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+      );
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session?.user?.id) {
+        throw new Error('User must be authenticated to save connection');
+      }
+
       const connectionData = {
+        user_id: session.user.id,
         provider: 'garmin',
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
@@ -219,9 +231,11 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
         }
       };
       
-      await supabase
+      await supabaseClient
         .from('user_connections')
-        .upsert(connectionData);
+        .upsert(connectionData, {
+          onConflict: 'user_id,provider'
+        });
         
     } catch (error) {
       console.error('Error saving connection:', error);

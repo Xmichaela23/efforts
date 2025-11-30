@@ -338,6 +338,8 @@ const handleGarminOAuthSuccess = async (code: string) => {
             ...(typeof tokenData.scope === 'string' ? { scope: tokenData.scope } : {}),
             token_type: tokenData.token_type || 'bearer'
           }
+        }, {
+          onConflict: 'user_id,provider'
         });
 
       // Try to enrich with Garmin user_id (non-fatal)
