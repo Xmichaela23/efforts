@@ -829,6 +829,33 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                               if (/drill|technique|swim_drills_|swim_technique_/.test(desc)) return 'Swim — Drills';
                               return 'Swim';
                             }
+                            if (type === 'pilates_yoga') {
+                              // Check workout_metadata for session_type (for completed) or description/name for planned
+                              const metadata = (workout as any)?.workout_metadata || {};
+                              const sessionType = metadata.session_type;
+                              if (sessionType) {
+                                const sessionTypeLabels: { [key: string]: string } = {
+                                  'pilates_mat': 'Pilates Mat',
+                                  'pilates_reformer': 'Pilates Reformer',
+                                  'yoga_flow': 'Yoga Flow',
+                                  'yoga_restorative': 'Yoga Restorative',
+                                  'yoga_power': 'Yoga Power',
+                                  'other': 'Pilates/Yoga'
+                                };
+                                return sessionTypeLabels[sessionType] || 'Pilates/Yoga';
+                              }
+                              // For planned workouts, try to infer from name/description
+                              const nameLower = String(workout.name || '').toLowerCase();
+                              const descLower = String(workout.description || '').toLowerCase();
+                              if (/pilates.*mat/i.test(nameLower + descLower)) return 'Pilates Mat';
+                              if (/pilates.*reformer/i.test(nameLower + descLower)) return 'Pilates Reformer';
+                              if (/yoga.*flow|vinyasa/i.test(nameLower + descLower)) return 'Yoga Flow';
+                              if (/yoga.*restorative|yin/i.test(nameLower + descLower)) return 'Yoga Restorative';
+                              if (/yoga.*power|ashtanga/i.test(nameLower + descLower)) return 'Yoga Power';
+                              if (/pilates/i.test(nameLower + descLower)) return 'Pilates';
+                              if (/yoga/i.test(nameLower + descLower)) return 'Yoga';
+                              return 'Pilates/Yoga';
+                            }
                             return workout.name || getDisplaySport(workout);
                           })()}
                           {workout.workout_status === 'planned' && (

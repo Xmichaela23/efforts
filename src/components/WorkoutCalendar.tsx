@@ -150,6 +150,37 @@ function derivePlannedCellLabel(w: any): string | null {
       return `MBL`.trim();
     }
 
+    // PILATES/YOGA - Show specific type based on session_type
+    if (type === 'pilates_yoga') {
+      const metadata = (w as any)?.workout_metadata || {};
+      const sessionType = metadata.session_type;
+      if (sessionType) {
+        if (sessionType.startsWith('pilates_')) {
+          if (sessionType === 'pilates_reformer') return `PLT-REF ${durStr}`.trim();
+          if (sessionType === 'pilates_mat') return `PLT-MAT ${durStr}`.trim();
+          return `PLT ${durStr}`.trim();
+        }
+        if (sessionType.startsWith('yoga_')) {
+          if (sessionType === 'yoga_power') return `YGO-PWR ${durStr}`.trim();
+          if (sessionType === 'yoga_flow') return `YGO-FLW ${durStr}`.trim();
+          if (sessionType === 'yoga_restorative') return `YGO-RST ${durStr}`.trim();
+          return `YGO ${durStr}`.trim();
+        }
+      }
+      // Fallback: try to infer from name/description
+      const nameLower = String(w.name || '').toLowerCase();
+      const descLower = String(w.description || '').toLowerCase();
+      const combined = nameLower + ' ' + descLower;
+      if (/pilates.*reformer/i.test(combined)) return `PLT-REF ${durStr}`.trim();
+      if (/pilates.*mat/i.test(combined)) return `PLT-MAT ${durStr}`.trim();
+      if (/pilates/i.test(combined)) return `PLT ${durStr}`.trim();
+      if (/yoga.*power|ashtanga/i.test(combined)) return `YGO-PWR ${durStr}`.trim();
+      if (/yoga.*flow|vinyasa/i.test(combined)) return `YGO-FLW ${durStr}`.trim();
+      if (/yoga.*restorative|yin/i.test(combined)) return `YGO-RST ${durStr}`.trim();
+      if (/yoga/i.test(combined)) return `YGO ${durStr}`.trim();
+      return `PY ${durStr}`.trim(); // Generic fallback
+    }
+
     // STRENGTH (apply mixed rule priority: Compounds > Accessory > Core)
     if (type === 'strength') {
       // Prefer minutes from steps token strength_main_XXmin over row.duration (which may reflect multi-session day totals)
@@ -219,6 +250,8 @@ export default function WorkoutCalendar({
     friendly_summary: (it as any)?.planned?.friendly_summary ?? null,
     rendered_description: (it as any)?.planned?.rendered_description ?? null,
     training_plan_id: (it as any)?.planned?.training_plan_id ?? null,
+    name: (it as any)?.planned?.name || (it as any)?.name || null,
+    workout_metadata: (it as any)?.planned?.workout_metadata || null,
   }));
   const unifiedWorkouts = unifiedItems.map((it:any)=> ({
     id: it.id,
@@ -375,7 +408,7 @@ export default function WorkoutCalendar({
         const miles = normalizeDistanceMiles(w);
         const milesText = miles != null ? formatMilesShort(miles, 1) : '';
         const plannedLabel = derivePlannedCellLabel(w);
-        const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '');
+        const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '', w);
         const isCompleted = String(w?.workout_status||'').toLowerCase()==='completed';
         const isPlannedLinked = isCompleted && !!(w as any)?.planned_id;
         

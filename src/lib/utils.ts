@@ -73,14 +73,31 @@ export function formatMilesShort(miles: number | null, digits: number = 1): stri
   return `${rounded.toFixed(digits)}m`;
 }
 
-export function typeAbbrev(typeLike: string | undefined): string {
+export function typeAbbrev(typeLike: string | undefined, workout?: any): string {
   const t = (typeLike || '').toLowerCase();
   if (t.includes('run')) return 'RN';
   if (t.includes('ride') || t.includes('bike') || t === 'cycling') return 'BK';
   if (t.includes('swim')) return 'SW';
   if (t.includes('strength')) return 'ST';
   if (t.includes('mobility')) return 'MBL';
-  if (t.includes('pilates') || t.includes('yoga') || t === 'pilates_yoga') return 'PY';
+  if (t.includes('pilates') || t.includes('yoga') || t === 'pilates_yoga') {
+    // For pilates_yoga, check session_type to return PLT or YGO
+    if (workout) {
+      const metadata = workout.workout_metadata || {};
+      const sessionType = metadata.session_type;
+      if (sessionType) {
+        if (sessionType.startsWith('pilates_')) return 'PLT';
+        if (sessionType.startsWith('yoga_')) return 'YGO';
+      }
+      // Fallback: infer from name/description
+      const nameLower = String(workout.name || '').toLowerCase();
+      const descLower = String(workout.description || '').toLowerCase();
+      const combined = nameLower + ' ' + descLower;
+      if (/pilates/i.test(combined)) return 'PLT';
+      if (/yoga/i.test(combined)) return 'YGO';
+    }
+    return 'PY'; // Generic fallback
+  }
   if (t.includes('walk')) return 'WK';
   return 'WO';
 }
