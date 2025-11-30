@@ -50,6 +50,52 @@ function getTitle(workout: any): string {
   }
   if (t === 'strength') return nm || 'Strength';
   if (t === 'mobility') return nm || 'Mobility';
+  if (t === 'pilates_yoga') {
+    // Check workout_metadata for session_type (for completed) or description/name for planned
+    const metadata = (workout as any)?.workout_metadata || {};
+    const sessionType = metadata.session_type;
+    if (sessionType) {
+      const sessionTypeLabels: { [key: string]: string } = {
+        'pilates_mat': 'Pilates Mat',
+        'pilates_reformer': 'Pilates Reformer',
+        'yoga_flow': 'Yoga Flow',
+        'yoga_restorative': 'Yoga Restorative',
+        'yoga_power': 'Yoga Power',
+        'other': 'Pilates/Yoga'
+      };
+      return sessionTypeLabels[sessionType] || 'Pilates/Yoga';
+    }
+    // For planned workouts, try to infer from name/description with better patterns
+    const nameLower = String(nm || '').toLowerCase();
+    const descLower = String(desc || '').toLowerCase();
+    const combined = (nameLower + ' ' + descLower).toLowerCase();
+    
+    // Check for specific yoga types first (more specific)
+    if (/yoga.*power|ashtanga|power.*yoga/i.test(combined)) return 'Yoga Power';
+    if (/yoga.*flow|vinyasa|flow.*yoga/i.test(combined)) return 'Yoga Flow';
+    if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) return 'Yoga Restorative';
+    if (/yoga/i.test(combined)) return 'Yoga';
+    
+    // Check for specific pilates types
+    if (/reformer/i.test(combined) && !/mat/i.test(combined)) return 'Pilates Reformer';
+    if (/mat/i.test(combined) && !/reformer/i.test(combined)) return 'Pilates Mat';
+    // If both mentioned, prefer reformer (more specific equipment)
+    if (/reformer/i.test(combined)) return 'Pilates Reformer';
+    if (/mat/i.test(combined)) return 'Pilates Mat';
+    
+    // Generic pilates
+    if (/pilates/i.test(combined)) return 'Pilates';
+    
+    // Last resort: check if name is just "Session" and use description
+    if (nameLower === 'session' || nameLower === 'pilates session' || nameLower === 'yoga session') {
+      if (/reformer/i.test(descLower)) return 'Pilates Reformer';
+      if (/mat/i.test(descLower)) return 'Pilates Mat';
+      if (/yoga/i.test(descLower)) return 'Yoga';
+      if (/pilates/i.test(descLower)) return 'Pilates';
+    }
+    
+    return nm || 'Pilates/Yoga';
+  }
   return nm || 'Session';
 }
 

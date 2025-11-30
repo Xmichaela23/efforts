@@ -844,16 +844,35 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                                 };
                                 return sessionTypeLabels[sessionType] || 'Pilates/Yoga';
                               }
-                              // For planned workouts, try to infer from name/description
+                              // For planned workouts, try to infer from name/description with better patterns
                               const nameLower = String(workout.name || '').toLowerCase();
                               const descLower = String(workout.description || '').toLowerCase();
-                              if (/pilates.*mat/i.test(nameLower + descLower)) return 'Pilates Mat';
-                              if (/pilates.*reformer/i.test(nameLower + descLower)) return 'Pilates Reformer';
-                              if (/yoga.*flow|vinyasa/i.test(nameLower + descLower)) return 'Yoga Flow';
-                              if (/yoga.*restorative|yin/i.test(nameLower + descLower)) return 'Yoga Restorative';
-                              if (/yoga.*power|ashtanga/i.test(nameLower + descLower)) return 'Yoga Power';
-                              if (/pilates/i.test(nameLower + descLower)) return 'Pilates';
-                              if (/yoga/i.test(nameLower + descLower)) return 'Yoga';
+                              const combined = (nameLower + ' ' + descLower).toLowerCase();
+                              
+                              // Check for specific yoga types first (more specific)
+                              if (/yoga.*power|ashtanga|power.*yoga/i.test(combined)) return 'Yoga Power';
+                              if (/yoga.*flow|vinyasa|flow.*yoga/i.test(combined)) return 'Yoga Flow';
+                              if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) return 'Yoga Restorative';
+                              if (/yoga/i.test(combined)) return 'Yoga';
+                              
+                              // Check for specific pilates types
+                              if (/reformer/i.test(combined) && !/mat/i.test(combined)) return 'Pilates Reformer';
+                              if (/mat/i.test(combined) && !/reformer/i.test(combined)) return 'Pilates Mat';
+                              // If both mentioned, prefer reformer (more specific equipment)
+                              if (/reformer/i.test(combined)) return 'Pilates Reformer';
+                              if (/mat/i.test(combined)) return 'Pilates Mat';
+                              
+                              // Generic pilates
+                              if (/pilates/i.test(combined)) return 'Pilates';
+                              
+                              // Last resort: check if name is just "Session" and use description
+                              if (nameLower === 'session' || nameLower === 'pilates session' || nameLower === 'yoga session') {
+                                if (/reformer/i.test(descLower)) return 'Pilates Reformer';
+                                if (/mat/i.test(descLower)) return 'Pilates Mat';
+                                if (/yoga/i.test(descLower)) return 'Yoga';
+                                if (/pilates/i.test(descLower)) return 'Pilates';
+                              }
+                              
                               return 'Pilates/Yoga';
                             }
                             return workout.name || getDisplaySport(workout);

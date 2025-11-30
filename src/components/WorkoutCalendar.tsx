@@ -167,17 +167,35 @@ function derivePlannedCellLabel(w: any): string | null {
           return `YGO ${durStr}`.trim();
         }
       }
-      // Fallback: try to infer from name/description
+      // Fallback: try to infer from name/description with better patterns
       const nameLower = String(w.name || '').toLowerCase();
       const descLower = String(w.description || '').toLowerCase();
-      const combined = nameLower + ' ' + descLower;
-      if (/pilates.*reformer/i.test(combined)) return `PLT-REF ${durStr}`.trim();
-      if (/pilates.*mat/i.test(combined)) return `PLT-MAT ${durStr}`.trim();
-      if (/pilates/i.test(combined)) return `PLT ${durStr}`.trim();
-      if (/yoga.*power|ashtanga/i.test(combined)) return `YGO-PWR ${durStr}`.trim();
-      if (/yoga.*flow|vinyasa/i.test(combined)) return `YGO-FLW ${durStr}`.trim();
-      if (/yoga.*restorative|yin/i.test(combined)) return `YGO-RST ${durStr}`.trim();
+      const combined = (nameLower + ' ' + descLower).toLowerCase();
+      
+      // Check for specific yoga types first (more specific)
+      if (/yoga.*power|ashtanga|power.*yoga/i.test(combined)) return `YGO-PWR ${durStr}`.trim();
+      if (/yoga.*flow|vinyasa|flow.*yoga/i.test(combined)) return `YGO-FLW ${durStr}`.trim();
+      if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) return `YGO-RST ${durStr}`.trim();
       if (/yoga/i.test(combined)) return `YGO ${durStr}`.trim();
+      
+      // Check for specific pilates types
+      if (/reformer/i.test(combined) && !/mat/i.test(combined)) return `PLT-REF ${durStr}`.trim();
+      if (/mat/i.test(combined) && !/reformer/i.test(combined)) return `PLT-MAT ${durStr}`.trim();
+      // If both mentioned, prefer reformer (more specific equipment)
+      if (/reformer/i.test(combined)) return `PLT-REF ${durStr}`.trim();
+      if (/mat/i.test(combined)) return `PLT-MAT ${durStr}`.trim();
+      
+      // Generic pilates
+      if (/pilates/i.test(combined)) return `PLT ${durStr}`.trim();
+      
+      // Last resort: check if name is just "Session" and use description
+      if (nameLower === 'session' || nameLower === 'pilates session' || nameLower === 'yoga session') {
+        if (/reformer/i.test(descLower)) return `PLT-REF ${durStr}`.trim();
+        if (/mat/i.test(descLower)) return `PLT-MAT ${durStr}`.trim();
+        if (/yoga/i.test(descLower)) return `YGO ${durStr}`.trim();
+        if (/pilates/i.test(descLower)) return `PLT ${durStr}`.trim();
+      }
+      
       return `PY ${durStr}`.trim(); // Generic fallback
     }
 
