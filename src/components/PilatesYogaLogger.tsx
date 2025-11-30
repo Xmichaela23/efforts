@@ -1,19 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  X, 
-  Clock, 
-  Activity,
-  ChevronDown,
-  ChevronUp
-} from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { createWorkoutMetadata, PilatesYogaSessionType, FocusArea } from '@/utils/workoutMetadata';
@@ -259,11 +249,10 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
 
   if (!isInitialized) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2">Loading pilates/yoga logger...</span>
+      <div className="min-h-screen pb-24">
+        <div className="bg-white pb-2 mb-2">
+          <div className="flex items-center w-full">
+            <h1 className="text-xl font-medium text-gray-700">Loading...</h1>
           </div>
         </div>
       </div>
@@ -272,111 +261,101 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b">
-            <div className="flex items-center space-x-2">
-              <Activity className="h-6 w-6 text-purple-600" />
-              <h2 className="text-xl font-semibold">Pilates/Yoga Session</h2>
-            </div>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+      <div className="min-h-screen pb-24">
+        {/* Header */}
+        <div className="bg-white pb-2 mb-2">
+          <div className="flex items-center justify-between w-full px-3">
+            <h1 className="text-xl font-medium text-gray-700">
+              {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Pilates/Yoga'}
+            </h1>
           </div>
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Duration */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Duration</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    type="number"
-                    min="1"
-                    value={duration}
-                    onChange={(e) => setDuration(Number(e.target.value))}
-                    className="w-32"
-                  />
-                  <Label>minutes</Label>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Session Type */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Session Type</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Select value={sessionType} onValueChange={(value: PilatesYogaSessionType) => setSessionType(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SESSION_TYPES.map(type => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-
-            {/* Focus Areas (Optional) */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Focus Areas (Optional)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-3">
-                  {FOCUS_AREAS.map(area => (
-                    <div key={area.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`focus-${area.value}`}
-                        checked={focusAreas.includes(area.value)}
-                        onCheckedChange={() => toggleFocusArea(area.value)}
-                      />
-                      <Label htmlFor={`focus-${area.value}`} className="cursor-pointer">
-                        {area.label}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Notes (Optional) */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Notes (Optional)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="How did the session feel? Any modifications or observations?"
-                  rows={4}
+        {/* Main content container */}
+        <div className="space-y-2 w-full pb-3 px-3">
+          {/* Duration */}
+          <div className="bg-white">
+            <div className="p-2">
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">Duration</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="1"
+                  value={duration}
+                  onChange={(e) => setDuration(Number(e.target.value))}
+                  className="h-9 text-center text-sm border-gray-300 flex-1"
+                  style={{ fontSize: '16px' }}
+                  placeholder="60"
                 />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Footer */}
-          <div className="p-4 border-t bg-gray-50">
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button onClick={saveWorkout} disabled={!sessionType || duration <= 0}>
-                Save Workout
-              </Button>
+                <span className="text-sm text-gray-600">minutes</span>
+              </div>
             </div>
           </div>
+
+          {/* Session Type */}
+          <div className="bg-white">
+            <div className="p-2">
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">Session Type</Label>
+              <Select value={sessionType} onValueChange={(value: PilatesYogaSessionType) => setSessionType(value)}>
+                <SelectTrigger className="h-9 text-sm border-gray-300">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
+                  {SESSION_TYPES.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Focus Areas (Optional) */}
+          <div className="bg-white">
+            <div className="p-2">
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">Focus Areas (Optional)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {FOCUS_AREAS.map(area => (
+                  <div key={area.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`focus-${area.value}`}
+                      checked={focusAreas.includes(area.value)}
+                      onCheckedChange={() => toggleFocusArea(area.value)}
+                    />
+                    <Label htmlFor={`focus-${area.value}`} className="cursor-pointer text-sm text-gray-700">
+                      {area.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Notes (Optional) */}
+          <div className="bg-white">
+            <div className="p-2">
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">Notes (Optional)</Label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="How did the session feel? Any modifications or observations?"
+                rows={4}
+                className="text-sm border-gray-300"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Fixed bottom save action (text-only per design) */}
+        <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-gray-200 z-[100]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+          <button 
+            onClick={saveWorkout}
+            disabled={!sessionType || duration <= 0}
+            className="w-full h-12 text-base font-medium text-black hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Save
+          </button>
         </div>
       </div>
 
@@ -415,20 +394,19 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
               </div>
             </div>
             
-            <div className="flex space-x-3">
-              <Button
-                variant="outline"
+            <div className="flex gap-3">
+              <button
                 onClick={handleSessionRPESkip}
-                className="flex-1"
+                className="flex-1 py-4 text-gray-600 hover:text-gray-900"
               >
                 Skip
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={handleSessionRPESubmit}
-                className="flex-1"
+                className="flex-1 py-4 text-gray-700 hover:text-gray-900 font-medium"
               >
-                Save
-              </Button>
+                Submit & Finish
+              </button>
             </div>
           </div>
         </div>
