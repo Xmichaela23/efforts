@@ -677,6 +677,25 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
+    } else if (type === 'log-pilates-yoga') {
+      // Check for today's planned pilates_yoga workout
+      (async () => {
+        try {
+          const today = selectedDate;
+          const { data } = await supabase.functions.invoke('get-week', { body: { from: today, to: today } } as any) as any;
+          const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
+          const pilatesYoga = items.find((it:any)=> String(it?.date)===today && String(it?.type||'').toLowerCase()==='pilates_yoga' && !!it?.planned);
+          if (pilatesYoga?.planned) {
+            setLoggerScheduledWorkout({ ...pilatesYoga.planned, type: 'pilates_yoga', date: today } as any);
+          } else {
+            setLoggerScheduledWorkout({ type: 'pilates_yoga', name: 'Pilates/Yoga Session', date: today } as any);
+          }
+        } catch {
+          setLoggerScheduledWorkout({ type: 'pilates_yoga', name: 'Pilates/Yoga Session', date: selectedDate } as any);
+        } finally {
+          setShowPilatesYogaLogger(true);
+        }
+      })();
     } else if (type === 'log-mobility') {
       // Route to strength template in mobility mode with today's planned mobility if present
       (async () => {
@@ -748,6 +767,25 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
+    } else if (type === 'log-pilates-yoga') {
+      // Check for today's planned pilates_yoga workout
+      (async () => {
+        try {
+          const today = selectedDate;
+          const { data } = await supabase.functions.invoke('get-week', { body: { from: today, to: today } } as any) as any;
+          const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
+          const pilatesYoga = items.find((it:any)=> String(it?.date)===today && String(it?.type||'').toLowerCase()==='pilates_yoga' && !!it?.planned);
+          if (pilatesYoga?.planned) {
+            setLoggerScheduledWorkout({ ...pilatesYoga.planned, type: 'pilates_yoga', date: today } as any);
+          } else {
+            setLoggerScheduledWorkout({ type: 'pilates_yoga', name: 'Pilates/Yoga Session', date: today } as any);
+          }
+        } catch {
+          setLoggerScheduledWorkout({ type: 'pilates_yoga', name: 'Pilates/Yoga Session', date: selectedDate } as any);
+        } finally {
+          setShowPilatesYogaLogger(true);
+        }
+      })();
     } else if (type === 'log-mobility') {
       // Mirror planned path: fetch today's planned mobility (if any) and convert → strength exercises
       (async () => {
@@ -1067,6 +1105,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 scheduledWorkout={loggerScheduledWorkout || undefined}
                 onWorkoutSaved={(workout) => {
                   setShowStrengthLogger(false);
+                  setSelectedWorkout(workout);
+                  setActiveTab('summary');
+                  setLoggerScheduledWorkout(null);
+                }}
+                targetDate={(loggerScheduledWorkout as any)?.date || selectedDate}
+              />
+            </div>
+          ) : showPilatesYogaLogger ? (
+            <div className="pt-4">
+              <PilatesYogaLogger 
+                onClose={handleBackToDashboard} 
+                scheduledWorkout={loggerScheduledWorkout || undefined}
+                onWorkoutSaved={(workout) => {
+                  setShowPilatesYogaLogger(false);
                   setSelectedWorkout(workout);
                   setActiveTab('summary');
                   setLoggerScheduledWorkout(null);
