@@ -207,6 +207,16 @@ Deno.serve(async (req) => {
         });
         console.log('[auto-attach-planned] compute-workout-summary status:', computeResponse.status);
         
+        // Ensure computed.analysis is populated (needed for max pace, etc.)
+        console.log('[auto-attach-planned] Calling compute-workout-analysis');
+        const analysisUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
+        const analysisResponse = await fetch(analysisUrl, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
+          body: JSON.stringify({ workout_id: w.id }) 
+        });
+        console.log('[auto-attach-planned] compute-workout-analysis status:', analysisResponse.status);
+        
         // Run discipline-specific analysis
         if (w.type === 'run' || w.type === 'running') {
           console.log('[auto-attach-planned] Calling analyze-running-workout');

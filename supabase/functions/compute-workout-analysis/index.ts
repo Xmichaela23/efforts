@@ -1,6 +1,7 @@
 // Supabase Edge Function: compute-workout-analysis
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 
 const ANALYSIS_VERSION = 'v0.1.8'; // elevation + NP + swim pace (no sample timeout)
 
@@ -945,6 +946,9 @@ Deno.serve(async (req) => {
     }
 
   // Build minimal provider-agnostic analysis rows (time, dist, elev, hr, cadences, power, speed)
+  // OLD - Replaced by shared library: supabase/lib/analysis/sensor-data/extractor.ts
+  // Keeping as backup for rollback if needed
+  /*
   function normalizeSamples(samplesIn: any[]): Array<{ t:number; d:number; elev?:number; hr?:number; cad_spm?:number; cad_rpm?:number; power_w?:number; v_mps?:number }> {
     const out: Array<{ t:number; d:number; elev?:number; hr?:number; cad_spm?:number; cad_rpm?:number; power_w?:number; v_mps?:number }> = [];
       for (let i=0;i<samplesIn.length;i+=1) {
@@ -983,6 +987,7 @@ Deno.serve(async (req) => {
       }
       return out;
     }
+  */
 
     // Build rows from sensor samples; fallback to GPS if needed
     let rows = normalizeSamples(sensor);
@@ -1197,8 +1202,8 @@ Deno.serve(async (req) => {
       return p > 1200 ? Math.round(p / 10) : p;
     });
   
-    // Light smoothing for elevation and pace to reduce noise/spikes
-    const elevation_sm = hasRows ? smoothEMA(elevation_m, 0.25) : [];
+  // Light smoothing for elevation and pace to reduce noise/spikes
+  const elevation_sm = hasRows ? smoothEMA(elevation_m, 0.25) : [];
   const pace_sm = hasRows ? smoothEMA(pace_s_per_km_fixed, 0.25) : [];
   const speed_sm = hasRows ? smoothEMA(speed_mps, 0.18) : [];
   const grade_sm = hasRows ? smoothEMA(grade_percent, 0.25) : [];
@@ -1225,7 +1230,23 @@ Deno.serve(async (req) => {
         splits: { km: computeSplits(1000), mi: computeSplits(1609.34) }
       },
     zones: {},
-      bests: {},
+      bests: (() => {
+        const bests: any = {};
+        // Calculate max pace (fastest = minimum seconds per km) from series speed data
+        // Use raw speed_mps array (before smoothing) to get true fastest pace
+        if (hasRows && isRun && speed_mps.length > 0) {
+          const validSpeeds = speed_mps.filter((s): s is number => 
+            s !== null && Number.isFinite(s) && s > 0.5 && s < 10 // Realistic running speeds: 0.5-10 m/s
+          );
+          if (validSpeeds.length > 0) {
+            const maxSpeedMps = Math.max(...validSpeeds); // Fastest speed
+            if (maxSpeedMps > 0) {
+              bests.max_pace_s_per_km = Math.round(1000 / maxSpeedMps); // Convert m/s to s/km
+            }
+          }
+        }
+        return bests;
+      })(),
       power: normalizedPower !== null ? {
         normalized_power: Math.round(normalizedPower),
         variability_index: variabilityIndex,
@@ -1436,11 +1457,13 @@ Deno.serve(async (req) => {
           // Non-swim (runs, rides)
           const dist = Number.isFinite(distSeries) && distSeries>0 ? Math.round(distSeries)
             : (Number((w as any)?.distance)*1000 || prevOverall?.distance_m || null);
-          // Extract duration from last sample (same as swims)
-          let dur = Number.isFinite(timeSeries) && timeSeries>0 ? Math.round(timeSeries) : null;
+          // Extract duration - PRIORITIZE moving time over elapsed time
+          // timeSeries might be elapsed time, so we need to get moving time explicitly
+          let dur = null;
           let elapsedDur = null;
 
-          if (!dur && ga) {
+          // First: try to get moving time from raw sensor data (most accurate)
+          if (ga) {
             try {
               const raw = parseJson(ga.raw_data) || {};
               const samples = Array.isArray(raw?.samples) ? raw.samples : [];
@@ -1451,23 +1474,49 @@ Deno.serve(async (req) => {
                 if (Number.isFinite(movingS) && movingS > 0) dur = Math.round(movingS);
                 if (Number.isFinite(clockS) && clockS > 0) elapsedDur = Math.round(clockS);
               }
-              // Fallback to summary (even though we know it's NULL)
-              if (!dur) {
-                const garminDur = Number(raw?.summary?.durationInSeconds ?? raw?.durationInSeconds);
-                if (Number.isFinite(garminDur) && garminDur > 0) dur = Math.round(garminDur);
-              }
             } catch {}
           }
-          // Last resort: convert moving_time from minutes to seconds
+          
+          // Second: use stored moving_time field (reliable fallback)
           if (!dur) {
             const moveMin = Number((w as any)?.moving_time);
             if (Number.isFinite(moveMin) && moveMin > 0) dur = Math.round(moveMin * 60);
           }
-          return { ...(prevOverall||{}), distance_m: dist, duration_s_moving: dur, duration_s_elapsed: elapsedDur };
+          
+          // Third: use timeSeries ONLY if we don't have moving time (might be elapsed time)
+          // This ensures pace calculations use moving time, not elapsed time
+          if (!dur && Number.isFinite(timeSeries) && timeSeries > 0) {
+            dur = Math.round(timeSeries);
+          }
+          
+          // Set elapsed time if we have timeSeries but didn't get it from raw data
+          if (!elapsedDur && Number.isFinite(timeSeries) && timeSeries > 0) {
+            elapsedDur = Math.round(timeSeries);
+          }
+          
+          // Calculate avg_pace_s_per_mi for runs/walks (needed by Summary screen)
+          let avgPaceSPerMi: number | null = null;
+          if (dist && dur && dist > 0 && dur > 0) {
+            const miles = dist / 1609.34; // meters to miles
+            if (miles > 0) {
+              avgPaceSPerMi = dur / miles; // seconds per mile
+            }
+          }
+          
+          return { 
+            ...(prevOverall||{}), 
+            distance_m: dist, 
+            duration_s_moving: dur, 
+            duration_s_elapsed: elapsedDur,
+            avg_pace_s_per_mi: avgPaceSPerMi ?? prevOverall?.avg_pace_s_per_mi ?? null
+          };
         } catch { return prevOverall || {}; }
       }
       return prevOverall || {};
     })();
+
+    // Note: avg_pace_s_per_km is calculated from overall.avg_pace_s_per_mi in useWorkoutData hook
+    // No need to duplicate - both Summary and Details use computed.overall.avg_pace_s_per_mi
 
     // Add swim pace metrics to analysis (needs overall data)
     if (sport.includes('swim')) {

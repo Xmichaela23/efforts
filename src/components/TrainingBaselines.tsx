@@ -329,6 +329,7 @@ const handleGarminOAuthSuccess = async (code: string) => {
       await supabase
         .from('user_connections')
         .upsert({
+          user_id: session.user.id,
           provider: 'garmin',
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token,
@@ -351,7 +352,8 @@ const handleGarminOAuthSuccess = async (code: string) => {
             await supabase
               .from('user_connections')
               .update({ connection_data: { scope: tokenData.scope, token_type: tokenData.token_type || 'bearer', user_id: garminUserId, access_token: tokenData.access_token } })
-              .eq('provider', 'garmin');
+              .eq('provider', 'garmin')
+              .eq('user_id', session.user.id);
           }
         }
       } catch {}

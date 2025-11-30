@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { extractSensorData } from '../../lib/analysis/sensor-data/extractor.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -523,8 +524,7 @@ Deno.serve(async (req) => {
         total_timer_time,
         distance,
         weather_data,
-        avg_temperature,
-        total_elevation_gain
+        avg_temperature
       `)
       .eq('id', workout_id)
       .single();
@@ -1118,24 +1118,25 @@ Deno.serve(async (req) => {
       // Granular analysis uses time-in-range calculation (sample-by-sample), which is more accurate
       
       // Pace adherence: Use granular time-in-range score (converted to percentage)
+      // We have all the data - use granular analysis directly, no fallbacks
       const granularPaceAdherence = enhancedAnalysis.overall_adherence != null 
         ? Math.round(enhancedAnalysis.overall_adherence * 100)
-        : null;
+        : 0;
       
       // Duration adherence: Use granular duration adherence percentage
+      // We have all the data - use granular analysis directly, no fallbacks
       const granularDurationAdherence = enhancedAnalysis.duration_adherence?.adherence_percentage != null
         ? Math.round(enhancedAnalysis.duration_adherence.adherence_percentage)
-        : null;
+        : 0;
       
       console.log(`🔍 [GRANULAR CHECK] enhancedAnalysis.overall_adherence: ${enhancedAnalysis.overall_adherence}`);
       console.log(`🔍 [GRANULAR CHECK] enhancedAnalysis.duration_adherence:`, enhancedAnalysis.duration_adherence);
       console.log(`🔍 [GRANULAR CHECK] granularPaceAdherence calculated: ${granularPaceAdherence}`);
       console.log(`🔍 [GRANULAR CHECK] granularDurationAdherence calculated: ${granularDurationAdherence}`);
       
-      // Fallback to execution analysis if granular analysis is missing or 0
-      // But if granular is 0, that's a valid score (means no samples in range), so use it
-      performance.pace_adherence = granularPaceAdherence !== null ? granularPaceAdherence : executionAnalysis.pace_execution;
-      performance.duration_adherence = granularDurationAdherence !== null ? granularDurationAdherence : executionAnalysis.duration_adherence;
+      // Use granular values directly - we have all the data
+      performance.pace_adherence = granularPaceAdherence;
+      performance.duration_adherence = granularDurationAdherence;
       
       // Execution adherence = combination of pace + duration (equal weight: 50% pace, 50% duration)
       // Will be recalculated after plannedPaceInfo is extracted to include average pace adherence
@@ -1510,7 +1511,13 @@ interface SampleTiming {
 /**
  * Extract sensor data from sensor_data column
  * This reads the raw sensor data from the workouts table
+ * 
+ * OLD - Replaced by shared library: supabase/lib/analysis/sensor-data/extractor.ts
+ * Keeping as backup for rollback if needed
  */
+// OLD - Replaced by shared library: supabase/lib/analysis/sensor-data/extractor.ts
+// Keeping as backup for rollback if needed
+/*
 function extractSensorData(data: any): any[] {
   console.log('🔍 Data type:', typeof data);
   console.log('🔍 Data is array:', Array.isArray(data));
@@ -1716,6 +1723,7 @@ function extractSensorData(data: any): any[] {
   
   return samplesWithQuality;
 }
+*/
 
 /**
  * Calculate duration adherence using computed data (workout-level metric)
@@ -2330,6 +2338,26 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
     const stdDev = allPaces.length > 1 ? calculateStandardDeviation(allPaces) : 0;
     const cv = avgPace > 0 ? stdDev / avgPace : 0;
     
+    // Calculate duration adherence even for freeform runs (we have the data)
+    const plannedDurationSeconds = plannedWorkout?.computed?.total_duration_seconds || 0;
+    const actualDurationSeconds = 
+      workout?.computed?.overall?.duration_s_moving ||
+      totalTimeSeconds ||
+      intervals.reduce((sum, i) => sum + (i.executed?.duration_s || 0), 0);
+    
+    let durationAdherencePct = 0;
+    if (plannedDurationSeconds > 0 && actualDurationSeconds > 0) {
+      const ratio = actualDurationSeconds / plannedDurationSeconds;
+      if (ratio >= 0.9 && ratio <= 1.1) {
+        durationAdherencePct = 100 - Math.abs(ratio - 1) * 100;
+      } else if (ratio < 0.9) {
+        durationAdherencePct = ratio * 100;
+      } else {
+        durationAdherencePct = (plannedDurationSeconds / actualDurationSeconds) * 100;
+      }
+      durationAdherencePct = Math.max(0, Math.min(100, durationAdherencePct));
+    }
+    
     console.log('📊 Freeform run analysis:', {
       totalTimeSeconds,
       avgPace: avgPace.toFixed(1),
@@ -2337,7 +2365,8 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
       maxHR,
       hrDrift,
       cv: (cv * 100).toFixed(1) + '%',
-      sensorSamples: sensorData.length
+      sensorSamples: sensorData.length,
+      durationAdherencePct
     });
     
     return {
@@ -2378,7 +2407,12 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
         variability_score: cv,
         avg_pace_s_per_mi: avgPace
       },
-      duration_adherence: null
+      duration_adherence: {
+        adherence_percentage: durationAdherencePct,
+        planned_duration_s: plannedDurationSeconds,
+        actual_duration_s: actualDurationSeconds,
+        delta_seconds: actualDurationSeconds - plannedDurationSeconds
+      }
     };
   }
   
@@ -2397,8 +2431,34 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
   }
   
   if (segments.length === 0) {
-    console.log('⚠️ No valid segments found');
-    return createEmptyAdherence();
+    console.log('⚠️ No valid segments found - calculating duration adherence from available data');
+    // Even with no segments, we can still calculate duration adherence if we have planned/actual data
+    const plannedDurationSeconds = plannedWorkout?.computed?.total_duration_seconds || 0;
+    const actualDurationSeconds = 
+      workout?.computed?.overall?.duration_s_moving ||
+      intervals.reduce((sum, i) => sum + (i.executed?.duration_s || 0), 0);
+    
+    let durationAdherencePct = 0;
+    if (plannedDurationSeconds > 0 && actualDurationSeconds > 0) {
+      const ratio = actualDurationSeconds / plannedDurationSeconds;
+      if (ratio >= 0.9 && ratio <= 1.1) {
+        durationAdherencePct = 100 - Math.abs(ratio - 1) * 100;
+      } else if (ratio < 0.9) {
+        durationAdherencePct = ratio * 100;
+      } else {
+        durationAdherencePct = (plannedDurationSeconds / actualDurationSeconds) * 100;
+      }
+      durationAdherencePct = Math.max(0, Math.min(100, durationAdherencePct));
+    }
+    
+    const empty = createEmptyAdherence();
+    empty.duration_adherence = {
+      adherence_percentage: durationAdherencePct,
+      planned_duration_s: plannedDurationSeconds,
+      actual_duration_s: actualDurationSeconds,
+      delta_seconds: actualDurationSeconds - plannedDurationSeconds
+    };
+    return empty;
   }
   
   // Calculate pace statistics

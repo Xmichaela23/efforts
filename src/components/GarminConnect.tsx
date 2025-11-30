@@ -182,7 +182,8 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
                 await supabaseClient
                   .from('user_connections')
                   .update({ connection_data: newConnectionData })
-                  .eq('provider', 'garmin');
+                  .eq('provider', 'garmin')
+                  .eq('user_id', session.user.id);
               }
             }
           }
