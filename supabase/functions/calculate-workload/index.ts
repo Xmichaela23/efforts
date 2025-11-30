@@ -506,7 +506,8 @@ function mapRPEToIntensity(rpe: number): number {
 
 /**
  * Calculate workload for pilates_yoga workouts
- * Formula: duration × RPE × modality_factor
+ * Formula: duration (minutes) × RPE
+ * Pure sRPE method (research-validated, no modality factors)
  */
 function calculatePilatesYogaWorkload(workout: WorkoutData, sessionRPE?: number): number {
   if (!workout.duration || workout.duration <= 0) return 0;
@@ -516,37 +517,15 @@ function calculatePilatesYogaWorkload(workout: WorkoutData, sessionRPE?: number)
   const rpe = sessionRPE || metadata.session_rpe;
   
   if (!rpe || typeof rpe !== 'number' || rpe < 1 || rpe > 10) {
-    // Default to moderate RPE if not provided
-    console.warn('No RPE provided for pilates_yoga workout, using default RPE 5');
-    return Math.round((workout.duration / 60) * 5 * 1.0 * 100);
+    // Cannot calculate workload without RPE
+    console.warn('No RPE provided for pilates_yoga workout, cannot calculate workload');
+    return 0;
   }
   
-  // Get modality factor based on session_type
-  const sessionType = metadata.session_type || 'other';
-  const modalityFactor = getPilatesYogaModalityFactor(sessionType);
-  
-  // Calculate workload: duration (hours) × RPE × modality_factor × 100
-  const durationHours = workout.duration / 60;
-  const workload = Math.round(durationHours * rpe * modalityFactor * 100);
+  // Pure sRPE method: duration (minutes) × RPE
+  const workload = Math.round(workout.duration * rpe);
   
   return workload;
-}
-
-/**
- * Get modality factor for pilates_yoga session types
- */
-function getPilatesYogaModalityFactor(sessionType: string): number {
-  const PILATES_YOGA_MODALITY_FACTORS: { [key: string]: number } = {
-    'pilates_reformer': 1.2,
-    'pilates_mat': 1.0,
-    'yoga_power': 1.2,
-    'yoga_flow': 1.0,
-    'yoga_restorative': 0.7,
-    'yoga_hot': 1.0,
-    'other': 1.0
-  };
-  
-  return PILATES_YOGA_MODALITY_FACTORS[sessionType] || 1.0;
 }
 
 /**

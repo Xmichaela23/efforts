@@ -11,8 +11,20 @@ export type PilatesYogaSessionType =
   | 'yoga_flow'
   | 'yoga_restorative'
   | 'yoga_power'
-  | 'yoga_hot'
   | 'other';
+
+export type SessionFeeling = 
+  | 'energizing'
+  | 'challenging'
+  | 'restorative'
+  | 'frustrating'
+  | 'flow_state';
+
+export type Environment = 
+  | 'studio'
+  | 'home'
+  | 'virtual'
+  | 'outdoor';
 
 export type FocusArea = 
   | 'core'
@@ -23,7 +35,7 @@ export type FocusArea =
   | 'full_body';
 
 export interface WorkoutMetadata {
-  session_rpe?: number;  // Session RPE (1-10) from "Workout Complete!" popup
+  session_rpe?: number;  // Session RPE (1-10) - REQUIRED for pilates_yoga
   notes?: string;         // User notes about the workout
   readiness?: {           // Pre-workout readiness check-in
     energy: number;       // Energy level (1-10)
@@ -31,8 +43,12 @@ export interface WorkoutMetadata {
     sleep: number;        // Sleep hours (0-12)
   };
   // Pilates/Yoga specific fields
-  session_type?: PilatesYogaSessionType;
-  focus_area?: FocusArea[];
+  session_type?: PilatesYogaSessionType;  // REQUIRED for pilates_yoga
+  session_feeling?: SessionFeeling;       // Optional
+  environment?: Environment;              // Optional
+  is_heated?: boolean;                    // Optional (for yoga sessions)
+  instructor?: string;                    // Optional
+  focus_area?: FocusArea[];              // Optional
 }
 
 /**
@@ -78,6 +94,10 @@ export function createWorkoutMetadata(params: {
   notes?: string;
   readiness?: { energy: number; soreness: number; sleep: number };
   session_type?: PilatesYogaSessionType;
+  session_feeling?: SessionFeeling;
+  environment?: Environment;
+  is_heated?: boolean;
+  instructor?: string;
   focus_area?: FocusArea[];
 }): WorkoutMetadata {
   const metadata: WorkoutMetadata = {};
@@ -96,6 +116,22 @@ export function createWorkoutMetadata(params: {
   
   if (params.session_type) {
     metadata.session_type = params.session_type;
+  }
+  
+  if (params.session_feeling) {
+    metadata.session_feeling = params.session_feeling;
+  }
+  
+  if (params.environment) {
+    metadata.environment = params.environment;
+  }
+  
+  if (params.is_heated === true) {
+    metadata.is_heated = true;
+  }
+  
+  if (params.instructor && typeof params.instructor === 'string' && params.instructor.trim().length > 0) {
+    metadata.instructor = params.instructor.trim();
   }
   
   if (Array.isArray(params.focus_area) && params.focus_area.length > 0) {

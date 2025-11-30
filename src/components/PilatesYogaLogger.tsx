@@ -4,9 +4,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
-import { createWorkoutMetadata, PilatesYogaSessionType, FocusArea } from '@/utils/workoutMetadata';
+import { createWorkoutMetadata, PilatesYogaSessionType, FocusArea, SessionFeeling, Environment } from '@/utils/workoutMetadata';
 
 interface PilatesYogaLoggerProps {
   onClose: () => void;
@@ -18,11 +19,25 @@ interface PilatesYogaLoggerProps {
 const SESSION_TYPES: { value: PilatesYogaSessionType; label: string }[] = [
   { value: 'pilates_mat', label: 'Pilates Mat' },
   { value: 'pilates_reformer', label: 'Pilates Reformer' },
-  { value: 'yoga_flow', label: 'Yoga Flow' },
-  { value: 'yoga_restorative', label: 'Yoga Restorative' },
-  { value: 'yoga_power', label: 'Yoga Power' },
-  { value: 'yoga_hot', label: 'Yoga Hot' },
+  { value: 'yoga_flow', label: 'Yoga Flow/Vinyasa' },
+  { value: 'yoga_restorative', label: 'Yoga Restorative/Yin' },
+  { value: 'yoga_power', label: 'Yoga Power/Ashtanga' },
   { value: 'other', label: 'Other' }
+];
+
+const SESSION_FEELINGS: { value: SessionFeeling; label: string }[] = [
+  { value: 'energizing', label: 'Energizing' },
+  { value: 'challenging', label: 'Challenging' },
+  { value: 'restorative', label: 'Restorative' },
+  { value: 'frustrating', label: 'Frustrating' },
+  { value: 'flow_state', label: 'Flow State' }
+];
+
+const ENVIRONMENTS: { value: Environment; label: string }[] = [
+  { value: 'studio', label: 'Studio Class' },
+  { value: 'home', label: 'Home Practice' },
+  { value: 'virtual', label: 'Virtual/Online Class' },
+  { value: 'outdoor', label: 'Outdoor' }
 ];
 
 const FOCUS_AREAS: { value: FocusArea; label: string }[] = [
@@ -39,15 +54,21 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
   const [workoutStartTime] = useState<Date>(new Date());
   const [isInitialized, setIsInitialized] = useState(false);
   
-  // Form fields
+  // Required fields
   const [duration, setDuration] = useState<number>(60);
-  const [sessionType, setSessionType] = useState<PilatesYogaSessionType>('pilates_mat');
+  const [sessionRPE, setSessionRPE] = useState<number>(5);
+  const [sessionType, setSessionType] = useState<PilatesYogaSessionType | ''>('');
+  
+  // Optional fields
+  const [sessionFeeling, setSessionFeeling] = useState<SessionFeeling | ''>('');
+  const [environment, setEnvironment] = useState<Environment | ''>('');
+  const [isHeated, setIsHeated] = useState(false);
+  const [instructor, setInstructor] = useState('');
   const [focusAreas, setFocusAreas] = useState<FocusArea[]>([]);
   const [notes, setNotes] = useState('');
   
-  // Session RPE prompt state
-  const [showSessionRPE, setShowSessionRPE] = useState(false);
-  const [sessionRPE, setSessionRPE] = useState<number>(5);
+  // UI state
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
 
   // Get date string helper
   const getDateString = () => {
@@ -88,6 +109,21 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
       if (metadata.session_type) {
         setSessionType(metadata.session_type);
       }
+      if (metadata.session_rpe) {
+        setSessionRPE(metadata.session_rpe);
+      }
+      if (metadata.session_feeling) {
+        setSessionFeeling(metadata.session_feeling);
+      }
+      if (metadata.environment) {
+        setEnvironment(metadata.environment);
+      }
+      if (metadata.is_heated) {
+        setIsHeated(metadata.is_heated);
+      }
+      if (metadata.instructor) {
+        setInstructor(metadata.instructor);
+      }
       if (metadata.focus_area && Array.isArray(metadata.focus_area)) {
         setFocusAreas(metadata.focus_area);
       }
@@ -120,34 +156,26 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
     return 'Maximal';
   };
 
-  // Session RPE handlers
-  const handleSessionRPESubmit = () => {
-    setShowSessionRPE(false);
-    finalizeSave({ rpe: sessionRPE });
-  };
+  // Check if session type is yoga (for showing heated checkbox)
+  const isYogaSession = sessionType.startsWith('yoga_');
 
-  const handleSessionRPESkip = () => {
-    setShowSessionRPE(false);
-    finalizeSave();
-  };
-
-  const saveWorkout = () => {
+  const saveWorkout = async () => {
+    // Validation
+    if (!duration || duration <= 0) {
+      alert('Duration must be greater than 0');
+      return;
+    }
+    if (!sessionRPE || sessionRPE < 1 || sessionRPE > 10) {
+      alert('RPE must be between 1 and 10');
+      return;
+    }
     if (!sessionType) {
-      alert('Please select a session type.');
+      alert('Session type is required');
       return;
     }
-    if (duration <= 0) {
-      alert('Please enter a valid duration.');
-      return;
-    }
-    // Show session RPE prompt
-    setShowSessionRPE(true);
-  };
 
-  const finalizeSave = async (extra?: { rpe?: number }) => {
     const workoutEndTime = new Date();
     const actualDuration = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
-    // Use user-entered duration if provided, otherwise use actual elapsed time
     const finalDuration = duration > 0 ? duration : actualDuration;
 
     // Determine if editing existing completed workout or creating from planned
@@ -157,11 +185,15 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
       ? String(scheduledWorkout.id) 
       : null;
     
-    // Create unified metadata (single source of truth)
+    // Build metadata object
     const workoutMetadata = createWorkoutMetadata({
-      session_rpe: typeof extra?.rpe === 'number' ? extra.rpe : undefined,
+      session_rpe: sessionRPE,
+      session_type: sessionType as PilatesYogaSessionType,
       notes: notes.trim() || undefined,
-      session_type: sessionType,
+      session_feeling: sessionFeeling || undefined,
+      environment: environment || undefined,
+      is_heated: isHeated || undefined,
+      instructor: instructor.trim() || undefined,
       focus_area: focusAreas.length > 0 ? focusAreas : undefined
     });
     
@@ -260,27 +292,31 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
   }
 
   return (
-    <>
-      <div className="min-h-screen pb-24">
-        {/* Header */}
-        <div className="bg-white pb-2 mb-2">
-          <div className="flex items-center justify-between w-full px-3">
-            <h1 className="text-xl font-medium text-gray-700">
-              {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Pilates/Yoga'}
-            </h1>
-          </div>
+    <div className="min-h-screen pb-24">
+      {/* Header */}
+      <div className="bg-white pb-2 mb-2">
+        <div className="flex items-center justify-between w-full px-3">
+          <h1 className="text-xl font-medium text-gray-700">
+            {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Pilates/Yoga'}
+          </h1>
         </div>
+      </div>
 
-        {/* Main content container */}
-        <div className="space-y-2 w-full pb-3 px-3">
-          {/* Duration */}
-          <div className="bg-white">
-            <div className="p-2">
+      {/* Main content container */}
+      <div className="space-y-2 w-full pb-3 px-3">
+        {/* REQUIRED SECTION */}
+        <div className="bg-white">
+          <div className="p-2">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Session Details</h3>
+            
+            {/* Duration */}
+            <div className="mb-3">
               <Label className="text-sm font-medium text-gray-700 mb-2 block">Duration</Label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
                   min="1"
+                  max="240"
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
                   className="h-9 text-center text-sm border-gray-300 flex-1"
@@ -290,15 +326,39 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                 <span className="text-sm text-gray-600">minutes</span>
               </div>
             </div>
-          </div>
 
-          {/* Session Type */}
-          <div className="bg-white">
-            <div className="p-2">
+            {/* RPE - CRITICAL FIELD */}
+            <div className="mb-3">
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                RPE (1-10)
+                <span className="text-xs text-gray-500 ml-1">How hard did this session feel overall?</span>
+              </Label>
+              <div className="space-y-2">
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={sessionRPE}
+                  onChange={(e) => setSessionRPE(Number(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Easy</span>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-900">{sessionRPE}</div>
+                    <div className="text-xs text-gray-500">{getRPELabel(sessionRPE)}</div>
+                  </div>
+                  <span className="text-xs text-gray-500">Maximal</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Session Type */}
+            <div className="mb-3">
               <Label className="text-sm font-medium text-gray-700 mb-2 block">Session Type</Label>
               <Select value={sessionType} onValueChange={(value: PilatesYogaSessionType) => setSessionType(value)}>
                 <SelectTrigger className="h-9 text-sm border-gray-300">
-                  <SelectValue />
+                  <SelectValue placeholder="Select..." />
                 </SelectTrigger>
                 <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
                   {SESSION_TYPES.map(type => (
@@ -310,108 +370,136 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
               </Select>
             </div>
           </div>
+        </div>
 
-          {/* Focus Areas (Optional) */}
-          <div className="bg-white">
-            <div className="p-2">
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">Focus Areas (Optional)</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {FOCUS_AREAS.map(area => (
-                  <div key={area.value} className="flex items-center space-x-2">
+        {/* OPTIONAL SECTION - Collapsible */}
+        <div className="bg-white">
+          <div className="p-2">
+            <button
+              onClick={() => setShowOptionalFields(!showOptionalFields)}
+              className="flex items-center justify-between w-full text-sm font-medium text-gray-700 hover:text-gray-900 mb-2"
+            >
+              <span>Additional Info (Optional)</span>
+              {showOptionalFields ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </button>
+            
+            {showOptionalFields && (
+              <div className="space-y-3 pt-2">
+                {/* Session Feeling */}
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Session Feeling</Label>
+                  <Select value={sessionFeeling} onValueChange={(value: SessionFeeling) => setSessionFeeling(value)}>
+                    <SelectTrigger className="h-9 text-sm border-gray-300">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
+                      <SelectItem value="">None</SelectItem>
+                      {SESSION_FEELINGS.map(feeling => (
+                        <SelectItem key={feeling.value} value={feeling.value}>
+                          {feeling.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Environment */}
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Environment</Label>
+                  <Select value={environment} onValueChange={(value: Environment) => setEnvironment(value)}>
+                    <SelectTrigger className="h-9 text-sm border-gray-300">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
+                      <SelectItem value="">None</SelectItem>
+                      {ENVIRONMENTS.map(env => (
+                        <SelectItem key={env.value} value={env.value}>
+                          {env.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Heated - Only show if yoga session */}
+                {isYogaSession && (
+                  <div className="flex items-center space-x-2">
                     <Checkbox
-                      id={`focus-${area.value}`}
-                      checked={focusAreas.includes(area.value)}
-                      onCheckedChange={() => toggleFocusArea(area.value)}
+                      id="is-heated"
+                      checked={isHeated}
+                      onCheckedChange={(checked) => setIsHeated(checked === true)}
                     />
-                    <Label htmlFor={`focus-${area.value}`} className="cursor-pointer text-sm text-gray-700">
-                      {area.label}
+                    <Label htmlFor="is-heated" className="cursor-pointer text-sm text-gray-700">
+                      Heated/Hot Room
                     </Label>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
+                )}
 
-          {/* Notes (Optional) */}
-          <div className="bg-white">
-            <div className="p-2">
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">Notes (Optional)</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="How did the session feel? Any modifications or observations?"
-                rows={4}
-                className="text-sm border-gray-300"
-              />
+                {/* Instructor/Studio */}
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Instructor/Studio</Label>
+                  <Input
+                    value={instructor}
+                    onChange={(e) => setInstructor(e.target.value)}
+                    placeholder="e.g., Sarah Johnson"
+                    className="h-9 text-sm border-gray-300"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* FOCUS AREAS - Optional */}
+        <div className="bg-white">
+          <div className="p-2">
+            <Label className="text-sm font-medium text-gray-700 mb-2 block">Focus Areas (Optional)</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {FOCUS_AREAS.map(area => (
+                <div key={area.value} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`focus-${area.value}`}
+                    checked={focusAreas.includes(area.value)}
+                    onCheckedChange={() => toggleFocusArea(area.value)}
+                  />
+                  <Label htmlFor={`focus-${area.value}`} className="cursor-pointer text-sm text-gray-700">
+                    {area.label}
+                  </Label>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Fixed bottom save action (text-only per design) */}
-        <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-gray-200 z-[100]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
-          <button 
-            onClick={saveWorkout}
-            disabled={!sessionType || duration <= 0}
-            className="w-full h-12 text-base font-medium text-black hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Save
-          </button>
+        {/* NOTES - Optional */}
+        <div className="bg-white">
+          <div className="p-2">
+            <Label className="text-sm font-medium text-gray-700 mb-2 block">Notes (Optional)</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="How did the session feel? Any modifications or observations?"
+              rows={4}
+              className="text-sm border-gray-300"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Session RPE Prompt */}
-      {showSessionRPE && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={handleSessionRPESkip} />
-          <div className="relative w-full max-w-md mx-4 bg-white rounded-lg shadow-xl p-6 z-10">
-            <h2 className="text-2xl font-bold mb-2 text-center">
-              Workout Complete!
-            </h2>
-            
-            <p className="text-gray-600 mb-8 text-center">
-              How hard was that session?
-            </p>
-            
-            {/* RPE slider */}
-            <div className="mb-6">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Easy</span>
-                <span className="text-sm text-gray-500">Maximal</span>
-              </div>
-              
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={sessionRPE}
-                onChange={(e) => setSessionRPE(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              
-              <div className="text-center mt-3">
-                <div className="text-4xl font-bold text-gray-900">{sessionRPE}</div>
-                <div className="text-sm text-gray-500 mt-1">{getRPELabel(sessionRPE)}</div>
-              </div>
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={handleSessionRPESkip}
-                className="flex-1 py-4 text-gray-600 hover:text-gray-900"
-              >
-                Skip
-              </button>
-              <button
-                onClick={handleSessionRPESubmit}
-                className="flex-1 py-4 text-gray-700 hover:text-gray-900 font-medium"
-              >
-                Submit & Finish
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+      {/* Fixed bottom save action (text-only per design) */}
+      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-gray-200 z-[100]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+        <button 
+          onClick={saveWorkout}
+          disabled={!sessionType || duration <= 0 || sessionRPE < 1 || sessionRPE > 10}
+          className="w-full h-12 text-base font-medium text-black hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Save
+        </button>
+      </div>
+    </div>
   );
 }
-

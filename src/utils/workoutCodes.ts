@@ -75,7 +75,7 @@ export const WORKOUT_CODES = {
     'yoga_flow': 'YG-FLW',
     'yoga_restorative': 'YG-RST',
     'yoga_power': 'YG-PWR',
-    'yoga_hot': 'YG-HOT',
+    'yoga_hot': 'YG-FLW', // Backward compatibility - map to Yoga Flow
     'other': 'PY-OTH'
   }
 };

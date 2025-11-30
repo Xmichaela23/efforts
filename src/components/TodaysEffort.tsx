@@ -400,7 +400,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           'yoga_flow': 'Yoga Flow',
           'yoga_restorative': 'Yoga Restorative',
           'yoga_power': 'Yoga Power',
-          'yoga_hot': 'Yoga Hot',
+          'yoga_hot': 'Yoga Flow', // Backward compatibility - map to Yoga Flow
           'other': 'Pilates/Yoga'
         };
         
