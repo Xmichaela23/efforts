@@ -227,6 +227,7 @@ Deno.serve(async (req)=>{
                 else if (raw === 'swim') normType = 'swim';
                 else if (raw === 'run') normType = 'run';
                 else if (raw === 'mobility') normType = 'mobility';
+                else if (raw === 'pilates_yoga' || raw === 'pilates' || raw === 'yoga') normType = 'pilates_yoga';
                 // Skip unknown/blank types entirely to avoid phantom RN rows
                 if (!normType) {
                   if (debug && debugNotes.length < 50) debugNotes.push({
