@@ -218,6 +218,14 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
         throw new Error('User must be authenticated to save connection');
       }
 
+      // Check if connection already exists for this user
+      const { data: existing } = await supabaseClient
+        .from('user_connections')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('provider', 'garmin')
+        .maybeSingle();
+
       const connectionData = {
         user_id: session.user.id,
         provider: 'garmin',
@@ -231,11 +239,19 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
         }
       };
       
-      await supabaseClient
-        .from('user_connections')
-        .upsert(connectionData, {
-          onConflict: 'user_id,provider'
-        });
+      if (existing) {
+        // Update existing connection
+        await supabaseClient
+          .from('user_connections')
+          .update(connectionData)
+          .eq('id', existing.id)
+          .eq('user_id', session.user.id);
+      } else {
+        // Insert new connection
+        await supabaseClient
+          .from('user_connections')
+          .insert(connectionData);
+      }
         
     } catch (error) {
       console.error('Error saving connection:', error);

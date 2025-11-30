@@ -325,22 +325,39 @@ const handleGarminOAuthSuccess = async (code: string) => {
 
     // CRITICAL: Persist Garmin OAuth tokens to user_connections so server can fetch single-activity TE
     try {
-      // Save minimal token info immediately
-      await supabase
+      // Check if connection already exists for this user
+      const { data: existing } = await supabase
         .from('user_connections')
-        .upsert({
-          user_id: session.user.id,
-          provider: 'garmin',
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
-          expires_at: tokenData.expires_at || new Date(Date.now() + (Number(tokenData.expires_in || 0) * 1000)).toISOString(),
-          connection_data: {
-            ...(typeof tokenData.scope === 'string' ? { scope: tokenData.scope } : {}),
-            token_type: tokenData.token_type || 'bearer'
-          }
-        }, {
-          onConflict: 'user_id,provider'
-        });
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('provider', 'garmin')
+        .maybeSingle();
+
+      const connectionData = {
+        user_id: session.user.id,
+        provider: 'garmin',
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_at: tokenData.expires_at || new Date(Date.now() + (Number(tokenData.expires_in || 0) * 1000)).toISOString(),
+        connection_data: {
+          ...(typeof tokenData.scope === 'string' ? { scope: tokenData.scope } : {}),
+          token_type: tokenData.token_type || 'bearer'
+        }
+      };
+
+      if (existing) {
+        // Update existing connection
+        await supabase
+          .from('user_connections')
+          .update(connectionData)
+          .eq('id', existing.id)
+          .eq('user_id', session.user.id);
+      } else {
+        // Insert new connection
+        await supabase
+          .from('user_connections')
+          .insert(connectionData);
+      }
 
       // Try to enrich with Garmin user_id (non-fatal)
       try {
