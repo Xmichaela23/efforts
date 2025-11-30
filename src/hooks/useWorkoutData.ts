@@ -47,10 +47,14 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
       : (Number.isFinite(workoutData?.avg_speed) ? Number(workoutData.avg_speed) 
       : (distance_km && duration_s && duration_s > 0 ? (distance_km / (duration_s / 3600)) : null));
     const avg_speed_mps = Number.isFinite(avg_speed_kmh) ? (avg_speed_kmh as number) / 3.6 : null;
-    // Calculate avg_pace from avg_speed if not stored
-    const avg_pace_s_per_km = Number.isFinite(workoutData?.avg_pace) ? Number(workoutData.avg_pace) 
+    // Calculate avg_pace - MUST use same source as Summary screen for consistency
+    // Summary uses computed.overall.avg_pace_s_per_mi, so Details should use the same
+    // Convert from per-mile to per-km: divide by 1.60934
+    const avg_pace_s_per_km = Number.isFinite(workoutData?.computed?.overall?.avg_pace_s_per_mi) 
+      ? Number(workoutData.computed.overall.avg_pace_s_per_mi) / 1.60934  // Convert mi to km
+      : (Number.isFinite(workoutData?.avg_pace) ? Number(workoutData.avg_pace) 
       : (Number.isFinite(workoutData?.metrics?.avg_pace) ? Number(workoutData.metrics.avg_pace) 
-      : (avg_speed_kmh && avg_speed_kmh > 0 ? (3600 / avg_speed_kmh) : null));
+      : (avg_speed_kmh && avg_speed_kmh > 0 ? (3600 / avg_speed_kmh) : null)));
     const avg_running_cadence_spm = Number.isFinite((workoutData as any)?.avg_cadence) ? Number((workoutData as any).avg_cadence) : (Number.isFinite((workoutData as any)?.avg_running_cadence) ? Number((workoutData as any).avg_running_cadence) : (Number.isFinite((workoutData as any)?.avg_run_cadence) ? Number((workoutData as any).avg_run_cadence) : null));
     const avg_cycling_cadence_rpm = Number.isFinite((workoutData as any)?.avg_cadence) ? Number((workoutData as any).avg_cadence) : (Number.isFinite((workoutData as any)?.avg_bike_cadence) ? Number((workoutData as any).avg_bike_cadence) : (Number.isFinite((workoutData as any)?.metrics?.avg_bike_cadence) ? Number((workoutData as any).metrics.avg_bike_cadence) : null));
     const calories = Number.isFinite(workoutData?.calories) ? Number(workoutData.calories) : (Number.isFinite(workoutData?.metrics?.calories) ? Number(workoutData.metrics.calories) : null);
@@ -60,11 +64,13 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     const max_speed_kmh = Number.isFinite(workoutData?.max_speed) ? Number(workoutData.max_speed) : (Number.isFinite(workoutData?.metrics?.max_speed) ? Number(workoutData.metrics.max_speed) : null);
     const max_speed_mps = max_speed_kmh ? max_speed_kmh / 3.6 : null;
     const max_cadence_rpm = Number.isFinite(workoutData?.max_cadence) ? Number(workoutData.max_cadence) : (Number.isFinite(workoutData?.max_cycling_cadence) ? Number(workoutData.max_cycling_cadence) : (Number.isFinite(workoutData?.max_running_cadence) ? Number(workoutData.max_running_cadence) : null));
-    // Use server-calculated max_pace (no client-side math)
-    const max_pace_s_per_km = Number.isFinite(workoutData?.calculated_metrics?.max_pace_s_per_km) ? 
-      Number(workoutData.calculated_metrics.max_pace_s_per_km) : 
-      (Number.isFinite(workoutData?.metrics?.max_pace) ? Number(workoutData.metrics.max_pace) : 
-      (Number.isFinite(workoutData?.max_pace) ? Number(workoutData.max_pace) : null));
+    // Use server-calculated max_pace from computed.analysis.bests (most accurate - from series data)
+    const max_pace_s_per_km = Number.isFinite(workoutData?.computed?.analysis?.bests?.max_pace_s_per_km) 
+      ? Number(workoutData.computed.analysis.bests.max_pace_s_per_km)
+      : (Number.isFinite(workoutData?.calculated_metrics?.max_pace_s_per_km) 
+      ? Number(workoutData.calculated_metrics.max_pace_s_per_km) 
+      : (Number.isFinite(workoutData?.metrics?.max_pace) ? Number(workoutData.metrics.max_pace) : 
+      (Number.isFinite(workoutData?.max_pace) ? Number(workoutData.max_pace) : null)));
     const work_kj = Number.isFinite(workoutData?.total_work) ? Number(workoutData.total_work) : null;
     // Read from computed.analysis.power (server-calculated)
     const powerMetrics = workoutData?.computed?.analysis?.power;

@@ -1419,8 +1419,17 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const km = Number((hydratedCompleted || completed)?.distance);
             return Number.isFinite(km) && km>0 ? Math.round(km * 1000) : null;
           })();
-          // ONLY use server-computed pace - NO fallbacks, NO client-side calculations
+          // Calculate pace from distance/time (same as Details screen) for consistency
           const executedSecPerMi = (() => {
+            const distM = Number(compOverall?.distance_m);
+            const durS = Number(compOverall?.duration_s_moving);
+            if (Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
+              const miles = distM / 1609.34;
+              if (miles > 0) {
+                return durS / miles; // Calculate from distance/time
+              }
+            }
+            // Fallback to stored value only if calculation not possible
             const v = Number(compOverall?.avg_pace_s_per_mi);
             return Number.isFinite(v) && v > 0 ? v : null;
           })();
@@ -2163,10 +2172,21 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 const workout = hydratedCompleted || completed;
                 let secPerMi: number | null = null;
                 if (idx === 0) {
-                  // Overall row: use ONLY overall pace (no interval fallback)
-                  const overallPace = Number(workout?.computed?.overall?.avg_pace_s_per_mi);
-                  if (Number.isFinite(overallPace) && overallPace > 0) {
-                    secPerMi = overallPace;
+                  // Overall row: calculate from distance/time (same as Details screen)
+                  // This ensures consistency - Details calculates from distance/duration when avg_pace_s_per_mi is wrong
+                  const distM = Number(workout?.computed?.overall?.distance_m);
+                  const durS = Number(workout?.computed?.overall?.duration_s_moving);
+                  if (Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
+                    const miles = distM / 1609.34;
+                    if (miles > 0) {
+                      secPerMi = durS / miles;
+                    }
+                  } else {
+                    // Fallback to stored value if calculation not possible
+                    const overallPace = Number(workout?.computed?.overall?.avg_pace_s_per_mi);
+                    if (Number.isFinite(overallPace) && overallPace > 0) {
+                      secPerMi = overallPace;
+                    }
                   }
                 } else {
                   // Individual intervals: use getDisplayPace (which checks interval first, then overall)
