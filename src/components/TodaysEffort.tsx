@@ -386,6 +386,40 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           return chips;
         }
         return [ { icon: Dumbbell, value: 'No exercises' } ];
+      } else if (workout.type === 'pilates_yoga') {
+        // Pilates/Yoga: show session type, duration, RPE, and focus areas
+        const metadata = (workout as any)?.workout_metadata || {};
+        const sessionType = metadata.session_type || 'other';
+        const rpe = metadata.session_rpe;
+        const focusAreas = metadata.focus_area || [];
+        const duration = workout.duration || 0;
+        
+        const sessionTypeLabels: { [key: string]: string } = {
+          'pilates_mat': 'Pilates Mat',
+          'pilates_reformer': 'Pilates Reformer',
+          'yoga_flow': 'Yoga Flow',
+          'yoga_restorative': 'Yoga Restorative',
+          'yoga_power': 'Yoga Power',
+          'yoga_hot': 'Yoga Hot',
+          'other': 'Pilates/Yoga'
+        };
+        
+        const metrics: any[] = [];
+        metrics.push({ icon: Activity, value: sessionTypeLabels[sessionType] || 'Pilates/Yoga' });
+        if (duration > 0) {
+          metrics.push({ icon: Clock, value: `${duration}min` });
+        }
+        if (typeof rpe === 'number' && rpe >= 1 && rpe <= 10) {
+          metrics.push({ icon: Activity, value: `RPE ${rpe}/10` });
+        }
+        if (focusAreas.length > 0) {
+          const focusLabels = focusAreas.map((area: string) => {
+            return area.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          });
+          metrics.push({ icon: Activity, value: focusLabels.join(', ') });
+        }
+        
+        return metrics.length > 0 ? metrics : [{ icon: Activity, value: 'Pilates/Yoga Session' }];
       } else {
         // Endurance: distance, pace/speed, power (rides), heart rate, elevation (unified executed.overall only)
         const isRun = workout.type === 'run' || workout.type === 'walk';
@@ -525,6 +559,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       case 'swim': return 'Swim';
       case 'strength': return 'Lift';
       case 'mobility': return 'Mobility';
+      case 'pilates_yoga': return 'Pilates/Yoga';
       default: return type.charAt(0).toUpperCase() + type.slice(1);
     }
   };
@@ -558,6 +593,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       case 'swim': return 'Drills';
       case 'strength': return 'Compound';
       case 'mobility': return 'Stretch';
+      case 'pilates_yoga': return 'Flexibility';
       default: return 'Workout';
     }
   };

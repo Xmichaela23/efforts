@@ -22,7 +22,7 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
   const { addWorkout, useImperial } = useAppContext();
   const [formData, setFormData] = useState({
     name: '',
-    type: 'run' as 'run' | 'ride' | 'strength' | 'swim',
+    type: 'run' as 'run' | 'ride' | 'strength' | 'swim' | 'pilates_yoga',
     duration: 0,
     date: new Date().toISOString().split('T')[0],
     description: '',
@@ -133,7 +133,7 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
                   
                   <div>
                     <Label htmlFor="workout-type">Type</Label>
-                    <Select value={formData.type} onValueChange={(value: 'run' | 'ride' | 'strength' | 'swim') => 
+                    <Select value={formData.type} onValueChange={(value: 'run' | 'ride' | 'strength' | 'swim' | 'pilates_yoga') => 
                       setFormData(prev => ({ ...prev, type: value }))
                     }>
                       <SelectTrigger id="workout-type" name="workout-type">
@@ -144,6 +144,7 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
                         <SelectItem value="ride">Ride</SelectItem>
                         <SelectItem value="strength">Strength</SelectItem>
                         <SelectItem value="swim">Swim</SelectItem>
+                        <SelectItem value="pilates_yoga">Pilates/Yoga</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

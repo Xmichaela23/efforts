@@ -2,18 +2,19 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Activity, Dumbbell, Calendar, Filter, Waves, Bike } from 'lucide-react';
+import { Activity, Dumbbell, Calendar, Filter, Waves, Bike, Move } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface WorkoutTypeFilterProps {
-  selectedType: 'all' | 'run' | 'ride' | 'strength' | 'swim';
-  onTypeChange: (type: 'all' | 'run' | 'ride' | 'strength' | 'swim') => void;
+  selectedType: 'all' | 'run' | 'ride' | 'strength' | 'swim' | 'pilates_yoga';
+  onTypeChange: (type: 'all' | 'run' | 'ride' | 'strength' | 'swim' | 'pilates_yoga') => void;
   workoutCounts: {
     all: number;
     run: number;
     ride: number;
     strength: number;
     swim: number;
+    pilates_yoga?: number;
   };
 }
 
@@ -67,10 +68,16 @@ const WorkoutTypeFilter: React.FC<WorkoutTypeFilterProps> = ({
                   Swimming
                 </div>
               </SelectItem>
+              <SelectItem value="pilates_yoga">
+                <div className="flex items-center gap-2">
+                  <Move className="h-4 w-4 text-purple-500" />
+                  Pilates/Yoga
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
           
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-6 gap-2">
             <Button
               variant={selectedType === 'all' ? 'default' : 'outline'}
               size="sm"
@@ -133,6 +140,19 @@ const WorkoutTypeFilter: React.FC<WorkoutTypeFilterProps> = ({
               <span className="text-xs">Swim</span>
               <Badge variant="secondary" className="text-xs">
                 {workoutCounts.swim}
+              </Badge>
+            </Button>
+            
+            <Button
+              variant={selectedType === 'pilates_yoga' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onTypeChange('pilates_yoga')}
+              className="flex flex-col gap-1 h-auto py-2"
+            >
+              <Move className="h-4 w-4 text-purple-500" />
+              <span className="text-xs">Pilates/Yoga</span>
+              <Badge variant="secondary" className="text-xs">
+                {workoutCounts.pilates_yoga || 0}
               </Badge>
             </Button>
           </div>

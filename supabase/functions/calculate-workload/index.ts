@@ -123,6 +123,11 @@ function calculateWorkload(workout: WorkoutData, sessionRPE?: number): number {
     return calculateStrengthWorkload(workout.strength_exercises, sessionRPE);
   }
   
+  // Pilates/Yoga workouts use duration × RPE × modality_factor
+  if (workout.type === 'pilates_yoga') {
+    return calculatePilatesYogaWorkload(workout, sessionRPE);
+  }
+  
   // Other workout types (run/bike/swim) use duration-based calculation
   // Prefer moving_time over duration for accurate workload (excludes stops)
   let effectiveDuration = workout.duration;
@@ -207,6 +212,11 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
   // Strength workouts use specialized calculation (with RPE)
   if (workout.type === 'strength' && workout.strength_exercises) {
     return getStrengthIntensity(workout.strength_exercises, sessionRPE);
+  }
+  
+  // Pilates/Yoga workouts use RPE-based calculation
+  if (workout.type === 'pilates_yoga') {
+    return getPilatesYogaIntensity(workout, sessionRPE);
   }
   
   // Mobility workouts use completion-based calculation
@@ -323,6 +333,7 @@ function getDefaultIntensityForType(type: string): number {
     'swim': 0.75,
     'strength': 0.75,
     'mobility': 0.60,
+    'pilates_yoga': 0.75,
     'walk': 0.40
   };
   
@@ -494,6 +505,67 @@ function mapRPEToIntensity(rpe: number): number {
 }
 
 /**
+ * Calculate workload for pilates_yoga workouts
+ * Formula: duration × RPE × modality_factor
+ */
+function calculatePilatesYogaWorkload(workout: WorkoutData, sessionRPE?: number): number {
+  if (!workout.duration || workout.duration <= 0) return 0;
+  
+  // Get RPE from metadata (required for pilates_yoga)
+  const metadata = workout.workout_metadata || {};
+  const rpe = sessionRPE || metadata.session_rpe;
+  
+  if (!rpe || typeof rpe !== 'number' || rpe < 1 || rpe > 10) {
+    // Default to moderate RPE if not provided
+    console.warn('No RPE provided for pilates_yoga workout, using default RPE 5');
+    return Math.round((workout.duration / 60) * 5 * 1.0 * 100);
+  }
+  
+  // Get modality factor based on session_type
+  const sessionType = metadata.session_type || 'other';
+  const modalityFactor = getPilatesYogaModalityFactor(sessionType);
+  
+  // Calculate workload: duration (hours) × RPE × modality_factor × 100
+  const durationHours = workout.duration / 60;
+  const workload = Math.round(durationHours * rpe * modalityFactor * 100);
+  
+  return workload;
+}
+
+/**
+ * Get modality factor for pilates_yoga session types
+ */
+function getPilatesYogaModalityFactor(sessionType: string): number {
+  const PILATES_YOGA_MODALITY_FACTORS: { [key: string]: number } = {
+    'pilates_reformer': 1.2,
+    'pilates_mat': 1.0,
+    'yoga_power': 1.2,
+    'yoga_flow': 1.0,
+    'yoga_restorative': 0.7,
+    'yoga_hot': 1.0,
+    'other': 1.0
+  };
+  
+  return PILATES_YOGA_MODALITY_FACTORS[sessionType] || 1.0;
+}
+
+/**
+ * Get intensity for pilates_yoga session (based on RPE)
+ */
+function getPilatesYogaIntensity(workout: WorkoutData, sessionRPE?: number): number {
+  const metadata = workout.workout_metadata || {};
+  const rpe = sessionRPE || metadata.session_rpe;
+  
+  if (!rpe || typeof rpe !== 'number' || rpe < 1 || rpe > 10) {
+    // Default to moderate intensity if no RPE
+    return 0.75;
+  }
+  
+  // Map RPE (1-10) to intensity (0.55-0.95)
+  return mapRPEToIntensity(rpe);
+}
+
+/**
  * Get intensity for mobility session
  */
 function getMobilityIntensity(exercises: any[]): number {
@@ -630,9 +702,9 @@ serve(async (req) => {
       workoutStatus = 'completed'; // Default
     }
 
-    // Extract session RPE from metadata (ONLY for strength workouts)
+    // Extract session RPE from metadata (for strength and pilates_yoga workouts)
     // Runs/rides/swims don't use RPE - they use performance-based intensity
-    const sessionRPE = finalWorkoutData.type === 'strength' && parsedMetadata?.session_rpe 
+    const sessionRPE = (finalWorkoutData.type === 'strength' || finalWorkoutData.type === 'pilates_yoga') && parsedMetadata?.session_rpe 
       ? parsedMetadata.session_rpe 
       : undefined;
     

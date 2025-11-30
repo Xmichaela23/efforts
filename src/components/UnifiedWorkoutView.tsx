@@ -795,11 +795,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               showHeader={true}
             />
             {(() => {
-              // Show inline launcher for planned sessions (strength and mobility)
+              // Show inline launcher for planned sessions (strength, mobility, and pilates_yoga)
               const row = isCompleted ? (linkedPlanned || null) : unifiedWorkout;
               const isPlanned = String((row as any)?.workout_status || '').toLowerCase() === 'planned';
               const type = String((row as any)?.type || '').toLowerCase();
-              if (!row || !isPlanned || (type!=='strength' && type!=='mobility')) return null;
+              if (!row || !isPlanned || (type!=='strength' && type!=='mobility' && type!=='pilates_yoga')) return null;
               const handleClick = () => {
                 try {
                   const rowAny: any = row as any;
@@ -807,13 +807,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   // Always include date/type/name for the logger header and fallbacks
                   basePlanned.date = rowAny?.date || basePlanned.date;
                   basePlanned.type = basePlanned.type || type;
-                  basePlanned.name = basePlanned.name || (type==='mobility' ? 'Mobility Session' : 'Strength');
+                  basePlanned.name = basePlanned.name || (
+                    type==='mobility' ? 'Mobility Session' : 
+                    type==='pilates_yoga' ? 'Pilates/Yoga Session' : 
+                    'Strength'
+                  );
 
                   if (type==='strength') {
                     window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: basePlanned } }));
-                  } else {
+                  } else if (type==='mobility') {
                     // Mobility → keep unified simple; route via app handler
                     window.dispatchEvent(new CustomEvent('open:mobilityLogger', { detail: { planned: basePlanned } }));
+                  } else if (type==='pilates_yoga') {
+                    window.dispatchEvent(new CustomEvent('open:pilatesYogaLogger', { detail: { planned: basePlanned } }));
                   }
                 } catch {}
               };
@@ -893,9 +899,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       workoutData={completedData}
                     />
                   </div>
-                ) : (workout.type === 'strength' || workout.type === 'mobility') ? (
+                ) : (workout.type === 'strength' || workout.type === 'mobility' || workout.type === 'pilates_yoga') ? (
                   <div className="p-4">
-                    <h3 className="font-semibold mb-4">{workout.type === 'mobility' ? 'Mobility' : 'Strength'} Workout Completed</h3>
+                    <h3 className="font-semibold mb-4">
+                      {workout.type === 'mobility' ? 'Mobility' : 
+                       workout.type === 'pilates_yoga' ? 'Pilates/Yoga' : 
+                       'Strength'} Workout Completed</h3>
                     {/* Use StrengthCompletedView for both strength and mobility workouts */}
                     <StrengthCompletedView 
                       workoutData={completedData}

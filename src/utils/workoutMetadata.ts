@@ -5,6 +5,23 @@
  * JSONB structure stored in workout_metadata column.
  */
 
+export type PilatesYogaSessionType = 
+  | 'pilates_mat'
+  | 'pilates_reformer'
+  | 'yoga_flow'
+  | 'yoga_restorative'
+  | 'yoga_power'
+  | 'yoga_hot'
+  | 'other';
+
+export type FocusArea = 
+  | 'core'
+  | 'upper_body'
+  | 'lower_body'
+  | 'flexibility'
+  | 'balance'
+  | 'full_body';
+
 export interface WorkoutMetadata {
   session_rpe?: number;  // Session RPE (1-10) from "Workout Complete!" popup
   notes?: string;         // User notes about the workout
@@ -13,6 +30,9 @@ export interface WorkoutMetadata {
     soreness: number;     // Muscle soreness (1-10)
     sleep: number;        // Sleep hours (0-12)
   };
+  // Pilates/Yoga specific fields
+  session_type?: PilatesYogaSessionType;
+  focus_area?: FocusArea[];
 }
 
 /**
@@ -57,6 +77,8 @@ export function createWorkoutMetadata(params: {
   session_rpe?: number;
   notes?: string;
   readiness?: { energy: number; soreness: number; sleep: number };
+  session_type?: PilatesYogaSessionType;
+  focus_area?: FocusArea[];
 }): WorkoutMetadata {
   const metadata: WorkoutMetadata = {};
   
@@ -70,6 +92,14 @@ export function createWorkoutMetadata(params: {
   
   if (params.readiness && typeof params.readiness === 'object') {
     metadata.readiness = params.readiness;
+  }
+  
+  if (params.session_type) {
+    metadata.session_type = params.session_type;
+  }
+  
+  if (Array.isArray(params.focus_area) && params.focus_area.length > 0) {
+    metadata.focus_area = params.focus_area;
   }
   
   return metadata;

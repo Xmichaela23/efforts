@@ -68,6 +68,15 @@ export const WORKOUT_CODES = {
     'mobility': 'MB-MOB',
     'activation': 'MB-MOB',
     'range of motion': 'MB-MOB'
+  },
+  pilates_yoga: {
+    'pilates_mat': 'PY-MAT',
+    'pilates_reformer': 'PY-REF',
+    'yoga_flow': 'YG-FLW',
+    'yoga_restorative': 'YG-RST',
+    'yoga_power': 'YG-PWR',
+    'yoga_hot': 'YG-HOT',
+    'other': 'PY-OTH'
   }
 };
 
@@ -111,6 +120,8 @@ export function getSimpleDisciplineCode(discipline: string): string {
     case 'mobility':
     case 'recovery':
       return 'MB';
+    case 'pilates_yoga':
+      return 'PY';
     default:
       return discipline.toUpperCase().substring(0, 2);
   }

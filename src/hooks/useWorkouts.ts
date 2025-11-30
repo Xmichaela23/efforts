@@ -66,7 +66,7 @@ export interface StrengthExercise {
 export interface Workout {
   id: string;
   name: string;
-  type: "run" | "ride" | "swim" | "strength" | "walk" | "mobility";
+  type: "run" | "ride" | "swim" | "strength" | "walk" | "mobility" | "pilates_yoga";
   duration: number;
   date: string;
   description?: string;

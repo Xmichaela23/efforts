@@ -80,6 +80,7 @@ export function typeAbbrev(typeLike: string | undefined): string {
   if (t.includes('swim')) return 'SW';
   if (t.includes('strength')) return 'ST';
   if (t.includes('mobility')) return 'MBL';
+  if (t.includes('pilates') || t.includes('yoga') || t === 'pilates_yoga') return 'PY';
   if (t.includes('walk')) return 'WK';
   return 'WO';
 }

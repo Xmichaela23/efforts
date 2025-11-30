@@ -10,6 +10,7 @@ import WorkoutDetail from './WorkoutDetail';
 import GarminAutoSync from './GarminAutoSync';
 import TodaysEffort from './TodaysEffort';
 import StrengthLogger from './StrengthLogger';
+import PilatesYogaLogger from './PilatesYogaLogger';
 import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
 import WorkoutSummary from './WorkoutSummary';
@@ -51,6 +52,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
+  const [showPilatesYogaLogger, setShowPilatesYogaLogger] = useState(false);
   // MobilityLogger removed; mobility now uses StrengthLogger in mobility mode
   const initialRouteState: any = (location && location.state) || {};
   const [showAllPlans, setShowAllPlans] = useState<boolean>(!!initialRouteState.openPlans);
@@ -211,6 +213,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     };
     window.addEventListener('open:mobilityLogger', handler as any);
     return () => window.removeEventListener('open:mobilityLogger', handler as any);
+  }, []);
+
+  // Pilates/Yoga logger openings
+  useEffect(() => {
+    const handler = (ev: any) => {
+      try {
+        const planned = ev?.detail?.planned;
+        setShowAllPlans(false);
+        setSelectedWorkout(null);
+        setLoggerScheduledWorkout(planned);
+        if (planned?.date) setSelectedDate(String(planned.date));
+        setShowPilatesYogaLogger(true);
+      } catch {}
+    };
+    window.addEventListener('open:pilatesYogaLogger', handler as any);
+    return () => window.removeEventListener('open:pilatesYogaLogger', handler as any);
   }, []);
 
   // Load provider data once per session when Completed tab is first opened
@@ -548,6 +566,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
 
     setShowStrengthLogger(false);
+    setShowPilatesYogaLogger(false);
     setShowBuilder(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
@@ -975,7 +994,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               </DropdownMenu>
 
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
-              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage || showContext) && !showSummary && (
+              {(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
                   <Button
                     onClick={handleHeaderBack}
@@ -1121,7 +1140,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       </main>
 
       {/* Bottom Navigation Tab Bar - Instagram style */}
-      {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
+      {!(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
         <div className="mobile-tabbar px-3 pt-0.5 flex items-center">
           <div className="w-full">
             <div className="flex justify-around items-center">

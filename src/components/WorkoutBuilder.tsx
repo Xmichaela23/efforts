@@ -51,7 +51,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
 
   const [formData, setFormData] = useState({
     name: '',
-    type: (existingWorkout?.type) || (initialType && initialType !== '' ? initialType as 'run' | 'ride' | 'strength' | 'swim' | 'mobility' : ''),
+    type: (existingWorkout?.type) || (initialType && initialType !== '' ? initialType as 'run' | 'ride' | 'strength' | 'swim' | 'mobility' | 'pilates_yoga' : ''),
     date: getInitialDate(),
     description: '',
     userComments: '',
@@ -84,7 +84,8 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         'ride': 'Ride', 
         'strength': 'Strength',
         'swim': 'Swim',
-        'mobility': 'Mobility'
+        'mobility': 'Mobility',
+        'pilates_yoga': 'Pilates/Yoga'
       };
       
       const disciplineName = disciplineMap[formData.type as keyof typeof disciplineMap];
@@ -331,6 +332,9 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
       case 'mobility':
         parts.push('Mobility session');
         break;
+      case 'pilates_yoga':
+        parts.push('Pilates/Yoga session');
+        break;
     }
     return parts.length > 0 ? parts.join(' + ') : '';
   };
@@ -342,7 +346,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
 
       const workoutData = {
         name: workoutTitle,
-        type: formData.type as 'run' | 'ride' | 'swim' | 'strength' | 'walk',
+        type: formData.type as 'run' | 'ride' | 'swim' | 'strength' | 'walk' | 'pilates_yoga',
         date: formData.date,
         description: formData.description || generateWorkoutDescription(),
         duration: Math.round(calculateTotalTime() / 60), // Convert seconds to minutes
@@ -504,7 +508,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                   >
                     {generateWorkoutDescription()}
                   </div>
-                  {formData.type !== 'strength' && formData.type !== 'mobility' && (
+                  {formData.type !== 'strength' && formData.type !== 'mobility' && formData.type !== 'pilates_yoga' && (
                     <div className="absolute bottom-2 right-3 flex items-center gap-2 text-muted-foreground text-sm">
                       <Clock className="h-3 w-3" />
                       <span>Total Time: {formatTime(calculateTotalTime())}</span>
@@ -563,9 +567,16 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                 <p className="text-sm">Track your mobility and flexibility work</p>
               </div>
             )}
+            {formData.type === 'pilates_yoga' && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Move className="h-12 w-12 mx-auto mb-4 text-purple-400" />
+                <p className="text-lg font-medium mb-2">Pilates/Yoga Session</p>
+                <p className="text-sm">Track your pilates and yoga sessions</p>
+              </div>
+            )}
           </div>
 
-          {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0 || formData.type === 'mobility') && (
+          {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0 || formData.type === 'mobility' || formData.type === 'pilates_yoga') && (
             <div className="bg-gray-50 p-2">
               <p className="text-sm text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                 {generateWorkoutDescription()}
