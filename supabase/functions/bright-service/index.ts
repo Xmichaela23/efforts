@@ -66,7 +66,8 @@ Deno.serve(async (req) => {
     // Validate environment variables
     if (!GARMIN_CLIENT_ID || !GARMIN_CLIENT_SECRET) {
       console.error('❌ BRIGHT-SERVICE: Missing GARMIN_CLIENT_ID or GARMIN_CLIENT_SECRET');
-      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+      console.error('❌ BRIGHT-SERVICE: Client ID present:', !!GARMIN_CLIENT_ID, 'Secret present:', !!GARMIN_CLIENT_SECRET);
+      return new Response(JSON.stringify({ error: 'Server configuration error: Garmin credentials not set. Please set GARMIN_CLIENT_ID and GARMIN_CLIENT_SECRET in Supabase Edge Function secrets.' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...cors() },
       });
@@ -90,9 +91,10 @@ Deno.serve(async (req) => {
     console.log('🔍 BRIGHT-SERVICE: Code starts with:', code.substring(0, 20) + '...');
     console.log('🔍 BRIGHT-SERVICE: CodeVerifier starts with:', codeVerifier.substring(0, 20) + '...');
     console.log('🔍 BRIGHT-SERVICE: Redirect URI:', redirectUri || 'not provided');
-    console.log('🔍 BRIGHT-SERVICE: Client ID present:', !!GARMIN_CLIENT_ID);
+    console.log('🔍 BRIGHT-SERVICE: Client ID present:', !!GARMIN_CLIENT_ID, 'Client ID length:', GARMIN_CLIENT_ID?.length || 0);
+    console.log('🔍 BRIGHT-SERVICE: Client Secret present:', !!GARMIN_CLIENT_SECRET, 'Secret length:', GARMIN_CLIENT_SECRET?.length || 0);
 
-    const resp = await fetch('https://diauth.garmin.com/di-oauth2-service/oauth/token', {
+    const resp = await fetch('https://connectapi.garmin.com/di-oauth2-service/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
