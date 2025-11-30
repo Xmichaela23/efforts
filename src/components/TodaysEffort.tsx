@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
-import { Calendar, Clock, Dumbbell } from 'lucide-react';
+import { Calendar, Clock, Dumbbell, Activity } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
