@@ -63,7 +63,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Validate environment variables
+    if (!GARMIN_CLIENT_ID || !GARMIN_CLIENT_SECRET) {
+      console.error('❌ BRIGHT-SERVICE: Missing GARMIN_CLIENT_ID or GARMIN_CLIENT_SECRET');
+      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...cors() },
+      });
+    }
+
     // Exchange code for tokens with Garmin
+    // Note: redirect_uri MUST match exactly what was used in the authorization request
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: GARMIN_CLIENT_ID,
@@ -71,11 +81,16 @@ Deno.serve(async (req) => {
       code: code,
       code_verifier: codeVerifier,
     });
-    if (redirectUri) body.append('redirect_uri', redirectUri);
+    // Always include redirect_uri if provided (Garmin requires it to match)
+    if (redirectUri) {
+      body.append('redirect_uri', redirectUri);
+    }
 
     console.log('🔍 BRIGHT-SERVICE: Exchanging code for tokens for user_id:', userId);
     console.log('🔍 BRIGHT-SERVICE: Code starts with:', code.substring(0, 20) + '...');
     console.log('🔍 BRIGHT-SERVICE: CodeVerifier starts with:', codeVerifier.substring(0, 20) + '...');
+    console.log('🔍 BRIGHT-SERVICE: Redirect URI:', redirectUri || 'not provided');
+    console.log('🔍 BRIGHT-SERVICE: Client ID present:', !!GARMIN_CLIENT_ID);
 
     const resp = await fetch('https://diauth.garmin.com/di-oauth2-service/oauth/token', {
       method: 'POST',
