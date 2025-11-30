@@ -322,6 +322,12 @@ const handleGarminOAuthSuccess = async (code: string) => {
 
     const tokenData = await tokenResponse.json();
     
+    // Log what the edge function returned - CRITICAL DEBUG INFO
+    console.log('🔐 [TrainingBaselines] Edge function response for user_id:', session.user.id);
+    console.log('🔐 [TrainingBaselines] Full tokenData object keys:', Object.keys(tokenData));
+    console.log('🔐 [TrainingBaselines] Token from edge function - access_token starts with:', tokenData.access_token?.substring(0, 30), 'refresh_token starts with:', tokenData.refresh_token?.substring(0, 30));
+    console.log('🔐 [TrainingBaselines] Token lengths - access_token:', tokenData.access_token?.length, 'refresh_token:', tokenData.refresh_token?.length);
+    console.log('🔐 [TrainingBaselines] OAuth code used:', code.substring(0, 20) + '...', 'codeVerifier used:', codeVerifier.substring(0, 20) + '...');
 
     // CRITICAL: Persist Garmin OAuth tokens to user_connections so server can fetch single-activity TE
     try {
@@ -330,7 +336,7 @@ const handleGarminOAuthSuccess = async (code: string) => {
       // Check if connection already exists for this user
       const { data: existing, error: selectError } = await supabase
         .from('user_connections')
-        .select('id, user_id')
+        .select('id, user_id, access_token')
         .eq('user_id', session.user.id)
         .eq('provider', 'garmin')
         .maybeSingle();
@@ -338,7 +344,7 @@ const handleGarminOAuthSuccess = async (code: string) => {
       if (selectError) {
         console.error('❌ [TrainingBaselines] Error checking existing connection:', selectError);
       }
-      console.log('🔐 [TrainingBaselines] Existing connection:', existing ? `Found id=${existing.id}` : 'Not found');
+      console.log('🔐 [TrainingBaselines] Existing connection:', existing ? `Found id=${existing.id}, existing token starts with: ${existing.access_token?.substring(0, 30)}` : 'Not found');
 
       const connectionData = {
         user_id: session.user.id,
@@ -355,6 +361,7 @@ const handleGarminOAuthSuccess = async (code: string) => {
       if (existing) {
         // Update existing connection
         console.log('🔐 [TrainingBaselines] Updating existing connection id=', existing.id, 'for user_id=', session.user.id);
+        console.log('🔐 [TrainingBaselines] About to save - new token starts with:', connectionData.access_token?.substring(0, 30));
         const { error: updateError } = await supabase
           .from('user_connections')
           .update(connectionData)
@@ -366,18 +373,31 @@ const handleGarminOAuthSuccess = async (code: string) => {
           throw updateError;
         }
         console.log('✅ [TrainingBaselines] Successfully updated connection');
+        
+        // Verify what actually got saved
+        const { data: verify } = await supabase
+          .from('user_connections')
+          .select('id, user_id, access_token, refresh_token')
+          .eq('id', existing.id)
+          .maybeSingle();
+        console.log('🔍 [TrainingBaselines] VERIFICATION - Saved access_token starts with:', verify?.access_token?.substring(0, 30), 'refresh_token starts with:', verify?.refresh_token?.substring(0, 30), 'for user_id:', verify?.user_id);
       } else {
         // Insert new connection
         console.log('🔐 [TrainingBaselines] Inserting new connection for user_id=', session.user.id);
-        const { error: insertError } = await supabase
+        console.log('🔐 [TrainingBaselines] About to insert - token starts with:', connectionData.access_token?.substring(0, 30));
+        const { error: insertError, data: insertedData } = await supabase
           .from('user_connections')
-          .insert(connectionData);
+          .insert(connectionData)
+          .select('id, user_id, access_token, refresh_token');
         
         if (insertError) {
           console.error('❌ [TrainingBaselines] Insert error:', insertError);
           throw insertError;
         }
         console.log('✅ [TrainingBaselines] Successfully inserted new connection');
+        if (insertedData && insertedData[0]) {
+          console.log('🔍 [TrainingBaselines] VERIFICATION - Inserted access_token starts with:', insertedData[0].access_token?.substring(0, 30), 'refresh_token starts with:', insertedData[0].refresh_token?.substring(0, 30), 'for user_id:', insertedData[0].user_id);
+        }
       }
 
       // Try to enrich with Garmin user_id (non-fatal)
