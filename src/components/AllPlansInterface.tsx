@@ -1193,15 +1193,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     (async () => {
       try {
         if (focusPlanId && !selectedPlanDetail && !hasAutoOpenedRef.current) {
-          // Show detail immediately to avoid list flash
-          setCurrentView('detail');
-          await handlePlanClick(focusPlanId);
-          hasAutoOpenedRef.current = true;
-          if (typeof focusWeek === 'number' && focusWeek > 0) setSelectedWeek(focusWeek);
+          // Wait for plan to be in detailedPlans before opening
+          const planDetail = detailedPlans[focusPlanId as keyof typeof detailedPlans];
+          if (planDetail) {
+            // Show detail immediately to avoid list flash
+            setCurrentView('detail');
+            await handlePlanClick(focusPlanId);
+            hasAutoOpenedRef.current = true;
+            if (typeof focusWeek === 'number' && focusWeek > 0) setSelectedWeek(focusWeek);
+          }
         }
       } catch {}
     })();
-  }, [focusPlanId, focusWeek]);
+  }, [focusPlanId, focusWeek, detailedPlans]);
   
   // Prevent ANY updates from resetting the plan status when we've manually changed it
   const lastManualStatusRef = useRef<{planId: string, status: string} | null>(null);

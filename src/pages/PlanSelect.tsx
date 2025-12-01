@@ -1076,17 +1076,20 @@ export default function PlanSelect() {
         setMaterializationStatus('Plan activated! Materialization continuing in background...');
         setProgress(100);
         
-        // Refresh plans list first, then navigate to dashboard (not directly to plan detail)
-        // This avoids trying to load plan details before materialization completes
-        try { await refreshPlans?.(); } catch {}
+        // Refresh plans list and wait for it to complete so plan is in detailedPlans
+        try { 
+          await refreshPlans?.(); 
+          // Give React a moment to update state
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch {}
         
-        // Small delay to show success message, then navigate to dashboard
+        // Small delay to show success message, then navigate to dashboard with focusPlanId
         setTimeout(() => {
           setSaving(false);
           setMaterializationStatus('');
           setProgress(0);
-          // Navigate to dashboard - user can open the plan from there once materialization completes
-          navigate('/', { state: { openPlans: true } });
+          // Navigate to dashboard with focusPlanId - plan should now be in detailedPlans
+          navigate('/', { state: { openPlans: true, focusPlanId: planRow.id, focusWeek: 1 } });
         }, 1500);
       } catch (activateErr: any) {
         setSaving(false);
