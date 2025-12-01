@@ -51,48 +51,14 @@ function getTitle(workout: any): string {
   if (t === 'strength') return nm || 'Strength';
   if (t === 'mobility') return nm || 'Mobility';
   if (t === 'pilates_yoga') {
-    // Check workout_metadata for session_type (for completed) or description/name for planned
-    const metadata = (workout as any)?.workout_metadata || {};
-    const sessionType = metadata.session_type;
-    if (sessionType) {
-      const sessionTypeLabels: { [key: string]: string } = {
-        'pilates_mat': 'Pilates Mat',
-        'pilates_reformer': 'Pilates Reformer',
-        'yoga_flow': 'Yoga Flow',
-        'yoga_restorative': 'Yoga Restorative',
-        'yoga_power': 'Yoga Power',
-        'other': 'Pilates/Yoga'
-      };
-      return sessionTypeLabels[sessionType] || 'Pilates/Yoga';
-    }
-    // For planned workouts, try to infer from name/description with better patterns
+    // Just return "Pilates" or "Yoga" - specific type goes in description
     const nameLower = String(nm || '').toLowerCase();
     const descLower = String(desc || '').toLowerCase();
     const combined = (nameLower + ' ' + descLower).toLowerCase();
     
-    // Check for specific yoga types first (more specific)
-    if (/yoga.*power|ashtanga|power.*yoga/i.test(combined)) return 'Yoga Power';
-    if (/yoga.*flow|vinyasa|flow.*yoga/i.test(combined)) return 'Yoga Flow';
-    if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) return 'Yoga Restorative';
+    // Determine if it's yoga or pilates
     if (/yoga/i.test(combined)) return 'Yoga';
-    
-    // Check for specific pilates types
-    if (/reformer/i.test(combined) && !/mat/i.test(combined)) return 'Pilates Reformer';
-    if (/mat/i.test(combined) && !/reformer/i.test(combined)) return 'Pilates Mat';
-    // If both mentioned, prefer reformer (more specific equipment)
-    if (/reformer/i.test(combined)) return 'Pilates Reformer';
-    if (/mat/i.test(combined)) return 'Pilates Mat';
-    
-    // Generic pilates
     if (/pilates/i.test(combined)) return 'Pilates';
-    
-    // Last resort: check if name is just "Session" and use description
-    if (nameLower === 'session' || nameLower === 'pilates session' || nameLower === 'yoga session') {
-      if (/reformer/i.test(descLower)) return 'Pilates Reformer';
-      if (/mat/i.test(descLower)) return 'Pilates Mat';
-      if (/yoga/i.test(descLower)) return 'Yoga';
-      if (/pilates/i.test(descLower)) return 'Pilates';
-    }
     
     return nm || 'Pilates/Yoga';
   }
@@ -218,6 +184,74 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | unde
     const pn = (baselines as any)?.performanceNumbers || {};
     try {
       const disc = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
+      if (disc === 'pilates_yoga') {
+        // Extract session type details for pilates/yoga
+        const metadata = (workout as any)?.workout_metadata || {};
+        const sessionType = metadata.session_type;
+        const parts: string[] = [];
+        
+        if (sessionType) {
+          const sessionTypeLabels: { [key: string]: string } = {
+            'pilates_mat': 'Mat',
+            'pilates_reformer': 'Reformer',
+            'yoga_flow': 'Flow',
+            'yoga_restorative': 'Restorative',
+            'yoga_power': 'Power',
+            'other': ''
+          };
+          const typeLabel = sessionTypeLabels[sessionType];
+          if (typeLabel) parts.push(typeLabel);
+        } else {
+          // Infer from description/name for planned workouts
+          const nameLower = String(workout.name || '').toLowerCase();
+          const descLower = String(workout.description || workout.rendered_description || '').toLowerCase();
+          const combined = (nameLower + ' ' + descLower).toLowerCase();
+          
+          if (/reformer/i.test(combined)) parts.push('Reformer');
+          else if (/mat/i.test(combined)) parts.push('Mat');
+          else if (/yoga.*power|ashtanga|power.*yoga/i.test(combined)) parts.push('Power');
+          else if (/yoga.*flow|vinyasa|flow.*yoga/i.test(combined)) parts.push('Flow');
+          else if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) parts.push('Restorative');
+        }
+        
+        // Add duration if available (duration is in minutes, total_duration_seconds is in seconds)
+        let durationMins: number | null = null;
+        if (typeof (workout as any)?.duration === 'number' && (workout as any).duration > 0) {
+          durationMins = Math.round((workout as any).duration);
+        } else if (typeof (workout as any)?.total_duration_seconds === 'number' && (workout as any).total_duration_seconds > 0) {
+          durationMins = Math.round((workout as any).total_duration_seconds / 60);
+        }
+        if (durationMins && durationMins > 0) {
+          parts.push(`${durationMins}min`);
+        }
+        
+        // Add RPE if available
+        const rpe = metadata.session_rpe;
+        if (typeof rpe === 'number' && rpe > 0) {
+          parts.push(`RPE ${rpe}/10`);
+        }
+        
+        // Add focus areas if available
+        const focusAreas = metadata.focus_area;
+        if (Array.isArray(focusAreas) && focusAreas.length > 0) {
+          const focusLabels: { [key: string]: string } = {
+            'core': 'Core',
+            'upper_body': 'Upper Body',
+            'lower_body': 'Lower Body',
+            'flexibility': 'Flexibility',
+            'balance': 'Balance',
+            'full_body': 'Full Body'
+          };
+          const focusList = focusAreas.map((f: string) => focusLabels[f] || f).join(', ');
+          if (focusList) parts.push(focusList);
+        }
+        
+        if (parts.length > 0) return parts.join(' • ');
+        
+        // Fallback to description if no structured data
+        const desc = String((workout as any)?.rendered_description || (workout as any)?.description || '').trim();
+        if (desc) return desc;
+      }
       if (disc === 'swim') {
         const parts: string[] = [];
         const stepsTok: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t: any) => String(t)) : [];
@@ -270,6 +304,74 @@ function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): strin
   try {
     const pn = (baselines as any)?.performanceNumbers || {};
     const disc = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
+    if (disc === 'pilates_yoga') {
+      // Extract session type details for pilates/yoga
+      const metadata = (workout as any)?.workout_metadata || {};
+      const sessionType = metadata.session_type;
+      const parts: string[] = [];
+      
+      if (sessionType) {
+        const sessionTypeLabels: { [key: string]: string } = {
+          'pilates_mat': 'Mat',
+          'pilates_reformer': 'Reformer',
+          'yoga_flow': 'Flow',
+          'yoga_restorative': 'Restorative',
+          'yoga_power': 'Power',
+          'other': ''
+        };
+        const typeLabel = sessionTypeLabels[sessionType];
+        if (typeLabel) parts.push(typeLabel);
+      } else {
+        // Infer from description/name for planned workouts
+        const nameLower = String(workout.name || '').toLowerCase();
+        const descLower = String(workout.description || workout.rendered_description || '').toLowerCase();
+        const combined = (nameLower + ' ' + descLower).toLowerCase();
+        
+        if (/reformer/i.test(combined)) parts.push('Reformer');
+        else if (/mat/i.test(combined)) parts.push('Mat');
+        else if (/yoga.*power|ashtanga|power.*yoga/i.test(combined)) parts.push('Power');
+        else if (/yoga.*flow|vinyasa|flow.*yoga/i.test(combined)) parts.push('Flow');
+        else if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) parts.push('Restorative');
+      }
+      
+      // Add duration if available (duration is in minutes, total_duration_seconds is in seconds)
+      let durationMins: number | null = null;
+      if (typeof (workout as any)?.duration === 'number' && (workout as any).duration > 0) {
+        durationMins = Math.round((workout as any).duration);
+      } else if (typeof (workout as any)?.total_duration_seconds === 'number' && (workout as any).total_duration_seconds > 0) {
+        durationMins = Math.round((workout as any).total_duration_seconds / 60);
+      }
+      if (durationMins && durationMins > 0) {
+        parts.push(`${durationMins}min`);
+      }
+      
+      // Add RPE if available
+      const rpe = metadata.session_rpe;
+      if (typeof rpe === 'number' && rpe > 0) {
+        parts.push(`RPE ${rpe}/10`);
+      }
+      
+      // Add focus areas if available
+      const focusAreas = metadata.focus_area;
+      if (Array.isArray(focusAreas) && focusAreas.length > 0) {
+        const focusLabels: { [key: string]: string } = {
+          'core': 'Core',
+          'upper_body': 'Upper Body',
+          'lower_body': 'Lower Body',
+          'flexibility': 'Flexibility',
+          'balance': 'Balance',
+          'full_body': 'Full Body'
+        };
+        const focusList = focusAreas.map((f: string) => focusLabels[f] || f).join(', ');
+        if (focusList) parts.push(focusList);
+      }
+      
+      if (parts.length > 0) return parts.join(' • ');
+      
+      // Fallback to description if no structured data
+      const desc = String((workout as any)?.rendered_description || (workout as any)?.description || '').trim();
+      if (desc) return desc;
+    }
     if (disc === 'swim') {
       const parts: string[] = [];
       const stepsTok: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t: any) => String(t)) : [];
