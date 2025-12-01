@@ -89,6 +89,13 @@ function derivePlannedCellLabel(w: any): string | null {
     const steps: string[] = Array.isArray(w.steps_preset) ? w.steps_preset : [];
     const txt = String(w.description || '').toLowerCase();
     const type = String(w.type || '').toLowerCase();
+    
+    // Check if workout is optional
+    const raw = (w as any).tags;
+    let tags: any[] = [];
+    if (Array.isArray(raw)) tags = raw;
+    else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
+    const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
   // Robust duration resolution (authoritative, no legacy fallbacks):
   // total_duration_seconds (row) > computed.total_duration_seconds > sum(computed.steps.seconds) > sum(intervals)
     const comp: any = w?.computed || {};
@@ -122,82 +129,88 @@ function derivePlannedCellLabel(w: any): string | null {
 
     // RUN
     if (type === 'run') {
-      if (has(/interval_/i) && has(/5kpace|10kpace|rep|vo2/i)) return `RN-VO2 ${durStr}`.trim();
-      if (has(/longrun_/i) || /long\b/.test(txt)) return `RN-LR ${durStr}`.trim();
-      if (has(/tempo_/i)) return `RN-TMP ${durStr}`.trim();
-      if (has(/speed_|strides_/i)) return `RN-INT-SP ${durStr}`.trim();
-      if (has(/hill|hills?/i)) return `RN-INT-HL ${durStr}`.trim();
-      return `RN ${durStr}`.trim();
+      let label = '';
+      if (has(/interval_/i) && has(/5kpace|10kpace|rep|vo2/i)) label = `RN-VO2 ${durStr}`.trim();
+      else if (has(/longrun_/i) || /long\b/.test(txt)) label = `RN-LR ${durStr}`.trim();
+      else if (has(/tempo_/i)) label = `RN-TMP ${durStr}`.trim();
+      else if (has(/speed_|strides_/i)) label = `RN-INT-SP ${durStr}`.trim();
+      else if (has(/hill|hills?/i)) label = `RN-INT-HL ${durStr}`.trim();
+      else label = `RN ${durStr}`.trim();
+      return isOptional ? `OPT ${label}` : label;
     }
 
     // BIKE
     if (type === 'ride' || type === 'bike') {
-      if (has(/bike_vo2_/i) || has(/vo2/i)) return `BK-VO2 ${durStr}`.trim();
-      if (has(/bike_thr_/i)) return `BK-THR ${durStr}`.trim();
-      if (has(/bike_ss_/i)) return `BK-SS ${durStr}`.trim();
-      if (has(/endurance|z2|long\s*ride/i)) return `BK-LR ${durStr}`.trim();
-      return `BK ${durStr}`.trim();
+      let label = '';
+      if (has(/bike_vo2_/i) || has(/vo2/i)) label = `BK-VO2 ${durStr}`.trim();
+      else if (has(/bike_thr_/i)) label = `BK-THR ${durStr}`.trim();
+      else if (has(/bike_ss_/i)) label = `BK-SS ${durStr}`.trim();
+      else if (has(/endurance|z2|long\s*ride/i)) label = `BK-LR ${durStr}`.trim();
+      else label = `BK ${durStr}`.trim();
+      return isOptional ? `OPT ${label}` : label;
     }
 
     // SWIM - Always show duration
     if (type === 'swim') {
-      if (has(/swim_intervals_/i)) return durStr ? `SM-INT ${durStr}`.trim() : 'SM-INT';
-      if (has(/technique|drill|drills|swim_drills_/i)) return durStr ? `SM-DRL ${durStr}`.trim() : 'SM-DRL';
-      return durStr ? `SM ${durStr}`.trim() : 'SM';
+      let label = '';
+      if (has(/swim_intervals_/i)) label = durStr ? `SM-INT ${durStr}`.trim() : 'SM-INT';
+      else if (has(/technique|drill|drills|swim_drills_/i)) label = durStr ? `SM-DRL ${durStr}`.trim() : 'SM-DRL';
+      else label = durStr ? `SM ${durStr}`.trim() : 'SM';
+      return isOptional ? `OPT ${label}` : label;
     }
 
     // MOBILITY / PT
     if (type === 'mobility') {
-      return `MBL`.trim();
+      const label = `MBL`.trim();
+      return isOptional ? `OPT ${label}` : label;
     }
 
     // PILATES/YOGA - Show specific type based on session_type
     if (type === 'pilates_yoga') {
       const metadata = (w as any)?.workout_metadata || {};
       const sessionType = metadata.session_type;
+      let label = '';
       if (sessionType) {
         if (sessionType.startsWith('pilates_')) {
-          if (sessionType === 'pilates_reformer') return `PLT-REF ${durStr}`.trim();
-          if (sessionType === 'pilates_mat') return `PLT-MAT ${durStr}`.trim();
-          return `PLT ${durStr}`.trim();
-        }
-        if (sessionType.startsWith('yoga_')) {
-          if (sessionType === 'yoga_power') return `YGO-PWR ${durStr}`.trim();
-          if (sessionType === 'yoga_flow') return `YGO-FLW ${durStr}`.trim();
-          if (sessionType === 'yoga_restorative') return `YGO-RST ${durStr}`.trim();
-          return `YGO ${durStr}`.trim();
+          if (sessionType === 'pilates_reformer') label = `PLT-REF ${durStr}`.trim();
+          else if (sessionType === 'pilates_mat') label = `PLT-MAT ${durStr}`.trim();
+          else label = `PLT ${durStr}`.trim();
+        } else if (sessionType.startsWith('yoga_')) {
+          if (sessionType === 'yoga_power') label = `YGO-PWR ${durStr}`.trim();
+          else if (sessionType === 'yoga_flow') label = `YGO-FLW ${durStr}`.trim();
+          else if (sessionType === 'yoga_restorative') label = `YGO-RST ${durStr}`.trim();
+          else label = `YGO ${durStr}`.trim();
         }
       }
-      // Fallback: try to infer from name/description with better patterns
-      const nameLower = String(w.name || '').toLowerCase();
-      const descLower = String(w.description || '').toLowerCase();
-      const combined = (nameLower + ' ' + descLower).toLowerCase();
-      
-      // Check for specific yoga types first (more specific)
-      if (/yoga.*power|ashtanga|power.*yoga/i.test(combined)) return `YGO-PWR ${durStr}`.trim();
-      if (/yoga.*flow|vinyasa|flow.*yoga/i.test(combined)) return `YGO-FLW ${durStr}`.trim();
-      if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) return `YGO-RST ${durStr}`.trim();
-      if (/yoga/i.test(combined)) return `YGO ${durStr}`.trim();
-      
-      // Check for specific pilates types
-      if (/reformer/i.test(combined) && !/mat/i.test(combined)) return `PLT-REF ${durStr}`.trim();
-      if (/mat/i.test(combined) && !/reformer/i.test(combined)) return `PLT-MAT ${durStr}`.trim();
-      // If both mentioned, prefer reformer (more specific equipment)
-      if (/reformer/i.test(combined)) return `PLT-REF ${durStr}`.trim();
-      if (/mat/i.test(combined)) return `PLT-MAT ${durStr}`.trim();
-      
-      // Generic pilates
-      if (/pilates/i.test(combined)) return `PLT ${durStr}`.trim();
-      
-      // Last resort: check if name is just "Session" and use description
-      if (nameLower === 'session' || nameLower === 'pilates session' || nameLower === 'yoga session') {
-        if (/reformer/i.test(descLower)) return `PLT-REF ${durStr}`.trim();
-        if (/mat/i.test(descLower)) return `PLT-MAT ${durStr}`.trim();
-        if (/yoga/i.test(descLower)) return `YGO ${durStr}`.trim();
-        if (/pilates/i.test(descLower)) return `PLT ${durStr}`.trim();
+      if (!label) {
+        // Fallback: try to infer from name/description with better patterns
+        const nameLower = String(w.name || '').toLowerCase();
+        const descLower = String(w.description || '').toLowerCase();
+        const combined = (nameLower + ' ' + descLower).toLowerCase();
+        
+        // Check for specific yoga types first (more specific)
+        if (/yoga.*power|ashtanga|power.*yoga/i.test(combined)) label = `YGO-PWR ${durStr}`.trim();
+        else if (/yoga.*flow|vinyasa|flow.*yoga/i.test(combined)) label = `YGO-FLW ${durStr}`.trim();
+        else if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) label = `YGO-RST ${durStr}`.trim();
+        else if (/yoga/i.test(combined)) label = `YGO ${durStr}`.trim();
+        // Check for specific pilates types
+        else if (/reformer/i.test(combined) && !/mat/i.test(combined)) label = `PLT-REF ${durStr}`.trim();
+        else if (/mat/i.test(combined) && !/reformer/i.test(combined)) label = `PLT-MAT ${durStr}`.trim();
+        // If both mentioned, prefer reformer (more specific equipment)
+        else if (/reformer/i.test(combined)) label = `PLT-REF ${durStr}`.trim();
+        else if (/mat/i.test(combined)) label = `PLT-MAT ${durStr}`.trim();
+        // Generic pilates
+        else if (/pilates/i.test(combined)) label = `PLT ${durStr}`.trim();
+        // Last resort: check if name is just "Session" and use description
+        else if (nameLower === 'session' || nameLower === 'pilates session' || nameLower === 'yoga session') {
+          if (/reformer/i.test(descLower)) label = `PLT-REF ${durStr}`.trim();
+          else if (/mat/i.test(descLower)) label = `PLT-MAT ${durStr}`.trim();
+          else if (/yoga/i.test(descLower)) label = `YGO ${durStr}`.trim();
+          else if (/pilates/i.test(descLower)) label = `PLT ${durStr}`.trim();
+        }
+        if (!label) label = `PY ${durStr}`.trim(); // Generic fallback
       }
-      
-      return `PY ${durStr}`.trim(); // Generic fallback
+      return isOptional ? `OPT ${label}` : label;
     }
 
     // STRENGTH - Abbreviate names consistently for calendar cells
@@ -205,6 +218,7 @@ function derivePlannedCellLabel(w: any): string | null {
       // Check workout_structure.title first (from plans), then workout.name
       const stTitle = String((w as any)?.workout_structure?.title || '').trim();
       const name = stTitle || String(w.name || '').trim();
+      let label = '';
       if (name && name.toLowerCase() !== 'strength') {
         // Strip date suffix like "Strength - 11/24/2025"
         let cleanName = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
@@ -213,21 +227,21 @@ function derivePlannedCellLabel(w: any): string | null {
         
         // Abbreviate based on name pattern
         const nameLower = cleanName.toLowerCase();
-        if (/^upper/i.test(cleanName)) return 'Upper STG';
-        if (/^lower/i.test(cleanName)) return 'Lower STG';
-        if (/^full/i.test(cleanName)) return 'Full STG';
-        
-        // If name doesn't match patterns, use generic STG
-        return 'STG';
+        if (/^upper/i.test(cleanName)) label = 'Upper STG';
+        else if (/^lower/i.test(cleanName)) label = 'Lower STG';
+        else if (/^full/i.test(cleanName)) label = 'Full STG';
+        else label = 'STG';
+      } else {
+        // Fallback to abbreviation logic if no name
+        const hasCompound = /squat|deadlift|bench|ohp/.test(txt);
+        const hasAccessory = /chin|row|pull|lunge|accessor/i.test(txt);
+        const hasCore = /core/.test(txt);
+        if (hasCompound) label = 'STG-CMP';
+        else if (hasAccessory) label = 'STG-ACC';
+        else if (hasCore) label = 'STG-CORE';
+        else label = 'STG';
       }
-      // Fallback to abbreviation logic if no name
-      const hasCompound = /squat|deadlift|bench|ohp/.test(txt);
-      const hasAccessory = /chin|row|pull|lunge|accessor/i.test(txt);
-      const hasCore = /core/.test(txt);
-      if (hasCompound) return 'STG-CMP';
-      if (hasAccessory) return 'STG-ACC';
-      if (hasCore) return 'STG-CORE';
-      return 'STG';
+      return isOptional ? `OPT ${label}` : label;
     }
 
     return null;
@@ -265,21 +279,6 @@ export default function WorkoutCalendar({
   const unifiedPlanned = unifiedItems
     .filter((it:any)=> !!it?.planned)
     .map((it:any)=> mapUnifiedItemToPlanned(it));
-  
-  // Debug: Check swims at each step
-  useEffect(() => {
-    const swimsInUnified = unifiedItems.filter((it:any) => {
-      const type = String(it?.type || it?.planned?.type || '').toLowerCase();
-      return type === 'swim' && !!it?.planned;
-    });
-    const swimsInPlanned = unifiedPlanned.filter((p:any) => String(p?.type || '').toLowerCase() === 'swim');
-    console.log('[WorkoutCalendar] Swim check:', {
-      inUnifiedItems: swimsInUnified.length,
-      inUnifiedPlanned: swimsInPlanned.length,
-      unifiedItems: swimsInUnified.map((it:any) => ({ id: it.id, type: it.type, status: it.status })),
-      unifiedPlanned: swimsInPlanned.map((p:any) => ({ id: p.id, type: p.type, workout_status: p.workout_status }))
-    });
-  }, [unifiedItems, unifiedPlanned]);
   // Only include completed workouts (items with executed data)
   // Planned-only items are already covered by unifiedPlanned to avoid duplicates
   const unifiedWorkouts = unifiedItems
@@ -411,40 +410,13 @@ export default function WorkoutCalendar({
       .filter((p:any) => {
         // Don't include planned workouts that are linked to a completed workout
         // The completed workout will show instead
-        const isLinked = workoutIdByPlannedId.has(String(p?.id));
-        if (String(p?.type || '').toLowerCase() === 'swim') {
-          console.log('[WorkoutCalendar] Swim in mappedPlanned filter:', {
-            id: p.id,
-            type: p.type,
-            workout_status: p.workout_status,
-            isLinked,
-            willInclude: !isLinked
-          });
-        }
-        return !isLinked;
+        return !workoutIdByPlannedId.has(String(p?.id));
       });
-    
-    // Debug: Check swims after filtering
-    const swimsInMapped = mappedPlanned.filter((w:any) => String(w?.type || '').toLowerCase() === 'swim');
-    if (swimsInMapped.length > 0) {
-      console.log('[WorkoutCalendar] Swims in mappedPlanned:', swimsInMapped.map((w:any) => ({
-        id: w.id,
-        type: w.type,
-        workout_status: w.workout_status,
-        date: w.date
-      })));
-    }
 
     const all = [ ...wkCombinedFiltered, ...mappedPlanned ];
     // Don't filter out optional workouts - show them like Today's Efforts does
     // (Today's Efforts shows both activated and optional workouts)
     const allFiltered = all;
-    
-    // Debug: Check if swims are in allFiltered
-    const swimsInAllFiltered = allFiltered.filter((w:any) => String(w?.type || '').toLowerCase() === 'swim');
-    if (swimsInAllFiltered.length > 0) {
-      console.log('[WorkoutCalendar] Swims in allFiltered:', swimsInAllFiltered.length);
-    }
 
     // Build raw events with consistent labels; collapse exact duplicates by (id) to prevent double materialize artifacts
     const rawAll = allFiltered
@@ -454,21 +426,6 @@ export default function WorkoutCalendar({
         if (w.date >= today) {
           const isPlanned = w.workout_status === 'planned' || !w.workout_status;
           const isCompleted = w.workout_status === 'completed';
-          
-          // Debug: Check if swims are being filtered out by date/status check
-          const isSwim = String(w?.type || '').toLowerCase() === 'swim';
-          if (isSwim) {
-            console.log('[WorkoutCalendar] Swim in rawAll filter:', {
-              id: w.id,
-              date: w.date,
-              today,
-              workout_status: w.workout_status,
-              isPlanned,
-              isCompleted,
-              willInclude: isPlanned || isCompleted
-            });
-          }
-          
           return isPlanned || isCompleted;
         } else {
           return true;
@@ -481,18 +438,6 @@ export default function WorkoutCalendar({
         const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '', w);
         const isCompleted = String(w?.workout_status||'').toLowerCase()==='completed';
         const isPlannedLinked = isCompleted && !!(w as any)?.planned_id;
-        
-        // Debug: Check swim label generation
-        const isSwim = String(w?.type || '').toLowerCase() === 'swim';
-        if (isSwim) {
-          console.log('[WorkoutCalendar] Swim label generation:', {
-            id: w.id,
-            plannedLabel,
-            typeAbbrev: t,
-            milesText,
-            workout_status: w.workout_status
-          });
-        }
         
         // Determine checkmark based on status
         let checkmark = '';
