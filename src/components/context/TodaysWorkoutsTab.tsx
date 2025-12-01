@@ -1059,17 +1059,25 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                       
                       const friendlySport = getFriendlySport();
                       
-                      // Check if name is already nice (not a raw activity_type)
+                      // Check if name is already nice (not a raw activity_type or single lowercase word)
                       const existingName = workout.name;
-                      if (existingName && 
-                          !existingName.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i) &&
-                          !existingName.startsWith('Garmin ') &&
-                          !existingName.startsWith('Strava ')) {
-                        return existingName;
+                      if (existingName) {
+                        // Check if it's a raw provider code (all caps with underscores)
+                        const isRawProviderCode = existingName.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i);
+                        // Check if it's a generic provider name
+                        const isGenericProvider = existingName.startsWith('Garmin ') || existingName.startsWith('Strava ');
+                        // Check if it's just a lowercase single word (like "swim", "run", "ride")
+                        const isLowercaseSingleWord = existingName === existingName.toLowerCase() && 
+                                                      !existingName.includes(' ') && 
+                                                      ['swim', 'run', 'ride', 'walk', 'strength'].includes(existingName.toLowerCase());
+                        
+                        // Only use existing name if it's actually nice (not raw, not generic, not lowercase single word)
+                        if (!isRawProviderCode && !isGenericProvider && !isLowercaseSingleWord) {
+                          return existingName;
+                        }
                       }
                       
-                      // TODO: Add location name when reverse geocoding is available
-                      // For now, return just the sport type
+                      // Generate nice name from type and activity data
                       return friendlySport;
                     })()}
                   </div>

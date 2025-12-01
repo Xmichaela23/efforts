@@ -843,11 +843,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             }
                             // Use workout.name if it's nice, otherwise fall back to getDisplaySport
                             const name = workout.name;
-                            if (name && 
-                                !name.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i) &&
-                                !name.startsWith('Garmin ') &&
-                                !name.startsWith('Strava ')) {
-                              return name;
+                            if (name) {
+                              // Check if it's a raw provider code or lowercase single word
+                              const isRawProviderCode = name.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i);
+                              const isGenericProvider = name.startsWith('Garmin ') || name.startsWith('Strava ');
+                              const isLowercaseSingleWord = name === name.toLowerCase() && 
+                                                            !name.includes(' ') && 
+                                                            ['swim', 'run', 'ride', 'walk', 'strength'].includes(name.toLowerCase());
+                              
+                              // Only use existing name if it's actually nice
+                              if (!isRawProviderCode && !isGenericProvider && !isLowercaseSingleWord) {
+                                return name;
+                              }
                             }
                             return getDisplaySport(workout);
                           })()}
