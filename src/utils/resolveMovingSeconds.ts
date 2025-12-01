@@ -5,6 +5,87 @@
 export function resolveMovingSeconds(workout: any): number | null {
   try {
     const src = workout as any;
+    const isPlanned = String(src?.workout_status || '').toLowerCase() === 'planned';
+    
+    // For planned workouts, use planned duration calculation
+    if (isPlanned) {
+      const comp: any = src?.computed || {};
+      let secs = 0;
+      // Priority 1: total_duration_seconds at root level
+      const rootTs = Number(src?.total_duration_seconds);
+      if (Number.isFinite(rootTs) && rootTs > 0) secs = rootTs;
+      // Priority 2: computed.total_duration_seconds
+      const ts = Number(comp?.total_duration_seconds);
+      if (secs <= 0 && Number.isFinite(ts) && ts > 0) secs = ts;
+      // Priority 3: sum of computed.steps.seconds
+      if (secs <= 0 && Array.isArray(comp?.steps) && comp.steps.length > 0) {
+        try {
+          secs = comp.steps.reduce((a: number, s: any) => a + (Number(s?.seconds) || 0), 0);
+        } catch {}
+      }
+      // Priority 4: sum of intervals
+      if (secs <= 0 && Array.isArray(src?.intervals) && src.intervals.length > 0) {
+        try {
+          const sumIntervals = (arr: any[]): number => arr.reduce((acc: number, it: any) => {
+            if (Array.isArray(it?.segments) && Number(it?.repeatCount) > 0) {
+              const segSum = it.segments.reduce((s: number, sg: any) => s + (Number(sg?.duration) || 0), 0);
+              return acc + segSum * Number(it.repeatCount);
+            }
+            return acc + (Number(it?.duration) || 0);
+          }, 0);
+          const sInt = sumIntervals(src.intervals);
+          if (Number.isFinite(sInt) && sInt > 0) secs = sInt;
+        } catch {}
+      }
+      // Priority 5: extract from steps_preset or description
+      if (secs <= 0) {
+        const steps: string[] = Array.isArray(src?.steps_preset) ? src.steps_preset : [];
+        const txt = String(src?.description || '').toLowerCase();
+        // Check steps_preset for duration patterns
+        if (steps.length > 0) {
+          try {
+            for (const step of steps) {
+              const stepStr = String(step).toLowerCase();
+              const minMatch = stepStr.match(/(\d+)\s*(?:min|m|minutes?)/i);
+              if (minMatch) {
+                const mins = Number(minMatch[1]);
+                if (Number.isFinite(mins) && mins > 0) {
+                  secs = mins * 60;
+                  break;
+                }
+              }
+              const hourMatch = stepStr.match(/(\d+(?:\.\d+)?)\s*h(?:ours?)?/i);
+              if (hourMatch) {
+                const hours = Number(hourMatch[1]);
+                if (Number.isFinite(hours) && hours > 0) {
+                  secs = hours * 3600;
+                  break;
+                }
+              }
+            }
+          } catch {}
+        }
+        // Check description for duration patterns
+        if (secs <= 0 && txt) {
+          try {
+            const minMatch = txt.match(/(\d+)\s*(?:min|m|minutes?)/i);
+            if (minMatch) {
+              const mins = Number(minMatch[1]);
+              if (Number.isFinite(mins) && mins > 0) secs = mins * 60;
+            } else {
+              const hourMatch = txt.match(/(\d+(?:\.\d+)?)\s*h(?:ours?)?/i);
+              if (hourMatch) {
+                const hours = Number(hourMatch[1]);
+                if (Number.isFinite(hours) && hours > 0) secs = hours * 3600;
+              }
+            }
+          } catch {}
+        }
+      }
+      if (secs > 0) return Math.round(secs);
+      return null;
+    }
+    
     // Ensure metrics is parsed if it arrives as a JSON string
     const METRICS = (() => {
       try {
