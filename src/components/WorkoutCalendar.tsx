@@ -844,6 +844,41 @@ export default function WorkoutCalendar({
                     }
                     return null;
                   })()}
+                  
+                  {/* Total Pilates/Yoga Hours - calculated from pilates_yoga workouts */}
+                  {(() => {
+                    // Calculate total hours from all pilates/yoga workouts in the week
+                    let totalMinutes = 0;
+                    for (const item of unifiedItems) {
+                      if (String(item?.type || '').toLowerCase() === 'pilates_yoga') {
+                        // Use resolveMovingSeconds to get duration (works for both planned and completed)
+                        const secs = resolveMovingSeconds(item);
+                        if (secs && secs > 0) {
+                          totalMinutes += Math.round(secs / 60);
+                        }
+                      }
+                    }
+                    
+                    if (totalMinutes > 0) {
+                      const hours = Math.floor(totalMinutes / 60);
+                      const mins = totalMinutes % 60;
+                      const hoursDisplay = hours > 0 
+                        ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`)
+                        : `${mins}m`;
+                      
+                      return (
+                        <div className="space-y-1 pt-1 border-t border-gray-200">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600">Pilates/Yoga:</span>
+                            <span className="font-medium text-gray-700">
+                              {hoursDisplay}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
             </div>
