@@ -788,6 +788,62 @@ export default function WorkoutCalendar({
                       )}
                     </div>
                   )}
+                  
+                  {/* Total Volume Load - calculated from strength workouts */}
+                  {(() => {
+                    // Calculate total volume load from all strength workouts in the week
+                    // Volume load = sum of (weight × reps) for all completed sets
+                    let totalVolumeLoad = 0;
+                    for (const item of unifiedItems) {
+                      if (String(item?.type || '').toLowerCase() === 'strength') {
+                        // Only count executed exercises from completed workouts
+                        const executedExercises = Array.isArray(item?.executed?.strength_exercises) 
+                          ? item.executed.strength_exercises 
+                          : [];
+                        
+                        for (const ex of executedExercises) {
+                          if (!ex || !Array.isArray(ex.sets)) continue;
+                          
+                          // Check if exercise is time-based (planks, holds, etc.)
+                          const isTimeBased = ex.name?.toLowerCase().includes('plank') || 
+                                            ex.name?.toLowerCase().includes('wall sit') ||
+                                            ex.name?.toLowerCase().includes('hold') ||
+                                            ex.sets.some((s: any) => s.duration_seconds && s.duration_seconds > 0 && (!s.reps || s.reps === 0));
+                          
+                          // Skip time-based exercises - they don't contribute to volume load
+                          if (isTimeBased) continue;
+                          
+                          // Calculate volume for this exercise
+                          for (const set of ex.sets) {
+                            // Only count completed sets
+                            if (set.completed === false) continue;
+                            
+                            const weight = Number(set.weight) || 0;
+                            const reps = Number(set.reps) || 0;
+                            
+                            // Only add if both weight and reps are valid
+                            if (weight > 0 && reps > 0) {
+                              totalVolumeLoad += weight * reps;
+                            }
+                          }
+                        }
+                      }
+                    }
+                    
+                    if (totalVolumeLoad > 0) {
+                      return (
+                        <div className="space-y-1 pt-1 border-t border-gray-200">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600">Strength:</span>
+                            <span className="font-medium text-gray-700">
+                              {totalVolumeLoad.toLocaleString()} {useImperial ? 'lb' : 'kg'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
             </div>
