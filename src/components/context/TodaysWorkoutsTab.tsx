@@ -546,15 +546,28 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     // Auto-trigger analysis if workout is completed but has no analysis and isn't already being analyzed
     // Auto-trigger for workout types that have analyzers (run, strength, ride, swim)
     // Only auto-trigger if we're NOT already showing a spinner for this workout
+    // SKIP auto-trigger if analysis failed with a permanent error (e.g., "No sensor data available")
     const workoutStatus = workoutWithAnalysis.workout_status || workoutWithAnalysis.status;
     const hasAnalyzerImplemented = ['run', 'running', 'strength', 'strength_training', 'ride', 'cycling', 'bike', 'swim', 'swimming'].includes(workoutWithAnalysis.type?.toLowerCase());
     const isCurrentlyAnalyzing = analyzingWorkout === workoutWithAnalysis.id || analyzingRef.current.has(workoutWithAnalysis.id);
+    
+    // Check for permanent errors that shouldn't be retried
+    const analysisError = workoutWithAnalysis.analysis_error || '';
+    const permanentErrors = [
+      'No sensor data available',
+      'No sensor data',
+      'sensor data',
+      'No computed data available'
+    ];
+    const hasPermanentError = workoutWithAnalysis.analysis_status === 'failed' && 
+      permanentErrors.some(err => analysisError.toLowerCase().includes(err.toLowerCase()));
     
     if (workoutStatus === 'completed' && 
         hasAnalyzerImplemented &&
         !workoutWithAnalysis.workout_analysis && 
         workoutWithAnalysis.analysis_status !== 'analyzing' &&
         workoutWithAnalysis.analysis_status !== 'complete' &&
+        !hasPermanentError && // Don't auto-retry permanent errors
         !isCurrentlyAnalyzing) {
       console.log('🔄 Auto-triggering analysis for completed workout without analysis:', workoutWithAnalysis.id, 'type:', workoutWithAnalysis.type);
       // Trigger analysis in background (don't await) and start polling
@@ -937,6 +950,54 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 </div>
               );
             }
+            // Check if workout has a failed status with error message
+            const displayedWorkout = recentWorkouts.find(w => 
+              w.id === (selectedWorkoutId || analysisMetrics?.workout?.id)
+            );
+            const workoutFailedError = displayedWorkout?.analysis_status === 'failed' 
+              ? displayedWorkout.analysis_error 
+              : null;
+            
+            if (workoutFailedError) {
+              // Check if it's a permanent error
+              const permanentErrors = [
+                'No sensor data available',
+                'No sensor data',
+                'sensor data',
+                'No computed data available'
+              ];
+              const isPermanentError = permanentErrors.some(err => 
+                workoutFailedError.toLowerCase().includes(err.toLowerCase())
+              );
+              
+              return (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div className="text-sm font-medium text-red-800">
+                    Analysis Failed
+                  </div>
+                  <div className="text-xs text-red-600 mt-1">
+                    {workoutFailedError}
+                  </div>
+                  {!isPermanentError && selectedWorkoutId && (
+                    <button
+                      onClick={() => {
+                        setAnalysisError(null);
+                        analyzeWorkout(selectedWorkoutId);
+                      }}
+                      className="mt-2 text-xs text-red-700 hover:text-red-900 underline"
+                    >
+                      Try again
+                    </button>
+                  )}
+                  {isPermanentError && (
+                    <div className="text-xs text-red-500 mt-1 italic">
+                      This error cannot be resolved. The workout is missing required data.
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            
             return (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <div className="text-sm font-medium text-gray-800">
