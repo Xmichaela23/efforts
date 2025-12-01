@@ -748,55 +748,43 @@ export default function WorkoutCalendar({
                     </div>
                   </div>
                   
-                  {/* Distance Totals - server-provided */}
-                  {weeklyStats.distances && (
-                    <div className="space-y-1 pt-1">
-                      {/* Run Distance */}
-                      {weeklyStats.distances.run_meters > 0 && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600">Run:</span>
-                          <span className="font-medium text-gray-700">
-                            {useImperial 
-                              ? `${(weeklyStats.distances.run_meters / 1609.34).toFixed(1)} mi`
-                              : `${(weeklyStats.distances.run_meters / 1000).toFixed(1)} km`}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {/* Swim Distance */}
-                      {weeklyStats.distances.swim_meters > 0 && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600">Swim:</span>
-                          <span className="font-medium text-gray-700">
-                            {useImperial
-                              ? `${Math.round(weeklyStats.distances.swim_meters / 0.9144)} yd`
-                              : `${Math.round(weeklyStats.distances.swim_meters)} m`}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {/* Cycling Distance */}
-                      {weeklyStats.distances.cycling_meters > 0 && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600">Bike:</span>
-                          <span className="font-medium text-gray-700">
-                            {useImperial
-                              ? `${(weeklyStats.distances.cycling_meters / 1609.34).toFixed(1)} mi`
-                              : `${(weeklyStats.distances.cycling_meters / 1000).toFixed(1)} km`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Total Volume Load - calculated from strength workouts */}
+                  {/* All Metrics - grouped together */}
                   {(() => {
-                    // Calculate total volume load from all strength workouts in the week
-                    // Volume load = sum of (weight × reps) for all completed sets
+                    // Collect all metrics in one array
+                    const metrics: Array<{ label: string; value: string }> = [];
+                    
+                    // Distance Totals - server-provided
+                    if (weeklyStats.distances) {
+                      if (weeklyStats.distances.run_meters > 0) {
+                        metrics.push({
+                          label: 'Run:',
+                          value: useImperial 
+                            ? `${(weeklyStats.distances.run_meters / 1609.34).toFixed(1)} mi`
+                            : `${(weeklyStats.distances.run_meters / 1000).toFixed(1)} km`
+                        });
+                      }
+                      if (weeklyStats.distances.swim_meters > 0) {
+                        metrics.push({
+                          label: 'Swim:',
+                          value: useImperial
+                            ? `${Math.round(weeklyStats.distances.swim_meters / 0.9144)} yd`
+                            : `${Math.round(weeklyStats.distances.swim_meters)} m`
+                        });
+                      }
+                      if (weeklyStats.distances.cycling_meters > 0) {
+                        metrics.push({
+                          label: 'Bike:',
+                          value: useImperial
+                            ? `${(weeklyStats.distances.cycling_meters / 1609.34).toFixed(1)} mi`
+                            : `${(weeklyStats.distances.cycling_meters / 1000).toFixed(1)} km`
+                        });
+                      }
+                    }
+                    
+                    // Total Volume Load - calculated from strength workouts
                     let totalVolumeLoad = 0;
                     for (const item of unifiedItems) {
                       if (String(item?.type || '').toLowerCase() === 'strength') {
-                        // Only count executed exercises from completed workouts
                         const executedExercises = Array.isArray(item?.executed?.strength_exercises) 
                           ? item.executed.strength_exercises 
                           : [];
@@ -804,24 +792,19 @@ export default function WorkoutCalendar({
                         for (const ex of executedExercises) {
                           if (!ex || !Array.isArray(ex.sets)) continue;
                           
-                          // Check if exercise is time-based (planks, holds, etc.)
                           const isTimeBased = ex.name?.toLowerCase().includes('plank') || 
                                             ex.name?.toLowerCase().includes('wall sit') ||
                                             ex.name?.toLowerCase().includes('hold') ||
                                             ex.sets.some((s: any) => s.duration_seconds && s.duration_seconds > 0 && (!s.reps || s.reps === 0));
                           
-                          // Skip time-based exercises - they don't contribute to volume load
                           if (isTimeBased) continue;
                           
-                          // Calculate volume for this exercise
                           for (const set of ex.sets) {
-                            // Only count completed sets
                             if (set.completed === false) continue;
                             
                             const weight = Number(set.weight) || 0;
                             const reps = Number(set.reps) || 0;
                             
-                            // Only add if both weight and reps are valid
                             if (weight > 0 && reps > 0) {
                               totalVolumeLoad += weight * reps;
                             }
@@ -831,27 +814,16 @@ export default function WorkoutCalendar({
                     }
                     
                     if (totalVolumeLoad > 0) {
-                      return (
-                        <div className="space-y-1 pt-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600">Strength:</span>
-                            <span className="font-medium text-gray-700">
-                              {totalVolumeLoad.toLocaleString()} {useImperial ? 'lb' : 'kg'}
-                            </span>
-                          </div>
-                        </div>
-                      );
+                      metrics.push({
+                        label: 'Strength:',
+                        value: `${totalVolumeLoad.toLocaleString()} ${useImperial ? 'lb' : 'kg'}`
+                      });
                     }
-                    return null;
-                  })()}
-                  
-                  {/* Total Pilates/Yoga Hours - calculated from pilates_yoga workouts */}
-                  {(() => {
-                    // Calculate total hours from all pilates/yoga workouts in the week
+                    
+                    // Total Pilates/Yoga Hours
                     let totalMinutes = 0;
                     for (const item of unifiedItems) {
                       if (String(item?.type || '').toLowerCase() === 'pilates_yoga') {
-                        // Use resolveMovingSeconds to get duration (works for both planned and completed)
                         const secs = resolveMovingSeconds(item);
                         if (secs && secs > 0) {
                           totalMinutes += Math.round(secs / 60);
@@ -865,15 +837,21 @@ export default function WorkoutCalendar({
                       const hoursDisplay = hours > 0 
                         ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`)
                         : `${mins}m`;
-                      
+                      metrics.push({
+                        label: 'Pilates/Yoga:',
+                        value: hoursDisplay
+                      });
+                    }
+                    
+                    if (metrics.length > 0) {
                       return (
                         <div className="space-y-1 pt-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600">Pilates/Yoga:</span>
-                            <span className="font-medium text-gray-700">
-                              {hoursDisplay}
-                            </span>
-                          </div>
+                          {metrics.map((metric, index) => (
+                            <div key={index} className="flex items-center justify-between text-xs">
+                              <span className="text-gray-600">{metric.label}</span>
+                              <span className="font-medium text-gray-700">{metric.value}</span>
+                            </div>
+                          ))}
                         </div>
                       );
                     }
