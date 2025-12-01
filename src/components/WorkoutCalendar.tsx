@@ -750,7 +750,7 @@ export default function WorkoutCalendar({
                   
                   {/* Distance Totals - server-provided */}
                   {weeklyStats.distances && (
-                    <div className="space-y-1 pt-1 border-t border-gray-200">
+                    <div className="space-y-1 pt-1">
                       {/* Run Distance */}
                       {weeklyStats.distances.run_meters > 0 && (
                         <div className="flex items-center justify-between text-xs">
@@ -832,7 +832,7 @@ export default function WorkoutCalendar({
                     
                     if (totalVolumeLoad > 0) {
                       return (
-                        <div className="space-y-1 pt-1 border-t border-gray-200">
+                        <div className="space-y-1 pt-1">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-gray-600">Strength:</span>
                             <span className="font-medium text-gray-700">
@@ -867,7 +867,7 @@ export default function WorkoutCalendar({
                         : `${mins}m`;
                       
                       return (
-                        <div className="space-y-1 pt-1 border-t border-gray-200">
+                        <div className="space-y-1 pt-1">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-gray-600">Pilates/Yoga:</span>
                             <span className="font-medium text-gray-700">
