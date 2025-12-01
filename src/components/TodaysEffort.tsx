@@ -135,6 +135,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           date: it.date,
           type: it.type,
           workout_status: 'planned',
+          name: it.planned?.name || null,
           description: it.planned?.description || null,
           rendered_description: it.planned?.rendered_description || it.planned?.description || null,
           computed: (Array.isArray(it.planned?.steps) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null),
