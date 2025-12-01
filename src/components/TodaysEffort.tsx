@@ -805,6 +805,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const desc = String(workout.description || '').toLowerCase();
                             const steps = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
                             if (type === 'strength') {
+                              // Debug: log what we actually have
+                              console.log('🔍 Strength workout data:', {
+                                name: workout.name,
+                                workout_structure: (workout as any)?.workout_structure,
+                                workout_structure_title: (workout as any)?.workout_structure?.title,
+                                description: workout.description,
+                                allKeys: Object.keys(workout)
+                              });
                               // Check workout_structure.title first (from plans), then workout.name
                               const stTitle = String((workout as any)?.workout_structure?.title || '').trim();
                               const name = stTitle || workout.name;
