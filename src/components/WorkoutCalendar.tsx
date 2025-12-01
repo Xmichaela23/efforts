@@ -843,6 +843,31 @@ export default function WorkoutCalendar({
                       });
                     }
                     
+                    // Total Workout Hours - sum of all workout durations
+                    let totalWorkoutMinutes = 0;
+                    for (const item of unifiedItems) {
+                      const type = String(item?.type || '').toLowerCase();
+                      // Skip strength (volume-based, not time-based) and mobility (no duration typically)
+                      if (type === 'strength' || type === 'mobility') continue;
+                      
+                      const secs = resolveMovingSeconds(item);
+                      if (secs && secs > 0) {
+                        totalWorkoutMinutes += Math.round(secs / 60);
+                      }
+                    }
+                    
+                    if (totalWorkoutMinutes > 0) {
+                      const hours = Math.floor(totalWorkoutMinutes / 60);
+                      const mins = totalWorkoutMinutes % 60;
+                      const hoursDisplay = hours > 0 
+                        ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`)
+                        : `${mins}m`;
+                      metrics.push({
+                        label: 'Total:',
+                        value: hoursDisplay
+                      });
+                    }
+                    
                     if (metrics.length > 0) {
                       return (
                         <div className="space-y-1 pt-1">
