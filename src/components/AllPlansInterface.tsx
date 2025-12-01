@@ -560,6 +560,22 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     }
     let planDetail = detailedPlans[planId as keyof typeof detailedPlans];
 
+    // If plan not found in detailedPlans, try fetching from database (plan might be newly created)
+    if (!planDetail) {
+      try {
+        const { data: planData } = await supabase
+          .from('plans')
+          .select('*')
+          .eq('id', planId)
+          .single();
+        if (planData) {
+          planDetail = planData;
+        }
+      } catch (err) {
+        console.warn('[handlePlanClick] Could not fetch plan from DB:', err);
+      }
+    }
+
     // Parse JSON-string fields persisted in plans row
     if (planDetail) {
       const tryParse = (v: any) => { if (typeof v !== 'string') return v; try { return JSON.parse(v); } catch { return v; } };
@@ -971,7 +987,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       setPlanStatus(pd.status || 'active');
       setCurrentView('detail');
     } else {
-      alert('Plan details are not available. Please try again.');
+      // Plan might still be materializing - try refreshing plans and retry
+      console.warn('[handlePlanClick] Plan details not available, plan might still be materializing');
+      // Don't show alert immediately - plan might just be processing
+      // Instead, try to refresh and show a loading state
+      setCurrentView('list');
+      // Optionally: could add a retry mechanism here
     }
   };
 
