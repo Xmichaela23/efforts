@@ -436,29 +436,9 @@ export default function WorkoutCalendar({
     }
 
     const all = [ ...wkCombinedFiltered, ...mappedPlanned ];
-    // Filter out planned optionals defensively (tags may be JSON string or array)
-    const allFiltered = all.filter((w: any) => {
-      const raw = (w as any).tags;
-      let tags: any[] = [];
-      if (Array.isArray(raw)) tags = raw;
-      else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
-      
-      // Debug: Check if swims are being filtered out by optional tag
-      const isSwim = String(w?.type || '').toLowerCase() === 'swim';
-      if (isSwim) {
-        const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
-        console.log('[WorkoutCalendar] Swim in allFiltered:', {
-          id: w.id,
-          tags,
-          isOptional,
-          willInclude: !isOptional
-        });
-      }
-      
-      // Hide optional planned rows entirely
-      if (tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional')) return false;
-      return true;
-    });
+    // Don't filter out optional workouts - show them like Today's Efforts does
+    // (Today's Efforts shows both activated and optional workouts)
+    const allFiltered = all;
     
     // Debug: Check if swims are in allFiltered
     const swimsInAllFiltered = allFiltered.filter((w:any) => String(w?.type || '').toLowerCase() === 'swim');
