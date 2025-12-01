@@ -17,12 +17,16 @@ import { PlannedWorkout } from '@/types/planned-workout';
 export function mapUnifiedItemToPlanned(item: any): PlannedWorkout {
   const planned = item.planned || {};
   
+  // For items with planned data, always set workout_status to 'planned'
+  // (item.status might be 'planned' or undefined, but we want it explicitly set)
+  const workoutStatus = planned.id ? 'planned' : (item.status || planned.workout_status || 'planned');
+  
   return {
     // Core identifiers
     id: planned.id || item.id,
     date: item.date,
     type: item.type || planned.type,
-    workout_status: (item.status || planned.workout_status || 'planned') as PlannedWorkout['workout_status'],
+    workout_status: workoutStatus as PlannedWorkout['workout_status'],
     
     // Name and description
     name: planned.name || null,

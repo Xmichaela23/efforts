@@ -122,9 +122,9 @@ function derivePlannedCellLabel(w: any): string | null {
 
     // RUN
     if (type === 'run') {
+      if (has(/interval_/i) && has(/5kpace|10kpace|rep|vo2/i)) return `RN-VO2 ${durStr}`.trim();
       if (has(/longrun_/i) || /long\b/.test(txt)) return `RN-LR ${durStr}`.trim();
       if (has(/tempo_/i)) return `RN-TMP ${durStr}`.trim();
-      if (has(/interval_/i) && has(/5kpace|10kpace|rep|vo2/i)) return `RN-INT-VO2 ${durStr}`.trim();
       if (has(/speed_|strides_/i)) return `RN-INT-SP ${durStr}`.trim();
       if (has(/hill|hills?/i)) return `RN-INT-HL ${durStr}`.trim();
       return `RN ${durStr}`.trim();
@@ -132,18 +132,18 @@ function derivePlannedCellLabel(w: any): string | null {
 
     // BIKE
     if (type === 'ride' || type === 'bike') {
-      if (has(/bike_vo2_/i)) return `BK-INT-VO2 ${durStr}`.trim();
+      if (has(/bike_vo2_/i) || has(/vo2/i)) return `BK-VO2 ${durStr}`.trim();
       if (has(/bike_thr_/i)) return `BK-THR ${durStr}`.trim();
       if (has(/bike_ss_/i)) return `BK-SS ${durStr}`.trim();
       if (has(/endurance|z2|long\s*ride/i)) return `BK-LR ${durStr}`.trim();
       return `BK ${durStr}`.trim();
     }
 
-    // SWIM
+    // SWIM - Always show duration
     if (type === 'swim') {
-      if (has(/swim_intervals_/i)) return `SM-INT ${durStr}`.trim();
-      if (has(/technique|drill|drills|swim_drills_/i)) return `SM-DRL ${durStr}`.trim();
-      return `SM ${durStr}`.trim();
+      if (has(/swim_intervals_/i)) return durStr ? `SM-INT ${durStr}`.trim() : 'SM-INT';
+      if (has(/technique|drill|drills|swim_drills_/i)) return durStr ? `SM-DRL ${durStr}`.trim() : 'SM-DRL';
+      return durStr ? `SM ${durStr}`.trim() : 'SM';
     }
 
     // MOBILITY / PT
@@ -200,45 +200,34 @@ function derivePlannedCellLabel(w: any): string | null {
       return `PY ${durStr}`.trim(); // Generic fallback
     }
 
-    // STRENGTH - Check name/workout_structure.title first before falling back to abbreviations
+    // STRENGTH - Abbreviate names consistently for calendar cells
     if (type === 'strength') {
       // Check workout_structure.title first (from plans), then workout.name
       const stTitle = String((w as any)?.workout_structure?.title || '').trim();
       const name = stTitle || String(w.name || '').trim();
       if (name && name.toLowerCase() !== 'strength') {
-        // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
-        const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
-        if (hasDateSuffix) {
-          const nameWithoutDate = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
-          // Add duration if available
-          const mmTok = steps.join(' ').toLowerCase().match(/strength_main_(\d+)min/);
-          const minsFromSteps = mmTok ? parseInt(mmTok[1], 10) : undefined;
-          const effMins = (typeof minsFromSteps === 'number' && minsFromSteps > 0)
-            ? ` ${minsFromSteps}m`
-            : (durStr ? ` ${durStr}` : '');
-          return `${nameWithoutDate}${effMins}`.trim();
-        }
-        // Use the name directly with duration if available
-        const mmTok = steps.join(' ').toLowerCase().match(/strength_main_(\d+)min/);
-        const minsFromSteps = mmTok ? parseInt(mmTok[1], 10) : undefined;
-        const effMins = (typeof minsFromSteps === 'number' && minsFromSteps > 0)
-          ? ` ${minsFromSteps}m`
-          : (durStr ? ` ${durStr}` : '');
-        return `${name}${effMins}`.trim();
+        // Strip date suffix like "Strength - 11/24/2025"
+        let cleanName = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+        // Strip modifiers like "- DELOAD", "- Volume", "- Power"
+        cleanName = cleanName.replace(/\s*-\s*(DELOAD|Volume|Power|Endurance|Hybrid)$/i, '').trim();
+        
+        // Abbreviate based on name pattern
+        const nameLower = cleanName.toLowerCase();
+        if (/^upper/i.test(cleanName)) return 'Upper STG';
+        if (/^lower/i.test(cleanName)) return 'Lower STG';
+        if (/^full/i.test(cleanName)) return 'Full STG';
+        
+        // If name doesn't match patterns, use generic STG
+        return 'STG';
       }
       // Fallback to abbreviation logic if no name
-      const mmTok = steps.join(' ').toLowerCase().match(/strength_main_(\d+)min/);
-      const minsFromSteps = mmTok ? parseInt(mmTok[1], 10) : undefined;
-      const effMins = (typeof minsFromSteps === 'number' && minsFromSteps > 0)
-        ? `${minsFromSteps}m`
-        : durStr;
       const hasCompound = /squat|deadlift|bench|ohp/.test(txt);
       const hasAccessory = /chin|row|pull|lunge|accessor/i.test(txt);
       const hasCore = /core/.test(txt);
-      if (hasCompound) return `STG-CMP ${effMins}`.trim();
-      if (hasAccessory) return `STG-ACC ${effMins}`.trim();
-      if (hasCore) return `STG-CORE ${effMins}`.trim();
-      return `STG ${effMins}`.trim();
+      if (hasCompound) return 'STG-CMP';
+      if (hasAccessory) return 'STG-ACC';
+      if (hasCore) return 'STG-CORE';
+      return 'STG';
     }
 
     return null;
