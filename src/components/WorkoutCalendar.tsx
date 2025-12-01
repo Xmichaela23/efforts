@@ -752,19 +752,31 @@ export default function WorkoutCalendar({
                         </button>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-xs">
-                          <strong>Total Workload Calculation</strong>
-                          <br />
-                          Includes all planned workouts for the week, including optional workouts marked with "OPT".
-                          <br />
-                          <br />
-                          Workload is calculated as: duration (hours) × intensity² × 100
-                          <br />
-                          <br />
-                          Planned: Sum of all workout workloads (including optionals)
-                          <br />
-                          Completed: Sum of actual workloads from completed workouts
-                        </p>
+                        <div className="text-xs space-y-2">
+                          <div>
+                            <strong>Total Workload</strong>
+                            <br />
+                            Tracks your weekly training stress by combining workout duration and intensity.
+                          </div>
+                          <div>
+                            <strong>How it works:</strong>
+                            <ul className="list-disc list-inside mt-1 space-y-0.5">
+                              <li>Longer workouts = higher workload</li>
+                              <li>Harder efforts = higher workload</li>
+                              <li>Different disciplines use appropriate metrics (pace/power for endurance, weight×reps for strength, RPE for yoga)</li>
+                            </ul>
+                          </div>
+                          <div>
+                            <strong>The numbers:</strong>
+                            <br />
+                            📅 <strong>Planned:</strong> Total scheduled training stress (includes optional workouts)
+                            <br />
+                            ✓ <strong>Completed:</strong> Actual training stress from finished workouts
+                          </div>
+                          <div className="pt-1 border-t border-gray-200">
+                            <strong>Why it matters:</strong> Use this to balance hard weeks (high workload) with recovery weeks (lower workload) and track your training progression over time.
+                          </div>
+                        </div>
                       </TooltipContent>
                     </Tooltip>
                     <div className="flex items-center gap-1">
