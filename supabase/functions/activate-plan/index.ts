@@ -264,7 +264,9 @@ Deno.serve(async (req) => {
         // Skip unknown/blank types instead of defaulting to run
         if (!mapped) continue
         const stepsTokens: string[] = Array.isArray(s?.steps_preset) ? s.steps_preset.map((t:any)=> String(t)) : []
-        const name = s.name || (s as any).title || titleFor(mapped, stepsTokens)
+        // Check multiple sources for the workout name: name, title, workout_structure.title
+        const workoutStructure = (s as any)?.workout_structure && typeof (s as any).workout_structure === 'object' ? (s as any).workout_structure : null
+        const name = s.name || (s as any).title || (workoutStructure?.title ? String(workoutStructure.title) : null) || titleFor(mapped, stepsTokens)
         const durationVal = (typeof s?.duration === 'number' && isFinite(s.duration)) ? s.duration : 0
 
         // Brick support: split into ride and run rows

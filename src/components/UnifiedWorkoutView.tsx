@@ -567,9 +567,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       const t = String(workout.type || '').toLowerCase();
       const typeLabel = t === 'run' ? 'Run' : t === 'ride' ? 'Ride' : t === 'swim' ? 'Swim' : t === 'strength' ? 'Strength' : 'Session';
       
-      // For strength workouts, check workout.name first (from plans, e.g., "Upper Body Volume", "Lower Body - DELOAD")
+      // For strength workouts, check workout_structure.title first (from plans), then workout.name
       if (t === 'strength') {
-        const name = String(workout.name || '').trim();
+        const stTitle = String((workout as any)?.workout_structure?.title || '').trim();
+        const name = stTitle || String(workout.name || '').trim();
         if (name && name.toLowerCase() !== 'strength') {
           // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
           const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
