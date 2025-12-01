@@ -541,6 +541,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
               <div className="flex flex-col items-center justify-center">
                 <Loader2 className="h-12 w-12 text-blue-600 animate-spin mb-4" />
                 <p className="text-lg font-medium text-gray-900">Saving workout...</p>
+                <p className="text-sm text-gray-500 mt-2">(you don't need to stay here while loading)</p>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center">
