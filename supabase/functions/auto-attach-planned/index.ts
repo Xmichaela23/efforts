@@ -99,8 +99,23 @@ Deno.serve(async (req) => {
     }
 
     console.log('[auto-attach-planned] About to call sportSubtype with:', w.provider_sport, w.type);
-    const { sport, subtype } = sportSubtype(w.provider_sport || w.type);
-    console.log('[auto-attach-planned] Sport:', sport, 'Subtype:', subtype);
+    
+    // Normalize the workout's actual type field (source of truth)
+    const { sport: workoutSport } = sportSubtype(w.type);
+    console.log('[auto-attach-planned] Workout type field:', w.type, 'normalized to:', workoutSport);
+    
+    // Also check provider_sport for reference, but type field takes precedence
+    const { sport: providerSport } = sportSubtype(w.provider_sport);
+    console.log('[auto-attach-planned] Provider sport:', w.provider_sport, 'normalized to:', providerSport);
+    
+    // Warn if there's a mismatch (might indicate data issue)
+    if (w.provider_sport && workoutSport !== providerSport) {
+      console.warn('[auto-attach-planned] ⚠️ Type mismatch: type field says', workoutSport, 'but provider_sport says', providerSport, '- using type field');
+    }
+    
+    // Use workout's type field as source of truth (prevents misclassification)
+    const finalSport = workoutSport;
+    console.log('[auto-attach-planned] Final sport for matching (from type field):', finalSport);
     // @ts-ignore
     const currentPlannedId = w.planned_id;
     console.log('[auto-attach-planned] Current planned_id:', currentPlannedId);
@@ -253,25 +268,30 @@ Deno.serve(async (req) => {
       .from('planned_workouts')
       .select('id,user_id,type,date,name,computed,intervals,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment,strength_exercises,mobility_exercises')
       .eq('user_id', w.user_id)
-      .eq('type', sport)
+      .eq('type', finalSport)
       .eq('date', day)
       .in('workout_status', ['planned','in_progress','completed']);
 
     let candidates = Array.isArray(plannedList) ? plannedList : [];
-    console.log('[auto-attach-planned] Found candidates:', candidates.length, 'for sport:', sport, 'day:', day);
+    console.log('[auto-attach-planned] Found candidates:', candidates.length, 'for sport:', finalSport, 'day:', day);
     if (!candidates.length) {
-      console.log('[auto-attach-planned] No candidates found for sport:', sport, 'day:', day);
+      console.log('[auto-attach-planned] No candidates found for sport:', finalSport, 'day:', day);
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    // Filter candidates by date/type match (already filtered by query, but double-check)
+    // Filter candidates by date/type match - normalize planned workout type the same way
     candidates = candidates.filter((p: any) => {
       const pdate = String((p as any).date || '').slice(0,10);
-      return pdate === day && String((p as any).type||'').toLowerCase() === sport;
+      const plannedTypeNormalized = sportSubtype((p as any).type).sport;
+      const matches = pdate === day && plannedTypeNormalized === finalSport;
+      if (!matches) {
+        console.log('[auto-attach-planned] Candidate filtered out:', p.id, 'planned type:', (p as any).type, 'normalized:', plannedTypeNormalized, 'expected:', finalSport);
+      }
+      return matches;
     });
 
     // ===== STRENGTH/MOBILITY: Match by date + type only (no duration check) =====
-    if (sport === 'strength' || sport === 'mobility') {
+    if (finalSport === 'strength' || finalSport === 'mobility') {
       console.log('[auto-attach-planned] Strength/mobility workout - matching by date + type only');
       if (candidates.length === 0) {
         return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -362,8 +382,9 @@ Deno.serve(async (req) => {
 
     for (const p of candidates) {
       const pdate = String((p as any).date || '').slice(0,10);
-      console.log('[auto-attach-planned] Checking candidate:', p.id, 'date:', pdate, 'type:', (p as any).type, 'sport:', sport);
-      if (pdate !== day || String((p as any).type||'').toLowerCase() !== sport) {
+      const plannedTypeNormalized = sportSubtype((p as any).type).sport;
+      console.log('[auto-attach-planned] Checking candidate:', p.id, 'date:', pdate, 'type:', (p as any).type, 'normalized:', plannedTypeNormalized, 'expected:', finalSport);
+      if (pdate !== day || plannedTypeNormalized !== finalSport) {
         console.log('[auto-attach-planned] Skipping candidate - date or type mismatch');
         continue;
       }
