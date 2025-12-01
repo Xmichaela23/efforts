@@ -747,7 +747,9 @@ export default function WorkoutCalendar({
                     <span className="text-sm font-medium">Total Workload</span>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Info className="w-3.5 h-3.5 text-gray-500 hover:text-gray-700 cursor-help" />
+                        <button type="button" className="inline-flex items-center">
+                          <Info className="w-3.5 h-3.5 text-gray-500 hover:text-gray-700 cursor-help" />
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
                         <p className="text-xs">
