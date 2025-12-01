@@ -442,10 +442,29 @@ export default function WorkoutCalendar({
       let tags: any[] = [];
       if (Array.isArray(raw)) tags = raw;
       else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
+      
+      // Debug: Check if swims are being filtered out by optional tag
+      const isSwim = String(w?.type || '').toLowerCase() === 'swim';
+      if (isSwim) {
+        const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
+        console.log('[WorkoutCalendar] Swim in allFiltered:', {
+          id: w.id,
+          tags,
+          isOptional,
+          willInclude: !isOptional
+        });
+      }
+      
       // Hide optional planned rows entirely
       if (tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional')) return false;
       return true;
     });
+    
+    // Debug: Check if swims are in allFiltered
+    const swimsInAllFiltered = allFiltered.filter((w:any) => String(w?.type || '').toLowerCase() === 'swim');
+    if (swimsInAllFiltered.length > 0) {
+      console.log('[WorkoutCalendar] Swims in allFiltered:', swimsInAllFiltered.length);
+    }
 
     // Build raw events with consistent labels; collapse exact duplicates by (id) to prevent double materialize artifacts
     const rawAll = allFiltered
@@ -455,6 +474,21 @@ export default function WorkoutCalendar({
         if (w.date >= today) {
           const isPlanned = w.workout_status === 'planned' || !w.workout_status;
           const isCompleted = w.workout_status === 'completed';
+          
+          // Debug: Check if swims are being filtered out by date/status check
+          const isSwim = String(w?.type || '').toLowerCase() === 'swim';
+          if (isSwim) {
+            console.log('[WorkoutCalendar] Swim in rawAll filter:', {
+              id: w.id,
+              date: w.date,
+              today,
+              workout_status: w.workout_status,
+              isPlanned,
+              isCompleted,
+              willInclude: isPlanned || isCompleted
+            });
+          }
+          
           return isPlanned || isCompleted;
         } else {
           return true;
@@ -467,6 +501,18 @@ export default function WorkoutCalendar({
         const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '', w);
         const isCompleted = String(w?.workout_status||'').toLowerCase()==='completed';
         const isPlannedLinked = isCompleted && !!(w as any)?.planned_id;
+        
+        // Debug: Check swim label generation
+        const isSwim = String(w?.type || '').toLowerCase() === 'swim';
+        if (isSwim) {
+          console.log('[WorkoutCalendar] Swim label generation:', {
+            id: w.id,
+            plannedLabel,
+            typeAbbrev: t,
+            milesText,
+            workout_status: w.workout_status
+          });
+        }
         
         // Determine checkmark based on status
         let checkmark = '';
