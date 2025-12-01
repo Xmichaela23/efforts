@@ -841,7 +841,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                               
                               return workout.name || 'Pilates/Yoga';
                             }
-                            return workout.name || getDisplaySport(workout);
+                            // Use workout.name if it's nice, otherwise fall back to getDisplaySport
+                            const name = workout.name;
+                            if (name && 
+                                !name.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i) &&
+                                !name.startsWith('Garmin ') &&
+                                !name.startsWith('Strava ')) {
+                              return name;
+                            }
+                            return getDisplaySport(workout);
                           })()}
                           {workout.workout_status === 'planned' && (
                             <span className="text-xs ml-2 text-gray-500">(planned)</span>

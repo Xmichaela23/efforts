@@ -304,9 +304,63 @@ export const useWorkouts = () => {
                 workoutType
               );
 
+              // Generate a nice workout name
+              const generateWorkoutName = () => {
+                // If activity has a custom name, use it (unless it's a raw activity_type)
+                if (activity.activity_name && 
+                    !activity.activity_name.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i)) {
+                  return activity.activity_name;
+                }
+                
+                // Get friendly sport type
+                const rawType = (activity.activity_type || '').toLowerCase();
+                const poolLength = activity.pool_length;
+                const numberOfLengths = activity.number_of_active_lengths;
+                const hasGps = activity.starting_latitude && activity.starting_longitude;
+                
+                let friendlySport = '';
+                if (workoutType === 'swim') {
+                  if (/open\s*water|ocean|ow\b|open_water/.test(rawType)) {
+                    friendlySport = 'Open Water Swim';
+                  } else if (/lap|pool|indoor/.test(rawType) || poolLength || numberOfLengths) {
+                    friendlySport = 'Lap Swim';
+                  } else if (hasGps) {
+                    friendlySport = 'Open Water Swim';
+                  } else {
+                    friendlySport = 'Lap Swim';
+                  }
+                } else if (workoutType === 'run') {
+                  if (/trail/.test(rawType)) {
+                    friendlySport = 'Trail Run';
+                  } else {
+                    friendlySport = 'Run';
+                  }
+                } else if (workoutType === 'ride') {
+                  if (/gravel/.test(rawType)) {
+                    friendlySport = 'Gravel Ride';
+                  } else if (/mountain|mtb/.test(rawType)) {
+                    friendlySport = 'Mountain Bike';
+                  } else if (/road/.test(rawType)) {
+                    friendlySport = 'Road Ride';
+                  } else {
+                    friendlySport = 'Ride';
+                  }
+                } else if (workoutType === 'walk') {
+                  friendlySport = /hike|hiking/.test(rawType) ? 'Hike' : 'Walk';
+                } else if (workoutType === 'strength') {
+                  friendlySport = 'Strength';
+                } else {
+                  friendlySport = workoutType.charAt(0).toUpperCase() + workoutType.slice(1);
+                }
+                
+                // TODO: Add location name when reverse geocoding is available
+                // For now, return just the sport type
+                return friendlySport;
+              };
+              
               return {
                 id: `garmin_${activity.garmin_activity_id || activity.id}`,
-                name: activity.activity_name || activity.activity_type || locationTitle || `Garmin ${workoutType}`,
+                name: generateWorkoutName(),
                 type: workoutType,
                 activity_type: activity.activity_type,
                 duration: Math.round(activity.duration_seconds / 60) || 0,
@@ -466,10 +520,60 @@ export const useWorkouts = () => {
             const iso = a.start_date || a.start_date_local || new Date().toISOString();
             const date = String(iso).split('T')[0];
             const startLatLng = Array.isArray(a.start_latlng) ? a.start_latlng : null;
-            const locationTitle = generateLocationTitleSync(startLatLng?.[0] ?? null, startLatLng?.[1] ?? null, type);
+            // Generate a nice workout name
+            const generateWorkoutName = () => {
+              // If Strava activity has a custom name, use it (unless it's generic)
+              if (a.name && !a.name.match(/^(Run|Ride|Swim|Workout)$/i)) {
+                return a.name;
+              }
+              
+              // Get friendly sport type
+              const rawType = (a.sport_type || a.type || '').toLowerCase();
+              const hasGps = startLatLng && startLatLng[0] && startLatLng[1];
+              
+              let friendlySport = '';
+              if (type === 'swim') {
+                if (/open\s*water|ocean|ow\b/.test(rawType)) {
+                  friendlySport = 'Open Water Swim';
+                } else if (/pool|indoor/.test(rawType)) {
+                  friendlySport = 'Lap Swim';
+                } else if (hasGps) {
+                  friendlySport = 'Open Water Swim';
+                } else {
+                  friendlySport = 'Lap Swim';
+                }
+              } else if (type === 'run') {
+                if (/trail/.test(rawType)) {
+                  friendlySport = 'Trail Run';
+                } else {
+                  friendlySport = 'Run';
+                }
+              } else if (type === 'ride') {
+                if (/gravel/.test(rawType)) {
+                  friendlySport = 'Gravel Ride';
+                } else if (/mountain|mtb/.test(rawType)) {
+                  friendlySport = 'Mountain Bike';
+                } else if (/road/.test(rawType)) {
+                  friendlySport = 'Road Ride';
+                } else {
+                  friendlySport = 'Ride';
+                }
+              } else if (type === 'walk') {
+                friendlySport = /hike/.test(rawType) ? 'Hike' : 'Walk';
+              } else if (type === 'strength') {
+                friendlySport = 'Strength';
+              } else {
+                friendlySport = type.charAt(0).toUpperCase() + type.slice(1);
+              }
+              
+              // TODO: Add location name when reverse geocoding is available
+              // For now, return just the sport type
+              return friendlySport;
+            };
+            
             return {
               id: `strava_${row.strava_id || a.id}`,
-              name: a.name || locationTitle || `Strava ${type}`,
+              name: generateWorkoutName(),
               type,
               duration: Math.round((a.moving_time || a.elapsed_time || 0) / 60),
               date,

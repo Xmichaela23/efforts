@@ -1025,7 +1025,53 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
               >
                 <div>
                   <div className="font-medium">
-                    {workout.name || `${workout.type} Workout`}
+                    {(() => {
+                      // Generate a nice workout name
+                      const type = workout.type || '';
+                      const activityType = workout.activity_type || workout.provider_sport || '';
+                      const poolLength = workout.pool_length || null;
+                      const numberOfLengths = workout.number_of_active_lengths || null;
+                      const hasGps = Array.isArray(workout.gps_track) && workout.gps_track.length > 0;
+                      
+                      // Get friendly sport type
+                      const getFriendlySport = () => {
+                        const rawType = activityType.toLowerCase();
+                        if (type === 'swim') {
+                          if (/open\s*water|ocean|ow\b|open_water/.test(rawType)) return 'Open Water Swim';
+                          if (/lap|pool|indoor/.test(rawType) || poolLength || numberOfLengths) return 'Lap Swim';
+                          if (hasGps) return 'Open Water Swim';
+                          return 'Lap Swim';
+                        }
+                        if (type === 'run') {
+                          if (/trail/.test(rawType)) return 'Trail Run';
+                          return 'Run';
+                        }
+                        if (type === 'ride') {
+                          if (/gravel/.test(rawType)) return 'Gravel Ride';
+                          if (/mountain|mtb/.test(rawType)) return 'Mountain Bike';
+                          if (/road/.test(rawType)) return 'Road Ride';
+                          return 'Ride';
+                        }
+                        if (type === 'walk') return 'Walk';
+                        if (type === 'strength') return 'Strength';
+                        return type.charAt(0).toUpperCase() + type.slice(1);
+                      };
+                      
+                      const friendlySport = getFriendlySport();
+                      
+                      // Check if name is already nice (not a raw activity_type)
+                      const existingName = workout.name;
+                      if (existingName && 
+                          !existingName.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i) &&
+                          !existingName.startsWith('Garmin ') &&
+                          !existingName.startsWith('Strava ')) {
+                        return existingName;
+                      }
+                      
+                      // TODO: Add location name when reverse geocoding is available
+                      // For now, return just the sport type
+                      return friendlySport;
+                    })()}
                   </div>
                   <div className="text-xs text-[#666666]">
                     {new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', { 

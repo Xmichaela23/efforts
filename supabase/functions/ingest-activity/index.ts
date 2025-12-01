@@ -509,9 +509,63 @@ async function mapGarminToWorkout(activity, userId) {
     if (summary?.poolLengthInMeters != null) merged.pool_length = Number(summary.poolLengthInMeters);
     return merged;
   })();
+  // Generate a nice workout name
+  const generateWorkoutName = () => {
+    // If activity has a custom name, use it (unless it's a raw activity_type)
+    if (activity.activity_name && 
+        !activity.activity_name.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i)) {
+      return activity.activity_name;
+    }
+    
+    // Get friendly sport type
+    const rawType = (activity.activity_type || '').toLowerCase();
+    const poolLength = computeInput?.pool_length || computeInput?.summary?.poolLengthInMeters;
+    const numberOfLengths = activity.number_of_active_lengths || computeInput?.summary?.numberOfActiveLengths;
+    const hasGps = Array.isArray(activity.gps_track) && activity.gps_track.length > 0;
+    
+    let friendlySport = '';
+    if (type === 'swim') {
+      if (/open\s*water|ocean|ow\b|open_water/.test(rawType)) {
+        friendlySport = 'Open Water Swim';
+      } else if (/lap|pool|indoor/.test(rawType) || poolLength || numberOfLengths) {
+        friendlySport = 'Lap Swim';
+      } else if (hasGps) {
+        friendlySport = 'Open Water Swim';
+      } else {
+        friendlySport = 'Lap Swim';
+      }
+    } else if (type === 'run') {
+      if (/trail/.test(rawType)) {
+        friendlySport = 'Trail Run';
+      } else {
+        friendlySport = 'Run';
+      }
+    } else if (type === 'ride') {
+      if (/gravel/.test(rawType)) {
+        friendlySport = 'Gravel Ride';
+      } else if (/mountain|mtb/.test(rawType)) {
+        friendlySport = 'Mountain Bike';
+      } else if (/road/.test(rawType)) {
+        friendlySport = 'Road Ride';
+      } else {
+        friendlySport = 'Ride';
+      }
+    } else if (type === 'walk') {
+      friendlySport = /hike|hiking/.test(rawType) ? 'Hike' : 'Walk';
+    } else if (type === 'strength') {
+      friendlySport = 'Strength';
+    } else {
+      friendlySport = type.charAt(0).toUpperCase() + type.slice(1);
+    }
+    
+    // TODO: Add location name when reverse geocoding is available
+    // For now, return just the sport type
+    return friendlySport;
+  };
+  
   return {
     user_id: userId,
-    name: activity.activity_name || activity.activity_type || `Garmin ${type}`,
+    name: generateWorkoutName(),
     type,
     refined_type: computeInput?.refined_type || null,
     date: date,

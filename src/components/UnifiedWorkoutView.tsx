@@ -630,13 +630,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     // Create title: "Location + Friendly Sport" or sanitized name fallback
     if (location && location !== 'Unknown Location') {
       return `${location} ${friendlySport()}`;
-    } else if (workout.name && !workout.name.includes('Garmin Activity')) {
-      const cleaned = humanize(String(workout.name));
-      // If name looks like a provider code (had underscores or all-caps), prefer friendly sport
-      if (/_/.test(String(workout.name)) || String(workout.name) === String(workout.name).toUpperCase()) {
-        return friendlySport();
+    } else if (workout.name && !workout.name.includes('Garmin Activity') && !workout.name.includes('Strava Activity')) {
+      // Check if name is already nice (not a raw provider code)
+      const nameStr = String(workout.name);
+      const isProviderCode = /^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i.test(nameStr) ||
+                            /_/.test(nameStr) && nameStr === nameStr.toUpperCase();
+      
+      if (!isProviderCode) {
+        // Name is already nice, use it as-is
+        return nameStr;
       }
-      return cleaned;
+      // Name is a provider code, use friendly sport instead
+      return friendlySport();
     } else {
       return friendlySport();
     }

@@ -428,8 +428,59 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     console.log('⚠️ Failed to enrich gpsTrack with altitude/time:', e);
   }
 
+  // Generate a nice workout name
+  const generateWorkoutName = () => {
+    // If Strava activity has a custom name, use it (unless it's generic)
+    if (a.name && a.name !== 'Strava Activity' && !a.name.match(/^(Run|Ride|Swim|Workout)$/i)) {
+      return a.name;
+    }
+    
+    // Get friendly sport type
+    const rawType = (a.sport_type || a.type || '').toLowerCase();
+    const hasGps = !!gpsTrack && gpsTrack.length > 0;
+    
+    let friendlySport = '';
+    if (type === 'swim') {
+      if (/open\s*water|ocean|ow\b/.test(rawType)) {
+        friendlySport = 'Open Water Swim';
+      } else if (/pool|indoor/.test(rawType)) {
+        friendlySport = 'Lap Swim';
+      } else if (hasGps) {
+        friendlySport = 'Open Water Swim';
+      } else {
+        friendlySport = 'Lap Swim';
+      }
+    } else if (type === 'run') {
+      if (/trail/.test(rawType)) {
+        friendlySport = 'Trail Run';
+      } else {
+        friendlySport = 'Run';
+      }
+    } else if (type === 'ride') {
+      if (/gravel/.test(rawType)) {
+        friendlySport = 'Gravel Ride';
+      } else if (/mountain|mtb/.test(rawType)) {
+        friendlySport = 'Mountain Bike';
+      } else if (/road/.test(rawType)) {
+        friendlySport = 'Road Ride';
+      } else {
+        friendlySport = 'Ride';
+      }
+    } else if (type === 'walk') {
+      friendlySport = /hike/.test(rawType) ? 'Hike' : 'Walk';
+    } else if (type === 'strength') {
+      friendlySport = 'Strength';
+    } else {
+      friendlySport = type.charAt(0).toUpperCase() + type.slice(1);
+    }
+    
+    // TODO: Add location name when reverse geocoding is available
+    // For now, return just the sport type
+    return friendlySport;
+  };
+  
   return {
-    name: a.name || 'Strava Activity',
+    name: generateWorkoutName(),
     type,
     user_id: userId,
 
