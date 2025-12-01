@@ -265,6 +265,21 @@ export default function WorkoutCalendar({
   const unifiedPlanned = unifiedItems
     .filter((it:any)=> !!it?.planned)
     .map((it:any)=> mapUnifiedItemToPlanned(it));
+  
+  // Debug: Check swims at each step
+  useEffect(() => {
+    const swimsInUnified = unifiedItems.filter((it:any) => {
+      const type = String(it?.type || it?.planned?.type || '').toLowerCase();
+      return type === 'swim' && !!it?.planned;
+    });
+    const swimsInPlanned = unifiedPlanned.filter((p:any) => String(p?.type || '').toLowerCase() === 'swim');
+    console.log('[WorkoutCalendar] Swim check:', {
+      inUnifiedItems: swimsInUnified.length,
+      inUnifiedPlanned: swimsInPlanned.length,
+      unifiedItems: swimsInUnified.map((it:any) => ({ id: it.id, type: it.type, status: it.status })),
+      unifiedPlanned: swimsInPlanned.map((p:any) => ({ id: p.id, type: p.type, workout_status: p.workout_status }))
+    });
+  }, [unifiedItems, unifiedPlanned]);
   // Only include completed workouts (items with executed data)
   // Planned-only items are already covered by unifiedPlanned to avoid duplicates
   const unifiedWorkouts = unifiedItems
@@ -396,8 +411,29 @@ export default function WorkoutCalendar({
       .filter((p:any) => {
         // Don't include planned workouts that are linked to a completed workout
         // The completed workout will show instead
-        return !workoutIdByPlannedId.has(String(p?.id));
+        const isLinked = workoutIdByPlannedId.has(String(p?.id));
+        if (String(p?.type || '').toLowerCase() === 'swim') {
+          console.log('[WorkoutCalendar] Swim in mappedPlanned filter:', {
+            id: p.id,
+            type: p.type,
+            workout_status: p.workout_status,
+            isLinked,
+            willInclude: !isLinked
+          });
+        }
+        return !isLinked;
       });
+    
+    // Debug: Check swims after filtering
+    const swimsInMapped = mappedPlanned.filter((w:any) => String(w?.type || '').toLowerCase() === 'swim');
+    if (swimsInMapped.length > 0) {
+      console.log('[WorkoutCalendar] Swims in mappedPlanned:', swimsInMapped.map((w:any) => ({
+        id: w.id,
+        type: w.type,
+        workout_status: w.workout_status,
+        date: w.date
+      })));
+    }
 
     const all = [ ...wkCombinedFiltered, ...mappedPlanned ];
     // Filter out planned optionals defensively (tags may be JSON string or array)
