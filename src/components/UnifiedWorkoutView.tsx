@@ -633,6 +633,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     } else if (workout.name && !workout.name.includes('Garmin Activity') && !workout.name.includes('Strava Activity')) {
       // Check if name is already nice (not a raw provider code or lowercase single word)
       const nameStr = String(workout.name);
+      
+      // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
+      const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(nameStr);
+      if (hasDateSuffix) {
+        const nameWithoutDate = nameStr.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+        // If what's left is just the type, use friendly sport instead
+        const activityType = getWorkoutType();
+        if (nameWithoutDate.toLowerCase() === activityType.toLowerCase()) {
+          return friendlySport();
+        }
+        return nameWithoutDate;
+      }
+      
       const isProviderCode = /^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i.test(nameStr) ||
                             /_/.test(nameStr) && nameStr === nameStr.toUpperCase();
       const isLowercaseSingleWord = nameStr === nameStr.toLowerCase() && 

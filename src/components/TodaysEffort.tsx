@@ -844,6 +844,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             // Use workout.name if it's nice, otherwise fall back to getDisplaySport
                             const name = workout.name;
                             if (name) {
+                              // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
+                              const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
+                              if (hasDateSuffix) {
+                                const nameWithoutDate = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+                                // If what's left is just the type, use getDisplaySport instead
+                                if (nameWithoutDate.toLowerCase() === type.toLowerCase()) {
+                                  return getDisplaySport(workout);
+                                }
+                                return nameWithoutDate;
+                              }
+                              
                               // Check if it's a raw provider code or lowercase single word
                               const isRawProviderCode = name.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i);
                               const isGenericProvider = name.startsWith('Garmin ') || name.startsWith('Strava ');

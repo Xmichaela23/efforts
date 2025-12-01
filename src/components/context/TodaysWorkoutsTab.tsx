@@ -1070,6 +1070,18 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                         const isLowercaseSingleWord = existingName === existingName.toLowerCase() && 
                                                       !existingName.includes(' ') && 
                                                       ['swim', 'run', 'ride', 'walk', 'strength'].includes(existingName.toLowerCase());
+                        // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
+                        const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(existingName);
+                        
+                        // Strip date suffix if present (date is shown underneath anyway)
+                        if (hasDateSuffix) {
+                          const nameWithoutDate = existingName.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+                          // If what's left is just the type, use friendly sport instead
+                          if (nameWithoutDate.toLowerCase() === type.toLowerCase()) {
+                            return friendlySport;
+                          }
+                          return nameWithoutDate;
+                        }
                         
                         // Only use existing name if it's actually nice (not raw, not generic, not lowercase single word)
                         if (!isRawProviderCode && !isGenericProvider && !isLowercaseSingleWord) {
