@@ -558,23 +558,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     if (selectedPlanDetail?.id === planId && currentView === 'detail') {
       return;
     }
-    let planDetail = detailedPlans[planId as keyof typeof detailedPlans];
-
-    // If plan not found in detailedPlans, try fetching from database (plan might be newly created)
-    if (!planDetail) {
-      try {
-        const { data: planData } = await supabase
-          .from('plans')
-          .select('*')
-          .eq('id', planId)
-          .single();
-        if (planData) {
-          planDetail = planData;
-        }
-      } catch (err) {
-        console.warn('[handlePlanClick] Could not fetch plan from DB:', err);
-      }
-    }
+    const planDetail = detailedPlans[planId as keyof typeof detailedPlans];
 
     // Parse JSON-string fields persisted in plans row
     if (planDetail) {
@@ -595,20 +579,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       }
       if (planDetail.template && typeof planDetail.template === 'string') {
         planDetail.template = tryParse(planDetail.template);
-      }
-    }
-
-    // Fallback to basic plan info if detailed record missing
-    if (!planDetail) {
-      const basicPlan = [...currentPlans, ...completedPlans].find(plan => plan.id === planId);
-      if (basicPlan) {
-        planDetail = {
-          ...basicPlan,
-          weeks: (basicPlan as any).weeks || [],
-          duration: (basicPlan as any).duration || (basicPlan as any).duration_weeks || 4,
-          totalWorkouts: (basicPlan as any).totalWorkouts || 0,
-          currentWeek: basicPlan.currentWeek || 1
-        } as any;
       }
     }
 
@@ -987,12 +957,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       setPlanStatus(pd.status || 'active');
       setCurrentView('detail');
     } else {
-      // Plan might still be materializing - try refreshing plans and retry
-      console.warn('[handlePlanClick] Plan details not available, plan might still be materializing');
-      // Don't show alert immediately - plan might just be processing
-      // Instead, try to refresh and show a loading state
+      console.warn('[handlePlanClick] Plan not found in detailedPlans:', planId);
       setCurrentView('list');
-      // Optionally: could add a retry mechanism here
     }
   };
 
