@@ -566,6 +566,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     if (workout.workout_status === 'planned') {
       const t = String(workout.type || '').toLowerCase();
       const typeLabel = t === 'run' ? 'Run' : t === 'ride' ? 'Ride' : t === 'swim' ? 'Swim' : t === 'strength' ? 'Strength' : 'Session';
+      
+      // For strength workouts, check workout.name first (from plans, e.g., "Upper Body Volume", "Lower Body - DELOAD")
+      if (t === 'strength') {
+        const name = String(workout.name || '').trim();
+        if (name && name.toLowerCase() !== 'strength') {
+          // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
+          const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
+          if (hasDateSuffix) {
+            const nameWithoutDate = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+            return nameWithoutDate || 'Strength';
+          }
+          // Use the name directly (e.g., "Upper Body Volume" or "Lower Body - DELOAD")
+          return name;
+        }
+      }
+      
       const raw = String(workout.name || (workout as any).rendered_description || (workout as any).description || '').toLowerCase();
       const focus = (() => {
         if (/interval/.test(raw)) return 'Intervals';

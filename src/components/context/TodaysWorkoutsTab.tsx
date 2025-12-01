@@ -1053,7 +1053,20 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                           return 'Ride';
                         }
                         if (type === 'walk') return 'Walk';
-                        if (type === 'strength') return 'Strength';
+                        if (type === 'strength') {
+                          // Check workout.name first (from plans, e.g., "Upper Body Volume", "Lower Body - DELOAD")
+                          const name = existingName;
+                          if (name && name.trim() && name.toLowerCase() !== 'strength') {
+                            // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
+                            const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
+                            if (hasDateSuffix) {
+                              const nameWithoutDate = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+                              return nameWithoutDate || 'Strength';
+                            }
+                            return name;
+                          }
+                          return 'Strength';
+                        }
                         return type.charAt(0).toUpperCase() + type.slice(1);
                       };
                       

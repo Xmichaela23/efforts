@@ -805,6 +805,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const desc = String(workout.description || '').toLowerCase();
                             const steps = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
                             if (type === 'strength') {
+                              // Check workout.name first (from plans, e.g., "Upper Body Volume", "Lower Body - DELOAD")
+                              const name = workout.name;
+                              if (name && name.trim() && name.toLowerCase() !== 'strength') {
+                                // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
+                                const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
+                                if (hasDateSuffix) {
+                                  const nameWithoutDate = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+                                  return nameWithoutDate || 'Strength';
+                                }
+                                return name;
+                              }
+                              // Fallback to description-based logic if no name
                               if (/squat|deadlift|bench|ohp/.test(desc)) return 'Strength — Compounds';
                               if (/chin|row|pull|lunge|accessor/i.test(desc)) return 'Strength — Accessory';
                               if (/core/.test(desc)) return 'Strength — Core';
