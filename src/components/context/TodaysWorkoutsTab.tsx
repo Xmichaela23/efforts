@@ -84,7 +84,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         // First try to update just this workout
         const { data: updatedWorkout } = await supabase
           .from('workouts')
-          .select('*, workout_analysis, analysis_status')
+          .select('*, workout_analysis, analysis_status, analysis_error')
           .eq('id', workoutId)
           .single();
         
@@ -330,7 +330,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       
       const { data: recentData, error: loadError } = await supabase
         .from('workouts')
-        .select('*, workout_analysis, analysis_status')
+        .select('*, workout_analysis, analysis_status, analysis_error')
         .eq('user_id', user.id)
         .eq('workout_status', 'completed') // ONLY completed workouts
         .gte('date', fourteenDaysAgoLocal)
@@ -380,7 +380,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         console.log('🔍 Focus workout not in recent list, loading specifically:', focusWorkoutId);
         const { data: focusWorkout } = await supabase
           .from('workouts')
-          .select('*, workout_analysis')
+          .select('*, workout_analysis, analysis_status, analysis_error')
           .eq('id', focusWorkoutId)
           .single();
         
@@ -505,8 +505,9 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       console.log('🎯 Showing selected workout:', selectedWorkoutId, workoutWithAnalysis ? 'found' : 'not found');
     }
     
-    // If no selected workout, show the MOST RECENT workout (by date), regardless of analysis status
-    // This ensures chronological order - most recent workout always shows first
+    // If no selected workout, show the MOST RECENT workout WITH ANALYSIS (by date)
+    // Skip failed analyses - only show them if user explicitly selects that workout
+    // This ensures chronological order - most recent successful analysis shows first
     if (!workoutWithAnalysis) {
       // Ensure workouts are sorted by date descending (most recent first)
       const sortedWorkouts = [...recentWorkouts].sort((a, b) => {
@@ -515,16 +516,22 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
         return dateB - dateA; // Descending order (newest first)
       });
       
-      // Show the most recent workout first (index 0)
-      workoutWithAnalysis = sortedWorkouts[0] || null;
+      // Find the most recent workout that has successful analysis (not failed)
+      workoutWithAnalysis = sortedWorkouts.find(w => 
+        w.workout_analysis && 
+        w.analysis_status !== 'failed' &&
+        w.analysis_status === 'complete'
+      ) || null;
       
       if (workoutWithAnalysis) {
-        console.log('🎯 Showing most recent workout by date:', {
+        console.log('🎯 Showing most recent workout with analysis:', {
           id: workoutWithAnalysis.id,
           date: workoutWithAnalysis.date,
           type: workoutWithAnalysis.type,
           has_analysis: !!workoutWithAnalysis.workout_analysis
         });
+      } else {
+        console.log('🎯 No workouts with successful analysis found');
       }
     } else if (!workoutWithAnalysis.workout_analysis) {
       console.log('🎯 Selected workout has no analysis yet - will show when analysis completes');
@@ -579,6 +586,28 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
     // If analysis is in progress, show spinner
     if (isCurrentlyAnalyzing && workoutWithAnalysis.analysis_status === 'analyzing') {
       return null; // This will trigger the spinner UI
+    }
+    
+    // If analysis failed, return a special object so UI can show error message
+    // BUT only if user explicitly selected this workout (not auto-selected)
+    // This prevents showing errors for failed workouts that user didn't click on
+    if (workoutWithAnalysis.analysis_status === 'failed' && 
+        !workoutWithAnalysis.workout_analysis &&
+        selectedWorkoutId === workoutWithAnalysis.id) {
+      return {
+        workout: workoutWithAnalysis,
+        failed: true,
+        error: workoutWithAnalysis.analysis_error || 'Analysis failed',
+        isPermanentError: hasPermanentError
+      };
+    }
+    
+    // If auto-selected workout failed, return null to show "Analysis Not Available"
+    // User can click on the workout in the list if they want to see the error
+    if (workoutWithAnalysis.analysis_status === 'failed' && 
+        !workoutWithAnalysis.workout_analysis &&
+        !selectedWorkoutId) {
+      return null;
     }
     
     // If selected workout has no analysis yet, return null to show "Analysis Not Available"
@@ -775,14 +804,33 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       {/* Daily Conversation - Focus on insights, not metrics */}
       {analysisMetrics ? (
         <div className="px-2 -mt-10">
-          {/* Daily Context Header */}
-          <div className="text-sm text-[#666666] mb-3">
-            <div className="font-medium">Latest workout analysis:</div>
-            <div className="text-xs">Latest performance data</div>
-          </div>
-
-          {/* Analysis Results */}
-          {analysisMetrics.insights && analysisMetrics.insights.length > 0 ? (
+          {/* Show error if analysis failed */}
+          {analysisMetrics.failed ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <div className="text-sm font-medium text-red-800">
+                Analysis Failed
+              </div>
+              <div className="text-xs text-red-600 mt-1">
+                {analysisMetrics.error}
+              </div>
+              {!analysisMetrics.isPermanentError && analysisMetrics.workout && (
+                <button
+                  onClick={() => {
+                    setAnalysisError(null);
+                    analyzeWorkout(analysisMetrics.workout.id);
+                  }}
+                  className="mt-2 text-xs text-red-700 hover:text-red-900 underline"
+                >
+                  Try again
+                </button>
+              )}
+              {analysisMetrics.isPermanentError && (
+                <div className="text-xs text-red-500 mt-1 italic">
+                  This error cannot be resolved. The workout is missing required data.
+                </div>
+              )}
+            </div>
+          ) : analysisMetrics.insights && analysisMetrics.insights.length > 0 ? (
             <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">

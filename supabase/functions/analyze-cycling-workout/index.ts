@@ -859,14 +859,41 @@ function analyzeHeartRate(sensorData: any[], intervals: any[], maxHR?: number): 
 
 /**
  * Extract sensor data from workout
+ * Tries multiple data sources in order of preference
  */
 function extractSensorData(data: any): any[] {
-  if (data.sensor_data?.samples && Array.isArray(data.sensor_data.samples)) {
-    return data.sensor_data.samples;
-  }
+  // Try time_series_data first (most likely to have power data)
   if (data.time_series_data && Array.isArray(data.time_series_data)) {
     return data.time_series_data;
   }
+  
+  // Try computed.series (from compute-workout-analysis)
+  if (data.computed?.series && Array.isArray(data.computed.series)) {
+    return data.computed.series;
+  }
+  
+  // Try garmin_data
+  if (data.garmin_data) {
+    if (Array.isArray(data.garmin_data)) {
+      return data.garmin_data;
+    }
+    if (data.garmin_data.samples && Array.isArray(data.garmin_data.samples)) {
+      return data.garmin_data.samples;
+    }
+  }
+  
+  // Try sensor_data.samples
+  if (data.sensor_data?.samples && Array.isArray(data.sensor_data.samples)) {
+    return data.sensor_data.samples;
+  }
+  
+  // Try computed data directly (might have series nested)
+  if (data.computed && typeof data.computed === 'object') {
+    if (Array.isArray(data.computed)) {
+      return data.computed;
+    }
+  }
+  
   return [];
 }
 
@@ -1205,8 +1232,36 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Extract sensor data
-    const sensorData = extractSensorData(workout);
+    // Extract sensor data - try multiple sources
+    let sensorData: any[] = [];
+    
+    // Try time_series_data first (most likely to have power data)
+    if (workout.time_series_data) {
+      console.log('🔍 Trying time_series_data...');
+      sensorData = extractSensorData(workout.time_series_data);
+      console.log(`📊 time_series_data yielded ${sensorData.length} samples`);
+    }
+    
+    // Try garmin_data if time_series_data doesn't work
+    if (sensorData.length === 0 && workout.garmin_data) {
+      console.log('🔍 Trying garmin_data...');
+      sensorData = extractSensorData(workout.garmin_data);
+      console.log(`📊 garmin_data yielded ${sensorData.length} samples`);
+    }
+    
+    // Try computed data
+    if (sensorData.length === 0 && workout.computed) {
+      console.log('🔍 Trying computed data...');
+      sensorData = extractSensorData(workout.computed);
+      console.log(`📊 computed data yielded ${sensorData.length} samples`);
+    }
+    
+    // Try sensor_data as last resort
+    if (sensorData.length === 0 && workout.sensor_data) {
+      console.log('🔍 Trying sensor_data as fallback...');
+      sensorData = extractSensorData(workout.sensor_data);
+      console.log(`📊 sensor_data yielded ${sensorData.length} samples`);
+    }
     
     if (sensorData.length === 0) {
       throw new Error('No sensor data available');
