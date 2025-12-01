@@ -145,12 +145,13 @@ function derivePlannedCellLabel(w: any): string | null {
       if (isOptional) {
         return durStr ? `OPT BK ${durStr}`.trim() : 'OPT BK';
       }
+      // Always include duration for bikes when available
       let label = '';
-      if (has(/bike_vo2_/i) || has(/vo2/i)) label = durStr ? `BK-VO2 ${durStr}`.trim() : 'BK-VO2';
-      else if (has(/bike_thr_/i)) label = durStr ? `BK-THR ${durStr}`.trim() : 'BK-THR';
-      else if (has(/bike_ss_/i)) label = durStr ? `BK-SS ${durStr}`.trim() : 'BK-SS';
-      else if (has(/endurance|z2|long\s*ride/i)) label = durStr ? `BK-LR ${durStr}`.trim() : 'BK-LR';
-      else label = durStr ? `BK ${durStr}`.trim() : 'BK';
+      if (has(/bike_vo2_/i) || has(/vo2/i)) label = `BK-VO2${durStr ? ` ${durStr}` : ''}`.trim();
+      else if (has(/bike_thr_/i)) label = `BK-THR${durStr ? ` ${durStr}` : ''}`.trim();
+      else if (has(/bike_ss_/i)) label = `BK-SS${durStr ? ` ${durStr}` : ''}`.trim();
+      else if (has(/endurance|z2|long\s*ride/i)) label = `BK-LR${durStr ? ` ${durStr}` : ''}`.trim();
+      else label = `BK${durStr ? ` ${durStr}` : ''}`.trim();
       return label;
     }
 
@@ -477,12 +478,65 @@ export default function WorkoutCalendar({
                 secs = comp.steps.reduce((a: number, s: any) => a + (Number(s?.seconds) || 0), 0);
               } catch {}
             }
+            if (secs <= 0 && Array.isArray(w?.intervals) && w.intervals.length > 0) {
+              try {
+                const sumIntervals = (arr: any[]): number => arr.reduce((acc: number, it: any) => {
+                  if (Array.isArray(it?.segments) && Number(it?.repeatCount) > 0) {
+                    const segSum = it.segments.reduce((s: number, sg: any) => s + (Number(sg?.duration) || 0), 0);
+                    return acc + segSum * Number(it.repeatCount);
+                  }
+                  return acc + (Number(it?.duration) || 0);
+                }, 0);
+                const sInt = sumIntervals(w.intervals);
+                if (Number.isFinite(sInt) && sInt > 0) secs = sInt;
+              } catch {}
+            }
             const mins = secs > 0 ? Math.round(secs / 60) : 0;
             const durStr = mins > 0 ? `${mins}m` : '';
             labelBase = durStr ? `${t} ${durStr}`.trim() : t;
           } else {
             // For completed workouts or other types, use miles if available
             labelBase = [t, milesText].filter(Boolean).join(' ');
+          }
+        } else {
+          // If plannedLabel exists but doesn't have duration for bikes/swims, try to add it
+          const type = String(w?.type || '').toLowerCase();
+          const isPlanned = String(w?.workout_status||'').toLowerCase() === 'planned';
+          if (isPlanned && (type === 'ride' || type === 'bike' || type === 'swim')) {
+            // Check if label already has duration (contains "m" or "min")
+            const hasDuration = /\d+m|\d+\s*min/i.test(labelBase);
+            if (!hasDuration) {
+              // Recalculate duration and add it
+              const comp: any = w?.computed || {};
+              let secs = 0;
+              const rootTs = Number((w as any)?.total_duration_seconds);
+              if (Number.isFinite(rootTs) && rootTs > 0) secs = rootTs;
+              const ts = Number(comp?.total_duration_seconds);
+              if (secs <= 0 && Number.isFinite(ts) && ts > 0) secs = ts;
+              if (secs <= 0 && Array.isArray(comp?.steps) && comp.steps.length > 0) {
+                try {
+                  secs = comp.steps.reduce((a: number, s: any) => a + (Number(s?.seconds) || 0), 0);
+                } catch {}
+              }
+              if (secs <= 0 && Array.isArray(w?.intervals) && w.intervals.length > 0) {
+                try {
+                  const sumIntervals = (arr: any[]): number => arr.reduce((acc: number, it: any) => {
+                    if (Array.isArray(it?.segments) && Number(it?.repeatCount) > 0) {
+                      const segSum = it.segments.reduce((s: number, sg: any) => s + (Number(sg?.duration) || 0), 0);
+                      return acc + segSum * Number(it.repeatCount);
+                    }
+                    return acc + (Number(it?.duration) || 0);
+                  }, 0);
+                  const sInt = sumIntervals(w.intervals);
+                  if (Number.isFinite(sInt) && sInt > 0) secs = sInt;
+                } catch {}
+              }
+              const mins = secs > 0 ? Math.round(secs / 60) : 0;
+              const durStr = mins > 0 ? `${mins}m` : '';
+              if (durStr) {
+                labelBase = `${labelBase} ${durStr}`.trim();
+              }
+            }
           }
         }
         if (isPlannedLinked && !(w as any)?._plannedLabelUsed) {
