@@ -868,8 +868,31 @@ function extractSensorData(data: any): any[] {
   }
   
   // Try computed.series (from compute-workout-analysis)
-  if (data.computed?.series && Array.isArray(data.computed.series)) {
-    return data.computed.series;
+  // This is an object with arrays: { power_watts: [...], hr_bpm: [...], time_s: [...] }
+  if (data.computed?.series && typeof data.computed.series === 'object') {
+    const series = data.computed.series;
+    const time_s = series.time_s || [];
+    const power_watts = series.power_watts || [];
+    const hr_bpm = series.hr_bpm || [];
+    const speed_mps = series.speed_mps || [];
+    const distance_m = series.distance_m || [];
+    
+    // Convert series structure to array of sample objects
+    if (time_s.length > 0) {
+      const samples = [];
+      for (let i = 0; i < time_s.length; i++) {
+        samples.push({
+          timestamp: time_s[i] || i,
+          power: power_watts[i] || null,
+          watts: power_watts[i] || null,
+          heart_rate: hr_bpm[i] || null,
+          speed: speed_mps[i] || null,
+          distance: distance_m[i] || null,
+          t: time_s[i] || i
+        });
+      }
+      return samples;
+    }
   }
   
   // Try garmin_data
