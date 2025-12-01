@@ -295,8 +295,8 @@ export default function WorkoutCalendar({
       // Pass sets for strength and mobility so views can read exercise data
       strength_exercises: Array.isArray((it as any)?.executed?.strength_exercises) ? (it as any).executed.strength_exercises : undefined,
       mobility_exercises: Array.isArray((it as any)?.executed?.mobility_exercises) ? (it as any).executed.mobility_exercises : undefined,
-      // Include planned_id for linking logic
-      planned_id: (it as any)?.executed?.planned_id || undefined,
+      // Include planned_id for linking logic - it's at top level of unified item, not in executed
+      planned_id: (it as any)?.planned_id || undefined,
     }));
 
   // No legacy backstop: unified feed is authoritative
@@ -364,8 +364,14 @@ export default function WorkoutCalendar({
         if (String(w?.workout_status||'').toLowerCase()==='completed' && (w as any)?.planned_id) {
           const pid = String((w as any).planned_id);
           workoutIdByPlannedId.set(pid, String((w as any).id));
+          // Debug: log when we find a linked workout
+          console.log('[Calendar] Found linked workout:', { workoutId: w.id, plannedId: pid, date: w.date, type: w.type });
         }
       } catch {}
+    }
+    // Debug: log if no links found
+    if (workoutIdByPlannedId.size === 0 && wkDb.length > 0) {
+      console.log('[Calendar] No linked workouts found. Sample workout:', wkDb[0], 'has planned_id?', !!(wkDb[0] as any)?.planned_id);
     }
     // Keep raw workout rows even when linked; we will suppress the planned row instead so the completed shows
     const wkCombined = wkDb;
