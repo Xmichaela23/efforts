@@ -22,6 +22,17 @@ const formatDuration = (minutes: number) => {
 };
 
 function getTitle(workout: any): string {
+  // Debug: log what we actually have
+  if (String(workout.type || '').toLowerCase() === 'strength') {
+    console.log('🔍 PlannedWorkoutSummary - Strength workout data:', {
+      name: workout.name,
+      workout_structure: (workout as any)?.workout_structure,
+      workout_structure_title: (workout as any)?.workout_structure?.title,
+      workout_title: (workout as any)?.workout_title,
+      description: workout.description,
+      allKeys: Object.keys(workout)
+    });
+  }
   const st = String((workout as any)?.workout_structure?.title || (workout as any)?.workout_title || '').trim();
   if (st) return st;
   const nm = (workout.name || '');
