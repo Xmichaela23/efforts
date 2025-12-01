@@ -860,17 +860,23 @@ function analyzeHeartRate(sensorData: any[], intervals: any[], maxHR?: number): 
 /**
  * Extract sensor data from workout
  * Tries multiple data sources in order of preference
+ * When called with workout.computed, data IS the computed object, so check data.series directly
  */
 function extractSensorData(data: any): any[] {
+  // If data is already an array, return it
+  if (Array.isArray(data)) {
+    return data;
+  }
+  
   // Try time_series_data first (most likely to have power data)
   if (data.time_series_data && Array.isArray(data.time_series_data)) {
     return data.time_series_data;
   }
   
-  // Try computed.series (from compute-workout-analysis)
+  // Try series directly (when data IS computed object: workout.computed.series)
   // This is an object with arrays: { power_watts: [...], hr_bpm: [...], time_s: [...] }
-  if (data.computed?.series && typeof data.computed.series === 'object') {
-    const series = data.computed.series;
+  if (data.series && typeof data.series === 'object' && !Array.isArray(data.series)) {
+    const series = data.series;
     const time_s = series.time_s || [];
     const power_watts = series.power_watts || [];
     const hr_bpm = series.hr_bpm || [];
@@ -891,6 +897,34 @@ function extractSensorData(data: any): any[] {
           t: time_s[i] || i
         });
       }
+      console.log(`✅ Converted computed.series to ${samples.length} samples (power: ${power_watts.filter((p: any) => p && p > 0).length} samples)`);
+      return samples;
+    }
+  }
+  
+  // Try computed.series (when data is workout object, not computed object)
+  if (data.computed?.series && typeof data.computed.series === 'object' && !Array.isArray(data.computed.series)) {
+    const series = data.computed.series;
+    const time_s = series.time_s || [];
+    const power_watts = series.power_watts || [];
+    const hr_bpm = series.hr_bpm || [];
+    const speed_mps = series.speed_mps || [];
+    const distance_m = series.distance_m || [];
+    
+    if (time_s.length > 0) {
+      const samples = [];
+      for (let i = 0; i < time_s.length; i++) {
+        samples.push({
+          timestamp: time_s[i] || i,
+          power: power_watts[i] || null,
+          watts: power_watts[i] || null,
+          heart_rate: hr_bpm[i] || null,
+          speed: speed_mps[i] || null,
+          distance: distance_m[i] || null,
+          t: time_s[i] || i
+        });
+      }
+      console.log(`✅ Converted computed.series to ${samples.length} samples (power: ${power_watts.filter((p: any) => p && p > 0).length} samples)`);
       return samples;
     }
   }
@@ -908,13 +942,6 @@ function extractSensorData(data: any): any[] {
   // Try sensor_data.samples
   if (data.sensor_data?.samples && Array.isArray(data.sensor_data.samples)) {
     return data.sensor_data.samples;
-  }
-  
-  // Try computed data directly (might have series nested)
-  if (data.computed && typeof data.computed === 'object') {
-    if (Array.isArray(data.computed)) {
-      return data.computed;
-    }
   }
   
   return [];
@@ -1272,11 +1299,19 @@ Deno.serve(async (req) => {
       console.log(`📊 garmin_data yielded ${sensorData.length} samples`);
     }
     
-    // Try computed data
-    if (sensorData.length === 0 && workout.computed) {
-      console.log('🔍 Trying computed data...');
+    // Try computed.series (from compute-workout-analysis)
+    // This is the same structure Details screen uses
+    if (sensorData.length === 0 && workout.computed?.series) {
+      console.log('🔍 Trying computed.series...');
       sensorData = extractSensorData(workout.computed);
-      console.log(`📊 computed data yielded ${sensorData.length} samples`);
+      console.log(`📊 computed.series yielded ${sensorData.length} samples`);
+    }
+    
+    // Try computed.analysis.series (alternative location)
+    if (sensorData.length === 0 && workout.computed?.analysis?.series) {
+      console.log('🔍 Trying computed.analysis.series...');
+      sensorData = extractSensorData(workout.computed.analysis);
+      console.log(`📊 computed.analysis.series yielded ${sensorData.length} samples`);
     }
     
     // Try sensor_data as last resort
