@@ -6,6 +6,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';
 import { augmentPlan } from '@/services/plans/tools/plan_bake_and_compute';
+import { Progress } from '@/components/ui/progress';
 
 function computeNextMonday(): string {
   const d = new Date();
@@ -322,6 +323,9 @@ export default function PlanSelect() {
   const [longRideDay, setLongRideDay] = useState<string>('');
   const [showPreview, setShowPreview] = useState<boolean>(true);
   const [baselines, setBaselines] = useState<any|null>(null);
+  const [saving, setSaving] = useState(false);
+  const [materializationStatus, setMaterializationStatus] = useState<string>('');
+  const [progress, setProgress] = useState(0);
   const DAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const byDay = (a: any, b: any) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day);
   const cleanDesc = (text: string) => String(text || '').replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '');
@@ -504,6 +508,10 @@ export default function PlanSelect() {
 
   async function save() {
     if (!libPlan) return;
+    setSaving(true);
+    setProgress(0);
+    setMaterializationStatus('Preparing plan...');
+    setError(null);
     try {
       // If tri acceptance variables are present, validate race_date window first
       const tMin = triVars.minWeeks;
@@ -1019,6 +1027,9 @@ export default function PlanSelect() {
       
       const insertPayload: any = { ...payload, user_id: user.id, current_week: currentWeek };
       delete insertPayload.export_hints;
+      
+      setMaterializationStatus('Saving plan...');
+      setProgress(20);
       const planInsert = await supabase
         .from('plans')
         .insert([insertPayload])
@@ -1028,16 +1039,60 @@ export default function PlanSelect() {
       if (planErr) throw planErr;
 
       // Activate plan server-side with explicit start_date: insert planned rows and materialize steps
+      setMaterializationStatus('Creating planned workouts...');
+      setProgress(40);
       try {
         const { supabase } = await import('@/lib/supabase');
         const chosenStart = (startDate && startDate.trim().length>0) ? startDate : (payload?.config?.user_selected_start_date || '');
-        const resp = await supabase.functions.invoke('activate-plan', { body: { plan_id: String(planRow.id), start_date: chosenStart } });
+        setMaterializationStatus('Materializing workout steps (30-60 seconds for larger plans)...');
+        setProgress(60);
+        
+        // Start activation (non-blocking - will continue server-side even if user navigates away)
+        const activatePromise = supabase.functions.invoke('activate-plan', { 
+          body: { plan_id: String(planRow.id), start_date: chosenStart } 
+        });
+        
+        // Simulate progress while waiting
+        const progressInterval = setInterval(() => {
+          setProgress(prev => Math.min(prev + 2, 90));
+        }, 1000);
+        
+        // Wait for initial response (plan creation), but materialization continues server-side
+        const resp = await activatePromise;
+        clearInterval(progressInterval);
         try { console.log('[PlanSelect] activate-plan start_date:', chosenStart, 'resp:', (resp as any)?.data); } catch {}
-      } catch {}
-
-      try { await refreshPlans?.(); } catch {}
-      navigate('/', { state: { openPlans: true, focusPlanId: planRow.id, focusWeek: 1 } });
+        
+        // Check if activation was initiated successfully
+        if ((resp as any)?.error) {
+          throw new Error((resp as any).error.message || 'Failed to activate plan');
+        }
+        
+        const respData = (resp as any)?.data;
+        if (respData && respData.success === false) {
+          throw new Error(respData.error || 'Plan activation failed');
+        }
+        
+        // Plan is saved and activation started - materialization continues server-side
+        setMaterializationStatus('Plan activated! Materialization continuing in background...');
+        setProgress(100);
+        
+        // Small delay to show success message, then navigate
+        setTimeout(() => {
+          setSaving(false);
+          setMaterializationStatus('');
+          setProgress(0);
+          try { refreshPlans?.(); } catch {}
+          navigate('/', { state: { openPlans: true, focusPlanId: planRow.id, focusWeek: 1 } });
+        }, 1000);
+      } catch (activateErr: any) {
+        setSaving(false);
+        setMaterializationStatus('');
+        setProgress(0);
+        throw new Error(activateErr?.message || 'Failed to activate plan');
+      }
     } catch (e: any) {
+      setSaving(false);
+      setMaterializationStatus('');
       setError(e?.message ? String(e.message) : JSON.stringify(e));
     }
   }
@@ -1104,8 +1159,38 @@ export default function PlanSelect() {
   );
 
   return (
-    <div className="mobile-app-container">
-      <header className="mobile-header">
+    <>
+      {saving && (
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => {
+            // Allow clicking outside to dismiss - plan continues processing server-side
+            setSaving(false);
+            setMaterializationStatus('');
+            navigate('/', { state: { openPlans: true } });
+          }}
+        >
+          <div 
+            className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center space-y-4 w-full">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <div className="text-center w-full">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Activating Plan</h3>
+                <p className="text-sm text-gray-600">{materializationStatus || 'Please wait...'}</p>
+                <div className="mt-4 w-full">
+                  <Progress value={progress} className="h-2" />
+                </div>
+                <p className="text-xs text-gray-500 mt-3">This may take 30-60 seconds for larger plans</p>
+                <p className="text-xs text-gray-400 mt-2">Feel free to come back in a few minutes - plan will appear in your plan dropdown</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="mobile-app-container">
+        <header className="mobile-header">
         <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full px-4">
             <div className="flex items-center gap-3">
@@ -1318,14 +1403,19 @@ export default function PlanSelect() {
         })()}
         {error && <div className="text-sm text-red-600">{error}</div>}
             <div>
-              <button onClick={save} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50">
-                Save Plan
+              <button 
+                onClick={save} 
+                disabled={saving}
+                className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving...' : 'Save Plan'}
               </button>
             </div>
           </div>
         </div>
       </main>
-    </div>
+      </div>
+    </>
   );
 }
 
