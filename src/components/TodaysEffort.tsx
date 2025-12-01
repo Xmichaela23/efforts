@@ -867,7 +867,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs">
-                          {/* Duration hidden for completed entries per product decision */}
+                          {workout.workout_status === 'planned' && (() => {
+                            const sec = resolveMovingSeconds(workout);
+                            if (Number.isFinite(sec as any) && (sec as number) > 0) {
+                              const mins = Math.round((sec as number) / 60);
+                              return <span className="px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-800">{mins}min</span>;
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                       
