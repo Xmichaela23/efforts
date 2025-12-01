@@ -399,14 +399,16 @@ export default function WorkoutCalendar({
 
     // Do not suppress workouts based on date/type; rely on explicit links and later de-dupe
     const wkCombinedFiltered = [...wkCombined];
-    // Normalize planned statuses:
-    // - If a planned row links to a completed workout (either side), force completed ✓
-    const mappedPlanned = (planned as any[]).map((p:any)=>{
-      if (workoutIdByPlannedId.has(String(p?.id))) {
-        return { ...p, workout_status: 'completed' };
-      }
-      return p;
-    });
+    
+    // Filter out planned workouts that are linked to completed workouts BEFORE adding them
+    // (completed workouts already in wkCombinedFiltered will show, so we don't need the planned version)
+    const mappedPlanned = (planned as any[])
+      .filter((p:any) => {
+        // Don't include planned workouts that are linked to a completed workout
+        // The completed workout will show instead
+        return !workoutIdByPlannedId.has(String(p?.id));
+      })
+      .map((p:any) => p); // Keep as planned, don't change status
 
     const all = [ ...wkCombinedFiltered, ...mappedPlanned ];
     // Filter out planned optionals defensively (tags may be JSON string or array)
@@ -417,11 +419,6 @@ export default function WorkoutCalendar({
       else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
       // Hide optional planned rows entirely
       if (tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional')) return false;
-      // If this is a planned row that has a completed workout linked via either side, suppress it (completed wins)
-      const isPlannedRow = String((w as any).source || '').toLowerCase() === 'training_plan' || String((w as any).provider||'').toLowerCase()==='workouts';
-      if (isPlannedRow) {
-        if (workoutIdByPlannedId.has(String((w as any).id))) return false;
-      }
       return true;
     });
 
@@ -660,7 +657,8 @@ export default function WorkoutCalendar({
               <div className="flex flex-col gap-1 items-start">
                 {items.length > 0 && (
                   items.map((evt, i) => {
-                    const workoutStatus = String((evt?._src?.workout_status || '').toLowerCase());
+                    // Check actual workout_status from _src
+                    const workoutStatus = String((evt?._src?.workout_status || '')).toLowerCase();
                     const isCompleted = workoutStatus === 'completed';
                     const isPlanned = workoutStatus === 'planned';
                     return (
