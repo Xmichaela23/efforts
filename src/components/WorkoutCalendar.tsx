@@ -200,9 +200,33 @@ function derivePlannedCellLabel(w: any): string | null {
       return `PY ${durStr}`.trim(); // Generic fallback
     }
 
-    // STRENGTH (apply mixed rule priority: Compounds > Accessory > Core)
+    // STRENGTH - Check name/workout_structure.title first before falling back to abbreviations
     if (type === 'strength') {
-      // Prefer minutes from steps token strength_main_XXmin over row.duration (which may reflect multi-session day totals)
+      // Check workout_structure.title first (from plans), then workout.name
+      const stTitle = String((w as any)?.workout_structure?.title || '').trim();
+      const name = stTitle || String(w.name || '').trim();
+      if (name && name.toLowerCase() !== 'strength') {
+        // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
+        const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
+        if (hasDateSuffix) {
+          const nameWithoutDate = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+          // Add duration if available
+          const mmTok = steps.join(' ').toLowerCase().match(/strength_main_(\d+)min/);
+          const minsFromSteps = mmTok ? parseInt(mmTok[1], 10) : undefined;
+          const effMins = (typeof minsFromSteps === 'number' && minsFromSteps > 0)
+            ? ` ${minsFromSteps}m`
+            : (durStr ? ` ${durStr}` : '');
+          return `${nameWithoutDate}${effMins}`.trim();
+        }
+        // Use the name directly with duration if available
+        const mmTok = steps.join(' ').toLowerCase().match(/strength_main_(\d+)min/);
+        const minsFromSteps = mmTok ? parseInt(mmTok[1], 10) : undefined;
+        const effMins = (typeof minsFromSteps === 'number' && minsFromSteps > 0)
+          ? ` ${minsFromSteps}m`
+          : (durStr ? ` ${durStr}` : '');
+        return `${name}${effMins}`.trim();
+      }
+      // Fallback to abbreviation logic if no name
       const mmTok = steps.join(' ').toLowerCase().match(/strength_main_(\d+)min/);
       const minsFromSteps = mmTok ? parseInt(mmTok[1], 10) : undefined;
       const effMins = (typeof minsFromSteps === 'number' && minsFromSteps > 0)
@@ -422,14 +446,10 @@ export default function WorkoutCalendar({
         const isCompleted = String(w?.workout_status||'').toLowerCase()==='completed';
         const isPlannedLinked = isCompleted && !!(w as any)?.planned_id;
         
-        // Determine checkmark based on status and linkage
+        // Determine checkmark based on status
         let checkmark = '';
         if (isCompleted) {
-          if (isPlannedLinked) {
-            checkmark = ' ✓✓'; // Double checkmark for completed + attached
-          } else {
-            checkmark = ' ✓'; // Single checkmark for completed but not attached
-          }
+          checkmark = ' ✓'; // Single checkmark for all completed workouts
         }
         // No checkmark for planned workouts
         
@@ -464,12 +484,25 @@ export default function WorkoutCalendar({
       });
 
     // De-dupe by id with preference to completed over planned
+    // Only dedupe exact same ID (true duplicates), not different workouts on same day
     const byId = new Map<string, any>();
     for (const ev of rawAll) {
       const id = String((ev as any)?._src?.id || '');
-      if (!id) { byId.set(`${ev.date}|${ev.label}|${Math.random()}`, ev); continue; }
+      if (!id) { 
+        // No ID - use date+type+label as key to avoid duplicates
+        const date = String(ev.date || '');
+        const type = String((ev as any)?._src?.type || '').toLowerCase();
+        const label = String(ev.label || '').replace(/✓+$/, '').trim();
+        const key = `${date}|${type}|${label}`;
+        byId.set(key, ev); 
+        continue; 
+      }
       const existing = byId.get(id);
-      if (!existing) { byId.set(id, ev); continue; }
+      if (!existing) { 
+        byId.set(id, ev); 
+        continue; 
+      }
+      // Same ID - prefer completed over planned
       const exCompleted = /✓+$/.test(String(existing.label||'')) || String((existing as any)?._src?.workout_status||'').toLowerCase()==='completed';
       const curCompleted = /✓+$/.test(String(ev.label||'')) || String((ev as any)?._src?.workout_status||'').toLowerCase()==='completed';
       if (curCompleted && !exCompleted) byId.set(id, ev);
@@ -612,7 +645,7 @@ export default function WorkoutCalendar({
               onClick={() => handleDayClick(d)}
               className={[
                 "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-gray-200 p-2 flex flex-col justify-between items-stretch",
-                isToday ? "bg-gray-100" : "bg-white hover:bg-gray-50",
+                "bg-white hover:bg-gray-50",
               ].join(" ")}
             >
               {/* Top row: Day + Date inline */}
@@ -626,18 +659,29 @@ export default function WorkoutCalendar({
               {/* Bottom area: Event labels anchored at bottom */}
               <div className="flex flex-col gap-1 items-start">
                 {items.length > 0 && (
-                  items.map((evt, i) => (
-                    <span
-                      key={`${key}-${i}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
-                      onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                      className="cursor-pointer text-xs text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded w-full text-center truncate hover:bg-gray-200"
-                    >
-                      {evt.label}
-                    </span>
-                  ))
+                  items.map((evt, i) => {
+                    const workoutStatus = String((evt?._src?.workout_status || '').toLowerCase());
+                    const isCompleted = workoutStatus === 'completed';
+                    const isPlanned = workoutStatus === 'planned';
+                    return (
+                      <span
+                        key={`${key}-${i}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
+                        onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
+                        className={`cursor-pointer text-xs text-gray-700 px-1.5 py-0.5 rounded w-full text-center truncate border ${
+                          isCompleted 
+                            ? 'bg-green-50 border-green-200 hover:bg-green-100' 
+                            : isPlanned
+                            ? 'bg-blue-50 border-blue-200 hover:bg-blue-100'
+                            : 'bg-gray-100 border-gray-200 hover:bg-gray-200'
+                        }`}
+                      >
+                        {evt.label}
+                      </span>
+                    );
+                  })
                 )}
                 
                 
