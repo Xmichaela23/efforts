@@ -97,7 +97,7 @@ function derivePlannedCellLabel(w: any): string | null {
     else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
     const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
   // Robust duration resolution (authoritative, no legacy fallbacks):
-  // total_duration_seconds (row) > computed.total_duration_seconds > sum(computed.steps.seconds) > sum(intervals)
+  // total_duration_seconds (row) > computed.total_duration_seconds > sum(computed.steps.seconds) > sum(intervals) > extract from steps_preset/description
     const comp: any = w?.computed || {};
     let secs = 0;
   const rootTs = Number((w as any)?.total_duration_seconds);
@@ -120,6 +120,48 @@ function derivePlannedCellLabel(w: any): string | null {
         }, 0);
         const sInt = sumIntervals(w.intervals);
         if (Number.isFinite(sInt) && sInt > 0) secs = sInt;
+      } catch {}
+    }
+    // Last resort: try to extract duration from steps_preset or description
+    if (secs <= 0 && Array.isArray(steps) && steps.length > 0) {
+      try {
+        // Look for duration patterns in steps_preset (e.g., "recovery_ride_60min", "easy_30min")
+        for (const step of steps) {
+          const stepStr = String(step).toLowerCase();
+          // Match patterns like "60min", "30m", "1h", "45min"
+          const minMatch = stepStr.match(/(\d+)\s*(?:min|m|minutes?)/i);
+          if (minMatch) {
+            const mins = Number(minMatch[1]);
+            if (Number.isFinite(mins) && mins > 0) {
+              secs = mins * 60;
+              break;
+            }
+          }
+          const hourMatch = stepStr.match(/(\d+(?:\.\d+)?)\s*h(?:ours?)?/i);
+          if (hourMatch) {
+            const hours = Number(hourMatch[1]);
+            if (Number.isFinite(hours) && hours > 0) {
+              secs = hours * 3600;
+              break;
+            }
+          }
+        }
+      } catch {}
+    }
+    if (secs <= 0 && txt) {
+      try {
+        // Try to extract duration from description text
+        const minMatch = txt.match(/(\d+)\s*(?:min|m|minutes?)/i);
+        if (minMatch) {
+          const mins = Number(minMatch[1]);
+          if (Number.isFinite(mins) && mins > 0) secs = mins * 60;
+        } else {
+          const hourMatch = txt.match(/(\d+(?:\.\d+)?)\s*h(?:ours?)?/i);
+          if (hourMatch) {
+            const hours = Number(hourMatch[1]);
+            if (Number.isFinite(hours) && hours > 0) secs = hours * 3600;
+          }
+        }
       } catch {}
     }
   const mins = secs > 0 ? Math.round(secs / 60) : 0;
@@ -151,6 +193,7 @@ function derivePlannedCellLabel(w: any): string | null {
       else if (has(/bike_thr_/i)) label = `BK-THR${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/bike_ss_/i)) label = `BK-SS${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/endurance|z2|long\s*ride/i)) label = `BK-LR${durStr ? ` ${durStr}` : ''}`.trim();
+      else if (has(/recovery/i)) label = `BK-REC${durStr ? ` ${durStr}` : ''}`.trim();
       else label = `BK${durStr ? ` ${durStr}` : ''}`.trim();
       return label;
     }
