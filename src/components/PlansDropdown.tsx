@@ -143,16 +143,6 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           <span>Build plans</span>
         </DropdownMenuItem>
 
-        {/* Admin: publish template (JSON) */}
-        <DropdownMenuSeparator className="my-2" />
-        <DropdownMenuItem
-          onClick={() => { navigate('/plans/admin'); }}
-          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
-        >
-          <span>Admin – Add template (JSON)</span>
-        </DropdownMenuItem>
-
         {/* Removed View Current Plans entry per design */}
       </DropdownMenuContent>
     </DropdownMenu>

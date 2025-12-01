@@ -1020,6 +1020,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     <Upload className="mr-2 h-4 w-4" />
                     Import
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { navigate('/plans/admin'); }}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Admin – Add template (JSON)
+                  </DropdownMenuItem>
                   <DropdownMenuItem>
                     <Upload className="mr-2 h-4 w-4" />
                     Export Data
