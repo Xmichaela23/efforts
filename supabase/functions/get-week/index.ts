@@ -381,7 +381,7 @@ Deno.serve(async (req)=>{
     let plannedRows = null;
     let pErr = null;
     try {
-      const { data, error } = await supabase.from('planned_workouts').select('id,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+      const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
         ascending: true
       }).order('created_at', {
         ascending: true
@@ -394,7 +394,7 @@ Deno.serve(async (req)=>{
       pErr = e1;
       // Fallback for schemas without completed_workout_id or created_at
       try {
-        const { data, error } = await supabase.from('planned_workouts').select('id,date,type,workout_status,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+        const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
           ascending: true
         }).order('id', {
           ascending: true
@@ -458,7 +458,7 @@ Deno.serve(async (req)=>{
         });
         // Reload planned rows that were adjusted (best-effort, limited scope) so UI sees cooldown immediately
         try {
-          const { data } = await supabase.from('planned_workouts').select('id,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+          const { data } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
             ascending: true
           }).order('created_at', {
             ascending: true
@@ -802,6 +802,7 @@ Deno.serve(async (req)=>{
         }) : null;
         const planned = {
           id: p.id,
+          name: p?.name || null,
           steps: processedSteps,
           total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
           description: p?.description || p?.rendered_description || null,
@@ -813,7 +814,7 @@ Deno.serve(async (req)=>{
           export_hints: p?.export_hints ?? null,
           workout_structure: p?.workout_structure ?? null,
           friendly_summary: p?.friendly_summary ?? null,
-          rendered_description: p?.rendered_description ?? null,
+          rendered_description: p?.rendered_description || null,
           brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
           brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null
         };
@@ -865,6 +866,7 @@ Deno.serve(async (req)=>{
         }) : null;
         const planned = {
           id: p.id,
+          name: p?.name || null,
           steps: processedSteps,
           total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
           description: p?.description || p?.rendered_description || null,
@@ -876,7 +878,7 @@ Deno.serve(async (req)=>{
           export_hints: p?.export_hints ?? null,
           workout_structure: p?.workout_structure ?? null,
           friendly_summary: p?.friendly_summary ?? null,
-          rendered_description: p?.rendered_description ?? null,
+          rendered_description: p?.rendered_description || null,
           brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
           brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null
         };

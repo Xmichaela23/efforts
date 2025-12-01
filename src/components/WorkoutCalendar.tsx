@@ -5,6 +5,7 @@ import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/util
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle } from 'lucide-react';
+import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -247,30 +248,10 @@ export default function WorkoutCalendar({
   const toISO = toDateOnlyString(weekEnd);
   const { items: unifiedItems, weeklyStats, trainingPlanContext, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
   // Adapt unified items → planned + workouts shapes expected below
-  const unifiedPlanned = unifiedItems.filter((it:any)=> !!it?.planned).map((it:any)=> ({
-    id: it.id,
-    date: it.date,
-    type: it.type,
-    workout_status: it.status || 'planned',
-    source: 'training_plan',
-    provider: 'workouts',
-    // Map planned_data fields expected by label derivation; include total for WU/CD
-    computed: (it.planned && Array.isArray(it.planned.steps)) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null,
-    total_duration_seconds: it.planned?.total_duration_seconds || null,
-    description: it.planned?.description || null,
-    tags: it.planned?.tags || null,
-    // Pass-through fields used by label derivation and details
-    steps_preset: (it as any)?.planned?.steps_preset ?? null,
-    strength_exercises: (it as any)?.planned?.strength_exercises ?? null,
-    mobility_exercises: (it as any)?.planned?.mobility_exercises ?? null,
-    export_hints: (it as any)?.planned?.export_hints ?? null,
-    workout_structure: (it as any)?.planned?.workout_structure ?? null,
-    friendly_summary: (it as any)?.planned?.friendly_summary ?? null,
-    rendered_description: (it as any)?.planned?.rendered_description ?? null,
-    training_plan_id: (it as any)?.planned?.training_plan_id ?? null,
-    name: (it as any)?.planned?.name || (it as any)?.name || null,
-    workout_metadata: (it as any)?.planned?.workout_metadata || null,
-  }));
+  // Use mapper - SINGLE SOURCE OF TRUTH
+  const unifiedPlanned = unifiedItems
+    .filter((it:any)=> !!it?.planned)
+    .map((it:any)=> mapUnifiedItemToPlanned(it));
   const unifiedWorkouts = unifiedItems.map((it:any)=> ({
     id: it.id,
     date: it.date,

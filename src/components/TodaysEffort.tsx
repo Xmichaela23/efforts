@@ -9,6 +9,7 @@ import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
+import { mapUnifiedItemToPlanned, mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -120,33 +121,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       const isCompleted = String(it?.status||'').toLowerCase()==='completed';
       
       if (isCompleted) {
-        // Spread all executed data to preserve distance, duration, metrics, etc.
-        return {
-          id: it.id,
-          date: it.date,
-          type: it.type,
-          workout_status: 'completed',
-          ...it.executed,  // All the metrics, distance, duration, pace, power, HR, etc.
-          computed: it.executed || null,
-        };
+        // Use mapper for completed workouts
+        return mapUnifiedItemToCompleted(it);
       } else {
-        return {
-          id: it.planned?.id || it.id,
-          date: it.date,
-          type: it.type,
-          workout_status: 'planned',
-          name: it.planned?.name || null,
-          description: it.planned?.description || null,
-          rendered_description: it.planned?.rendered_description || it.planned?.description || null,
-          computed: (Array.isArray(it.planned?.steps) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null),
-          tags: it.planned?.tags || [],
-          steps_preset: (it as any)?.planned?.steps_preset ?? null,
-          strength_exercises: (it as any)?.planned?.strength_exercises ?? null,
-          mobility_exercises: (it as any)?.planned?.mobility_exercises ?? null,
-          export_hints: (it as any)?.planned?.export_hints ?? null,
-          workout_structure: (it as any)?.planned?.workout_structure ?? null,
-          friendly_summary: (it as any)?.planned?.friendly_summary ?? null,
-        };
+        // Use mapper for planned workouts - SINGLE SOURCE OF TRUTH
+        return mapUnifiedItemToPlanned(it);
       }
     });
   }, [unifiedItems]);

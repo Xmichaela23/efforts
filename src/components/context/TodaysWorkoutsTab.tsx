@@ -1033,6 +1033,9 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                       const numberOfLengths = workout.number_of_active_lengths || null;
                       const hasGps = Array.isArray(workout.gps_track) && workout.gps_track.length > 0;
                       
+                      // Check if name is already nice (not a raw activity_type or single lowercase word)
+                      const existingName = workout.name;
+                      
                       // Get friendly sport type
                       const getFriendlySport = () => {
                         const rawType = activityType.toLowerCase();
@@ -1072,9 +1075,6 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                       };
                       
                       const friendlySport = getFriendlySport();
-                      
-                      // Check if name is already nice (not a raw activity_type or single lowercase word)
-                      const existingName = workout.name;
                       if (existingName) {
                         // Check if it's a raw provider code (all caps with underscores)
                         const isRawProviderCode = existingName.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i);

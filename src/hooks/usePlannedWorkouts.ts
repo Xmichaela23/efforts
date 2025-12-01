@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 type PlannedWorkout = any;
 
 export const usePlannedWorkouts = () => {
@@ -442,21 +443,10 @@ export const usePlannedWorkoutsToday = (dateIso: string) => {
         const { data, error } = await (supabase.functions.invoke as any)('get-week', { body: { from: dateIso, to: dateIso } });
         if (error) throw error;
         const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
-        const plannedForDay = items.filter((it:any)=> !!it?.planned).map((it:any)=> ({
-          id: it.planned?.id,
-          date: it.date,
-          type: it.type,
-          workout_status: 'planned',
-          description: it.planned?.description || null,
-          rendered_description: it.planned?.rendered_description || null,
-          tags: it.planned?.tags || null,
-          steps_preset: it.planned?.steps_preset || null,
-          computed: it.planned?.steps ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null,
-          total_duration_seconds: it.planned?.total_duration_seconds || null,
-          workout_structure: null,
-          workout_title: null,
-          export_hints: null,
-        }));
+        // Use mapper - SINGLE SOURCE OF TRUTH
+        const plannedForDay = items
+          .filter((it:any)=> !!it?.planned)
+          .map((it:any)=> mapUnifiedItemToPlanned(it));
         if (!cancelled) setRows(plannedForDay as any);
       } catch (e:any) {
         if (!cancelled) setError(e?.message || 'Failed to load planned workouts');

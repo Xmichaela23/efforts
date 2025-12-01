@@ -550,7 +550,24 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     <div className="space-y-3">
       {showHeader && (
         <div className="flex items-center justify-between">
-          <div className="text-base font-semibold">{String(ws?.title || (workout as any)?.title || '') || 'Planned'}</div>
+          <div className="text-base font-semibold">{(() => {
+            // For strength workouts, check workout_structure.title first, then workout.name, then workout.title
+            const t = String((workout as any)?.type || '').toLowerCase();
+            if (t === 'strength') {
+              const stTitle = String(ws?.title || '').trim();
+              const name = stTitle || String((workout as any)?.name || '').trim();
+              if (name && name.toLowerCase() !== 'strength') {
+                // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
+                const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
+                if (hasDateSuffix) {
+                  const nameWithoutDate = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+                  return nameWithoutDate || 'Planned';
+                }
+                return name;
+              }
+            }
+            return String(ws?.title || (workout as any)?.title || (workout as any)?.name || '') || 'Planned';
+          })()}</div>
           <div className="text-sm text-gray-500 flex items-center gap-3">
             {parentDisc==='swim' && ((typeof totalYdFromComputed==='number' && totalYdFromComputed>0) || (typeof totalYdFromStruct==='number' && totalYdFromStruct>0)) ? <span>{`${(totalYdFromComputed||0)+(totalYdFromStruct||0)} yd`}</span> : null}
             {typeof durationMin==='number'?<span>{`${durationMin} min`}</span>:null}

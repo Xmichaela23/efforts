@@ -20,3 +20,4 @@ SELECT
 FROM public.workouts
 WHERE id = 'ed4fc98f-27d6-4c69-bc28-fa529f44124a';
 
+

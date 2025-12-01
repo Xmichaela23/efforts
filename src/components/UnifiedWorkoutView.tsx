@@ -14,6 +14,7 @@ import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { supabase } from '@/lib/supabase';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
+import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 
 // Get unified planned workout data with pace ranges (same as Today's Effort and Weekly)
 const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPlanned: any, linkedPlanned: any) => {
@@ -127,27 +128,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     );
     
     if (unifiedPlanned?.planned) {
-      // Use the same data structure as Today's Efforts (lines 133-148 in TodaysEffort.tsx)
-      return {
-        id: unifiedPlanned.planned.id || unifiedPlanned.id,
-        date: unifiedPlanned.date,
-        type: unifiedPlanned.type,
-        workout_status: 'planned',
-        description: unifiedPlanned.planned.description || null,
-        rendered_description: unifiedPlanned.planned.rendered_description || unifiedPlanned.planned.description || null,
-        computed: (Array.isArray(unifiedPlanned.planned.steps) ? { 
-          steps: unifiedPlanned.planned.steps, 
-          total_duration_seconds: unifiedPlanned.planned.total_duration_seconds 
-        } : null),
-        tags: unifiedPlanned.planned.tags || [],
-        steps_preset: (unifiedPlanned as any)?.planned?.steps_preset ?? null,
-        strength_exercises: (unifiedPlanned as any)?.planned?.strength_exercises ?? null,
-        mobility_exercises: (unifiedPlanned as any)?.planned?.mobility_exercises ?? null,
-        export_hints: (unifiedPlanned as any)?.planned?.export_hints ?? null,
-        workout_structure: (unifiedPlanned as any)?.planned?.workout_structure ?? null,
-        friendly_summary: (unifiedPlanned as any)?.planned?.friendly_summary ?? null,
-        planned_id: unifiedPlanned.planned.id
-      };
+      // Use mapper - SINGLE SOURCE OF TRUTH
+      return mapUnifiedItemToPlanned(unifiedPlanned);
     }
     
     // If not found in unified data, use the original workout (this should not happen in normal flow)
@@ -527,6 +509,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       if (stTitle) return stTitle;
       const t = String((plannedRow as any)?.type || '').toLowerCase();
       const typeLabel = t === 'run' ? 'Run' : t === 'ride' ? 'Ride' : t === 'swim' ? 'Swim' : t === 'strength' ? 'Strength' : 'Session';
+      // For strength workouts attached to planned row, check name first
+      if (t === 'strength') {
+        const plannedName = String((plannedRow as any)?.name || '').trim();
+        if (plannedName && plannedName.toLowerCase() !== 'strength') {
+          // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
+          const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(plannedName);
+          if (hasDateSuffix) {
+            const nameWithoutDate = plannedName.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+            return nameWithoutDate || 'Strength';
+          }
+          // Use the name directly (e.g., "Upper Body Volume" or "Lower Body - DELOAD")
+          return plannedName;
+        }
+      }
+      
       const rawDesc = String((plannedRow as any)?.name || (plannedRow as any)?.rendered_description || (plannedRow as any)?.description || '').toLowerCase();
       const tagsArr: any[] = Array.isArray((plannedRow as any)?.tags) ? (plannedRow as any).tags : [];
       const tags = tagsArr.map((x:any)=> String(x).toLowerCase());
