@@ -7,7 +7,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle, Info } from 'lucide-react';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -739,28 +739,26 @@ export default function WorkoutCalendar({
                   {/* Total Workload with counts */}
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">Total Workload</span>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="w-3 h-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-xs">
-                          <p className="text-xs">
-                            <strong>Total Workload Calculation</strong>
-                            <br />
-                            Includes all planned workouts for the week, including optional workouts marked with "OPT".
-                            <br />
-                            <br />
-                            Workload is calculated as: duration (hours) × intensity² × 100
-                            <br />
-                            <br />
-                            Planned: Sum of all workout workloads (including optionals)
-                            <br />
-                            Completed: Sum of actual workloads from completed workouts
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-gray-500 hover:text-gray-700 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-xs">
+                          <strong>Total Workload Calculation</strong>
+                          <br />
+                          Includes all planned workouts for the week, including optional workouts marked with "OPT".
+                          <br />
+                          <br />
+                          Workload is calculated as: duration (hours) × intensity² × 100
+                          <br />
+                          <br />
+                          Planned: Sum of all workout workloads (including optionals)
+                          <br />
+                          Completed: Sum of actual workloads from completed workouts
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                     <div className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
                       <span className="text-sm">{weeklyStats.planned}</span>
