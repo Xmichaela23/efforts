@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,8 @@ import {
   Activity, 
   ChevronDown, 
   ChevronUp,
-  Search
+  Search,
+  Loader2
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { ExerciseLibraryService } from '@/services/ExerciseLibrary';
@@ -50,6 +51,10 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [showSessionRPE, setShowSessionRPE] = useState(false);
   const [sessionRPE, setSessionRPE] = useState<number>(5);
   const [sessionNotes, setSessionNotes] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const isMountedRef = useRef(true);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get today's date string
   const getTodayDateString = () => {
@@ -150,6 +155,11 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
   useEffect(() => {
     return () => {
       console.log('🧹 MobilityLogger cleanup - clearing state');
+      isMountedRef.current = false;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
       setExercises([]);
       setCurrentExercise('');
       setShowSuggestions(false);
@@ -247,6 +257,10 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const finalizeSave = async (extra?: { rpe?: number; notes?: string }) => {
+    // Set loading state
+    setIsSaving(true);
+    setIsSaved(false);
+    
     const workoutEndTime = new Date();
     const durationMinutes = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
 
@@ -340,17 +354,32 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
       }
     } catch (e) {
       console.error('❌ Save failed with error:', e);
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setIsSaving(false);
+        setIsSaved(false);
+      }
       alert(`Failed to save workout: ${e.message}`);
       return;
     }
 
-    // Navigate to completed view
-    if (onWorkoutSaved) {
-      onWorkoutSaved(saved || completedWorkout);
-    } else {
-      alert(`Mobility workout saved! Duration: ${durationMinutes} minutes`);
-      onClose();
-    }
+    // Show success state
+    setIsSaving(false);
+    setIsSaved(true);
+    
+    // Auto-close after showing success for 1.5 seconds
+    saveTimeoutRef.current = setTimeout(() => {
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
+      
+      // Navigate to completed view
+      if (onWorkoutSaved) {
+        onWorkoutSaved(saved || completedWorkout);
+      } else {
+        alert(`Mobility workout saved! Duration: ${durationMinutes} minutes`);
+        onClose();
+      }
+    }, 1500);
   };
 
   const handleInputChange = (value: string) => {
@@ -559,67 +588,81 @@ export default function MobilityLogger({ onClose, scheduledWorkout, onWorkoutSav
       {/* Session RPE Prompt */}
       {showSessionRPE && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={handleSessionRPESkip} />
+          <div className="absolute inset-0 bg-black/40" onClick={isSaving || isSaved ? undefined : handleSessionRPESkip} />
           <div className="relative w-full max-w-md mx-4 bg-white rounded-lg shadow-xl p-6 z-10">
-            <h2 className="text-2xl font-bold mb-2 text-center">
-              Workout Complete!
-            </h2>
-            
-            <p className="text-gray-600 mb-8 text-center">
-              How hard was that session?
-            </p>
-            
-            {/* RPE slider */}
-            <div className="mb-6">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Easy</span>
-                <span className="text-sm text-gray-500">Maximal</span>
+            {isSaving ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="h-12 w-12 text-blue-600 animate-spin mb-4" />
+                <p className="text-lg font-medium text-gray-900">Saving workout...</p>
               </div>
-              
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={sessionRPE}
-                onChange={(e) => setSessionRPE(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              
-              <div className="text-center mt-3">
-                <div className="text-4xl font-bold text-gray-900">{sessionRPE}</div>
-                <div className="text-sm text-gray-600 mt-1">
-                  {getRPELabel(sessionRPE)}
+            ) : isSaved ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <CheckCircle className="h-12 w-12 text-green-600 mb-4" />
+                <p className="text-lg font-medium text-gray-900">Saved!</p>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-2xl font-bold mb-2 text-center">
+                  Workout Complete!
+                </h2>
+                
+                <p className="text-gray-600 mb-8 text-center">
+                  How hard was that session?
+                </p>
+                
+                {/* RPE slider */}
+                <div className="mb-6">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm text-gray-500">Easy</span>
+                    <span className="text-sm text-gray-500">Maximal</span>
+                  </div>
+                  
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={sessionRPE}
+                    onChange={(e) => setSessionRPE(Number(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  
+                  <div className="text-center mt-3">
+                    <div className="text-4xl font-bold text-gray-900">{sessionRPE}</div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      {getRPELabel(sessionRPE)}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Notes input */}
-            <div className="mb-6">
-              <Label htmlFor="session-notes">Session Notes (Optional)</Label>
-              <Textarea
-                id="session-notes"
-                value={sessionNotes}
-                onChange={(e) => setSessionNotes(e.target.value)}
-                placeholder="How did the session feel overall?"
-                rows={3}
-                className="mt-1"
-              />
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={handleSessionRPESkip}
-                className="flex-1 py-4 text-gray-600 hover:text-gray-900"
-              >
-                Skip
-              </button>
-              <button
-                onClick={() => handleSessionRPESubmit(sessionRPE)}
-                className="flex-1 py-4 text-gray-700 hover:text-gray-900 font-medium"
-              >
-                Submit & Finish
-              </button>
-            </div>
+                {/* Notes input */}
+                <div className="mb-6">
+                  <Label htmlFor="session-notes">Session Notes (Optional)</Label>
+                  <Textarea
+                    id="session-notes"
+                    value={sessionNotes}
+                    onChange={(e) => setSessionNotes(e.target.value)}
+                    placeholder="How did the session feel overall?"
+                    rows={3}
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSessionRPESkip}
+                    className="flex-1 py-4 text-gray-600 hover:text-gray-900"
+                  >
+                    Skip
+                  </button>
+                  <button
+                    onClick={() => handleSessionRPESubmit(sessionRPE)}
+                    className="flex-1 py-4 text-gray-700 hover:text-gray-900 font-medium"
+                  >
+                    Submit & Finish
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

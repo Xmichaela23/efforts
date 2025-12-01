@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, CheckCircle } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { createWorkoutMetadata, PilatesYogaSessionType, FocusArea, SessionFeeling, Environment } from '@/utils/workoutMetadata';
@@ -69,6 +69,10 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
   
   // UI state
   const [showOptionalFields, setShowOptionalFields] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const isMountedRef = useRef(true);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get date string helper
   const getDateString = () => {
@@ -136,6 +140,15 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
     }
     
     setIsInitialized(true);
+
+    // Cleanup on unmount
+    return () => {
+      isMountedRef.current = false;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+    };
   }, [scheduledWorkout, workouts, targetDate]);
 
   // Toggle focus area
@@ -173,6 +186,10 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
       alert('Session type is required');
       return;
     }
+
+    // Set loading state
+    setIsSaving(true);
+    setIsSaved(false);
 
     const workoutEndTime = new Date();
     const actualDuration = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
@@ -266,17 +283,32 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
       }
     } catch (e: any) {
       console.error('❌ Save failed with error:', e);
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setIsSaving(false);
+        setIsSaved(false);
+      }
       alert(`Failed to save workout: ${e.message}`);
       return;
     }
 
-    // Navigate to completed view
-    if (onWorkoutSaved) {
-      onWorkoutSaved(saved || completedWorkout);
-    } else {
-      alert(`Pilates/Yoga workout saved! Duration: ${finalDuration} minutes`);
-      onClose();
-    }
+    // Show success state
+    setIsSaving(false);
+    setIsSaved(true);
+    
+    // Auto-close after showing success for 1.5 seconds
+    saveTimeoutRef.current = setTimeout(() => {
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
+      
+      // Navigate to completed view
+      if (onWorkoutSaved) {
+        onWorkoutSaved(saved || completedWorkout);
+      } else {
+        alert(`Pilates/Yoga workout saved! Duration: ${finalDuration} minutes`);
+        onClose();
+      }
+    }, 1500);
   };
 
   if (!isInitialized) {
@@ -494,12 +526,31 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
       <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-gray-200 z-[100]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
         <button 
           onClick={saveWorkout}
-          disabled={!sessionType || duration <= 0 || sessionRPE < 1 || sessionRPE > 10}
+          disabled={!sessionType || duration <= 0 || sessionRPE < 1 || sessionRPE > 10 || isSaving || isSaved}
           className="w-full h-12 text-base font-medium text-black hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Save
         </button>
       </div>
+
+      {/* Loading/Success Overlay */}
+      {(isSaving || isSaved) && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-xl p-8 max-w-md mx-4">
+            {isSaving ? (
+              <div className="flex flex-col items-center justify-center">
+                <Loader2 className="h-12 w-12 text-blue-600 animate-spin mb-4" />
+                <p className="text-lg font-medium text-gray-900">Saving workout...</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center">
+                <CheckCircle className="h-12 w-12 text-green-600 mb-4" />
+                <p className="text-lg font-medium text-gray-900">Saved!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

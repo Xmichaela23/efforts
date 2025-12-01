@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Plus, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
@@ -374,6 +374,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Session RPE prompt state
   const [showSessionRPE, setShowSessionRPE] = useState(false);
   const [sessionRPE, setSessionRPE] = useState<number>(5);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const isMountedRef = useRef(true);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Readiness check state
   const [showReadinessCheck, setShowReadinessCheck] = useState(false);
@@ -1013,6 +1017,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (pn) setPerformanceNumbers(pn);
       } catch {}
     })();
+
+    // Cleanup on unmount
+    return () => {
+      isMountedRef.current = false;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   // Guard to ensure initialization runs only once per open
@@ -1921,23 +1934,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   // Session RPE handlers
   const handleSessionRPESubmit = (rpe: number) => {
-    setShowSessionRPE(false);
     // Check if user has notes/RPE meta, then show notes modal, otherwise save directly
     const hasMeta = (typeof notesRpe === 'number') || (typeof notesText === 'string' && notesText.trim().length > 0);
     if (hasMeta) {
+      setShowSessionRPE(false);
       setShowNotesModal(true);
     } else {
+      // Keep RPE modal open to show loading/success states
       finalizeSave({ rpe });
     }
   };
 
   const handleSessionRPESkip = () => {
-    setShowSessionRPE(false);
     // Check if user has notes/RPE meta, then show notes modal, otherwise save directly
     const hasMeta = (typeof notesRpe === 'number') || (typeof notesText === 'string' && notesText.trim().length > 0);
     if (hasMeta) {
+      setShowSessionRPE(false);
       setShowNotesModal(true);
     } else {
+      // Keep RPE modal open to show loading/success states
       finalizeSave();
     }
   };
@@ -1949,6 +1964,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const finalizeSave = async (extra?: { notes?: string; rpe?: number; mood?: 'positive'|'neutral'|'negative' }) => {
+    // Set loading state
+    setIsSaving(true);
+    setIsSaved(false);
+    
     // Clear session progress when workout is completed
     clearSessionProgress();
     
@@ -2125,18 +2144,36 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         stack: e.stack,
         name: e.name
       });
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setIsSaving(false);
+        setIsSaved(false);
+      }
       alert(`Failed to save workout: ${e.message}`);
       return; // Don't proceed with navigation if save failed
     }
 
-    // Navigate to completed view (prefer saved row if available)
-    if (onWorkoutSaved) {
-      onWorkoutSaved(saved || completedWorkout);
-    } else {
-      // Fallback to old behavior if no navigation callback provided
-      alert(`Workout saved! Total volume: ${currentTotalVolume.toLocaleString()}lbs`);
-      onClose();
-    }
+    // Show success state
+    setIsSaving(false);
+    setIsSaved(true);
+    
+    // Close notes modal if open
+    setShowNotesModal(false);
+    
+    // Auto-close after showing success for 1.5 seconds
+    saveTimeoutRef.current = setTimeout(() => {
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
+      
+      // Navigate to completed view (prefer saved row if available)
+      if (onWorkoutSaved) {
+        onWorkoutSaved(saved || completedWorkout);
+      } else {
+        // Fallback to old behavior if no navigation callback provided
+        alert(`Workout saved! Total volume: ${currentTotalVolume.toLocaleString()}lbs`);
+        onClose();
+      }
+    }, 1500);
   };
 
   const saveWorkout = () => {
@@ -2949,7 +2986,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       {/* Notes Modal */}
       {showNotesModal && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={()=>setShowNotesModal(false)} />
+          <div className="absolute inset-0 bg-black/40" onClick={isSaving || isSaved ? undefined : ()=>setShowNotesModal(false)} />
           <div className="relative w-full sm:w-[520px] bg-white rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
             <h3 className="text-lg font-semibold mb-3">How did it feel?</h3>
             <div className="space-y-3">
@@ -2975,9 +3012,28 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             </div>
             <div className="mt-4 sticky bottom-0 bg-white pt-3">
               <div className="flex items-center gap-4">
-                <button onClick={()=>setShowNotesModal(false)} className="text-sm text-gray-700 hover:text-gray-900">Cancel</button>
-                <button onClick={()=>{ setShowNotesModal(false); finalizeSave(); }} className="text-sm text-gray-700 hover:text-gray-900">Skip</button>
-                <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="text-sm text-black hover:text-blue-600">Save</button>
+                {isSaving || isSaved ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-600 flex-1 justify-center">
+                    {isSaving && (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Saving workout...</span>
+                      </>
+                    )}
+                    {isSaved && (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span>Saved!</span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <button onClick={()=>setShowNotesModal(false)} className="text-sm text-gray-700 hover:text-gray-900">Cancel</button>
+                    <button onClick={()=>{ finalizeSave(); }} className="text-sm text-gray-700 hover:text-gray-900">Skip</button>
+                    <button onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="text-sm text-black hover:text-blue-600">Save</button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -3031,54 +3087,68 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       {/* Session RPE Prompt */}
       {showSessionRPE && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={handleSessionRPESkip} />
+          <div className="absolute inset-0 bg-black/40" onClick={isSaving || isSaved ? undefined : handleSessionRPESkip} />
           <div className="relative w-full max-w-md mx-4 bg-white rounded-lg shadow-xl p-6 z-10">
-            <h2 className="text-2xl font-bold mb-2 text-center">
-              Workout Complete!
-            </h2>
-            
-            <p className="text-gray-600 mb-8 text-center">
-              How hard was that session?
-            </p>
-            
-            {/* RPE slider */}
-            <div className="mb-6">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Easy</span>
-                <span className="text-sm text-gray-500">Maximal</span>
+            {isSaving ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="h-12 w-12 text-blue-600 animate-spin mb-4" />
+                <p className="text-lg font-medium text-gray-900">Saving workout...</p>
               </div>
-              
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={sessionRPE}
-                onChange={(e) => setSessionRPE(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              
-              <div className="text-center mt-3">
-                <div className="text-4xl font-bold text-gray-900">{sessionRPE}</div>
-                <div className="text-sm text-gray-600 mt-1">
-                  {getRPELabel(sessionRPE)}
+            ) : isSaved ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <CheckCircle className="h-12 w-12 text-green-600 mb-4" />
+                <p className="text-lg font-medium text-gray-900">Saved!</p>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-2xl font-bold mb-2 text-center">
+                  Workout Complete!
+                </h2>
+                
+                <p className="text-gray-600 mb-8 text-center">
+                  How hard was that session?
+                </p>
+                
+                {/* RPE slider */}
+                <div className="mb-6">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm text-gray-500">Easy</span>
+                    <span className="text-sm text-gray-500">Maximal</span>
+                  </div>
+                  
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={sessionRPE}
+                    onChange={(e) => setSessionRPE(Number(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  
+                  <div className="text-center mt-3">
+                    <div className="text-4xl font-bold text-gray-900">{sessionRPE}</div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      {getRPELabel(sessionRPE)}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={handleSessionRPESkip}
-                className="flex-1 py-4 text-gray-600 hover:text-gray-900"
-              >
-                Skip
-              </button>
-              <button
-                onClick={() => handleSessionRPESubmit(sessionRPE)}
-                className="flex-1 py-4 text-gray-700 hover:text-gray-900 font-medium"
-              >
-                Submit & Finish
-              </button>
-            </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSessionRPESkip}
+                    className="flex-1 py-4 text-gray-600 hover:text-gray-900"
+                  >
+                    Skip
+                  </button>
+                  <button
+                    onClick={() => handleSessionRPESubmit(sessionRPE)}
+                    className="flex-1 py-4 text-gray-700 hover:text-gray-900 font-medium"
+                  >
+                    Submit & Finish
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
