@@ -101,36 +101,31 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           </>
         )}
 
-        {/* Completed Plans */}
+        {/* Completed Plans - Navigation to full screen */}
         {completedPlans.length > 0 && (
           <>
-            {completedPlans.slice(0, 3).map((plan) => (
-              <DropdownMenuItem
-                key={plan.id}
-                onClick={(e) => handlePlanSelect(e, plan.id)}
-                className="flex flex-col items-start hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-                style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '50px'}}
-              >
-                <span className="text-xs text-gray-500 mb-1">
-                  {plan.status === 'ended' ? 'Ended:' : 'Completed:'}
-                </span>
-                <span className="font-medium">{plan.name}</span>
-              </DropdownMenuItem>
-            ))}
+            {currentPlans.length > 0 && (
+              <DropdownMenuSeparator className="my-2" />
+            )}
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                navigate('.', { state: { openPlans: true, showCompleted: true } });
+              }}
+              className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+              style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+            >
+              <span>Completed Plans</span>
+              <ArrowRight className="h-4 w-4 text-gray-400" />
+            </DropdownMenuItem>
           </>
         )}
 
-        {/* Admin: publish template (JSON) */}
-        <DropdownMenuSeparator className="my-2" />
-        <DropdownMenuItem
-          onClick={() => { navigate('/plans/admin'); }}
-          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
-        >
-          <span>Admin – Add template (JSON)</span>
-        </DropdownMenuItem>
-
         {/* User: select a plan from catalog */}
+        {(currentPlans.length > 0 || completedPlans.length > 0) && (
+          <DropdownMenuSeparator className="my-2" />
+        )}
         <DropdownMenuItem
           onClick={() => { navigate('/plans/catalog'); }}
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
@@ -140,14 +135,22 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
         </DropdownMenuItem>
 
         {/* Builder hub */}
-        <DropdownMenuSeparator className="my-2" />
         <DropdownMenuItem
           onClick={() => { navigate('/plans/build'); }}
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >
           <span>Build plans</span>
-          <span className="text-xs text-blue-600 font-semibold">NEW</span>
+        </DropdownMenuItem>
+
+        {/* Admin: publish template (JSON) */}
+        <DropdownMenuSeparator className="my-2" />
+        <DropdownMenuItem
+          onClick={() => { navigate('/plans/admin'); }}
+          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <span>Admin – Add template (JSON)</span>
         </DropdownMenuItem>
 
         {/* Removed View Current Plans entry per design */}

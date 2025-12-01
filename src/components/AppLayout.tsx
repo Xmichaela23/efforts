@@ -58,6 +58,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showAllPlans, setShowAllPlans] = useState<boolean>(!!initialRouteState.openPlans);
   const [focusPlanId, setFocusPlanId] = useState<string | undefined>(initialRouteState.focusPlanId);
   const [focusWeek, setFocusWeek] = useState<number | undefined>(initialRouteState.focusWeek);
+  const [showCompletedPlans, setShowCompletedPlans] = useState<boolean>(!!initialRouteState.showCompleted);
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
   const [showImportPage, setShowImportPage] = useState(false);
@@ -250,13 +251,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   }, [activeTab, loadProviderData, selectedWorkout]);
 
-  // Open weekly planner when routed with state { openPlans, focusPlanId, focusWeek }
+  // Open weekly planner when routed with state { openPlans, focusPlanId, focusWeek, showCompleted }
   useLayoutEffect(() => {
     const state: any = (location && location.state) || {};
     if (state.openPlans) {
       setShowAllPlans(true);
       if (state.focusPlanId) setFocusPlanId(state.focusPlanId);
       if (state.focusWeek) setFocusWeek(state.focusWeek);
+      if (state.showCompleted) setShowCompletedPlans(true);
       // Clear state to avoid re-opening on back/refresh
       try { navigate(location.pathname, { replace: true, state: {} }); } catch {}
     }
@@ -1096,6 +1098,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 }}
                 focusPlanId={focusPlanId}
                 focusWeek={focusWeek}
+                showCompleted={showCompletedPlans}
               />
             </div>
           ) : showStrengthLogger ? (

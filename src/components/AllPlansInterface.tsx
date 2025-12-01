@@ -192,6 +192,8 @@ interface AllPlansInterfaceProps {
   // Optional: auto-open a specific plan and week when mounting
   focusPlanId?: string;
   focusWeek?: number;
+  // Optional: show only completed plans
+  showCompleted?: boolean;
 }
 
 const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ 
@@ -204,7 +206,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   detailedPlans = {},
   onSelectWorkout,
   focusPlanId,
-  focusWeek
+  focusWeek,
+  showCompleted = false
 }) => {
   // Planned workouts are sourced via unified server paths now
   const plannedWorkouts: any[] = [];
@@ -2083,7 +2086,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         </div>
       </div>
 
-      {currentPlans.length > 0 && (
+      {!showCompleted && currentPlans.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-medium text-gray-900">Current Plans</h2>
           {currentPlans.map((plan) => (
