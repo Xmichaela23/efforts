@@ -139,24 +139,32 @@ function derivePlannedCellLabel(w: any): string | null {
       return isOptional ? `OPT ${label}` : label;
     }
 
-    // BIKE
+    // BIKE - Always show duration
     if (type === 'ride' || type === 'bike') {
+      // For optional bikes, just show "OPT BK" with duration
+      if (isOptional) {
+        return durStr ? `OPT BK ${durStr}`.trim() : 'OPT BK';
+      }
       let label = '';
-      if (has(/bike_vo2_/i) || has(/vo2/i)) label = `BK-VO2 ${durStr}`.trim();
-      else if (has(/bike_thr_/i)) label = `BK-THR ${durStr}`.trim();
-      else if (has(/bike_ss_/i)) label = `BK-SS ${durStr}`.trim();
-      else if (has(/endurance|z2|long\s*ride/i)) label = `BK-LR ${durStr}`.trim();
-      else label = `BK ${durStr}`.trim();
-      return isOptional ? `OPT ${label}` : label;
+      if (has(/bike_vo2_/i) || has(/vo2/i)) label = durStr ? `BK-VO2 ${durStr}`.trim() : 'BK-VO2';
+      else if (has(/bike_thr_/i)) label = durStr ? `BK-THR ${durStr}`.trim() : 'BK-THR';
+      else if (has(/bike_ss_/i)) label = durStr ? `BK-SS ${durStr}`.trim() : 'BK-SS';
+      else if (has(/endurance|z2|long\s*ride/i)) label = durStr ? `BK-LR ${durStr}`.trim() : 'BK-LR';
+      else label = durStr ? `BK ${durStr}`.trim() : 'BK';
+      return label;
     }
 
     // SWIM - Always show duration
     if (type === 'swim') {
+      // For optional swims, just show "OPT SM" with duration
+      if (isOptional) {
+        return durStr ? `OPT SM ${durStr}`.trim() : 'OPT SM';
+      }
       let label = '';
       if (has(/swim_intervals_/i)) label = durStr ? `SM-INT ${durStr}`.trim() : 'SM-INT';
       else if (has(/technique|drill|drills|swim_drills_/i)) label = durStr ? `SM-DRL ${durStr}`.trim() : 'SM-DRL';
       else label = durStr ? `SM ${durStr}`.trim() : 'SM';
-      return isOptional ? `OPT ${label}` : label;
+      return label;
     }
 
     // MOBILITY / PT
@@ -215,6 +223,10 @@ function derivePlannedCellLabel(w: any): string | null {
 
     // STRENGTH - Abbreviate names consistently for calendar cells
     if (type === 'strength') {
+      // For optional strength, just show "OPT STG"
+      if (isOptional) {
+        return 'OPT STG';
+      }
       // Check workout_structure.title first (from plans), then workout.name
       const stTitle = String((w as any)?.workout_structure?.title || '').trim();
       const name = stTitle || String(w.name || '').trim();
@@ -241,7 +253,7 @@ function derivePlannedCellLabel(w: any): string | null {
         else if (hasCore) label = 'STG-CORE';
         else label = 'STG';
       }
-      return isOptional ? `OPT ${label}` : label;
+      return label;
     }
 
     return null;
@@ -447,7 +459,32 @@ export default function WorkoutCalendar({
         // No checkmark for planned workouts
         
         // For linked completed workouts, try to find the planned workout's label
-        let labelBase = plannedLabel || [t, milesText].filter(Boolean).join(' ');
+        let labelBase = plannedLabel;
+        if (!labelBase) {
+          // Fallback: calculate duration for planned workouts (runs, rides, swims)
+          const isPlanned = String(w?.workout_status||'').toLowerCase() === 'planned';
+          const type = String(w?.type || '').toLowerCase();
+          if (isPlanned && (type === 'run' || type === 'ride' || type === 'bike' || type === 'swim')) {
+            // Calculate duration same way as derivePlannedCellLabel
+            const comp: any = w?.computed || {};
+            let secs = 0;
+            const rootTs = Number((w as any)?.total_duration_seconds);
+            if (Number.isFinite(rootTs) && rootTs > 0) secs = rootTs;
+            const ts = Number(comp?.total_duration_seconds);
+            if (secs <= 0 && Number.isFinite(ts) && ts > 0) secs = ts;
+            if (secs <= 0 && Array.isArray(comp?.steps) && comp.steps.length > 0) {
+              try {
+                secs = comp.steps.reduce((a: number, s: any) => a + (Number(s?.seconds) || 0), 0);
+              } catch {}
+            }
+            const mins = secs > 0 ? Math.round(secs / 60) : 0;
+            const durStr = mins > 0 ? `${mins}m` : '';
+            labelBase = durStr ? `${t} ${durStr}`.trim() : t;
+          } else {
+            // For completed workouts or other types, use miles if available
+            labelBase = [t, milesText].filter(Boolean).join(' ');
+          }
+        }
         if (isPlannedLinked && !(w as any)?._plannedLabelUsed) {
           // Try to find the linked planned workout to use its label instead
           const plannedId = String((w as any)?.planned_id || '');
