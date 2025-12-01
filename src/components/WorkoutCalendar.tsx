@@ -6,6 +6,7 @@ import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle } from 'lucide-react';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
+import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -96,75 +97,10 @@ function derivePlannedCellLabel(w: any): string | null {
     if (Array.isArray(raw)) tags = raw;
     else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
     const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
-  // Robust duration resolution (authoritative, no legacy fallbacks):
-  // total_duration_seconds (row) > computed.total_duration_seconds > sum(computed.steps.seconds) > sum(intervals) > extract from steps_preset/description
-    const comp: any = w?.computed || {};
-    let secs = 0;
-  const rootTs = Number((w as any)?.total_duration_seconds);
-  if (Number.isFinite(rootTs) && rootTs > 0) secs = rootTs;
-    const ts = Number(comp?.total_duration_seconds);
-  if (secs <= 0 && Number.isFinite(ts) && ts > 0) secs = ts;
-    if (secs <= 0 && Array.isArray(comp?.steps) && comp.steps.length > 0) {
-      try {
-        secs = comp.steps.reduce((a: number, s: any) => a + (Number(s?.seconds) || 0), 0);
-      } catch {}
-    }
-    if (secs <= 0 && Array.isArray(w?.intervals) && w.intervals.length > 0) {
-      try {
-        const sumIntervals = (arr: any[]): number => arr.reduce((acc: number, it: any) => {
-          if (Array.isArray(it?.segments) && Number(it?.repeatCount) > 0) {
-            const segSum = it.segments.reduce((s: number, sg: any) => s + (Number(sg?.duration) || 0), 0);
-            return acc + segSum * Number(it.repeatCount);
-          }
-          return acc + (Number(it?.duration) || 0);
-        }, 0);
-        const sInt = sumIntervals(w.intervals);
-        if (Number.isFinite(sInt) && sInt > 0) secs = sInt;
-      } catch {}
-    }
-    // Last resort: try to extract duration from steps_preset or description
-    if (secs <= 0 && Array.isArray(steps) && steps.length > 0) {
-      try {
-        // Look for duration patterns in steps_preset (e.g., "recovery_ride_60min", "easy_30min")
-        for (const step of steps) {
-          const stepStr = String(step).toLowerCase();
-          // Match patterns like "60min", "30m", "1h", "45min"
-          const minMatch = stepStr.match(/(\d+)\s*(?:min|m|minutes?)/i);
-          if (minMatch) {
-            const mins = Number(minMatch[1]);
-            if (Number.isFinite(mins) && mins > 0) {
-              secs = mins * 60;
-              break;
-            }
-          }
-          const hourMatch = stepStr.match(/(\d+(?:\.\d+)?)\s*h(?:ours?)?/i);
-          if (hourMatch) {
-            const hours = Number(hourMatch[1]);
-            if (Number.isFinite(hours) && hours > 0) {
-              secs = hours * 3600;
-              break;
-            }
-          }
-        }
-      } catch {}
-    }
-    if (secs <= 0 && txt) {
-      try {
-        // Try to extract duration from description text
-        const minMatch = txt.match(/(\d+)\s*(?:min|m|minutes?)/i);
-        if (minMatch) {
-          const mins = Number(minMatch[1]);
-          if (Number.isFinite(mins) && mins > 0) secs = mins * 60;
-        } else {
-          const hourMatch = txt.match(/(\d+(?:\.\d+)?)\s*h(?:ours?)?/i);
-          if (hourMatch) {
-            const hours = Number(hourMatch[1]);
-            if (Number.isFinite(hours) && hours > 0) secs = hours * 3600;
-          }
-        }
-      } catch {}
-    }
-  const mins = secs > 0 ? Math.round(secs / 60) : 0;
+    
+    // Use single source of truth for duration calculation
+    const secs = resolveMovingSeconds(w);
+    const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
     const durStr = mins > 0 ? `${mins}m` : '';
 
     const has = (pat: RegExp) => steps.some(s => pat.test(s)) || pat.test(txt);
@@ -509,32 +445,9 @@ export default function WorkoutCalendar({
           const isPlanned = String(w?.workout_status||'').toLowerCase() === 'planned';
           const type = String(w?.type || '').toLowerCase();
           if (isPlanned && (type === 'run' || type === 'ride' || type === 'bike' || type === 'swim')) {
-            // Calculate duration same way as derivePlannedCellLabel
-            const comp: any = w?.computed || {};
-            let secs = 0;
-            const rootTs = Number((w as any)?.total_duration_seconds);
-            if (Number.isFinite(rootTs) && rootTs > 0) secs = rootTs;
-            const ts = Number(comp?.total_duration_seconds);
-            if (secs <= 0 && Number.isFinite(ts) && ts > 0) secs = ts;
-            if (secs <= 0 && Array.isArray(comp?.steps) && comp.steps.length > 0) {
-              try {
-                secs = comp.steps.reduce((a: number, s: any) => a + (Number(s?.seconds) || 0), 0);
-              } catch {}
-            }
-            if (secs <= 0 && Array.isArray(w?.intervals) && w.intervals.length > 0) {
-              try {
-                const sumIntervals = (arr: any[]): number => arr.reduce((acc: number, it: any) => {
-                  if (Array.isArray(it?.segments) && Number(it?.repeatCount) > 0) {
-                    const segSum = it.segments.reduce((s: number, sg: any) => s + (Number(sg?.duration) || 0), 0);
-                    return acc + segSum * Number(it.repeatCount);
-                  }
-                  return acc + (Number(it?.duration) || 0);
-                }, 0);
-                const sInt = sumIntervals(w.intervals);
-                if (Number.isFinite(sInt) && sInt > 0) secs = sInt;
-              } catch {}
-            }
-            const mins = secs > 0 ? Math.round(secs / 60) : 0;
+            // Use single source of truth for duration calculation
+            const secs = resolveMovingSeconds(w);
+            const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
             const durStr = mins > 0 ? `${mins}m` : '';
             labelBase = durStr ? `${t} ${durStr}`.trim() : t;
           } else {
@@ -549,32 +462,9 @@ export default function WorkoutCalendar({
             // Check if label already has duration (contains "m" or "min")
             const hasDuration = /\d+m|\d+\s*min/i.test(labelBase);
             if (!hasDuration) {
-              // Recalculate duration and add it
-              const comp: any = w?.computed || {};
-              let secs = 0;
-              const rootTs = Number((w as any)?.total_duration_seconds);
-              if (Number.isFinite(rootTs) && rootTs > 0) secs = rootTs;
-              const ts = Number(comp?.total_duration_seconds);
-              if (secs <= 0 && Number.isFinite(ts) && ts > 0) secs = ts;
-              if (secs <= 0 && Array.isArray(comp?.steps) && comp.steps.length > 0) {
-                try {
-                  secs = comp.steps.reduce((a: number, s: any) => a + (Number(s?.seconds) || 0), 0);
-                } catch {}
-              }
-              if (secs <= 0 && Array.isArray(w?.intervals) && w.intervals.length > 0) {
-                try {
-                  const sumIntervals = (arr: any[]): number => arr.reduce((acc: number, it: any) => {
-                    if (Array.isArray(it?.segments) && Number(it?.repeatCount) > 0) {
-                      const segSum = it.segments.reduce((s: number, sg: any) => s + (Number(sg?.duration) || 0), 0);
-                      return acc + segSum * Number(it.repeatCount);
-                    }
-                    return acc + (Number(it?.duration) || 0);
-                  }, 0);
-                  const sInt = sumIntervals(w.intervals);
-                  if (Number.isFinite(sInt) && sInt > 0) secs = sInt;
-                } catch {}
-              }
-              const mins = secs > 0 ? Math.round(secs / 60) : 0;
+              // Use single source of truth for duration calculation
+              const secs = resolveMovingSeconds(w);
+              const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
               const durStr = mins > 0 ? `${mins}m` : '';
               if (durStr) {
                 labelBase = `${labelBase} ${durStr}`.trim();
