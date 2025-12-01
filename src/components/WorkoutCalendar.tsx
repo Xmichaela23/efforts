@@ -252,21 +252,32 @@ export default function WorkoutCalendar({
   const unifiedPlanned = unifiedItems
     .filter((it:any)=> !!it?.planned)
     .map((it:any)=> mapUnifiedItemToPlanned(it));
-  const unifiedWorkouts = unifiedItems.map((it:any)=> ({
-    id: it.id,
-    date: it.date,
-    type: it.type,
-    workout_status: (String(it?.status||'').toLowerCase()==='completed' || (it?.executed && ((it.executed.overall) || (Array.isArray(it.executed.intervals)&&it.executed.intervals.length>0)))) ? 'completed' : 'planned',
-    // Provide distance in km if available from executed.overall so labels can render
-    distance: (it?.executed?.overall?.distance_m && typeof it.executed.overall.distance_m === 'number')
-      ? (it.executed.overall.distance_m / 1000)
-      : undefined,
-    // Pass sets for strength and mobility so views can read exercise data
-    strength_exercises: Array.isArray((it as any)?.executed?.strength_exercises) ? (it as any).executed.strength_exercises : undefined,
-    mobility_exercises: Array.isArray((it as any)?.executed?.mobility_exercises) ? (it as any).executed.mobility_exercises : undefined,
-    // Include planned_id for linking logic
-    planned_id: (it as any)?.executed?.planned_id || undefined,
-  }));
+  // Only include completed workouts (items with executed data)
+  // Planned-only items are already covered by unifiedPlanned to avoid duplicates
+  const unifiedWorkouts = unifiedItems
+    .filter((it:any) => {
+      // Only include if it has executed data (completed workout)
+      return it?.executed && (
+        it.executed.overall || 
+        (Array.isArray(it.executed.intervals) && it.executed.intervals.length > 0) ||
+        String(it?.status||'').toLowerCase() === 'completed'
+      );
+    })
+    .map((it:any)=> ({
+      id: it.id,
+      date: it.date,
+      type: it.type,
+      workout_status: 'completed' as const,
+      // Provide distance in km if available from executed.overall so labels can render
+      distance: (it?.executed?.overall?.distance_m && typeof it.executed.overall.distance_m === 'number')
+        ? (it.executed.overall.distance_m / 1000)
+        : undefined,
+      // Pass sets for strength and mobility so views can read exercise data
+      strength_exercises: Array.isArray((it as any)?.executed?.strength_exercises) ? (it as any).executed.strength_exercises : undefined,
+      mobility_exercises: Array.isArray((it as any)?.executed?.mobility_exercises) ? (it as any).executed.mobility_exercises : undefined,
+      // Include planned_id for linking logic
+      planned_id: (it as any)?.executed?.planned_id || undefined,
+    }));
 
   // No legacy backstop: unified feed is authoritative
 
