@@ -222,6 +222,45 @@ function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
   return 'strength';
 }
 
+// --- Reverse geocoding helper (using OpenStreetMap Nominatim) ---
+async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  try {
+    // Rate limit: max 1 request per second (Nominatim requirement)
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'EffortsApp/1.0' // Required by Nominatim
+      }
+    });
+    
+    if (!response.ok) {
+      console.log(`⚠️ Reverse geocoding failed: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    if (!data || !data.address) {
+      return null;
+    }
+    
+    // Extract city name (prefer city, then town, then village, then municipality)
+    const address = data.address;
+    const city = address.city || address.town || address.village || address.municipality || 
+                 address.county || address.state || null;
+    
+    if (city) {
+      return city;
+    }
+    
+    return null;
+  } catch (error) {
+    console.log(`⚠️ Reverse geocoding error: ${error}`);
+    return null;
+  }
+}
+
 async function convertStravaToWorkout(a: StravaActivity, userId: string, accessToken: string) {
   const type = mapStravaTypeToWorkoutType(a);
   
@@ -428,8 +467,8 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     console.log('⚠️ Failed to enrich gpsTrack with altitude/time:', e);
   }
 
-  // Generate a nice workout name
-  const generateWorkoutName = () => {
+  // Generate a nice workout name (async to support reverse geocoding)
+  const generateWorkoutName = async () => {
     // If Strava activity has a custom name, use it (unless it's generic)
     if (a.name && a.name !== 'Strava Activity' && !a.name.match(/^(Run|Ride|Swim|Workout)$/i)) {
       return a.name;
@@ -474,13 +513,31 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
       friendlySport = type.charAt(0).toUpperCase() + type.slice(1);
     }
     
-    // TODO: Add location name when reverse geocoding is available
-    // For now, return just the sport type
+    // Try to get location name from coordinates
+    const startLatLng = Array.isArray(a.start_latlng) ? a.start_latlng : null;
+    let locationName: string | null = null;
+    
+    if (startLatLng && startLatLng[0] && startLatLng[1] && 
+        Number.isFinite(Number(startLatLng[0])) && Number.isFinite(Number(startLatLng[1]))) {
+      try {
+        locationName = await reverseGeocode(Number(startLatLng[0]), Number(startLatLng[1]));
+      } catch (error) {
+        console.log(`⚠️ Reverse geocoding failed for ${startLatLng[0]},${startLatLng[1]}: ${error}`);
+      }
+    }
+    
+    // Return location + sport type if we have location, otherwise just sport type
+    if (locationName) {
+      return `${locationName} ${friendlySport}`;
+    }
+    
     return friendlySport;
   };
   
+  const workoutName = await generateWorkoutName();
+  
   return {
-    name: generateWorkoutName(),
+    name: workoutName,
     type,
     user_id: userId,
 

@@ -96,6 +96,46 @@ function deriveSwimMovingSeconds(activityLike: any): number | null {
     return null;
   }
 }
+// --- Reverse geocoding helper (using OpenStreetMap Nominatim) ---
+async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  try {
+    // Rate limit: max 1 request per second (Nominatim requirement)
+    // Use a simple delay to avoid hitting rate limits
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'EffortsApp/1.0' // Required by Nominatim
+      }
+    });
+    
+    if (!response.ok) {
+      console.log(`⚠️ Reverse geocoding failed: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    if (!data || !data.address) {
+      return null;
+    }
+    
+    // Extract city name (prefer city, then town, then village, then municipality)
+    const address = data.address;
+    const city = address.city || address.town || address.village || address.municipality || 
+                 address.county || address.state || null;
+    
+    if (city) {
+      return city;
+    }
+    
+    return null;
+  } catch (error) {
+    console.log(`⚠️ Reverse geocoding error: ${error}`);
+    return null;
+  }
+}
+
 // --- Garmin local date + UTC timestamp resolver ---
 function garminLocalDateAndTimestamp(a) {
   const sIn = Number(a?.summary?.startTimeInSeconds ?? a?.start_time_in_seconds);
@@ -509,8 +549,8 @@ async function mapGarminToWorkout(activity, userId) {
     if (summary?.poolLengthInMeters != null) merged.pool_length = Number(summary.poolLengthInMeters);
     return merged;
   })();
-  // Generate a nice workout name
-  const generateWorkoutName = () => {
+  // Generate a nice workout name (async to support reverse geocoding)
+  const generateWorkoutName = async () => {
     // If activity has a custom name, use it (unless it's a raw activity_type)
     if (activity.activity_name && 
         !activity.activity_name.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i)) {
@@ -558,14 +598,32 @@ async function mapGarminToWorkout(activity, userId) {
       friendlySport = type.charAt(0).toUpperCase() + type.slice(1);
     }
     
-    // TODO: Add location name when reverse geocoding is available
-    // For now, return just the sport type
+    // Try to get location name from coordinates
+    const lat = activity.starting_latitude || activity.startingLatitudeInDegree;
+    const lng = activity.starting_longitude || activity.startingLongitudeInDegree;
+    let locationName: string | null = null;
+    
+    if (lat && lng && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+      try {
+        locationName = await reverseGeocode(Number(lat), Number(lng));
+      } catch (error) {
+        console.log(`⚠️ Reverse geocoding failed for ${lat},${lng}: ${error}`);
+      }
+    }
+    
+    // Return location + sport type if we have location, otherwise just sport type
+    if (locationName) {
+      return `${locationName} ${friendlySport}`;
+    }
+    
     return friendlySport;
   };
   
+  const workoutName = await generateWorkoutName();
+  
   return {
     user_id: userId,
-    name: generateWorkoutName(),
+    name: workoutName,
     type,
     refined_type: computeInput?.refined_type || null,
     date: date,
