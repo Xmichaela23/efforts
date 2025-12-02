@@ -242,16 +242,10 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
       environment: environment || undefined,
       is_heated: isHeated || undefined,
       instructor: instructor.trim() || undefined,
-      focus_area: focusAreas.length > 0 ? focusAreas : undefined
+      focus_area: focusAreas.length > 0 ? focusAreas : undefined,
+      studio_name: studioName.trim() || undefined,
+      teacher_rating: teacherRating && teacherRating >= 1 && teacherRating <= 10 ? teacherRating : undefined
     });
-    
-    // Add studio/teacher fields to metadata
-    if (studioName.trim()) {
-      (workoutMetadata as any).studio_name = studioName.trim();
-    }
-    if (teacherRating && teacherRating >= 1 && teacherRating <= 10) {
-      (workoutMetadata as any).teacher_rating = teacherRating;
-    }
     
     // Prepare the workout data
     const completedWorkout = {

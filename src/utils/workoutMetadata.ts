@@ -49,6 +49,8 @@ export interface WorkoutMetadata {
   is_heated?: boolean;                    // Optional (for yoga sessions)
   instructor?: string;                    // Optional
   focus_area?: FocusArea[];              // Optional
+  studio_name?: string;                   // Optional - Studio or teacher name
+  teacher_rating?: number;                // Optional - Teacher rating (1-10)
 }
 
 /**
@@ -99,6 +101,8 @@ export function createWorkoutMetadata(params: {
   is_heated?: boolean;
   instructor?: string;
   focus_area?: FocusArea[];
+  studio_name?: string;
+  teacher_rating?: number;
 }): WorkoutMetadata {
   const metadata: WorkoutMetadata = {};
   
@@ -136,6 +140,14 @@ export function createWorkoutMetadata(params: {
   
   if (Array.isArray(params.focus_area) && params.focus_area.length > 0) {
     metadata.focus_area = params.focus_area;
+  }
+  
+  if (params.studio_name && typeof params.studio_name === 'string' && params.studio_name.trim().length > 0) {
+    metadata.studio_name = params.studio_name.trim();
+  }
+  
+  if (typeof params.teacher_rating === 'number' && params.teacher_rating >= 1 && params.teacher_rating <= 10) {
+    metadata.teacher_rating = params.teacher_rating;
   }
   
   return metadata;
