@@ -55,6 +55,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
   const [isInitialized, setIsInitialized] = useState(false);
   
   // Required fields
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [duration, setDuration] = useState<number>(60);
   const [sessionRPE, setSessionRPE] = useState<number>(5);
   const [sessionType, setSessionType] = useState<PilatesYogaSessionType | ''>('');
@@ -65,6 +66,8 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
   const [isHeated, setIsHeated] = useState(false);
   const [instructor, setInstructor] = useState('');
   const [focusAreas, setFocusAreas] = useState<FocusArea[]>([]);
+  const [studioName, setStudioName] = useState('');
+  const [teacherRating, setTeacherRating] = useState<number>(5);
   const [notes, setNotes] = useState('');
   
   // UI state
@@ -89,11 +92,15 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
   useEffect(() => {
     console.log('🔄 PilatesYogaLogger initializing...');
     
+    // Initialize date - use targetDate, scheduledWorkout date, or today
+    const initialDate = targetDate || scheduledWorkout?.date || getDateString();
+    setSelectedDate(initialDate);
+    
     // Check for existing planned workout data
     let workoutToLoad = scheduledWorkout;
     
     if (!workoutToLoad) {
-      const dateStr = getDateString();
+      const dateStr = initialDate;
       const currentPlanned = (workouts || []) as any[];
       const todaysPilatesYogaWorkouts = currentPlanned.filter((w: any) => 
         String(w?.date) === dateStr && 
@@ -131,11 +138,21 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
       if (metadata.focus_area && Array.isArray(metadata.focus_area)) {
         setFocusAreas(metadata.focus_area);
       }
+      if (metadata.studio_name) {
+        setStudioName(metadata.studio_name);
+      }
+      if (metadata.teacher_rating) {
+        setTeacherRating(metadata.teacher_rating);
+      }
       if (metadata.notes) {
         setNotes(metadata.notes);
       }
       if (workoutToLoad.duration) {
         setDuration(workoutToLoad.duration);
+      }
+      // Set date from workout if available
+      if (workoutToLoad.date) {
+        setSelectedDate(workoutToLoad.date);
       }
     }
     
@@ -169,11 +186,25 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
     return 'Maximal';
   };
 
+  // Helper: get teacher rating label
+  const getTeacherRatingLabel = (rating: number): string => {
+    if (rating <= 2) return 'Poor';
+    if (rating <= 4) return 'Fair';
+    if (rating <= 6) return 'Good';
+    if (rating <= 8) return 'Very Good';
+    return 'Excellent';
+  };
+
   // Check if session type is yoga (for showing heated checkbox)
-  const isYogaSession = sessionType.startsWith('yoga_');
+  const isYogaSession = sessionType ? sessionType.startsWith('yoga_') : false;
 
   const saveWorkout = async () => {
     // Validation
+    const workoutDate = selectedDate || getDateString();
+    if (!workoutDate) {
+      alert('Date is required');
+      return;
+    }
     if (!duration || duration <= 0) {
       alert('Duration must be greater than 0');
       return;
@@ -214,12 +245,20 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
       focus_area: focusAreas.length > 0 ? focusAreas : undefined
     });
     
+    // Add studio/teacher fields to metadata
+    if (studioName.trim()) {
+      (workoutMetadata as any).studio_name = studioName.trim();
+    }
+    if (teacherRating && teacherRating >= 1 && teacherRating <= 10) {
+      (workoutMetadata as any).teacher_rating = teacherRating;
+    }
+    
     // Prepare the workout data
     const completedWorkout = {
       id: isEditingCompleted ? scheduledWorkout.id : Date.now().toString(),
       name: scheduledWorkout?.name || `${SESSION_TYPES.find(t => t.value === sessionType)?.label || 'Pilates/Yoga'} - ${new Date().toLocaleDateString()}`,
       type: 'pilates_yoga' as const,
-      date: getDateString(),
+      date: workoutDate,
       description: `${SESSION_TYPES.find(t => t.value === sessionType)?.label || 'Pilates/Yoga'} session`,
       duration: finalDuration,
       workout_status: 'completed' as const,
@@ -331,6 +370,13 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
           <h1 className="text-xl font-medium text-gray-700">
             {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Pilates/Yoga'}
           </h1>
+          <Input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="min-h-[44px] bg-transparent w-auto border-none shadow-none focus:border-none focus:ring-0 focus:outline-none"
+            style={{fontFamily: 'Inter, sans-serif'}}
+          />
         </div>
       </div>
 
@@ -503,6 +549,49 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                   </Label>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* STUDIO/TEACHER - Optional */}
+        <div className="bg-white">
+          <div className="p-2">
+            <Label className="text-sm font-medium text-gray-700 mb-2 block">Studio/Teacher (Optional)</Label>
+            
+            {/* Studio/Teacher Name */}
+            <div className="mb-3">
+              <Input
+                value={studioName}
+                onChange={(e) => setStudioName(e.target.value)}
+                placeholder="e.g., CorePower Yoga, Sarah Johnson"
+                className="h-9 text-sm border-gray-300"
+              />
+            </div>
+
+            {/* Teacher Rating */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                Teacher Rating (1-10)
+                <span className="text-xs text-gray-500 ml-1">How would you rate this teacher?</span>
+              </Label>
+              <div className="space-y-2">
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={teacherRating}
+                  onChange={(e) => setTeacherRating(Number(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Poor</span>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-900">{teacherRating}</div>
+                    <div className="text-xs text-gray-500">{getTeacherRatingLabel(teacherRating)}</div>
+                  </div>
+                  <span className="text-xs text-gray-500">Excellent</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
