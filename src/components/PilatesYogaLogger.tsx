@@ -368,7 +368,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="min-h-[44px] bg-transparent w-auto border-none shadow-none focus:border-none focus:ring-0 focus:outline-none"
+            className="h-7 px-1.5 py-0.5 text-xs text-gray-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 cursor-pointer focus:bg-blue-100 focus:border-blue-300 transition-colors"
             style={{fontFamily: 'Inter, sans-serif'}}
           />
         </div>
@@ -417,7 +417,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Easy</span>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-gray-900">{sessionRPE}</div>
+                    <div className="text-lg font-bold text-gray-900">{sessionRPE}</div>
                     <div className="text-xs text-gray-500">{getRPELabel(sessionRPE)}</div>
                   </div>
                   <span className="text-xs text-gray-500">Maximal</span>
@@ -580,7 +580,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Poor</span>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-gray-900">{teacherRating}</div>
+                    <div className="text-lg font-bold text-gray-900">{teacherRating}</div>
                     <div className="text-xs text-gray-500">{getTeacherRatingLabel(teacherRating)}</div>
                   </div>
                   <span className="text-xs text-gray-500">Excellent</span>
