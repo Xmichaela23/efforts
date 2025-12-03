@@ -2251,22 +2251,30 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             })();
 
             const timeCell = (() => {
-              // For overall row (idx === 0), ALWAYS use overall moving time, not interval duration
-                if (idx === 0) {
-                  const overall = (completed as any)?.computed?.overall || {};
+              // Check if this is an overall/summary row (not a real interval step)
+              const stepKind = String(st?.kind || st?.type || '').toLowerCase();
+              const isOverallRow = stepKind === 'overall' || st?.id === 'overall' || (idx === 0 && !hasServerComputed);
+              
+              // For overall row, use overall moving time
+              if (isOverallRow) {
+                const overall = (completed as any)?.computed?.overall || {};
                 const dur = Number(overall?.duration_s_moving);
-                  if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
+                if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
                 return '—';
               }
-              // For individual intervals, use interval duration
+              // For individual intervals (warmup, work, recovery, cooldown), use interval duration
               if (!hasServerComputed || !row) return '—';
               const dur = row?.executed?.duration_s; return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
             })();
 
             const hrVal = (() => {
               if (!hasServerComputed || !row) {
-                // For first row (overall), show overall workout HR
-                if (idx === 0) {
+                // Check if this is an overall/summary row (not a real interval step)
+                const stepKind = String(st?.kind || st?.type || '').toLowerCase();
+                const isOverallRow = stepKind === 'overall' || st?.id === 'overall' || (idx === 0 && !hasServerComputed);
+                
+                // For overall row, show overall workout HR
+                if (isOverallRow) {
                   const overall = (completed as any)?.computed?.overall || {};
                   const hr = Number(overall?.avg_hr);
                   if (Number.isFinite(hr) && hr > 0) return Math.round(hr);
