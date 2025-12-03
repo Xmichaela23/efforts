@@ -1358,7 +1358,6 @@ Deno.serve(async (req) => {
           console.log(`   - Final execution score (rounded): ${calculatedExecutionScore}%`);
         }
         }
-    }
 
     // 🤖 GENERATE AI NARRATIVE INSIGHTS
     let narrativeInsights = null;
