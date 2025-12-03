@@ -1515,6 +1515,20 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             performanceAssessment,
             finalExecutionScore,
             finalPacePct,
+            finalDurationPct,
+            'paceAdherence type': typeof paceAdherence,
+            'durationAdherence type': typeof durationAdherence,
+            'paceAdherence isFinite': Number.isFinite(paceAdherence),
+            'durationAdherence isFinite': Number.isFinite(durationAdherence)
+          });
+          
+          // ✅ DEBUG: Log why chips might not render
+          console.log('🔍 [CHIP DEBUG] Will render chips:', {
+            'Execution chip': finalExecutionScore != null,
+            'Pace chip': finalPacePct != null,
+            'Duration chip': finalDurationPct != null,
+            finalExecutionScore,
+            finalPacePct,
             finalDurationPct
           });
           
