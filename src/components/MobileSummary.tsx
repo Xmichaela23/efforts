@@ -2189,31 +2189,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               // For runs/walks, use universal pace selection logic
               const isRunOrWalk = /run|walk/i.test(sportType);
               if (isRunOrWalk) {
-                // For overall row (idx === 0), ALWAYS use overall pace, not interval pace
-                // This ensures we use the correct server-computed pace from moving_time
                 const workout = hydratedCompleted || completed;
-                let secPerMi: number | null = null;
-                if (idx === 0) {
-                  // Overall row: calculate from distance/time (same as Details screen)
-                  // This ensures consistency - Details calculates from distance/duration when avg_pace_s_per_mi is wrong
-                  const distM = Number(workout?.computed?.overall?.distance_m);
-                  const durS = Number(workout?.computed?.overall?.duration_s_moving);
-                  if (Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
-                    const miles = distM / 1609.34;
-                    if (miles > 0) {
-                      secPerMi = durS / miles;
-                    }
-                  } else {
-                    // Fallback to stored value if calculation not possible
-                    const overallPace = Number(workout?.computed?.overall?.avg_pace_s_per_mi);
-                    if (Number.isFinite(overallPace) && overallPace > 0) {
-                      secPerMi = overallPace;
-                    }
-                  }
-                } else {
-                  // Individual intervals: use getDisplayPace (which uses workout_analysis same as Context)
-                  secPerMi = getDisplayPace(workout, row, st);
-                }
+                // ✅ ALWAYS use getDisplayPace which reads from detailed_analysis.interval_breakdown (same as Context)
+                // This ensures all intervals (including warmup) use the same source
+                const secPerMi = getDisplayPace(workout, row, st);
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
                   return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
                 }
