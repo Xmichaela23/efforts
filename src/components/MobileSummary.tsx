@@ -674,31 +674,33 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   };
 
   const getDisplayPace = (workout: any, interval: any, step: any): number | null => {
-    // ✅ SINGLE SOURCE OF TRUTH: Use workout_analysis.detailed_analysis.interval_breakdown (same as Context)
+    // ✅ SINGLE SOURCE OF TRUTH: Use workout_analysis.detailed_analysis.interval_breakdown.intervals (same as Context)
     // NO FALLBACKS - if analysis not available, return null (show "—")
     const workoutAnalysis = workout?.workout_analysis;
-    const intervalBreakdown = workoutAnalysis?.detailed_analysis?.interval_breakdown;
+    const intervalBreakdownObj = workoutAnalysis?.detailed_analysis?.interval_breakdown;
     
-    if (!intervalBreakdown || !Array.isArray(intervalBreakdown) || intervalBreakdown.length === 0 || !step) {
+    // interval_breakdown is an object with .intervals array, not an array itself
+    if (!intervalBreakdownObj || !intervalBreakdownObj.available || !Array.isArray(intervalBreakdownObj.intervals) || intervalBreakdownObj.intervals.length === 0 || !step) {
       return null;
     }
     
+    const intervals = intervalBreakdownObj.intervals;
     const stepId = String((step as any)?.id || '');
     const stepIndex = Number((step as any)?.planned_index);
     const stepKind = String((step as any)?.kind || (step as any)?.type || '').toLowerCase();
     
     // Find matching interval by interval_type (warmup/cooldown/recovery/work) or planned_step_id
-    const matchingInterval = intervalBreakdown.find((iv: any) => {
+    const matchingInterval = intervals.find((iv: any) => {
       const ivId = String(iv?.interval_id || '');
       const ivIndex = Number(iv?.interval_number || iv?.interval_index);
       const ivKind = String(iv?.interval_type || iv?.kind || '').toLowerCase();
       
-      // Match warmup/cooldown by kind
+      // Match warmup/cooldown/recovery by kind
       if (stepKind && (stepKind === 'warmup' || stepKind === 'cooldown' || stepKind === 'recovery')) {
         return ivKind === stepKind;
       }
       
-      // Match work intervals by index
+      // Match work intervals by index (interval_number matches planned_index)
       if (stepKind === 'work' && Number.isFinite(stepIndex)) {
         return ivKind === 'work' && ivIndex === stepIndex;
       }
