@@ -1283,11 +1283,12 @@ Deno.serve(async (req) => {
     console.log(`   - detailedAnalysis exists: ${!!detailedAnalysis}`);
     console.log(`   - interval_breakdown exists: ${!!detailedAnalysis?.interval_breakdown}`);
     console.log(`   - interval_breakdown.available: ${detailedAnalysis?.interval_breakdown?.available}`);
-      console.log(`🔍 [EXECUTION SCORE DEBUG] Entered calculation block, intervalBreakdown.length: ${intervalBreakdown.length}`);    console.log(`   - interval_breakdown.intervals: ${Array.isArray(detailedAnalysis?.interval_breakdown?.intervals) ? detailedAnalysis.interval_breakdown.intervals.length : 'not array'}`);
+    console.log(`   - interval_breakdown.intervals: ${Array.isArray(detailedAnalysis?.interval_breakdown?.intervals) ? detailedAnalysis.interval_breakdown.intervals.length : 'not array'}`);
     if (detailedAnalysis && detailedAnalysis.interval_breakdown && detailedAnalysis.interval_breakdown.available) {
       // interval_breakdown is an object with .intervals array (not .summary)
       const breakdownData = detailedAnalysis.interval_breakdown;
       const intervalBreakdown = Array.isArray(breakdownData.intervals) ? breakdownData.intervals : [];      
+      console.log(`🔍 [EXECUTION SCORE DEBUG] Entered calculation block, intervalBreakdown.length: ${intervalBreakdown.length}`);
       if (intervalBreakdown.length > 0) {
         // First pass: count intervals by type to calculate per-interval weights
         const warmupIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'warmup');
