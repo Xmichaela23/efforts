@@ -1278,13 +1278,10 @@ Deno.serve(async (req) => {
 
     // ✅ RECALCULATE EXECUTION SCORE FROM detailed_analysis.interval_breakdown (same source as segment scores)
     // Weighted average: Warmup 15%, Work intervals 60%, Recoveries 10%, Cooldown 15%
-    if (detailedAnalysis && detailedAnalysis.interval_breakdown) {
-      // interval_breakdown can be an object with .available or an array
+    if (detailedAnalysis && detailedAnalysis.interval_breakdown && detailedAnalysis.interval_breakdown.available) {
+      // interval_breakdown is an object with .intervals array (not .summary)
       const breakdownData = detailedAnalysis.interval_breakdown;
-      const intervalBreakdown = Array.isArray(breakdownData) 
-        ? breakdownData 
-        : (breakdownData.available !== false && Array.isArray(breakdownData.summary) ? breakdownData.summary : []);
-      
+      const intervalBreakdown = Array.isArray(breakdownData.intervals) ? breakdownData.intervals : [];      
       if (intervalBreakdown.length > 0) {
         let weightedSum = 0;
         let totalWeight = 0;
