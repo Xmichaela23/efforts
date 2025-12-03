@@ -1359,7 +1359,7 @@ Deno.serve(async (req) => {
         }
         }
 
-    // 🤖 GENERATE AI NARRATIVE INSIGHTS
+    }    // 🤖 GENERATE AI NARRATIVE INSIGHTS
     let narrativeInsights = null;
     try {
       console.log('🤖 [CRITICAL] Starting AI narrative generation...');
