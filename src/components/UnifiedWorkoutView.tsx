@@ -99,11 +99,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         
         if (refreshedWorkout) {
           console.log('✅ [UnifiedWorkoutView] Workout data refreshed, planned_id:', refreshedWorkout.planned_id);
+          console.log('🔍 [REFRESH DEBUG] workout_analysis type:', typeof refreshedWorkout.workout_analysis);
+          console.log('🔍 [REFRESH DEBUG] workout_analysis value:', refreshedWorkout.workout_analysis);
           // Parse JSONB fields that might be returned as strings
           const parsed = { ...refreshedWorkout };
           try {
             if (typeof parsed.workout_analysis === 'string') {
               parsed.workout_analysis = JSON.parse(parsed.workout_analysis);
+              console.log('✅ [REFRESH DEBUG] Parsed workout_analysis from string');
             }
             if (typeof parsed.computed === 'string') {
               parsed.computed = JSON.parse(parsed.computed);
@@ -114,6 +117,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           } catch (e) {
             console.warn('Failed to parse JSONB fields:', e);
           }
+          console.log('🔍 [REFRESH DEBUG] Final parsed.workout_analysis:', parsed.workout_analysis ? 'present' : 'missing');
+          console.log('🔍 [REFRESH DEBUG] Final parsed.workout_analysis?.performance:', parsed.workout_analysis?.performance);
           setUpdatedWorkoutData(parsed);
         }
       } catch (error) {
