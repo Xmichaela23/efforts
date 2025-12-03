@@ -1283,36 +1283,61 @@ Deno.serve(async (req) => {
       const breakdownData = detailedAnalysis.interval_breakdown;
       const intervalBreakdown = Array.isArray(breakdownData.intervals) ? breakdownData.intervals : [];      
       if (intervalBreakdown.length > 0) {
+        // First pass: count intervals by type to calculate per-interval weights
+        const warmupIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'warmup');
+        const workIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'work');
+        const recoveryIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'recovery');
+        const cooldownIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'cooldown');
+        
+        // Calculate per-interval weights (divide total segment weight by count)
+        const warmupWeightPerInterval = warmupIntervals.length > 0 ? 0.15 / warmupIntervals.length : 0;
+        const workWeightPerInterval = workIntervals.length > 0 ? 0.60 / workIntervals.length : 0;
+        const recoveryWeightPerInterval = recoveryIntervals.length > 0 ? 0.10 / recoveryIntervals.length : 0;
+        const cooldownWeightPerInterval = cooldownIntervals.length > 0 ? 0.15 / cooldownIntervals.length : 0;
+        
         let weightedSum = 0;
         let totalWeight = 0;
+        const segmentScores: any[] = [];
         
         for (const interval of intervalBreakdown) {
           const intervalType = String(interval.interval_type || '').toLowerCase();
           let weight = 0;
           
-          // Assign weights based on interval type
+          // Assign per-interval weights based on interval type
           if (intervalType === 'warmup') {
-            weight = 0.15; // 15%
+            weight = warmupWeightPerInterval;
           } else if (intervalType === 'work') {
-            weight = 0.60; // 60%
+            weight = workWeightPerInterval;
           } else if (intervalType === 'recovery') {
-            weight = 0.10; // 10%
+            weight = recoveryWeightPerInterval;
           } else if (intervalType === 'cooldown') {
-            weight = 0.15; // 15%
+            weight = cooldownWeightPerInterval;
           }
           
           if (weight > 0) {
             // Use performance_score if available, otherwise calculate from pace and duration adherence
             let segmentScore = interval.performance_score;
+            const paceAdherence = interval.pace_adherence_percent || 0;
+            const durationAdherence = interval.duration_adherence_percent || 0;
+            
             if (segmentScore === undefined || segmentScore === null) {
               // Calculate segment score: average of pace and duration adherence
-              const paceAdherence = interval.pace_adherence_percent || 0;
-              const durationAdherence = interval.duration_adherence_percent || 0;
               segmentScore = (paceAdherence + durationAdherence) / 2;
             }
             
-            weightedSum += segmentScore * weight;
+            const weightedContribution = segmentScore * weight;
+            weightedSum += weightedContribution;
             totalWeight += weight;
+            
+            segmentScores.push({
+              type: intervalType,
+              interval_number: interval.interval_number || interval.recovery_number || '',
+              performance_score: segmentScore,
+              pace_adherence: paceAdherence,
+              duration_adherence: durationAdherence,
+              weight: weight,
+              weighted_contribution: weightedContribution
+            });
           }
         }
         
@@ -1321,9 +1346,18 @@ Deno.serve(async (req) => {
           performance.execution_adherence = calculatedExecutionScore;
           
           console.log(`🎯 [EXECUTION SCORE] Recalculated from detailed_analysis.interval_breakdown:`);
-          console.log(`   - Weighted average: ${calculatedExecutionScore}%`);
-          console.log(`   - Weights: Warmup 15%, Work 60%, Recovery 10%, Cooldown 15%`);
-          console.log(`   - Intervals processed: ${intervalBreakdown.length}`);
+          console.log(`   - Interval counts: Warmup=${warmupIntervals.length}, Work=${workIntervals.length}, Recovery=${recoveryIntervals.length}, Cooldown=${cooldownIntervals.length}`);
+          console.log(`   - Per-interval weights: Warmup=${(warmupWeightPerInterval*100).toFixed(1)}%, Work=${(workWeightPerInterval*100).toFixed(1)}%, Recovery=${(recoveryWeightPerInterval*100).toFixed(1)}%, Cooldown=${(cooldownWeightPerInterval*100).toFixed(1)}%`);
+          console.log(`   - Segment breakdown:`);
+          segmentScores.forEach(seg => {
+            console.log(`     ${seg.type} ${seg.interval_number || ''}: score=${seg.performance_score.toFixed(1)}%, pace=${seg.pace_adherence.toFixed(1)}%, duration=${seg.duration_adherence.toFixed(1)}%, weight=${(seg.weight*100).toFixed(2)}%, contribution=${seg.weighted_contribution.toFixed(2)}`);
+          });
+          console.log(`   - Weighted sum: ${weightedSum.toFixed(2)}`);
+          console.log(`   - Total weight: ${totalWeight.toFixed(2)}`);
+          console.log(`   - Weighted average: ${(weightedSum / totalWeight).toFixed(2)}%`);
+          console.log(`   - Final execution score (rounded): ${calculatedExecutionScore}%`);
+        }
+      }
         }
       }
     }
