@@ -1357,7 +1357,6 @@ Deno.serve(async (req) => {
           console.log(`   - Weighted average: ${(weightedSum / totalWeight).toFixed(2)}%`);
           console.log(`   - Final execution score (rounded): ${calculatedExecutionScore}%`);
         }
-      }
         }
       }
     }
