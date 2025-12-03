@@ -674,12 +674,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   };
 
   const getDisplayPace = (workout: any, interval: any, step: any): number | null => {
-    // ✅ SINGLE SOURCE OF TRUTH: Use workout_analysis.granular_analysis.interval_breakdown (same as Context)
+    // ✅ SINGLE SOURCE OF TRUTH: Use workout_analysis.detailed_analysis.interval_breakdown (same as Context)
     // NO FALLBACKS - if analysis not available, return null (show "—")
     const workoutAnalysis = workout?.workout_analysis;
-    const intervalBreakdown = workoutAnalysis?.granular_analysis?.interval_breakdown;
+    const intervalBreakdown = workoutAnalysis?.detailed_analysis?.interval_breakdown;
     
-    if (!intervalBreakdown || !Array.isArray(intervalBreakdown) || !step) {
+    if (!intervalBreakdown || !Array.isArray(intervalBreakdown) || intervalBreakdown.length === 0 || !step) {
       return null;
     }
     
@@ -687,21 +687,31 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     const stepIndex = Number((step as any)?.planned_index);
     const stepKind = String((step as any)?.kind || (step as any)?.type || '').toLowerCase();
     
-    // Find matching interval by planned_step_id, planned_index, or kind (warmup/cooldown)
+    // Find matching interval by interval_type (warmup/cooldown/recovery/work) or planned_step_id
     const matchingInterval = intervalBreakdown.find((iv: any) => {
       const ivId = String(iv?.interval_id || '');
-      const ivIndex = Number(iv?.interval_index);
+      const ivIndex = Number(iv?.interval_number || iv?.interval_index);
       const ivKind = String(iv?.interval_type || iv?.kind || '').toLowerCase();
       
-      return ivId === stepId || 
-             (Number.isFinite(stepIndex) && ivIndex === stepIndex) ||
-             (stepKind && (stepKind === 'warmup' || stepKind === 'cooldown') && ivKind === stepKind);
+      // Match warmup/cooldown by kind
+      if (stepKind && (stepKind === 'warmup' || stepKind === 'cooldown' || stepKind === 'recovery')) {
+        return ivKind === stepKind;
+      }
+      
+      // Match work intervals by index
+      if (stepKind === 'work' && Number.isFinite(stepIndex)) {
+        return ivKind === 'work' && ivIndex === stepIndex;
+      }
+      
+      // Match by interval_id if available
+      return ivId === stepId;
     });
     
-    if (matchingInterval?.actual_pace_s_per_mi) {
-      const pace = Number(matchingInterval.actual_pace_s_per_mi);
-      if (Number.isFinite(pace) && pace > 0) {
-        return pace;
+    // Field is actual_pace_min_per_mi (minutes per mile), convert to seconds per mile
+    if (matchingInterval?.actual_pace_min_per_mi) {
+      const paceMinPerMi = Number(matchingInterval.actual_pace_min_per_mi);
+      if (Number.isFinite(paceMinPerMi) && paceMinPerMi > 0) {
+        return Math.round(paceMinPerMi * 60); // Convert minutes to seconds per mile
       }
     }
     
