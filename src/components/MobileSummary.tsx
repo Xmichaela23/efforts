@@ -673,24 +673,36 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     return null;
   };
 
-  const getDisplayPace = (workout: any, interval: any): number | null => {
-    // For interval workouts, use individual interval pace
-    // For continuous workouts, use overall pace
+  const getDisplayPace = (workout: any, interval: any, step: any): number | null => {
+    // ✅ SINGLE SOURCE OF TRUTH: Use workout_analysis.granular_analysis.interval_breakdown (same as Context)
+    // NO FALLBACKS - if analysis not available, return null (show "—")
+    const workoutAnalysis = workout?.workout_analysis;
+    const intervalBreakdown = workoutAnalysis?.granular_analysis?.interval_breakdown;
     
-    // Priority 1: Use individual interval pace if available
-    if (interval?.executed?.avg_pace_s_per_mi) {
-      const intervalPace = Number(interval.executed.avg_pace_s_per_mi);
-      if (Number.isFinite(intervalPace) && intervalPace > 0) {
-        return intervalPace;
-      }
+    if (!intervalBreakdown || !Array.isArray(intervalBreakdown) || !step) {
+      return null;
     }
     
-    // Priority 2: Use ONLY server-computed overall pace (calculated from moving_time)
-    // NO fallbacks to metrics.avg_pace or other fields (they may be from elapsed time)
-    const overallPace = Number(workout?.computed?.overall?.avg_pace_s_per_mi);
+    const stepId = String((step as any)?.id || '');
+    const stepIndex = Number((step as any)?.planned_index);
+    const stepKind = String((step as any)?.kind || (step as any)?.type || '').toLowerCase();
     
-    if (Number.isFinite(overallPace) && overallPace > 0) {
-      return overallPace;
+    // Find matching interval by planned_step_id, planned_index, or kind (warmup/cooldown)
+    const matchingInterval = intervalBreakdown.find((iv: any) => {
+      const ivId = String(iv?.interval_id || '');
+      const ivIndex = Number(iv?.interval_index);
+      const ivKind = String(iv?.interval_type || iv?.kind || '').toLowerCase();
+      
+      return ivId === stepId || 
+             (Number.isFinite(stepIndex) && ivIndex === stepIndex) ||
+             (stepKind && (stepKind === 'warmup' || stepKind === 'cooldown') && ivKind === stepKind);
+    });
+    
+    if (matchingInterval?.actual_pace_s_per_mi) {
+      const pace = Number(matchingInterval.actual_pace_s_per_mi);
+      if (Number.isFinite(pace) && pace > 0) {
+        return pace;
+      }
     }
     
     return null;
@@ -2189,8 +2201,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                     }
                   }
                 } else {
-                  // Individual intervals: use getDisplayPace (which checks interval first, then overall)
-                  secPerMi = getDisplayPace(workout, row);
+                  // Individual intervals: use getDisplayPace (which uses workout_analysis same as Context)
+                  secPerMi = getDisplayPace(workout, row, st);
                 }
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
                   return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
