@@ -3341,6 +3341,7 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervals?: any[], o
     return {
       interval_type: 'work',
       interval_number: index + 1,
+      interval_id: interval.planned_step_id || null,
       planned_duration_s: plannedDuration,
       actual_duration_s: actualDuration,
       duration_adherence_percent: Math.round(durationAdherence),
@@ -3710,6 +3711,7 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervals?: any[], o
         const warmupElevation = calculateIntervalElevation(sensorData || [], warmupInterval.sample_idx_start, warmupInterval.sample_idx_end);
         
         completeBreakdown.push({
+          interval_id: warmupInterval.planned_step_id || null,
           interval_type: 'warmup',
           planned_duration_s: warmupPlannedDuration,
           actual_duration_s: warmupActualDuration,
@@ -3822,7 +3824,7 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervals?: any[], o
       // Calculate HR and elevation
       const cooldownHR = calculateIntervalHeartRate(sensorData || [], cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end);
       const cooldownElevation = calculateIntervalElevation(sensorData || [], cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end);
-      
+          interval_id: cooldownInterval.planned_step_id || null,
         completeBreakdown.push({
           interval_type: 'cooldown',
           planned_duration_s: cooldownPlannedDuration,
