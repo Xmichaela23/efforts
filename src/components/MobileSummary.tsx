@@ -673,7 +673,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     return null;
   };
 
-  const getDisplayPace = (workout: any, interval: any, step: any): number | null => {
+  const getDisplayPace = (workout: any, interval: any, step: any, stepsDisplay?: any[], stepIdx?: number): number | null => {
     // ✅ SINGLE SOURCE OF TRUTH: Use workout_analysis.detailed_analysis.interval_breakdown.intervals (same as Context)
     // NO FALLBACKS - if analysis not available, return null (show "—")
     const workoutAnalysis = workout?.workout_analysis;
@@ -686,23 +686,46 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     
     const intervals = intervalBreakdownObj.intervals;
     const stepId = String((step as any)?.id || '');
-    const stepIndex = Number((step as any)?.planned_index);
     const stepKind = String((step as any)?.kind || (step as any)?.type || '').toLowerCase();
     
     // Find matching interval by interval_type (warmup/cooldown/recovery/work) or planned_step_id
-    const matchingInterval = intervals.find((iv: any) => {
+    let matchingInterval = intervals.find((iv: any) => {
       const ivId = String(iv?.interval_id || '');
-      const ivIndex = Number(iv?.interval_number || iv?.interval_index);
       const ivKind = String(iv?.interval_type || iv?.kind || '').toLowerCase();
       
-      // Match warmup/cooldown/recovery by kind
-      if (stepKind && (stepKind === 'warmup' || stepKind === 'cooldown' || stepKind === 'recovery')) {
+      // Match warmup/cooldown by kind (only one of each type)
+      if (stepKind && (stepKind === 'warmup' || stepKind === 'cooldown')) {
         return ivKind === stepKind;
       }
       
-      // Match work intervals by index (interval_number matches planned_index)
-      if (stepKind === 'work' && Number.isFinite(stepIndex)) {
-        return ivKind === 'work' && ivIndex === stepIndex;
+      // Match recovery by kind and recovery_number
+      if (stepKind === 'recovery') {
+        if (ivKind !== 'recovery') return false;
+        const stepRecoveryNum = Number((step as any)?.recovery_number);
+        if (Number.isFinite(stepRecoveryNum) && iv.recovery_number) {
+          return iv.recovery_number === stepRecoveryNum;
+        }
+        // If no recovery_number, match by order (first recovery to first recovery)
+        return true;
+      }
+      
+      // Match work intervals: count work steps before this one to get interval_number
+      if (stepKind === 'work') {
+        if (ivKind !== 'work') return false;
+        // Try matching by planned_step_id first (most reliable)
+        if (ivId && stepId && ivId === stepId) {
+          return true;
+        }
+        // If no ID match, count work intervals before this step
+        if (stepsDisplay && Number.isFinite(stepIdx)) {
+          const workStepsBefore = stepsDisplay.slice(0, stepIdx).filter((s: any) => {
+            const sKind = String(s?.kind || s?.type || '').toLowerCase();
+            return sKind === 'work';
+          });
+          const workIntervalNumber = workStepsBefore.length + 1; // 1-indexed
+          return iv.interval_number === workIntervalNumber;
+        }
+        return false;
       }
       
       // Match by interval_id if available
@@ -2194,7 +2217,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 const workout = hydratedCompleted || completed;
                 // ✅ ALWAYS use getDisplayPace which reads from detailed_analysis.interval_breakdown (same as Context)
                 // This ensures all intervals (including warmup) use the same source
-                const secPerMi = getDisplayPace(workout, row, st);
+                // Pass stepsDisplay and idx so we can count work intervals for matching
+                const secPerMi = getDisplayPace(workout, row, st, stepsDisplay, idx);
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
                   return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
                 }
