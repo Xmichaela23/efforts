@@ -914,6 +914,25 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 );
               })()}
 
+              {/* Interval Breakdown (for interval workouts) - Show BEFORE insights */}
+              {(() => {
+                const intervalBreakdown = analysisMetrics.workout?.workout_analysis?.detailed_analysis?.interval_breakdown;
+                
+                if (intervalBreakdown?.available && intervalBreakdown?.section) {
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+                      <div className="text-sm font-medium text-gray-800 mb-2">
+                        Interval-by-Interval Breakdown
+                      </div>
+                      <div className="text-xs text-gray-600 whitespace-pre-line bg-blue-50 rounded p-3 font-mono">
+                        {intervalBreakdown.section}
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Key Insights - Only show if insights exist */}
               {analysisMetrics.insights && analysisMetrics.insights.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
@@ -937,25 +956,6 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                       </div>
                     </div>
                   )}
-
-                  {/* Interval Breakdown (for interval workouts) */}
-                  {(() => {
-                    const intervalBreakdown = analysisMetrics.workout?.workout_analysis?.detailed_analysis?.interval_breakdown;
-                    
-                    if (intervalBreakdown?.available && intervalBreakdown?.section) {
-                      return (
-                        <div className="mt-4">
-                          <div className="text-sm font-medium text-gray-800 mb-2">
-                            Interval-by-Interval Breakdown
-                          </div>
-                          <div className="text-xs text-gray-600 whitespace-pre-line bg-blue-50 rounded p-3 font-mono">
-                            {intervalBreakdown.section}
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
 
                   {/* Red Flags */}
                   {analysisMetrics.red_flags.length > 0 && (
