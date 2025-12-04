@@ -973,28 +973,6 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 </div>
               )}
             </>
-          ) : analysisMetrics.noInsights ? (
-            <div className="px-2 mt-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="text-sm font-medium text-blue-800">
-                  Analysis Complete - No Insights Available
-                </div>
-                <div className="text-xs text-blue-600 mt-1">
-                  {analysisMetrics.workout.type} workout analyzed but no meaningful data found for insights.
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="px-2 mt-4">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <div className="text-sm font-medium text-yellow-800">
-                  No Insights Generated
-                </div>
-                <div className="text-xs text-yellow-600 mt-1">
-                  Analysis completed but no insights were generated.
-                </div>
-              </div>
-            </div>
           )}
         </div>
       ) : (
