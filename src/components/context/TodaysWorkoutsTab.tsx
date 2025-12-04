@@ -830,93 +830,149 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 </div>
               )}
             </div>
-          ) : analysisMetrics.insights && analysisMetrics.insights.length > 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div>
-                    <div className="font-medium text-gray-900">
-                      {analysisMetrics.workout.name || `${analysisMetrics.workout.type} Workout`}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {new Date(analysisMetrics.workout.date + 'T00:00:00').toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        month: 'short', 
-                        day: 'numeric' 
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-500">
-                    Analysis Complete
-                  </div>
-                </div>
-              </div>
-
-              {/* Key Insights */}
-              <div className="space-y-2">
-                {analysisMetrics.insights.map((insight, index) => (
-                  <div key={index} className="text-sm text-gray-700 bg-gray-50 rounded p-2">
-                    {insight}
-                  </div>
-                ))}
-              </div>
-
-              {/* Mile-by-Mile Terrain Analysis */}
-              {analysisMetrics.mile_by_mile_terrain && analysisMetrics.mile_by_mile_terrain.section && (
-                <div className="mt-4">
-                  <div className="text-sm font-medium text-gray-800 mb-2">
-                    Mile-by-Mile Terrain Breakdown
-                  </div>
-                  <div className="text-xs text-gray-600 whitespace-pre-line bg-blue-50 rounded p-3 font-mono">
-                    {analysisMetrics.mile_by_mile_terrain.section}
-                  </div>
-                </div>
-              )}
-
-              {/* Interval Breakdown (for interval workouts) */}
-              {(() => {
-                const intervalBreakdown = analysisMetrics.workout?.workout_analysis?.detailed_analysis?.interval_breakdown;
-                console.log('🔍 [UI DEBUG] Interval breakdown check:', {
-                  hasWorkout: !!analysisMetrics.workout,
-                  hasWorkoutAnalysis: !!analysisMetrics.workout?.workout_analysis,
-                  hasDetailedAnalysis: !!analysisMetrics.workout?.workout_analysis?.detailed_analysis,
-                  hasIntervalBreakdown: !!intervalBreakdown,
-                  available: intervalBreakdown?.available,
-                  hasSection: !!intervalBreakdown?.section,
-                  sectionLength: intervalBreakdown?.section?.length
-                });
+          ) : (
+            <>
+              {/* Workout Totals - Show for ANY workout with analysis, regardless of insights */}
+              {analysisMetrics.workout && (() => {
+                const workout = analysisMetrics.workout;
                 
-                if (intervalBreakdown?.available && intervalBreakdown?.section) {
-                  return (
-                    <div className="mt-4">
-                      <div className="text-sm font-medium text-gray-800 mb-2">
-                        Interval-by-Interval Breakdown
+                // Extract totals from workout data
+                const formatDistance = (km: number): string => {
+                  const mi = km * 0.621371;
+                  return mi < 1 ? `${(mi * 5280).toFixed(0)} ft` : `${mi.toFixed(1)} mi`;
+                };
+                
+                const formatDuration = (seconds: number): string => {
+                  const mins = Math.floor(seconds / 60);
+                  const secs = Math.round(seconds % 60);
+                  return `${mins}:${secs.toString().padStart(2, '0')}`;
+                };
+                
+                const distanceKm = workout.distance || 0;
+                const durationSeconds = workout.computed?.overall?.duration_s_moving 
+                  || (workout.moving_time ? workout.moving_time * 60 : 0)
+                  || (workout.duration ? workout.duration * 60 : 0);
+                const elevationGainM = workout.elevation_gain 
+                  ?? workout.metrics?.elevation_gain 
+                  ?? 0;
+                const avgHR = workout.computed?.overall?.avg_heart_rate 
+                  || workout.avg_heart_rate 
+                  || null;
+                
+                return (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {workout.name || `${workout.type} Workout`}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', { 
+                              weekday: 'long', 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-600 whitespace-pre-line bg-blue-50 rounded p-3 font-mono">
-                        {intervalBreakdown.section}
+                      <div className="text-right">
+                        <div className="text-sm text-gray-500">
+                          Analysis Complete
+                        </div>
                       </div>
                     </div>
-                  );
-                }
-                return null;
+
+                    {/* Workout Totals Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <div className="text-xs text-gray-600 mb-1">Distance</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {formatDistance(distanceKm)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-600 mb-1">Duration</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {formatDuration(durationSeconds)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-600 mb-1">Elevation</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {elevationGainM > 0 ? `${Math.round(elevationGainM * 3.28084)} ft` : '—'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-600 mb-1">Avg HR</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {avgHR ? `${Math.round(avgHR)} bpm` : '—'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
               })()}
 
-              {/* Red Flags */}
-              {analysisMetrics.red_flags.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <div className="text-xs font-medium text-red-600 mb-2">⚠️ Areas for Improvement:</div>
-                  <div className="space-y-1">
-                    {analysisMetrics.red_flags.map((flag, index) => (
-                      <div key={index} className="text-xs text-red-600">
-                        • {flag}
+              {/* Key Insights - Only show if insights exist */}
+              {analysisMetrics.insights && analysisMetrics.insights.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+                  {/* Key Insights */}
+                  <div className="space-y-2">
+                    {analysisMetrics.insights.map((insight, index) => (
+                      <div key={index} className="text-sm text-gray-700 bg-gray-50 rounded p-2">
+                        {insight}
                       </div>
                     ))}
                   </div>
+
+                  {/* Mile-by-Mile Terrain Analysis */}
+                  {analysisMetrics.mile_by_mile_terrain && analysisMetrics.mile_by_mile_terrain.section && (
+                    <div className="mt-4">
+                      <div className="text-sm font-medium text-gray-800 mb-2">
+                        Mile-by-Mile Terrain Breakdown
+                      </div>
+                      <div className="text-xs text-gray-600 whitespace-pre-line bg-blue-50 rounded p-3 font-mono">
+                        {analysisMetrics.mile_by_mile_terrain.section}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Interval Breakdown (for interval workouts) */}
+                  {(() => {
+                    const intervalBreakdown = analysisMetrics.workout?.workout_analysis?.detailed_analysis?.interval_breakdown;
+                    
+                    if (intervalBreakdown?.available && intervalBreakdown?.section) {
+                      return (
+                        <div className="mt-4">
+                          <div className="text-sm font-medium text-gray-800 mb-2">
+                            Interval-by-Interval Breakdown
+                          </div>
+                          <div className="text-xs text-gray-600 whitespace-pre-line bg-blue-50 rounded p-3 font-mono">
+                            {intervalBreakdown.section}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Red Flags */}
+                  {analysisMetrics.red_flags.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="text-xs font-medium text-red-600 mb-2">⚠️ Areas for Improvement:</div>
+                      <div className="space-y-1">
+                        {analysisMetrics.red_flags.map((flag, index) => (
+                          <div key={index} className="text-xs text-red-600">
+                            • {flag}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </>
           ) : analysisMetrics.noInsights ? (
             <div className="px-2 mt-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
