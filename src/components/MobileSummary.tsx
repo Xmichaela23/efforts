@@ -674,6 +674,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   };
 
   const getDisplayPace = (workout: any, interval: any, step: any, stepsDisplay?: any[], stepIdx?: number): number | null => {
+    // Debug logging
+    console.log('🔍 [getDisplayPace] Called with:', {
+      stepId: (step as any)?.id,
+      stepKind: (step as any)?.kind || (step as any)?.type,
+      hasWorkoutAnalysis: !!workout?.workout_analysis,
+      hasDetailedAnalysis: !!workout?.workout_analysis?.detailed_analysis,
+      hasIntervalBreakdown: !!workout?.workout_analysis?.detailed_analysis?.interval_breakdown
+    });
     // ✅ SINGLE SOURCE OF TRUTH: Use workout_analysis.detailed_analysis.interval_breakdown.intervals (same as Context)
     // NO FALLBACKS - if analysis not available, return null (show "—")
     const workoutAnalysis = workout?.workout_analysis;
@@ -689,6 +697,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     const stepKind = String((step as any)?.kind || (step as any)?.type || '').toLowerCase();
     
     // Find matching interval by interval_type (warmup/cooldown/recovery/work) or planned_step_id
+    console.log('🔍 [getDisplayPace] Intervals available:', intervals.length, intervals.map((iv: any) => ({
+      interval_type: iv.interval_type,
+      interval_id: iv.interval_id,
+      interval_number: iv.interval_number,
+      has_pace: !!iv.actual_pace_min_per_mi
+    })));
+    
     let matchingInterval = intervals.find((iv: any) => {
       const ivId = String(iv?.interval_id || '');
       const ivKind = String(iv?.interval_type || iv?.kind || '').toLowerCase();
@@ -731,6 +746,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       // Match by interval_id if available
       return ivId === stepId;
     });
+    
+    console.log('🔍 [getDisplayPace] Matching interval:', matchingInterval ? {
+      interval_type: matchingInterval.interval_type,
+      interval_id: matchingInterval.interval_id,
+      actual_pace_min_per_mi: matchingInterval.actual_pace_min_per_mi
+    } : 'NOT FOUND');
     
     // Field is actual_pace_min_per_mi (minutes per mile), convert to seconds per mile
     if (matchingInterval?.actual_pace_min_per_mi) {
