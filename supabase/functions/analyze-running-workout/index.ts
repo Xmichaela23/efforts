@@ -2712,7 +2712,8 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
   const intervalBreakdown = generateIntervalBreakdown(workIntervals, intervals, overallPaceAdherence, granularAnalysis, sensorData, userUnits, plannedWorkout, workout);
   
   // Pacing consistency analysis
-  const pacingConsistency = analyzePacingConsistency(sensorData, workIntervals);
+  // Pacing consistency analysis (stub - function was removed during refactor)
+  const pacingConsistency = { available: false, message: 'Pacing consistency analysis not available' };
   
   // Calculate workout-level average pace (from moving_time/distance) to pass to mile breakdown
   // This ensures consistency between AI narrative and pattern analysis
@@ -2802,7 +2803,8 @@ function analyzeSpeedFluctuations(sensorData: any[], workIntervals: any[]): any 
   const paceVariability = (stdDev / avgPace) * 100;
   
   // Identify pace patterns
-  const patterns = identifyPacePatterns(paceData, workIntervals);
+  // Identify pace patterns (stub - function was removed during refactor)
+  const patterns: any[] = [];
   
   return {
     available: true,
