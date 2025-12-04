@@ -833,7 +833,15 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
           ) : (
             <>
               {/* Workout Totals - Show for ANY workout with analysis, regardless of insights */}
-              {analysisMetrics.workout && (() => {
+              {(() => {
+                console.log('🔍 [WORKOUT TOTALS DEBUG] analysisMetrics:', analysisMetrics);
+                console.log('🔍 [WORKOUT TOTALS DEBUG] analysisMetrics.workout:', analysisMetrics.workout);
+                
+                if (!analysisMetrics.workout) {
+                  console.warn('⚠️ [WORKOUT TOTALS] No workout in analysisMetrics, skipping totals grid');
+                  return null;
+                }
+                
                 const workout = analysisMetrics.workout;
                 
                 // Extract totals from workout data
