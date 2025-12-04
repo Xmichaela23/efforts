@@ -787,11 +787,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     if (!pid || !wid) return;
                     // disable re-link noise then detach
                     suppressRelinkUntil.current = Date.now() + 15000; // 15s
-                    // Remove the database link and clear analysis to force re-analysis on reattach
+                    // Remove the database link (preserve analysis - don't clear it)
                     try {
                       await supabase.from('workouts').update({ 
-                        planned_id: null,
-                        workout_analysis: null  // Clear analysis to force fresh analysis on reattach
+                        planned_id: null
+                        // Don't clear workout_analysis - preserve it so adherence data isn't lost
                       } as any).eq('id', wid);
                       await supabase.from('planned_workouts').update({ workout_status: 'planned' } as any).eq('id', pid);
                     } catch {}
