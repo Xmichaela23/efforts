@@ -92,6 +92,8 @@ export function generateIntervalBreakdown(
       interval_id: interval.planned_step_id || null,
       planned_duration_s: plannedDuration,
       actual_duration_s: actualDuration,
+      planned_distance_m: interval.planned?.distance_m || 0,
+      actual_distance_m: interval.executed?.distance_m || 0,
       duration_adherence_percent: Math.round(durationAdherence),
       // Store pace range if available
       planned_pace_range_lower: workRangeLower,
@@ -461,11 +463,17 @@ export function generateIntervalBreakdown(
         const warmupHR = calculateIntervalHeartRate(sensorData || [], warmupInterval.sample_idx_start, warmupInterval.sample_idx_end);
         const warmupElevation = calculateIntervalElevation(sensorData || [], warmupInterval.sample_idx_start, warmupInterval.sample_idx_end);
         
+        // ✅ Get planned_label from compute-workout-summary (same source as Summary screen)
+        const warmupPlannedLabel = warmupInterval.planned_label || null;
+        
         completeBreakdown.push({
           interval_id: warmupInterval.planned_step_id || null,
           interval_type: 'warmup',
           planned_duration_s: warmupPlannedDuration,
           actual_duration_s: warmupActualDuration,
+          planned_distance_m: warmupInterval.planned?.distance_m || warmupInterval.executed?.distance_m || 0,
+          actual_distance_m: warmupInterval.executed?.distance_m || 0,
+          planned_label: warmupPlannedLabel, // ✅ Same source as Summary screen
           duration_adherence_percent: Math.round(warmupDurationAdherence),
           // Store pace range (not single target)
           planned_pace_range_lower: warmupRangeLower,
@@ -492,7 +500,13 @@ export function generateIntervalBreakdown(
     const recoveryIntervals = allIntervals.filter((i: any) => (i.role === 'recovery' || i.kind === 'recovery' || i.type === 'recovery' || i.type === 'rest') && i.executed);
     
     breakdown.forEach((workInterval, workIndex) => {
-      // Add work interval
+      // Add work interval - find matching interval in allIntervals to get planned_label
+      const matchingWorkInterval = allIntervals?.find((i: any) => 
+        i.planned_step_id === workInterval.interval_id
+      );
+      if (matchingWorkInterval?.planned_label) {
+        workInterval.planned_label = matchingWorkInterval.planned_label;
+      }
       completeBreakdown.push(workInterval);
       
       // Add recovery period after each work interval (except after the last one)
@@ -530,31 +544,37 @@ export function generateIntervalBreakdown(
         const recHR = calculateIntervalHeartRate(sensorData || [], recoveryInterval.sample_idx_start, recoveryInterval.sample_idx_end);
         const recElevation = calculateIntervalElevation(sensorData || [], recoveryInterval.sample_idx_start, recoveryInterval.sample_idx_end);
         
-        completeBreakdown.push({
-          interval_type: 'recovery',
-          interval_id: recoveryInterval.planned_step_id || null,
-          recovery_number: workIndex + 1,
-          planned_duration_s: recPlannedDuration,
-          actual_duration_s: recActualDuration,
-          duration_adherence_percent: Math.round(recDurationAdherence),
-          planned_pace_range_lower: recRangeLower,
-          planned_pace_range_upper: recRangeUpper,
-          planned_pace_min_per_mi: recRangeLower > 0 && recRangeUpper > 0 
-            ? null // Use range instead
-            : (recoveryInterval.planned?.target_pace_s_per_mi || 0) / 60,
-          actual_pace_min_per_mi: recActualPace > 0 ? Math.round(recActualPace / 60 * 100) / 100 : 0,
-          pace_adherence_percent: Math.round(recPaceAdherence),
-          performance_score: Math.round(recPerformanceScore),
-          avg_heart_rate_bpm: recHR.avg_heart_rate_bpm,
-          max_heart_rate_bpm: recHR.max_heart_rate_bpm,
-          min_heart_rate_bpm: recHR.min_heart_rate_bpm,
-          elevation_start_m: recElevation.elevation_start_m,
-          elevation_end_m: recElevation.elevation_end_m,
-          elevation_gain_m: recElevation.elevation_gain_m,
-          elevation_loss_m: recElevation.elevation_loss_m,
-          net_elevation_change_m: recElevation.net_elevation_change_m,
-          avg_grade_percent: recElevation.avg_grade_percent
-        });
+        // ✅ Get planned_label from compute-workout-summary (same source as Summary screen)
+        const recPlannedLabel = recoveryInterval.planned_label || null;
+        
+                 completeBreakdown.push({
+                   interval_type: 'recovery',
+                   interval_id: recoveryInterval.planned_step_id || null,
+                   recovery_number: workIndex + 1,
+                   planned_duration_s: recPlannedDuration,
+                   actual_duration_s: recActualDuration,
+                   planned_distance_m: recoveryInterval.planned?.distance_m || recoveryInterval.executed?.distance_m || 0,
+                   actual_distance_m: recoveryInterval.executed?.distance_m || 0,
+                   planned_label: recPlannedLabel, // ✅ Same source as Summary screen
+                   duration_adherence_percent: Math.round(recDurationAdherence),
+                   planned_pace_range_lower: recRangeLower,
+                   planned_pace_range_upper: recRangeUpper,
+                   planned_pace_min_per_mi: recRangeLower > 0 && recRangeUpper > 0 
+                     ? null // Use range instead
+                     : (recoveryInterval.planned?.target_pace_s_per_mi || 0) / 60,
+                   actual_pace_min_per_mi: recActualPace > 0 ? Math.round(recActualPace / 60 * 100) / 100 : 0,
+                   pace_adherence_percent: Math.round(recPaceAdherence),
+                   performance_score: Math.round(recPerformanceScore),
+                   avg_heart_rate_bpm: recHR.avg_heart_rate_bpm,
+                   max_heart_rate_bpm: recHR.max_heart_rate_bpm,
+                   min_heart_rate_bpm: recHR.min_heart_rate_bpm,
+                   elevation_start_m: recElevation.elevation_start_m,
+                   elevation_end_m: recElevation.elevation_end_m,
+                   elevation_gain_m: recElevation.elevation_gain_m,
+                   elevation_loss_m: recElevation.elevation_loss_m,
+                   net_elevation_change_m: recElevation.net_elevation_change_m,
+                   avg_grade_percent: recElevation.avg_grade_percent
+                 });
       }
     });
     
@@ -589,33 +609,40 @@ export function generateIntervalBreakdown(
       // Calculate performance score using 70/30 weighting (pace/duration) - same as work intervals
       const cooldownPerformanceScore = (cooldownPaceAdherence * 0.7) + (cooldownDurationAdherence * 0.3);
       
-      // Calculate HR and elevation
-      const cooldownHR = calculateIntervalHeartRate(sensorData || [], cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end);
-      const cooldownElevation = calculateIntervalElevation(sensorData || [], cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end);
-        completeBreakdown.push({
-          interval_type: 'cooldown',
-          interval_id: cooldownInterval.planned_step_id || null,
-          planned_duration_s: cooldownPlannedDuration,
-          actual_duration_s: cooldownActualDuration,
-          duration_adherence_percent: Math.round(cooldownDurationAdherence),
-          planned_pace_range_lower: cooldownRangeLower,
-          planned_pace_range_upper: cooldownRangeUpper,
-          planned_pace_min_per_mi: cooldownRangeLower > 0 && cooldownRangeUpper > 0 
-            ? null // Use range instead
-            : (cooldownInterval.planned?.target_pace_s_per_mi || 0) / 60,
-          actual_pace_min_per_mi: cooldownActualPace > 0 ? Math.round(cooldownActualPace / 60 * 100) / 100 : 0,
-          pace_adherence_percent: Math.round(cooldownPaceAdherence),
-          performance_score: Math.round(cooldownPerformanceScore),
-          avg_heart_rate_bpm: cooldownHR.avg_heart_rate_bpm,
-          max_heart_rate_bpm: cooldownHR.max_heart_rate_bpm,
-          min_heart_rate_bpm: cooldownHR.min_heart_rate_bpm,
-          elevation_start_m: cooldownElevation.elevation_start_m,
-          elevation_end_m: cooldownElevation.elevation_end_m,
-          elevation_gain_m: cooldownElevation.elevation_gain_m,
-          elevation_loss_m: cooldownElevation.elevation_loss_m,
-          net_elevation_change_m: cooldownElevation.net_elevation_change_m,
-          avg_grade_percent: cooldownElevation.avg_grade_percent
-        });
+        // Calculate HR and elevation
+        const cooldownHR = calculateIntervalHeartRate(sensorData || [], cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end);
+        const cooldownElevation = calculateIntervalElevation(sensorData || [], cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end);
+        
+        // ✅ Get planned_label from compute-workout-summary (same source as Summary screen)
+        const cooldownPlannedLabel = cooldownInterval.planned_label || null;
+        
+                 completeBreakdown.push({
+                   interval_type: 'cooldown',
+                   interval_id: cooldownInterval.planned_step_id || null,
+                   planned_duration_s: cooldownPlannedDuration,
+                   actual_duration_s: cooldownActualDuration,
+                   planned_distance_m: cooldownInterval.planned?.distance_m || cooldownInterval.executed?.distance_m || 0,
+                   actual_distance_m: cooldownInterval.executed?.distance_m || 0,
+                   planned_label: cooldownPlannedLabel, // ✅ Same source as Summary screen
+                   duration_adherence_percent: Math.round(cooldownDurationAdherence),
+                   planned_pace_range_lower: cooldownRangeLower,
+                   planned_pace_range_upper: cooldownRangeUpper,
+                   planned_pace_min_per_mi: cooldownRangeLower > 0 && cooldownRangeUpper > 0 
+                     ? null // Use range instead
+                     : (cooldownInterval.planned?.target_pace_s_per_mi || 0) / 60,
+                   actual_pace_min_per_mi: cooldownActualPace > 0 ? Math.round(cooldownActualPace / 60 * 100) / 100 : 0,
+                   pace_adherence_percent: Math.round(cooldownPaceAdherence),
+                   performance_score: Math.round(cooldownPerformanceScore),
+                   avg_heart_rate_bpm: cooldownHR.avg_heart_rate_bpm,
+                   max_heart_rate_bpm: cooldownHR.max_heart_rate_bpm,
+                   min_heart_rate_bpm: cooldownHR.min_heart_rate_bpm,
+                   elevation_start_m: cooldownElevation.elevation_start_m,
+                   elevation_end_m: cooldownElevation.elevation_end_m,
+                   elevation_gain_m: cooldownElevation.elevation_gain_m,
+                   elevation_loss_m: cooldownElevation.elevation_loss_m,
+                   net_elevation_change_m: cooldownElevation.net_elevation_change_m,
+                   avg_grade_percent: cooldownElevation.avg_grade_percent
+                 });
     }
   } else {
     // If no allIntervals, just use work intervals
@@ -637,7 +664,7 @@ export function generateIntervalBreakdown(
   
   // Separate intervals by type for better formatting
   const warmupIntervals = completeBreakdown.filter(i => i.interval_type === 'warmup');
-  const workIntervals = completeBreakdown.filter(i => i.interval_type === 'work');
+  const workIntervalsFiltered = completeBreakdown.filter(i => i.interval_type === 'work');
   const recoveryIntervals = completeBreakdown.filter(i => i.interval_type === 'recovery');
   const cooldownIntervals = completeBreakdown.filter(i => i.interval_type === 'cooldown');
   
@@ -667,7 +694,7 @@ export function generateIntervalBreakdown(
   }
   
   // Generate breakdown: warmup, work intervals, recovery aggregate, cooldown
-  const intervalsToShow = [...warmupIntervals, ...workIntervals, ...cooldownIntervals];
+  const intervalsToShow = [...warmupIntervals, ...workIntervalsFiltered, ...cooldownIntervals];
   
   intervalsToShow.forEach((interval) => {
     // Format planned pace - use range if available, otherwise single target
@@ -693,8 +720,43 @@ export function generateIntervalBreakdown(
     }
     
     const actualPace = formatPace(interval.actual_pace_min_per_mi);
-    const plannedDur = formatDuration(interval.planned_duration_s);
     const actualDur = formatDuration(interval.actual_duration_s);
+    
+    // ✅ FIX: Use same source as Summary screen - planned_label from compute-workout-summary
+    // The interval object should already have planned_label from compute-workout-summary
+    let plannedLabelStr = interval.planned_label || '—';
+    
+    // Fallback: if no planned_label in interval, try to get from allIntervals
+    if (plannedLabelStr === '—' && allIntervals && interval.interval_id) {
+      const matchingInterval = allIntervals.find((i: any) => 
+        i.planned_step_id === interval.interval_id || 
+        (interval.interval_type === 'warmup' && (i.role === 'warmup' || i.kind === 'warmup')) ||
+        (interval.interval_type === 'cooldown' && (i.role === 'cooldown' || i.kind === 'cooldown'))
+      );
+      if (matchingInterval?.planned_label && typeof matchingInterval.planned_label === 'string') {
+        plannedLabelStr = matchingInterval.planned_label;
+      }
+    }
+    
+    // Last fallback: if still no planned_label, try to get from planned step directly (same logic as formatPlannedLabel)
+    if (plannedLabelStr === '—' && plannedWorkout && interval.interval_id) {
+      const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.interval_id);
+      if (plannedStep) {
+        // Use same logic as formatPlannedLabel: distance first, then time
+        const meters = plannedStep.distance_m || plannedStep.distanceMeters || plannedStep.m || plannedStep.meters;
+        if (meters && meters > 0) {
+          const miles = meters / 1609.34;
+          plannedLabelStr = miles < 1 ? `${miles.toFixed(2)} mi` : `${miles.toFixed(1)} mi`;
+        } else {
+          const seconds = plannedStep.duration_s || plannedStep.seconds || plannedStep.duration;
+          if (seconds && seconds > 0) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            plannedLabelStr = secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
+          }
+        }
+      }
+    }
     
     const intervalLabel = interval.interval_type === 'warmup' ? 'Warmup' :
                          interval.interval_type === 'cooldown' ? 'Cooldown' :
@@ -702,7 +764,7 @@ export function generateIntervalBreakdown(
                          `Interval ${interval.interval_number || ''}`;
     
     sectionText += `${intervalLabel}:\n`;
-    sectionText += `  Planned: ${plannedDur} @ ${plannedPaceStr}\n`;
+    sectionText += `  Planned: ${plannedLabelStr} @ ${plannedPaceStr}\n`;
     sectionText += `  Actual: ${actualDur} @ ${actualPace}/mi\n`;
     if (interval.pace_adherence_percent !== undefined) {
     sectionText += `  Pace adherence: ${interval.pace_adherence_percent}%\n`;
@@ -718,27 +780,29 @@ export function generateIntervalBreakdown(
       if (interval.max_heart_rate_bpm !== null) sectionText += ` (max: ${interval.max_heart_rate_bpm} bpm)`;
       sectionText += `\n`;
     }
-    if (interval.elevation_gain_m !== undefined && interval.elevation_gain_m > 0) {
-      // Convert elevation based on user preference
-      if (userUnits === 'imperial') {
-        const gainFt = Math.round(interval.elevation_gain_m * 3.28084);
-        const lossFt = Math.round(interval.elevation_loss_m * 3.28084);
-        sectionText += `  Elevation: +${gainFt}ft / -${lossFt}ft`;
-        if (interval.avg_grade_percent !== null && interval.avg_grade_percent !== undefined) {
-          sectionText += ` (${interval.avg_grade_percent > 0 ? '+' : ''}${interval.avg_grade_percent}% grade)`;
-        }
-        sectionText += `\n`;
-      } else {
-        sectionText += `  Elevation: +${interval.elevation_gain_m}m / -${interval.elevation_loss_m}m`;
-        if (interval.avg_grade_percent !== null && interval.avg_grade_percent !== undefined) {
-          sectionText += ` (${interval.avg_grade_percent > 0 ? '+' : ''}${interval.avg_grade_percent}% grade)`;
-        }
-        sectionText += `\n`;
-      }
-    } else if (interval.avg_grade_percent !== null && interval.avg_grade_percent !== undefined) {
-      // Show grade even if no elevation gain/loss
-      sectionText += `  Grade: ${interval.avg_grade_percent > 0 ? '+' : ''}${interval.avg_grade_percent}%\n`;
-    }
+             // ✅ NOTE: Per-interval elevations are GPS-estimated and may not sum to total
+             // Total elevation uses Garmin barometric data (more accurate)
+             if (interval.elevation_gain_m !== undefined && interval.elevation_gain_m > 0) {
+               // Convert elevation based on user preference
+               if (userUnits === 'imperial') {
+                 const gainFt = Math.round(interval.elevation_gain_m * 3.28084);
+                 const lossFt = Math.round(interval.elevation_loss_m * 3.28084);
+                 sectionText += `  Elevation: +${gainFt}ft / -${lossFt}ft (GPS-estimated)`;
+                 if (interval.avg_grade_percent !== null && interval.avg_grade_percent !== undefined) {
+                   sectionText += ` (${interval.avg_grade_percent > 0 ? '+' : ''}${interval.avg_grade_percent}% grade)`;
+                 }
+                 sectionText += `\n`;
+               } else {
+                 sectionText += `  Elevation: +${interval.elevation_gain_m}m / -${interval.elevation_loss_m}m (GPS-estimated)`;
+                 if (interval.avg_grade_percent !== null && interval.avg_grade_percent !== undefined) {
+                   sectionText += ` (${interval.avg_grade_percent > 0 ? '+' : ''}${interval.avg_grade_percent}% grade)`;
+                 }
+                 sectionText += `\n`;
+               }
+             } else if (interval.avg_grade_percent !== null && interval.avg_grade_percent !== undefined) {
+               // Show grade even if no elevation gain/loss
+               sectionText += `  Grade: ${interval.avg_grade_percent > 0 ? '+' : ''}${interval.avg_grade_percent}%\n`;
+             }
     sectionText += `
 `;
   });
@@ -752,10 +816,44 @@ export function generateIntervalBreakdown(
     sectionText += `  Pace adherence: ${recoveryAggregate.avg_pace_adherence}%\n\n`;
   }
   
-  // Use Garmin's barometric elevation data (more accurate than summing GPS segments)
+  // ✅ FIX #1: Use Garmin barometric data (accurate), fallback to GPS sum only if unavailable
   // GPS noise accumulates across segments, so trust the device's barometric altimeter
-  const elevationGainM = rawWorkoutData?.elevation_gain ?? rawWorkoutData?.metrics?.elevation_gain;
-  const totalElevationGain = (elevationGainM != null && Number.isFinite(elevationGainM)) ? Number(elevationGainM) : 0;
+  // Check multiple possible locations for elevation data
+  let elevationGainM: number | null = null;
+  let elevationSource = 'none';
+  
+  if (rawWorkoutData) {
+    // Check all possible locations for elevation data
+    if (rawWorkoutData.elevation_gain != null && Number.isFinite(rawWorkoutData.elevation_gain)) {
+      elevationGainM = Number(rawWorkoutData.elevation_gain);
+      elevationSource = 'workout.elevation_gain';
+    } else if (rawWorkoutData.metrics?.elevation_gain != null && Number.isFinite(rawWorkoutData.metrics.elevation_gain)) {
+      elevationGainM = Number(rawWorkoutData.metrics.elevation_gain);
+      elevationSource = 'workout.metrics.elevation_gain';
+    } else if (rawWorkoutData.total_elevation_gain != null && Number.isFinite(rawWorkoutData.total_elevation_gain)) {
+      elevationGainM = Number(rawWorkoutData.total_elevation_gain);
+      elevationSource = 'workout.total_elevation_gain';
+    }
+  }
+  
+  // Calculate GPS sum for comparison
+  const gpsSumM = completeBreakdown.length > 0 
+    ? completeBreakdown.reduce((sum, i) => sum + (i.elevation_gain_m || 0), 0)
+    : 0;
+  
+  // Only use GPS sum as last resort if Garmin data is completely unavailable
+  const totalElevationGain = (elevationGainM != null && Number.isFinite(elevationGainM) && elevationGainM > 0) 
+    ? Number(elevationGainM) 
+    : gpsSumM;
+  
+  const finalSource = (elevationGainM != null && Number.isFinite(elevationGainM) && elevationGainM > 0) 
+    ? elevationSource 
+    : 'GPS sum (fallback)';
+  
+  console.log(`🔍 [ELEVATION DEBUG] rawWorkoutData exists: ${!!rawWorkoutData}`);
+  console.log(`🔍 [ELEVATION DEBUG] rawWorkoutData.elevation_gain: ${rawWorkoutData?.elevation_gain}`);
+  console.log(`🔍 [ELEVATION DEBUG] rawWorkoutData.metrics?.elevation_gain: ${rawWorkoutData?.metrics?.elevation_gain}`);
+  console.log(`🔍 [ELEVATION DEBUG] Source: ${finalSource}, Garmin value: ${elevationGainM}m, GPS sum: ${gpsSumM}m, Final: ${totalElevationGain}m (${Math.round(totalElevationGain * 3.28084)}ft)`);
   const totalElevationLoss = 0; // Garmin only provides gain, not loss breakdown
   
   sectionText += `SUMMARY:\n`;
@@ -766,12 +864,13 @@ export function generateIntervalBreakdown(
   sectionText += `- Poor (<70%): ${summary.poor} intervals\n`;
   
   // Add total elevation summary (using Garmin's barometric data)
+  // Note: Per-interval elevations are GPS-estimated and may not sum to total
   if (totalElevationGain > 0) {
     if (userUnits === 'imperial') {
       const totalGainFt = Math.round(totalElevationGain * 3.28084);
-      sectionText += `- Total elevation: ${totalGainFt}ft gain\n`;
+      sectionText += `- Total elevation: ${totalGainFt}ft gain (barometric data, per-interval values are GPS-estimated)\n`;
     } else {
-      sectionText += `- Total elevation: ${Math.round(totalElevationGain)}m gain\n`;
+      sectionText += `- Total elevation: ${Math.round(totalElevationGain)}m gain (barometric data, per-interval values are GPS-estimated)\n`;
     }
   }
   
@@ -840,45 +939,48 @@ export function generateIntervalBreakdown(
           const warmupActualFormattedDur = formatDuration(warmupActualDuration);
           
           sectionText += '\n';
-          sectionText += `EXECUTION SCORE BREAKDOWN (${executionScore}%):\n`;
-          sectionText += `\n`;
-          sectionText += `✅ Work intervals: ${paceAdherence}% pace, ${durationAdherence}% duration (perfect)\n`;
-          if (recoveryIntervals.length > 0) {
-            sectionText += `✅ Recoveries: Well controlled\n`;
-          }
-          if (cooldownInterval) {
-            // Calculate cooldown metrics for display
-            let cooldownPaceRange = cooldownInterval.planned?.pace_range || cooldownInterval.pace_range;
-            if (!cooldownPaceRange && plannedWorkout && cooldownInterval.planned_step_id) {
-              const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === cooldownInterval.planned_step_id);
-              cooldownPaceRange = plannedStep?.pace_range;
-            }
-            let cooldownActualPaceFromSensor = 0;
-            if (sensorData && cooldownInterval.sample_idx_start !== undefined && cooldownInterval.sample_idx_end !== undefined) {
-              const samples = sensorData.slice(cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end + 1);
-              const validPaces = samples.map(s => s.pace_s_per_mi).filter(p => p && p > 0);
-              if (validPaces.length > 0) {
-                cooldownActualPaceFromSensor = validPaces.reduce((sum, p) => sum + p, 0) / validPaces.length;
-              }
-            }
-            if (cooldownActualPaceFromSensor === 0) {
-              cooldownActualPaceFromSensor = cooldownInterval.executed?.avg_pace_s_per_mi || 0;
-            }
-            const cooldownPaceAdh = cooldownPaceRange && cooldownActualPaceFromSensor > 0
-              ? calculatePaceRangeAdherence(cooldownActualPaceFromSensor, cooldownPaceRange.lower, cooldownPaceRange.upper)
-              : 100;
-            const cooldownDurAdh = cooldownInterval.planned?.duration_s && cooldownInterval.executed?.duration_s
-              ? Math.max(0, 100 - (Math.abs(cooldownInterval.executed.duration_s - cooldownInterval.planned.duration_s) / cooldownInterval.planned.duration_s) * 100)
-              : 100;
-            sectionText += `✅ Cooldown: ${Math.round(cooldownPaceAdh)}% pace, ${Math.round(cooldownDurAdh)}% duration\n`;
-          }
-          sectionText += `⚠️ Warmup: ${Math.round(warmupPaceAdherence)}% pace, ${Math.round(warmupDurationAdherence)}% duration (penalty source)\n`;
-          sectionText += `\nWARMUP PENALTY (-${100 - executionScore}% from pace only):\n`;
-          sectionText += `Planned: ${warmupPlannedFormatted} @ ${warmupPlannedRange}\n`;
-          sectionText += `Actual: ${warmupActualFormattedDur} @ ${warmupActualFormatted}\n`;
-          sectionText += `\nIssue: Warmup pace was ${warmupActualFormatted} vs ${warmupPlannedRange} target (too fast)\n`;
-          sectionText += `Duration was perfect (${warmupPlannedFormatted} completed), but running warmup too fast reduces workout quality.\n`;
-          sectionText += `\nFix: Complete warmup at prescribed easy pace (${warmupPlannedRange}) to maximize workout benefit.\n`;
+                   sectionText += `EXECUTION SCORE BREAKDOWN (${executionScore}%):\n`;
+                   sectionText += `\n`;
+                   sectionText += `✅ Work intervals: ${paceAdherence}% pace, ${durationAdherence}% duration (perfect)\n`;
+                   if (recoveryIntervals.length > 0) {
+                     sectionText += `✅ Recoveries: Well controlled\n`;
+                   }
+                   if (cooldownInterval) {
+                     // Calculate cooldown metrics for display
+                     let cooldownPaceRange = cooldownInterval.planned?.pace_range || cooldownInterval.pace_range;
+                     if (!cooldownPaceRange && plannedWorkout && cooldownInterval.planned_step_id) {
+                       const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === cooldownInterval.planned_step_id);
+                       cooldownPaceRange = plannedStep?.pace_range;
+                     }
+                     let cooldownActualPaceFromSensor = 0;
+                     if (sensorData && cooldownInterval.sample_idx_start !== undefined && cooldownInterval.sample_idx_end !== undefined) {
+                       const samples = sensorData.slice(cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end + 1);
+                       const validPaces = samples.map(s => s.pace_s_per_mi).filter(p => p && p > 0);
+                       if (validPaces.length > 0) {
+                         cooldownActualPaceFromSensor = validPaces.reduce((sum, p) => sum + p, 0) / validPaces.length;
+                       }
+                     }
+                     if (cooldownActualPaceFromSensor === 0) {
+                       cooldownActualPaceFromSensor = cooldownInterval.executed?.avg_pace_s_per_mi || 0;
+                     }
+                     const cooldownPaceAdh = cooldownPaceRange && cooldownActualPaceFromSensor > 0
+                       ? calculatePaceRangeAdherence(cooldownActualPaceFromSensor, cooldownPaceRange.lower, cooldownPaceRange.upper)
+                       : 100;
+                     const cooldownDurAdh = cooldownInterval.planned?.duration_s && cooldownInterval.executed?.duration_s
+                       ? Math.max(0, 100 - (Math.abs(cooldownInterval.executed.duration_s - cooldownInterval.planned.duration_s) / cooldownInterval.planned.duration_s) * 100)
+                       : 100;
+                     sectionText += `✅ Cooldown: ${Math.round(cooldownPaceAdh)}% pace, ${Math.round(cooldownDurAdh)}% duration\n`;
+                   }
+                   sectionText += `⚠️ Warmup: ${Math.round(warmupPaceAdherence)}% pace, ${Math.round(warmupDurationAdherence)}% duration (penalty source)\n`;
+                   sectionText += `\nWARMUP PENALTY (-${100 - executionScore}% from pace only):\n`;
+                   // ✅ FIX: Show distance instead of time in execution breakdown
+                   const warmupPlannedDistM = warmupInterval.planned?.distance_m || warmupInterval.executed?.distance_m || 0;
+                   const warmupPlannedDistStr = warmupPlannedDistM > 0 ? `${(warmupPlannedDistM / 1609.34).toFixed(warmupPlannedDistM / 1609.34 < 1 ? 2 : 1)} mi` : warmupPlannedFormatted;
+                   sectionText += `Planned: ${warmupPlannedDistStr} @ ${warmupPlannedRange}\n`;
+                   sectionText += `Actual: ${warmupActualFormattedDur} @ ${warmupActualFormatted}\n`;
+                   sectionText += `\nIssue: Warmup pace was ${warmupActualFormatted} vs ${warmupPlannedRange} target (too fast)\n`;
+                   sectionText += `Duration was perfect (${warmupPlannedFormatted} completed), but running warmup too fast reduces workout quality.\n`;
+                   sectionText += `\nFix: Complete warmup at prescribed easy pace (${warmupPlannedRange}) to maximize workout benefit.\n`;
         } else if (executionScore < 100) {
           // Even if warmup is good, still explain why execution < 100%
           sectionText += '\n';
