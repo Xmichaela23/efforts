@@ -1266,28 +1266,33 @@ function EffortsViewerMapbox({
     }
     // Round pace domain to nice minute:second intervals (similar to speed's clean mph rounding)
     if (tab === "pace" && workoutData?.type !== 'ride') {
-      // Convert to seconds per unit (mi or km) for rounding
+      // Domain is in pace_s_per_km. Round to intervals that produce clean :00/:30 when displayed.
+      // For miles: 30 sec/mi = 30/1.60934 ≈ 18.64 sec/km. Round to nearest 18.64.
+      // For km: 30 sec/km. Round to nearest 30.
+      const roundIntervalSec = useMiles ? 30 / 1.60934 : 30;
+      
+      // Convert domain boundaries to display units for rounding, then convert back
       const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
       const fromSecPerUnit = (secPerUnit: number) => useMiles ? secPerUnit / 1.60934 : secPerUnit;
       
-      // Round to nearest 30 seconds for clean :00/:30 intervals
-      const loSec = toSecPerUnit(lo);
-      const hiSec = toSecPerUnit(hi);
-      let roundedLo = Math.floor(loSec / 30) * 30;
-      let roundedHi = Math.ceil(hiSec / 30) * 30;
+      // Round boundaries in display units to 30-second intervals
+      const loDisplay = toSecPerUnit(lo);
+      const hiDisplay = toSecPerUnit(hi);
+      let roundedLoDisplay = Math.floor(loDisplay / 30) * 30;
+      let roundedHiDisplay = Math.ceil(hiDisplay / 30) * 30;
       
       // Ensure span is a multiple of 120 seconds (4 steps of 30s) so evenly spaced ticks align with :00/:30
-      let span = roundedHi - roundedLo;
-      const minSpan = Math.max(120, Math.ceil(span / 120) * 120); // Round up to nearest multiple of 120
-      if (span < minSpan) {
-        // Expand the range to ensure even spacing
-        const center = (roundedLo + roundedHi) / 2;
-        roundedLo = Math.floor((center - minSpan / 2) / 30) * 30;
-        roundedHi = Math.ceil((center + minSpan / 2) / 30) * 30;
+      let spanDisplay = roundedHiDisplay - roundedLoDisplay;
+      const minSpanDisplay = Math.max(120, Math.ceil(spanDisplay / 120) * 120);
+      if (spanDisplay < minSpanDisplay) {
+        const centerDisplay = (roundedLoDisplay + roundedHiDisplay) / 2;
+        roundedLoDisplay = Math.floor((centerDisplay - minSpanDisplay / 2) / 30) * 30;
+        roundedHiDisplay = Math.ceil((centerDisplay + minSpanDisplay / 2) / 30) * 30;
       }
       
-      lo = fromSecPerUnit(roundedLo);
-      hi = fromSecPerUnit(roundedHi);
+      // Convert back to pace_s_per_km for domain
+      lo = fromSecPerUnit(roundedLoDisplay);
+      hi = fromSecPerUnit(roundedHiDisplay);
     }
     // Round speed domain to nice mph/kmh intervals (like pace but for speed)
     if (tab === 'spd' || tab === 'speed') {
