@@ -1264,6 +1264,51 @@ function EffortsViewerMapbox({
       // Extra top headroom so high HR values don't appear clipped
       hi += 3;
     }
+    // Round pace domain to nice minute:second intervals (similar to speed's clean mph rounding)
+    if (tab === "pace" && workoutData?.type !== 'ride') {
+      // Convert to seconds per unit (mi or km) for rounding
+      const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
+      const fromSecPerUnit = (secPerUnit: number) => useMiles ? secPerUnit / 1.60934 : secPerUnit;
+      
+      // Round to nearest 30 seconds for clean :00/:30 intervals
+      const loSec = toSecPerUnit(lo);
+      const hiSec = toSecPerUnit(hi);
+      const roundedLo = Math.floor(loSec / 30) * 30;
+      const roundedHi = Math.ceil(hiSec / 30) * 30;
+      
+      lo = fromSecPerUnit(roundedLo);
+      hi = fromSecPerUnit(roundedHi);
+      
+      // Ensure minimum span
+      const minSpanSec = toSecPerUnit(hi) - toSecPerUnit(lo);
+      if (minSpanSec < 120) { // At least 2 minutes span
+        const center = (toSecPerUnit(lo) + toSecPerUnit(hi)) / 2;
+        lo = fromSecPerUnit(Math.floor((center - 60) / 30) * 30);
+        hi = fromSecPerUnit(Math.ceil((center + 60) / 30) * 30);
+      }
+    }
+    // Round speed domain to nice mph/kmh intervals (like pace but for speed)
+    if (tab === 'spd' || tab === 'speed') {
+      // Speed is in m/s, convert to mph/kmh, round, then convert back
+      const speedInMph = hi * 2.237;
+      const speedInKmh = hi * 3.6;
+      const speedLoMph = lo * 2.237;
+      const speedLoKmh = lo * 3.6;
+      
+      if (useMiles) {
+        // Round to nearest mph
+        const roundedHi = Math.ceil(speedInMph);
+        const roundedLo = Math.max(0, Math.floor(speedLoMph));
+        hi = roundedHi / 2.237;
+        lo = roundedLo / 2.237;
+      } else {
+        // Round to nearest kmh
+        const roundedHi = Math.ceil(speedInKmh);
+        const roundedLo = Math.max(0, Math.floor(speedLoKmh));
+        hi = roundedHi / 3.6;
+        lo = roundedLo / 3.6;
+      }
+    }
     
     // Refined padding for better use of vertical space (tighter than before)
     const padFrac = (tab === 'pace') ? (isOutdoorGlobal ? 0.08 : 0.05)
@@ -1276,7 +1321,7 @@ function EffortsViewerMapbox({
                     : (isOutdoorGlobal ? 0.03 : 0.02);
     const pad = Math.max((hi - lo) * padFrac, 1);
     return [lo - pad, hi + pad];
-  }, [metricRaw, tab, isOutdoorGlobal, useFeet, workoutData]);
+  }, [metricRaw, tab, isOutdoorGlobal, useFeet, useMiles, workoutData]);
 
   // Helpers to map to SVG - consistent domain [d0..dN] from monotonic distance
   const xFromDist = (d: number) => {
@@ -1297,11 +1342,32 @@ function EffortsViewerMapbox({
     return H - P - t * (H - P * 2);
   };
 
-  // Tick values
+  // Tick values - round to nice intervals for pace and speed
   const yTicks = useMemo(() => {
-    const [a, b] = yDomain; const step = (b - a) / 4;
+    const [a, b] = yDomain; 
+    
+    // For pace (running), round ticks to nice minute:second intervals
+    if (tab === 'pace' && workoutData?.type !== 'ride') {
+      const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
+      const fromSecPerUnit = (secPerUnit: number) => useMiles ? secPerUnit / 1.60934 : secPerUnit;
+      
+      const aSec = toSecPerUnit(a);
+      const bSec = toSecPerUnit(b);
+      const step = (bSec - aSec) / 4;
+      
+      return new Array(5).fill(0).map((_, i) => {
+        const tickSec = aSec + i * step;
+        // Round to nearest 30 seconds for clean :00/:30 intervals
+        const roundedSec = Math.round(tickSec / 30) * 30;
+        return fromSecPerUnit(roundedSec);
+      });
+    }
+    
+    // For speed, ticks are already nicely rounded from domain rounding above
+    // For other metrics, use evenly spaced ticks
+    const step = (b - a) / 4;
     return new Array(5).fill(0).map((_, i) => a + i * step);
-  }, [yDomain]);
+  }, [yDomain, tab, workoutData, useMiles]);
 
   // Build path from smoothed metric
   const linePath = useMemo(() => {
@@ -1360,6 +1426,8 @@ function EffortsViewerMapbox({
   const chartConfig = useMemo(() => {
     const configs: Record<string, { color: string; gradient: string }> = {
       pace: { color: '#3b82f6', gradient: 'paceGradient' },
+      spd: { color: '#3b82f6', gradient: 'speedGradient' },
+      speed: { color: '#3b82f6', gradient: 'speedGradient' },
       bpm: { color: '#ef4444', gradient: 'bpmGradient' },
       cad: { color: '#8b5cf6', gradient: 'cadGradient' },
       pwr: { color: '#f59e0b', gradient: 'pwrGradient' },
@@ -1651,6 +1719,10 @@ function EffortsViewerMapbox({
             <linearGradient id="vamGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.4" />
               <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.05" />
+            </linearGradient>
+            <linearGradient id="speedGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
             </linearGradient>
           </defs>
           {/* vertical grid */}
