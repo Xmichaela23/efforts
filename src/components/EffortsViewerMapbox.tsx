@@ -1266,11 +1266,8 @@ function EffortsViewerMapbox({
     }
     // Round pace domain to nice minute:second intervals (similar to speed's clean mph rounding)
     if (tab === "pace" && workoutData?.type !== 'ride') {
-      // Domain is in pace_s_per_km. Round to intervals that produce clean :00/:30 when displayed.
-      // For miles: 30 sec/mi = 30/1.60934 ≈ 18.64 sec/km. Round to nearest 18.64.
-      // For km: 30 sec/km. Round to nearest 30.
-      const roundIntervalSec = useMiles ? 30 / 1.60934 : 30;
-      
+      // Domain is in pace_s_per_km. Convert to display units (sec/mi or sec/km) for rounding.
+      // Round to 30-second intervals in display units, then convert back to pace_s_per_km.
       // Convert domain boundaries to display units for rounding, then convert back
       const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
       const fromSecPerUnit = (secPerUnit: number) => useMiles ? secPerUnit / 1.60934 : secPerUnit;
