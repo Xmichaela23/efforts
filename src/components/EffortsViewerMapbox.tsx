@@ -1273,19 +1273,21 @@ function EffortsViewerMapbox({
       // Round to nearest 30 seconds for clean :00/:30 intervals
       const loSec = toSecPerUnit(lo);
       const hiSec = toSecPerUnit(hi);
-      const roundedLo = Math.floor(loSec / 30) * 30;
-      const roundedHi = Math.ceil(hiSec / 30) * 30;
+      let roundedLo = Math.floor(loSec / 30) * 30;
+      let roundedHi = Math.ceil(hiSec / 30) * 30;
+      
+      // Ensure span is a multiple of 120 seconds (4 steps of 30s) so evenly spaced ticks align with :00/:30
+      let span = roundedHi - roundedLo;
+      const minSpan = Math.max(120, Math.ceil(span / 120) * 120); // Round up to nearest multiple of 120
+      if (span < minSpan) {
+        // Expand the range to ensure even spacing
+        const center = (roundedLo + roundedHi) / 2;
+        roundedLo = Math.floor((center - minSpan / 2) / 30) * 30;
+        roundedHi = Math.ceil((center + minSpan / 2) / 30) * 30;
+      }
       
       lo = fromSecPerUnit(roundedLo);
       hi = fromSecPerUnit(roundedHi);
-      
-      // Ensure minimum span
-      const minSpanSec = toSecPerUnit(hi) - toSecPerUnit(lo);
-      if (minSpanSec < 120) { // At least 2 minutes span
-        const center = (toSecPerUnit(lo) + toSecPerUnit(hi)) / 2;
-        lo = fromSecPerUnit(Math.floor((center - 60) / 30) * 30);
-        hi = fromSecPerUnit(Math.ceil((center + 60) / 30) * 30);
-      }
     }
     // Round speed domain to nice mph/kmh intervals (like pace but for speed)
     if (tab === 'spd' || tab === 'speed') {
@@ -1342,32 +1344,14 @@ function EffortsViewerMapbox({
     return H - P - t * (H - P * 2);
   };
 
-  // Tick values - round to nice intervals for pace and speed
+  // Tick values - evenly spaced ticks (domain rounding ensures clean labels)
   const yTicks = useMemo(() => {
     const [a, b] = yDomain; 
-    
-    // For pace (running), round ticks to nice minute:second intervals
-    if (tab === 'pace' && workoutData?.type !== 'ride') {
-      const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
-      const fromSecPerUnit = (secPerUnit: number) => useMiles ? secPerUnit / 1.60934 : secPerUnit;
-      
-      const aSec = toSecPerUnit(a);
-      const bSec = toSecPerUnit(b);
-      const step = (bSec - aSec) / 4;
-      
-      return new Array(5).fill(0).map((_, i) => {
-        const tickSec = aSec + i * step;
-        // Round to nearest 30 seconds for clean :00/:30 intervals
-        const roundedSec = Math.round(tickSec / 30) * 30;
-        return fromSecPerUnit(roundedSec);
-      });
-    }
-    
-    // For speed, ticks are already nicely rounded from domain rounding above
-    // For other metrics, use evenly spaced ticks
+    // Use evenly spaced ticks - domain boundaries are already rounded to nice intervals
+    // This ensures visual spacing is consistent (like speed chart)
     const step = (b - a) / 4;
     return new Array(5).fill(0).map((_, i) => a + i * step);
-  }, [yDomain, tab, workoutData, useMiles]);
+  }, [yDomain]);
 
   // Build path from smoothed metric
   const linePath = useMemo(() => {
