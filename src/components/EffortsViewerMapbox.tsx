@@ -1165,6 +1165,21 @@ function EffortsViewerMapbox({
         .map(s => s.avgPace_s_per_km)
         .filter((p): p is number => p !== null && Number.isFinite(p));
       
+      // Convert to display units for logging
+      const toDisplay = (secPerKm: number) => {
+        const secPerUnit = useMiles ? secPerKm * 1.60934 : secPerKm;
+        const m = Math.floor(secPerUnit / 60);
+        const s = Math.round(secPerUnit % 60);
+        return `${m}:${String(s).padStart(2, "0")}`;
+      };
+      
+      console.log('[Pace Splits Debug]', {
+        splitCount: splitsForDomain.length,
+        splitPaces_secPerKm: splitPaces,
+        splitPaces_display: splitPaces.map(p => toDisplay(p)),
+        useMiles
+      });
+      
       if (splitPaces.length > 0) {
         // Get min/max from splits (already in sec_per_km) - this is the ground truth
         const splitPaceRange = {
@@ -1172,10 +1187,19 @@ function EffortsViewerMapbox({
           max: Math.max(...splitPaces)
         };
         
-        // Minimal padding: 2% on each side (just enough to avoid edge clipping)
+        // 5% padding on each side (just enough to avoid edge clipping)
         const range = splitPaceRange.max - splitPaceRange.min;
-        lo = Math.max(0, splitPaceRange.min - (range * 0.02));
-        hi = splitPaceRange.max + (range * 0.02);
+        lo = Math.max(0, splitPaceRange.min - (range * 0.05));
+        hi = splitPaceRange.max + (range * 0.05);
+        
+        console.log('[Pace Domain from Splits]', {
+          splitMin_secPerKm: splitPaceRange.min,
+          splitMax_secPerKm: splitPaceRange.max,
+          splitMin_display: toDisplay(splitPaceRange.min),
+          splitMax_display: toDisplay(splitPaceRange.max),
+          domainLo_display: toDisplay(lo),
+          domainHi_display: toDisplay(hi)
+        });
       } else {
         // If no splits, use raw pace data min/max (not percentiles - they don't work correctly)
         const paceVals = vals.filter((v): v is number => Number.isFinite(v) && v > 0);
@@ -1183,8 +1207,8 @@ function EffortsViewerMapbox({
           const minPace = Math.min(...paceVals);
           const maxPace = Math.max(...paceVals);
           const range = maxPace - minPace;
-          lo = Math.max(0, minPace - (range * 0.02));
-          hi = maxPace + (range * 0.02);
+          lo = Math.max(0, minPace - (range * 0.05));
+          hi = maxPace + (range * 0.05);
         } else {
           // Absolute last resort - use default range
           lo = 200; // ~3:20/km
@@ -1286,52 +1310,17 @@ function EffortsViewerMapbox({
       // Extra top headroom so high HR values don't appear clipped
       hi += 3;
     }
-    // Round pace domain to nice minute:second intervals - but DON'T expand beyond splits range
+    // NO ROUNDING for pace - just use splits min/max directly
+    // The old rounding logic was expanding the domain by 30+ seconds on each side
     if (tab === "pace" && workoutData?.type !== 'ride') {
-      // Domain is in pace_s_per_km. Convert to display units (sec/mi or sec/km) for rounding.
-      // Round to 30-second intervals in display units, then convert back to pace_s_per_km.
-      // IMPORTANT: Only round inward or minimally outward - don't expand significantly
       const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
-      const fromSecPerUnit = (secPerUnit: number) => useMiles ? secPerUnit / 1.60934 : secPerUnit;
-      
-      const loBefore = lo;
-      const hiBefore = hi;
-      
-      // Convert to display units
-      const loDisplay = toSecPerUnit(lo);
-      const hiDisplay = toSecPerUnit(hi);
-      const originalSpanDisplay = hiDisplay - loDisplay;
-      
-      // Round to 30-second intervals, but constrain to not expand beyond original + 10 seconds
-      // Round inward (floor/ceil) but don't expand more than 10s total
-      let roundedLoDisplay = Math.floor(loDisplay / 30) * 30;
-      let roundedHiDisplay = Math.ceil(hiDisplay / 30) * 30;
-      
-      // If rounding expanded too much, constrain it
-      const expandedSpan = roundedHiDisplay - roundedLoDisplay;
-      if (expandedSpan > originalSpanDisplay + 10) {
-        // Too much expansion - keep original boundaries rounded inward only
-        roundedLoDisplay = Math.ceil(loDisplay / 30) * 30;  // Round up (faster pace = lower number)
-        roundedHiDisplay = Math.floor(hiDisplay / 30) * 30; // Round down (slower pace = higher number)
-        // Ensure we don't go inside the original range
-        if (roundedLoDisplay > loDisplay) roundedLoDisplay = Math.floor(loDisplay / 30) * 30;
-        if (roundedHiDisplay < hiDisplay) roundedHiDisplay = Math.ceil(hiDisplay / 30) * 30;
-      }
-      
-      // Convert back to pace_s_per_km for domain
-      lo = fromSecPerUnit(roundedLoDisplay);
-      hi = fromSecPerUnit(roundedHiDisplay);
-      
-      // Debug logging
       console.log('[Pace Domain Debug]', {
-          before: { lo: loBefore, hi: hiBefore },
-          display: { lo: loDisplay, hi: hiDisplay },
-          rounded_display: { lo: roundedLoDisplay, hi: roundedHiDisplay },
-          after: { lo, hi },
-          useMiles,
-          originalSpanDisplay,
-          expandedSpan: roundedHiDisplay - roundedLoDisplay
-        });
+        lo_secPerKm: lo,
+        hi_secPerKm: hi,
+        lo_display: toSecPerUnit(lo),
+        hi_display: toSecPerUnit(hi),
+        useMiles
+      });
     }
     // Round speed domain to nice mph/kmh intervals (like pace but for speed)
     if (tab === 'spd' || tab === 'speed') {
@@ -1356,10 +1345,12 @@ function EffortsViewerMapbox({
       }
     }
     
-    // Refined padding for better use of vertical space (tighter than before)
-    // For pace: minimal padding (already added 2% above) - just 1% more for visual breathing room
-    const padFrac = (tab === 'pace') ? 0.01  // Minimal padding - splits already define the range
-                    : (tab === 'bpm') ? 0.04
+    // Padding for other metrics - pace uses splits directly (no additional padding)
+    if (tab === 'pace') {
+      // NO additional padding - splits define the exact range
+      return [lo, hi];
+    }
+    const padFrac = (tab === 'bpm') ? 0.04
                     : (tab === 'cad') ? 0.05
                     : (tab === 'pwr') ? 0.06
                     : (tab === 'elev') ? 0.04
