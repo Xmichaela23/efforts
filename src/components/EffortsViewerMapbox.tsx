@@ -1059,12 +1059,13 @@ function EffortsViewerMapbox({
       // This preserves actual max speed peaks (e.g., 34.5 mph sprints)
       return spd;
     }
-    // Pace - NO smoothing to preserve actual peaks (downsampling already preserves min pace)
+    // Pace - 30-second rolling average smoothing (like Garmin)
     if (tab === "pace") {
       const raw = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
-      // Return RAW pace data - downsampling already preserved the min (fastest) pace index
-      // Any smoothing here would hide actual peak performance
-      return raw;
+      // Apply 30-sample rolling average (~30 seconds) to smooth GPS noise
+      // This matches Garmin/Strava behavior - show the trend, not every spike
+      const smoothed = nanAwareMovAvg(raw, 30);
+      return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Heart rate - enhanced smoothing with outlier handling
     if (tab === "bpm") {
