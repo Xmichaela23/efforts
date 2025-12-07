@@ -1380,20 +1380,44 @@ function EffortsViewerMapbox({
     const step = (b - a) / 4;
     const ticks = new Array(5).fill(0).map((_, i) => a + i * step);
     
-    // Debug logging for pace chart
+    // Comprehensive debug logging for pace chart
     if (tab === 'pace' && workoutData?.type !== 'ride' && import.meta.env?.DEV) {
       const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
-      console.log('[Pace Chart Debug]', {
+      const fmtPaceDebug = (secPerKm: number) => {
+        const secPerUnit = toSecPerUnit(secPerKm);
+        const m = Math.floor(secPerUnit / 60);
+        const s = Math.round(secPerUnit % 60);
+        return `${m}:${String(s).padStart(2, "0")}`;
+      };
+      
+      // Get sample of actual data values
+      const samplePaces = metricRaw.filter(Number.isFinite).slice(0, 10).map(v => ({
+        secPerKm: v,
+        display: fmtPaceDebug(v)
+      }));
+      
+      // Get splits for comparison
+      const sampleSplits = splits.slice(0, 3).map(sp => ({
+        avgPace_s_per_km: sp.avgPace_s_per_km,
+        display: fmtPaceDebug(sp.avgPace_s_per_km || 0),
+        time_s: sp.time_s
+      }));
+      
+      console.log('[Pace Chart Debug - COMPREHENSIVE]', {
         domain_secPerKm: [a, b],
-        domain_display: [toSecPerUnit(a), toSecPerUnit(b)],
+        domain_display: [fmtPaceDebug(a), fmtPaceDebug(b)],
         ticks_secPerKm: ticks,
-        ticks_display: ticks.map(t => toSecPerUnit(t)),
-        useMiles
+        ticks_display: ticks.map(t => fmtPaceDebug(t)),
+        useMiles,
+        sample_data_values: samplePaces,
+        sample_splits: sampleSplits,
+        metricRaw_length: metricRaw.length,
+        metricRaw_finite_count: metricRaw.filter(Number.isFinite).length
       });
     }
     
     return ticks;
-  }, [yDomain, tab, workoutData, useMiles]);
+  }, [yDomain, tab, workoutData, useMiles, metricRaw, splits]);
 
   // Build path from smoothed metric
   const linePath = useMemo(() => {
@@ -1515,9 +1539,41 @@ function EffortsViewerMapbox({
   // Cursor & current values
   const s = normalizedSamples[idx] || normalizedSamples[normalizedSamples.length - 1];
   const cx = xFromDist(s?.d_m ?? 0);
-  const cy = yFromValue(Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : 0);
+  const currentMetricRaw = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : 0;
+  const cy = yFromValue(currentMetricRaw);
   const gainNow_m = cumGain_m[Math.min(idx, cumGain_m.length - 1)] ?? 0;
   const altNow_m  = (s?.elev_m_sm ?? 0);
+  
+  // Debug: Log cursor value vs Y-axis position for pace chart
+  if (tab === 'pace' && workoutData?.type !== 'ride' && import.meta.env?.DEV && idx > 0) {
+    const [domainLo, domainHi] = yDomain;
+    const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
+    const fmtPaceDebug = (secPerKm: number) => {
+      const secPerUnit = toSecPerUnit(secPerKm);
+      const m = Math.floor(secPerUnit / 60);
+      const s = Math.round(secPerUnit % 60);
+      return `${m}:${String(s).padStart(2, "0")}`;
+    };
+    
+    // Calculate what Y-axis label should be at this Y position
+    const yPos = cy;
+    const chartHeight = H - P * 2;
+    const normalizedY = (H - P - yPos) / chartHeight; // 0 = bottom, 1 = top
+    // For pace (inverted), normalizedY represents position: 0 = slow (hi), 1 = fast (lo)
+    const valueAtY = domainLo + (1 - normalizedY) * (domainHi - domainLo);
+    
+    console.log('[Cursor Debug]', {
+      idx,
+      cursor_value_secPerKm: currentMetricRaw,
+      cursor_value_display: fmtPaceDebug(currentMetricRaw),
+      y_position: yPos,
+      value_at_y_position_secPerKm: valueAtY,
+      value_at_y_position_display: fmtPaceDebug(valueAtY),
+      domain: [fmtPaceDebug(domainLo), fmtPaceDebug(domainHi)],
+      difference_sec: Math.abs(currentMetricRaw - valueAtY),
+      difference_display: Math.abs(toSecPerUnit(currentMetricRaw) - toSecPerUnit(valueAtY))
+    });
+  }
 
 
   return (
