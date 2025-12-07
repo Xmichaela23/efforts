@@ -1159,11 +1159,14 @@ function EffortsViewerMapbox({
     let lo: number, hi: number;
     if (tab === 'pace') {
       // Data is already smoothed (30s rolling avg in metricRaw)
-      // Use simple min/max - no percentiles needed since smoothing removed spikes
+      // Use 5th/95th percentile on SMOOTHED data to exclude remaining outliers
       const paceVals = vals.filter(v => v > 0);
       if (paceVals.length > 0) {
-        lo = Math.min(...paceVals);
-        hi = Math.max(...paceVals);
+        const sorted = [...paceVals].sort((a, b) => a - b);
+        const p5 = sorted[Math.floor(sorted.length * 0.05)];
+        const p95 = sorted[Math.min(Math.floor(sorted.length * 0.95), sorted.length - 1)];
+        lo = p5;
+        hi = p95;
         // Add 10% padding for visual breathing room
         const range = hi - lo;
         lo = lo - range * 0.1;
