@@ -1162,19 +1162,11 @@ function EffortsViewerMapbox({
       const pHi = isOutdoorGlobal ? 95 : 98;
       const pLowVal = pct(winsorized, pLo);
       const pHighVal = pct(winsorized, pHi);
-      // Use winsorized percentiles as base, but expand slightly to show full range
-      // Don't include absolute min/max as they're often outliers (e.g., GPS spikes at start)
-      const rawPaces = normalizedSamples
-        .map(s => (Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN))
-        .filter(Number.isFinite) as number[];
-      
-      // Use 1st and 99th percentiles instead of absolute min/max to exclude extreme outliers
-      const robustMin = rawPaces.length ? pct(rawPaces, 1) : pLowVal;
-      const robustMax = rawPaces.length ? pct(rawPaces, 99) : pHighVal;
-      
-      // Start with winsorized range, then expand to robust percentiles (but not absolute extremes)
-      lo = Math.min(pLowVal, robustMin);
-      hi = Math.max(pHighVal, robustMax);
+      // Use winsorized percentiles as base - these already exclude outliers
+      // Don't expand beyond winsorized range as that includes GPS spikes and noise
+      // The splits table shows the actual pace range, and we should match that
+      lo = pLowVal;
+      hi = pHighVal;
       
       // Add small padding (2%) to ensure data isn't clipped at edges
       const padding = (hi - lo) * 0.02;
