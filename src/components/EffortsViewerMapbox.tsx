@@ -1158,22 +1158,36 @@ function EffortsViewerMapbox({
     let lo: number, hi: number;
     // Use robust percentiles, but ensure full data range is visible (no clipping)
     if (tab === 'pace') {
-      // Use tighter percentiles (10th/90th) to exclude GPS spikes and outliers
-      // This ensures the chart Y-axis matches the splits table range
-      const pLo = isOutdoorGlobal ? 10 : 2;
-      const pHi = isOutdoorGlobal ? 90 : 98;
-      const pLowVal = pct(winsorized, pLo);
-      const pHighVal = pct(winsorized, pHi);
-      // Use winsorized percentiles as base - these already exclude outliers
-      // Don't expand beyond winsorized range as that includes GPS spikes and noise
-      // The splits table shows the actual pace range, and we should match that
-      lo = pLowVal;
-      hi = pHighVal;
+      // Use splits data to define domain - splits are the ground truth that matches the splits table
+      // Compute splits inline to get the actual pace range
+      const splitsForDomain = computeSplits(normalizedSamples, useMiles ? 1609.34 : 1000);
+      const splitPaces = splitsForDomain
+        .map(s => s.avgPace_s_per_km)
+        .filter((p): p is number => p !== null && Number.isFinite(p));
       
-      // Add small padding (2%) to ensure data isn't clipped at edges
-      const padding = (hi - lo) * 0.02;
-      lo = Math.max(0, lo - padding);
-      hi = hi + padding;
+      if (splitPaces.length > 0) {
+        // Get min/max from splits (already in sec_per_km)
+        const splitPaceRange = {
+          min: Math.min(...splitPaces),
+          max: Math.max(...splitPaces)
+        };
+        
+        // 10% padding on each side
+        const range = splitPaceRange.max - splitPaceRange.min;
+        lo = Math.max(0, splitPaceRange.min - (range * 0.1));
+        hi = splitPaceRange.max + (range * 0.1);
+      } else {
+        // Fallback to percentiles if no splits available
+        const pLo = isOutdoorGlobal ? 10 : 2;
+        const pHi = isOutdoorGlobal ? 90 : 98;
+        const pLowVal = pct(winsorized, pLo);
+        const pHighVal = pct(winsorized, pHi);
+        lo = pLowVal;
+        hi = pHighVal;
+        const padding = (hi - lo) * 0.02;
+        lo = Math.max(0, lo - padding);
+        hi = hi + padding;
+      }
     } else {
       lo = pct(winsorized, isOutdoorGlobal ? 10 : 2);
       hi = pct(winsorized, isOutdoorGlobal ? 90 : 98);
@@ -1351,7 +1365,7 @@ function EffortsViewerMapbox({
                     : (isOutdoorGlobal ? 0.03 : 0.02);
     const pad = Math.max((hi - lo) * padFrac, 1);
     return [lo - pad, hi + pad];
-  }, [metricRaw, tab, isOutdoorGlobal, useFeet, useMiles, workoutData]);
+  }, [metricRaw, tab, isOutdoorGlobal, useFeet, useMiles, workoutData, normalizedSamples]);
 
   // Helpers to map to SVG - consistent domain [d0..dN] from monotonic distance
   const xFromDist = (d: number) => {
