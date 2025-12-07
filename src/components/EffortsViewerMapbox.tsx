@@ -1157,15 +1157,17 @@ function EffortsViewerMapbox({
       : winsorize(vals, 2, 98);
     
     let lo: number, hi: number;
-    // Use robust percentiles, but ensure full data range is visible (no clipping)
     if (tab === 'pace') {
-      // Clean implementation: 2nd/98th percentile of raw pace data
-      // This matches what Garmin/Strava show - the actual data range
+      // Data is already smoothed (30s rolling avg in metricRaw)
+      // Use simple min/max - no percentiles needed since smoothing removed spikes
       const paceVals = vals.filter(v => v > 0);
       if (paceVals.length > 0) {
-        const sorted = [...paceVals].sort((a, b) => a - b);
-        lo = sorted[Math.floor(sorted.length * 0.02)];
-        hi = sorted[Math.min(Math.floor(sorted.length * 0.98), sorted.length - 1)];
+        lo = Math.min(...paceVals);
+        hi = Math.max(...paceVals);
+        // Add 10% padding for visual breathing room
+        const range = hi - lo;
+        lo = lo - range * 0.1;
+        hi = hi + range * 0.1;
       } else {
         lo = 200;
         hi = 600;
@@ -1286,10 +1288,9 @@ function EffortsViewerMapbox({
       }
     }
     
-    // Pace: small padding (5%) for visual breathing room
+    // Pace: padding already added in pace block above
     if (tab === 'pace') {
-      const pad = (hi - lo) * 0.05;
-      return [lo - pad, hi + pad];
+      return [lo, hi];
     }
     const padFrac = (tab === 'bpm') ? 0.04
                     : (tab === 'cad') ? 0.05
