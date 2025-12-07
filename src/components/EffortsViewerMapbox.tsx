@@ -1158,12 +1158,9 @@ function EffortsViewerMapbox({
     let lo: number, hi: number;
     // Use robust percentiles, but ensure full data range is visible (no clipping)
     if (tab === 'pace') {
-      // Use splits data to define domain - splits are the ground truth that matches the splits table
-      // Compute splits inline to get the actual pace range
-      const splitsForDomain = computeSplits(normalizedSamples, useMiles ? 1609.34 : 1000);
-      const splitPaces = splitsForDomain
-        .map(s => s.avgPace_s_per_km)
-        .filter((p): p is number => p !== null && Number.isFinite(p));
+      // Use 2nd/98th percentile of RAW pace data (metricRaw) to set domain
+      // This matches what the chart actually plots, excluding only extreme GPS spikes
+      const paceVals = vals.filter((v): v is number => Number.isFinite(v) && v > 0);
       
       // Convert to display units for logging
       const toDisplay = (secPerKm: number) => {
@@ -1173,47 +1170,35 @@ function EffortsViewerMapbox({
         return `${m}:${String(s).padStart(2, "0")}`;
       };
       
-      console.log('[Pace Splits Debug]', {
-        splitCount: splitsForDomain.length,
-        splitPaces_secPerKm: splitPaces,
-        splitPaces_display: splitPaces.map(p => toDisplay(p)),
-        useMiles
-      });
-      
-      if (splitPaces.length > 0) {
-        // Get min/max from splits (already in sec_per_km) - this is the ground truth
-        const splitPaceRange = {
-          min: Math.min(...splitPaces),
-          max: Math.max(...splitPaces)
-        };
+      if (paceVals.length > 0) {
+        // Sort for percentile calculation
+        const sorted = [...paceVals].sort((a, b) => a - b);
         
-        // 5% padding on each side (just enough to avoid edge clipping)
-        const range = splitPaceRange.max - splitPaceRange.min;
-        lo = Math.max(0, splitPaceRange.min - (range * 0.05));
-        hi = splitPaceRange.max + (range * 0.05);
+        // Use 2nd and 98th percentile to exclude GPS spikes
+        const p2Index = Math.floor(sorted.length * 0.02);
+        const p98Index = Math.floor(sorted.length * 0.98);
+        const p2 = sorted[p2Index];
+        const p98 = sorted[Math.min(p98Index, sorted.length - 1)];
         
-        console.log('[Pace Domain from Splits]', {
-          splitMin_secPerKm: splitPaceRange.min,
-          splitMax_secPerKm: splitPaceRange.max,
-          splitMin_display: toDisplay(splitPaceRange.min),
-          splitMax_display: toDisplay(splitPaceRange.max),
+        // Small padding (2%) for visual breathing room
+        const range = p98 - p2;
+        lo = Math.max(0, p2 - (range * 0.02));
+        hi = p98 + (range * 0.02);
+        
+        console.log('[Pace Domain from Raw Data]', {
+          totalSamples: paceVals.length,
+          p2_secPerKm: p2,
+          p98_secPerKm: p98,
+          p2_display: toDisplay(p2),
+          p98_display: toDisplay(p98),
           domainLo_display: toDisplay(lo),
-          domainHi_display: toDisplay(hi)
+          domainHi_display: toDisplay(hi),
+          useMiles
         });
       } else {
-        // If no splits, use raw pace data min/max (not percentiles - they don't work correctly)
-        const paceVals = vals.filter((v): v is number => Number.isFinite(v) && v > 0);
-        if (paceVals.length > 0) {
-          const minPace = Math.min(...paceVals);
-          const maxPace = Math.max(...paceVals);
-          const range = maxPace - minPace;
-          lo = Math.max(0, minPace - (range * 0.05));
-          hi = maxPace + (range * 0.05);
-        } else {
-          // Absolute last resort - use default range
-          lo = 200; // ~3:20/km
-          hi = 600; // ~10:00/km
-        }
+        // Fallback - use default range
+        lo = 200; // ~3:20/km
+        hi = 600; // ~10:00/km
       }
     } else {
       lo = pct(winsorized, isOutdoorGlobal ? 10 : 2);
