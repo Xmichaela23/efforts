@@ -1282,6 +1282,21 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Log what we actually have in the workout
+    console.log('🔍 Workout data structure check:', {
+      has_computed: !!workout.computed,
+      computed_type: typeof workout.computed,
+      computed_keys: workout.computed && typeof workout.computed === 'object' ? Object.keys(workout.computed) : [],
+      has_computed_series: !!workout.computed?.series,
+      has_computed_analysis: !!workout.computed?.analysis,
+      has_computed_analysis_series: !!workout.computed?.analysis?.series,
+      has_time_series_data: !!workout.time_series_data,
+      has_garmin_data: !!workout.garmin_data,
+      has_sensor_data: !!workout.sensor_data,
+      computed_series_type: workout.computed?.series ? typeof workout.computed.series : 'N/A',
+      computed_series_keys: workout.computed?.series && typeof workout.computed.series === 'object' ? Object.keys(workout.computed.series) : []
+    });
+    
     // Extract sensor data - try multiple sources
     let sensorData: any[] = [];
     
@@ -1307,7 +1322,7 @@ Deno.serve(async (req) => {
       console.log(`📊 computed.series yielded ${sensorData.length} samples`);
     }
     
-    // Try computed.analysis.series (alternative location)
+    // Try computed.analysis.series (alternative location - what Details screen uses)
     if (sensorData.length === 0 && workout.computed?.analysis?.series) {
       console.log('🔍 Trying computed.analysis.series...');
       sensorData = extractSensorData(workout.computed.analysis);
