@@ -1166,16 +1166,16 @@ function EffortsViewerMapbox({
         .filter((p): p is number => p !== null && Number.isFinite(p));
       
       if (splitPaces.length > 0) {
-        // Get min/max from splits (already in sec_per_km)
+        // Get min/max from splits (already in sec_per_km) - this is the ground truth
         const splitPaceRange = {
           min: Math.min(...splitPaces),
           max: Math.max(...splitPaces)
         };
         
-        // 10% padding on each side
+        // Minimal padding: 2% on each side (just enough to avoid edge clipping)
         const range = splitPaceRange.max - splitPaceRange.min;
-        lo = Math.max(0, splitPaceRange.min - (range * 0.1));
-        hi = splitPaceRange.max + (range * 0.1);
+        lo = Math.max(0, splitPaceRange.min - (range * 0.02));
+        hi = splitPaceRange.max + (range * 0.02);
       } else {
         // If no splits, use raw pace data min/max (not percentiles - they don't work correctly)
         const paceVals = vals.filter((v): v is number => Number.isFinite(v) && v > 0);
@@ -1183,8 +1183,8 @@ function EffortsViewerMapbox({
           const minPace = Math.min(...paceVals);
           const maxPace = Math.max(...paceVals);
           const range = maxPace - minPace;
-          lo = Math.max(0, minPace - (range * 0.1));
-          hi = maxPace + (range * 0.1);
+          lo = Math.max(0, minPace - (range * 0.02));
+          hi = maxPace + (range * 0.02);
         } else {
           // Absolute last resort - use default range
           lo = 200; // ~3:20/km
@@ -1257,7 +1257,8 @@ function EffortsViewerMapbox({
         const c = (lo + hi) / 2; lo = c - spanMin / 2; hi = c + spanMin / 2;
       }
     };
-    if (tab === 'pace' && workoutData?.type !== 'ride') ensureMinSpan(isOutdoorGlobal ? 60 : 45); // widen min span for pace to reduce clipping
+    // Don't enforce minimum span for pace - let splits define the range naturally
+    // if (tab === 'pace' && workoutData?.type !== 'ride') ensureMinSpan(isOutdoorGlobal ? 60 : 45); // DISABLED - splits should define range
     if (tab === 'pace' && workoutData?.type === 'ride') ensureMinSpan(isOutdoorGlobal ? 3 : 2);   // mph/kmh equivalent spacing
     if (tab === 'bpm') ensureMinSpan(10);
     // Ensure BPM domain fully covers visible data
@@ -1285,37 +1286,36 @@ function EffortsViewerMapbox({
       // Extra top headroom so high HR values don't appear clipped
       hi += 3;
     }
-    // Round pace domain to nice minute:second intervals (similar to speed's clean mph rounding)
+    // Round pace domain to nice minute:second intervals - but DON'T expand beyond splits range
     if (tab === "pace" && workoutData?.type !== 'ride') {
       // Domain is in pace_s_per_km. Convert to display units (sec/mi or sec/km) for rounding.
       // Round to 30-second intervals in display units, then convert back to pace_s_per_km.
-      // Convert domain boundaries to display units for rounding, then convert back
+      // IMPORTANT: Only round inward or minimally outward - don't expand significantly
       const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
       const fromSecPerUnit = (secPerUnit: number) => useMiles ? secPerUnit / 1.60934 : secPerUnit;
       
       const loBefore = lo;
       const hiBefore = hi;
       
-      // Round boundaries in display units to 30-second intervals
+      // Convert to display units
       const loDisplay = toSecPerUnit(lo);
       const hiDisplay = toSecPerUnit(hi);
       const originalSpanDisplay = hiDisplay - loDisplay;
-      const centerDisplay = (loDisplay + hiDisplay) / 2;
       
-      // Round to 30-second intervals, keeping the center roughly the same
-      // Don't expand beyond original range + small padding (max 30s on each side)
+      // Round to 30-second intervals, but constrain to not expand beyond original + 10 seconds
+      // Round inward (floor/ceil) but don't expand more than 10s total
       let roundedLoDisplay = Math.floor(loDisplay / 30) * 30;
       let roundedHiDisplay = Math.ceil(hiDisplay / 30) * 30;
       
-      // Ensure span is a multiple of 120 seconds (4 steps of 30s) for clean ticks
-      // But only expand if it's close to a 120s multiple already
-      let spanDisplay = roundedHiDisplay - roundedLoDisplay;
-      const targetSpanDisplay = Math.ceil(originalSpanDisplay / 120) * 120;
-      
-      // Only expand if target span is reasonable (not more than 60s beyond original)
-      if (targetSpanDisplay <= originalSpanDisplay + 60 && spanDisplay < targetSpanDisplay) {
-        roundedLoDisplay = Math.floor((centerDisplay - targetSpanDisplay / 2) / 30) * 30;
-        roundedHiDisplay = Math.ceil((centerDisplay + targetSpanDisplay / 2) / 30) * 30;
+      // If rounding expanded too much, constrain it
+      const expandedSpan = roundedHiDisplay - roundedLoDisplay;
+      if (expandedSpan > originalSpanDisplay + 10) {
+        // Too much expansion - keep original boundaries rounded inward only
+        roundedLoDisplay = Math.ceil(loDisplay / 30) * 30;  // Round up (faster pace = lower number)
+        roundedHiDisplay = Math.floor(hiDisplay / 30) * 30; // Round down (slower pace = higher number)
+        // Ensure we don't go inside the original range
+        if (roundedLoDisplay > loDisplay) roundedLoDisplay = Math.floor(loDisplay / 30) * 30;
+        if (roundedHiDisplay < hiDisplay) roundedHiDisplay = Math.ceil(hiDisplay / 30) * 30;
       }
       
       // Convert back to pace_s_per_km for domain
@@ -1330,8 +1330,7 @@ function EffortsViewerMapbox({
           after: { lo, hi },
           useMiles,
           originalSpanDisplay,
-          spanDisplay,
-          targetSpanDisplay
+          expandedSpan: roundedHiDisplay - roundedLoDisplay
         });
     }
     // Round speed domain to nice mph/kmh intervals (like pace but for speed)
@@ -1358,7 +1357,8 @@ function EffortsViewerMapbox({
     }
     
     // Refined padding for better use of vertical space (tighter than before)
-    const padFrac = (tab === 'pace') ? (isOutdoorGlobal ? 0.08 : 0.05)
+    // For pace: minimal padding (already added 2% above) - just 1% more for visual breathing room
+    const padFrac = (tab === 'pace') ? 0.01  // Minimal padding - splits already define the range
                     : (tab === 'bpm') ? 0.04
                     : (tab === 'cad') ? 0.05
                     : (tab === 'pwr') ? 0.06
