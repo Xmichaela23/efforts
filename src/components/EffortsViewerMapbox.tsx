@@ -1177,16 +1177,19 @@ function EffortsViewerMapbox({
         lo = Math.max(0, splitPaceRange.min - (range * 0.1));
         hi = splitPaceRange.max + (range * 0.1);
       } else {
-        // Fallback to percentiles if no splits available
-        const pLo = isOutdoorGlobal ? 10 : 2;
-        const pHi = isOutdoorGlobal ? 90 : 98;
-        const pLowVal = pct(winsorized, pLo);
-        const pHighVal = pct(winsorized, pHi);
-        lo = pLowVal;
-        hi = pHighVal;
-        const padding = (hi - lo) * 0.02;
-        lo = Math.max(0, lo - padding);
-        hi = hi + padding;
+        // If no splits, use raw pace data min/max (not percentiles - they don't work correctly)
+        const paceVals = vals.filter((v): v is number => Number.isFinite(v) && v > 0);
+        if (paceVals.length > 0) {
+          const minPace = Math.min(...paceVals);
+          const maxPace = Math.max(...paceVals);
+          const range = maxPace - minPace;
+          lo = Math.max(0, minPace - (range * 0.1));
+          hi = maxPace + (range * 0.1);
+        } else {
+          // Absolute last resort - use default range
+          lo = 200; // ~3:20/km
+          hi = 600; // ~10:00/km
+        }
       }
     } else {
       lo = pct(winsorized, isOutdoorGlobal ? 10 : 2);
