@@ -1158,8 +1158,10 @@ function EffortsViewerMapbox({
     let lo: number, hi: number;
     // Use robust percentiles, but ensure full data range is visible (no clipping)
     if (tab === 'pace') {
-      const pLo = isOutdoorGlobal ? 5 : 2;
-      const pHi = isOutdoorGlobal ? 95 : 98;
+      // Use tighter percentiles (10th/90th) to exclude GPS spikes and outliers
+      // This ensures the chart Y-axis matches the splits table range
+      const pLo = isOutdoorGlobal ? 10 : 2;
+      const pHi = isOutdoorGlobal ? 90 : 98;
       const pLowVal = pct(winsorized, pLo);
       const pHighVal = pct(winsorized, pHi);
       // Use winsorized percentiles as base - these already exclude outliers
