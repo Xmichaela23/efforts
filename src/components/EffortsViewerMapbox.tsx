@@ -1396,13 +1396,6 @@ function EffortsViewerMapbox({
         display: fmtPaceDebug(v)
       }));
       
-      // Get splits for comparison
-      const sampleSplits = splits.slice(0, 3).map(sp => ({
-        avgPace_s_per_km: sp.avgPace_s_per_km,
-        display: fmtPaceDebug(sp.avgPace_s_per_km || 0),
-        time_s: sp.time_s
-      }));
-      
       console.log('[Pace Chart Debug - COMPREHENSIVE]', {
         domain_secPerKm: [a, b],
         domain_display: [fmtPaceDebug(a), fmtPaceDebug(b)],
@@ -1410,14 +1403,13 @@ function EffortsViewerMapbox({
         ticks_display: ticks.map(t => fmtPaceDebug(t)),
         useMiles,
         sample_data_values: samplePaces,
-        sample_splits: sampleSplits,
         metricRaw_length: metricRaw.length,
         metricRaw_finite_count: metricRaw.filter(Number.isFinite).length
       });
     }
     
     return ticks;
-  }, [yDomain, tab, workoutData, useMiles, metricRaw, splits]);
+  }, [yDomain, tab, workoutData, useMiles, metricRaw]);
 
   // Build path from smoothed metric
   const linePath = useMemo(() => {
