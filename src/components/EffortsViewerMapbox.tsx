@@ -1272,6 +1272,9 @@ function EffortsViewerMapbox({
       const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
       const fromSecPerUnit = (secPerUnit: number) => useMiles ? secPerUnit / 1.60934 : secPerUnit;
       
+      const loBefore = lo;
+      const hiBefore = hi;
+      
       // Round boundaries in display units to 30-second intervals
       const loDisplay = toSecPerUnit(lo);
       const hiDisplay = toSecPerUnit(hi);
@@ -1290,6 +1293,19 @@ function EffortsViewerMapbox({
       // Convert back to pace_s_per_km for domain
       lo = fromSecPerUnit(roundedLoDisplay);
       hi = fromSecPerUnit(roundedHiDisplay);
+      
+      // Debug logging
+      if (import.meta.env?.DEV) {
+        console.log('[Pace Domain Debug]', {
+          before: { lo: loBefore, hi: hiBefore },
+          display: { lo: loDisplay, hi: hiDisplay },
+          rounded_display: { lo: roundedLoDisplay, hi: roundedHiDisplay },
+          after: { lo, hi },
+          useMiles,
+          spanDisplay,
+          minSpanDisplay
+        });
+      }
     }
     // Round speed domain to nice mph/kmh intervals (like pace but for speed)
     if (tab === 'spd' || tab === 'speed') {
@@ -1352,8 +1368,22 @@ function EffortsViewerMapbox({
     // Use evenly spaced ticks - domain boundaries are already rounded to nice intervals
     // This ensures visual spacing is consistent (like speed chart)
     const step = (b - a) / 4;
-    return new Array(5).fill(0).map((_, i) => a + i * step);
-  }, [yDomain]);
+    const ticks = new Array(5).fill(0).map((_, i) => a + i * step);
+    
+    // Debug logging for pace chart
+    if (tab === 'pace' && workoutData?.type !== 'ride' && import.meta.env?.DEV) {
+      const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
+      console.log('[Pace Chart Debug]', {
+        domain_secPerKm: [a, b],
+        domain_display: [toSecPerUnit(a), toSecPerUnit(b)],
+        ticks_secPerKm: ticks,
+        ticks_display: ticks.map(t => toSecPerUnit(t)),
+        useMiles
+      });
+    }
+    
+    return ticks;
+  }, [yDomain, tab, workoutData, useMiles]);
 
   // Build path from smoothed metric
   const linePath = useMemo(() => {
