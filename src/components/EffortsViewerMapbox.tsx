@@ -1162,14 +1162,24 @@ function EffortsViewerMapbox({
       const pHi = isOutdoorGlobal ? 95 : 98;
       const pLowVal = pct(winsorized, pLo);
       const pHighVal = pct(winsorized, pHi);
-      // Include smoothed values and raw cursor-capable values to ensure full coverage
+      // Use winsorized percentiles as base, but expand slightly to show full range
+      // Don't include absolute min/max as they're often outliers (e.g., GPS spikes at start)
       const rawPaces = normalizedSamples
         .map(s => (Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN))
         .filter(Number.isFinite) as number[];
-      const rawMin = rawPaces.length ? Math.min(...rawPaces) : Infinity;
-      const rawMax = rawPaces.length ? Math.max(...rawPaces) : -Infinity;
-      lo = Math.min(Math.min(...vals), pLowVal, rawMin);
-      hi = Math.max(Math.max(...vals), pHighVal, rawMax);
+      
+      // Use 1st and 99th percentiles instead of absolute min/max to exclude extreme outliers
+      const robustMin = rawPaces.length ? pct(rawPaces, 1) : pLowVal;
+      const robustMax = rawPaces.length ? pct(rawPaces, 99) : pHighVal;
+      
+      // Start with winsorized range, then expand to robust percentiles (but not absolute extremes)
+      lo = Math.min(pLowVal, robustMin);
+      hi = Math.max(pHighVal, robustMax);
+      
+      // Add small padding (2%) to ensure data isn't clipped at edges
+      const padding = (hi - lo) * 0.02;
+      lo = Math.max(0, lo - padding);
+      hi = hi + padding;
     } else {
       lo = pct(winsorized, isOutdoorGlobal ? 10 : 2);
       hi = pct(winsorized, isOutdoorGlobal ? 90 : 98);
