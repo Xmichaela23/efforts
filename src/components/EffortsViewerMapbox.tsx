@@ -1059,12 +1059,12 @@ function EffortsViewerMapbox({
       // This preserves actual max speed peaks (e.g., 34.5 mph sprints)
       return spd;
     }
-    // Pace - 30-second rolling average smoothing (like Garmin)
+    // Pace - double smoothing for Garmin-like appearance
     if (tab === "pace") {
       const raw = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
-      // Apply 30-sample rolling average (~30 seconds) to smooth GPS noise
-      // This matches Garmin/Strava behavior - show the trend, not every spike
-      const smoothed = nanAwareMovAvg(raw, 30);
+      // Apply 30-second smoothing TWICE for much smoother line
+      const firstPass = nanAwareMovAvg(raw, 30);
+      const smoothed = nanAwareMovAvg(firstPass, 30);
       return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Heart rate - enhanced smoothing with outlier handling
