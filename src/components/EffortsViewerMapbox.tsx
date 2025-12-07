@@ -1288,16 +1288,23 @@ function EffortsViewerMapbox({
       // Round boundaries in display units to 30-second intervals
       const loDisplay = toSecPerUnit(lo);
       const hiDisplay = toSecPerUnit(hi);
+      const originalSpanDisplay = hiDisplay - loDisplay;
+      const centerDisplay = (loDisplay + hiDisplay) / 2;
+      
+      // Round to 30-second intervals, keeping the center roughly the same
+      // Don't expand beyond original range + small padding (max 30s on each side)
       let roundedLoDisplay = Math.floor(loDisplay / 30) * 30;
       let roundedHiDisplay = Math.ceil(hiDisplay / 30) * 30;
       
-      // Ensure span is a multiple of 120 seconds (4 steps of 30s) so evenly spaced ticks align with :00/:30
+      // Ensure span is a multiple of 120 seconds (4 steps of 30s) for clean ticks
+      // But only expand if it's close to a 120s multiple already
       let spanDisplay = roundedHiDisplay - roundedLoDisplay;
-      const minSpanDisplay = Math.max(120, Math.ceil(spanDisplay / 120) * 120);
-      if (spanDisplay < minSpanDisplay) {
-        const centerDisplay = (roundedLoDisplay + roundedHiDisplay) / 2;
-        roundedLoDisplay = Math.floor((centerDisplay - minSpanDisplay / 2) / 30) * 30;
-        roundedHiDisplay = Math.ceil((centerDisplay + minSpanDisplay / 2) / 30) * 30;
+      const targetSpanDisplay = Math.ceil(originalSpanDisplay / 120) * 120;
+      
+      // Only expand if target span is reasonable (not more than 60s beyond original)
+      if (targetSpanDisplay <= originalSpanDisplay + 60 && spanDisplay < targetSpanDisplay) {
+        roundedLoDisplay = Math.floor((centerDisplay - targetSpanDisplay / 2) / 30) * 30;
+        roundedHiDisplay = Math.ceil((centerDisplay + targetSpanDisplay / 2) / 30) * 30;
       }
       
       // Convert back to pace_s_per_km for domain
