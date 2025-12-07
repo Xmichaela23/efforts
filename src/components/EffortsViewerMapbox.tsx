@@ -1158,9 +1158,12 @@ function EffortsViewerMapbox({
     let lo: number, hi: number;
     // Use robust percentiles, but ensure full data range is visible (no clipping)
     if (tab === 'pace') {
-      // Use 2nd/98th percentile of RAW pace data (metricRaw) to set domain
-      // This matches what the chart actually plots, excluding only extreme GPS spikes
-      const paceVals = vals.filter((v): v is number => Number.isFinite(v) && v > 0);
+      // Use SPLITS data to define domain - this matches the splits table the user sees
+      // The splits are averaged pace per mile/km, which is what users expect to see
+      const splitsForDomain = computeSplits(normalizedSamples, useMiles ? 1609.34 : 1000);
+      const splitPaces = splitsForDomain
+        .map(s => s.avgPace_s_per_km)
+        .filter((p): p is number => p !== null && Number.isFinite(p));
       
       // Convert to display units for logging
       const toDisplay = (secPerKm: number) => {
@@ -1170,27 +1173,21 @@ function EffortsViewerMapbox({
         return `${m}:${String(s).padStart(2, "0")}`;
       };
       
-      if (paceVals.length > 0) {
-        // Sort for percentile calculation
-        const sorted = [...paceVals].sort((a, b) => a - b);
+      if (splitPaces.length > 0) {
+        // Get min/max from splits
+        const minSplitPace = Math.min(...splitPaces);
+        const maxSplitPace = Math.max(...splitPaces);
         
-        // Use 2nd and 98th percentile to exclude GPS spikes
-        const p2Index = Math.floor(sorted.length * 0.02);
-        const p98Index = Math.floor(sorted.length * 0.98);
-        const p2 = sorted[p2Index];
-        const p98 = sorted[Math.min(p98Index, sorted.length - 1)];
+        // 10% padding so the line has room to breathe
+        const range = maxSplitPace - minSplitPace;
+        lo = Math.max(0, minSplitPace - (range * 0.1));
+        hi = maxSplitPace + (range * 0.1);
         
-        // Small padding (2%) for visual breathing room
-        const range = p98 - p2;
-        lo = Math.max(0, p2 - (range * 0.02));
-        hi = p98 + (range * 0.02);
-        
-        console.log('[Pace Domain from Raw Data]', {
-          totalSamples: paceVals.length,
-          p2_secPerKm: p2,
-          p98_secPerKm: p98,
-          p2_display: toDisplay(p2),
-          p98_display: toDisplay(p98),
+        console.log('[Pace Domain from SPLITS]', {
+          splitCount: splitPaces.length,
+          splitPaces_display: splitPaces.map(p => toDisplay(p)),
+          minSplit_display: toDisplay(minSplitPace),
+          maxSplit_display: toDisplay(maxSplitPace),
           domainLo_display: toDisplay(lo),
           domainHi_display: toDisplay(hi),
           useMiles
