@@ -1318,8 +1318,9 @@ function EffortsViewerMapbox({
           rounded_display: { lo: roundedLoDisplay, hi: roundedHiDisplay },
           after: { lo, hi },
           useMiles,
+          originalSpanDisplay,
           spanDisplay,
-          minSpanDisplay
+          targetSpanDisplay
         });
     }
     // Round speed domain to nice mph/kmh intervals (like pace but for speed)
