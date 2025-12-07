@@ -1305,8 +1305,7 @@ function EffortsViewerMapbox({
       hi = fromSecPerUnit(roundedHiDisplay);
       
       // Debug logging
-      if (import.meta.env?.DEV) {
-        console.log('[Pace Domain Debug]', {
+      console.log('[Pace Domain Debug]', {
           before: { lo: loBefore, hi: hiBefore },
           display: { lo: loDisplay, hi: hiDisplay },
           rounded_display: { lo: roundedLoDisplay, hi: roundedHiDisplay },
@@ -1315,7 +1314,6 @@ function EffortsViewerMapbox({
           spanDisplay,
           minSpanDisplay
         });
-      }
     }
     // Round speed domain to nice mph/kmh intervals (like pace but for speed)
     if (tab === 'spd' || tab === 'speed') {
@@ -1381,7 +1379,7 @@ function EffortsViewerMapbox({
     const ticks = new Array(5).fill(0).map((_, i) => a + i * step);
     
     // Comprehensive debug logging for pace chart
-    if (tab === 'pace' && workoutData?.type !== 'ride' && import.meta.env?.DEV) {
+    if (tab === 'pace' && workoutData?.type !== 'ride') {
       const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
       const fmtPaceDebug = (secPerKm: number) => {
         const secPerUnit = toSecPerUnit(secPerKm);
@@ -1537,7 +1535,7 @@ function EffortsViewerMapbox({
   const altNow_m  = (s?.elev_m_sm ?? 0);
   
   // Debug: Log cursor value vs Y-axis position for pace chart
-  if (tab === 'pace' && workoutData?.type !== 'ride' && import.meta.env?.DEV && idx > 0) {
+  if (tab === 'pace' && workoutData?.type !== 'ride' && idx > 0) {
     const [domainLo, domainHi] = yDomain;
     const toSecPerUnit = (secPerKm: number) => useMiles ? secPerKm * 1.60934 : secPerKm;
     const fmtPaceDebug = (secPerKm: number) => {
