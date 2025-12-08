@@ -661,7 +661,7 @@ const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick 
     <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{label}</span>
     <span style={{ fontSize: 12, fontWeight: 700, color: active ? "#0284c7" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "opacity 150ms ease" }}>{value}</span>
     {subValue ? (
-      <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600, whiteSpace: "nowrap" }}>{subValue}</span>
+      <span style={{ fontSize: 10, color: "#6b7280", fontWeight: 600, whiteSpace: "nowrap", transition: "opacity 150ms ease" }}>{subValue}</span>
     ) : null}
   </div>
 );
@@ -1692,6 +1692,7 @@ function EffortsViewerMapbox({
                 }
               }
             })()}  
+            subValue={isScrubbing ? undefined : "(avg)"}
             active={tab==="pace" || tab==="spd"} 
             width={54}
             onClick={() => setTab(workoutData?.type === 'run' ? "pace" : "spd")}
@@ -1704,6 +1705,7 @@ function EffortsViewerMapbox({
                 ? (Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—')
                 : (getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—')
               } 
+              subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="pwr"} 
               width={54}
               onClick={() => setTab("pwr")}
@@ -1723,6 +1725,7 @@ function EffortsViewerMapbox({
                 return getAvgHR != null ? `${Math.round(getAvgHR)} bpm` : '—';
               }
             })()} 
+            subValue={isScrubbing ? undefined : "(avg)"}
             active={tab==="bpm"} 
             width={54}
             onClick={() => setTab("bpm")}
@@ -1747,6 +1750,7 @@ function EffortsViewerMapbox({
                 return '—';
               }
             })()}
+            subValue={isScrubbing ? undefined : "(avg)"}
             active={tab==="elev"}
             width={54}
             onClick={() => setTab("elev")}
@@ -1758,6 +1762,7 @@ function EffortsViewerMapbox({
               ? (Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—')
               : (getAvgCadence != null ? `${Math.round(getAvgCadence)}${workoutData?.type==='ride'?' rpm':' spm'}` : '—')
             } 
+            subValue={isScrubbing ? undefined : "(avg)"}
             active={tab==="cad"} 
             width={54}
             onClick={() => setTab("cad")}
@@ -1770,6 +1775,7 @@ function EffortsViewerMapbox({
                 ? (Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—')
                 : (getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—')
               } 
+              subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="pwr"} 
               width={54}
               onClick={() => setTab("pwr")}
@@ -1792,6 +1798,7 @@ function EffortsViewerMapbox({
                   return avgVam != null ? fmtVAM(avgVam, useFeet) : '—';
                 }
               })()} 
+              subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="vam"} 
               width={54}
               onClick={() => setTab("vam")}
@@ -1799,22 +1806,20 @@ function EffortsViewerMapbox({
           )}
         </div>
         
-        {/* Context label - shows (avg) or (at distance • time) */}
-        <div style={{ 
-          textAlign: 'center', 
-          fontSize: 11, 
-          color: '#6b7280', 
-          marginTop: -4, 
-          marginBottom: 4,
-          transition: 'opacity 150ms ease',
-          opacity: 1
-        }}>
-          {isScrubbing && idx !== null && normalizedSamples[idx] ? (
-            <>at {fmtDist(distNow, useMiles)} • {fmtTime(normalizedSamples[idx].t_s)}</>
-          ) : (
-            <>(avg)</>
-          )}
-        </div>
+        {/* Context label when scrubbing - shows distance and time */}
+        {isScrubbing && idx !== null && normalizedSamples[idx] && (
+          <div style={{ 
+            textAlign: 'center', 
+            fontSize: 11, 
+            color: '#6b7280', 
+            marginTop: -4, 
+            marginBottom: 4,
+            transition: 'opacity 150ms ease',
+            opacity: 1
+          }}>
+            at {fmtDist(distNow, useMiles)} • {fmtTime(normalizedSamples[idx].t_s)}
+          </div>
+        )}
         
         {/* Distance, time, altitude (left) and final totals (right) */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
