@@ -1373,8 +1373,6 @@ function EffortsViewerMapbox({
         secPerKm: v,
         display: fmtPaceDebug(v)
       }));
-        metricRaw_finite_count: metricRaw.filter(Number.isFinite).length
-      });
     }
     
     return ticks;
