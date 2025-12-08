@@ -1904,9 +1904,9 @@ function EffortsViewerMapbox({
           {/* cursor */}
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
-          {/* Drag hint centered in chart plotting area */}
+          {/* Drag hint centered in chart plotting area (right of y-labels) */}
           <text 
-            x={W / 2} 
+            x={pl + (W - pl - pr) / 2} 
             y={H - pb - 15} 
             textAnchor="middle" 
             fill="#d1d5db" 
