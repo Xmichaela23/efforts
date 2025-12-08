@@ -1904,11 +1904,18 @@ function EffortsViewerMapbox({
           {/* cursor */}
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
+          {/* Drag hint centered in chart plotting area */}
+          <text 
+            x={pl + (W - pl - pr) / 2} 
+            y={P + (H - pb - P) / 2} 
+            textAnchor="middle" 
+            fill="#d1d5db" 
+            fontSize={10} 
+            letterSpacing={0.5}
+          >
+            ← drag for details →
+          </text>
         </svg>
-        {/* Drag hint between chart and buttons */}
-        <div style={{ textAlign: 'center', marginTop: 2, marginBottom: 0, fontSize: 10, color: '#d1d5db', letterSpacing: 0.5 }}>
-          ← drag for details →
-        </div>
       </div>
 
       {/* Metric buttons */}
