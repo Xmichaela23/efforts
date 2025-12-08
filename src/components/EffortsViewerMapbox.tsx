@@ -1896,13 +1896,15 @@ function EffortsViewerMapbox({
         <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
           {( (
             [
-              normalizedSamples.some(s=>Number.isFinite(s.speed_mps as any)) ? "spd" : null,
-              normalizedSamples.some(s=>Number.isFinite(s.pace_s_per_km as any)) ? "pace" : null,
+              // Running: pace, bpm, elev, cad, pwr (no VAM)
+              // Cycling: spd, bpm, elev, cad, pwr, vam
+              workoutData?.type === 'run' ? "pace" : null,
+              workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.speed_mps as any)) ? "spd" : null,
               "bpm",
+              "elev",
               normalizedSamples.some(s=>Number.isFinite(s.cad_rpm as any) || Number.isFinite(s.cad_spm as any)) ? "cad" : null,
               normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
-              "elev",
-              normalizedSamples.some(s=>Number.isFinite(s.vam_m_per_h as any)) ? "vam" : null
+              workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.vam_m_per_h as any)) ? "vam" : null
             ].filter(Boolean) as MetricTab[]
           ) ).map((t) => (
             <button
