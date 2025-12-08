@@ -908,8 +908,8 @@ function EffortsViewerMapbox({
   const W = 700, H = 260;           // overall SVG size (in SVG units)
   const P = 24;                     // vertical padding (top)
   const pb = 38;                    // bottom padding (space for x-axis labels)
-  const [pl, setPl] = useState(50); // left padding (space for Y labels)
-  const pr = 16;                    // right padding (balanced)
+  const pl = 46;                    // left padding (space for Y labels)
+  const pr = 12;                    // right padding
 
   // cumulative positive gain (m) and loss (m), used for the InfoCard
   const { cumGain_m, cumLoss_m } = useMemo(() => {
@@ -1472,22 +1472,6 @@ function EffortsViewerMapbox({
 
   // Scrub helpers
   const svgRef = useRef<SVGSVGElement>(null);
-  // Measure y-label width to auto-adjust left padding for perfect fit
-  useLayoutEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    try {
-      const labels = svg.querySelectorAll('text');
-      let maxLabelX = 0;
-      labels.forEach((n: any) => {
-        const bb = n.getBBox?.();
-        if (bb) maxLabelX = Math.max(maxLabelX, bb.x + bb.width);
-      });
-      // Add 8px gap after longest label, clamp to sane bounds
-      const desiredPl = Math.min(Math.max(Math.ceil(maxLabelX) + 8, 50), 100);
-      if (Number.isFinite(desiredPl) && desiredPl !== pl) setPl(desiredPl);
-    } catch {}
-  });
   const toIdxFromClientX = (clientX: number, svg: SVGSVGElement) => {
     const rect = svg.getBoundingClientRect();
     const pxScreen = clamp(clientX - rect.left, 0, rect.width);
