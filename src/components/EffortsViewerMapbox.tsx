@@ -1775,6 +1775,10 @@ function EffortsViewerMapbox({
               <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
               <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
             </linearGradient>
+            {/* Clip path to contain chart within bounds */}
+            <clipPath id="chartClip">
+              <rect x={pl} y={P} width={W - pl - pr} height={H - pb - P} />
+            </clipPath>
           </defs>
           {/* vertical grid */}
           {[0, 1, 2, 3, 4].map((i) => {
@@ -1797,12 +1801,14 @@ function EffortsViewerMapbox({
             const timeDisplay = mins >= 60 
               ? `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
               : `${mins}:${String(secs).padStart(2, '0')}`;
+            // Align: first label left, last label right, others center
+            const anchor = i === 0 ? "start" : i === 4 ? "end" : "middle";
             return (
               <g key={`xaxis-${i}`}>
-                <text x={x} y={H - pb + 16} fill="#6b7280" fontSize={14} fontWeight={500} textAnchor="middle">
+                <text x={x} y={H - pb + 16} fill="#6b7280" fontSize={14} fontWeight={500} textAnchor={anchor}>
                   {distDisplay} {distUnit}
                 </text>
-                <text x={x} y={H - pb + 30} fill="#9ca3af" fontSize={12} textAnchor="middle">
+                <text x={x} y={H - pb + 30} fill="#9ca3af" fontSize={12} textAnchor={anchor}>
                   {timeDisplay}
                 </text>
               </g>
@@ -1818,79 +1824,82 @@ function EffortsViewerMapbox({
             </g>
           ))}
 
-          {/* elevation fill */}
-          {tab === "elev" && (
-            <>
-              <defs>
-                <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.02} />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity={0.08} />
-                </linearGradient>
-              </defs>
-              <path d={elevArea} fill="url(#elevGrad)" opacity={1} />
-            </>
-          )}
-          {/* VAM background elevation silhouette when on VAM tab */}
-          {tab === "vam" && (() => {
-            const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
-            const finite = elev.filter(Number.isFinite) as number[];
-            if (!finite.length) return null;
-            const minE = Math.min(...finite), maxE = Math.max(...finite);
-            const [a, b] = yDomain; const span = Math.max(1, b - a);
-            const targetLo = a + span * 0.1; const targetHi = a + span * 0.9;
-            let d = ""; const n = normalizedSamples.length;
-            for (let i = 0; i < n; i++) {
-              const e = Number.isFinite(elev[i]) ? (elev[i] as number) : NaN;
-              const t = Number.isFinite(e) && (maxE > minE) ? (e - minE) / (maxE - minE) : 0;
-              const y = yFromValue(targetLo + t * (targetHi - targetLo));
-              const x = xFromDist(distCalc.distMono[i] ?? distCalc.d0);
-              d += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
-            }
-            return <path d={d} fill="none" stroke="#e2e8f0" strokeWidth={1} />;
-          })()}
-
-          {/* Area fill under line (gradient) */}
-          {tab !== "vam" && tab !== "elev" && areaPath && (
-            <path d={areaPath} fill={`url(#${chartConfig.gradient})`} opacity={1} />
-          )}
-
-          {/* metric line (smoothed) or VAM threshold-colored segments */}
-          {tab !== "vam" ? (
-            <path d={linePath} fill="none" stroke={chartConfig.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
-          ) : (() => {
-            const buildSegPath = (loR:number, hiR:number) => {
-              let d = ""; let pen = false; const n = normalizedSamples.length;
-              for (let i = 0; i < n; i++) {
-                const v = Number.isFinite(metricRaw[i]) ? (metricRaw[i] as number) : NaN;
-                if (Number.isFinite(v) && v >= loR && v < hiR) {
-                  const x = xFromDist(distCalc.distMono[i] ?? distCalc.d0);
-                  const y = yFromValue(v);
-                  if (!pen) { d += `M ${x} ${y}`; pen = true; } else { d += ` L ${x} ${y}`; }
-                } else {
-                  pen = false;
-                }
-              }
-              return d;
-            };
-            const green = buildSegPath(0, 400);
-            const yellow = buildSegPath(400, 800);
-            const red = buildSegPath(800, 1e9);
-            const anyFinite = metricRaw.some(v => Number.isFinite(v));
-            return (
+          {/* Chart content - clipped to chart area */}
+          <g clipPath="url(#chartClip)">
+            {/* elevation fill */}
+            {tab === "elev" && (
               <>
-                {!anyFinite && (
-                  <text x={(W/2)} y={(H/2)} textAnchor="middle" fill="#94a3b8" fontSize={14} fontWeight={700}>No VAM data</text>
-                )}
-                {anyFinite && (
-                  <>
-                    <path d={green} fill="none" stroke="#10b981" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-                    <path d={yellow} fill="none" stroke="#f59e0b" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-                    <path d={red} fill="none" stroke="#ef4444" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-                  </>
-                )}
+                <defs>
+                  <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.02} />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity={0.08} />
+                  </linearGradient>
+                </defs>
+                <path d={elevArea} fill="url(#elevGrad)" opacity={1} />
               </>
-            );
-          })()}
+            )}
+            {/* VAM background elevation silhouette when on VAM tab */}
+            {tab === "vam" && (() => {
+              const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
+              const finite = elev.filter(Number.isFinite) as number[];
+              if (!finite.length) return null;
+              const minE = Math.min(...finite), maxE = Math.max(...finite);
+              const [a, b] = yDomain; const span = Math.max(1, b - a);
+              const targetLo = a + span * 0.1; const targetHi = a + span * 0.9;
+              let d = ""; const n = normalizedSamples.length;
+              for (let i = 0; i < n; i++) {
+                const e = Number.isFinite(elev[i]) ? (elev[i] as number) : NaN;
+                const t = Number.isFinite(e) && (maxE > minE) ? (e - minE) / (maxE - minE) : 0;
+                const y = yFromValue(targetLo + t * (targetHi - targetLo));
+                const x = xFromDist(distCalc.distMono[i] ?? distCalc.d0);
+                d += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
+              }
+              return <path d={d} fill="none" stroke="#e2e8f0" strokeWidth={1} />;
+            })()}
+
+            {/* Area fill under line (gradient) */}
+            {tab !== "vam" && tab !== "elev" && areaPath && (
+              <path d={areaPath} fill={`url(#${chartConfig.gradient})`} opacity={1} />
+            )}
+
+            {/* metric line (smoothed) or VAM threshold-colored segments */}
+            {tab !== "vam" ? (
+              <path d={linePath} fill="none" stroke={chartConfig.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
+            ) : (() => {
+              const buildSegPath = (loR:number, hiR:number) => {
+                let d = ""; let pen = false; const n = normalizedSamples.length;
+                for (let i = 0; i < n; i++) {
+                  const v = Number.isFinite(metricRaw[i]) ? (metricRaw[i] as number) : NaN;
+                  if (Number.isFinite(v) && v >= loR && v < hiR) {
+                    const x = xFromDist(distCalc.distMono[i] ?? distCalc.d0);
+                    const y = yFromValue(v);
+                    if (!pen) { d += `M ${x} ${y}`; pen = true; } else { d += ` L ${x} ${y}`; }
+                  } else {
+                    pen = false;
+                  }
+                }
+                return d;
+              };
+              const green = buildSegPath(0, 400);
+              const yellow = buildSegPath(400, 800);
+              const red = buildSegPath(800, 1e9);
+              const anyFinite = metricRaw.some(v => Number.isFinite(v));
+              return (
+                <>
+                  {!anyFinite && (
+                    <text x={(W/2)} y={(H/2)} textAnchor="middle" fill="#94a3b8" fontSize={14} fontWeight={700}>No VAM data</text>
+                  )}
+                  {anyFinite && (
+                    <>
+                      <path d={green} fill="none" stroke="#10b981" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+                      <path d={yellow} fill="none" stroke="#f59e0b" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+                      <path d={red} fill="none" stroke="#ef4444" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+                    </>
+                  )}
+                </>
+              );
+            })()}
+          </g>
 
           {/* cursor */}
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
