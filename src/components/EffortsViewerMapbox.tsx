@@ -905,9 +905,9 @@ function EffortsViewerMapbox({
   const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
 
   /** ----- Chart prep ----- */
-  const W = 700, H = 280;           // overall SVG size (in SVG units)
+  const W = 700, H = 260;           // overall SVG size (in SVG units)
   const P = 24;                     // vertical padding (top)
-  const pb = 44;                    // bottom padding (space for x-axis labels)
+  const pb = 38;                    // bottom padding (space for x-axis labels)
   const [pl, setPl] = useState(66); // left padding (space for Y labels) - increased to prevent clipping
   const pr = 8;                     // right padding (tight)
 
@@ -1799,10 +1799,10 @@ function EffortsViewerMapbox({
               : `${mins}:${String(secs).padStart(2, '0')}`;
             return (
               <g key={`xaxis-${i}`}>
-                <text x={x} y={H - pb + 18} fill="#6b7280" fontSize={16} fontWeight={500} textAnchor="middle">
+                <text x={x} y={H - pb + 16} fill="#6b7280" fontSize={14} fontWeight={500} textAnchor="middle">
                   {distDisplay} {distUnit}
                 </text>
-                <text x={x} y={H - pb + 36} fill="#9ca3af" fontSize={14} textAnchor="middle">
+                <text x={x} y={H - pb + 30} fill="#9ca3af" fontSize={12} textAnchor="middle">
                   {timeDisplay}
                 </text>
               </g>
@@ -1899,7 +1899,7 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Metric buttons */}
-      <div style={{ marginTop: 8, padding: "0 6px" }}>
+      <div style={{ marginTop: 0, padding: "0 6px" }}>
         <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
           {( (
             [
