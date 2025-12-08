@@ -1907,7 +1907,7 @@ function EffortsViewerMapbox({
           {/* Drag hint - below time labels, inside chart white area */}
           <text 
             x={pl + (W - pl - pr) / 2} 
-            y={H + 28} 
+            y={H + 38} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={14}
