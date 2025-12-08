@@ -905,8 +905,9 @@ function EffortsViewerMapbox({
   const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
 
   /** ----- Chart prep ----- */
-  const W = 700, H = 260;           // overall SVG size (in SVG units)
-  const P = 24;                     // vertical padding (top/bottom)
+  const W = 700, H = 295;           // overall SVG size (in SVG units) - increased for x-axis labels
+  const P = 24;                     // vertical padding (top)
+  const pb = 55;                    // bottom padding (space for x-axis labels)
   const [pl, setPl] = useState(66); // left padding (space for Y labels) - increased to prevent clipping
   const pr = 8;                     // right padding (tight)
 
@@ -1345,7 +1346,7 @@ function EffortsViewerMapbox({
       t = 1 - t;
     }
     
-    return H - P - t * (H - P * 2);
+    return H - pb - t * (H - pb - P);
   };
 
   // Tick values - evenly spaced ticks (domain rounding ensures clean labels)
@@ -1435,10 +1436,10 @@ function EffortsViewerMapbox({
     }
     // Close the path to the bottom
     const xLast = useIndex ? xFromIndex(n - 1) : xFromDist(distCalc.distMono[n - 1]);
-    const bottomY = H - P; // Bottom of chart area
+    const bottomY = H - pb; // Bottom of chart area
     d += ` L ${xLast} ${bottomY} L ${x0} ${bottomY} Z`;
     return d;
-  }, [metricRaw, normalizedSamples, distCalc, pl, pr, W, H, P, yDomain, xFromDist, tab]);
+  }, [metricRaw, normalizedSamples, distCalc, pl, pr, W, H, pb, yDomain, xFromDist, tab]);
 
   // Chart-specific colors
   const chartConfig = useMemo(() => {
@@ -1461,9 +1462,9 @@ function EffortsViewerMapbox({
     const n = normalizedSamples.length;
     let d = `M ${xFromDist(distCalc.distMono[0])} ${yFromValue(normalizedSamples[0].elev_m_sm ?? 0)}`;
     for (let i = 1; i < n; i++) d += ` L ${xFromDist(distCalc.distMono[i])} ${yFromValue(normalizedSamples[i].elev_m_sm ?? 0)}`;
-    d += ` L ${xFromDist(distCalc.distMono[n - 1])} ${H - P} L ${xFromDist(distCalc.distMono[0])} ${H - P} Z`;
+    d += ` L ${xFromDist(distCalc.distMono[n - 1])} ${H - pb} L ${xFromDist(distCalc.distMono[0])} ${H - pb} Z`;
     return d;
-  }, [normalizedSamples, yDomain, tab, distCalc, pl, pr]);
+  }, [normalizedSamples, yDomain, tab, distCalc, pl, pr, pb]);
 
   // Splits + active split
   const splits = useMemo(() => computeSplits(normalizedSamples, useMiles ? 1609.34 : 1000), [normalizedSamples, useMiles]);
@@ -1525,8 +1526,8 @@ function EffortsViewerMapbox({
     
     // Calculate what Y-axis label should be at this Y position
     const yPos = cy;
-    const chartHeight = H - P * 2;
-    const normalizedY = (H - P - yPos) / chartHeight; // 0 = bottom, 1 = top
+    const chartHeight = H - pb - P;
+    const normalizedY = (H - pb - yPos) / chartHeight; // 0 = bottom, 1 = top
     // For pace (inverted), normalizedY represents position: 0 = slow (hi), 1 = fast (lo)
     const valueAtY = domainLo + (1 - normalizedY) * (domainHi - domainLo);
     
@@ -1778,7 +1779,34 @@ function EffortsViewerMapbox({
           {/* vertical grid */}
           {[0, 1, 2, 3, 4].map((i) => {
             const x = pl + i * ((W - pl - pr) / 4);
-            return <line key={i} x1={x} x2={x} y1={P} y2={H - P} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4 4" />;
+            return <line key={i} x1={x} x2={x} y1={P} y2={H - pb} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4 4" />;
+          })}
+          {/* X-axis labels (time and distance) */}
+          {[0, 1, 2, 3, 4].map((i) => {
+            const x = pl + i * ((W - pl - pr) / 4);
+            const ratio = i / 4;
+            // Calculate distance at this point
+            const distM = distCalc.d0 + ratio * (distCalc.dN - distCalc.d0);
+            const distDisplay = useMiles ? (distM / 1609.34).toFixed(1) : (distM / 1000).toFixed(1);
+            const distUnit = useMiles ? 'mi' : 'km';
+            // Calculate time at this point (interpolate from samples)
+            const totalTime = normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].t_s : 0;
+            const timeAtPoint = totalTime * ratio;
+            const mins = Math.floor(timeAtPoint / 60);
+            const secs = Math.floor(timeAtPoint % 60);
+            const timeDisplay = mins >= 60 
+              ? `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+              : `${mins}:${String(secs).padStart(2, '0')}`;
+            return (
+              <g key={`xaxis-${i}`}>
+                <text x={x} y={H - pb + 18} fill="#6b7280" fontSize={12} fontWeight={500} textAnchor="middle">
+                  {distDisplay} {distUnit}
+                </text>
+                <text x={x} y={H - pb + 32} fill="#9ca3af" fontSize={11} textAnchor="middle">
+                  {timeDisplay}
+                </text>
+              </g>
+            );
           })}
           {/* horizontal ticks */}
           {yTicks.map((v, i) => (
@@ -1865,7 +1893,7 @@ function EffortsViewerMapbox({
           })()}
 
           {/* cursor */}
-          <line x1={cx} x2={cx} y1={P} y2={H - P} stroke="#0ea5e9" strokeWidth={1.5} />
+          <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
         </svg>
       </div>
