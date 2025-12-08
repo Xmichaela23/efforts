@@ -1605,28 +1605,25 @@ function EffortsViewerMapbox({
 
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>
-        {/* Current metric values aligned with tabs */}
+        {/* Current metric values aligned with tabs - order: Pace/Speed, HR, Grade, Cadence, Power, VAM (VAM hidden for running) */}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 4, marginBottom: 8, padding: "0 8px" }}>
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
             value={(() => {
               // Use the plotted, smoothed value for pace/speed to match the chart
               if (tab === 'spd') {
-                // For speed tab: value is speed_mps, use proper speed formatter
                 const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
                 return formatSpeed(v, useMiles);
               }
               if (tab === 'pace') {
-                // For pace tab: value is pace_s_per_km
                 const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
                 return fmtPace(v, useMiles);
               }
-              // Fallback when not on pace/speed tab
               return workoutData?.type === 'ride' ? formatSpeed(s?.speed_mps ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles);
             })()}  
             active={tab==="pace" || tab==="spd"} 
             width={54}
-            onClick={() => setTab(normalizedSamples.some(s => Number.isFinite(s.speed_mps as any)) ? "spd" : "pace")}
+            onClick={() => setTab(workoutData?.type === 'run' ? "pace" : "spd")}
           />
           <Pill 
             label="HR" 
@@ -1640,22 +1637,6 @@ function EffortsViewerMapbox({
             active={tab==="bpm"} 
             width={54}
             onClick={() => setTab("bpm")}
-          />
-          {/* TODO: MIGRATION CODE - After backfill, read from normalizedSamples instead of cadSeries */}
-          <Pill 
-            label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} 
-            value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} 
-            active={tab==="cad"} 
-            width={54}
-            onClick={() => setTab("cad")}
-          />
-          {/* TODO: MIGRATION CODE - After backfill, read from normalizedSamples instead of pwrSeries */}
-          <Pill 
-            label="Power" 
-            value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} 
-            active={tab==="pwr"} 
-            width={54}
-            onClick={() => setTab("pwr")}
           />
           <Pill
             label="Grade"
@@ -1676,18 +1657,35 @@ function EffortsViewerMapbox({
             onClick={() => setTab("elev")}
           />
           <Pill 
-            label="VAM" 
-            value={(() => {
-              if (tab === 'vam') {
-                const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? Math.round(metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
-                return v != null ? fmtVAM(v, useFeet) : '—';
-              }
-              return s?.vam_m_per_h != null ? fmtVAM(s.vam_m_per_h, useFeet) : '—';
-            })()} 
-            active={tab==="vam"} 
+            label="Cadence" 
+            value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} 
+            active={tab==="cad"} 
             width={54}
-            onClick={() => setTab("vam")}
+            onClick={() => setTab("cad")}
           />
+          <Pill 
+            label="Power" 
+            value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} 
+            active={tab==="pwr"} 
+            width={54}
+            onClick={() => setTab("pwr")}
+          />
+          {/* VAM only shown for non-running workouts */}
+          {workoutData?.type !== 'run' && (
+            <Pill 
+              label="VAM" 
+              value={(() => {
+                if (tab === 'vam') {
+                  const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? Math.round(metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
+                  return v != null ? fmtVAM(v, useFeet) : '—';
+                }
+                return s?.vam_m_per_h != null ? fmtVAM(s.vam_m_per_h, useFeet) : '—';
+              })()} 
+              active={tab==="vam"} 
+              width={54}
+              onClick={() => setTab("vam")}
+            />
+          )}
         </div>
         
         {/* Distance, time, altitude (left) and final totals (right) */}
