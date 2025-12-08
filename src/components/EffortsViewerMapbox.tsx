@@ -905,9 +905,9 @@ function EffortsViewerMapbox({
   const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
 
   /** ----- Chart prep ----- */
-  const W = 700, H = 235;           // overall SVG size (in SVG units) - compact
-  const P = 12;                     // vertical padding (top)
-  const pb = 32;                    // bottom padding (space for x-axis labels)
+  const W = 700, H = 225;           // overall SVG size (in SVG units) - compact
+  const P = 10;                     // vertical padding (top)
+  const pb = 28;                    // bottom padding (space for x-axis labels)
   const pl = 46;                    // left padding (space for Y labels)
   const pr = 12;                    // right padding
 
@@ -1734,7 +1734,7 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Chart */}
-      <div style={{ marginTop: 4 }}>
+      <div style={{ marginTop: 0 }}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}   // responsive: all drawn in SVG units
@@ -1905,13 +1905,13 @@ function EffortsViewerMapbox({
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
         </svg>
-        <div style={{ textAlign: 'center', fontSize: 11, color: '#d1d5db', marginTop: 2, letterSpacing: 0.5 }}>
+        <div style={{ textAlign: 'center', fontSize: 10, color: '#d1d5db', marginTop: -2, letterSpacing: 0.5 }}>
           ← Drag for details →
         </div>
       </div>
 
       {/* Metric buttons */}
-      <div style={{ marginTop: 0, padding: "0 8px" }}>
+      <div style={{ marginTop: -4, padding: "0 8px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
           {( (
             [
