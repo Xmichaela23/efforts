@@ -1496,6 +1496,14 @@ function EffortsViewerMapbox({
     setIsScrubbing(true);
     setIdx(toIdxFromClientX(t.clientX, svgRef.current!));
   };
+  const onTouchEnd = (e: React.TouchEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    setIsScrubbing(false);
+  };
+  const onMouseUp = (e: React.MouseEvent<SVGSVGElement>) => {
+    // Reset scrubbing when mouse button is released
+    setIsScrubbing(false);
+  };
   const onMouseLeave = () => {
     setIsScrubbing(false);
   };
@@ -1849,15 +1857,17 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Chart */}
-      <div style={{ marginTop: 0 }}>
+      <div style={{ marginTop: 0 }} onMouseLeave={onMouseLeave}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}   // responsive: all drawn in SVG units
           width="100%" height={H}
           onMouseMove={onMove}
+          onMouseUp={onMouseUp}
           onMouseLeave={onMouseLeave}
           onTouchStart={onTouch}
           onTouchMove={onTouch}
+          onTouchEnd={onTouchEnd}
           onDoubleClick={() => setLocked((l) => !l)}
           style={{ display: "block", borderRadius: 12, background: "#fff", touchAction: "none", cursor: "crosshair", border: "1px solid #eef2f7" }}
         >
