@@ -1908,8 +1908,8 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Metric buttons */}
-      <div style={{ marginTop: 0, padding: "0 6px" }}>
-        <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
+      <div style={{ marginTop: 0, padding: "0 8px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
           {( (
             [
               // Running: pace, bpm, elev, cad, pwr (no VAM)
@@ -1923,18 +1923,35 @@ function EffortsViewerMapbox({
               workoutData?.type === 'run' && normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
               workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.vam_m_per_h as any)) ? "vam" : null
             ].filter(Boolean) as MetricTab[]
-          ) ).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                border: "none", background: "transparent", color: tab === t ? "#0f172a" : "#64748b", cursor: "pointer",
-                padding: "6px 2px", borderBottom: tab === t ? "2px solid #0ea5e9" : "2px solid transparent", letterSpacing: 0.5
-              }}
-            >
-              {t === 'spd' ? 'SPEED' : t.toUpperCase()}
-            </button>
-          ))}
+          ) ).map((t) => {
+            // Chart colors for each metric
+            const colors: Record<string, string> = {
+              pace: '#3b82f6', spd: '#3b82f6', bpm: '#ef4444', 
+              elev: '#10b981', cad: '#8b5cf6', pwr: '#f59e0b', vam: '#06b6d4'
+            };
+            const color = colors[t] || '#64748b';
+            const isActive = tab === t;
+            return (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                style={{
+                  border: `1.5px solid ${isActive ? color : color + '40'}`,
+                  borderRadius: 6,
+                  background: isActive ? color + '20' : color + '08',
+                  color: isActive ? color : '#64748b',
+                  cursor: "pointer",
+                  padding: "4px 10px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {t === 'spd' ? 'SPEED' : t.toUpperCase()}
+              </button>
+            );
+          })}
         </div>
 
       </div>
