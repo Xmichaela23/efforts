@@ -1605,12 +1605,14 @@ function EffortsViewerMapbox({
 
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>
-        {/* Current metric values aligned with tabs - order: Pace/Speed, HR, Grade, Cadence, Power, VAM (VAM hidden for running) */}
+        {/* Current metric values aligned with tabs
+            Running: Pace, HR, Grade, Cadence, Power
+            Cycling: Speed, Power, HR, Grade, Cadence, VAM */}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 4, marginBottom: 8, padding: "0 8px" }}>
+          {/* Speed/Pace - always first */}
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
             value={(() => {
-              // Use the plotted, smoothed value for pace/speed to match the chart
               if (tab === 'spd') {
                 const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
                 return formatSpeed(v, useMiles);
@@ -1625,6 +1627,17 @@ function EffortsViewerMapbox({
             width={54}
             onClick={() => setTab(workoutData?.type === 'run' ? "pace" : "spd")}
           />
+          {/* Power - 2nd for cycling only */}
+          {workoutData?.type !== 'run' && (
+            <Pill 
+              label="Power" 
+              value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} 
+              active={tab==="pwr"} 
+              width={54}
+              onClick={() => setTab("pwr")}
+            />
+          )}
+          {/* HR */}
           <Pill 
             label="HR" 
             value={(() => {
@@ -1638,6 +1651,7 @@ function EffortsViewerMapbox({
             width={54}
             onClick={() => setTab("bpm")}
           />
+          {/* Grade */}
           <Pill
             label="Grade"
             value={(() => {
@@ -1656,6 +1670,7 @@ function EffortsViewerMapbox({
             width={54}
             onClick={() => setTab("elev")}
           />
+          {/* Cadence */}
           <Pill 
             label="Cadence" 
             value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} 
@@ -1663,14 +1678,17 @@ function EffortsViewerMapbox({
             width={54}
             onClick={() => setTab("cad")}
           />
-          <Pill 
-            label="Power" 
-            value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} 
-            active={tab==="pwr"} 
-            width={54}
-            onClick={() => setTab("pwr")}
-          />
-          {/* VAM only shown for non-running workouts */}
+          {/* Power - last for running only */}
+          {workoutData?.type === 'run' && (
+            <Pill 
+              label="Power" 
+              value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} 
+              active={tab==="pwr"} 
+              width={54}
+              onClick={() => setTab("pwr")}
+            />
+          )}
+          {/* VAM - cycling only */}
           {workoutData?.type !== 'run' && (
             <Pill 
               label="VAM" 
@@ -1895,13 +1913,14 @@ function EffortsViewerMapbox({
           {( (
             [
               // Running: pace, bpm, elev, cad, pwr (no VAM)
-              // Cycling: spd, bpm, elev, cad, pwr, vam
+              // Cycling: spd, pwr, bpm, elev, cad, vam
               workoutData?.type === 'run' ? "pace" : null,
               workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.speed_mps as any)) ? "spd" : null,
+              workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
               "bpm",
               "elev",
               normalizedSamples.some(s=>Number.isFinite(s.cad_rpm as any) || Number.isFinite(s.cad_spm as any)) ? "cad" : null,
-              normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
+              workoutData?.type === 'run' && normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
               workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.vam_m_per_h as any)) ? "vam" : null
             ].filter(Boolean) as MetricTab[]
           ) ).map((t) => (
