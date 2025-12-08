@@ -1373,15 +1373,6 @@ function EffortsViewerMapbox({
         secPerKm: v,
         display: fmtPaceDebug(v)
       }));
-      
-      console.log('[Pace Chart Debug - COMPREHENSIVE]', {
-        domain_secPerKm: [a, b],
-        domain_display: [fmtPaceDebug(a), fmtPaceDebug(b)],
-        ticks_secPerKm: ticks,
-        ticks_display: ticks.map(t => fmtPaceDebug(t)),
-        useMiles,
-        sample_data_values: samplePaces,
-        metricRaw_length: metricRaw.length,
         metricRaw_finite_count: metricRaw.filter(Number.isFinite).length
       });
     }
@@ -1582,18 +1573,6 @@ function EffortsViewerMapbox({
     const normalizedY = (H - pb - yPos) / chartHeight; // 0 = bottom, 1 = top
     // For pace (inverted), normalizedY represents position: 0 = slow (hi), 1 = fast (lo)
     const valueAtY = domainLo + (1 - normalizedY) * (domainHi - domainLo);
-    
-    console.log('[Cursor Debug]', {
-      idx,
-      cursor_value_secPerKm: currentMetricRaw,
-      cursor_value_display: fmtPaceDebug(currentMetricRaw),
-      y_position: yPos,
-      value_at_y_position_secPerKm: valueAtY,
-      value_at_y_position_display: fmtPaceDebug(valueAtY),
-      domain: [fmtPaceDebug(domainLo), fmtPaceDebug(domainHi)],
-      difference_sec: Math.abs(currentMetricRaw - valueAtY),
-      difference_display: Math.abs(toSecPerUnit(currentMetricRaw) - toSecPerUnit(valueAtY))
-    });
   }
 
 
@@ -1620,13 +1599,10 @@ function EffortsViewerMapbox({
         trackLngLat={useMemo(() => {
           try {
             const raw = Array.isArray(trackLngLat) ? trackLngLat : [];
-            console.log('[EffortsViewerMapbox] ROUTE DATA - Raw trackLngLat length:', raw.length, 'theme:', theme);
             // Use Douglas-Peucker algorithm for intelligent route simplification
             const simplified = simplifyRouteForMap(raw);
-            console.log('[EffortsViewerMapbox] ROUTE DATA - Simplified length:', simplified.length, 'theme:', theme);
             return simplified;
           } catch (error) {
-            console.log('[EffortsViewerMapbox] ROUTE DATA - Error in simplification:', error, 'theme:', theme);
             return Array.isArray(trackLngLat) ? trackLngLat : [];
           }
         }, [trackLngLat, theme]) as any}

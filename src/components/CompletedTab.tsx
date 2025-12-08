@@ -140,7 +140,6 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
       })
       .filter(Boolean) as [number,number][];
     const series = src?.computed?.analysis?.series || null;
-    console.log('[memo] series check:', { has_series: !!series, series_keys: series ? Object.keys(series) : [] });
     return { track, series } as const;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workoutIdKey, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);

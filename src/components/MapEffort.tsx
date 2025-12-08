@@ -89,10 +89,6 @@ export default function MapEffort({
   const [isManualScrubbing, setIsManualScrubbing] = useState(false);
   const zoomingRef = useRef(false); // Flag to block onResize during zoom operation
   
-  // Debug expanded state changes
-  useEffect(() => {
-    console.log('[MapEffort] EXPANDED STATE CHANGED TO:', expanded);
-  }, [expanded]);
   
   // Compute effective height - full viewport when expanded (Strava-style)
   // Use different calculations for mobile vs desktop
@@ -100,14 +96,10 @@ export default function MapEffort({
   const effectiveHeight = expanded 
     ? (isMobile ? 'calc(100vh - 100px)' : 'calc(100vh - 120px)')
     : height;
-
-  console.log('[MapEffort] Component rendered, trackLngLat points:', trackLngLat?.length);
   
   const coords = useMemo(() => sanitizeLngLat(trackLngLat), [trackLngLat]);
   const lineCum = useMemo(() => cumulativeMeters(coords), [coords]);
   const dTotal = useMemo(() => (typeof totalDist_m === 'number' && totalDist_m > 0 ? totalDist_m : (lineCum[lineCum.length - 1] || 1)), [totalDist_m, lineCum]);
-  
-  console.log('[MapEffort] coords.length:', coords.length, 'ready:', ready, 'expanded:', expanded);
 
   // Prefetch both styles for smoother switching
   useEffect(() => {
@@ -124,7 +116,6 @@ export default function MapEffort({
 
   // Create map once
   useEffect(() => {
-    console.log('[MapEffort] MAP CREATION EFFECT - theme:', theme, 'divRef:', !!divRef.current, 'mapRef:', !!mapRef.current);
     if (!divRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: divRef.current,
@@ -356,12 +347,8 @@ export default function MapEffort({
 
     // When style changes (theme), re-attach layers
     map.on('styledata', () => {
-      console.log('[MapEffort] GLOBAL styledata event, layersAttached:', layersAttachedRef.current);
       if (!layersAttachedRef.current) {
-        console.log('[MapEffort] GLOBAL styledata - Layers not attached, calling attachLayers from styledata');
         attachLayers();
-      } else {
-        console.log('[MapEffort] GLOBAL styledata - Layers already attached, skipping');
       }
     });
 
@@ -394,7 +381,6 @@ export default function MapEffort({
 
   // Seed/fit route once and update data on changes
   useEffect(() => {
-    console.log('[MapEffort] DATA UPDATE EFFECT - coords.length:', coords.length, 'ready:', ready);
     const map = mapRef.current; if (!map || !ready) return;
     const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
     if (coords.length > 1) lastNonEmptyRef.current = coords;
@@ -402,10 +388,7 @@ export default function MapEffort({
     const applyData = () => {
       const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
       if (src && has) {
-        console.log('[MapEffort] Setting route data, points:', valid.length);
         src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
-      } else {
-        console.log('[MapEffort] DATA UPDATE - Cannot set route data - src:', !!src, 'has:', has, 'coords.length:', coords.length);
       }
       
       // Enhancement 1: Update start/finish markers

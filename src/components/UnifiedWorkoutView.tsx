@@ -769,7 +769,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         <div className="flex items-center gap-2">
           {isCompleted && (
             (() => {
-              console.log('🔍 Button logic - currentPlannedId:', currentPlannedId, 'linkedPlanned:', linkedPlanned);
               return (!currentPlannedId && !linkedPlanned) ? (
                 <Button
                   variant="ghost"
@@ -913,10 +912,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               </div>
             )}
             {(() => {
-              console.log('🔍 [UNIFIED DEBUG] isCompleted:', isCompleted, 'isLinked:', isLinked, 'linkedPlanned:', linkedPlanned);
-              console.log('🔍 [DATA SOURCE DEBUG] updatedWorkoutData:', !!updatedWorkoutData, 'hydratedCompleted:', !!hydratedCompleted, 'workout:', !!workout);
-              console.log('🔍 [DATA SOURCE DEBUG] updatedWorkoutData structure:', updatedWorkoutData?.workout_analysis ? 'has workout_analysis' : 'no workout_analysis');
-              console.log('🔍 [DATA SOURCE DEBUG] hydratedCompleted structure:', hydratedCompleted?.workout_analysis ? 'has workout_analysis' : 'no workout_analysis');
               return isCompleted && !isLinked ? (
                 <div className="px-3 py-2 text-sm text-gray-600">Attach this workout to a planned session to see planned vs actual.</div>
               ) : (

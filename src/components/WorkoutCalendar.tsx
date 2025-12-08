@@ -364,8 +364,6 @@ export default function WorkoutCalendar({
         if (String(w?.workout_status||'').toLowerCase()==='completed' && (w as any)?.planned_id) {
           const pid = String((w as any).planned_id);
           workoutIdByPlannedId.set(pid, String((w as any).id));
-          // Debug: log when we find a linked workout
-          console.log('[Calendar] Found linked workout:', { workoutId: w.id, plannedId: pid, date: w.date, type: w.type });
         }
       } catch {}
     }
