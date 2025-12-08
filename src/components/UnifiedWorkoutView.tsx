@@ -163,7 +163,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     // Prefer updatedWorkoutData (refreshed from DB) over workout prop (may be stale)
     const sourceWorkout = updatedWorkoutData || unifiedWorkout;
     const plannedId = (sourceWorkout as any)?.planned_id || null;
-    console.log('🔍 Using planned_id from:', updatedWorkoutData ? 'updatedWorkoutData' : 'unifiedWorkout', plannedId);
     setCurrentPlannedId(plannedId);
   }, [(unifiedWorkout as any)?.planned_id, updatedWorkoutData?.planned_id]);
 

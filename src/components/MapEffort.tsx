@@ -137,11 +137,8 @@ export default function MapEffort({
 
 
     const attachLayers = () => {
-      console.log('[MapEffort] attachLayers called - current theme:', theme);
-      
       // Route source
       if (!map.getSource(ROUTE_SRC)) {
-        console.log('[MapEffort] Adding route source');
         map.addSource(ROUTE_SRC, { 
           type: 'geojson', 
           data: { 
@@ -150,15 +147,12 @@ export default function MapEffort({
             properties: {} 
           } as any 
         });
-      } else {
-        console.log('[MapEffort] Route source already exists');
       }
       
       // DEEP BLUE ROUTE LAYERS
       
       // Shadow layer (bottom) - Navy blue glow
       if (!map.getLayer(ROUTE_SHADOW)) {
-        console.log('[MapEffort] Adding shadow layer');
         try {
           map.addLayer({ 
             id: ROUTE_SHADOW, 
@@ -172,17 +166,13 @@ export default function MapEffort({
             },
             layout: { 'line-cap': 'round', 'line-join': 'round' }
           });
-          console.log('[MapEffort] Shadow layer added successfully');
         } catch (error) {
-          console.log('[MapEffort] Error adding shadow layer:', error);
+          console.error('[MapEffort] Error adding shadow layer:', error);
         }
-      } else {
-        console.log('[MapEffort] Shadow layer already exists');
       }
       
       // Outline layer (middle) - Royal blue
       if (!map.getLayer(ROUTE_OUTLINE)) {
-        console.log('[MapEffort] Adding outline layer');
         map.addLayer({ 
           id: ROUTE_OUTLINE, 
           type: 'line', 
@@ -194,13 +184,10 @@ export default function MapEffort({
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
-      } else {
-        console.log('[MapEffort] Outline layer already exists');
       }
       
       // Main route line (top) - Bright blue
       if (!map.getLayer(ROUTE_LINE)) {
-        console.log('[MapEffort] Adding main route line');
         try {
           map.addLayer({ 
             id: ROUTE_LINE, 
@@ -213,12 +200,9 @@ export default function MapEffort({
             }, 
             layout: { 'line-cap': 'round', 'line-join': 'round' }
           });
-          console.log('[MapEffort] Main route line added successfully');
         } catch (error) {
-          console.log('[MapEffort] Error adding main route line:', error);
+          console.error('[MapEffort] Error adding main route line:', error);
         }
-      } else {
-        console.log('[MapEffort] Main route line already exists');
       }
       
       // Start marker (green pin)
@@ -286,7 +270,6 @@ export default function MapEffort({
       
       // Animated pulsing halo - BLUE to match route
       if (!map.getLayer(CURSOR_HALO)) {
-        console.log('[MapEffort] Adding cursor halo');
         map.addLayer({ 
           id: CURSOR_HALO, 
           type: 'circle', 
@@ -298,13 +281,10 @@ export default function MapEffort({
             'circle-blur': 1
           } 
         });
-      } else {
-        console.log('[MapEffort] Cursor halo already exists');
       }
       
       // Cursor point - White center with BLUE border
       if (!map.getLayer(CURSOR_PT)) {
-        console.log('[MapEffort] Adding cursor point');
         map.addLayer({ 
           id: CURSOR_PT, 
           type: 'circle', 
@@ -316,20 +296,15 @@ export default function MapEffort({
             'circle-stroke-width': 2
           } 
         });
-      } else {
-        console.log('[MapEffort] Cursor point already exists');
       }
       
       layersAttachedRef.current = true;
-      console.log('[MapEffort] All layers processed, layersAttached set to true');
     };
     // Expose a safe reattach for later effects
     (map as any).__attachEffortLayers = attachLayers;
 
     map.on('load', () => {
-      console.log('[MapEffort] Map loaded, calling attachLayers');
       attachLayers();
-      console.log('[MapEffort] Layers attached, configuring map interactions');
       // Keep zoom centered at the pinch midpoint to avoid horizontal "slide"
       // @ts-ignore – MapLibre supports this option
       map.touchZoomRotate.enable({ around: 'pinch' });
@@ -339,7 +314,6 @@ export default function MapEffort({
       const container = map.getCanvasContainer();
       container.style.touchAction = 'pan-y';
       map.getCanvas().style.touchAction = 'pan-y';
-      console.log('[MapEffort] Setting ready=true');
       setReady(true);
       onMapReady?.();
     });
@@ -355,7 +329,6 @@ export default function MapEffort({
     const onResize = () => {
       // Ignore resize events during expansion/collapse
       if (zoomingRef.current) {
-        console.log('[MapEffort] onResize blocked - zooming in progress');
         return;
       }
       
@@ -372,7 +345,6 @@ export default function MapEffort({
     map.on('resize', onResize);
 
     return () => {
-      console.log('[MapEffort] MAP DESTRUCTION - removing map for theme:', theme);
       map.off('resize', onResize);
       map.remove();
       mapRef.current = null;
@@ -395,13 +367,11 @@ export default function MapEffort({
       if (has) {
         const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
         if (startSrc) {
-          console.log('[MapEffort] Setting start marker:', valid[0]);
           startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
         }
         
         const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
         if (finishSrc) {
-          console.log('[MapEffort] Setting finish marker:', valid[valid.length - 1]);
           finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
         }
       }
@@ -424,48 +394,30 @@ export default function MapEffort({
 
   // Handle zoom when expanding/collapsing (Strava-style)
   useEffect(() => {
-    console.log('[MapEffort] Zoom effect triggered - expanded:', expanded, 'ready:', ready, 'fitted:', fittedRef.current);
-    
     const map = mapRef.current;
     if (!map || !ready) {
-      console.log('[MapEffort] Zoom effect skipped - map:', !!map, 'ready:', ready);
       return;
     }
     
     const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
     if (valid.length < 2) {
-      console.log('[MapEffort] Zoom effect skipped - no valid coords');
       return;
     }
-    
-    console.log('[MapEffort] Zoom effect will execute in 320ms, coords:', valid.length);
     
     // Wait for CSS height transition, then zoom (don't call resize - MapLibre auto-detects)
     setTimeout(() => {
       try {
-        console.log('[MapEffort] Executing zoom now (no manual resize - auto-detected)');
-        
         // Block onResize from interfering
         zoomingRef.current = true;
         
         const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
         for (const c of valid) b.extend(c);
         
-        const currentZoom = map.getZoom();
-        
-        // Use geographic bounds center (works for loops and out-and-backs)
-        const routeCenter = b.getCenter();
-        
-        console.log('[MapEffort] Current zoom level:', currentZoom);
-        console.log('[MapEffort] Route center (midpoint):', routeCenter, 'from', valid.length, 'points');
-        
         // Get actual container dimensions
         const container = map.getContainer();
         const containerWidth = container.offsetWidth;
         const containerHeight = container.offsetHeight;
         const isMobile = containerWidth < 768;
-        
-        console.log('[MapEffort] Fitting bounds - mobile:', isMobile, 'size:', containerWidth, 'x', containerHeight);
         
         if (expanded) {
           // EXPANDED: Account for UI elements on mobile
@@ -686,86 +638,55 @@ export default function MapEffort({
     const map = mapRef.current; 
     if (!map || !ready || expanded) return; // Skip during expansion!
     
-    console.log('[MapEffort] THEME SWITCHING - Theme changed to:', theme);
     layersAttachedRef.current = false;
     try {
       const cached = styleCacheRef.current[theme];
       if (cached) {
-        console.log('[MapEffort] THEME SWITCHING - Using cached style for:', theme);
         map.setStyle(cached as any, { diff: true });
       } else {
-        console.log('[MapEffort] THEME SWITCHING - Loading new style for:', theme);
         map.setStyle(styleUrl(theme));
       }
     } catch (error) {
-      console.log('[MapEffort] THEME SWITCHING - Error setting style:', error);
+      console.error('[MapEffort] Error setting style:', error);
     }
     // Wait for complete render cycle to avoid race condition
     setVisible(false);
     const onIdle = () => {
-      console.log('[MapEffort] THEME SWITCHING - onIdle called for theme:', theme);
       try {
         // Reattach layers first
         const reattach = (map as any).__attachEffortLayers as (() => void) | undefined;
         if (reattach) {
-          console.log('[MapEffort] THEME SWITCHING - Calling reattach function');
           reattach();
-        } else {
-          console.log('[MapEffort] THEME SWITCHING - No reattach function available');
         }
         
         // Set route data
         const valid = (coords.length > 1 ? coords : lastNonEmptyRef.current);
         const has = valid.length > 1;
-        console.log('[MapEffort] THEME SWITCHING - Route data check - has:', has, 'coords:', valid.length);
         
         // Reapply route data
         const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
         if (src && has) {
-          console.log('[MapEffort] THEME SWITCHING - Setting route data for theme:', theme);
           src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
-          // Check if data was actually set
-          const data = src.getData();
-          console.log('[MapEffort] THEME SWITCHING - Route data after setData:', data ? 'HAS_DATA' : 'NO_DATA', 'coords:', data?.geometry?.coordinates?.length || 0);
-        } else {
-          console.log('[MapEffort] THEME SWITCHING - Cannot set route data - src:', !!src, 'has:', has);
         }
         
         // Reapply start/finish markers
         if (has) {
           const startSrc = map.getSource(START_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
           if (startSrc) {
-            console.log('[MapEffort] THEME SWITCHING - Setting start marker for theme:', theme);
             startSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[0] }, properties: {} } as any);
           }
           
           const finishSrc = map.getSource(FINISH_MARKER_SRC) as maplibregl.GeoJSONSource | undefined;
           if (finishSrc) {
-            console.log('[MapEffort] THEME SWITCHING - Setting finish marker for theme:', theme);
             finishSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: valid[valid.length - 1] }, properties: {} } as any);
           }
-        }
-        
-        // Check if layers exist after reattachment
-        console.log('[MapEffort] THEME SWITCHING - Layer check after reattachment:');
-        console.log('[MapEffort] THEME SWITCHING - ROUTE_SHADOW exists:', !!map.getLayer(ROUTE_SHADOW));
-        console.log('[MapEffort] THEME SWITCHING - ROUTE_OUTLINE exists:', !!map.getLayer(ROUTE_OUTLINE));
-        console.log('[MapEffort] THEME SWITCHING - ROUTE_LINE exists:', !!map.getLayer(ROUTE_LINE));
-        console.log('[MapEffort] THEME SWITCHING - ROUTE_SRC exists:', !!map.getSource(ROUTE_SRC));
-        
-        // Check if route is actually visible
-        const routeLayer = map.getLayer(ROUTE_LINE);
-        if (routeLayer) {
-          const visibility = map.getLayoutProperty(ROUTE_LINE, 'visibility');
-          const paint = map.getPaintProperty(ROUTE_LINE, 'line-color');
-          console.log('[MapEffort] THEME SWITCHING - Route visibility:', visibility, 'color:', paint);
         }
         
         // Restore camera and fade in
         if (savedCameraRef.current && !expanded) map.jumpTo(savedCameraRef.current as any);
         requestAnimationFrame(() => setVisible(true));
       } catch (error) {
-        console.log('[MapEffort] THEME SWITCHING - Error in onIdle:', error);
+        console.error('[MapEffort] Error in onIdle:', error);
         requestAnimationFrame(() => setVisible(true));
       }
     };
@@ -820,13 +741,11 @@ export default function MapEffort({
             onTouchEnd={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              console.log('[MapEffort] Expand button touched (onTouchEnd)!');
               setExpanded(true);
             }}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              console.log('[MapEffort] Expand button clicked (onClick)!');
               setExpanded(true);
             }}
             style={{
