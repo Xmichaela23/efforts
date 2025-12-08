@@ -659,7 +659,7 @@ const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick 
     onMouseLeave={(e) => { if (onClick) e.currentTarget.style.opacity = "1"; }}
   >
     <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{label}</span>
-    <span style={{ fontSize: 12, fontWeight: 700, color: active ? "#0284c7" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
+    <span style={{ fontSize: 12, fontWeight: 700, color: active ? "#0284c7" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "opacity 150ms ease" }}>{value}</span>
     {subValue ? (
       <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600, whiteSpace: "nowrap" }}>{subValue}</span>
     ) : null}
@@ -841,6 +841,7 @@ function EffortsViewerMapbox({
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
   const [scrubDistance, setScrubDistance] = useState<number | null>(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
   
   // Handle thumb scrubbing
   const handleScrub = (distance_m: number) => {
@@ -1483,11 +1484,70 @@ function EffortsViewerMapbox({
     while (lo < hi) { const m = (lo + hi) >> 1; (distCalc.distMono[m] < target) ? (lo = m + 1) : (hi = m); }
     return lo;
   };
-  const onMove = (e: React.MouseEvent<SVGSVGElement>) => { if (locked) return; setIdx(toIdxFromClientX(e.clientX, svgRef.current!)); };
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => { 
+    if (locked) return; 
+    setIsScrubbing(true);
+    setIdx(toIdxFromClientX(e.clientX, svgRef.current!)); 
+  };
   const onTouch = (e: React.TouchEvent<SVGSVGElement>) => {
-    if (locked) return; const t = e.touches[0]; if (!t) return;
+    if (locked) return; 
+    const t = e.touches[0]; 
+    if (!t) return;
+    setIsScrubbing(true);
     setIdx(toIdxFromClientX(t.clientX, svgRef.current!));
   };
+  const onMouseLeave = () => {
+    setIsScrubbing(false);
+  };
+
+  // Helper functions to get averages from workoutData (same source as Summary)
+  const getAvgPace = useMemo(() => {
+    // Use same source as Summary: computed.overall.avg_pace_s_per_mi converted to km
+    const avgPaceMi = Number.isFinite(workoutData?.computed?.overall?.avg_pace_s_per_mi) 
+      ? Number(workoutData.computed.overall.avg_pace_s_per_mi)
+      : (Number.isFinite(workoutData?.avg_pace) ? Number(workoutData.avg_pace) 
+      : (Number.isFinite(workoutData?.metrics?.avg_pace) ? Number(workoutData.metrics.avg_pace) : null));
+    // Convert from per-mile to per-km if needed (if avg_pace is in sec/km, no conversion needed)
+    // For now, assume computed.overall.avg_pace_s_per_mi is in sec/mi, others might be sec/km
+    if (avgPaceMi != null && workoutData?.computed?.overall?.avg_pace_s_per_mi) {
+      return avgPaceMi / 1.60934; // Convert mi to km
+    }
+    return avgPaceMi; // Already in sec/km or null
+  }, [workoutData]);
+
+  const getAvgSpeed = useMemo(() => {
+    // Speed in m/s from avg_speed_kmh
+    const avgSpeedKmh = Number.isFinite(workoutData?.metrics?.avg_speed) 
+      ? Number(workoutData.metrics.avg_speed)
+      : (Number.isFinite(workoutData?.avg_speed) ? Number(workoutData.avg_speed) : null);
+    return avgSpeedKmh != null ? avgSpeedKmh / 3.6 : null; // Convert km/h to m/s
+  }, [workoutData]);
+
+  const getAvgHR = useMemo(() => {
+    return Number.isFinite(workoutData?.avg_heart_rate) 
+      ? Number(workoutData.avg_heart_rate)
+      : (Number.isFinite(workoutData?.metrics?.avg_heart_rate) ? Number(workoutData.metrics.avg_heart_rate) : null);
+  }, [workoutData]);
+
+  const getAvgPower = useMemo(() => {
+    return Number.isFinite(workoutData?.avg_power) 
+      ? Number(workoutData.avg_power)
+      : (Number.isFinite(workoutData?.metrics?.avg_power) ? Number(workoutData.metrics.avg_power) : null);
+  }, [workoutData]);
+
+  const getAvgCadence = useMemo(() => {
+    if (workoutData?.type === 'ride') {
+      return Number.isFinite(workoutData?.avg_cadence) 
+        ? Number(workoutData.avg_cadence)
+        : (Number.isFinite(workoutData?.avg_bike_cadence) ? Number(workoutData.avg_bike_cadence)
+        : (Number.isFinite(workoutData?.metrics?.avg_bike_cadence) ? Number(workoutData.metrics.avg_bike_cadence) : null));
+    } else {
+      return Number.isFinite(workoutData?.avg_cadence) 
+        ? Number(workoutData.avg_cadence)
+        : (Number.isFinite(workoutData?.avg_running_cadence) ? Number(workoutData.avg_running_cadence)
+        : (Number.isFinite(workoutData?.avg_run_cadence) ? Number(workoutData.avg_run_cadence) : null));
+    }
+  }, [workoutData]);
 
   // Cursor & current values
   const s = normalizedSamples[idx] || normalizedSamples[normalizedSamples.length - 1];
@@ -1613,15 +1673,24 @@ function EffortsViewerMapbox({
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
             value={(() => {
-              if (tab === 'spd') {
-                const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
-                return formatSpeed(v, useMiles);
+              if (isScrubbing) {
+                if (tab === 'spd') {
+                  const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
+                  return formatSpeed(v, useMiles);
+                }
+                if (tab === 'pace') {
+                  const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
+                  return fmtPace(v, useMiles);
+                }
+                return workoutData?.type === 'ride' ? formatSpeed(s?.speed_mps ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles);
+              } else {
+                // Show averages
+                if (workoutData?.type === 'ride') {
+                  return formatSpeed(getAvgSpeed, useMiles);
+                } else {
+                  return fmtPace(getAvgPace, useMiles);
+                }
               }
-              if (tab === 'pace') {
-                const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
-                return fmtPace(v, useMiles);
-              }
-              return workoutData?.type === 'ride' ? formatSpeed(s?.speed_mps ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles);
             })()}  
             active={tab==="pace" || tab==="spd"} 
             width={54}
@@ -1631,7 +1700,10 @@ function EffortsViewerMapbox({
           {workoutData?.type !== 'run' && (
             <Pill 
               label="Power" 
-              value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} 
+              value={isScrubbing 
+                ? (Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—')
+                : (getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—')
+              } 
               active={tab==="pwr"} 
               width={54}
               onClick={() => setTab("pwr")}
@@ -1641,11 +1713,15 @@ function EffortsViewerMapbox({
           <Pill 
             label="HR" 
             value={(() => {
-              if (tab === 'bpm') {
-                const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? Math.round(metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
-                return v != null ? `${v} bpm` : '—';
+              if (isScrubbing) {
+                if (tab === 'bpm') {
+                  const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? Math.round(metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
+                  return v != null ? `${v} bpm` : '—';
+                }
+                return s?.hr_bpm != null ? `${s.hr_bpm} bpm` : '—';
+              } else {
+                return getAvgHR != null ? `${Math.round(getAvgHR)} bpm` : '—';
               }
-              return s?.hr_bpm != null ? `${s.hr_bpm} bpm` : '—';
             })()} 
             active={tab==="bpm"} 
             width={54}
@@ -1655,16 +1731,21 @@ function EffortsViewerMapbox({
           <Pill
             label="Grade"
             value={(() => {
-              const i = Math.min(idx, Math.max(0, normalizedSamples.length - 1));
-              const sNow = normalizedSamples[i];
-              let g = Number(sNow?.grade);
-              if (!Number.isFinite(g)) {
-                const prev = normalizedSamples[Math.max(0, i - 1)] || sNow;
-                const dd = Math.max(1, (sNow?.d_m ?? 0) - (prev?.d_m ?? (sNow?.d_m ?? 0)));
-                const dh = (sNow?.elev_m_sm ?? 0) - (prev?.elev_m_sm ?? (sNow?.elev_m_sm ?? 0));
-                g = dh / dd;
+              if (isScrubbing) {
+                const i = Math.min(idx, Math.max(0, normalizedSamples.length - 1));
+                const sNow = normalizedSamples[i];
+                let g = Number(sNow?.grade);
+                if (!Number.isFinite(g)) {
+                  const prev = normalizedSamples[Math.max(0, i - 1)] || sNow;
+                  const dd = Math.max(1, (sNow?.d_m ?? 0) - (prev?.d_m ?? (sNow?.d_m ?? 0)));
+                  const dh = (sNow?.elev_m_sm ?? 0) - (prev?.elev_m_sm ?? (sNow?.elev_m_sm ?? 0));
+                  g = dh / dd;
+                }
+                return fmtPct(g);
+              } else {
+                // No avg_grade in workoutData, show "—"
+                return '—';
               }
-              return fmtPct(g);
             })()}
             active={tab==="elev"}
             width={54}
@@ -1673,7 +1754,10 @@ function EffortsViewerMapbox({
           {/* Cadence */}
           <Pill 
             label="Cadence" 
-            value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} 
+            value={isScrubbing
+              ? (Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—')
+              : (getAvgCadence != null ? `${Math.round(getAvgCadence)}${workoutData?.type==='ride'?' rpm':' spm'}` : '—')
+            } 
             active={tab==="cad"} 
             width={54}
             onClick={() => setTab("cad")}
@@ -1682,7 +1766,10 @@ function EffortsViewerMapbox({
           {workoutData?.type === 'run' && (
             <Pill 
               label="Power" 
-              value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} 
+              value={isScrubbing
+                ? (Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—')
+                : (getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—')
+              } 
               active={tab==="pwr"} 
               width={54}
               onClick={() => setTab("pwr")}
@@ -1693,16 +1780,39 @@ function EffortsViewerMapbox({
             <Pill 
               label="VAM" 
               value={(() => {
-                if (tab === 'vam') {
-                  const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? Math.round(metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
-                  return v != null ? fmtVAM(v, useFeet) : '—';
+                if (isScrubbing) {
+                  if (tab === 'vam') {
+                    const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? Math.round(metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
+                    return v != null ? fmtVAM(v, useFeet) : '—';
+                  }
+                  return s?.vam_m_per_h != null ? fmtVAM(s.vam_m_per_h, useFeet) : '—';
+                } else {
+                  // Use avg_vam from workoutData if available
+                  const avgVam = Number.isFinite(workoutData?.avg_vam) ? Number(workoutData.avg_vam) : null;
+                  return avgVam != null ? fmtVAM(avgVam, useFeet) : '—';
                 }
-                return s?.vam_m_per_h != null ? fmtVAM(s.vam_m_per_h, useFeet) : '—';
               })()} 
               active={tab==="vam"} 
               width={54}
               onClick={() => setTab("vam")}
             />
+          )}
+        </div>
+        
+        {/* Context label - shows (avg) or (at distance • time) */}
+        <div style={{ 
+          textAlign: 'center', 
+          fontSize: 11, 
+          color: '#6b7280', 
+          marginTop: -4, 
+          marginBottom: 4,
+          transition: 'opacity 150ms ease',
+          opacity: 1
+        }}>
+          {isScrubbing && idx !== null && normalizedSamples[idx] ? (
+            <>at {fmtDist(distNow, useMiles)} • {fmtTime(normalizedSamples[idx].t_s)}</>
+          ) : (
+            <>(avg)</>
           )}
         </div>
         
@@ -1740,6 +1850,7 @@ function EffortsViewerMapbox({
           viewBox={`0 0 ${W} ${H}`}   // responsive: all drawn in SVG units
           width="100%" height={H}
           onMouseMove={onMove}
+          onMouseLeave={onMouseLeave}
           onTouchStart={onTouch}
           onTouchMove={onTouch}
           onDoubleClick={() => setLocked((l) => !l)}
