@@ -1905,6 +1905,9 @@ function EffortsViewerMapbox({
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
         </svg>
+        <div style={{ textAlign: 'center', fontSize: 11, color: '#d1d5db', marginTop: 2, letterSpacing: 0.5 }}>
+          ← Drag for details →
+        </div>
       </div>
 
       {/* Metric buttons */}
