@@ -1059,12 +1059,35 @@ function EffortsViewerMapbox({
       // This preserves actual max speed peaks (e.g., 34.5 mph sprints)
       return spd;
     }
-    // Pace - double smoothing for Garmin-like appearance
+    // Pace - calculate from time/distance (not GPS pace field which is inaccurate)
     if (tab === "pace") {
-      const raw = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
-      // Apply 30-second smoothing TWICE for much smoother line
-      const firstPass = nanAwareMovAvg(raw, 30);
-      const smoothed = nanAwareMovAvg(firstPass, 30);
+      // Calculate pace using rolling window of time/distance (like splits do)
+      // This gives accurate pace that matches the splits table
+      const windowSize = 30; // ~30 second window
+      const calculated: number[] = [];
+      
+      for (let i = 0; i < normalizedSamples.length; i++) {
+        // Find window boundaries (±15 samples)
+        const startIdx = Math.max(0, i - Math.floor(windowSize / 2));
+        const endIdx = Math.min(normalizedSamples.length - 1, i + Math.floor(windowSize / 2));
+        
+        const startSample = normalizedSamples[startIdx];
+        const endSample = normalizedSamples[endIdx];
+        
+        const timeDelta = endSample.t_s - startSample.t_s;
+        const distDelta = endSample.d_m - startSample.d_m;
+        
+        // Calculate pace as sec/km (time / distance_in_km)
+        if (distDelta > 10 && timeDelta > 0) { // Need at least 10m to calculate
+          const paceSecPerKm = timeDelta / (distDelta / 1000);
+          calculated.push(paceSecPerKm);
+        } else {
+          calculated.push(NaN);
+        }
+      }
+      
+      // Apply additional smoothing for clean appearance
+      const smoothed = nanAwareMovAvg(calculated, 30);
       return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Heart rate - enhanced smoothing with outlier handling
