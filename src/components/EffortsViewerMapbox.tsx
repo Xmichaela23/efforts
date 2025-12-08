@@ -1906,12 +1906,12 @@ function EffortsViewerMapbox({
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
           {/* Drag hint centered in chart plotting area */}
           <text 
-            x={350} 
-            y={100} 
+            x={W / 2} 
+            y={H - pb - 15} 
             textAnchor="middle" 
-            fill="#ff0000" 
-            fontSize={14} 
-            fontWeight={600}
+            fill="#d1d5db" 
+            fontSize={10} 
+            letterSpacing={0.5}
           >
             ← drag for details →
           </text>
