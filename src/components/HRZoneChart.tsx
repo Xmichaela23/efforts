@@ -173,12 +173,14 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
     if (zoneDurationsSeconds && zoneDurationsSeconds.length > 0) {
       // Use provided durations
       const total = zoneDurationsSeconds.reduce((a, b) => a + b, 0);
+      // Include ALL zones (even with 0 duration) so the chart shows all zones
       const zoneData = zoneDurationsSeconds.map((duration, i) => ({
         zone: zoneDefs[i]?.name || `Zone ${i + 1}`,
         duration,
         percentage: total > 0 ? duration / total : 0,
         color: colors[i % colors.length],
-      })).filter(z => z.duration > 0);
+        zoneIndex: i, // Store original index for zoneDefs lookup
+      }));
       
       return { zoneData, totalTime: total, avgHr: providedAvgHr ?? 0, maxHr: providedMaxHr ?? 0 };
     }
@@ -219,7 +221,8 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
       duration: count,
       percentage: totalTime > 0 ? count / totalTime : 0,
       color: colors[i % colors.length],
-    })).filter(z => z.duration > 0);
+      zoneIndex: i, // Store original index for zoneDefs lookup
+    }));
 
     return { zoneData, totalTime, avgHr, maxHr };
   }, [samples, zoneDurationsSeconds, zoneDefs, colors]);
@@ -273,7 +276,9 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={zoneData} margin={{ top: 8, right: 8, left: 8, bottom: 16 }}>
                 <XAxis dataKey="zone" />
-                <YAxis />
+                <YAxis 
+                  tickFormatter={(value) => fmtTime(value)}
+                />
                 <Tooltip 
                   formatter={(value: any) => [fmtTime(value), 'Time']}
                   labelFormatter={(label) => `Zone: ${label}`}
@@ -311,7 +316,7 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
         <div>
           <h3 className="text-sm font-medium mb-3">Zone Details</h3>
           <div className="space-y-2">
-            {zoneData.map((zone, index) => (
+            {zoneData.filter(z => z.duration > 0).map((zone) => (
               <div key={zone.zone} className="flex items-center justify-between p-3 rounded-lg border">
                 <div className="flex items-center gap-3">
                   <div 
@@ -320,7 +325,7 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
                   />
                   <span className="font-medium">{zone.zone}</span>
                   <span className="text-sm text-muted-foreground">
-                    {zoneDefs[index]?.min}-{zoneDefs[index]?.max} bpm
+                    {zoneDefs[(zone as any).zoneIndex]?.min}-{zoneDefs[(zone as any).zoneIndex]?.max} bpm
                   </span>
                 </div>
                 <div className="text-right">
