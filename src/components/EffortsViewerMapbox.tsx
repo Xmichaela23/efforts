@@ -1904,14 +1904,13 @@ function EffortsViewerMapbox({
           {/* cursor */}
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
-          {/* Drag hint centered between x-axis labels and bottom of chart */}
+          {/* Drag hint - centered between x-axis time labels and chart bottom */}
           <text 
             x={pl + (W - pl - pr) / 2} 
-            y={H - pb + 42} 
+            y={H - 6} 
             textAnchor="middle" 
             fill="#c9cdd4" 
-            fontSize={13} 
-            letterSpacing={0.5}
+            fontSize={14}
           >
             ← drag for details →
           </text>
@@ -1919,7 +1918,7 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Metric buttons */}
-      <div style={{ marginTop: -4, padding: "0 8px" }}>
+      <div style={{ marginTop: 0, padding: "0 8px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
           {( (
             [
