@@ -905,9 +905,9 @@ function EffortsViewerMapbox({
   const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
 
   /** ----- Chart prep ----- */
-  const W = 700, H = 295;           // overall SVG size (in SVG units) - increased for x-axis labels
+  const W = 700, H = 280;           // overall SVG size (in SVG units)
   const P = 24;                     // vertical padding (top)
-  const pb = 55;                    // bottom padding (space for x-axis labels)
+  const pb = 44;                    // bottom padding (space for x-axis labels)
   const [pl, setPl] = useState(66); // left padding (space for Y labels) - increased to prevent clipping
   const pr = 8;                     // right padding (tight)
 
@@ -1799,10 +1799,10 @@ function EffortsViewerMapbox({
               : `${mins}:${String(secs).padStart(2, '0')}`;
             return (
               <g key={`xaxis-${i}`}>
-                <text x={x} y={H - pb + 18} fill="#6b7280" fontSize={12} fontWeight={500} textAnchor="middle">
+                <text x={x} y={H - pb + 18} fill="#6b7280" fontSize={16} fontWeight={500} textAnchor="middle">
                   {distDisplay} {distUnit}
                 </text>
-                <text x={x} y={H - pb + 32} fill="#9ca3af" fontSize={11} textAnchor="middle">
+                <text x={x} y={H - pb + 36} fill="#9ca3af" fontSize={14} textAnchor="middle">
                   {timeDisplay}
                 </text>
               </g>
