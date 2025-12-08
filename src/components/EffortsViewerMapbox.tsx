@@ -905,9 +905,9 @@ function EffortsViewerMapbox({
   const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
 
   /** ----- Chart prep ----- */
-  const W = 700, H = 260;           // overall SVG size (in SVG units)
-  const P = 32;                     // vertical padding (top) - increased to prevent clipping
-  const pb = 38;                    // bottom padding (space for x-axis labels)
+  const W = 700, H = 235;           // overall SVG size (in SVG units) - compact
+  const P = 12;                     // vertical padding (top)
+  const pb = 32;                    // bottom padding (space for x-axis labels)
   const pl = 46;                    // left padding (space for Y labels)
   const pr = 12;                    // right padding
 
@@ -1191,10 +1191,10 @@ function EffortsViewerMapbox({
         const p95 = sorted[Math.min(Math.floor(sorted.length * 0.95), sorted.length - 1)];
         lo = p5;
         hi = p95;
-        // Add 10% padding for visual breathing room
+        // Add 15% padding for visual breathing room
         const range = hi - lo;
-        lo = lo - range * 0.1;
-        hi = hi + range * 0.1;
+        lo = lo - range * 0.15;
+        hi = hi + range * 0.15;
       } else {
         lo = 200;
         hi = 600;
