@@ -908,8 +908,8 @@ function EffortsViewerMapbox({
   const W = 700, H = 260;           // overall SVG size (in SVG units)
   const P = 24;                     // vertical padding (top)
   const pb = 38;                    // bottom padding (space for x-axis labels)
-  const [pl, setPl] = useState(66); // left padding (space for Y labels) - increased to prevent clipping
-  const pr = 8;                     // right padding (tight)
+  const [pl, setPl] = useState(50); // left padding (space for Y labels)
+  const pr = 16;                    // right padding (balanced)
 
   // cumulative positive gain (m) and loss (m), used for the InfoCard
   const { cumGain_m, cumLoss_m } = useMemo(() => {
@@ -1818,7 +1818,7 @@ function EffortsViewerMapbox({
           {yTicks.map((v, i) => (
             <g key={i}>
               <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#e5e7eb" strokeWidth="1" />
-              <text x={pl - 8} y={yFromValue(v) + 4} fill="#6b7280" fontSize={16} fontWeight={500} textAnchor="end">
+              <text x={pl - 6} y={yFromValue(v) + 4} fill="#6b7280" fontSize={14} fontWeight={500} textAnchor="end">
                 {fmtYAxis(v, tab, workoutData?.type || 'run', useMiles, useFeet)}
               </text>
             </g>
