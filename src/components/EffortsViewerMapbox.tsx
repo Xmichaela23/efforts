@@ -906,7 +906,7 @@ function EffortsViewerMapbox({
 
   /** ----- Chart prep ----- */
   const W = 700, H = 260;           // overall SVG size (in SVG units)
-  const P = 24;                     // vertical padding (top)
+  const P = 32;                     // vertical padding (top) - increased to prevent clipping
   const pb = 38;                    // bottom padding (space for x-axis labels)
   const pl = 46;                    // left padding (space for Y labels)
   const pr = 12;                    // right padding
