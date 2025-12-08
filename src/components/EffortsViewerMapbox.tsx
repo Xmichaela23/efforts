@@ -1907,10 +1907,10 @@ function EffortsViewerMapbox({
           {/* Drag hint centered in chart plotting area (right of y-labels) */}
           <text 
             x={pl + (W - pl - pr) / 2} 
-            y={H - pb - 15} 
+            y={H - pb - 4} 
             textAnchor="middle" 
-            fill="#d1d5db" 
-            fontSize={10} 
+            fill="#c9cdd4" 
+            fontSize={12} 
             letterSpacing={0.5}
           >
             ← drag for details →
