@@ -2,16 +2,12 @@ import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
-  PieChart,
-  Pie,
-  Cell,
   BarChart,
   Bar,
   XAxis,
   Tooltip,
   ResponsiveContainer,
   YAxis,
-  Legend,
 } from "recharts";
 
 /**
@@ -268,54 +264,22 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
 
         <Separator />
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Bar Chart */}
-          <div>
-            <h3 className="text-sm font-medium mb-3">Time Distribution</h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={zoneData} margin={{ top: 8, right: 8, left: 8, bottom: 16 }}>
-                <XAxis dataKey="zone" />
-                <YAxis 
-                  tickFormatter={(value) => fmtTime(value)}
-                />
-                <Tooltip 
-                  formatter={(value: any) => [fmtTime(value), 'Time']}
-                  labelFormatter={(label) => `Zone: ${label}`}
-                />
-                <Bar dataKey="duration" fill="#3b82f6" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Pie Chart */}
-          <div>
-            <h3 className="text-sm font-medium mb-3">Zone Distribution</h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie
-                  data={zoneData}
-                  dataKey="percentage"
-                  nameKey="zone"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={72}
-                  label={({ duration }) => duration > 0 ? fmtTime(duration) : ''}
-                >
-                  {zoneData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value: any, name: any, props: any) => [
-                    `${fmtTime(props.payload.duration)} (${pctFmt(value)})`, 
-                    'Time'
-                  ]}
-                  labelFormatter={(label) => `${label}`}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Bar Chart */}
+        <div>
+          <h3 className="text-sm font-medium mb-3">Time Distribution</h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={zoneData} margin={{ top: 8, right: 8, left: 8, bottom: 16 }}>
+              <XAxis dataKey="zone" />
+              <YAxis 
+                tickFormatter={(value) => fmtTime(value)}
+              />
+              <Tooltip 
+                formatter={(value: any) => [fmtTime(value), 'Time']}
+                labelFormatter={(label) => `Zone: ${label}`}
+              />
+              <Bar dataKey="duration" fill="#3b82f6" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
         {/* Zone Table */}
