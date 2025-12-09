@@ -300,13 +300,19 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
                   cx="50%"
                   cy="50%"
                   outerRadius={72}
-                  label={({ percentage }) => pctFmt(percentage)}
+                  label={({ duration }) => duration > 0 ? fmtTime(duration) : ''}
                 >
                   {zoneData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: any) => [pctFmt(value), 'Percentage']} />
+                <Tooltip 
+                  formatter={(value: any, name: any, props: any) => [
+                    `${fmtTime(props.payload.duration)} (${pctFmt(value)})`, 
+                    'Time'
+                  ]}
+                  labelFormatter={(label) => `${label}`}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
