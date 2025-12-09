@@ -2094,10 +2094,6 @@ function EffortsViewerMapbox({
 
         {/* VAM UI moved to CompletedTab */}
       </div>
-
-      <div style={{ marginTop: 14, color: "#94a3b8", fontSize: 12 }}>
-        Drag to scrub • Double-tap chart to {locked ? "unlock" : "lock"} • Light smoothing + outlier trim for cleaner lines
-      </div>
     </div>
   );
 }
