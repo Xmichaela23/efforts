@@ -2285,6 +2285,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               return '—';
             })();
 
+            // Check if this is a single-interval steady-state run (use moving time)
+            const isSingleIntervalSteadyState = (() => {
+              const workSteps = stepsDisplay.filter((s: any) => {
+                const kind = String(s?.kind || s?.type || '').toLowerCase();
+                return kind === 'work' || kind === 'interval';
+              });
+              return workSteps.length === 1;
+            })();
+            
             const timeCell = (() => {
               // Check if this is an overall/summary row (not a real interval step)
               const stepKind = String(st?.kind || st?.type || '').toLowerCase();
@@ -2297,10 +2306,21 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
                 return '—';
               }
+              
+              // For single-interval steady-state runs, use moving time from overall
+              if (isSingleIntervalSteadyState && stepKind === 'work') {
+                const overall = (completed as any)?.computed?.overall || {};
+                const movingTime = Number(overall?.duration_s_moving);
+                if (Number.isFinite(movingTime) && movingTime > 0) return fmtTime(movingTime);
+              }
+              
               // For individual intervals (warmup, work, recovery, cooldown), use interval duration
               if (!hasServerComputed || !row) return '—';
               const dur = row?.executed?.duration_s; return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
             })();
+            
+            // Show "Moving Time" subtitle for single-interval steady-state runs
+            const showMovingTimeLabel = isSingleIntervalSteadyState && String(st?.kind || st?.type || '').toLowerCase() === 'work';
 
             const hrVal = (() => {
               if (!hasServerComputed || !row) {
@@ -2364,6 +2384,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 <td className="px-2 py-1.5">{distCell}</td>
                 <td className="px-2 py-1.5">
                   <div className="font-medium">{timeCell}</div>
+                  {showMovingTimeLabel && <div className="text-[9px] text-gray-500">Moving Time</div>}
                 </td>
                 <td className="px-1 py-1.5 text-[13px]">
                   <div className="text-right">

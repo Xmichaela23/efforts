@@ -922,6 +922,52 @@ Deno.serve(async (req) => {
       // Find matching step in planned workout to get pace_range
       const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.planned_step_id);
       
+      // ✅ CRITICAL FIX: Always check and expand ranges, even if interval already has pace_range
+      // This ensures we use the expanded range for adherence calculation
+      if (plannedStep?.pace_range) {
+        // Check if we need to expand the range (whether from plannedStep or existing interval)
+        const rangeToCheck = interval.pace_range || plannedStep.pace_range;
+        const rangeWidth = rangeToCheck.upper - rangeToCheck.lower;
+        const midpoint = (rangeToCheck.lower + rangeToCheck.upper) / 2;
+        const actualTolerance = rangeWidth / midpoint;
+        const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
+        
+        // If range is too tight (less than 60% of expected tolerance), expand it
+        if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
+          const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
+          const plannedPaceFromInterval = interval.planned?.target_pace_s_per_mi;
+          const plannedPaceFromStep = plannedStep?.pace_sec_per_mi;
+          const centerPace = plannedPaceFromInterval || 
+                             plannedPaceFromStep || 
+                             midpoint;
+          
+          console.log(`🔍 [CENTER DEBUG] Recalculating range - interval.planned.target_pace_s_per_mi=${plannedPaceFromInterval}, plannedStep.pace_sec_per_mi=${plannedPaceFromStep}, midpoint=${midpoint}, using centerPace=${centerPace}`);
+          
+          const lower = Math.round(centerPace * (1 - tolerance));
+          const upper = Math.round(centerPace * (1 + tolerance));
+          console.log(`⚠️ [FIX] Recalculated too-tight range ${rangeToCheck.lower}-${rangeToCheck.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance) centered on ${centerPace}s/mi`);
+          return {
+            ...interval,
+            pace_range: { lower, upper },
+            target_pace: { lower, upper }
+          };
+        }
+        
+        // Check for zero-width range
+        if (rangeToCheck.lower === rangeToCheck.upper && rangeToCheck.lower > 0) {
+          const singlePace = rangeToCheck.lower;
+          const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
+          const lower = Math.round(singlePace * (1 - tolerance));
+          const upper = Math.round(singlePace * (1 + tolerance));
+          console.log(`⚠️ [FIX] Expanded zero-width range ${singlePace}-${singlePace} to ${lower}-${upper}s/mi`);
+          return {
+            ...interval,
+            pace_range: { lower, upper },
+            target_pace: { lower, upper }
+          };
+        }
+      }
+      
       // Add pace_range to interval if not already present
       if (plannedStep?.pace_range && !interval.pace_range && !interval.target_pace) {
         // ✅ FIX: Check for zero-width range
@@ -993,51 +1039,7 @@ Deno.serve(async (req) => {
         };
       }
       
-      // ✅ FIX: Check if pace_range exists but has zero width (lower === upper)
-      if (interval.pace_range?.lower === interval.pace_range?.upper && interval.pace_range?.lower > 0) {
-        const singlePace = interval.pace_range.lower;
-        const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-        const lower = Math.round(singlePace * (1 - tolerance));
-        const upper = Math.round(singlePace * (1 + tolerance));
-        console.log(`⚠️ [FIX] Expanded zero-width pace_range ${singlePace}-${singlePace} to ${lower}-${upper}s/mi`);
-        return {
-          ...interval,
-          pace_range: { lower, upper },
-          target_pace: { lower, upper }
-        };
-      }
-      
-      // ✅ FIX: Check for asymmetric/too-tight ranges in existing pace_range
-      if (interval.pace_range?.lower && interval.pace_range?.upper && interval.pace_range.lower < interval.pace_range.upper) {
-        const rangeWidth = interval.pace_range.upper - interval.pace_range.lower;
-        const midpoint = (interval.pace_range.lower + interval.pace_range.upper) / 2;
-        const actualTolerance = rangeWidth / midpoint;
-        const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-        
-        // If actual tolerance is less than 60% of expected, recalculate with proper tolerance
-        // ✅ CRITICAL: Use planned.target_pace_s_per_mi as center (workout-specific pace) instead of midpoint (baseline)
-        if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
-          const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-          // Priority: Use planned target pace (workout-specific) over range midpoint (baseline)
-          // Check multiple possible locations for the planned pace
-          const plannedPaceFromInterval = interval.planned?.target_pace_s_per_mi;
-          const plannedPaceFromStep = plannedStep?.pace_sec_per_mi;
-          const centerPace = plannedPaceFromInterval || 
-                             plannedPaceFromStep || 
-                             midpoint;
-          
-          console.log(`🔍 [CENTER DEBUG] Recalculating pace_range - interval.planned.target_pace_s_per_mi=${plannedPaceFromInterval}, plannedStep.pace_sec_per_mi=${plannedPaceFromStep}, midpoint=${midpoint}, using centerPace=${centerPace}`);
-          
-          const lower = Math.round(centerPace * (1 - tolerance));
-          const upper = Math.round(centerPace * (1 + tolerance));
-          console.log(`⚠️ [FIX] Recalculated too-tight pace_range ${interval.pace_range.lower}-${interval.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance) centered on ${centerPace}s/mi`);
-          return {
-            ...interval,
-            pace_range: { lower, upper },
-            target_pace: { lower, upper }
-          };
-        }
-      }
+      // Note: Range expansion for existing pace_range is now handled at the top of this function
       
       // ✅ FIX: Check target_pace object for zero width
       if (interval.target_pace?.lower === interval.target_pace?.upper && interval.target_pace?.lower > 0) {
@@ -1119,14 +1121,50 @@ Deno.serve(async (req) => {
       // Calculate Garmin-style execution score using penalty system (for execution score only)
       const executionAnalysis = calculateGarminExecutionScore(computedIntervals, plannedWorkout);
       
-      // ✅ USE GRANULAR ANALYSIS FOR TRUE ADHERENCE SCORES
-      // Granular analysis uses time-in-range calculation (sample-by-sample), which is more accurate
+      // ✅ USE AVERAGE PACE FOR PACE ADHERENCE
+      // Pace adherence = 100% if average pace is within the target range
+      // This is the correct definition: did you hit your target pace on average?
       
-      // Pace adherence: Use granular time-in-range score (converted to percentage)
-      // We have all the data - use granular analysis directly, no fallbacks
-      const granularPaceAdherence = enhancedAnalysis.overall_adherence != null 
-        ? Math.round(enhancedAnalysis.overall_adherence * 100)
-        : 0;
+      // Get workout-level average pace for pace adherence calculation
+      const movingTimeForPace = workout?.computed?.overall?.duration_s_moving 
+        || (workout.moving_time ? workout.moving_time * 60 : null)
+        || null;
+      const distanceKmForPace = workout.distance || 0;
+      const distanceMiForPace = distanceKmForPace * 0.621371;
+      const avgPaceSecondsForAdherence = (movingTimeForPace > 0 && distanceMiForPace > 0) 
+        ? movingTimeForPace / distanceMiForPace 
+        : null;
+      
+      // Get target pace range from planned workout
+      let targetPaceLower: number | null = null;
+      let targetPaceUpper: number | null = null;
+      if (plannedWorkout?.computed?.steps) {
+        const workSteps = plannedWorkout.computed.steps.filter((step: any) =>
+          (step.kind === 'work' || step.role === 'work') && step.pace_range
+        );
+        if (workSteps.length > 0 && workSteps[0].pace_range) {
+          targetPaceLower = workSteps[0].pace_range.lower;
+          targetPaceUpper = workSteps[0].pace_range.upper;
+        }
+      }
+      
+      // Calculate pace adherence based on average pace within range
+      let granularPaceAdherence = 0;
+      if (avgPaceSecondsForAdherence && targetPaceLower && targetPaceUpper) {
+        granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper));
+        console.log(`🔍 [PACE ADHERENCE] Using AVERAGE pace adherence: ${granularPaceAdherence}%`);
+        console.log(`   - Average pace: ${(avgPaceSecondsForAdherence / 60).toFixed(2)} min/mi (${avgPaceSecondsForAdherence.toFixed(0)}s)`);
+        console.log(`   - Target range: ${(targetPaceLower / 60).toFixed(2)}-${(targetPaceUpper / 60).toFixed(2)} min/mi (${targetPaceLower}-${targetPaceUpper}s)`);
+        console.log(`   - In range? ${avgPaceSecondsForAdherence >= targetPaceLower && avgPaceSecondsForAdherence <= targetPaceUpper ? 'YES' : 'NO'}`);
+      } else {
+        // Fallback to time-in-range if we can't calculate average pace
+        granularPaceAdherence = enhancedAnalysis.overall_adherence != null 
+          ? Math.round(enhancedAnalysis.overall_adherence * 100)
+          : 0;
+        console.log(`🔍 [PACE ADHERENCE] Fallback to time-in-range: ${granularPaceAdherence}% (couldn't calculate average pace)`);
+      }
+      
+      console.log(`🔍 [PACE ADHERENCE] Final pace adherence: ${granularPaceAdherence}%`);
       
       // Duration adherence: Use granular duration adherence percentage
       // We have all the data - use granular analysis directly, no fallbacks
@@ -1149,11 +1187,10 @@ Deno.serve(async (req) => {
         (performance.pace_adherence * 0.5) + (performance.duration_adherence * 0.5)
       );
       
-      console.log(`🎯 Using granular analysis for adherence scores`);
-      console.log(`🎯 Granular pace adherence: ${granularPaceAdherence}% (from time-in-range)`);
-      console.log(`🎯 Granular duration adherence: ${granularDurationAdherence}%`);
-      console.log(`🎯 Initial execution score: ${performance.execution_adherence}% (pace: ${performance.pace_adherence}%, duration: ${performance.duration_adherence}%)`);
-      console.log(`🎯 Fallback execution analysis: pace=${executionAnalysis.pace_execution}%, duration=${executionAnalysis.duration_adherence}%`);
+      console.log(`🎯 Using adherence scores:`);
+      console.log(`🎯 Pace adherence: ${granularPaceAdherence}% (from AVERAGE pace)`);
+      console.log(`🎯 Duration adherence: ${granularDurationAdherence}% (from moving time)`);
+      console.log(`🎯 Overall execution: ${performance.execution_adherence}% = (${performance.pace_adherence}% + ${performance.duration_adherence}%) / 2`);
     }
 
     console.log('✅ Performance calculated:', performance);
@@ -1211,58 +1248,10 @@ Deno.serve(async (req) => {
         console.log('🎯 [PLANNED PACE] Extracted pace info:', JSON.stringify(plannedPaceInfo));
         console.log('🎯 [PLANNED PACE] Lower:', plannedPaceInfo?.lower, 'Upper:', plannedPaceInfo?.upper);
         
-        // Recalculate execution score with average pace adherence weighting
-        if (plannedPaceInfo && plannedPaceInfo.type === 'range' && plannedPaceInfo.lower && plannedPaceInfo.upper) {
-          // Get workout-level average pace
-          const workoutMovingTimeSeconds = workout?.computed?.overall?.duration_s_moving 
-            || (workout.moving_time ? workout.moving_time * 60 : null)
-            || (workout.duration ? workout.duration * 60 : 0);
-          const workoutDistanceKm = workout.distance || 0;
-          const workoutDistanceMi = workoutDistanceKm * 0.621371;
-          const workoutAvgPaceSeconds = (workoutMovingTimeSeconds > 0 && workoutDistanceMi > 0) 
-            ? workoutMovingTimeSeconds / workoutDistanceMi 
-            : null;
-          
-          if (workoutAvgPaceSeconds && workoutAvgPaceSeconds > 0) {
-            const targetLower = plannedPaceInfo.lower;
-            const targetUpper = plannedPaceInfo.upper;
-            
-            // Calculate average pace adherence score
-            let avgPaceAdherenceScore = performance.pace_adherence; // Default to time-in-range score
-            
-            // Check if average pace is within range
-            if (workoutAvgPaceSeconds >= targetLower && workoutAvgPaceSeconds <= targetUpper) {
-              avgPaceAdherenceScore = 100; // Perfect - within range
-            } else {
-              // Calculate how close to range (within 5s = 95%, within 10s = 90%, etc.)
-              let distanceFromRange = 0;
-              if (workoutAvgPaceSeconds < targetLower) {
-                distanceFromRange = targetLower - workoutAvgPaceSeconds;
-              } else {
-                distanceFromRange = workoutAvgPaceSeconds - targetUpper;
-              }
-              
-              // Score decreases by 1% per second away from range, but caps at 70% minimum
-              avgPaceAdherenceScore = Math.max(70, 100 - distanceFromRange);
-            }
-            
-            // Weighted execution score:
-            // - Average pace adherence: 40% (most important - did they hit the overall target?)
-            // - Time-in-range (mile-by-mile consistency): 30% (important but less than average)
-            // - Duration adherence: 30% (completing the workout)
-            performance.execution_adherence = Math.round(
-              (avgPaceAdherenceScore * 0.4) + 
-              (performance.pace_adherence * 0.3) + 
-              (performance.duration_adherence * 0.3)
-            );
-            
-            console.log(`🎯 [EXECUTION SCORE] Recalculated with average pace weighting:`);
-            console.log(`   - Average pace: ${(workoutAvgPaceSeconds / 60).toFixed(2)} min/mi, adherence: ${avgPaceAdherenceScore}%`);
-            console.log(`   - Time-in-range: ${performance.pace_adherence}%`);
-            console.log(`   - Duration: ${performance.duration_adherence}%`);
-            console.log(`   - Final execution score: ${performance.execution_adherence}%`);
-          }
-        }
+        // ✅ Overall adherence already calculated above: (pace_adherence + duration_adherence) / 2
+        // pace_adherence = based on AVERAGE pace being in range
+        // duration_adherence = based on moving time vs planned time
+        console.log(`🎯 [OVERALL ADHERENCE] Final: ${performance.execution_adherence}% = (${performance.pace_adherence}% pace + ${performance.duration_adherence}% duration) / 2`);
       }
     }
 
@@ -1327,15 +1316,14 @@ Deno.serve(async (req) => {
           }
           
           if (weight > 0) {
-            // Use performance_score if available, otherwise calculate from pace and duration adherence
-            let segmentScore = interval.performance_score;
+            // ✅ FIX: Use actual pace and duration adherence, not performance_score
+            // performance_score from interval_breakdown uses average pace (100%), not time-in-range (66%)
+            // Overall adherence should reflect actual execution consistency, not just hitting an average
             const paceAdherence = interval.pace_adherence_percent || 0;
             const durationAdherence = interval.duration_adherence_percent || 0;
             
-            if (segmentScore === undefined || segmentScore === null) {
-              // Calculate segment score: average of pace and duration adherence
-              segmentScore = (paceAdherence + durationAdherence) / 2;
-            }
+            // Calculate segment score from actual adherence metrics (50% pace, 50% duration)
+            const segmentScore = (paceAdherence + durationAdherence) / 2;
             
             const weightedContribution = segmentScore * weight;
             weightedSum += weightedContribution;
@@ -1355,7 +1343,18 @@ Deno.serve(async (req) => {
         
         if (totalWeight > 0) {
           const calculatedExecutionScore = Math.round(weightedSum / totalWeight);
-          performance.execution_adherence = calculatedExecutionScore;
+          // ✅ Keep the correct calculation: (pace_adherence + duration_adherence) / 2
+          // pace_adherence = average pace in range (100% if average is within target)
+          // duration_adherence = moving time vs planned time
+          // Only use interval_breakdown calculation as fallback
+          if (performance.pace_adherence > 0 && performance.duration_adherence > 0) {
+            // Already calculated correctly above - don't overwrite
+            console.log(`🎯 [EXECUTION SCORE] Keeping main calculation: ${performance.execution_adherence}% = (${performance.pace_adherence}% pace + ${performance.duration_adherence}% duration) / 2`);
+            console.log(`🎯 [EXECUTION SCORE] (Interval breakdown alternative would be: ${calculatedExecutionScore}%)`);
+          } else {
+            // Fallback: use interval_breakdown calculation if pace/duration not available
+            performance.execution_adherence = calculatedExecutionScore;
+          }
           
           console.log(`🎯 [EXECUTION SCORE] Recalculated from detailed_analysis.interval_breakdown:`);
           console.log(`   - Interval counts: Warmup=${warmupIntervals.length}, Work=${workIntervals.length}, Recovery=${recoveryIntervals.length}, Cooldown=${cooldownIntervals.length}`);
@@ -1642,6 +1641,11 @@ function calculatePrescribedRangeAdherenceGranular(sensorData: any[], intervals:
   
   const isIntervalWorkout = intervalsWithPaceTargets.length > 0;
   console.log(`🔍 Workout type: ${isIntervalWorkout ? 'Intervals' : 'Steady-state'} (${intervalsWithPaceTargets.length} intervals with pace targets, ${workIntervals.length} work segments)`);
+  
+  // ✅ CRITICAL: Use the enriched intervals (with expanded ranges) not the original intervals
+  // The 'intervals' parameter might be the original computedIntervals without expanded ranges
+  // We need to use the enriched intervals that were passed in (which should have expanded ranges)
+  console.log(`🔍 [RANGE CHECK] First interval pace_range:`, intervals[0]?.pace_range, `target_pace:`, intervals[0]?.target_pace);
   
   if (isIntervalWorkout) {
     return calculateIntervalPaceAdherence(sensorData, intervals, workout, plannedWorkout);
@@ -1957,7 +1961,7 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   }
   
   return {
-    overall_adherence: avgPaceAdherence / 100, // NEW: interval averages (industry standard)
+    overall_adherence: timeInRangeScore, // ✅ FIX: Use time-in-range (sample-by-sample), not interval averages
     time_in_range_score: timeInRangeScore,
     time_in_range_pct: timeInRangePct, // OLD: keep for reference (includes transitions/GPS noise)
     variability_score: pacingVariability.coefficient_of_variation / 100, // Convert CV% to decimal
@@ -2032,22 +2036,27 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
   console.log('🏃‍♂️ Analyzing steady-state workout pace adherence');
   
   // For steady-state, analyze the main workout segments (excluding warmup/cooldown)
-  const mainSegments = intervals.filter(interval => 
-    interval.type !== 'warmup' && 
-    interval.type !== 'cooldown' &&
-    interval.pace_range &&
-    interval.pace_range.lower &&
-    interval.pace_range.upper
-  );
+  // Intervals use 'role' or 'kind', not 'type'
+  const mainSegments = intervals.filter(interval => {
+    const role = String(interval.role || interval.kind || interval.type || '').toLowerCase();
+    return role !== 'warmup' && 
+           role !== 'cooldown' &&
+           interval.pace_range &&
+           interval.pace_range.lower &&
+           interval.pace_range.upper;
+  });
   
   if (mainSegments.length === 0) {
     console.log('⚠️ No main segments found - analyzing as freeform run using actual workout data');
     
     // Analyze the entire workout as a single segment using actual data
     // Calculate total time from sensor data or workout fields
-    const totalTimeSeconds = sensorData.length > 0 
-      ? (sensorData[sensorData.length - 1].elapsed_time_s || sensorData.length)
-      : (workout.moving_time * 60 || workout.duration * 60 || 0);
+    // ✅ FIX: Use moving time, not elapsed duration
+    // Don't use elapsed_time_s from sensor data - it's elapsed time, not moving time
+    // Use moving time sources only: duration_s_moving or moving_time field
+    const totalTimeSeconds = workout?.computed?.overall?.duration_s_moving 
+      || (workout.moving_time ? workout.moving_time * 60 : null)
+      || (sensorData.length > 0 ? sensorData.length : 0); // Fallback to sample count only if no moving time available
     
     // Calculate average pace and HR from sensor data
     const validPaceSamples = sensorData.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
@@ -2079,6 +2088,42 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
     const stdDev = allPaces.length > 1 ? calculateStandardDeviation(allPaces) : 0;
     const cv = avgPace > 0 ? stdDev / avgPace : 0;
     
+    // Try to get planned pace range from planned workout steps
+    let plannedPaceLower = 0;
+    let plannedPaceUpper = 0;
+    if (plannedWorkout?.computed?.steps) {
+      // Look for work step with pace range (steady-state runs typically have one main work step)
+      const workStep = plannedWorkout.computed.steps.find((step: any) => 
+        (step.kind === 'work' || step.role === 'work') && step.pace_range
+      );
+      if (workStep?.pace_range) {
+        plannedPaceLower = workStep.pace_range.lower || 0;
+        plannedPaceUpper = workStep.pace_range.upper || 0;
+      }
+    }
+    
+    // Calculate pace adherence: time-in-range if we have planned pace, otherwise 1.0
+    let paceAdherence = 1.0;
+    let timeInRange = 0;
+    let timeOutsideRange = 0;
+    
+    if (plannedPaceLower > 0 && plannedPaceUpper > 0 && validPaceSamples.length > 0) {
+      // Calculate time-in-range adherence (sample-by-sample)
+      for (const sample of validPaceSamples) {
+        const pace = sample.pace_s_per_mi;
+        if (pace >= plannedPaceLower && pace <= plannedPaceUpper) {
+          timeInRange += 1;
+        } else {
+          timeOutsideRange += 1;
+        }
+      }
+      const totalPaceTime = timeInRange + timeOutsideRange;
+      paceAdherence = totalPaceTime > 0 ? timeInRange / totalPaceTime : 1.0;
+      console.log(`📊 Pace adherence: ${(paceAdherence * 100).toFixed(1)}% (${timeInRange}s in range, ${timeOutsideRange}s outside)`);
+    } else {
+      console.log('⚠️ No planned pace range found - using default adherence 1.0');
+    }
+    
     // Calculate duration adherence even for freeform runs (we have the data)
     const plannedDurationSeconds = plannedWorkout?.computed?.total_duration_seconds || 0;
     const actualDurationSeconds = 
@@ -2102,6 +2147,8 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
     console.log('📊 Freeform run analysis:', {
       totalTimeSeconds,
       avgPace: avgPace.toFixed(1),
+      plannedPaceRange: plannedPaceLower > 0 ? `${plannedPaceLower}-${plannedPaceUpper}` : 'none',
+      paceAdherence: (paceAdherence * 100).toFixed(1) + '%',
       avgHR,
       maxHR,
       hrDrift,
@@ -2111,8 +2158,8 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
     });
     
     return {
-      overall_adherence: 1.0, // No target to compare against
-      time_in_range_score: 1.0,
+      overall_adherence: paceAdherence, // Use calculated pace adherence
+      time_in_range_score: paceAdherence,
       variability_score: cv,
       smoothness_score: Math.max(0, 1 - cv),
       pacing_variability: {
@@ -2123,11 +2170,11 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
         steadiness_score: Math.max(0, 100 - (cv * 100)),
         avg_pace_change_seconds: stdDev
       },
-      time_in_range_s: totalTimeSeconds,
-      time_outside_range_s: 0,
-      total_time_s: totalTimeSeconds,
-      samples_in_range: sensorData.length,
-      samples_outside_range: 0,
+      time_in_range_s: timeInRange,
+      time_outside_range_s: timeOutsideRange,
+      total_time_s: timeInRange + timeOutsideRange,
+      samples_in_range: timeInRange,
+      samples_outside_range: timeOutsideRange,
       heart_rate_analysis: avgHR > 0 ? {
         adherence_percentage: 100,
         time_in_zone_s: totalTimeSeconds,
@@ -2208,10 +2255,28 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
   const cv = stdDev / avgPace;
   
   // Get target pace from the main segment
-  const targetPace = mainSegments[0].pace_range.lower + 
-    (mainSegments[0].pace_range.upper - mainSegments[0].pace_range.lower) / 2;
+  const targetPaceLower = mainSegments[0].pace_range.lower;
+  const targetPaceUpper = mainSegments[0].pace_range.upper;
+  const targetPace = targetPaceLower + (targetPaceUpper - targetPaceLower) / 2;
   
-  // Calculate base adherence
+  // Calculate time-in-range adherence (sample-by-sample) for accurate adherence score
+  const validPaceSamples = sensorData.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
+  let timeInRange = 0;
+  let timeOutsideRange = 0;
+  
+  for (const sample of validPaceSamples) {
+    const pace = sample.pace_s_per_mi;
+    if (pace >= targetPaceLower && pace <= targetPaceUpper) {
+      timeInRange += 1;
+    } else {
+      timeOutsideRange += 1;
+    }
+  }
+  
+  const totalPaceTime = timeInRange + timeOutsideRange;
+  const timeInRangeScore = totalPaceTime > 0 ? timeInRange / totalPaceTime : 0;
+  
+  // Calculate base adherence (for backward compatibility with consistency penalty approach)
   const paceAdherence = targetPace / avgPace; // Closer to 1.0 is better
   
   // Apply consistency penalty
@@ -2224,7 +2289,8 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
     consistencyMultiplier = 0.95; // Minor penalty
   }
   
-  const finalScore = paceAdherence * consistencyMultiplier;
+  // Use time-in-range as primary adherence, but apply consistency penalty
+  const finalScore = timeInRangeScore * consistencyMultiplier;
   
   console.log('🔍 Steady-state pace adherence debug:', {
     targetPace,
@@ -2314,7 +2380,7 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
   
   return {
     overall_adherence: finalScore,
-    time_in_range_score: paceAdherence,
+    time_in_range_score: timeInRangeScore,
     variability_score: cv,
     smoothness_score: 1 - cv, // Higher CV = lower smoothness
     pacing_variability: {
@@ -2325,17 +2391,18 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
       steadiness_score: Math.max(0, 100 - (cv * 100)),
       avg_pace_change_seconds: stdDev
     },
-    time_in_range_s: 0, // Not applicable for steady-state
-    time_outside_range_s: 0,
-    total_time_s: 0,
-    samples_in_range: 0,
-    samples_outside_range: 0,
+    time_in_range_s: timeInRange,
+    time_outside_range_s: timeOutsideRange,
+    total_time_s: totalPaceTime,
+    samples_in_range: timeInRange,
+    samples_outside_range: timeOutsideRange,
     heart_rate_analysis: heartRateAnalysis,
     pacing_analysis: {
-      time_in_range_score: paceAdherence * 100, // Convert decimal to percentage
+      time_in_range_score: timeInRangeScore * 100, // Convert decimal to percentage
       variability_score: cv,
       smoothness_score: 1 - cv,
-      pacing_variability: cv * 100
+      pacing_variability: cv * 100,
+      avg_pace_s_per_mi: avgPace
     },
     duration_adherence: {
       adherence_percentage: durationAdherencePct,
@@ -2505,7 +2572,15 @@ function calculateTimeInRangeAdherence(samples: any[], interval: any): number | 
  * @param workStartTimestamp Start timestamp of work period (seconds)
  * @param workEndTimestamp End timestamp of work period (seconds)
  * @returns Object with drift_bpm, early_avg_hr, late_avg_hr, and interpretation
-
+ */
+/**
+ * Analyze pace adherence for a single interval using granular sample-by-sample analysis
+ * 
+ * @param samples Array of sensor samples for this interval
+ * @param interval Interval object with pace targets
+ * @param plannedWorkout Optional planned workout for tolerance calculation
+ * @returns Object with timeInRange, timeOutsideRange, totalSamples, and granular_metrics
+ */
 function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any): any {
   const validSamples = samples.filter(s => s.pace_s_per_mi && s.pace_s_per_mi > 0);
   
@@ -2608,11 +2683,18 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
   }
   
   console.log(`🔍 [ANALYZE] Interval ${interval.role || interval.kind}: target pace range ${targetLower.toFixed(0)}-${targetUpper.toFixed(0)}s/mi`);
+  console.log(`🔍 [ANALYZE] Range source: target_pace=${!!interval.target_pace}, pace_range=${!!interval.pace_range}, planned.pace_range=${!!interval.planned?.pace_range}`);
   
   // Sample-by-sample time-in-range calculation (TRUE granular analysis)
   let samplesInRange = 0;
   let samplesOutsideRange = 0;
   const paceValues = validSamples.map(s => s.pace_s_per_mi);
+  
+  // Debug: Check pace distribution
+  const avgPace = paceValues.reduce((sum, p) => sum + p, 0) / paceValues.length;
+  const minPace = Math.min(...paceValues);
+  const maxPace = Math.max(...paceValues);
+  console.log(`🔍 [ANALYZE] Pace stats: avg=${avgPace.toFixed(0)}s/mi, min=${minPace.toFixed(0)}s/mi, max=${maxPace.toFixed(0)}s/mi, range=${targetLower.toFixed(0)}-${targetUpper.toFixed(0)}s/mi`);
   
   for (const pace of paceValues) {
     if (pace >= targetLower && pace <= targetUpper) {
@@ -2622,11 +2704,12 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
     }
   }
   
+  console.log(`🔍 [ANALYZE] Time-in-range: ${samplesInRange}/${paceValues.length} samples (${((samplesInRange/paceValues.length)*100).toFixed(1)}%)`);
+  
   const totalSamples = validSamples.length;
   const timeInRangeScore = totalSamples > 0 ? samplesInRange / totalSamples : 0;
   
-  // Calculate average pace for metrics
-  const avgPace = paceValues.reduce((sum, v) => sum + v, 0) / paceValues.length;
+  // Calculate average pace for metrics (already calculated above for debug logging)
   
   // Calculate granular metrics
   const hrValues = samples.filter(s => s.heart_rate && s.heart_rate > 0).map(s => s.heart_rate);
@@ -2708,8 +2791,11 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
     ? Math.round(granularAnalysis.overall_adherence * 100)
     : undefined;
   
-  // Interval-by-interval breakdown (pass all intervals for warmup/recovery/cooldown analysis)
-  const intervalBreakdown = generateIntervalBreakdown(workIntervals, intervals, overallPaceAdherence, granularAnalysis, sensorData, userUnits, plannedWorkout, workout);
+  // Interval-by-interval breakdown
+  // For steady-state runs with no work intervals, use all intervals (warmup/work/recovery/cooldown)
+  // Otherwise use only work intervals
+  const intervalsForBreakdown = workIntervals.length > 0 ? workIntervals : intervals.filter(i => i.executed);
+  const intervalBreakdown = generateIntervalBreakdown(intervalsForBreakdown, intervals, overallPaceAdherence, granularAnalysis, sensorData, userUnits, plannedWorkout, workout);
   
   // Pacing consistency analysis
   // Pacing consistency analysis (stub - function was removed during refactor)
