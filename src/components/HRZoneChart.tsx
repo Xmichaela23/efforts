@@ -1,14 +1,7 @@
 import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  Tooltip,
-  ResponsiveContainer,
-  YAxis,
-} from "recharts";
+// No chart imports needed - using table only
 
 /**
  * Heart Rate Zone Chart — Running-first
@@ -263,24 +256,6 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
         </div>
 
         <Separator />
-
-        {/* Bar Chart */}
-        <div>
-          <h3 className="text-sm font-medium mb-3">Time Distribution</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={zoneData} margin={{ top: 8, right: 8, left: 8, bottom: 16 }}>
-              <XAxis dataKey="zone" />
-              <YAxis 
-                tickFormatter={(value) => fmtTime(value)}
-              />
-              <Tooltip 
-                formatter={(value: any) => [fmtTime(value), 'Time']}
-                labelFormatter={(label) => `Zone: ${label}`}
-              />
-              <Bar dataKey="duration" fill="#3b82f6" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
 
         {/* Zone Table */}
         <div>
