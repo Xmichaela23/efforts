@@ -1121,47 +1121,54 @@ Deno.serve(async (req) => {
       // Calculate Garmin-style execution score using penalty system (for execution score only)
       const executionAnalysis = calculateGarminExecutionScore(computedIntervals, plannedWorkout);
       
-      // ✅ USE AVERAGE PACE FOR PACE ADHERENCE
-      // Pace adherence = 100% if average pace is within the target range
-      // This is the correct definition: did you hit your target pace on average?
+      // ✅ PACE ADHERENCE CALCULATION
+      // - Single-interval steady-state runs: Use average pace vs target range (100% if average is in range)
+      // - Multi-interval workouts: Use time-in-range (sample-by-sample) since each interval has different targets
       
-      // Get workout-level average pace for pace adherence calculation
-      const movingTimeForPace = workout?.computed?.overall?.duration_s_moving 
-        || (workout.moving_time ? workout.moving_time * 60 : null)
-        || null;
-      const distanceKmForPace = workout.distance || 0;
-      const distanceMiForPace = distanceKmForPace * 0.621371;
-      const avgPaceSecondsForAdherence = (movingTimeForPace > 0 && distanceMiForPace > 0) 
-        ? movingTimeForPace / distanceMiForPace 
-        : null;
+      // Detect if this is a single-interval steady-state workout
+      const workStepsForDetection = plannedWorkout?.computed?.steps?.filter((step: any) =>
+        (step.kind === 'work' || step.role === 'work') && step.pace_range
+      ) || [];
+      const isSingleIntervalSteadyState = workStepsForDetection.length === 1;
       
-      // Get target pace range from planned workout
-      let targetPaceLower: number | null = null;
-      let targetPaceUpper: number | null = null;
-      if (plannedWorkout?.computed?.steps) {
-        const workSteps = plannedWorkout.computed.steps.filter((step: any) =>
-          (step.kind === 'work' || step.role === 'work') && step.pace_range
-        );
-        if (workSteps.length > 0 && workSteps[0].pace_range) {
-          targetPaceLower = workSteps[0].pace_range.lower;
-          targetPaceUpper = workSteps[0].pace_range.upper;
-        }
-      }
-      
-      // Calculate pace adherence based on average pace within range
       let granularPaceAdherence = 0;
-      if (avgPaceSecondsForAdherence && targetPaceLower && targetPaceUpper) {
-        granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper));
-        console.log(`🔍 [PACE ADHERENCE] Using AVERAGE pace adherence: ${granularPaceAdherence}%`);
-        console.log(`   - Average pace: ${(avgPaceSecondsForAdherence / 60).toFixed(2)} min/mi (${avgPaceSecondsForAdherence.toFixed(0)}s)`);
-        console.log(`   - Target range: ${(targetPaceLower / 60).toFixed(2)}-${(targetPaceUpper / 60).toFixed(2)} min/mi (${targetPaceLower}-${targetPaceUpper}s)`);
-        console.log(`   - In range? ${avgPaceSecondsForAdherence >= targetPaceLower && avgPaceSecondsForAdherence <= targetPaceUpper ? 'YES' : 'NO'}`);
+      
+      if (isSingleIntervalSteadyState) {
+        // SINGLE-INTERVAL STEADY-STATE: Use average pace vs target range
+        console.log(`🔍 [PACE ADHERENCE] Single-interval steady-state detected`);
+        
+        const movingTimeForPace = workout?.computed?.overall?.duration_s_moving 
+          || (workout.moving_time ? workout.moving_time * 60 : null)
+          || null;
+        const distanceKmForPace = workout.distance || 0;
+        const distanceMiForPace = distanceKmForPace * 0.621371;
+        const avgPaceSecondsForAdherence = (movingTimeForPace > 0 && distanceMiForPace > 0) 
+          ? movingTimeForPace / distanceMiForPace 
+          : null;
+        
+        const targetPaceLower = workStepsForDetection[0]?.pace_range?.lower;
+        const targetPaceUpper = workStepsForDetection[0]?.pace_range?.upper;
+        
+        if (avgPaceSecondsForAdherence && targetPaceLower && targetPaceUpper) {
+          granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper));
+          console.log(`🔍 [PACE ADHERENCE] Using AVERAGE pace adherence: ${granularPaceAdherence}%`);
+          console.log(`   - Average pace: ${(avgPaceSecondsForAdherence / 60).toFixed(2)} min/mi (${avgPaceSecondsForAdherence.toFixed(0)}s)`);
+          console.log(`   - Target range: ${(targetPaceLower / 60).toFixed(2)}-${(targetPaceUpper / 60).toFixed(2)} min/mi (${targetPaceLower}-${targetPaceUpper}s)`);
+          console.log(`   - In range? ${avgPaceSecondsForAdherence >= targetPaceLower && avgPaceSecondsForAdherence <= targetPaceUpper ? 'YES' : 'NO'}`);
+        } else {
+          // Fallback to time-in-range if we can't calculate average pace
+          granularPaceAdherence = enhancedAnalysis.overall_adherence != null 
+            ? Math.round(enhancedAnalysis.overall_adherence * 100)
+            : 0;
+          console.log(`🔍 [PACE ADHERENCE] Fallback to time-in-range: ${granularPaceAdherence}% (couldn't calculate average pace)`);
+        }
       } else {
-        // Fallback to time-in-range if we can't calculate average pace
+        // MULTI-INTERVAL WORKOUT: Use time-in-range (each interval has different targets)
+        console.log(`🔍 [PACE ADHERENCE] Multi-interval workout detected (${workStepsForDetection.length} work steps)`);
         granularPaceAdherence = enhancedAnalysis.overall_adherence != null 
           ? Math.round(enhancedAnalysis.overall_adherence * 100)
           : 0;
-        console.log(`🔍 [PACE ADHERENCE] Fallback to time-in-range: ${granularPaceAdherence}% (couldn't calculate average pace)`);
+        console.log(`🔍 [PACE ADHERENCE] Using time-in-range: ${granularPaceAdherence}%`);
       }
       
       console.log(`🔍 [PACE ADHERENCE] Final pace adherence: ${granularPaceAdherence}%`);
@@ -1188,7 +1195,7 @@ Deno.serve(async (req) => {
       );
       
       console.log(`🎯 Using adherence scores:`);
-      console.log(`🎯 Pace adherence: ${granularPaceAdherence}% (from AVERAGE pace)`);
+      console.log(`🎯 Pace adherence: ${granularPaceAdherence}% (${isSingleIntervalSteadyState ? 'AVERAGE pace' : 'time-in-range'})`);
       console.log(`🎯 Duration adherence: ${granularDurationAdherence}% (from moving time)`);
       console.log(`🎯 Overall execution: ${performance.execution_adherence}% = (${performance.pace_adherence}% + ${performance.duration_adherence}%) / 2`);
     }
