@@ -1043,14 +1043,13 @@ function EffortsViewerMapbox({
       const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
       return elev;
     }
-    // VAM (vertical ascent meters/hour) - apply heavy smoothing to match Speed chart smoothness
+    // VAM (vertical ascent meters/hour) - moderate smoothing to balance detail and smoothness
     if (tab === "vam") {
       const vam = normalizedSamples.map(s => Number.isFinite(s.vam_m_per_h as any) ? (s.vam_m_per_h as number) : NaN);
       const finite = vam.filter(Number.isFinite) as number[];
       if (import.meta.env?.DEV) console.log('[VAM DEBUG] samples:', normalizedSamples.length, 'finite vam:', finite.length, 'first 5:', finite.slice(0, 5), 'range:', finite.length ? [Math.min(...finite), Math.max(...finite)] : 'none');
-      // Apply smoothing twice (like pace) for much smoother line - 30 second window
-      const firstPass = nanAwareMovAvg(vam as any, 30);
-      const smoothed = nanAwareMovAvg(firstPass, 30);
+      // Single pass smoothing with 20-second window - preserves more detail than double pass
+      const smoothed = nanAwareMovAvg(vam as any, 20);
       return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Speed (m/s → present directly, NO smoothing to preserve actual peaks)
@@ -1157,12 +1156,12 @@ function EffortsViewerMapbox({
       const workoutType = String((workoutData as any)?.type || 'run').toLowerCase();
       const smoothingWindow = getPowerSmoothingWindow(workoutType, isIndoor);
       
-      // Apply smoothing to all power data (outdoor and indoor) to match Speed chart smoothness
+      // Apply smoothing to all power data (outdoor and indoor) - moderate smoothing to preserve detail
       const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 0 && v <= 2000 ? v : NaN));
       const wins = winsorize(cleaned as number[], 5, 99);
       const withoutOutliers = removeOutliers(wins, 2.0);
-      // Use larger smoothing window for outdoor rides to get smoother appearance
-      const finalSmoothingWindow = isOutdoorGlobal ? Math.max(smoothingWindow, 30) : smoothingWindow;
+      // Use moderate smoothing for outdoor rides - preserve peaks while reducing noise
+      const finalSmoothingWindow = isOutdoorGlobal ? Math.max(smoothingWindow, 15) : smoothingWindow;
       return smoothWithOutlierHandling(withoutOutliers, finalSmoothingWindow, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
     }
     // Default fallback (shouldn't be reached)
