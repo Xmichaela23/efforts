@@ -1317,6 +1317,25 @@ Deno.serve(async (req) => {
       const intervalBreakdown = Array.isArray(breakdownData.intervals) ? breakdownData.intervals : [];      
       console.log(`🔍 [EXECUTION SCORE DEBUG] Entered calculation block, intervalBreakdown.length: ${intervalBreakdown.length}`);
       if (intervalBreakdown.length > 0) {
+        // ✅ RECALCULATE PACE ADHERENCE from interval_breakdown (correct per-interval average pace adherence)
+        const allPaceAdherences = intervalBreakdown
+          .map(i => i.pace_adherence_percent)
+          .filter(p => typeof p === 'number' && p > 0);
+        
+        if (allPaceAdherences.length > 0) {
+          const avgPaceAdherence = Math.round(allPaceAdherences.reduce((sum, p) => sum + p, 0) / allPaceAdherences.length);
+          console.log(`🔍 [PACE ADHERENCE] Recalculating from interval_breakdown:`);
+          console.log(`   - Individual adherences: ${allPaceAdherences.join(', ')}%`);
+          console.log(`   - Average: ${avgPaceAdherence}%`);
+          performance.pace_adherence = avgPaceAdherence;
+          
+          // Recalculate execution adherence with corrected pace adherence
+          performance.execution_adherence = Math.round(
+            (performance.pace_adherence * 0.5) + (performance.duration_adherence * 0.5)
+          );
+          console.log(`🔍 [EXECUTION] Recalculated: ${performance.execution_adherence}% = (${performance.pace_adherence}% pace + ${performance.duration_adherence}% duration) / 2`);
+        }
+        
         // First pass: count intervals by type to calculate per-interval weights
         const warmupIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'warmup');
         const workIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'work');
