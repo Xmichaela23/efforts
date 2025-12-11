@@ -910,7 +910,7 @@ function EffortsViewerMapbox({
   const P = 10;                     // vertical padding (top)
   const pb = 50;                    // bottom padding (space for x-axis labels + drag hint)
   const SVG_HEIGHT = H + 30;        // Total SVG height to accommodate labels below chart (extra room for text)
-  const pl = 46;                    // left padding (space for Y labels)
+  const pl = 60;                    // left padding (space for Y labels - increased for 3-digit numbers)
   const pr = 12;                    // right padding
 
   // cumulative positive gain (m) and loss (m), used for the InfoCard
@@ -1838,7 +1838,7 @@ function EffortsViewerMapbox({
       <div style={{ marginTop: 0, overflow: 'visible' }} onMouseLeave={onMouseLeave}>
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${W} ${SVG_HEIGHT}`}   // responsive: all drawn in SVG units, extra height for labels
+          viewBox={`-10 0 ${W + 10} ${SVG_HEIGHT}`}   // responsive: all drawn in SVG units, extra height for labels, negative x for Y-axis labels
           width="100%" height={SVG_HEIGHT}
           onMouseMove={onMove}
           onMouseUp={onMouseUp}
@@ -1922,7 +1922,7 @@ function EffortsViewerMapbox({
           {yTicks.map((v, i) => (
             <g key={i}>
               <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#e5e7eb" strokeWidth="1" />
-              <text x={pl - 6} y={yFromValue(v) + 4} fill="#6b7280" fontSize={14} fontWeight={500} textAnchor="end">
+              <text x={pl - 8} y={yFromValue(v) + 4} fill="#6b7280" fontSize={14} fontWeight={500} textAnchor="end">
                 {fmtYAxis(v, tab, workoutData?.type || 'run', useMiles, useFeet)}
               </text>
             </g>
@@ -2153,7 +2153,7 @@ function VamChart({
         <div style={{ fontWeight: 700, color: '#0f172a' }}>VAM</div>
         <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{fmtVAM(Number.isFinite(vam[idx] as any) ? (vam[idx] as number) : null, useFeet)}</div>
       </div>
-      <svg viewBox={`0 0 ${W} ${SVG_HEIGHT}`} width="100%" height={SVG_HEIGHT} style={{ display: 'block', borderRadius: 12, background: '#fff', border: '1px solid #eef2f7', overflow: 'visible' }}>
+      <svg viewBox={`-10 0 ${W + 10} ${SVG_HEIGHT}`} width="100%" height={SVG_HEIGHT} style={{ display: 'block', borderRadius: 12, background: '#fff', border: '1px solid #eef2f7', overflow: 'visible' }}>
         {[0, 1, 2, 3, 4].map((i) => {
           const x = pl + i * ((W - pl - pr) / 4);
           return <line key={i} x1={x} x2={x} y1={P} y2={H - P} stroke="#eef2f7" strokeDasharray="4 4" />;
