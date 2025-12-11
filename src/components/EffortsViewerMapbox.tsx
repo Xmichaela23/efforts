@@ -908,7 +908,7 @@ function EffortsViewerMapbox({
   /** ----- Chart prep ----- */
   const W = 700, H = 225;           // overall SVG size (in SVG units) - compact
   const P = 10;                     // vertical padding (top)
-  const pb = 28;                    // bottom padding (space for x-axis labels)
+  const pb = 50;                    // bottom padding (space for x-axis labels + drag hint)
   const pl = 46;                    // left padding (space for Y labels)
   const pr = 12;                    // right padding
 
@@ -1149,10 +1149,10 @@ function EffortsViewerMapbox({
       });
       
       if (isOutdoorGlobal) {
-        // Outdoor rides: moderate smoothing (10 seconds) to reduce noise while preserving real variations
+        // Outdoor rides: moderate smoothing (15 seconds) for cleaner display while preserving real variations
         // Use winsorization to handle outliers, then smooth
         const wins = winsorize(cleaned as number[], 2, 98);
-        const smoothed = smoothWithOutlierHandling(wins, 10, 2.5);
+        const smoothed = smoothWithOutlierHandling(wins, 15, 2.5);
         // Ensure no negative values in final output
         return smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
       }
@@ -1161,7 +1161,7 @@ function EffortsViewerMapbox({
       const hasGPSTrack = ((workoutData as any)?.gps_data?.length || 0) > 10;
       const isIndoor = !hasGPSTrack;
       const workoutType = String((workoutData as any)?.type || 'run').toLowerCase();
-      const smoothingWindow = (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') && isIndoor ? 20 : 15;
+      const smoothingWindow = (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') && isIndoor ? 25 : 20;
       const wins = winsorize(cleaned as number[], 2, 98);
       const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.5);
       return smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
@@ -1234,15 +1234,18 @@ function EffortsViewerMapbox({
       const maxV = finite.length ? Math.max(...finite) : 0;
       lo = 0; hi = Math.max(450, maxV);
     }
-    // POWER domain: use RAW power values (before smoothing/outlier removal) to show full range
+    // POWER domain: use smoothed values for domain calculation to avoid showing negative noise
     if (tab === 'pwr') {
-      const rawPowerValues = normalizedSamples
-        .map(s => Number.isFinite(s.power_w as any) ? (s.power_w as number) : NaN)
-        .filter(Number.isFinite) as number[];
+      const powerValues = metricRaw
+        .filter(v => Number.isFinite(v) && v >= 0) as number[]; // Only positive values for domain
       
-      if (rawPowerValues.length) {
-        lo = 0; // Power starts at 0
-        hi = Math.max(...rawPowerValues); // Use raw max, not smoothed max
+      if (powerValues.length) {
+        // Use percentiles to avoid outliers affecting scale
+        const sorted = [...powerValues].sort((a, b) => a - b);
+        const p5 = sorted[Math.floor(sorted.length * 0.05)];
+        const p95 = sorted[Math.min(Math.floor(sorted.length * 0.95), sorted.length - 1)];
+        lo = Math.max(0, p5 * 0.9); // Start near 0 but allow small buffer
+        hi = p95 * 1.1; // Use 95th percentile with padding
       } else {
         lo = 0; hi = 200; // Default fallback
       }
@@ -1959,10 +1962,10 @@ function EffortsViewerMapbox({
           {/* cursor */}
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
-          {/* Drag hint - below time labels, inside chart white area */}
+          {/* Drag hint - below time labels */}
           <text 
             x={pl + (W - pl - pr) / 2} 
-            y={H + 38} 
+            y={H - pb + 45} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={14}
