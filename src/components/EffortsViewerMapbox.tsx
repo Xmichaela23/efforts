@@ -1235,18 +1235,17 @@ function EffortsViewerMapbox({
       const maxV = finite.length ? Math.max(...finite) : 0;
       lo = 0; hi = Math.max(450, maxV);
     }
-    // POWER domain: use smoothed values for domain calculation to avoid showing negative noise
+    // POWER domain: use actual max to show all peaks, with padding
     if (tab === 'pwr') {
       const powerValues = metricRaw
         .filter(v => Number.isFinite(v) && v >= 0) as number[]; // Only positive values for domain
       
       if (powerValues.length) {
-        // Use percentiles to avoid outliers affecting scale
-        const sorted = [...powerValues].sort((a, b) => a - b);
-        const p5 = sorted[Math.floor(sorted.length * 0.05)];
-        const p95 = sorted[Math.min(Math.floor(sorted.length * 0.95), sorted.length - 1)];
-        lo = Math.max(0, p5 * 0.9); // Start near 0 but allow small buffer
-        hi = p95 * 1.1; // Use 95th percentile with padding
+        // Use actual max (not percentile) to show all power peaks
+        const maxPower = Math.max(...powerValues);
+        const minPower = Math.min(...powerValues);
+        lo = Math.max(0, minPower * 0.95); // Start near 0 but allow small buffer
+        hi = maxPower * 1.15; // Use actual max with 15% padding to show peaks
       } else {
         lo = 0; hi = 200; // Default fallback
       }
@@ -1326,7 +1325,7 @@ function EffortsViewerMapbox({
     }
     const padFrac = (tab === 'bpm') ? 0.04
                     : (tab === 'cad') ? 0.05
-                    : (tab === 'pwr') ? 0.06
+                    : (tab === 'pwr') ? 0.0  // Power padding already applied in domain calculation above
                     : (tab === 'elev') ? 0.04
                     : (tab === 'spd') ? 0.15  // Extra padding to show full range including peaks
                     : (tab === 'vam') ? 0.08
