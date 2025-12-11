@@ -1163,12 +1163,38 @@ Deno.serve(async (req) => {
           console.log(`🔍 [PACE ADHERENCE] Fallback to time-in-range: ${granularPaceAdherence}% (couldn't calculate average pace)`);
         }
       } else {
-        // MULTI-INTERVAL WORKOUT: Use time-in-range (each interval has different targets)
+        // MULTI-INTERVAL WORKOUT: Calculate per-interval average pace adherence, then average
         console.log(`🔍 [PACE ADHERENCE] Multi-interval workout detected (${workStepsForDetection.length} work steps)`);
-        granularPaceAdherence = enhancedAnalysis.overall_adherence != null 
-          ? Math.round(enhancedAnalysis.overall_adherence * 100)
-          : 0;
-        console.log(`🔍 [PACE ADHERENCE] Using time-in-range: ${granularPaceAdherence}%`);
+        
+        // Calculate adherence for each interval based on its average pace vs its target range
+        const intervalAdherences: number[] = [];
+        
+        for (const interval of computedIntervals) {
+          // Get the interval's actual average pace
+          const actualPace = interval.executed?.avg_pace_s_per_mi || interval.executed?.pace_s_per_mi || 0;
+          
+          // Get the interval's target pace range
+          const paceRange = interval.pace_range || interval.target_pace || interval.planned?.pace_range;
+          const targetLower = paceRange?.lower || 0;
+          const targetUpper = paceRange?.upper || 0;
+          
+          if (actualPace > 0 && targetLower > 0 && targetUpper > 0) {
+            const adherence = calculatePaceRangeAdherence(actualPace, targetLower, targetUpper);
+            intervalAdherences.push(adherence);
+            console.log(`   - Interval ${interval.planned_step_id || 'unknown'}: ${(actualPace/60).toFixed(2)} min/mi vs ${(targetLower/60).toFixed(2)}-${(targetUpper/60).toFixed(2)} = ${adherence.toFixed(0)}%`);
+          }
+        }
+        
+        if (intervalAdherences.length > 0) {
+          granularPaceAdherence = Math.round(intervalAdherences.reduce((sum, a) => sum + a, 0) / intervalAdherences.length);
+          console.log(`🔍 [PACE ADHERENCE] Average of ${intervalAdherences.length} intervals: ${granularPaceAdherence}%`);
+        } else {
+          // Fallback to time-in-range if we couldn't calculate per-interval adherence
+          granularPaceAdherence = enhancedAnalysis.overall_adherence != null 
+            ? Math.round(enhancedAnalysis.overall_adherence * 100)
+            : 0;
+          console.log(`🔍 [PACE ADHERENCE] Fallback to time-in-range: ${granularPaceAdherence}%`);
+        }
       }
       
       console.log(`🔍 [PACE ADHERENCE] Final pace adherence: ${granularPaceAdherence}%`);
@@ -1195,7 +1221,7 @@ Deno.serve(async (req) => {
       );
       
       console.log(`🎯 Using adherence scores:`);
-      console.log(`🎯 Pace adherence: ${granularPaceAdherence}% (${isSingleIntervalSteadyState ? 'AVERAGE pace' : 'time-in-range'})`);
+      console.log(`🎯 Pace adherence: ${granularPaceAdherence}% (${isSingleIntervalSteadyState ? 'AVERAGE pace' : 'per-interval AVERAGE pace'})`);
       console.log(`🎯 Duration adherence: ${granularDurationAdherence}% (from moving time)`);
       console.log(`🎯 Overall execution: ${performance.execution_adherence}% = (${performance.pace_adherence}% + ${performance.duration_adherence}%) / 2`);
     }
