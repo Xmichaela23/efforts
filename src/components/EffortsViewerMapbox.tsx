@@ -1043,14 +1043,15 @@ function EffortsViewerMapbox({
       const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
       return elev;
     }
-    // VAM (vertical ascent meters/hour)
+    // VAM (vertical ascent meters/hour) - apply heavy smoothing to match Speed chart smoothness
     if (tab === "vam") {
       const vam = normalizedSamples.map(s => Number.isFinite(s.vam_m_per_h as any) ? (s.vam_m_per_h as number) : NaN);
       const finite = vam.filter(Number.isFinite) as number[];
-      console.log('[VAM DEBUG] samples:', normalizedSamples.length, 'finite vam:', finite.length, 'first 5:', finite.slice(0, 5), 'range:', finite.length ? [Math.min(...finite), Math.max(...finite)] : 'none');
-      // Light smoothing
-      const sm = nanAwareMovAvg(vam as any, 5);
-      return sm.map(v => (Number.isFinite(v) ? v : NaN));
+      if (import.meta.env?.DEV) console.log('[VAM DEBUG] samples:', normalizedSamples.length, 'finite vam:', finite.length, 'first 5:', finite.slice(0, 5), 'range:', finite.length ? [Math.min(...finite), Math.max(...finite)] : 'none');
+      // Apply smoothing twice (like pace) for much smoother line - 30 second window
+      const firstPass = nanAwareMovAvg(vam as any, 30);
+      const smoothed = nanAwareMovAvg(firstPass, 30);
+      return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Speed (m/s → present directly, NO smoothing to preserve actual peaks)
     if (tab === "spd") {
@@ -1156,15 +1157,13 @@ function EffortsViewerMapbox({
       const workoutType = String((workoutData as any)?.type || 'run').toLowerCase();
       const smoothingWindow = getPowerSmoothingWindow(workoutType, isIndoor);
       
-      if (isOutdoorGlobal) {
-        // Return RAW power data - no smoothing to preserve actual peaks (sprints, attacks)
-        // Downsampling already preserved the max power index
-        const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 0 && v <= 2000 ? v : NaN));
-        return cleaned;
-      }
-      const wins = winsorize(pwr as number[], 5, 99);
+      // Apply smoothing to all power data (outdoor and indoor) to match Speed chart smoothness
+      const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 0 && v <= 2000 ? v : NaN));
+      const wins = winsorize(cleaned as number[], 5, 99);
       const withoutOutliers = removeOutliers(wins, 2.0);
-      return smoothWithOutlierHandling(withoutOutliers, smoothingWindow, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
+      // Use larger smoothing window for outdoor rides to get smoother appearance
+      const finalSmoothingWindow = isOutdoorGlobal ? Math.max(smoothingWindow, 30) : smoothingWindow;
+      return smoothWithOutlierHandling(withoutOutliers, finalSmoothingWindow, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
     }
     // Default fallback (shouldn't be reached)
     return [];
