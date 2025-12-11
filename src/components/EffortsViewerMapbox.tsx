@@ -1139,30 +1139,22 @@ function EffortsViewerMapbox({
         });
       };
       
-      // Smart smoothing based on workout type and indoor/outdoor detection
-      const getPowerSmoothingWindow = (workoutType: string, isIndoor: boolean): number => {
-        if (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') {
-          return isIndoor ? 71 : 31;  // Heavy for indoor trainer (ERG mode noise), moderate for outdoor
-        }
-        if (workoutType === 'run' || workoutType === 'running') {
-          return isIndoor ? 41 : 21;  // Moderate for treadmill, lighter for outdoor terrain
-        }
-        return 25; // Default fallback
-      };
+      // Minimal smoothing for accurate power display - only remove obvious outliers
+      const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 0 && v <= 2000 ? v : NaN));
       
-      // Detect if indoor (heuristic: missing GPS track or very short)
+      if (isOutdoorGlobal) {
+        // Outdoor rides: minimal smoothing (5 seconds) to preserve accuracy while removing GPS noise
+        const wins = winsorize(cleaned as number[], 1, 99); // Less aggressive winsorization
+        return smoothWithOutlierHandling(wins, 5, 3.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
+      }
+      
+      // Indoor rides: slightly more smoothing for trainer noise, but still preserve accuracy
       const hasGPSTrack = ((workoutData as any)?.gps_data?.length || 0) > 10;
       const isIndoor = !hasGPSTrack;
       const workoutType = String((workoutData as any)?.type || 'run').toLowerCase();
-      const smoothingWindow = getPowerSmoothingWindow(workoutType, isIndoor);
-      
-      // Apply smoothing to all power data (outdoor and indoor) - moderate smoothing to preserve detail
-      const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 0 && v <= 2000 ? v : NaN));
-      const wins = winsorize(cleaned as number[], 5, 99);
-      const withoutOutliers = removeOutliers(wins, 2.0);
-      // Use moderate smoothing for outdoor rides - preserve peaks while reducing noise
-      const finalSmoothingWindow = isOutdoorGlobal ? Math.max(smoothingWindow, 15) : smoothingWindow;
-      return smoothWithOutlierHandling(withoutOutliers, finalSmoothingWindow, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
+      const smoothingWindow = (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') && isIndoor ? 15 : 10;
+      const wins = winsorize(cleaned as number[], 2, 98);
+      return smoothWithOutlierHandling(wins, smoothingWindow, 2.5).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
     }
     // Default fallback (shouldn't be reached)
     return [];

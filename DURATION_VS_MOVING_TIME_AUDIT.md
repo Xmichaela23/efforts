@@ -200,3 +200,4 @@ After fix, verify:
 - `calculateSteadyStatePaceAdherence()`: Lines 2027-2347
 - `calculateIntervalPaceAdherence()`: Lines 1788-1808 (uses `duration_s_moving` correctly)
 - `compute-workout-analysis/index.ts`: Lines 1460-1495 (correctly computes `duration_s_moving`)
+
