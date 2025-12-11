@@ -27,6 +27,119 @@ const corsHeaders = {
 function isISO(dateStr) {
   return !!dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 }
+
+// ============================================================================
+// INLINE WORKLOAD CALCULATION (self-healing - calculates if missing)
+// ============================================================================
+const INTENSITY_FACTORS = {
+  run: {
+    easypace: 0.65, warmup_run_easy: 0.65, cooldown_easy: 0.65, longrun_easypace: 0.70,
+    '5kpace': 0.95, '10kpace': 0.90, marathon_pace: 0.82, speed: 1.10, strides: 1.05,
+    interval: 0.95, tempo: 0.88, cruise: 0.88
+  },
+  ride: {
+    Z1: 0.55, recovery: 0.55, Z2: 0.70, endurance: 0.70, warmup_bike: 0.60, cooldown_bike: 0.60,
+    tempo: 0.80, ss: 0.90, thr: 1.00, vo2: 1.15, anaerobic: 1.20, neuro: 1.10
+  },
+  bike: {
+    Z1: 0.55, recovery: 0.55, Z2: 0.70, endurance: 0.70, warmup_bike: 0.60, cooldown_bike: 0.60,
+    tempo: 0.80, ss: 0.90, thr: 1.00, vo2: 1.15, anaerobic: 1.20, neuro: 1.10
+  },
+  swim: {
+    warmup: 0.60, cooldown: 0.60, drill: 0.50, easy: 0.65, aerobic: 0.75,
+    pull: 0.70, kick: 0.75, threshold: 0.95, interval: 1.00
+  }
+};
+
+function getDefaultIntensity(type) {
+  const defaults = { run: 0.75, ride: 0.70, bike: 0.70, swim: 0.75, strength: 0.75, mobility: 0.60, pilates_yoga: 0.75, walk: 0.40 };
+  return defaults[type] || 0.75;
+}
+
+function getStepsIntensity(steps, type) {
+  const factors = INTENSITY_FACTORS[type];
+  if (!factors || !Array.isArray(steps) || steps.length === 0) return getDefaultIntensity(type);
+  const intensities = [];
+  for (const token of steps) {
+    const tokenLower = String(token).toLowerCase();
+    for (const [key, value] of Object.entries(factors)) {
+      if (tokenLower.includes(key.toLowerCase())) {
+        intensities.push(value);
+        break;
+      }
+    }
+  }
+  return intensities.length > 0 ? Math.max(...intensities) : getDefaultIntensity(type);
+}
+
+function calculateStrengthWorkload(exercises) {
+  if (!Array.isArray(exercises) || exercises.length === 0) return 0;
+  let totalVolume = 0;
+  for (const ex of exercises) {
+    if (Array.isArray(ex.sets)) {
+      for (const set of ex.sets) {
+        if (set.completed !== false) {
+          const weight = Number(set.weight) || 0;
+          const reps = Number(set.reps) || 0;
+          totalVolume += weight * reps;
+        }
+      }
+    }
+  }
+  // Volume factor: 10,000 lbs = 1.0
+  const volumeFactor = Math.max(totalVolume / 10000, 0.1);
+  const intensity = 0.80; // Default strength intensity
+  return Math.round(volumeFactor * Math.pow(intensity, 2) * 100);
+}
+
+function calculateWorkloadForItem(item) {
+  try {
+    const type = String(item?.type || '').toLowerCase();
+    const status = String(item?.status || '').toLowerCase();
+    const isCompleted = status === 'completed';
+    
+    // For strength workouts, use volume-based calculation
+    if (type === 'strength') {
+      const exercises = isCompleted 
+        ? (item?.executed?.strength_exercises || [])
+        : (item?.planned?.strength_exercises || []);
+      return calculateStrengthWorkload(exercises);
+    }
+    
+    // For mobility, use fixed low workload
+    if (type === 'mobility') {
+      return 10; // Fixed low workload for mobility
+    }
+    
+    // For pilates_yoga, use duration × 0.75² × 100
+    if (type === 'pilates_yoga') {
+      const durationSec = item?.planned?.total_duration_seconds || item?.executed?.overall?.duration_s_moving || 0;
+      const durationHours = durationSec / 3600;
+      return Math.round(durationHours * Math.pow(0.75, 2) * 100);
+    }
+    
+    // For run/ride/swim, use duration × intensity² × 100
+    let durationSec = 0;
+    if (isCompleted && item?.executed?.overall) {
+      durationSec = item.executed.overall.duration_s_moving || item.executed.overall.duration_s || 0;
+    } else if (item?.planned?.total_duration_seconds) {
+      durationSec = item.planned.total_duration_seconds;
+    }
+    
+    if (durationSec <= 0) return 0;
+    
+    const durationHours = durationSec / 3600;
+    const stepsPreset = item?.planned?.steps_preset || [];
+    const intensity = getStepsIntensity(stepsPreset, type);
+    
+    return Math.round(durationHours * Math.pow(intensity, 2) * 100);
+  } catch (e) {
+    console.error('[get-week] Error calculating workload:', e);
+    return 0;
+  }
+}
+// ============================================================================
+
 Deno.serve(async (req)=>{
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -951,41 +1064,96 @@ Deno.serve(async (req)=>{
         console.error('Failed to fetch training plan context:', error);
       }
     }
-    // Calculate workload totals directly from workouts table
+    // Calculate workload totals INLINE from unified items (self-healing)
+    // This calculates workload on-the-fly for every item, ensuring it's always correct
     let workloadPlanned = 0;
     let workloadCompleted = 0;
+    const workloadBackfillUpdates = []; // Track items needing database backfill
+    
     try {
-      // Get completed workouts with workload data
-      const { data: completedWorkouts } = await supabase
-        .from('workouts')
-        .select('workload_actual')
-        .eq('user_id', userId)
-        .gte('date', fromISO)
-        .lte('date', toISO)
-        .not('workload_actual', 'is', null);
-      
-      // Get planned workouts with workload data  
-      const { data: plannedWorkouts } = await supabase
-        .from('planned_workouts')
-        .select('workload_planned')
-        .eq('user_id', userId)
-        .gte('date', fromISO)
-        .lte('date', toISO)
-        .not('workload_planned', 'is', null);
-      
-      // Sum up the totals
-      if (completedWorkouts) {
-        workloadCompleted = completedWorkouts.reduce((sum, workout) => sum + (workout.workload_actual || 0), 0);
+      for (const item of itemsWithAI) {
+        const calculatedWorkload = calculateWorkloadForItem(item);
+        const status = String(item?.status || '').toLowerCase();
+        const isCompleted = status === 'completed';
+        const isPlanned = status === 'planned';
+        
+        if (isCompleted) {
+          workloadCompleted += calculatedWorkload;
+          // Queue backfill if missing from database
+          if (item?.id && calculatedWorkload > 0) {
+            workloadBackfillUpdates.push({ 
+              table: 'workouts', 
+              id: item.id, 
+              workload_actual: calculatedWorkload 
+            });
+          }
+        } else if (isPlanned) {
+          workloadPlanned += calculatedWorkload;
+          // Queue backfill for planned workouts
+          if (item?.planned?.id && calculatedWorkload > 0) {
+            workloadBackfillUpdates.push({ 
+              table: 'planned_workouts', 
+              id: item.planned.id, 
+              workload_planned: calculatedWorkload 
+            });
+          }
+        }
       }
       
-      if (plannedWorkouts) {
-        workloadPlanned = plannedWorkouts.reduce((sum, workout) => sum + (workout.workload_planned || 0), 0);
+      // Fire-and-forget backfill updates to database (don't await, don't block response)
+      if (workloadBackfillUpdates.length > 0) {
+        (async () => {
+          try {
+            for (const update of workloadBackfillUpdates) {
+              if (update.table === 'workouts') {
+                await supabase.from('workouts')
+                  .update({ workload_actual: update.workload_actual })
+                  .eq('id', update.id)
+                  .is('workload_actual', null); // Only update if currently null
+              } else if (update.table === 'planned_workouts') {
+                await supabase.from('planned_workouts')
+                  .update({ workload_planned: update.workload_planned })
+                  .eq('id', update.id)
+                  .is('workload_planned', null); // Only update if currently null
+              }
+            }
+            console.log(`[get-week] Backfilled workload for ${workloadBackfillUpdates.length} items`);
+          } catch (e) {
+            console.error('[get-week] Workload backfill error:', e);
+          }
+        })();
       }
+      
+      console.log(`[get-week] Calculated workload: planned=${workloadPlanned}, completed=${workloadCompleted} from ${itemsWithAI.length} items`);
     } catch (error) {
       console.error('Failed to calculate workload totals:', error);
-      // Fallback to counts if calculation fails
-      workloadPlanned = totalPlanned;
-      workloadCompleted = totalCompleted;
+      // Fallback: try database query as last resort
+      try {
+        const { data: completedWorkouts } = await supabase
+          .from('workouts')
+          .select('workload_actual')
+          .eq('user_id', userId)
+          .gte('date', fromISO)
+          .lte('date', toISO)
+          .not('workload_actual', 'is', null);
+        
+        const { data: plannedWorkoutsDb } = await supabase
+          .from('planned_workouts')
+          .select('workload_planned')
+          .eq('user_id', userId)
+          .gte('date', fromISO)
+          .lte('date', toISO)
+          .not('workload_planned', 'is', null);
+        
+        if (completedWorkouts) {
+          workloadCompleted = completedWorkouts.reduce((sum, w) => sum + (w.workload_actual || 0), 0);
+        }
+        if (plannedWorkoutsDb) {
+          workloadPlanned = plannedWorkoutsDb.reduce((sum, w) => sum + (w.workload_planned || 0), 0);
+        }
+      } catch (e2) {
+        console.error('[get-week] Fallback workload query failed:', e2);
+      }
     }
 
     // Calculate distance totals for completed workouts

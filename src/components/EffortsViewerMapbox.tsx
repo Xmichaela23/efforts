@@ -1215,7 +1215,7 @@ function EffortsViewerMapbox({
       }
     }
     // SPEED domain: use RAW speed values (before smoothing) to show full range
-    if (tab === 'spd' || tab === 'speed') {
+    if (tab === 'spd') {
       // Get raw speed data directly from samples (before smoothing)
       const rawSpeedValues = normalizedSamples
         .map(s => Number.isFinite(s.speed_mps as any) ? (s.speed_mps as number) : NaN)
@@ -1281,7 +1281,7 @@ function EffortsViewerMapbox({
     }
     if (tab === 'vam') ensureMinSpan(200);
     if (tab === 'cad') ensureMinSpan(10);
-    if (tab === 'spd' || tab === 'speed') ensureMinSpan(2); // Min 2 m/s span (~4.5 mph)
+    if (tab === 'spd') ensureMinSpan(2); // Min 2 m/s span (~4.5 mph)
     if (tab === 'elev') ensureMinSpan(isOutdoorGlobal ? (useFeet ? 20/3.28084 : 6) : (useFeet ? 10/3.28084 : 3));
     
     // special handling (tick rounding)
@@ -1294,7 +1294,7 @@ function EffortsViewerMapbox({
       hi += 3;
     }
     // Round speed domain to nice mph/kmh intervals (like pace but for speed)
-    if (tab === 'spd' || tab === 'speed') {
+    if (tab === 'spd') {
       // Speed is in m/s, convert to mph/kmh, round, then convert back
       const speedInMph = hi * 2.237;
       const speedInKmh = hi * 3.6;
@@ -1324,7 +1324,7 @@ function EffortsViewerMapbox({
                     : (tab === 'cad') ? 0.05
                     : (tab === 'pwr') ? 0.06
                     : (tab === 'elev') ? 0.04
-                    : (tab === 'spd' || tab === 'speed') ? 0.15  // Extra padding to show full range including peaks
+                    : (tab === 'spd') ? 0.15  // Extra padding to show full range including peaks
                     : (tab === 'vam') ? 0.08
                     : (isOutdoorGlobal ? 0.03 : 0.02);
     const pad = Math.max((hi - lo) * padFrac, 1);
@@ -1412,7 +1412,7 @@ function EffortsViewerMapbox({
 
   // Build area path (for gradient fill under line) - close to bottom of chart
   const areaPath = useMemo(() => {
-    if (normalizedSamples.length < 2 || tab === 'elev' || tab === 'vam') return ""; // elev/vam have custom fills
+    if (normalizedSamples.length < 2 || tab === 'elev') return ""; // elev has custom fill
     const n = normalizedSamples.length;
     const useIndex = (distCalc.dN - distCalc.d0) < 5;
     const xFromIndex = (i: number) => pl + (i / Math.max(1, n - 1)) * (W - pl - pr);
@@ -1938,67 +1938,22 @@ function EffortsViewerMapbox({
                 <path d={elevArea} fill="url(#elevGrad)" opacity={1} />
               </>
             )}
-            {/* VAM background elevation silhouette when on VAM tab */}
-            {tab === "vam" && (() => {
-              const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
-              const finite = elev.filter(Number.isFinite) as number[];
-              if (!finite.length) return null;
-              const minE = Math.min(...finite), maxE = Math.max(...finite);
-              const [a, b] = yDomain; const span = Math.max(1, b - a);
-              const targetLo = a + span * 0.1; const targetHi = a + span * 0.9;
-              let d = ""; const n = normalizedSamples.length;
-              for (let i = 0; i < n; i++) {
-                const e = Number.isFinite(elev[i]) ? (elev[i] as number) : NaN;
-                const t = Number.isFinite(e) && (maxE > minE) ? (e - minE) / (maxE - minE) : 0;
-                const y = yFromValue(targetLo + t * (targetHi - targetLo));
-                const x = xFromDist(distCalc.distMono[i] ?? distCalc.d0);
-                d += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
-              }
-              return <path d={d} fill="none" stroke="#e2e8f0" strokeWidth={1} />;
-            })()}
-
             {/* Area fill under line (gradient) */}
-            {tab !== "vam" && tab !== "elev" && areaPath && (
+            {tab !== "elev" && areaPath && (
               <path d={areaPath} fill={`url(#${chartConfig.gradient})`} opacity={1} />
             )}
 
-            {/* metric line (smoothed) or VAM threshold-colored segments */}
-            {tab !== "vam" ? (
-              <path d={linePath} fill="none" stroke={chartConfig.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
-            ) : (() => {
-              const buildSegPath = (loR:number, hiR:number) => {
-                let d = ""; let pen = false; const n = normalizedSamples.length;
-                for (let i = 0; i < n; i++) {
-                  const v = Number.isFinite(metricRaw[i]) ? (metricRaw[i] as number) : NaN;
-                  if (Number.isFinite(v) && v >= loR && v < hiR) {
-                    const x = xFromDist(distCalc.distMono[i] ?? distCalc.d0);
-                    const y = yFromValue(v);
-                    if (!pen) { d += `M ${x} ${y}`; pen = true; } else { d += ` L ${x} ${y}`; }
-                  } else {
-                    pen = false;
-                  }
-                }
-                return d;
-              };
-              const green = buildSegPath(0, 400);
-              const yellow = buildSegPath(400, 800);
-              const red = buildSegPath(800, 1e9);
-              const anyFinite = metricRaw.some(v => Number.isFinite(v));
-              return (
-                <>
-                  {!anyFinite && (
-                    <text x={(W/2)} y={(H/2)} textAnchor="middle" fill="#94a3b8" fontSize={14} fontWeight={700}>No VAM data</text>
-                  )}
-                  {anyFinite && (
-                    <>
-                      <path d={green} fill="none" stroke="#10b981" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-                      <path d={yellow} fill="none" stroke="#f59e0b" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-                      <path d={red} fill="none" stroke="#ef4444" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-                    </>
-                  )}
-                </>
-              );
-            })()}
+            {/* metric line (smoothed) - same style for all metrics including VAM */}
+            {linePath && (
+              <>
+                {!metricRaw.some(v => Number.isFinite(v)) && tab === "vam" && (
+                  <text x={(W/2)} y={(H/2)} textAnchor="middle" fill="#94a3b8" fontSize={14} fontWeight={700}>No VAM data</text>
+                )}
+                {metricRaw.some(v => Number.isFinite(v)) && (
+                  <path d={linePath} fill="none" stroke={chartConfig.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
+                )}
+              </>
+            )}
           </g>
 
           {/* cursor */}
