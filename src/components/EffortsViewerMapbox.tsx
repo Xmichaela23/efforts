@@ -1139,22 +1139,32 @@ function EffortsViewerMapbox({
         });
       };
       
-      // Minimal smoothing for accurate power display - only remove obvious outliers
-      const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 0 && v <= 2000 ? v : NaN));
+      // Balance smoothing for accurate but readable power display
+      // Filter invalid values first (negative or unreasonably high)
+      const cleaned = pwr.map(v => {
+        if (!Number.isFinite(v)) return NaN;
+        // Power must be >= 0 and reasonable (max 2000W for human power)
+        if (v < 0 || v > 2000) return NaN;
+        return v;
+      });
       
       if (isOutdoorGlobal) {
-        // Outdoor rides: minimal smoothing (5 seconds) to preserve accuracy while removing GPS noise
-        const wins = winsorize(cleaned as number[], 1, 99); // Less aggressive winsorization
-        return smoothWithOutlierHandling(wins, 5, 3.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
+        // Outdoor rides: moderate smoothing (10 seconds) to reduce noise while preserving real variations
+        // Use winsorization to handle outliers, then smooth
+        const wins = winsorize(cleaned as number[], 2, 98);
+        const smoothed = smoothWithOutlierHandling(wins, 10, 2.5);
+        // Ensure no negative values in final output
+        return smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
       }
       
-      // Indoor rides: slightly more smoothing for trainer noise, but still preserve accuracy
+      // Indoor rides: more smoothing for trainer noise
       const hasGPSTrack = ((workoutData as any)?.gps_data?.length || 0) > 10;
       const isIndoor = !hasGPSTrack;
       const workoutType = String((workoutData as any)?.type || 'run').toLowerCase();
-      const smoothingWindow = (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') && isIndoor ? 15 : 10;
+      const smoothingWindow = (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') && isIndoor ? 20 : 15;
       const wins = winsorize(cleaned as number[], 2, 98);
-      return smoothWithOutlierHandling(wins, smoothingWindow, 2.5).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
+      const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.5);
+      return smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
     }
     // Default fallback (shouldn't be reached)
     return [];
