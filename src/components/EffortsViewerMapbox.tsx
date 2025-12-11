@@ -906,9 +906,10 @@ function EffortsViewerMapbox({
   const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
 
   /** ----- Chart prep ----- */
-  const W = 700, H = 225;           // overall SVG size (in SVG units) - compact
+  const W = 700, H = 225;           // chart area height (in SVG units) - compact
   const P = 10;                     // vertical padding (top)
   const pb = 50;                    // bottom padding (space for x-axis labels + drag hint)
+  const SVG_HEIGHT = H + 30;        // Total SVG height to accommodate labels below chart (extra room for text)
   const pl = 46;                    // left padding (space for Y labels)
   const pr = 12;                    // right padding
 
@@ -1834,11 +1835,11 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Chart */}
-      <div style={{ marginTop: 0 }} onMouseLeave={onMouseLeave}>
+      <div style={{ marginTop: 0, overflow: 'visible' }} onMouseLeave={onMouseLeave}>
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${W} ${H}`}   // responsive: all drawn in SVG units
-          width="100%" height={H}
+          viewBox={`0 0 ${W} ${SVG_HEIGHT}`}   // responsive: all drawn in SVG units, extra height for labels
+          width="100%" height={SVG_HEIGHT}
           onMouseMove={onMove}
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseLeave}
@@ -2152,7 +2153,7 @@ function VamChart({
         <div style={{ fontWeight: 700, color: '#0f172a' }}>VAM</div>
         <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{fmtVAM(Number.isFinite(vam[idx] as any) ? (vam[idx] as number) : null, useFeet)}</div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ display: 'block', borderRadius: 12, background: '#fff', border: '1px solid #eef2f7' }}>
+      <svg viewBox={`0 0 ${W} ${SVG_HEIGHT}`} width="100%" height={SVG_HEIGHT} style={{ display: 'block', borderRadius: 12, background: '#fff', border: '1px solid #eef2f7', overflow: 'visible' }}>
         {[0, 1, 2, 3, 4].map((i) => {
           const x = pl + i * ((W - pl - pr) / 4);
           return <line key={i} x1={x} x2={x} y1={P} y2={H - P} stroke="#eef2f7" strokeDasharray="4 4" />;
