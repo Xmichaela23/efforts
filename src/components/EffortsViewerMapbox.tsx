@@ -1235,15 +1235,16 @@ function EffortsViewerMapbox({
       const maxV = finite.length ? Math.max(...finite) : 0;
       lo = 0; hi = Math.max(450, maxV);
     }
-    // POWER domain: use actual max to show all peaks, with padding
+    // POWER domain: use RAW power values (before smoothing) to capture all peaks
     if (tab === 'pwr') {
-      const powerValues = metricRaw
-        .filter(v => Number.isFinite(v) && v >= 0) as number[]; // Only positive values for domain
+      const rawPowerValues = normalizedSamples
+        .map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN)
+        .filter(v => Number.isFinite(v) && v >= 0 && v <= 2000) as number[]; // Only valid positive values
       
-      if (powerValues.length) {
-        // Use actual max (not percentile) to show all power peaks
-        const maxPower = Math.max(...powerValues);
-        const minPower = Math.min(...powerValues);
+      if (rawPowerValues.length) {
+        // Use actual max from RAW data (not smoothed) to show all power peaks
+        const maxPower = Math.max(...rawPowerValues);
+        const minPower = Math.min(...rawPowerValues);
         lo = Math.max(0, minPower * 0.95); // Start near 0 but allow small buffer
         hi = maxPower * 1.15; // Use actual max with 15% padding to show peaks
       } else {
@@ -1904,14 +1905,15 @@ function EffortsViewerMapbox({
             const timeDisplay = mins >= 60 
               ? `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
               : `${mins}:${String(secs).padStart(2, '0')}`;
-            // Align: first label left, last label right, others center
+            // Align: first label slightly offset to avoid Y-axis overlap, last label right, others center
             const anchor = i === 0 ? "start" : i === 4 ? "end" : "middle";
+            const xPos = i === 0 ? x + 8 : x; // Offset first label to avoid Y-axis labels
             return (
               <g key={`xaxis-${i}`}>
-                <text x={x} y={H - pb + 16} fill="#6b7280" fontSize={14} fontWeight={500} textAnchor={anchor}>
+                <text x={xPos} y={H - pb + 16} fill="#6b7280" fontSize={14} fontWeight={500} textAnchor={anchor}>
                   {distDisplay} {distUnit}
                 </text>
-                <text x={x} y={H - pb + 30} fill="#9ca3af" fontSize={12} textAnchor={anchor}>
+                <text x={xPos} y={H - pb + 30} fill="#9ca3af" fontSize={12} textAnchor={anchor}>
                   {timeDisplay}
                 </text>
               </g>
