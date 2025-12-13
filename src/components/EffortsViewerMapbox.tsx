@@ -1998,10 +1998,10 @@ function EffortsViewerMapbox({
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
           
-          {/* Drag hint - centered in chart area where users drag */}
+          {/* Drag hint - centered between bottom of chart labels and buttons */}
           <text 
             x={pl + (W - pl - pr) / 2} 
-            y={(P + H - pb) / 2} 
+            y={(H - pb + 30 + SVG_HEIGHT) / 2} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={16}
