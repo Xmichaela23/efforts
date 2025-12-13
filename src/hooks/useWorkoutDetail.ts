@@ -71,64 +71,22 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       // Build normalized options once
       const normalized = JSON.parse(optsKey || '{}');
 
-      const fetchDetail = async () => {
-        // Get current session for auth
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Session expired - please log in again');
-        
-        const body = { id, ...normalized } as any;
-        const { data, error } = await supabase.functions.invoke('workout-detail', {
-          body,
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          }
-        });
-        if (error) throw error;
-        return (data as any)?.workout || null;
-      };
-
-      const hasSeries = (w: any) => {
-        try {
-          const s = w?.computed?.analysis?.series || null;
-          const n = Array.isArray(s?.distance_m) ? s.distance_m.length : 0;
-          const nt = Array.isArray(s?.time_s) ? s.time_s.length : (Array.isArray(s?.time) ? s.time.length : 0);
-          return n > 1 && nt > 1;
-        } catch { return false; }
-      };
-
-      let remote = await fetchDetail();
+      // Smart server, dumb client: server handles analysis computation
+      // Get current session for auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Session expired - please log in again');
+      
+      const body = { id, ...normalized } as any;
+      const { data, error } = await supabase.functions.invoke('workout-detail', {
+        body,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+      if (error) throw error;
+      const remote = (data as any)?.workout || null;
 
       if (!remote) throw new Error('Workout not found');
-
-      // If analysis missing → compute once and wait
-      if (!hasSeries(remote)) {
-        try {
-          // Validate session before invoking edge function
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session) {
-            throw new Error('Session expired - please log in again');
-          }
-          // Explicitly pass auth token in headers
-          await supabase.functions.invoke('compute-workout-analysis', {
-            body: { workout_id: id },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`
-            }
-          });
-        } catch (err) {
-          console.error('Failed to invoke compute-workout-analysis:', err);
-        }
-        for (let i = 0; i < 6; i++) {
-          await new Promise((r) => setTimeout(r, 700));
-          try {
-            const next = await fetchDetail();
-            if (next) {
-              remote = next;
-              if (hasSeries(remote)) break;
-            }
-          } catch {}
-        }
-      }
 
       // Merge with base row from context to preserve scalars
       try {
