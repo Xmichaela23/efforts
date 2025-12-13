@@ -1429,8 +1429,12 @@ const formatMovingTime = () => {
             {hasPowerZones && isRide && (
               <div className="my-4">
                 <PowerZoneChart 
-                  zoneDurationsSeconds={zonesPower.bins.map((b:any)=> Number(b.t_s)||0)}
-                  zoneRanges={zonesPower.bins.map((b:any)=> ({ min: b.min, max: b.max }))}
+                  zoneBins={zonesPower.bins.map((b:any)=> ({ 
+                    i: Number(b.i) || 0,
+                    t_s: Number(b.t_s) || 0,
+                    min: Number(b.min) || 0,
+                    max: Number(b.max) || 0
+                  }))}
                   avgPower={norm.avg_power ?? undefined}
                   maxPower={norm.max_power ?? undefined}
                   title="Power Distribution" 
