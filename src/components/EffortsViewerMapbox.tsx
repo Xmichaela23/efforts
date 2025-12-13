@@ -1997,19 +1997,14 @@ function EffortsViewerMapbox({
           {/* cursor */}
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
-          
-          {/* Drag hint - positioned lower, closer to buttons */}
-          <text 
-            x={pl + (W - pl - pr) / 2} 
-            y={SVG_HEIGHT - 10} 
-            textAnchor="middle" 
-            fill="#9ca3af" 
-            fontSize={16}
-            fontWeight={500}
-          >
-            ← drag for details →
-          </text>
         </svg>
+      </div>
+
+      {/* Drag hint - positioned between chart and buttons */}
+      <div style={{ textAlign: "center", marginTop: 8, marginBottom: 8 }}>
+        <span style={{ color: "#9ca3af", fontSize: 16, fontWeight: 500 }}>
+          ← drag for details →
+        </span>
       </div>
 
       {/* Metric buttons */}
