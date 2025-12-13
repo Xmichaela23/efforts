@@ -1809,27 +1809,60 @@ function EffortsViewerMapbox({
         
         {/* Distance, time, altitude (left) and final totals (right) */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
-          <div style={{ fontSize: 13, color: "#475569", fontWeight: 700 }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
-          <div style={{ 
-            fontWeight: 700, 
-            fontSize: 18, 
-            textAlign: "center", 
-            fontFeatureSettings: '"tnum"', // Use tabular numbers for consistent spacing
-            letterSpacing: "0.5px"
-          }}>
-            {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
+          {/* Altitude - show total when not scrubbing */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+            <div style={{ fontSize: 13, color: "#475569", fontWeight: 700 }}>
+              Alt {fmtAlt(isScrubbing ? altNow_m : (normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].elev_m_sm ?? 0 : 0), useFeet)}
+            </div>
+            {!isScrubbing && (
+              <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
+                (total)
+              </div>
+            )}
           </div>
-          <div style={{ fontSize: 13, color: "#475569", fontWeight: 700, whiteSpace: "nowrap" }}>
-            {(() => {
-              const gainNow = atEnd ? (Number.isFinite(totalGain_m) ? totalGain_m : (sigGain_m[sigGain_m.length - 1] ?? 0)) : (sigGain_m[Math.min(idx, sigGain_m.length - 1)] ?? 0);
-              const lossNow = atEnd ? (Number.isFinite(totalLoss_m) ? totalLoss_m : (sigLoss_m[sigLoss_m.length - 1] ?? 0)) : (sigLoss_m[Math.min(idx, sigLoss_m.length - 1)] ?? 0);
-              if (useFeet) {
-                const gft = Math.round(gainNow * 3.28084);
-                const lft = Math.round(lossNow * 3.28084);
-                return `+${gft} / -${lft} ft`;
+          {/* Distance and Time - show totals when not scrubbing */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div style={{ 
+              fontWeight: 700, 
+              fontSize: 18, 
+              textAlign: "center", 
+              fontFeatureSettings: '"tnum"', // Use tabular numbers for consistent spacing
+              letterSpacing: "0.5px"
+            }}>
+              {isScrubbing 
+                ? `${fmtDist(s?.d_m ?? 0, useMiles)} · ${fmtTime(s?.t_s ?? 0)}`
+                : `${fmtDist(dTotal ?? 0, useMiles)} · ${fmtTime(normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].t_s : 0)}`
               }
-              return `+${Math.round(gainNow)} / -${Math.round(lossNow)} m`;
-            })()}
+            </div>
+            {!isScrubbing && (
+              <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
+                (total)
+              </div>
+            )}
+          </div>
+          {/* Elevation Gain/Loss - show totals when not scrubbing */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+            <div style={{ fontSize: 13, color: "#475569", fontWeight: 700, whiteSpace: "nowrap" }}>
+              {(() => {
+                const gainNow = isScrubbing 
+                  ? (atEnd ? (Number.isFinite(totalGain_m) ? totalGain_m : (sigGain_m[sigGain_m.length - 1] ?? 0)) : (sigGain_m[Math.min(idx, sigGain_m.length - 1)] ?? 0))
+                  : (Number.isFinite(totalGain_m) ? totalGain_m : (sigGain_m[sigGain_m.length - 1] ?? 0));
+                const lossNow = isScrubbing
+                  ? (atEnd ? (Number.isFinite(totalLoss_m) ? totalLoss_m : (sigLoss_m[sigLoss_m.length - 1] ?? 0)) : (sigLoss_m[Math.min(idx, sigLoss_m.length - 1)] ?? 0))
+                  : (Number.isFinite(totalLoss_m) ? totalLoss_m : (sigLoss_m[sigLoss_m.length - 1] ?? 0));
+                if (useFeet) {
+                  const gft = Math.round(gainNow * 3.28084);
+                  const lft = Math.round(lossNow * 3.28084);
+                  return `+${gft} / -${lft} ft`;
+                }
+                return `+${Math.round(gainNow)} / -${Math.round(lossNow)} m`;
+              })()}
+            </div>
+            {!isScrubbing && (
+              <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
+                (total)
+              </div>
+            )}
           </div>
         </div>
       </div>
