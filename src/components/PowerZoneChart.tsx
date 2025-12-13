@@ -5,12 +5,8 @@ import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
-  Bar,
-  XAxis,
   Tooltip,
   ResponsiveContainer,
-  YAxis,
 } from "recharts";
 
 /**
@@ -161,51 +157,27 @@ const PowerZoneChart: React.FC<PowerZoneChartProps> = ({
 
         <Separator />
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Bar Chart */}
-          <div>
-            <h3 className="text-sm font-medium mb-3">Time Distribution</h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={zoneData} margin={{ top: 8, right: 8, left: 8, bottom: 16 }}>
-                <XAxis dataKey="zone" />
-                <YAxis tickFormatter={(value) => fmtTime(value)} />
-                <Tooltip 
-                  formatter={(value: any) => [fmtTime(value), 'Time']}
-                  labelFormatter={(label) => `${label}`}
-                />
-                <Bar dataKey="duration" fill="#f59e0b">
-                  {zoneData.map((entry) => (
-                    <Cell key={`cell-${entry.zoneIndex}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <p className="text-xs text-muted-foreground text-center mt-2">← Tap any bar to see time in zone →</p>
-          </div>
-
-          {/* Pie Chart */}
-          <div>
-            <h3 className="text-sm font-medium mb-3">Zone Distribution</h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie
-                  data={zoneData.filter(z => z.duration > 0)}
-                  dataKey="percentage"
-                  nameKey="zone"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={72}
-                  label={({ percentage }) => pctFmt(percentage)}
-                >
-                  {zoneData.filter(z => z.duration > 0).map((entry, index) => (
-                    <Cell key={`cell-${entry.zoneIndex}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: any) => [pctFmt(value), 'Percentage']} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Pie Chart */}
+        <div>
+          <h3 className="text-sm font-medium mb-3">Zone Distribution</h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie
+                data={zoneData.filter(z => z.duration > 0)}
+                dataKey="percentage"
+                nameKey="zone"
+                cx="50%"
+                cy="50%"
+                outerRadius={72}
+                label={({ percentage }) => pctFmt(percentage)}
+              >
+                {zoneData.filter(z => z.duration > 0).map((entry, index) => (
+                  <Cell key={`cell-${entry.zoneIndex}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value: any) => [pctFmt(value), 'Percentage']} />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
 
         {/* Zone Table */}
