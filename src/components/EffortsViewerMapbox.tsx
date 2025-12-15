@@ -1918,10 +1918,10 @@ function EffortsViewerMapbox({
             </clipPath>
           </defs>
           
-          {/* Drag hint - above chart area, aligned with (total) labels */}
+          {/* Drag hint - at top of chart area, aligned with (total) labels */}
           <text 
             x={W * 0.45} 
-            y={-8} 
+            y={P + 16} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={20}
