@@ -1918,15 +1918,14 @@ function EffortsViewerMapbox({
             </clipPath>
           </defs>
           
-          {/* Drag hint - at very top of chart box, aligned with (total) labels */}
+          {/* Drag hint - in top padding of scrubbable chart, aligned with (total) labels */}
           <text 
             x={W * 0.45} 
-            y={6} 
+            y={-20} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={20}
             fontWeight={500}
-            dominantBaseline="hanging"
           >
             ← drag for details →
           </text>
