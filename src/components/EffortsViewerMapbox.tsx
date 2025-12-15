@@ -1881,7 +1881,7 @@ function EffortsViewerMapbox({
           onTouchMove={onTouch}
           onTouchEnd={onTouchEnd}
           onDoubleClick={() => setLocked((l) => !l)}
-          style={{ display: "block", borderRadius: 12, background: "#fff", touchAction: "none", cursor: "crosshair", border: "1px solid #eef2f7" }}
+          style={{ display: "block", borderRadius: 12, background: "#fff", touchAction: "none", cursor: "crosshair" }}
         >
           {/* Gradient definitions */}
           <defs>
