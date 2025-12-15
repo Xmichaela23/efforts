@@ -2014,7 +2014,7 @@ function EffortsViewerMapbox({
           
           {/* Drag hint - in bottom padding of scrubbable SVG area, aligned with top drag hint */}
           <text 
-            x={pl + (W - pl - pr) / 2} 
+            x={W * 0.45} 
             y={dragHintY} 
             textAnchor="middle" 
             fill="#9ca3af" 
