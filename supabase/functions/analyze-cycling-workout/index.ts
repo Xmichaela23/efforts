@@ -694,30 +694,10 @@ function calculateDurationAdherence(workout: any, plannedWorkout: any, intervals
       };
     }
     
-    // Calculate adherence percentage
-    const isIntervalWorkout = intervals.some(interval => interval.type === 'work');
-    let adherencePercentage = 0;
-    
-    if (isIntervalWorkout) {
-      // For intervals, use lenient tolerance (±10%)
-      const tolerance = 0.10;
-      const minAcceptable = plannedDurationSeconds * (1 - tolerance);
-      const maxAcceptable = plannedDurationSeconds * (1 + tolerance);
-      
-      if (actualDurationSeconds >= minAcceptable && actualDurationSeconds <= maxAcceptable) {
-        adherencePercentage = 95 + Math.random() * 5; // 95-100%
-      } else {
-        const deviation = Math.abs(actualDurationSeconds - plannedDurationSeconds) / plannedDurationSeconds;
-        adherencePercentage = Math.max(0, 100 - (deviation * 100));
-      }
-    } else {
-      // For steady-state workouts
-      if (actualDurationSeconds <= plannedDurationSeconds) {
-        adherencePercentage = (actualDurationSeconds / plannedDurationSeconds) * 100;
-      } else {
-        adherencePercentage = Math.min(100, (plannedDurationSeconds / actualDurationSeconds) * 100);
-      }
-    }
+    // Calculate adherence percentage - same formula as running
+    // Duration adherence = how close actual is to planned (100% when equal, decreases with deviation)
+    const durationDelta = Math.abs(actualDurationSeconds - plannedDurationSeconds);
+    const adherencePercentage = Math.max(0, 100 - (durationDelta / plannedDurationSeconds) * 100);
     
     const deltaSeconds = actualDurationSeconds - plannedDurationSeconds;
     
@@ -740,63 +720,100 @@ function calculateDurationAdherence(workout: any, plannedWorkout: any, intervals
 
 /**
  * Generate interval-by-interval breakdown for cycling
+ * Matches running analysis structure for client compatibility
  */
-function generateIntervalBreakdown(workIntervals: any[], allIntervals?: any[]): any {
-  if (workIntervals.length === 0) {
-    return { available: false, message: 'No work intervals to analyze' };
+function generateIntervalBreakdown(workIntervals: any[], allIntervals?: any[], sensorData?: any[]): any[] {
+  // For steady-state rides, workIntervals might be empty but allIntervals has the data
+  const intervalsToAnalyze = workIntervals.length > 0 ? workIntervals : (allIntervals || []).filter(i => i.executed);
+  
+  if (intervalsToAnalyze.length === 0) {
+    return [];
   }
   
-  const breakdown = workIntervals.map((interval, index) => {
+  return intervalsToAnalyze.map((interval, index) => {
+    // Extract planned values
     const plannedDuration = interval.planned?.duration_s || interval.duration_s || 0;
-    const plannedPower = interval.planned?.target_power || interval.power_range?.lower || 0;
+    const powerRange = interval.power_range || interval.planned?.power_range || interval.target_power;
+    const plannedPowerLower = powerRange?.lower || powerRange?.min || 0;
+    const plannedPowerUpper = powerRange?.upper || powerRange?.max || plannedPowerLower;
+    const plannedPowerCenter = plannedPowerLower > 0 && plannedPowerUpper > 0 
+      ? Math.round((plannedPowerLower + plannedPowerUpper) / 2) 
+      : plannedPowerLower;
     
+    // Extract actual values from executed object
     const actualDuration = interval.executed?.duration_s || interval.duration_s || 0;
     const actualPower = interval.executed?.avg_power || interval.granular_metrics?.avg_power || 0;
     const normalizedPower = interval.granular_metrics?.normalized_power || actualPower;
+    const actualDistance = interval.executed?.distance_m || 0;
     
-    // Calculate duration adherence
+    // Heart rate from interval
+    const avgHR = interval.executed?.avg_heart_rate || interval.granular_metrics?.avg_heart_rate || null;
+    const maxHR = interval.executed?.max_heart_rate || null;
+    
+    // Calculate duration adherence: how close actual is to planned
     let durationAdherence = 0;
     if (plannedDuration > 0 && actualDuration > 0) {
       const durationDelta = Math.abs(actualDuration - plannedDuration);
       durationAdherence = Math.max(0, 100 - (durationDelta / plannedDuration) * 100);
     }
     
-    // Calculate power adherence
+    // Calculate power adherence using range if available
     let powerAdherence = 0;
-    if (plannedPower > 0 && actualPower > 0) {
-      const powerDelta = Math.abs(actualPower - plannedPower);
-      powerAdherence = Math.max(0, 100 - (powerDelta / plannedPower) * 100);
+    if (plannedPowerLower > 0 && plannedPowerUpper > 0 && actualPower > 0) {
+      // Check if actual power is within range
+      if (actualPower >= plannedPowerLower && actualPower <= plannedPowerUpper) {
+        powerAdherence = 100;
+      } else if (actualPower < plannedPowerLower) {
+        // Below range - calculate how far below
+        const deviation = (plannedPowerLower - actualPower) / plannedPowerLower;
+        powerAdherence = Math.max(0, 100 - (deviation * 100));
+      } else {
+        // Above range - calculate how far above
+        const deviation = (actualPower - plannedPowerUpper) / plannedPowerUpper;
+        powerAdherence = Math.max(0, 100 - (deviation * 100));
+      }
+    } else if (plannedPowerCenter > 0 && actualPower > 0) {
+      // Fallback to single target calculation
+      const powerDelta = Math.abs(actualPower - plannedPowerCenter);
+      powerAdherence = Math.max(0, 100 - (powerDelta / plannedPowerCenter) * 100);
     }
     
-    // Overall score (70% power, 30% duration)
-    const overallScore = (powerAdherence * 0.7) + (durationAdherence * 0.3);
+    // Overall performance score (70% power, 30% duration)
+    const performanceScore = (powerAdherence * 0.7) + (durationAdherence * 0.3);
+    
+    // Determine interval type based on role/kind
+    const role = String(interval.role || interval.kind || interval.type || '').toLowerCase();
+    let intervalType = 'work';
+    if (role.includes('warm')) intervalType = 'warmup';
+    else if (role.includes('cool')) intervalType = 'cooldown';
+    else if (role.includes('recovery') || role.includes('rest')) intervalType = 'recovery';
     
     return {
+      interval_type: intervalType,
       interval_number: index + 1,
+      interval_id: interval.planned_step_id || interval.id || `interval_${index}`,
+      // Duration metrics
       planned_duration_s: plannedDuration,
       actual_duration_s: actualDuration,
-      planned_power_w: plannedPower,
-      actual_power_w: actualPower,
-      normalized_power_w: normalizedPower,
-      power_adherence_percent: Math.round(powerAdherence),
       duration_adherence_percent: Math.round(durationAdherence),
-      overall_score: Math.round(overallScore)
+      // Power metrics
+      planned_power_range_lower: plannedPowerLower,
+      planned_power_range_upper: plannedPowerUpper,
+      planned_power_w: plannedPowerCenter,
+      actual_power_w: Math.round(actualPower),
+      normalized_power_w: Math.round(normalizedPower),
+      power_adherence_percent: Math.round(powerAdherence),
+      // Combined adherence (0-1 scale for compatibility with client getEnhancedAdherence)
+      adherence_percentage: powerAdherence / 100,
+      // Distance
+      actual_distance_m: actualDistance,
+      // Heart rate
+      avg_heart_rate_bpm: avgHR ? Math.round(avgHR) : null,
+      max_heart_rate_bpm: maxHR ? Math.round(maxHR) : null,
+      // Performance score
+      performance_score: Math.round(performanceScore)
     };
   });
-  
-  return {
-    available: true,
-    intervals: breakdown,
-    summary: {
-      total_intervals: breakdown.length,
-      avg_power_adherence: breakdown.length > 0
-        ? Math.round(breakdown.reduce((sum, i) => sum + i.power_adherence_percent, 0) / breakdown.length)
-        : 0,
-      avg_duration_adherence: breakdown.length > 0
-        ? Math.round(breakdown.reduce((sum, i) => sum + i.duration_adherence_percent, 0) / breakdown.length)
-        : 0
-    }
-  };
 }
 
 /**
@@ -1356,24 +1373,46 @@ Deno.serve(async (req) => {
       (i.role === 'work' || i.kind === 'work') && i.executed
     );
 
-    // Generate interval breakdown
-    const intervalBreakdown = generateIntervalBreakdown(workIntervals, intervals);
+    // Generate interval breakdown (matches running analysis structure)
+    const intervalBreakdown = generateIntervalBreakdown(workIntervals, intervals, sensorData);
 
     // Analyze heart rate
     const hrAnalysis = analyzeHeartRate(sensorData, intervals, baselines.max_heart_rate);
 
     // Calculate performance metrics
-    const powerAdherence = enhancedAnalysis.overall_adherence != null
-      ? Math.round(enhancedAnalysis.overall_adherence * 100)
+    // Use interval breakdown for more accurate adherence if available
+    let powerAdherence = 0;
+    if (intervalBreakdown.length > 0) {
+      // Calculate weighted average power adherence from intervals (like running)
+      const totalWeight = intervalBreakdown.reduce((sum: number, i: any) => sum + (i.actual_duration_s || 1), 0);
+      const weightedSum = intervalBreakdown.reduce((sum: number, i: any) => {
+        const weight = i.actual_duration_s || 1;
+        return sum + (i.power_adherence_percent * weight);
+      }, 0);
+      powerAdherence = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+    } else if (enhancedAnalysis.overall_adherence != null) {
+      powerAdherence = Math.round(enhancedAnalysis.overall_adherence * 100);
+    }
+    
+    const durationAdherenceValue = durationAdherence.adherence_percentage != null 
+      ? Math.round(durationAdherence.adherence_percentage) 
       : 0;
     
+    // Execution adherence = combination of power + duration (same formula as running)
+    const executionAdherence = Math.round((powerAdherence * 0.5) + (durationAdherenceValue * 0.5));
+    
     const performance = {
-      execution_adherence: (powerAdherence + (durationAdherence.adherence_percentage || 0)) / 2,
+      execution_adherence: executionAdherence,
       power_adherence: powerAdherence,
-      duration_adherence: durationAdherence.adherence_percentage || 0,
+      duration_adherence: durationAdherenceValue,
       completed_steps: workIntervals.length,
       total_steps: intervals.length
     };
+    
+    console.log(`🎯 Cycling performance metrics:`);
+    console.log(`  - Power adherence: ${powerAdherence}%`);
+    console.log(`  - Duration adherence: ${durationAdherenceValue}%`);
+    console.log(`  - Execution adherence: ${executionAdherence}% = (${powerAdherence}% power + ${durationAdherenceValue}% duration) / 2`);
 
     // Generate AI insights
     const insights = await generateAINarrativeInsights(
@@ -1396,6 +1435,17 @@ Deno.serve(async (req) => {
       : 0;
     const normalizedPower = calculateNormalizedPower(powerSamples);
 
+    // Build granular analysis (matches running structure for client compatibility)
+    const granularAnalysis = {
+      interval_breakdown: intervalBreakdown,
+      power_variability: enhancedAnalysis.power_variability,
+      heart_rate_analysis: hrAnalysis,
+      time_in_range_s: enhancedAnalysis.time_in_range_s,
+      time_outside_range_s: enhancedAnalysis.time_outside_range_s,
+      total_time_s: enhancedAnalysis.total_time_s,
+      overall_adherence: enhancedAnalysis.overall_adherence
+    };
+
     // Build detailed analysis
     const detailedAnalysis = {
       workout_summary: {
@@ -1405,24 +1455,34 @@ Deno.serve(async (req) => {
         normalized_power: normalizedPower,
         average_hr: hrAnalysis.available ? hrAnalysis.average_hr : 0
       },
-      interval_breakdown: intervalBreakdown,
+      interval_breakdown: intervalBreakdown, // Also include here for backwards compatibility
       heart_rate_analysis: hrAnalysis,
       power_variability: enhancedAnalysis.power_variability
     };
 
-    // Save analysis
+    // Save analysis - matches running analysis structure exactly
     const analysisPayload = {
-      performance,
+      _meta: {
+        version: "2.0",
+        source: "analyze-cycling-workout",
+        generated_at: new Date().toISOString(),
+        generator_version: "2.0.0"
+      },
+      granular_analysis: granularAnalysis,  // Same path as running for client compatibility
+      performance: performance,
       detailed_analysis: detailedAnalysis,
       narrative_insights: insights,
       insights: insights, // Backward compatibility
       adherence_analysis: {
         power_adherence: powerAdherence,
-        duration_adherence: durationAdherence.adherence_percentage,
+        duration_adherence: durationAdherenceValue,
         time_in_range_s: enhancedAnalysis.time_in_range_s,
         time_outside_range_s: enhancedAnalysis.time_outside_range_s
       }
     };
+    
+    console.log(`✅ Analysis payload structure:`, Object.keys(analysisPayload));
+    console.log(`  - granular_analysis.interval_breakdown: ${intervalBreakdown.length} intervals`);
 
     const { error: updateError } = await supabase
       .from('workouts')

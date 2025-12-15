@@ -1798,15 +1798,26 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             );
           }
 
-          // ------------ BIKE/RIDE (session-average power vs planned + duration) ------------
+          // ------------ BIKE/RIDE (smart server, dumb client - same as running) ------------
           if (isRide) {
-            // Debug: Check what we're getting from the server
-            console.log('🚨 [EXECUTION DEBUG] MOBILE SUMMARY RENDERING - RUNNING UPDATED CODE (BIKE)');
-            console.log('🔍 [EXECUTION DEBUG] completed:', completed);
-            console.log('🔍 [EXECUTION DEBUG] computed:', (completed as any)?.computed);
-            console.log('🔍 [EXECUTION DEBUG] overall:', (completed as any)?.computed?.overall);
-            console.log('🔍 [EXECUTION DEBUG] execution_score:', (completed as any)?.computed?.overall?.execution_score);
+            // ✅ SMART SERVER, DUMB CLIENT: Read all adherence values from workout_analysis.performance
+            const performance = (completed as any)?.workout_analysis?.performance;
+            console.log('🚴 [CYCLING DEBUG] Reading from workout_analysis.performance:', performance);
             
+            // Use server-computed values (same pattern as running)
+            const executionAdherence = Number.isFinite(performance?.execution_adherence) 
+              ? Math.round(performance.execution_adherence) 
+              : null;
+            const powerAdherence = Number.isFinite(performance?.power_adherence)
+              ? Math.round(performance.power_adherence)
+              : null;
+            const durationAdherence = Number.isFinite(performance?.duration_adherence)
+              ? Math.round(performance.duration_adherence)
+              : null;
+            
+            console.log('🚴 [CYCLING DEBUG] Server values - Execution:', executionAdherence, 'Power:', powerAdherence, 'Duration:', durationAdherence);
+            
+            // Calculate deltas for display only (not for adherence %)
             const plannedSecondsTotal = (() => {
               const t = Number((planned as any)?.computed?.total_duration_seconds);
               if (Number.isFinite(t) && t > 0) return t;
@@ -1815,51 +1826,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               return s > 0 ? s : null;
             })();
 
-            // Duration-weighted planned watts from server-processed steps
-            const plannedWatts = (() => {
-              // FTP calculations removed - server now handles this
-              const steps = Array.isArray(plannedStepsFull) && plannedStepsFull.length ? plannedStepsFull : (Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : []);
-              const isWorkStep = (st:any) => {
-                const k = String(st?.type || st?.kind || st?.name || '').toLowerCase();
-                return !(k.includes('warm') || k.includes('cool') || k.includes('rest') || k.includes('recovery') || k.includes('jog'));
-              };
-              let sum = 0; let w = 0;
-              for (const st of steps) {
-                if (!isWorkStep(st)) continue;
-                const dur = Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0);
-                let center: number | null = null;
-                const pr = (st as any)?.power_range;
-                const lo = Number(pr?.lower); const hi = Number(pr?.upper);
-                if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi > 0) {
-                  // Server already converted FTP percentages to absolute watts
-                  center = Math.round((lo + hi) / 2);
-                }
-                const pw = Number((st as any)?.power_target_watts ?? (st as any)?.target_watts ?? (st as any)?.watts);
-                if (center == null && Number.isFinite(pw) && pw > 0) center = Math.round(pw);
-                if (center != null && Number.isFinite(dur) && dur > 0) { sum += (center as number) * dur; w += dur; }
-              }
-              if (w > 0) return Math.round(sum / w);
-              // No fallback needed - server handles all power calculations
-              return null;
-            })();
-
-            // Executed watts - use server-calculated power only
-            const executedWatts = (() => {
-              // Use server-calculated average power from ingest-activity function
-              const v = Number((hydratedCompleted || completed)?.avg_power ?? (hydratedCompleted || completed)?.metrics?.avg_power ?? (hydratedCompleted || completed)?.average_watts);
-              return (Number.isFinite(v) && v>0) ? Math.round(v) : null;
-            })();
-
             const compOverall = (hydratedCompleted || completed)?.computed?.overall || {};
             const executedSeconds = (() => {
-              // ONLY use moving time - no fallbacks
               const s = Number(compOverall?.duration_s_moving);
               return Number.isFinite(s) && s > 0 ? s : null;
             })();
-
-            const powerPct = (plannedWatts && executedWatts) ? Math.round((executedWatts / plannedWatts) * 100) : null;
-            const powerDelta = (plannedWatts && executedWatts) ? (executedWatts - plannedWatts) : null; // + means higher
-            const durationPct = (plannedSecondsTotal && executedSeconds) ? Math.round((executedSeconds as number / (plannedSecondsTotal as number)) * 100) : null;
             const durationDelta = (plannedSecondsTotal && executedSeconds) ? ((executedSeconds as number) - (plannedSecondsTotal as number)) : null;
 
             // Determine workout intent for rule-based coloring
@@ -1877,18 +1848,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               );
             };
             const fmtDeltaTime = (s:number) => { const sign = s>=0 ? '+' : '−'; const v = Math.abs(Math.round(s)); const m=Math.floor(v/60); const ss=v%60; return `${sign}${m}:${String(ss).padStart(2,'0')}`; };
-            const fmtDeltaWatts = (w:number) => { const sign = w>=0 ? '+' : '−'; return `${sign}${Math.abs(Math.round(w))} W`; };
 
-            // Use server-computed overall execution score
-            const executionScore = (completed as any)?.computed?.overall?.execution_score;
-            
-            // ✅ FIX: Check for any valid values
-            const anyVal = (powerPct != null) || (durationPct != null) || (executionScore != null);
+            // ✅ FIX: Check for any valid server-computed values
+            const anyVal = (executionAdherence != null && executionAdherence >= 0) ||
+                          (powerAdherence != null && powerAdherence >= 0) ||
+                          (durationAdherence != null && durationAdherence >= 0);
             if (!anyVal) return null;
 
-            // Note: For bikes, we still use client-calculated powerPct/durationPct since 
-            // granular analysis is primarily for running. This is acceptable for now.
-            const message = getContextualMessage(workoutIntent, durationPct, null, powerPct, 'bike');
+            // Use server values for contextual message
+            const message = getContextualMessage(workoutIntent, durationAdherence, null, powerAdherence, 'bike');
 
             return (
               <div className="w-full pt-1 pb-2">
@@ -1899,12 +1867,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   </div>
                 )}
                 
-                {/* Adherence scores */}
+                {/* Adherence scores - all from server */}
                 <div className="flex items-center justify-center gap-6 text-center mb-3">
                   <div className="flex items-end gap-3">
-                    {chip('Execution', executionScore, 'Overall adherence', 'pace')}
-                    {chip('Watts', powerPct, powerDelta!=null ? fmtDeltaWatts(powerDelta) : '—', 'pace')}
-                    {chip('Duration', durationPct, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
+                    {chip('Execution', executionAdherence, 'Overall adherence', 'pace')}
+                    {chip('Power', powerAdherence, 'Time in range', 'pace')}
+                    {chip('Duration', durationAdherence, durationDelta!=null ? fmtDeltaTime(durationDelta) : '—', 'duration')}
                   </div>
                 </div>
                 
@@ -2203,9 +2171,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null;
               }
             }
-            // Use enhanced pacing analysis adherence percentage if available, otherwise fall back to server-computed
+            // Use enhanced analysis adherence percentage if available (works for both running and cycling)
             const getEnhancedAdherence = () => {
-              // Check for enhanced pacing analysis from analyze-running-workout
+              // Check for enhanced analysis from analyze-running-workout or analyze-cycling-workout
               const workoutAnalysis = (completed as any)?.workout_analysis;
               if (workoutAnalysis?.granular_analysis?.interval_breakdown) {
                 const intervalBreakdown = workoutAnalysis.granular_analysis.interval_breakdown;
@@ -2218,8 +2186,18 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                          interval.interval_id === plannedStepId;
                 });
                 if (matchingInterval) {
-                  // adherence_percentage is already a decimal (0-1), convert to percentage
-                  return Math.round(matchingInterval.adherence_percentage * 100);
+                  // For running: adherence_percentage is a decimal (0-1), convert to percentage
+                  // For cycling: adherence_percentage is also a decimal (0-1)
+                  // Also check for power_adherence_percent (cycling) or pace_adherence_percent (running) as direct %
+                  if (typeof matchingInterval.adherence_percentage === 'number') {
+                    // Decimal format (0-1)
+                    return Math.round(matchingInterval.adherence_percentage * 100);
+                  }
+                  // Fallback: use power_adherence_percent or pace_adherence_percent directly (already %)
+                  const directPct = matchingInterval.power_adherence_percent || matchingInterval.pace_adherence_percent;
+                  if (typeof directPct === 'number') {
+                    return Math.round(directPct);
+                  }
                 }
               }
               return null;
