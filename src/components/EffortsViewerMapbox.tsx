@@ -1917,6 +1917,18 @@ function EffortsViewerMapbox({
               <rect x={pl} y={P} width={W - pl - pr} height={H - pb - P} />
             </clipPath>
           </defs>
+          
+          {/* Drag hint - at top of chart area, centered */}
+          <text 
+            x={(W - 10) / 2} 
+            y={P + 20} 
+            textAnchor="middle" 
+            fill="#9ca3af" 
+            fontSize={26}
+            fontWeight={500}
+          >
+            ← drag for details →
+          </text>
           {/* vertical grid */}
           {[0, 1, 2, 3, 4].map((i) => {
             const x = pl + i * ((W - pl - pr) / 4);
