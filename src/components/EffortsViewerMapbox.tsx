@@ -1872,7 +1872,8 @@ function EffortsViewerMapbox({
         <svg
           ref={svgRef}
           viewBox={`-10 0 ${W + 10} ${SVG_HEIGHT}`}   // responsive: all drawn in SVG units, negative x for Y-axis labels
-          width="100%" height={SVG_HEIGHT}
+          width="100%"
+          preserveAspectRatio="xMidYMin meet"
           onMouseMove={onMove}
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseLeave}
