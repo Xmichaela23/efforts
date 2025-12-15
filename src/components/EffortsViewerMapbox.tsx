@@ -1998,10 +1998,10 @@ function EffortsViewerMapbox({
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
           
-          {/* Drag hint - below the x-axis time labels */}
+          {/* Drag hint - lower in scrubbable area, below x-axis labels */}
           <text 
             x={pl + (W - pl - pr) / 2} 
-            y={H - pb + 40} 
+            y={H - pb + 55} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={16}
