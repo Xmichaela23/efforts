@@ -910,6 +910,7 @@ function EffortsViewerMapbox({
   const P = 10;                     // vertical padding (top)
   const pb = 50;                    // bottom padding (space for x-axis labels + drag hint)
   const SVG_HEIGHT = H + 30;        // Total SVG height to accommodate labels below chart (extra room for text)
+  const dragHintY = SVG_HEIGHT - 8; // place drag hint between x-axis labels and buttons, but inside drag area
   const pl = 60;                    // left padding (space for Y labels - increased for 3-digit numbers)
   const pr = 12;                    // right padding
 
@@ -2001,7 +2002,7 @@ function EffortsViewerMapbox({
           {/* Drag hint - near bottom of scrubbable SVG area */}
           <text 
             x={pl + (W - pl - pr) / 2} 
-            y={SVG_HEIGHT - 12} 
+            y={dragHintY} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={16}
@@ -2070,7 +2071,7 @@ function EffortsViewerMapbox({
           <div style={{ fontWeight: 600, color: "#64748b" }}>
             {workoutData?.type === 'ride' ? 'Speed' : 'Pace'}
           </div>
-          <div style={{ fontWeight: 600, color: "#64748b" }}>Gain</div>
+          <div style={{ fontWeight: 600, color: "#64748b" }}>BPM</div>
           <div style={{ fontWeight: 600, color: "#64748b" }}>Grade</div>
           {splits.map((sp, i) => {
             const active = i === activeSplitIx;
@@ -2080,7 +2081,7 @@ function EffortsViewerMapbox({
                 {cell(i + 1)}
                 {cell(fmtTime(sp.time_s))}
                 {cell(workoutData?.type === 'ride' ? fmtSpeed(sp.avgPace_s_per_km, useMiles) : fmtPace(sp.avgPace_s_per_km, useMiles))}
-                {cell(fmtAlt(sp.gain_m, useFeet))}
+                {cell(Number.isFinite(sp.avgHr_bpm as any) ? `${Math.round(sp.avgHr_bpm as number)} bpm` : '—')}
                 {cell(fmtPct(sp.avgGrade))}
               </React.Fragment>
             );
