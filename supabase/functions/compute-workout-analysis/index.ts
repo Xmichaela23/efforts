@@ -1581,6 +1581,27 @@ Deno.serve(async (req) => {
         console.error('❌ Failed to trigger running analysis:', error);
       }
     }
+    
+    // Trigger granular analysis for cycling workouts
+    if (w.type === 'ride') {
+      try {
+        console.log('🚴 Triggering analyze-cycling-workout...');
+        
+        // Call the dedicated analyze-cycling-workout function
+        // It will write to workout_analysis independently
+        const { error: cyclingError } = await supabase.functions.invoke('analyze-cycling-workout', {
+          body: { workout_id: workout_id }
+        });
+        
+        if (cyclingError) {
+          console.error('❌ Cycling analysis failed:', cyclingError.message);
+        } else {
+          console.log('✅ Cycling analysis triggered successfully');
+        }
+      } catch (error) {
+        console.error('❌ Failed to trigger cycling analysis:', error);
+      }
+    }
 
     // Update workout with computed data only
     // NOTE: analyze-running-workout handles workout_analysis separately

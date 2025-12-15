@@ -242,6 +242,15 @@ Deno.serve(async (req) => {
             body: JSON.stringify({ workout_id: w.id }) 
           });
           console.log('[auto-attach-planned] analyze-running-workout status:', analyzeResponse.status);
+        } else if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
+          console.log('[auto-attach-planned] Calling analyze-cycling-workout');
+          const analyzeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-cycling-workout`;
+          const analyzeResponse = await fetch(analyzeUrl, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
+            body: JSON.stringify({ workout_id: w.id }) 
+          });
+          console.log('[auto-attach-planned] analyze-cycling-workout status:', analyzeResponse.status);
         }
         
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -339,6 +348,26 @@ Deno.serve(async (req) => {
         const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
         await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+      } catch {}
+
+      // Trigger discipline-specific analysis (same as explicit attach path)
+      try {
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        if (w.type === 'run' || w.type === 'running') {
+          console.log('[auto-attach-planned] date_type_match: Calling analyze-running-workout');
+          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
+            body: JSON.stringify({ workout_id: w.id }) 
+          });
+        } else if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
+          console.log('[auto-attach-planned] date_type_match: Calling analyze-cycling-workout');
+          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-cycling-workout`, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
+            body: JSON.stringify({ workout_id: w.id }) 
+          });
+        }
       } catch {}
 
       return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, mode: 'date_type_match' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -476,6 +505,26 @@ Deno.serve(async (req) => {
       const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
       const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
       await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+    } catch {}
+
+    // Trigger discipline-specific analysis (same as explicit attach path)
+    try {
+      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+      if (w.type === 'run' || w.type === 'running') {
+        console.log('[auto-attach-planned] heuristic: Calling analyze-running-workout');
+        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
+          body: JSON.stringify({ workout_id: w.id }) 
+        });
+      } else if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
+        console.log('[auto-attach-planned] heuristic: Calling analyze-cycling-workout');
+        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-cycling-workout`, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
+          body: JSON.stringify({ workout_id: w.id }) 
+        });
+      }
     } catch {}
 
     return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
