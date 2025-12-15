@@ -202,3 +202,4 @@ After fix, verify:
 - `compute-workout-analysis/index.ts`: Lines 1460-1495 (correctly computes `duration_s_moving`)
 
 
+

@@ -2012,7 +2012,7 @@ function EffortsViewerMapbox({
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
           
-          {/* Drag hint - in bottom padding of scrubbable SVG area, aligned with (total) labels */}
+          {/* Drag hint - in bottom padding of scrubbable SVG area, aligned with top drag hint */}
           <text 
             x={pl + (W - pl - pr) / 2} 
             y={dragHintY} 
