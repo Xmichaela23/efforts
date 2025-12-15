@@ -658,16 +658,18 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   };
 
   const getDisplayPower = (workout: any, interval: any): number | null => {
-    // For summary display, always use overall workout power to match Details tab
-    // Individual interval power should only be used for per-interval analysis
+    // ✅ Smart server, dumb client: Use per-interval actual power from server-computed data
+    // This shows the actual power for each interval, matching the server analysis
+    
+    // Priority 1: Use interval-specific executed power (per-interval actual)
+    if (interval?.executed?.avg_power_w) {
+      return Number(interval.executed.avg_power_w);
+    }
+    
+    // Priority 2: Fallback to overall workout power if no interval data
     const overallPower = Number(workout?.avg_power ?? workout?.metrics?.avg_power ?? workout?.average_watts);
     if (Number.isFinite(overallPower) && overallPower > 0) {
       return overallPower;
-    }
-    
-    // Fallback to interval-specific power only if no overall power available
-    if (interval?.executed?.avg_power_w) {
-      return Number(interval.executed.avg_power_w);
     }
     
     return null;
