@@ -1918,9 +1918,9 @@ function EffortsViewerMapbox({
             </clipPath>
           </defs>
           
-          {/* Drag hint - above chart area, centered */}
+          {/* Drag hint - above chart area, aligned with (total) labels */}
           <text 
-            x={(W - 10) / 2} 
+            x={W / 3} 
             y={-8} 
             textAnchor="middle" 
             fill="#9ca3af" 
@@ -2010,9 +2010,9 @@ function EffortsViewerMapbox({
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
           
-          {/* Drag hint - at very bottom of scrubbable SVG area, centered with full viewBox width */}
+          {/* Drag hint - at very bottom of scrubbable SVG area, aligned with (total) labels */}
           <text 
-            x={(W - 10) / 2} 
+            x={W / 3} 
             y={SVG_HEIGHT - 2} 
             textAnchor="middle" 
             fill="#9ca3af" 
