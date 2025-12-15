@@ -376,8 +376,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       handleBackToDashboard();
       return;
     }
-    // Fallback: browser history
-    history.back();
+    // Handle workout detail view - return to dashboard
+    if (selectedWorkout) {
+      handleBackToDashboard();
+      return;
+    }
+    // Handle other views - return to dashboard
+    if (showTrainingBaselines || showImportPage || showContext || showBuilder || showStrengthLogger || showPilatesYogaLogger) {
+      handleBackToDashboard();
+      return;
+    }
+    // Fallback: go to dashboard (safer than history.back())
+    handleBackToDashboard();
   };
 
   // NEW: Training Baselines handler
