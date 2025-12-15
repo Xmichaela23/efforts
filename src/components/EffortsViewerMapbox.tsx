@@ -1998,13 +1998,13 @@ function EffortsViewerMapbox({
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
           
-          {/* Drag hint - near bottom of scrubbable SVG area */}
+          {/* Drag hint - at very bottom of scrubbable SVG area */}
           <text 
             x={pl + (W - pl - pr) / 2} 
-            y={SVG_HEIGHT - 12} 
+            y={SVG_HEIGHT - 2} 
             textAnchor="middle" 
             fill="#9ca3af" 
-            fontSize={16}
+            fontSize={13}
             fontWeight={500}
           >
             ← drag for details →
