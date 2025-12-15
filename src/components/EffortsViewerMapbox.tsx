@@ -1871,8 +1871,8 @@ function EffortsViewerMapbox({
       <div style={{ marginTop: 0, overflow: 'visible' }} onMouseLeave={onMouseLeave}>
         <svg
           ref={svgRef}
-          viewBox={`-10 -40 ${W + 10} ${SVG_HEIGHT + 40}`}   // responsive: all drawn in SVG units, extra height for labels, negative x/y for labels and top hint
-          width="100%" height={SVG_HEIGHT + 40}
+          viewBox={`-10 -8 ${W + 10} ${SVG_HEIGHT + 8}`}   // responsive: all drawn in SVG units, extra height for labels, negative x/y for labels and top hint
+          width="100%" height={SVG_HEIGHT + 8}
           onMouseMove={onMove}
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseLeave}
@@ -1918,10 +1918,10 @@ function EffortsViewerMapbox({
             </clipPath>
           </defs>
           
-          {/* Drag hint - at absolute top of scrubbable chart, aligned with (total) labels */}
+          {/* Drag hint - at top of scrubbable chart, aligned with (total) labels */}
           <text 
             x={W * 0.45} 
-            y={-40} 
+            y={-6} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={20}
