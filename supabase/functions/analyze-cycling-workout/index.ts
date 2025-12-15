@@ -733,9 +733,12 @@ function calculateDurationAdherence(workout: any, plannedWorkout: any, intervals
  * Generate interval-by-interval breakdown for cycling
  * Matches running analysis structure for client compatibility
  */
-function generateIntervalBreakdown(workIntervals: any[], allIntervals?: any[], sensorData?: any[]): any[] {
-  // For steady-state rides, workIntervals might be empty but allIntervals has the data
-  const intervalsToAnalyze = workIntervals.length > 0 ? workIntervals : (allIntervals || []).filter(i => i.executed);
+function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?: any[], sensorData?: any[]): any[] {
+  // Analyze ALL intervals with power targets (warmup, work, cooldown)
+  // This ensures we capture deviations in non-work segments too
+  const intervalsToAnalyze = allIntervalsWithPower && allIntervalsWithPower.length > 0 
+    ? allIntervalsWithPower.filter(i => i.executed)
+    : workIntervals.filter(i => i.executed);
   
   if (intervalsToAnalyze.length === 0) {
     return [];
@@ -1436,23 +1439,36 @@ Deno.serve(async (req) => {
       (i.role === 'work' || i.kind === 'work') && i.executed
     );
 
-    // Generate interval breakdown (matches running analysis structure)
-    const intervalBreakdown = generateIntervalBreakdown(workIntervals, intervals, sensorData);
+    // Generate interval breakdown for ALL intervals with power targets (not just work)
+    // This captures warmup/cooldown deviations too
+    const allIntervalsWithPower = intervals.filter(i => i.power_range && i.executed);
+    const intervalBreakdown = generateIntervalBreakdown(workIntervals, allIntervalsWithPower, sensorData);
 
     // Analyze heart rate
     const hrAnalysis = analyzeHeartRate(sensorData, intervals, baselines.max_heart_rate);
 
-    // Calculate performance metrics
-    // Use interval breakdown for more accurate adherence if available
+    // Calculate performance metrics with proper weighting
+    // Work intervals get 2x weight (they're the most important part of the workout)
     let powerAdherence = 0;
     if (intervalBreakdown.length > 0) {
-      // Calculate weighted average power adherence from intervals (like running)
-      const totalWeight = intervalBreakdown.reduce((sum: number, i: any) => sum + (i.actual_duration_s || 1), 0);
-      const weightedSum = intervalBreakdown.reduce((sum: number, i: any) => {
-        const weight = i.actual_duration_s || 1;
-        return sum + (i.power_adherence_percent * weight);
-      }, 0);
+      // Calculate weighted average with work intervals weighted 2x
+      let totalWeight = 0;
+      let weightedSum = 0;
+      
+      for (const interval of intervalBreakdown) {
+        const isWorkInterval = interval.interval_type === 'work';
+        // Work intervals get 2x weight, others get 1x
+        const typeMultiplier = isWorkInterval ? 2.0 : 1.0;
+        const durationWeight = interval.actual_duration_s || 1;
+        const weight = durationWeight * typeMultiplier;
+        
+        totalWeight += weight;
+        weightedSum += (interval.power_adherence_percent || 0) * weight;
+      }
+      
       powerAdherence = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+      
+      console.log(`📊 Power adherence calculation: ${intervalBreakdown.length} intervals, work intervals 2x weighted`);
     } else if (enhancedAnalysis.overall_adherence != null) {
       powerAdherence = Math.round(enhancedAnalysis.overall_adherence * 100);
     }
@@ -1461,8 +1477,9 @@ Deno.serve(async (req) => {
       ? Math.round(durationAdherence.adherence_percentage) 
       : 0;
     
-    // Execution adherence = combination of power + duration (same formula as running)
-    const executionAdherence = Math.round((powerAdherence * 0.5) + (durationAdherenceValue * 0.5));
+    // Execution adherence: For cycling, power is primary metric (70% weight)
+    // Duration matters less than hitting your power targets
+    const executionAdherence = Math.round((powerAdherence * 0.7) + (durationAdherenceValue * 0.3));
     
     const performance = {
       execution_adherence: executionAdherence,
@@ -1473,9 +1490,9 @@ Deno.serve(async (req) => {
     };
     
     console.log(`🎯 Cycling performance metrics:`);
-    console.log(`  - Power adherence: ${powerAdherence}%`);
+    console.log(`  - Power adherence: ${powerAdherence}% (work intervals 2x weighted)`);
     console.log(`  - Duration adherence: ${durationAdherenceValue}%`);
-    console.log(`  - Execution adherence: ${executionAdherence}% = (${powerAdherence}% power + ${durationAdherenceValue}% duration) / 2`);
+    console.log(`  - Execution adherence: ${executionAdherence}% = (${powerAdherence}% × 0.7) + (${durationAdherenceValue}% × 0.3)`);
 
     // Generate AI insights
     const insights = await generateAINarrativeInsights(
