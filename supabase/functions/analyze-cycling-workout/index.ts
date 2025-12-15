@@ -462,17 +462,23 @@ function calculateIntervalPowerAdherence(
 ): EnhancedAdherence {
   console.log('🚴 Analyzing interval workout power adherence');
   
-  // Filter to intervals with power targets
+  // Filter to work intervals with execution data
   const workIntervals = intervals.filter(interval => {
     const hasPowerTarget = interval.power_range?.lower ||
                           interval.target_power?.lower ||
                           interval.planned?.power_range?.lower ||
                           interval.planned?.target_power?.lower;
     
-    return hasPowerTarget && interval.executed && (interval.sample_idx_start !== undefined);
+    const isWorkInterval = interval.role === 'work' || interval.kind === 'work' || interval.type === 'work';
+    const hasExecution = interval.executed || interval.sample_idx_start !== undefined;
+    
+    console.log(`🔍 Interval check: hasPower=${hasPowerTarget}, isWork=${isWorkInterval}, hasExec=${hasExecution}, role=${interval.role}`);
+    
+    // Accept intervals that either have power targets OR are work intervals
+    return (hasPowerTarget || isWorkInterval) && hasExecution;
   });
   
-  console.log(`📊 Analyzing ${workIntervals.length} intervals with power targets`);
+  console.log(`📊 Analyzing ${workIntervals.length} work intervals`);
   
   let totalTimeInRange = 0;
   let totalTimeOutsideRange = 0;
@@ -652,16 +658,21 @@ function calculatePrescribedRangeAdherenceGranular(
 ): EnhancedAdherence {
   console.log(`📊 Starting granular power adherence analysis for ${intervals.length} intervals`);
   
-  // Check if this is an interval workout
-  const intervalsWithPowerTargets = intervals.filter(interval => {
+  // Check if this is an interval workout - look for work intervals with power targets
+  const workIntervals = intervals.filter(interval => {
     const hasPowerTarget = interval.power_range?.lower ||
                           interval.target_power?.lower ||
                           interval.planned?.power_range?.lower ||
                           interval.planned?.target_power?.lower;
-    return hasPowerTarget && interval.executed;
+    const isWorkInterval = interval.role === 'work' || interval.kind === 'work' || interval.type === 'work';
+    const hasExecution = interval.executed || interval.sample_idx_start !== undefined;
+    
+    return (hasPowerTarget || isWorkInterval) && hasExecution;
   });
   
-  const isIntervalWorkout = intervalsWithPowerTargets.length > 0;
+  console.log(`🔍 Found ${workIntervals.length} work intervals with execution data`);
+  
+  const isIntervalWorkout = workIntervals.length > 0;
   console.log(`🔍 Workout type: ${isIntervalWorkout ? 'Intervals' : 'Steady-state'}`);
   
   if (isIntervalWorkout) {
@@ -1266,33 +1277,70 @@ Deno.serve(async (req) => {
       if (planned) {
         plannedWorkout = planned;
         
+        console.log('📋 Planned workout found:', {
+          id: planned.id,
+          hasComputedSteps: !!planned.computed?.steps,
+          stepsCount: planned.computed?.steps?.length || 0
+        });
+        
         // Extract intervals from planned workout
         if (planned.computed?.steps) {
-          intervals = planned.computed.steps.map((step: any) => ({
-            id: step.id,
-            type: step.kind || step.type,
-            kind: step.kind || step.type,
-            role: step.kind || step.type,
-            duration_s: step.seconds || step.duration_s,
-            power_range: step.power_range || step.target_power,
-            planned: {
+          intervals = planned.computed.steps.map((step: any, idx: number) => {
+            console.log(`📊 Step ${idx}:`, {
+              id: step.id,
+              kind: step.kind || step.type,
+              seconds: step.seconds,
+              power_range: step.power_range,
+              target_power: step.target_power
+            });
+            
+            return {
+              id: step.id,
+              type: step.kind || step.type,
+              kind: step.kind || step.type,
+              role: step.kind || step.type,
               duration_s: step.seconds || step.duration_s,
-              target_power: step.power_range?.lower || step.target_power?.lower,
-              power_range: step.power_range || step.target_power
-            }
-          }));
+              power_range: step.power_range || step.target_power,
+              planned: {
+                duration_s: step.seconds || step.duration_s,
+                target_power: step.power_range?.lower || step.target_power?.lower,
+                power_range: step.power_range || step.target_power
+              }
+            };
+          });
           
-          // Enrich with execution data
-          intervals = intervals.map(planned => {
-            const computedInterval = workout?.computed?.intervals?.find((exec: any) => 
+          console.log('📊 Workout computed intervals:', {
+            hasIntervals: !!workout?.computed?.intervals,
+            count: workout?.computed?.intervals?.length || 0
+          });
+          
+          // Enrich with execution data from workout.computed.intervals
+          const computedIntervals = workout?.computed?.intervals || [];
+          intervals = intervals.map((planned, idx) => {
+            // Try to match by planned_step_id first, then by index
+            let computedInterval = computedIntervals.find((exec: any) => 
               exec.planned_step_id === planned.id
             );
             
-            return {
-              ...planned,
-              executed: computedInterval?.executed || null,
+            // Fallback: match by index if no planned_step_id match
+            if (!computedInterval && computedIntervals[idx]) {
+              computedInterval = computedIntervals[idx];
+            }
+            
+            console.log(`🔗 Interval ${idx} matching:`, {
+              planned_id: planned.id,
+              found_match: !!computedInterval,
+              has_executed: !!computedInterval?.executed,
               sample_idx_start: computedInterval?.sample_idx_start,
               sample_idx_end: computedInterval?.sample_idx_end
+            });
+            
+            return {
+              ...planned,
+              executed: computedInterval?.executed || computedInterval || null,
+              sample_idx_start: computedInterval?.sample_idx_start,
+              sample_idx_end: computedInterval?.sample_idx_end,
+              planned_step_id: planned.id
             };
           });
         }
