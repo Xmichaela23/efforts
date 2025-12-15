@@ -251,6 +251,27 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     })();
   }, [loadUserBaselines]);
 
+  // Handle header back button navigation from AppLayout
+  useEffect(() => {
+    const handler = () => {
+      if (currentView === 'day') {
+        // From workout detail → back to week view
+        setCurrentView('detail');
+        setSelectedWorkout(null);
+        setWorkoutViewMode('summary');
+      } else if (currentView === 'detail') {
+        // From week detail → back to plans list
+        setCurrentView('list');
+        setSelectedPlanDetail(null);
+      } else {
+        // At list view → signal AppLayout to go to dashboard
+        window.dispatchEvent(new CustomEvent('plans:goToDashboard'));
+      }
+    };
+    window.addEventListener('plans:headerBack', handler);
+    return () => window.removeEventListener('plans:headerBack', handler);
+  }, [currentView]);
+
   const buildWeeklySubtitle = (workout: any): string | undefined => {
     try {
       const pn = (baselines as any)?.performanceNumbers || {};

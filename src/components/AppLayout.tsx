@@ -372,8 +372,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       return;
     }
     if (showAllPlans) {
-      // From plans, go back to dashboard
-      handleBackToDashboard();
+      // Dispatch event to let AllPlansInterface handle its internal navigation
+      // If it doesn't handle it (e.g., already at list view), it will dispatch back
+      window.dispatchEvent(new CustomEvent('plans:headerBack'));
       return;
     }
     // Handle workout detail view - return to dashboard
@@ -389,6 +390,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     // Fallback: go to dashboard (safer than history.back())
     handleBackToDashboard();
   };
+
+  // Listen for AllPlansInterface signaling it's at the top level (list view)
+  useEffect(() => {
+    const handler = () => {
+      // AllPlansInterface is at list view, so go to dashboard
+      handleBackToDashboard();
+    };
+    window.addEventListener('plans:goToDashboard', handler);
+    return () => window.removeEventListener('plans:goToDashboard', handler);
+  }, []);
 
   // NEW: Training Baselines handler
   const handleTrainingBaselinesClick = () => {
