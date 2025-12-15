@@ -1921,11 +1921,12 @@ function EffortsViewerMapbox({
           {/* Drag hint - at very top of scrubbable chart, aligned with (total) labels */}
           <text 
             x={W * 0.45} 
-            y={-32} 
+            y={-38} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={20}
             fontWeight={500}
+            dominantBaseline="hanging"
           >
             ← drag for details →
           </text>
