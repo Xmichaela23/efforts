@@ -1924,7 +1924,7 @@ function EffortsViewerMapbox({
             y={-8} 
             textAnchor="middle" 
             fill="#9ca3af" 
-            fontSize={26}
+            fontSize={20}
             fontWeight={500}
           >
             ← drag for details →
@@ -2016,7 +2016,7 @@ function EffortsViewerMapbox({
             y={SVG_HEIGHT - 2} 
             textAnchor="middle" 
             fill="#9ca3af" 
-            fontSize={26}
+            fontSize={20}
             fontWeight={500}
           >
             ← drag for details →
