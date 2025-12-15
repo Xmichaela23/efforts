@@ -1871,7 +1871,7 @@ function EffortsViewerMapbox({
       <div style={{ marginTop: 0, overflow: 'visible' }} onMouseLeave={onMouseLeave}>
         <svg
           ref={svgRef}
-          viewBox={`-10 -20 ${W + 10} ${SVG_HEIGHT + 20}`}   // responsive: all drawn in SVG units, with top padding for drag hint
+          viewBox={`-10 -30 ${W + 10} ${SVG_HEIGHT + 60}`}   // responsive: all drawn in SVG units, with top/bottom padding for drag hints
           width="100%"
           preserveAspectRatio="xMidYMin meet"
           onMouseMove={onMove}
@@ -1922,7 +1922,7 @@ function EffortsViewerMapbox({
           {/* Drag hint - in top padding of scrubbable chart, aligned with (total) labels */}
           <text 
             x={W * 0.45} 
-            y={-6} 
+            y={-12} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={20}
@@ -2011,10 +2011,10 @@ function EffortsViewerMapbox({
           <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
           
-          {/* Drag hint - at very bottom of scrubbable SVG area, aligned with (total) labels */}
+          {/* Drag hint - in bottom padding of scrubbable SVG area, aligned with (total) labels */}
           <text 
             x={W * 0.45} 
-            y={SVG_HEIGHT - 2} 
+            y={SVG_HEIGHT + 15} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={20}
