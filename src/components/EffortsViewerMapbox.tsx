@@ -1871,7 +1871,7 @@ function EffortsViewerMapbox({
       <div style={{ marginTop: 0, overflow: 'visible' }} onMouseLeave={onMouseLeave}>
         <svg
           ref={svgRef}
-          viewBox={`-10 -30 ${W + 10} ${SVG_HEIGHT + 60}`}   // responsive: all drawn in SVG units, with top/bottom padding for drag hints
+          viewBox={`-10 -30 ${W + 10} ${SVG_HEIGHT + 75}`}   // responsive: all drawn in SVG units, with top/bottom padding for drag hints
           width="100%"
           preserveAspectRatio="xMidYMin meet"
           onMouseMove={onMove}
@@ -2014,7 +2014,7 @@ function EffortsViewerMapbox({
           {/* Drag hint - in bottom padding of scrubbable SVG area, aligned with (total) labels */}
           <text 
             x={W * 0.45} 
-            y={SVG_HEIGHT + 15} 
+            y={SVG_HEIGHT + 25} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={20}
