@@ -378,8 +378,8 @@ function calculatePowerVariability(powerSamples: number[], normalizedPower: numb
   return {
     coefficient_of_variation: Math.round(coefficientOfVariation * 100) / 100,
     avg_power_change_per_min: Math.round(avgPowerChangePerMin),
-    num_surges,
-    num_crashes,
+    num_surges: numSurges,
+    num_crashes: numCrashes,
     steadiness_score: Math.round(steadinessScore * 100) / 100,
     normalized_power: normalizedPower,
     variability_index: Math.round(variabilityIndex * 100) / 100
@@ -1283,66 +1283,81 @@ Deno.serve(async (req) => {
           stepsCount: planned.computed?.steps?.length || 0
         });
         
-        // Extract intervals from planned workout
-        if (planned.computed?.steps) {
-          intervals = planned.computed.steps.map((step: any, idx: number) => {
-            console.log(`📊 Step ${idx}:`, {
-              id: step.id,
-              kind: step.kind || step.type,
-              seconds: step.seconds,
-              power_range: step.power_range,
-              target_power: step.target_power
+        // Log first step's full structure to understand data format
+        if (planned.computed?.steps?.[0]) {
+          console.log('📊 First step full structure:', JSON.stringify(planned.computed.steps[0], null, 2));
+        }
+        
+        // ✅ APPROACH: Use workout.computed.intervals (the source of truth from compute-workout-summary)
+        // These have the planned step data already matched with execution data
+        const computedIntervals = workout?.computed?.intervals || [];
+        
+        console.log('📊 Workout computed intervals:', {
+          hasIntervals: computedIntervals.length > 0,
+          count: computedIntervals.length
+        });
+        
+        if (computedIntervals.length > 0) {
+          // Log first interval to see its structure
+          console.log('📊 First computed interval structure:', JSON.stringify(computedIntervals[0], null, 2));
+          
+          // Use computed intervals directly - they already have planned/executed data matched
+          intervals = computedIntervals.map((interval: any, idx: number) => {
+            // Look up full step from planned workout to get power_range
+            const fullStep = planned.computed?.steps?.find((s: any) => s.id === interval.planned_step_id);
+            
+            // Extract power range from multiple possible locations
+            const powerRange = fullStep?.power_range || 
+                              fullStep?.powerRange || 
+                              fullStep?.target_power ||
+                              interval.planned?.power_range ||
+                              interval.power_range;
+            
+            console.log(`📊 Interval ${idx}:`, {
+              planned_step_id: interval.planned_step_id,
+              kind: interval.kind || interval.role,
+              fullStep_power_range: fullStep?.power_range,
+              interval_planned_power_range: interval.planned?.power_range,
+              resolved_power_range: powerRange
             });
             
             return {
-              id: step.id,
-              type: step.kind || step.type,
-              kind: step.kind || step.type,
-              role: step.kind || step.type,
-              duration_s: step.seconds || step.duration_s,
-              power_range: step.power_range || step.target_power,
+              id: interval.planned_step_id,
+              type: interval.kind || interval.role,
+              kind: interval.kind || interval.role,
+              role: interval.role || interval.kind,
+              duration_s: interval.planned?.duration_s || fullStep?.seconds,
+              power_range: powerRange,
               planned: {
-                duration_s: step.seconds || step.duration_s,
-                target_power: step.power_range?.lower || step.target_power?.lower,
-                power_range: step.power_range || step.target_power
-              }
+                duration_s: interval.planned?.duration_s || fullStep?.seconds,
+                target_power: powerRange?.lower,
+                power_range: powerRange
+              },
+              executed: interval.executed,
+              sample_idx_start: interval.sample_idx_start,
+              sample_idx_end: interval.sample_idx_end,
+              planned_step_id: interval.planned_step_id
             };
           });
-          
-          console.log('📊 Workout computed intervals:', {
-            hasIntervals: !!workout?.computed?.intervals,
-            count: workout?.computed?.intervals?.length || 0
-          });
-          
-          // Enrich with execution data from workout.computed.intervals
-          const computedIntervals = workout?.computed?.intervals || [];
-          intervals = intervals.map((planned, idx) => {
-            // Try to match by planned_step_id first, then by index
-            let computedInterval = computedIntervals.find((exec: any) => 
-              exec.planned_step_id === planned.id
-            );
-            
-            // Fallback: match by index if no planned_step_id match
-            if (!computedInterval && computedIntervals[idx]) {
-              computedInterval = computedIntervals[idx];
-            }
-            
-            console.log(`🔗 Interval ${idx} matching:`, {
-              planned_id: planned.id,
-              found_match: !!computedInterval,
-              has_executed: !!computedInterval?.executed,
-              sample_idx_start: computedInterval?.sample_idx_start,
-              sample_idx_end: computedInterval?.sample_idx_end
-            });
-            
-            return {
-              ...planned,
-              executed: computedInterval?.executed || computedInterval || null,
-              sample_idx_start: computedInterval?.sample_idx_start,
-              sample_idx_end: computedInterval?.sample_idx_end,
-              planned_step_id: planned.id
-            };
-          });
+        } else if (planned.computed?.steps) {
+          // Fallback: Use planned steps if no computed intervals
+          intervals = planned.computed.steps.map((step: any, idx: number) => ({
+            id: step.id,
+            type: step.kind || step.type,
+            kind: step.kind || step.type,
+            role: step.kind || step.type,
+            duration_s: step.seconds || step.duration_s,
+            power_range: step.power_range || step.powerRange || step.target_power,
+            planned: {
+              duration_s: step.seconds || step.duration_s,
+              target_power: step.power_range?.lower,
+              power_range: step.power_range || step.powerRange || step.target_power
+            },
+            executed: null,
+            sample_idx_start: undefined,
+            sample_idx_end: undefined,
+            planned_step_id: step.id
+          }));
         }
       }
     }
