@@ -1920,7 +1920,7 @@ function EffortsViewerMapbox({
           
           {/* Drag hint - above chart area, aligned with (total) labels */}
           <text 
-            x={W * 0.48} 
+            x={W * 0.45} 
             y={-8} 
             textAnchor="middle" 
             fill="#9ca3af" 
@@ -2012,7 +2012,7 @@ function EffortsViewerMapbox({
           
           {/* Drag hint - at very bottom of scrubbable SVG area, aligned with (total) labels */}
           <text 
-            x={W * 0.48} 
+            x={W * 0.45} 
             y={SVG_HEIGHT - 2} 
             textAnchor="middle" 
             fill="#9ca3af" 
