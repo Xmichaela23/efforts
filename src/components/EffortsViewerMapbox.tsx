@@ -2004,7 +2004,7 @@ function EffortsViewerMapbox({
             y={SVG_HEIGHT - 2} 
             textAnchor="middle" 
             fill="#9ca3af" 
-            fontSize={13}
+            fontSize={26}
             fontWeight={500}
           >
             ← drag for details →
