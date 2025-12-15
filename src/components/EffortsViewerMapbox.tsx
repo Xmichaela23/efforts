@@ -1921,11 +1921,12 @@ function EffortsViewerMapbox({
           {/* Drag hint - at top of chart area, centered */}
           <text 
             x={(W - 10) / 2} 
-            y={P + 20} 
+            y={P + 2} 
             textAnchor="middle" 
             fill="#9ca3af" 
             fontSize={26}
             fontWeight={500}
+            dominantBaseline="hanging"
           >
             ← drag for details →
           </text>
