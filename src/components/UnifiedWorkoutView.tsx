@@ -710,13 +710,71 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         <div className="flex items-center gap-3">
           <div className="p-2" />
           <div>
-            <h2 className="font-semibold text-lg">
+            <div className="flex items-center gap-3">
+              <h2 className="font-semibold text-lg">
+                {(() => {
+                  const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
+                  if (st) return st;
+                  return generateWorkoutTitle();
+                })()}
+              </h2>
+              {/* Source Logo (Strava/Garmin) */}
               {(() => {
-                const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
-                if (st) return st;
-                return generateWorkoutTitle();
+                const source = (workout as any)?.source;
+                const isStravaImported = (workout as any)?.is_strava_imported;
+                const stravaId = (workout as any)?.strava_activity_id;
+                const garminId = (workout as any)?.garmin_activity_id;
+                const deviceInfo = (() => {
+                  try {
+                    const di = (workout as any)?.device_info || (workout as any)?.deviceInfo;
+                    if (typeof di === 'string') return JSON.parse(di);
+                    return di;
+                  } catch { return null; }
+                })();
+                const deviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
+
+                if (source === 'strava' || stravaId || isStravaImported) {
+                  const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
+                  return (
+                    <a 
+                      href={stravaUrl || '#'} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 no-underline"
+                      title={stravaUrl ? 'View on Strava' : undefined}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="#FC4C02">
+                        <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066l-2.084 4.116zM7.878 14.794l2.835 5.594h4.17L7.878 6.149l-6.994 14.239h4.169l2.825-5.594z"/>
+                      </svg>
+                      <span className="text-[#FC4C02] font-semibold text-base">Strava</span>
+                    </a>
+                  );
+                }
+
+                if (source === 'garmin' || garminId) {
+                  const garminUrl = garminId ? `https://connect.garmin.com/modern/activity/${garminId}` : null;
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <a
+                        href={garminUrl || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 no-underline"
+                        title={garminUrl ? 'View on Garmin Connect' : undefined}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#007CC3">
+                          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.824a9.176 9.176 0 110 18.352 9.176 9.176 0 010-18.352zm0 1.412A7.765 7.765 0 004.236 12 7.765 7.765 0 0012 19.764 7.765 7.765 0 0019.764 12 7.765 7.765 0 0012 4.236zm3.07 2.471l-4.235 3.53v4.942h2.118v-3.883l3.177-2.647-1.06-1.942z"/>
+                        </svg>
+                        <span className="text-[#007CC3] font-semibold text-base">Garmin</span>
+                      </a>
+                      {deviceName && <span className="text-gray-500 text-sm">· {deviceName}</span>}
+                    </div>
+                  );
+                }
+
+                return null;
               })()}
-            </h2>
+            </div>
             <p className="text-sm text-muted-foreground leading-snug font-sans [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline">
               {(() => {
                 try {
