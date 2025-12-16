@@ -1111,14 +1111,15 @@ function EffortsViewerMapbox({
       const hasDataInSamples = cadFromSamples.some(v => Number.isFinite(v));
       // TODO: MIGRATION CODE - Remove cadSeries fallback after backfill
       const cad = hasDataInSamples ? cadFromSamples : (cadSeries && cadSeries.length ? cadSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN));
-      if (isOutdoorGlobal) {
-        // Remove impossible cadence outliers (< 40 or > 220) and smooth lightly
-        const clamped = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
-        const maFull = nanAwareMovAvg(clamped, 5);
-        return maFull.map(v => (Number.isFinite(v) ? v : NaN));
-      }
-      const wins = winsorize(cad as number[], 5, 95);
-      return smoothWithOutlierHandling(wins, 5, 2.0).map(v => (Number.isFinite(v) ? v : NaN));
+      
+      // Remove impossible cadence outliers (< 40 or > 220 for cycling, reasonable range for running)
+      const clamped = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
+      
+      // Apply consistent smoothing with other metrics (power uses 15-25, HR uses 7)
+      const wins = winsorize(clamped as number[], 5, 95);
+      const smoothingWindow = isOutdoorGlobal ? 15 : 20;
+      const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.5);
+      return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Power (prefer normalizedSamples, fallback to pwrSeries for historical workouts)
     if (tab === "pwr") {
