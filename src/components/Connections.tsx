@@ -3,24 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Switch } from './ui/switch';
-import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { 
   Activity, 
-  Wifi, 
-  WifiOff, 
   RefreshCw, 
-  CheckCircle, 
-  AlertCircle,
   Clock,
   Zap,
   Settings,
   Link2,
   Unlink,
   Calendar,
-  Watch,
   Menu,
   User,
   Upload,
@@ -939,20 +932,6 @@ const Connections: React.FC = () => {
                 
                 {connection.connected && (
                   <div className="flex items-center space-x-4">
-                    {connection.provider === 'strava' && (
-                      <div className="flex items-center space-x-2">
-                        <Label htmlFor={`webhook-${connection.provider}`} className="text-sm">
-                          Real-time Sync
-                        </Label>
-                        <Switch
-                          id={`webhook-${connection.provider}`}
-                          checked={connection.webhookActive}
-                          onCheckedChange={(enabled) => toggleWebhook(connection.provider, enabled)}
-                          disabled={loading}
-                        />
-                      </div>
-                    )}
-                    
                     <Button
                       variant="outline"
                       size="sm"
@@ -1017,12 +996,6 @@ const Connections: React.FC = () => {
                     </span>
                   </div>
 
-                  {connection.webhookActive && (
-                    <div className="flex items-center space-x-2 text-sm text-green-600">
-                      <Wifi className="h-3 w-3" />
-                      <span>Real-time sync active</span>
-                    </div>
-                  )}
 
                   <div className="flex items-center space-x-2">
                     {/* Strava Date Range Picker */}
