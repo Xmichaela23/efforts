@@ -334,7 +334,7 @@ export default function MapEffort({
         });
       }
       
-      // Segment line - Orange/gold for regular segments
+      // Segment line - Alternating orange/burnt orange for non-PR segments
       if (!map.getLayer(SEGMENT_LINE)) {
         map.addLayer({
           id: SEGMENT_LINE,
@@ -342,15 +342,21 @@ export default function MapEffort({
           source: SEGMENTS_SRC,
           filter: ['!=', ['get', 'isPR'], true],
           paint: {
-            'line-color': '#f97316',  // Orange
+            // Alternate colors based on segment index: orange (odd) vs burnt orange (even)
+            'line-color': [
+              'case',
+              ['==', ['%', ['get', 'index'], 2], 0],
+              '#f97316',  // Orange (even index)
+              '#ea580c'   // Burnt orange (odd index)
+            ],
             'line-width': 5,
-            'line-opacity': 0.85
+            'line-opacity': 0.9
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
       }
       
-      // PR segment line - Gold/amber with glow for PRs
+      // PR segment line - Gold/amber for PRs (always same color, stands out)
       if (!map.getLayer(SEGMENT_PR_LINE)) {
         map.addLayer({
           id: SEGMENT_PR_LINE,
@@ -494,7 +500,7 @@ export default function MapEffort({
         seg.start_index >= 0 &&
         seg.end_index < rawTrack.length
       )
-      .map((seg) => {
+      .map((seg, idx) => {
         // Extract the segment portion from the RAW (unsimplified) route
         const segmentCoords = rawTrack.slice(seg.start_index!, seg.end_index! + 1);
         return {
@@ -505,7 +511,8 @@ export default function MapEffort({
             elapsed_time: seg.elapsed_time,
             pr_rank: seg.pr_rank,
             kom_rank: seg.kom_rank,
-            isPR: seg.pr_rank === 1
+            isPR: seg.pr_rank === 1,
+            index: idx  // For alternating colors
           },
           geometry: {
             type: 'LineString' as const,
