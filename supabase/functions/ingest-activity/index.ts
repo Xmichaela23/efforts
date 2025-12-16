@@ -404,9 +404,13 @@ function mapStravaToWorkout(activity, userId) {
       } catch { return null; }
     })(),
     provider_sport: activity.sport_type || activity.type || null,
-    // Location
-    start_position_lat: Array.isArray(activity.start_latlng) ? activity.start_latlng[0] ?? null : null,
-    start_position_long: Array.isArray(activity.start_latlng) ? activity.start_latlng[1] ?? null : null,
+    // Location - prefer start_latlng, fallback to first GPS track point
+    start_position_lat: Array.isArray(activity.start_latlng) && activity.start_latlng[0] != null 
+      ? activity.start_latlng[0] 
+      : (gps_track && gps_track[0]?.lat != null ? gps_track[0].lat : null),
+    start_position_long: Array.isArray(activity.start_latlng) && activity.start_latlng[1] != null 
+      ? activity.start_latlng[1] 
+      : (gps_track && gps_track[0]?.lng != null ? gps_track[0].lng : null),
     // GPS track built from streams or pre-provided
     gps_track: gps_track ? JSON.stringify(gps_track) : (activity.gps_track ?? null),
     // Sensor data built from streams or pre-provided
