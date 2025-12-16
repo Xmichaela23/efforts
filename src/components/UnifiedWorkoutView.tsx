@@ -737,20 +737,29 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
                   
                   return (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-gray-400 text-sm">via</span>
-                      <a 
-                        href={stravaUrl || '#'} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 no-underline"
-                        title={stravaUrl ? 'View on Strava' : undefined}
-                      >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#FC4C02">
+                    <div className="flex items-center gap-2">
+                      {/* Badge style - informational, not clickable looking */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-gray-400 text-sm">via</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#FC4C02">
                           <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066l-2.084 4.116zM7.878 14.794l2.835 5.594h4.17L7.878 6.149l-6.994 14.239h4.169l2.825-5.594z"/>
                         </svg>
-                        <span className="text-[#FC4C02] font-semibold text-base">Strava</span>
-                      </a>
+                        <span className="text-[#FC4C02] font-semibold text-sm">Strava</span>
+                      </div>
+                      {/* Clear link styling */}
+                      {stravaUrl && (
+                        <>
+                          <span className="text-gray-300">•</span>
+                          <a 
+                            href={stravaUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-gray-500 hover:text-[#FC4C02] underline underline-offset-2 cursor-pointer transition-colors"
+                          >
+                            View activity ↗
+                          </a>
+                        </>
+                      )}
                     </div>
                   );
                 }
@@ -758,21 +767,30 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 if (source === 'garmin' || garminId) {
                   const garminUrl = garminId ? `https://connect.garmin.com/modern/activity/${garminId}` : null;
                   return (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-gray-400 text-sm">via</span>
-                      <a
-                        href={garminUrl || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 no-underline"
-                        title={garminUrl ? 'View on Garmin Connect' : undefined}
-                      >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#007CC3">
+                    <div className="flex items-center gap-2">
+                      {/* Badge style - informational */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-gray-400 text-sm">via</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#007CC3">
                           <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.824a9.176 9.176 0 110 18.352 9.176 9.176 0 010-18.352zm0 1.412A7.765 7.765 0 004.236 12 7.765 7.765 0 0012 19.764 7.765 7.765 0 0019.764 12 7.765 7.765 0 0012 4.236zm3.07 2.471l-4.235 3.53v4.942h2.118v-3.883l3.177-2.647-1.06-1.942z"/>
                         </svg>
-                        <span className="text-[#007CC3] font-semibold text-base">Garmin</span>
-                      </a>
-                      {deviceName && <span className="text-gray-500 text-sm">· {deviceName}</span>}
+                        <span className="text-[#007CC3] font-semibold text-sm">Garmin</span>
+                        {deviceName && <span className="text-gray-400 text-sm">({deviceName})</span>}
+                      </div>
+                      {/* Clear link styling */}
+                      {garminUrl && (
+                        <>
+                          <span className="text-gray-300">•</span>
+                          <a
+                            href={garminUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-gray-500 hover:text-[#007CC3] underline underline-offset-2 cursor-pointer transition-colors"
+                          >
+                            View activity ↗
+                          </a>
+                        </>
+                      )}
                     </div>
                   );
                 }
