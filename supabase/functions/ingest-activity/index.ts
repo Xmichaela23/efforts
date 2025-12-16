@@ -350,7 +350,6 @@ function mapStravaToWorkout(activity, userId) {
     max_temperature: Number.isFinite(activity.max_temp) ? Math.round(activity.max_temp) : null,
     // Server-computed summary for UI (includes GAP/cadence when available)
     computed: computedJsonObj ? JSON.stringify(computedJsonObj) : null,
-    normalization_version: 'v1',
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString()
   };
