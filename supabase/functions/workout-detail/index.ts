@@ -32,6 +32,7 @@ function normalizeBasic(w: any) {
     type,
     workout_status: String(w?.workout_status || 'completed'),
     planned_id: w?.planned_id || null,
+    name: w?.name || null,
     // Basic metrics (pass-through; units as stored)
     distance: w?.distance ?? w?.distance_km ?? null,
     distance_meters: w?.distance_meters ?? (typeof w?.distance === 'number' ? w.distance * 1000 : null),
@@ -50,6 +51,18 @@ function normalizeBasic(w: any) {
     steps: w?.steps ?? null,
     elevation_gain: w?.elevation_gain ?? w?.metrics?.elevation_gain ?? null,
     elevation_loss: w?.elevation_loss ?? w?.metrics?.elevation_loss ?? null,
+    // Location
+    start_position_lat: w?.start_position_lat ?? null,
+    start_position_long: w?.start_position_long ?? null,
+    timestamp: w?.timestamp ?? null,
+    // Source tracking
+    source: w?.source ?? null,
+    is_strava_imported: w?.is_strava_imported ?? null,
+    strava_activity_id: w?.strava_activity_id ?? null,
+    garmin_activity_id: w?.garmin_activity_id ?? null,
+    device_info: w?.device_info ?? null,
+    // Achievements (PRs, segments)
+    achievements: w?.achievements ?? null,
     // Computed snapshot passthrough
     computed: w?.computed || null,
   };
@@ -125,6 +138,8 @@ Deno.serve(async (req) => {
     try { (detail as any).workout_analysis = (()=>{ try { return typeof row.workout_analysis === 'string' ? JSON.parse(row.workout_analysis) : (row.workout_analysis || null); } catch { return row.workout_analysis || null; } })(); } catch {}
     try { (detail as any).strength_exercises = (()=>{ try { return typeof row.strength_exercises === 'string' ? JSON.parse(row.strength_exercises) : (row.strength_exercises || null); } catch { return row.strength_exercises || null; } })(); } catch {}
     try { (detail as any).mobility_exercises = (()=>{ try { return typeof row.mobility_exercises === 'string' ? JSON.parse(row.mobility_exercises) : (row.mobility_exercises || null); } catch { return row.mobility_exercises || null; } })(); } catch {}
+    try { (detail as any).achievements = (()=>{ try { return typeof row.achievements === 'string' ? JSON.parse(row.achievements) : (row.achievements || null); } catch { return row.achievements || null; } })(); } catch {}
+    try { (detail as any).device_info = (()=>{ try { return typeof row.device_info === 'string' ? JSON.parse(row.device_info) : (row.device_info || null); } catch { return row.device_info || null; } })(); } catch {}
     if (opts.include_gps) {
       try { (detail as any).gps_track = typeof row.gps_track === 'string' ? JSON.parse(row.gps_track) : (row.gps_track || null); } catch { (detail as any).gps_track = row.gps_track || null; }
     }
