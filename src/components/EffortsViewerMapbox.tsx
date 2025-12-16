@@ -1635,11 +1635,18 @@ function EffortsViewerMapbox({
     <div style={{ maxWidth: 780, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
       {/* Map header with weather, source, and theme toggle */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 6px 6px 6px" }}>
-        <WeatherDisplay 
-          weather={weather}
-          loading={weatherLoading}
-          fallbackTemperature={workoutData?.avg_temperature ? Number(workoutData.avg_temperature) : undefined}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <WeatherDisplay 
+            weather={weather}
+            loading={weatherLoading}
+            fallbackTemperature={workoutData?.avg_temperature ? Number(workoutData.avg_temperature) : undefined}
+          />
+          {memoizedSegments && memoizedSegments.length > 0 && (
+            <span style={{ color: '#94a3b8', fontSize: 12, fontStyle: 'italic' }}>
+              Tap colored sections to see performance
+            </span>
+          )}
+        </div>
         <button
           onClick={() => setTheme(theme === 'outdoor' ? 'hybrid' : theme === 'hybrid' ? 'topo' : 'outdoor')}
           style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}

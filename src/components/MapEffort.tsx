@@ -468,23 +468,10 @@ export default function MapEffort({
   // Update segment overlays when segments prop changes
   useEffect(() => {
     const map = mapRef.current;
-    console.log('[MapEffort Segments] Effect running:', { 
-      hasMap: !!map, 
-      ready, 
-      segmentsCount: segments?.length,
-      rawTrackLength: rawTrackLngLat?.length 
-    });
-    
-    if (!map || !ready) {
-      console.log('[MapEffort Segments] Early return: map or ready not available');
-      return;
-    }
+    if (!map || !ready) return;
     
     const segmentsSrc = map.getSource(SEGMENTS_SRC) as maplibregl.GeoJSONSource | undefined;
-    if (!segmentsSrc) {
-      console.log('[MapEffort Segments] Segment source not found!');
-      return;
-    }
+    if (!segmentsSrc) return;
     
     // Use raw (unsimplified) track for segment index lookups
     // Strava's start_index/end_index refer to the original GPS track, not simplified
@@ -492,7 +479,6 @@ export default function MapEffort({
     
     // Don't clear if we previously drew segments and data is just temporarily unavailable
     if (!rawTrack || !segments || segments.length === 0) {
-      console.log('[MapEffort Segments] No data:', { rawTrack: !!rawTrack, segments: segments?.length });
       // Only clear if we explicitly have no segments (not just undefined during re-render)
       if (segments && segments.length === 0) {
         segmentsSrc.setData({ type: 'FeatureCollection', features: [] });
@@ -500,15 +486,6 @@ export default function MapEffort({
       }
       return;
     }
-    
-    // Log segment details for debugging
-    console.log('[MapEffort Segments] Processing segments:', segments.map(s => ({
-      name: s.name,
-      start_index: s.start_index,
-      end_index: s.end_index,
-      rawTrackLength: rawTrack.length,
-      valid: typeof s.start_index === 'number' && typeof s.end_index === 'number' && s.start_index >= 0 && s.end_index < rawTrack.length
-    })));
     
     const features = segments
       .filter((seg) => 
@@ -538,15 +515,10 @@ export default function MapEffort({
       })
       .filter((f) => f.geometry.coordinates.length >= 2); // Must have at least 2 points
     
-    console.log('[MapEffort Segments] Features created:', features.length);
-    
     if (features.length > 0) {
       segmentsSrc.setData({ type: 'FeatureCollection', features });
       segmentsDrawnRef.current = true;
       segmentFeaturesRef.current = features; // Store for reapplication after theme changes
-      console.log(`[MapEffort] Drew ${features.length} segments on map (using raw track with ${rawTrack.length} points)`);
-    } else {
-      console.log('[MapEffort Segments] No valid features to draw!');
     }
   }, [rawTrackLngLat, ready, segments]);
 
@@ -880,7 +852,6 @@ export default function MapEffort({
           const segSrc = map.getSource(SEGMENTS_SRC) as maplibregl.GeoJSONSource | undefined;
           if (segSrc) {
             segSrc.setData({ type: 'FeatureCollection', features: segmentFeaturesRef.current });
-            console.log(`[MapEffort] Reapplied ${segmentFeaturesRef.current.length} segments after theme change`);
           }
         }
         
