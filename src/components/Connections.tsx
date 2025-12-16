@@ -1069,7 +1069,7 @@ const Connections: React.FC = () => {
                         onClick={() => {
                           let start = stravaStartDate;
                           let end = stravaEndDate;
-                          if (isMobile && !start && !end) {
+                          if (!start && !end) {
                             const endD = new Date();
                             const startD = new Date();
                             startD.setDate(startD.getDate() - 30);
@@ -1081,7 +1081,14 @@ const Connections: React.FC = () => {
                         disabled={loading}
                       >
                         <Zap className="h-4 w-4 mr-2" />
-                        Import Past Activities
+                        {(() => {
+                          if (stravaStartDate && stravaEndDate) {
+                            const start = new Date(stravaStartDate + 'T00:00:00');
+                            const end = new Date(stravaEndDate + 'T00:00:00');
+                            return `Import ${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                          }
+                          return 'Import Last 30 Days';
+                        })()}
                       </Button>
                     )}
 
