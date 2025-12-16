@@ -59,6 +59,7 @@ const CURSOR_HALO = 'cursor-halo';
 const CURSOR_PT = 'cursor-pt';
 // Segment layer IDs
 const SEGMENTS_SRC = 'segments-source';
+const SEGMENT_HIT_ZONE = 'segment-hit-zone';  // Invisible wide layer for tap detection
 const SEGMENT_LINE = 'segment-line';
 const SEGMENT_PR_LINE = 'segment-pr-line';
 
@@ -332,6 +333,21 @@ export default function MapEffort({
         });
       }
       
+      // Invisible hit zone layer - 20px wide for easy tap detection on mobile
+      if (!map.getLayer(SEGMENT_HIT_ZONE)) {
+        map.addLayer({
+          id: SEGMENT_HIT_ZONE,
+          type: 'line',
+          source: SEGMENTS_SRC,
+          paint: {
+            'line-color': 'transparent',
+            'line-width': 20,  // Wide tap target
+            'line-opacity': 0
+          },
+          layout: { 'line-cap': 'round', 'line-join': 'round' }
+        });
+      }
+      
       // Segment line - Alternating orange/teal for non-PR segments (high contrast)
       if (!map.getLayer(SEGMENT_LINE)) {
         map.addLayer({
@@ -527,38 +543,84 @@ export default function MapEffort({
     }
   }, [rawTrackLngLat, ready, segments]);
 
-  // Handle segment click events
+  // Track if we're currently over a segment (to prevent zoom)
+  const overSegmentRef = useRef(false);
+  const lastTapTimeRef = useRef(0);
+  
+  // Handle segment click events with priority over map zoom
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !onSegmentClick || !segments || segments.length === 0) return;
     
+    // Use hit zone layer for detection (20px wide)
+    const hitLayers = [SEGMENT_HIT_ZONE];
+    
     const handleSegmentClick = (e: maplibregl.MapMouseEvent) => {
-      const features = map.queryRenderedFeatures(e.point, { 
-        layers: [SEGMENT_LINE, SEGMENT_PR_LINE] 
-      });
+      const features = map.queryRenderedFeatures(e.point, { layers: hitLayers });
       if (features.length > 0) {
         const props = features[0].properties;
-        // Find matching segment
         const clickedSegment = segments.find((s) => s.name === props?.name);
         if (clickedSegment) {
+          // Prevent this from becoming a double-tap zoom
+          e.preventDefault();
           onSegmentClick(clickedSegment);
         }
       }
     };
     
-    // Add click handlers for both segment layers
-    map.on('click', SEGMENT_LINE, handleSegmentClick);
-    map.on('click', SEGMENT_PR_LINE, handleSegmentClick);
+    // Visual feedback: brighten segment on hover/touch
+    const handleMouseEnter = (e: maplibregl.MapMouseEvent) => {
+      map.getCanvas().style.cursor = 'pointer';
+      overSegmentRef.current = true;
+      
+      // Get the hovered segment and brighten it
+      const features = map.queryRenderedFeatures(e.point, { layers: hitLayers });
+      if (features.length > 0) {
+        const props = features[0].properties;
+        const isPR = props?.isPR;
+        const idx = props?.index ?? 0;
+        
+        // Brighten the appropriate layer
+        if (isPR) {
+          map.setPaintProperty(SEGMENT_PR_LINE, 'line-opacity', 1);
+          map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 8);
+        } else {
+          map.setPaintProperty(SEGMENT_LINE, 'line-opacity', 1);
+          map.setPaintProperty(SEGMENT_LINE, 'line-width', 7);
+        }
+      }
+    };
     
-    // Change cursor on hover
-    map.on('mouseenter', SEGMENT_LINE, () => { map.getCanvas().style.cursor = 'pointer'; });
-    map.on('mouseleave', SEGMENT_LINE, () => { map.getCanvas().style.cursor = ''; });
-    map.on('mouseenter', SEGMENT_PR_LINE, () => { map.getCanvas().style.cursor = 'pointer'; });
-    map.on('mouseleave', SEGMENT_PR_LINE, () => { map.getCanvas().style.cursor = ''; });
+    const handleMouseLeave = () => {
+      map.getCanvas().style.cursor = '';
+      overSegmentRef.current = false;
+      
+      // Restore original styling
+      map.setPaintProperty(SEGMENT_LINE, 'line-opacity', 0.9);
+      map.setPaintProperty(SEGMENT_LINE, 'line-width', 5);
+      map.setPaintProperty(SEGMENT_PR_LINE, 'line-opacity', 1);
+      map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 6);
+    };
+    
+    // Add handlers to hit zone layer
+    map.on('click', SEGMENT_HIT_ZONE, handleSegmentClick);
+    map.on('mouseenter', SEGMENT_HIT_ZONE, handleMouseEnter);
+    map.on('mouseleave', SEGMENT_HIT_ZONE, handleMouseLeave);
+    
+    // Prevent double-tap zoom when over segment
+    const handleDblClick = (e: maplibregl.MapMouseEvent) => {
+      const features = map.queryRenderedFeatures(e.point, { layers: hitLayers });
+      if (features.length > 0) {
+        e.preventDefault();  // Prevent zoom
+      }
+    };
+    map.on('dblclick', handleDblClick);
     
     return () => {
-      map.off('click', SEGMENT_LINE, handleSegmentClick);
-      map.off('click', SEGMENT_PR_LINE, handleSegmentClick);
+      map.off('click', SEGMENT_HIT_ZONE, handleSegmentClick);
+      map.off('mouseenter', SEGMENT_HIT_ZONE, handleMouseEnter);
+      map.off('mouseleave', SEGMENT_HIT_ZONE, handleMouseLeave);
+      map.off('dblclick', handleDblClick);
     };
   }, [ready, segments, onSegmentClick]);
 
