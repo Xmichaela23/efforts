@@ -1081,7 +1081,7 @@ const Connections: React.FC = () => {
                         disabled={loading}
                       >
                         <Zap className="h-4 w-4 mr-2" />
-                        {isMobile ? 'Import' : 'Import History'}
+                        Import Past Activities
                       </Button>
                     )}
 
