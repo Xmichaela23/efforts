@@ -350,10 +350,10 @@ async function refreshStravaAccessToken(userId: string): Promise<string | null> 
 async function fetchStravaStreamsData(
   activityId: number,
   accessToken: string
-): Promise<{ latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[] } | null> {
+): Promise<{ latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[], distance?: number[], velocity_smooth?: number[] } | null> {
   try {
     const response = await fetch(
-      `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,cadence,watts`,
+      `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,cadence,watts,distance,velocity_smooth`,
       { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
     );
 
@@ -366,15 +366,19 @@ async function fetchStravaStreamsData(
     const heartrate = streams.find((s: any) => s.type === 'heartrate')?.data || undefined;
     const cadence = streams.find((s: any) => s.type === 'cadence')?.data || undefined;
     const watts = streams.find((s: any) => s.type === 'watts')?.data || undefined;
+    const distance = streams.find((s: any) => s.type === 'distance')?.data || undefined;
+    const velocity_smooth = streams.find((s: any) => s.type === 'velocity_smooth')?.data || undefined;
 
-    const result: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[] } = {};
+    const result: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[], distance?: number[], velocity_smooth?: number[] } = {};
     if (Array.isArray(latlng) && latlng.length > 0) result.latlng = latlng as [number, number][];
     if (Array.isArray(altitude) && altitude.length > 0) result.altitude = altitude as number[];
     if (Array.isArray(time) && time.length > 0) result.time = time as number[];
     if (Array.isArray(heartrate) && heartrate.length > 0) result.heartrate = heartrate as number[];
     if (Array.isArray(cadence) && cadence.length > 0) result.cadence = cadence as number[];
     if (Array.isArray(watts) && watts.length > 0) result.watts = watts as number[];
-    if (!result.latlng && !result.altitude && !result.time && !result.heartrate && !result.cadence && !result.watts) return null;
+    if (Array.isArray(distance) && distance.length > 0) result.distance = distance as number[];
+    if (Array.isArray(velocity_smooth) && velocity_smooth.length > 0) result.velocity_smooth = velocity_smooth as number[];
+    if (!result.latlng && !result.altitude && !result.time && !result.heartrate && !result.cadence && !result.watts && !result.distance && !result.velocity_smooth) return null;
     return result;
   } catch (_e) {
     return null;
@@ -460,7 +464,7 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
       if (token) {
         streams = await fetchStravaStreamsData(activityData.id, token);
         if (streams) {
-          console.log(`📊 Fetched streams for activity ${activityData.id}: hr=${streams.heartrate?.length || 0}, cad=${streams.cadence?.length || 0}, watts=${streams.watts?.length || 0}, latlng=${streams.latlng?.length || 0}`);
+          console.log(`📊 Fetched streams for activity ${activityData.id}: hr=${streams.heartrate?.length || 0}, cad=${streams.cadence?.length || 0}, watts=${streams.watts?.length || 0}, latlng=${streams.latlng?.length || 0}, dist=${streams.distance?.length || 0}, speed=${streams.velocity_smooth?.length || 0}`);
         }
       }
     } catch (e) {

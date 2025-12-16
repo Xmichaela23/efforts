@@ -259,6 +259,54 @@ function mapStravaToWorkout(activity, userId) {
     }
   }
 
+  // Add speed (velocity_smooth) to sensor_data - maps to speedMetersPerSecond like Garmin
+  if (streams.velocity_smooth && streams.velocity_smooth.length > 0) {
+    // Create sensor_data if it doesn't exist
+    if (!sensor_data && streams.time && streams.time.length > 0) {
+      const timeLen = streams.time.length;
+      sensor_data = new Array(timeLen).fill(0).map((_, i) => {
+        const t = startEpochSec + streams.time[i];
+        return { startTimeInSeconds: t, timestamp: t * 1000 };
+      });
+    }
+
+    // Attach speed to sensor_data
+    if (sensor_data && streams.time && streams.time.length > 0) {
+      const useLen = Math.min(sensor_data.length, streams.velocity_smooth.length);
+      for (let i = 0; i < useLen; i++) {
+        const v = streams.velocity_smooth[i];
+        if (Number.isFinite(v)) {
+          sensor_data[i].speedMetersPerSecond = v;
+        }
+      }
+      console.log(`🏃 Added speedMetersPerSecond to sensor_data: ${useLen} points for Strava activity ${activity.id}`);
+    }
+  }
+
+  // Add distance to sensor_data - maps to totalDistanceInMeters like Garmin
+  if (streams.distance && streams.distance.length > 0) {
+    // Create sensor_data if it doesn't exist
+    if (!sensor_data && streams.time && streams.time.length > 0) {
+      const timeLen = streams.time.length;
+      sensor_data = new Array(timeLen).fill(0).map((_, i) => {
+        const t = startEpochSec + streams.time[i];
+        return { startTimeInSeconds: t, timestamp: t * 1000 };
+      });
+    }
+
+    // Attach distance to sensor_data
+    if (sensor_data && streams.time && streams.time.length > 0) {
+      const useLen = Math.min(sensor_data.length, streams.distance.length);
+      for (let i = 0; i < useLen; i++) {
+        const d = streams.distance[i];
+        if (Number.isFinite(d)) {
+          sensor_data[i].totalDistanceInMeters = d;
+        }
+      }
+      console.log(`📏 Added totalDistanceInMeters to sensor_data: ${useLen} points for Strava activity ${activity.id}`);
+    }
+  }
+
   // Normalize cadence for runs/walks (Strava reports half-cadence)
   let avgCadNorm = Number.isFinite(activity.average_cadence) ? Math.round(activity.average_cadence) : cadAvgComputed;
   let maxCadNorm = Number.isFinite(activity.max_cadence) ? Math.round(activity.max_cadence) : cadMaxComputed;
