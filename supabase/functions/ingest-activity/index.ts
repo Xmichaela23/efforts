@@ -196,7 +196,12 @@ function mapStravaToWorkout(activity, userId) {
     const len = Math.min(streams.heartrate.length, streams.time.length);
     sensor_data = new Array(len).fill(0).map((_, i) => {
       const t = startEpochSec + streams.time[i];
-      return { heartRate: streams.heartrate[i], startTimeInSeconds: t, timestamp: t * 1000 };
+      return { 
+        heartRate: streams.heartrate[i], 
+        startTimeInSeconds: t, 
+        timestamp: t * 1000,
+        timerDurationInSeconds: streams.time[i]  // Relative seconds from activity start (like Garmin)
+      };
     });
     console.log(`💓 Built sensor_data with ${len} HR points for Strava activity ${activity.id}`);
   }
@@ -213,7 +218,7 @@ function mapStravaToWorkout(activity, userId) {
         const timeLen = streams.time.length;
         sensor_data = new Array(timeLen).fill(0).map((_, i) => {
           const t = startEpochSec + streams.time[i];
-          return { startTimeInSeconds: t, timestamp: t * 1000 };
+          return { startTimeInSeconds: t, timestamp: t * 1000, timerDurationInSeconds: streams.time[i] };
         });
       }
 
@@ -240,7 +245,7 @@ function mapStravaToWorkout(activity, userId) {
         const timeLen = streams.time.length;
         sensor_data = new Array(timeLen).fill(0).map((_, i) => {
           const t = startEpochSec + streams.time[i];
-          return { startTimeInSeconds: t, timestamp: t * 1000 };
+          return { startTimeInSeconds: t, timestamp: t * 1000, timerDurationInSeconds: streams.time[i] };
         });
       }
 
@@ -266,7 +271,7 @@ function mapStravaToWorkout(activity, userId) {
       const timeLen = streams.time.length;
       sensor_data = new Array(timeLen).fill(0).map((_, i) => {
         const t = startEpochSec + streams.time[i];
-        return { startTimeInSeconds: t, timestamp: t * 1000 };
+        return { startTimeInSeconds: t, timestamp: t * 1000, timerDurationInSeconds: streams.time[i] };
       });
     }
 
@@ -290,7 +295,7 @@ function mapStravaToWorkout(activity, userId) {
       const timeLen = streams.time.length;
       sensor_data = new Array(timeLen).fill(0).map((_, i) => {
         const t = startEpochSec + streams.time[i];
-        return { startTimeInSeconds: t, timestamp: t * 1000 };
+        return { startTimeInSeconds: t, timestamp: t * 1000, timerDurationInSeconds: streams.time[i] };
       });
     }
 
@@ -314,7 +319,7 @@ function mapStravaToWorkout(activity, userId) {
       const timeLen = streams.time.length;
       sensor_data = new Array(timeLen).fill(0).map((_, i) => {
         const t = startEpochSec + streams.time[i];
-        return { startTimeInSeconds: t, timestamp: t * 1000 };
+        return { startTimeInSeconds: t, timestamp: t * 1000, timerDurationInSeconds: streams.time[i] };
       });
     }
 
