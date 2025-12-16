@@ -66,6 +66,8 @@ const Connections: React.FC = () => {
   const isMobile = useIsMobile();
   const [showDateControls, setShowDateControls] = useState(false);
   const navigate = useNavigate();
+  const [sourcePreference, setSourcePreference] = useState<'garmin' | 'strava' | 'both'>('both');
+  const [savingPreference, setSavingPreference] = useState(false);
 
   // Garmin connection state
   const [garminConnected, setGarminConnected] = useState(false);
@@ -80,6 +82,76 @@ const Connections: React.FC = () => {
     // On desktop, show controls by default; on mobile, keep them collapsed
     setShowDateControls(!isMobile);
   }, [isMobile]);
+
+  // Load source preference on mount
+  useEffect(() => {
+    loadSourcePreference();
+  }, []);
+
+  const loadSourcePreference = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser?.id) return;
+      
+      const { data: userData } = await supabase
+        .from('users')
+        .select('preferences')
+        .eq('id', authUser.id)
+        .single();
+      
+      if (userData?.preferences?.source_preference) {
+        setSourcePreference(userData.preferences.source_preference);
+      }
+    } catch (error) {
+      console.error('Error loading source preference:', error);
+    }
+  };
+
+  const saveSourcePreference = async (preference: 'garmin' | 'strava' | 'both') => {
+    try {
+      setSavingPreference(true);
+      
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser?.id) throw new Error('Not authenticated');
+      
+      // Get current preferences
+      const { data: userData } = await supabase
+        .from('users')
+        .select('preferences')
+        .eq('id', authUser.id)
+        .single();
+      
+      const currentPrefs = userData?.preferences || {};
+      
+      // Update with new source_preference
+      const { error } = await supabase
+        .from('users')
+        .update({
+          preferences: {
+            ...currentPrefs,
+            source_preference: preference
+          }
+        })
+        .eq('id', authUser.id);
+      
+      if (error) throw error;
+      
+      setSourcePreference(preference);
+      toast({
+        title: "Preference Saved",
+        description: `Activity source set to: ${preference === 'both' ? 'Accept both sources' : preference === 'garmin' ? 'Garmin only' : 'Strava only'}`,
+      });
+    } catch (error) {
+      console.error('Error saving source preference:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save preference",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingPreference(false);
+    }
+  };
 
   // Listen for Garmin OAuth callback messages
   useEffect(() => {
@@ -1129,6 +1201,78 @@ const Connections: React.FC = () => {
           </Card>
         ))}
       </div>
+
+      {/* Activity Source Preference Section */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Settings className="h-5 w-5" />
+            <span>Activity Source Preference</span>
+          </CardTitle>
+          <CardDescription>
+            Choose which sources to accept for activity data. This helps avoid duplicates if you have both Garmin and Strava connected.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="sourcePreference"
+                  value="garmin"
+                  checked={sourcePreference === 'garmin'}
+                  onChange={() => saveSourcePreference('garmin')}
+                  disabled={savingPreference}
+                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Garmin only</span>
+                  <p className="text-sm text-gray-500">Ignore activities from Strava</p>
+                </div>
+              </label>
+              
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="sourcePreference"
+                  value="strava"
+                  checked={sourcePreference === 'strava'}
+                  onChange={() => saveSourcePreference('strava')}
+                  disabled={savingPreference}
+                  className="h-4 w-4 text-orange-500 border-gray-300 focus:ring-orange-500"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Strava only</span>
+                  <p className="text-sm text-gray-500">Ignore activities from Garmin</p>
+                </div>
+              </label>
+              
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="sourcePreference"
+                  value="both"
+                  checked={sourcePreference === 'both'}
+                  onChange={() => saveSourcePreference('both')}
+                  disabled={savingPreference}
+                  className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Accept both sources</span>
+                  <p className="text-sm text-gray-500">May result in duplicates if Garmin auto-syncs to Strava</p>
+                </div>
+              </label>
+            </div>
+            
+            <div className="pt-2 border-t">
+              <p className="text-xs text-gray-500">
+                💡 <strong>Tip:</strong> If you have a Garmin watch that auto-syncs to Strava, choose "Garmin only" to avoid duplicate activities.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="text-center text-sm text-gray-500">
         <p>
