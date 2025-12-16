@@ -115,6 +115,13 @@ export default function MapEffort({
   const [isManualScrubbing, setIsManualScrubbing] = useState(false);
   const zoomingRef = useRef(false); // Flag to block onResize during zoom operation
   
+  // Segment hover card state (expanded mode only)
+  const [hoveredSegment, setHoveredSegment] = useState<{
+    segment: SegmentEffort;
+    x: number;
+    y: number;
+  } | null>(null);
+  
   
   // Compute effective height - full viewport when expanded (Strava-style)
   // Use different calculations for mobile vs desktop
@@ -578,7 +585,18 @@ export default function MapEffort({
       if (features.length > 0) {
         const props = features[0].properties;
         const isPR = props?.isPR;
-        const idx = props?.index ?? 0;
+        
+        // Show hover card when expanded
+        if (expanded) {
+          const matchedSegment = segments.find((s) => s.name === props?.name);
+          if (matchedSegment) {
+            setHoveredSegment({
+              segment: matchedSegment,
+              x: e.point.x,
+              y: e.point.y
+            });
+          }
+        }
         
         // Brighten the appropriate layer
         if (isPR) {
@@ -591,9 +609,30 @@ export default function MapEffort({
       }
     };
     
+    // Update hover card position on mouse move
+    const handleMouseMove = (e: maplibregl.MapMouseEvent) => {
+      if (!expanded) return;
+      
+      const features = map.queryRenderedFeatures(e.point, { layers: hitLayers });
+      if (features.length > 0) {
+        const props = features[0].properties;
+        const matchedSegment = segments.find((s) => s.name === props?.name);
+        if (matchedSegment) {
+          setHoveredSegment({
+            segment: matchedSegment,
+            x: e.point.x,
+            y: e.point.y
+          });
+        }
+      } else {
+        setHoveredSegment(null);
+      }
+    };
+    
     const handleMouseLeave = () => {
       map.getCanvas().style.cursor = '';
       overSegmentRef.current = false;
+      setHoveredSegment(null);
       
       // Restore original styling
       map.setPaintProperty(SEGMENT_LINE, 'line-opacity', 0.9);
@@ -605,6 +644,7 @@ export default function MapEffort({
     // Add handlers to hit zone layer
     map.on('click', SEGMENT_HIT_ZONE, handleSegmentClick);
     map.on('mouseenter', SEGMENT_HIT_ZONE, handleMouseEnter);
+    map.on('mousemove', SEGMENT_HIT_ZONE, handleMouseMove);
     map.on('mouseleave', SEGMENT_HIT_ZONE, handleMouseLeave);
     
     // Prevent double-tap zoom when over segment
@@ -619,10 +659,11 @@ export default function MapEffort({
     return () => {
       map.off('click', SEGMENT_HIT_ZONE, handleSegmentClick);
       map.off('mouseenter', SEGMENT_HIT_ZONE, handleMouseEnter);
+      map.off('mousemove', SEGMENT_HIT_ZONE, handleMouseMove);
       map.off('mouseleave', SEGMENT_HIT_ZONE, handleMouseLeave);
       map.off('dblclick', handleDblClick);
     };
-  }, [ready, segments, onSegmentClick]);
+  }, [ready, segments, onSegmentClick, expanded]);
 
   // Handle zoom when expanding/collapsing (Strava-style)
   useEffect(() => {
@@ -1016,6 +1057,93 @@ export default function MapEffort({
           </button>
         )}
         
+        {/* Segment hover card - only when expanded */}
+        {expanded && hoveredSegment && (
+          <div
+            style={{
+              position: 'absolute',
+              left: Math.min(hoveredSegment.x + 12, (divRef.current?.offsetWidth || 300) - 200),
+              top: Math.max(hoveredSegment.y - 80, 10),
+              background: 'rgba(255, 255, 255, 0.96)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              padding: '12px 16px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              zIndex: 100,
+              minWidth: 180,
+              pointerEvents: 'none'
+            }}
+          >
+            {/* Segment name */}
+            <div style={{ 
+              fontSize: 14, 
+              fontWeight: 700, 
+              color: '#1f2937',
+              marginBottom: 8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}>
+              {hoveredSegment.segment.pr_rank === 1 && (
+                <span style={{ color: '#fbbf24' }}>🏆</span>
+              )}
+              {hoveredSegment.segment.name}
+            </div>
+            
+            {/* Stats grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {/* Time */}
+              <div>
+                <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', marginBottom: 2 }}>Time</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>
+                  {hoveredSegment.segment.elapsed_time 
+                    ? `${Math.floor(hoveredSegment.segment.elapsed_time / 60)}:${String(hoveredSegment.segment.elapsed_time % 60).padStart(2, '0')}`
+                    : '--'}
+                </div>
+              </div>
+              
+              {/* Distance */}
+              <div>
+                <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', marginBottom: 2 }}>Distance</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>
+                  {hoveredSegment.segment.distance 
+                    ? `${(hoveredSegment.segment.distance / 1609.34).toFixed(2)} mi`
+                    : '--'}
+                </div>
+              </div>
+              
+              {/* PR Rank */}
+              {hoveredSegment.segment.pr_rank && (
+                <div>
+                  <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', marginBottom: 2 }}>PR Rank</div>
+                  <div style={{ 
+                    fontSize: 14, 
+                    fontWeight: 600, 
+                    color: hoveredSegment.segment.pr_rank === 1 ? '#f59e0b' : '#1f2937'
+                  }}>
+                    #{hoveredSegment.segment.pr_rank}
+                  </div>
+                </div>
+              )}
+              
+              {/* KOM Rank */}
+              {hoveredSegment.segment.kom_rank && (
+                <div>
+                  <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', marginBottom: 2 }}>KOM Rank</div>
+                  <div style={{ 
+                    fontSize: 14, 
+                    fontWeight: 600, 
+                    color: hoveredSegment.segment.kom_rank <= 3 ? '#ef4444' : '#1f2937'
+                  }}>
+                    #{hoveredSegment.segment.kom_rank}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
         {/* Enhancement 4: Metrics card - Only show when expanded */}
         {false && expanded && coords.length > 1 && (
           <div
@@ -1108,11 +1236,13 @@ export default function MapEffort({
           onTouchEnd={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            setHoveredSegment(null);
             setExpanded(false);
           }}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            setHoveredSegment(null);
             setExpanded(false);
           }}
           style={{
