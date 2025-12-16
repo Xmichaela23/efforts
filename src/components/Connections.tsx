@@ -907,48 +907,26 @@ const Connections: React.FC = () => {
       <div className="grid gap-6">
         {connections.map((connection) => (
           <Card key={connection.provider} className="relative">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  {getProviderIcon(connection.provider)}
-                  <div>
-                    <CardTitle className="flex items-center space-x-2">
-                      {getProviderName(connection.provider)}
-                      {connection.connected && (
-                        <div className={`w-2 h-2 rounded-full animate-pulse ${
-                          connection.provider === 'garmin' 
-                            ? 'bg-blue-500' 
-                            : connection.provider === 'strava'
-                            ? 'bg-orange-500'
-                            : 'bg-green-500'
-                        }`}></div>
-                      )}
-                    </CardTitle>
-                    <CardDescription>
-                      {getProviderDescription(connection.provider)}
-                    </CardDescription>
-                  </div>
+            <CardHeader className="pb-3">
+              <div className="flex items-start gap-3">
+                {getProviderIcon(connection.provider)}
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="flex items-center gap-2">
+                    {getProviderName(connection.provider)}
+                    {connection.connected && (
+                      <div className={`w-2 h-2 rounded-full animate-pulse ${
+                        connection.provider === 'garmin' 
+                          ? 'bg-blue-500' 
+                          : connection.provider === 'strava'
+                          ? 'bg-orange-500'
+                          : 'bg-green-500'
+                      }`}></div>
+                    )}
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    {getProviderDescription(connection.provider)}
+                  </CardDescription>
                 </div>
-                
-                {connection.connected && (
-                  <div className="flex items-center space-x-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (connection.provider === 'strava') {
-                          disconnectStrava();
-                        } else if (connection.provider === 'garmin') {
-                          disconnectGarmin();
-                        }
-                      }}
-                      disabled={loading}
-                    >
-                      <Unlink className="h-4 w-4 mr-2" />
-                      Disconnect
-                    </Button>
-                  </div>
-                )}
               </div>
             </CardHeader>
 
@@ -997,71 +975,73 @@ const Connections: React.FC = () => {
                   </div>
 
 
-                  <div className="flex items-center space-x-2">
-                    {/* Strava Date Range Picker */}
-                    {connection.provider === 'strava' && showDateControls && (
-                      <div className="flex flex-col space-y-2 w-full">
-                        {/* Quick Preset Buttons */}
-                        <div className="flex items-center space-x-2 text-xs">
-                          <button
-                            onClick={() => {
-                              const end = new Date();
-                              const start = new Date();
-                              start.setDate(start.getDate() - 7);
-                              setStravaStartDate(start.toISOString().split('T')[0]);
-                              setStravaEndDate(end.toISOString().split('T')[0]);
-                            }}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                          >
-                            Last 7 days
-                          </button>
-                          <button
-                            onClick={() => {
-                              const end = new Date();
-                              const start = new Date();
-                              start.setDate(start.getDate() - 30);
-                              setStravaStartDate(start.toISOString().split('T')[0]);
-                              setStravaEndDate(end.toISOString().split('T')[0]);
-                            }}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                          >
-                            Last 30 days
-                          </button>
-                          <button
-                            onClick={() => {
-                              const end = new Date();
-                              const start = new Date();
-                              start.setDate(start.getDate() - 60);
-                              setStravaStartDate(start.toISOString().split('T')[0]);
-                              setStravaEndDate(end.toISOString().split('T')[0]);
-                            }}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                          >
-                            Last 60 days
-                          </button>
-                        </div>
-                        
-                        {/* Custom Date Range */}
-                        <div className="flex items-center space-x-2 text-sm">
-                          <input
-                            type="date"
-                            value={stravaStartDate}
-                            onChange={(e) => setStravaStartDate(e.target.value)}
-                            className="px-2 py-1 border rounded text-xs"
-                            placeholder="Start Date"
-                          />
-                          <span className="text-gray-500">to</span>
-                          <input
-                            type="date"
-                            value={stravaEndDate}
-                            onChange={(e) => setStravaEndDate(e.target.value)}
-                            className="px-2 py-1 border rounded text-xs"
-                            placeholder="End Date"
-                          />
-                        </div>
+                  {/* Strava Date Range Picker */}
+                  {connection.provider === 'strava' && showDateControls && (
+                    <div className="flex flex-col gap-2">
+                      {/* Quick Preset Buttons */}
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <button
+                          onClick={() => {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setDate(start.getDate() - 7);
+                            setStravaStartDate(start.toISOString().split('T')[0]);
+                            setStravaEndDate(end.toISOString().split('T')[0]);
+                          }}
+                          className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                        >
+                          Last 7 days
+                        </button>
+                        <button
+                          onClick={() => {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setDate(start.getDate() - 30);
+                            setStravaStartDate(start.toISOString().split('T')[0]);
+                            setStravaEndDate(end.toISOString().split('T')[0]);
+                          }}
+                          className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                        >
+                          Last 30 days
+                        </button>
+                        <button
+                          onClick={() => {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setDate(start.getDate() - 60);
+                            setStravaStartDate(start.toISOString().split('T')[0]);
+                            setStravaEndDate(end.toISOString().split('T')[0]);
+                          }}
+                          className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                        >
+                          Last 60 days
+                        </button>
                       </div>
-                    )}
-                    
+                      
+                      {/* Custom Date Range */}
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <input
+                          type="date"
+                          value={stravaStartDate}
+                          onChange={(e) => setStravaStartDate(e.target.value)}
+                          className="px-2 py-1 border rounded text-xs flex-1 min-w-[120px]"
+                          placeholder="Start Date"
+                        />
+                        <span className="text-gray-500">to</span>
+                        <input
+                          type="date"
+                          value={stravaEndDate}
+                          onChange={(e) => setStravaEndDate(e.target.value)}
+                          className="px-2 py-1 border rounded text-xs flex-1 min-w-[120px]"
+                          placeholder="End Date"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action buttons - wrap on mobile */}
+                  <div className="flex flex-wrap gap-2">
+                    {/* Strava Import Button */}
                     {connection.provider === 'strava' && (
                       <Button
                         variant="outline"
@@ -1092,8 +1072,8 @@ const Connections: React.FC = () => {
                       </Button>
                     )}
 
-                    {/* Mobile-only: quick toggle to reveal date range controls */}
-                    {connection.provider === 'strava' && isMobile && (
+                    {/* Date Range toggle */}
+                    {connection.provider === 'strava' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1101,57 +1081,60 @@ const Connections: React.FC = () => {
                         disabled={loading}
                       >
                         <Calendar className="h-4 w-4 mr-2" />
-                        {showDateControls ? 'Hide Range' : 'Date Range'}
+                        {showDateControls ? 'Hide' : 'Custom'}
                       </Button>
                     )}
-                    
-                    {/* Progress Bar for Import - Strava only */}
-                    {importProgress.importing && connection.provider === 'strava' && (
-                      <div className="w-full mt-2">
-                        <div className="flex justify-between text-xs text-gray-600 mb-1">
-                          <span>Importing activities...</span>
-                          <span>{importProgress.progress}/{importProgress.total}</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${importProgress.total > 0 ? (importProgress.progress / importProgress.total) * 100 : 0}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Garmin-specific testing and message display */}
-                    {connection.provider === 'garmin' && garminConnected && (
-                      <div className="space-y-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={testGarminApi}
-                          disabled={loading || !garminAccessToken}
-                          className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                        >
-                          <Zap className="h-4 w-4 mr-2" />
-                          Test API
-                        </Button>
-                        {garminMessage && (
-                          <div className="p-2 bg-blue-50 rounded text-xs text-blue-700 border border-blue-200">
-                            {garminMessage}
-                          </div>
-                        )}
-                      </div>
-                    )}
 
+                    {/* Refresh button */}
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => loadConnectionStatus()}
                       disabled={loading}
                     >
-                      <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                      Refresh Status
+                      <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    </Button>
+
+                    {/* Disconnect button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (connection.provider === 'strava') {
+                          disconnectStrava();
+                        } else if (connection.provider === 'garmin') {
+                          disconnectGarmin();
+                        }
+                      }}
+                      disabled={loading}
+                      className="text-gray-500 hover:text-red-600 hover:border-red-300"
+                    >
+                      <Unlink className="h-4 w-4" />
                     </Button>
                   </div>
+                    
+                  {/* Progress Bar for Import - Strava only */}
+                  {importProgress.importing && connection.provider === 'strava' && (
+                    <div className="w-full mt-2">
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Importing activities...</span>
+                        <span>{importProgress.progress}/{importProgress.total}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${importProgress.total > 0 ? (importProgress.progress / importProgress.total) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                    
+                  {/* Garmin message display */}
+                  {connection.provider === 'garmin' && garminMessage && (
+                    <div className="p-2 bg-blue-50 rounded text-xs text-blue-700 border border-blue-200 mt-2">
+                      {garminMessage}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-6">
