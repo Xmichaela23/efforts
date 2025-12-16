@@ -1697,6 +1697,8 @@ function EffortsViewerMapbox({
         onSegmentClick={(segment) => {
           setSelectedSegment(segment);
         }}
+        // Pass raw (unsimplified) track for segment index lookups
+        rawTrackLngLat={Array.isArray(trackLngLat) ? trackLngLat : undefined}
       />
       
       {/* Segment info popup */}

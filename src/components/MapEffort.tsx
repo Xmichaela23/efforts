@@ -42,6 +42,8 @@ export type MapEffortProps = {
   // Strava segments
   segments?: SegmentEffort[];
   onSegmentClick?: (segment: SegmentEffort) => void;
+  // Raw (unsimplified) track for segment index lookups
+  rawTrackLngLat?: [number, number][];
 };
 
 // Layer IDs
@@ -99,6 +101,7 @@ export default function MapEffort({
   // Strava segments
   segments,
   onSegmentClick,
+  rawTrackLngLat,
 }: MapEffortProps) {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const divRef = useRef<HTMLDivElement>(null);
@@ -465,9 +468,11 @@ export default function MapEffort({
     const segmentsSrc = map.getSource(SEGMENTS_SRC) as maplibregl.GeoJSONSource | undefined;
     if (!segmentsSrc) return;
     
-    // Build GeoJSON features for each segment
-    const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
-    if (valid.length < 2 || !segments || segments.length === 0) {
+    // Use raw (unsimplified) track for segment index lookups
+    // Strava's start_index/end_index refer to the original GPS track, not simplified
+    const rawTrack = rawTrackLngLat && rawTrackLngLat.length > 1 ? rawTrackLngLat : null;
+    
+    if (!rawTrack || !segments || segments.length === 0) {
       // Clear segments if no data
       segmentsSrc.setData({ type: 'FeatureCollection', features: [] });
       return;
@@ -478,11 +483,11 @@ export default function MapEffort({
         typeof seg.start_index === 'number' && 
         typeof seg.end_index === 'number' &&
         seg.start_index >= 0 &&
-        seg.end_index <= valid.length
+        seg.end_index < rawTrack.length
       )
       .map((seg) => {
-        // Extract the segment portion of the route
-        const segmentCoords = valid.slice(seg.start_index!, seg.end_index! + 1);
+        // Extract the segment portion from the RAW (unsimplified) route
+        const segmentCoords = rawTrack.slice(seg.start_index!, seg.end_index! + 1);
         return {
           type: 'Feature' as const,
           properties: {
@@ -498,14 +503,15 @@ export default function MapEffort({
             coordinates: segmentCoords
           }
         };
-      });
+      })
+      .filter((f) => f.geometry.coordinates.length >= 2); // Must have at least 2 points
     
     segmentsSrc.setData({ type: 'FeatureCollection', features });
     
     if (features.length > 0) {
-      console.log(`[MapEffort] Drew ${features.length} segments on map`);
+      console.log(`[MapEffort] Drew ${features.length} segments on map (using raw track with ${rawTrack.length} points)`);
     }
-  }, [coords, ready, segments]);
+  }, [rawTrackLngLat, ready, segments]);
 
   // Handle segment click events
   useEffect(() => {
