@@ -96,7 +96,9 @@ Deno.serve(async (req) => {
       'start_position_lat','start_position_long','timestamp',
       'strength_exercises','mobility_exercises',
       // Source tracking for display
-      'source','is_strava_imported','strava_activity_id','garmin_activity_id','device_info'
+      'source','is_strava_imported','strava_activity_id','garmin_activity_id','device_info',
+      // Achievements (PRs, segments)
+      'achievements'
     ].join(',');
     const gpsSel = opts.include_gps ? ',gps_track' : '';
     const sensSel = opts.include_sensors ? ',sensor_data' : '';

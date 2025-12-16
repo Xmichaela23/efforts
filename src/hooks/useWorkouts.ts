@@ -225,6 +225,8 @@ export const useWorkouts = () => {
           'workload_planned','workload_actual','intensity_factor',
           // source tracking for display
           'source','is_strava_imported','strava_activity_id','garmin_activity_id','device_info',
+          // achievements (PRs, segments)
+          'achievements',
           'created_at','updated_at'
         ].join(','))
         .eq("user_id", user.id)

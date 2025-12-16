@@ -374,6 +374,64 @@ function mapStravaToWorkout(activity, userId) {
     }
   })();
 
+  // Build achievements from segment_efforts and best_efforts
+  const achievements = (() => {
+    try {
+      const segmentEfforts = Array.isArray(activity.segment_efforts) ? activity.segment_efforts : [];
+      const bestEfforts = Array.isArray(activity.best_efforts) ? activity.best_efforts : [];
+      
+      // Count PRs from segment efforts
+      const segmentPrs = segmentEfforts.filter((e: any) => e.pr_rank === 1);
+      // Count PRs from best efforts (running)
+      const bestEffortPrs = bestEfforts.filter((e: any) => e.pr_rank === 1);
+      
+      const prCount = segmentPrs.length + bestEffortPrs.length;
+      
+      // Only store if there's any achievement data
+      if (segmentEfforts.length === 0 && bestEfforts.length === 0) {
+        return null;
+      }
+      
+      const result: any = {
+        pr_count: prCount,
+        segment_pr_count: segmentPrs.length,
+        best_effort_pr_count: bestEffortPrs.length
+      };
+      
+      // Store full efforts for future segments tab
+      if (segmentEfforts.length > 0) {
+        result.segment_efforts = segmentEfforts.map((e: any) => ({
+          name: e.name,
+          distance: e.distance,
+          elapsed_time: e.elapsed_time,
+          moving_time: e.moving_time,
+          pr_rank: e.pr_rank,
+          kom_rank: e.kom_rank,
+          achievements: e.achievements,
+          average_watts: e.average_watts,
+          average_heartrate: e.average_heartrate
+        }));
+      }
+      
+      if (bestEfforts.length > 0) {
+        result.best_efforts = bestEfforts.map((e: any) => ({
+          name: e.name,
+          distance: e.distance,
+          elapsed_time: e.elapsed_time,
+          moving_time: e.moving_time,
+          pr_rank: e.pr_rank,
+          achievements: e.achievements
+        }));
+      }
+      
+      console.log(`🏆 Built achievements for Strava activity ${activity.id}: ${prCount} PRs (${segmentPrs.length} segment, ${bestEffortPrs.length} best effort)`);
+      return result;
+    } catch (err) {
+      console.warn(`⚠️ Error building achievements:`, err);
+      return null;
+    }
+  })();
+
   return {
     user_id: userId,
     name: activity.name || 'Strava Activity',
@@ -431,6 +489,8 @@ function mapStravaToWorkout(activity, userId) {
     max_temperature: Number.isFinite(activity.max_temp) ? Math.round(activity.max_temp) : null,
     // Server-computed summary for UI (includes GAP/cadence when available)
     computed: computedJsonObj ? JSON.stringify(computedJsonObj) : null,
+    // Strava achievements (PRs, segment efforts, best efforts)
+    achievements: achievements ? JSON.stringify(achievements) : null,
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString()
   };
