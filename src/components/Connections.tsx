@@ -1267,7 +1267,7 @@ const Connections: React.FC = () => {
             
             <div className="pt-2 border-t">
               <p className="text-xs text-gray-500">
-                💡 <strong>Tip:</strong> Choose "Garmin only" if you use a Garmin watch that syncs to Strava - this avoids duplicate activities.
+                💡 <strong>Tip:</strong> Want segments and PRs? Choose "Strava only". Just want clean data without duplicates? Choose "Garmin only".
               </p>
             </div>
           </div>
