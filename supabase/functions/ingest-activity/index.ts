@@ -1065,6 +1065,8 @@ async function mapGarminToWorkout(activity, userId) {
       distance_m: 'garmin.summary',
       duration_s_moving: 'garmin.summary'
     }),
+    // Device info for display (e.g., "Edge 1040", "Forerunner 965")
+    device_info: activity.device_name ? JSON.stringify({ device_name: activity.device_name }) : null,
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString()
   };

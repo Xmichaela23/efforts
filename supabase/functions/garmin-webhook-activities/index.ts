@@ -645,6 +645,8 @@ async function processActivityDetails(activityDetails) {
             // Multisport linkage
             is_parent: activity.isParent ?? null,
             parentSummaryId: activity.parentSummaryId ?? null,
+            // Device info
+            device_name: activity.deviceName ?? activityDetail?.summary?.deviceName ?? null,
             // Rich JSON
             gps_track: gpsTrack.length ? gpsTrack : null,
             sensor_data: allSensorData.length ? {
