@@ -814,9 +814,9 @@ const Connections: React.FC = () => {
   const getProviderDescription = (provider: string) => {
     switch (provider) {
       case 'strava':
-        return 'Connect your Strava account to automatically sync activities and enable real-time updates via webhooks.';
+        return 'Connect your Strava account to automatically import your activities.';
       case 'garmin':
-        return 'Connect your Garmin account for basic integration and API testing.';
+        return 'Connect your Garmin account to automatically import your activities.';
       default:
         return `Connect your ${provider} account to sync data.`;
     }
@@ -1210,7 +1210,7 @@ const Connections: React.FC = () => {
             <span>Activity Source Preference</span>
           </CardTitle>
           <CardDescription>
-            Choose which sources to accept for activity data. This helps avoid duplicates if you have both Garmin and Strava connected.
+            Choose where to get your activity data from.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1228,7 +1228,7 @@ const Connections: React.FC = () => {
                 />
                 <div>
                   <span className="font-medium text-gray-900">Garmin only</span>
-                  <p className="text-sm text-gray-500">Ignore activities from Strava</p>
+                  <p className="text-sm text-gray-500">Import activities from Garmin. Send planned workouts to your Garmin devices.</p>
                 </div>
               </label>
               
@@ -1244,7 +1244,7 @@ const Connections: React.FC = () => {
                 />
                 <div>
                   <span className="font-medium text-gray-900">Strava only</span>
-                  <p className="text-sm text-gray-500">Ignore activities from Garmin</p>
+                  <p className="text-sm text-gray-500">Import activities from Strava to see segments and PRs. You can still send planned workouts to Garmin devices when connected to Garmin.</p>
                 </div>
               </label>
               
@@ -1259,15 +1259,15 @@ const Connections: React.FC = () => {
                   className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
                 />
                 <div>
-                  <span className="font-medium text-gray-900">Accept both sources</span>
-                  <p className="text-sm text-gray-500">May result in duplicates if Garmin auto-syncs to Strava</p>
+                  <span className="font-medium text-gray-900">Both sources</span>
+                  <p className="text-sm text-gray-500">Import from both. Duplicates will occur if both are connected.</p>
                 </div>
               </label>
             </div>
             
             <div className="pt-2 border-t">
               <p className="text-xs text-gray-500">
-                💡 <strong>Tip:</strong> If you have a Garmin watch that auto-syncs to Strava, choose "Garmin only" to avoid duplicate activities.
+                💡 <strong>Tip:</strong> Choose "Garmin only" if you use a Garmin watch that syncs to Strava - this avoids duplicate activities.
               </p>
             </div>
           </div>
@@ -1276,7 +1276,7 @@ const Connections: React.FC = () => {
 
       <div className="text-center text-sm text-gray-500">
         <p>
-          <strong>New activities will automatically sync</strong> via webhooks when you complete them.
+          <strong>New activities will automatically sync</strong> when you complete them.
           <br />
           Historical import is for bringing in your past activities. This may take a few minutes.
         </p>
