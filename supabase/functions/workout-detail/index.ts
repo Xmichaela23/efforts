@@ -94,7 +94,9 @@ Deno.serve(async (req) => {
       'avg_heart_rate','max_heart_rate','avg_power','max_power','avg_cadence','max_cadence',
       'avg_speed','distance','duration','elapsed_time','moving_time','calories','steps','elevation_gain','elevation_loss',
       'start_position_lat','start_position_long','timestamp',
-      'strength_exercises','mobility_exercises'
+      'strength_exercises','mobility_exercises',
+      // Source tracking for display
+      'source','is_strava_imported','strava_activity_id','garmin_activity_id','device_info'
     ].join(',');
     const gpsSel = opts.include_gps ? ',gps_track' : '';
     const sensSel = opts.include_sensors ? ',sensor_data' : '';
