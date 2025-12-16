@@ -736,18 +736,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 if (source === 'strava' || stravaId || isStravaImported) {
                   const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
                   return (
-                    <a 
-                      href={stravaUrl || '#'} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 no-underline"
-                      title={stravaUrl ? 'View on Strava' : undefined}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="#FC4C02">
-                        <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066l-2.084 4.116zM7.878 14.794l2.835 5.594h4.17L7.878 6.149l-6.994 14.239h4.169l2.825-5.594z"/>
-                      </svg>
-                      <span className="text-[#FC4C02] font-semibold text-base">Strava</span>
-                    </a>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-gray-400 text-sm">via</span>
+                      <a 
+                        href={stravaUrl || '#'} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 no-underline"
+                        title={stravaUrl ? 'View on Strava' : undefined}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#FC4C02">
+                          <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066l-2.084 4.116zM7.878 14.794l2.835 5.594h4.17L7.878 6.149l-6.994 14.239h4.169l2.825-5.594z"/>
+                        </svg>
+                        <span className="text-[#FC4C02] font-semibold text-base">Strava</span>
+                      </a>
+                    </div>
                   );
                 }
 
@@ -755,6 +758,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   const garminUrl = garminId ? `https://connect.garmin.com/modern/activity/${garminId}` : null;
                   return (
                     <div className="flex items-center gap-1.5">
+                      <span className="text-gray-400 text-sm">via</span>
                       <a
                         href={garminUrl || '#'}
                         target="_blank"

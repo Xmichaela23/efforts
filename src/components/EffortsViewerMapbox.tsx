@@ -1616,70 +1616,11 @@ function EffortsViewerMapbox({
     <div style={{ maxWidth: 780, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
       {/* Map header with weather, source, and theme toggle */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 6px 6px 6px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <WeatherDisplay 
-            weather={weather}
-            loading={weatherLoading}
-            fallbackTemperature={workoutData?.avg_temperature ? Number(workoutData.avg_temperature) : undefined}
-          />
-          {/* Source indicator with clickable logo */}
-          {(() => {
-            const source = workoutData?.source;
-            const stravaId = workoutData?.strava_activity_id;
-            const garminId = workoutData?.garmin_activity_id;
-            const isStravaImported = workoutData?.is_strava_imported;
-            const deviceInfo = (() => {
-              try {
-                const di = workoutData?.device_info || workoutData?.deviceInfo;
-                if (typeof di === 'string') return JSON.parse(di);
-                return di;
-              } catch { return null; }
-            })();
-            const deviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
-            
-            if (source === 'strava' || stravaId || isStravaImported) {
-              const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
-              return (
-                <a 
-                  href={stravaUrl || '#'} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none', color: '#64748b', fontSize: 12 }}
-                  title={stravaUrl ? 'View on Strava' : undefined}
-                >
-                  <span style={{ color: '#94a3b8' }}>via</span>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#FC4C02">
-                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066l-2.084 4.116zM7.878 14.794l2.835 5.594h4.17L7.878 6.149l-6.994 14.239h4.169l2.825-5.594z"/>
-                  </svg>
-                  <span style={{ color: '#FC4C02', fontWeight: 600, fontSize: 13, letterSpacing: '-0.3px' }}>Strava</span>
-                </a>
-              );
-            }
-            
-            if (source === 'garmin' || garminId) {
-              const garminUrl = garminId ? `https://connect.garmin.com/modern/activity/${garminId}` : null;
-              return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#64748b', fontSize: 12 }}>
-                  <span style={{ color: '#94a3b8' }}>via</span>
-                  <a 
-                    href={garminUrl || '#'} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}
-                    title={garminUrl ? 'View on Garmin Connect' : undefined}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#007CC3">
-                      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.824a9.176 9.176 0 110 18.352 9.176 9.176 0 010-18.352zm0 1.412A7.765 7.765 0 004.236 12 7.765 7.765 0 0012 19.764 7.765 7.765 0 0019.764 12 7.765 7.765 0 0012 4.236zm3.07 2.471l-4.235 3.53v4.942h2.118v-3.883l3.177-2.647-1.06-1.942z"/>
-                    </svg>
-                  </a>
-                  {deviceName && <span style={{ color: '#64748b' }}>{deviceName}</span>}
-                </div>
-              );
-            }
-            
-            return null;
-          })()}
-        </div>
+        <WeatherDisplay 
+          weather={weather}
+          loading={weatherLoading}
+          fallbackTemperature={workoutData?.avg_temperature ? Number(workoutData.avg_temperature) : undefined}
+        />
         <button
           onClick={() => setTheme(theme === 'outdoor' ? 'hybrid' : theme === 'hybrid' ? 'topo' : 'outdoor')}
           style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
