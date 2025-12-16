@@ -307,6 +307,30 @@ function mapStravaToWorkout(activity, userId) {
     }
   }
 
+  // Add elevation (altitude) to sensor_data - maps to elevationInMeters like Garmin
+  if (streams.altitude && streams.altitude.length > 0) {
+    // Create sensor_data if it doesn't exist
+    if (!sensor_data && streams.time && streams.time.length > 0) {
+      const timeLen = streams.time.length;
+      sensor_data = new Array(timeLen).fill(0).map((_, i) => {
+        const t = startEpochSec + streams.time[i];
+        return { startTimeInSeconds: t, timestamp: t * 1000 };
+      });
+    }
+
+    // Attach elevation to sensor_data
+    if (sensor_data && streams.time && streams.time.length > 0) {
+      const useLen = Math.min(sensor_data.length, streams.altitude.length);
+      for (let i = 0; i < useLen; i++) {
+        const elev = streams.altitude[i];
+        if (Number.isFinite(elev)) {
+          sensor_data[i].elevationInMeters = elev;
+        }
+      }
+      console.log(`⛰️ Added elevationInMeters to sensor_data: ${useLen} points for Strava activity ${activity.id}`);
+    }
+  }
+
   // Normalize cadence for runs/walks (Strava reports half-cadence)
   let avgCadNorm = Number.isFinite(activity.average_cadence) ? Math.round(activity.average_cadence) : cadAvgComputed;
   let maxCadNorm = Number.isFinite(activity.max_cadence) ? Math.round(activity.max_cadence) : cadMaxComputed;
