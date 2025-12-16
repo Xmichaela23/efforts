@@ -710,8 +710,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         <div className="flex items-center gap-3">
           <div className="p-2" />
           <div>
-            <div className="flex items-center gap-2 flex-nowrap">
-              <h2 className="font-semibold text-lg whitespace-nowrap">
+            <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap">
+              <h2 className="font-semibold text-lg">
                 {(() => {
                   const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
                   if (st) return st;
