@@ -59,11 +59,8 @@ const CURSOR_HALO = 'cursor-halo';
 const CURSOR_PT = 'cursor-pt';
 // Segment layer IDs
 const SEGMENTS_SRC = 'segments-source';
-const SEGMENT_MARKERS_SRC = 'segment-markers-source';
 const SEGMENT_LINE = 'segment-line';
 const SEGMENT_PR_LINE = 'segment-pr-line';
-const SEGMENT_BOUNDARY_MARKER = 'segment-boundary-marker';
-const SEGMENT_BOUNDARY_HALO = 'segment-boundary-halo';
 
 function styleUrl(theme: 'outdoor' | 'hybrid' | 'topo') {
   const key = import.meta.env.VITE_MAPTILER_KEY as string | undefined;
@@ -335,14 +332,6 @@ export default function MapEffort({
         });
       }
       
-      // Source for segment boundary markers (start/end points)
-      if (!map.getSource(SEGMENT_MARKERS_SRC)) {
-        map.addSource(SEGMENT_MARKERS_SRC, {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] }
-        });
-      }
-      
       // Segment line - Alternating orange/teal for non-PR segments (high contrast)
       if (!map.getLayer(SEGMENT_LINE)) {
         map.addLayer({
@@ -378,44 +367,6 @@ export default function MapEffort({
             'line-opacity': 1
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
-        });
-      }
-      
-      // Segment boundary markers - halo (outer glow)
-      if (!map.getLayer(SEGMENT_BOUNDARY_HALO)) {
-        map.addLayer({
-          id: SEGMENT_BOUNDARY_HALO,
-          type: 'circle',
-          source: SEGMENT_MARKERS_SRC,
-          paint: {
-            'circle-radius': 7,
-            'circle-color': '#fff',
-            'circle-opacity': 0.9,
-            'circle-stroke-width': 0
-          }
-        });
-      }
-      
-      // Segment boundary markers - colored dot
-      if (!map.getLayer(SEGMENT_BOUNDARY_MARKER)) {
-        map.addLayer({
-          id: SEGMENT_BOUNDARY_MARKER,
-          type: 'circle',
-          source: SEGMENT_MARKERS_SRC,
-          paint: {
-            // Color based on marker type and segment color
-            'circle-radius': 4,
-            'circle-color': [
-              'case',
-              ['==', ['get', 'isPR'], true],
-              '#fbbf24',  // Gold for PR segment markers
-              ['==', ['%', ['get', 'segmentIndex'], 2], 0],
-              '#f97316',  // Orange for even segments
-              '#14b8a6'   // Teal for odd segments
-            ],
-            'circle-stroke-color': '#fff',
-            'circle-stroke-width': 2
-          }
         });
       }
       
@@ -517,7 +468,6 @@ export default function MapEffort({
   const segmentsDrawnRef = useRef(false);
   // Store segment features for reapplication after theme changes
   const segmentFeaturesRef = useRef<any[]>([]);
-  const segmentMarkerFeaturesRef = useRef<any[]>([]);
   
   // Update segment overlays when segments prop changes
   useEffect(() => {
@@ -541,15 +491,13 @@ export default function MapEffort({
       return;
     }
     
-    const validSegments = segments.filter((seg) => 
-      typeof seg.start_index === 'number' && 
-      typeof seg.end_index === 'number' &&
-      seg.start_index >= 0 &&
-      seg.end_index < rawTrack.length
-    );
-    
-    // Create line features for segments
-    const lineFeatures = validSegments
+    const features = segments
+      .filter((seg) => 
+        typeof seg.start_index === 'number' && 
+        typeof seg.end_index === 'number' &&
+        seg.start_index >= 0 &&
+        seg.end_index < rawTrack.length
+      )
       .map((seg, idx) => {
         // Extract the segment portion from the RAW (unsimplified) route
         const segmentCoords = rawTrack.slice(seg.start_index!, seg.end_index! + 1);
@@ -572,55 +520,10 @@ export default function MapEffort({
       })
       .filter((f) => f.geometry.coordinates.length >= 2); // Must have at least 2 points
     
-    // Create boundary marker features (start + end points of each segment)
-    const markerFeatures: any[] = [];
-    validSegments.forEach((seg, idx) => {
-      const startCoord = rawTrack[seg.start_index!];
-      const endCoord = rawTrack[seg.end_index!];
-      const isPR = seg.pr_rank === 1;
-      
-      // Start marker
-      markerFeatures.push({
-        type: 'Feature',
-        properties: {
-          name: seg.name,
-          markerType: 'start',
-          segmentIndex: idx,
-          isPR
-        },
-        geometry: {
-          type: 'Point',
-          coordinates: startCoord
-        }
-      });
-      
-      // End marker
-      markerFeatures.push({
-        type: 'Feature',
-        properties: {
-          name: seg.name,
-          markerType: 'end',
-          segmentIndex: idx,
-          isPR
-        },
-        geometry: {
-          type: 'Point',
-          coordinates: endCoord
-        }
-      });
-    });
-    
-    if (lineFeatures.length > 0) {
-      segmentsSrc.setData({ type: 'FeatureCollection', features: lineFeatures });
+    if (features.length > 0) {
+      segmentsSrc.setData({ type: 'FeatureCollection', features });
       segmentsDrawnRef.current = true;
-      segmentFeaturesRef.current = lineFeatures; // Store for reapplication after theme changes
-      segmentMarkerFeaturesRef.current = markerFeatures; // Store markers too
-      
-      // Update marker source
-      const markersSrc = map.getSource(SEGMENT_MARKERS_SRC) as maplibregl.GeoJSONSource | undefined;
-      if (markersSrc) {
-        markersSrc.setData({ type: 'FeatureCollection', features: markerFeatures });
-      }
+      segmentFeaturesRef.current = features; // Store for reapplication after theme changes
     }
   }, [rawTrackLngLat, ready, segments]);
 
@@ -954,14 +857,6 @@ export default function MapEffort({
           const segSrc = map.getSource(SEGMENTS_SRC) as maplibregl.GeoJSONSource | undefined;
           if (segSrc) {
             segSrc.setData({ type: 'FeatureCollection', features: segmentFeaturesRef.current });
-          }
-        }
-        
-        // Reapply segment marker data after theme change
-        if (segmentMarkerFeaturesRef.current.length > 0) {
-          const markerSrc = map.getSource(SEGMENT_MARKERS_SRC) as maplibregl.GeoJSONSource | undefined;
-          if (markerSrc) {
-            markerSrc.setData({ type: 'FeatureCollection', features: segmentMarkerFeaturesRef.current });
           }
         }
         
