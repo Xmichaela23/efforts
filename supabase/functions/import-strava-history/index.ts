@@ -150,16 +150,16 @@ async function fetchStravaLatLngStreams(activityId: number, accessToken: string)
   }
 }
 
-// Fetch multiple streams (latlng, altitude, time, heartrate, cadence) to enrich gps_track and metrics
+// Fetch multiple streams (latlng, altitude, time, heartrate, cadence, watts) to enrich gps_track and metrics
 async function fetchStravaStreamsData(
   activityId: number,
   accessToken: string
-): Promise<{ latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[] } | null> {
+): Promise<{ latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[] } | null> {
   try {
-    console.log(`🗺️ Fetching combined streams (latlng, altitude, time) for activity ${activityId}...`);
+    console.log(`🗺️ Fetching combined streams (latlng, altitude, time, heartrate, cadence, watts) for activity ${activityId}...`);
 
     const response = await fetch(
-      `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,cadence`,
+      `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,cadence,watts`,
       { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
     );
 
@@ -183,8 +183,9 @@ async function fetchStravaStreamsData(
     const time = streams.find((s: any) => s.type === 'time')?.data || undefined;
     const heartrate = streams.find((s: any) => s.type === 'heartrate')?.data || undefined;
     const cadence = streams.find((s: any) => s.type === 'cadence')?.data || undefined;
+    const watts = streams.find((s: any) => s.type === 'watts')?.data || undefined;
 
-    const result: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[] } = {};
+    const result: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[] } = {};
     if (Array.isArray(latlng) && latlng.length > 0) {
       result.latlng = latlng
         .filter((p: any) => Array.isArray(p) && p.length === 2)
@@ -194,9 +195,10 @@ async function fetchStravaStreamsData(
     if (Array.isArray(time) && time.length > 0) result.time = time as number[];
     if (Array.isArray(heartrate) && heartrate.length > 0) result.heartrate = heartrate as number[];
     if (Array.isArray(cadence) && cadence.length > 0) result.cadence = cadence as number[];
+    if (Array.isArray(watts) && watts.length > 0) result.watts = watts as number[];
 
-    if (!result.latlng && !result.altitude && !result.time && !result.heartrate && !result.cadence) return null;
-    console.log(`🗺️ Combined streams fetched: latlng=${result.latlng?.length || 0}, altitude=${result.altitude?.length || 0}, time=${result.time?.length || 0}, hr=${result.heartrate?.length || 0}, cad=${result.cadence?.length || 0}`);
+    if (!result.latlng && !result.altitude && !result.time && !result.heartrate && !result.cadence && !result.watts) return null;
+    console.log(`🗺️ Combined streams fetched: latlng=${result.latlng?.length || 0}, altitude=${result.altitude?.length || 0}, time=${result.time?.length || 0}, hr=${result.heartrate?.length || 0}, cad=${result.cadence?.length || 0}, watts=${result.watts?.length || 0}`);
     return result;
   } catch (err) {
     console.log(`⚠️ Error fetching combined streams: ${err}`);
@@ -459,6 +461,38 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
             // Stash on a temp object on gpsTrack[0] so we can return later; or just override below when building row
             (globalThis as any).__computedCadence = { avg: cadAvg, max: cadMax };
             console.log(`🌀 cadence computed from stream: avg=${cadAvg}, max=${cadMax}`);
+          }
+        }
+
+        // Add power (watts) stream to sensor_data if available
+        if (streams.watts && streams.watts.length > 0) {
+          const wattsArray = (streams.watts as number[]).filter((v) => Number.isFinite(v) && v >= 0);
+          if (wattsArray.length > 0) {
+            // Create sensor_data if it doesn't exist yet
+            if (!sensorData && streams.time && streams.time.length > 0) {
+              const timeLen = streams.time.length;
+              sensorData = new Array(timeLen).fill(0).map((_, i) => {
+                const relSec = streams.time![i];
+                const t = startEpochSec + relSec;
+                return {
+                  startTimeInSeconds: t,
+                  timestamp: t * 1000,
+                };
+              });
+            }
+            
+            // Attach power to sensor_data points
+            if (sensorData && sensorData.length > 0) {
+              const useLen = Math.min(sensorData.length, streams.watts.length);
+              for (let i = 0; i < useLen; i++) {
+                const w = streams.watts[i];
+                if (Number.isFinite(w) && w >= 0) {
+                  sensorData[i].power = Math.round(w);
+                  sensorData[i].watts = Math.round(w); // Alias for compatibility
+                }
+              }
+              console.log(`⚡ power added to sensor_data: ${useLen} points`);
+            }
           }
         }
       }
@@ -734,14 +768,55 @@ Deno.serve(async (req) => {
           console.log(`⚠️ Could not fetch detailed data for activity ${a.id}: ${err}`);
         }
 
-        const row = await convertStravaToWorkout(detailedActivity, userId, currentAccessToken);
-        if (!row.user_id || !row.name || !row.type) { skipped++; continue; }
+        // Fetch streams to enrich the activity
+        let streams: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[] } | null = null;
+        try {
+          streams = await fetchStravaStreamsData(a.id, currentAccessToken);
+          if (streams) {
+            console.log(`📊 Fetched streams for activity ${a.id}: hr=${streams.heartrate?.length || 0}, cad=${streams.cadence?.length || 0}, watts=${streams.watts?.length || 0}, latlng=${streams.latlng?.length || 0}`);
+          }
+        } catch (e) {
+          console.warn(`⚠️ Could not fetch streams for activity ${a.id}:`, e);
+        }
 
-        // Idempotent write on (user_id, strava_activity_id)
-        const { error } = await supabase
-          .from('workouts')
-          .upsert(row, { onConflict: 'user_id,strava_activity_id' });
-        if (error) { console.error('Upsert error:', error); skipped++; continue; }
+        // Package activity with streams and call ingest-activity
+        const enrichedActivity = {
+          ...detailedActivity,
+          streams: streams || undefined
+        };
+
+        const ingestUrl = `${SUPABASE_URL}/functions/v1/ingest-activity`;
+        const ingestPayload = {
+          userId,
+          provider: 'strava',
+          activity: enrichedActivity
+        };
+
+        console.log(`🔄 Calling ingest-activity for Strava activity ${a.id}...`);
+        
+        try {
+          const ingestResponse = await fetch(ingestUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${SUPABASE_KEY}`
+            },
+            body: JSON.stringify(ingestPayload)
+          });
+
+          if (!ingestResponse.ok) {
+            const errText = await ingestResponse.text();
+            console.error(`❌ ingest-activity failed for Strava activity ${a.id}: ${ingestResponse.status} - ${errText}`);
+            skipped++;
+            continue;
+          } else {
+            console.log(`✅ ingest-activity succeeded for Strava activity ${a.id}`);
+          }
+        } catch (ingestErr) {
+          console.error(`❌ ingest-activity error for activity ${a.id}:`, ingestErr);
+          skipped++;
+          continue;
+        }
 
         existing.add(a.id);
         imported++;

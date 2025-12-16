@@ -199,6 +199,20 @@ async function processActivities(activities) {
         console.log(`Found connection but user_id is null for Garmin userId: ${activity.userId}`);
         continue;
       }
+
+      // Check user's source preference
+      const { data: userData } = await supabase
+        .from('users')
+        .select('preferences')
+        .eq('id', connection.user_id)
+        .single();
+      
+      const sourcePreference = userData?.preferences?.source_preference || 'both';
+      if (sourcePreference === 'strava') {
+        console.log(`⏭️ Skipping Garmin activity ${activity.summaryId} - user prefers Strava only`);
+        continue;
+      }
+
       // Convert Garmin activity to our format
       const activityRecord = {
         user_id: connection.user_id,
@@ -316,6 +330,20 @@ async function processActivityDetails(activityDetails) {
         console.log(`Found connection but user_id is null for Garmin userId: ${activity.userId}`);
         continue;
       }
+
+      // Check user's source preference
+      const { data: userData } = await supabase
+        .from('users')
+        .select('preferences')
+        .eq('id', connection.user_id)
+        .single();
+      
+      const sourcePreference = userData?.preferences?.source_preference || 'both';
+      if (sourcePreference === 'strava') {
+        console.log(`⏭️ Skipping Garmin activity ${activity.summaryId} - user prefers Strava only`);
+        continue;
+      }
+
       // Process ALL sensor data from samples
       let avgPower = null, maxPower = null;
       let avgHeartRate = null, maxHeartRate = null;

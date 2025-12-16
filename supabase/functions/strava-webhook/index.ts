@@ -103,6 +103,19 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
     }
 
     const userId = userConnection.user_id;
+
+    // Check user's source preference
+    const { data: userData } = await supabase
+      .from('users')
+      .select('preferences')
+      .eq('id', userId)
+      .single();
+    
+    const sourcePreference = userData?.preferences?.source_preference || 'both';
+    if (sourcePreference === 'garmin') {
+      console.log(`⏭️ Skipping Strava activity ${activityId} - user prefers Garmin only`);
+      return;
+    }
     const connectionData = userConnection.connection_data || {};
     let accessToken = connectionData.access_token || (userConnection as any).access_token;
     const expiresAtIso = (userConnection as any).expires_at as string | null;
@@ -163,6 +176,19 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
     }
 
     const userId = userConnection.user_id;
+
+    // Check user's source preference
+    const { data: userData } = await supabase
+      .from('users')
+      .select('preferences')
+      .eq('id', userId)
+      .single();
+    
+    const sourcePreference = userData?.preferences?.source_preference || 'both';
+    if (sourcePreference === 'garmin') {
+      console.log(`⏭️ Skipping Strava activity update ${activityId} - user prefers Garmin only`);
+      return;
+    }
     const connectionData = userConnection.connection_data || {};
     let accessToken = connectionData.access_token || (userConnection as any).access_token;
     if (!accessToken) {
@@ -320,14 +346,14 @@ async function refreshStravaAccessToken(userId: string): Promise<string | null> 
   }
 }
 
-// Fetch streams (latlng, altitude, time, heartrate, cadence)
+// Fetch streams (latlng, altitude, time, heartrate, cadence, watts)
 async function fetchStravaStreamsData(
   activityId: number,
   accessToken: string
-): Promise<{ latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[] } | null> {
+): Promise<{ latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[] } | null> {
   try {
     const response = await fetch(
-      `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,cadence`,
+      `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,cadence,watts`,
       { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
     );
 
@@ -339,14 +365,16 @@ async function fetchStravaStreamsData(
     const time = streams.find((s: any) => s.type === 'time')?.data || undefined;
     const heartrate = streams.find((s: any) => s.type === 'heartrate')?.data || undefined;
     const cadence = streams.find((s: any) => s.type === 'cadence')?.data || undefined;
+    const watts = streams.find((s: any) => s.type === 'watts')?.data || undefined;
 
-    const result: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[] } = {};
+    const result: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[] } = {};
     if (Array.isArray(latlng) && latlng.length > 0) result.latlng = latlng as [number, number][];
     if (Array.isArray(altitude) && altitude.length > 0) result.altitude = altitude as number[];
     if (Array.isArray(time) && time.length > 0) result.time = time as number[];
     if (Array.isArray(heartrate) && heartrate.length > 0) result.heartrate = heartrate as number[];
     if (Array.isArray(cadence) && cadence.length > 0) result.cadence = cadence as number[];
-    if (!result.latlng && !result.altitude && !result.time && !result.heartrate && !result.cadence) return null;
+    if (Array.isArray(watts) && watts.length > 0) result.watts = watts as number[];
+    if (!result.latlng && !result.altitude && !result.time && !result.heartrate && !result.cadence && !result.watts) return null;
     return result;
   } catch (_e) {
     return null;
@@ -425,160 +453,50 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
     // Only persist supported types
     if (!['run','ride','swim','strength','walk'].includes(type)) return;
 
-    // Dedupe by strava_activity_id
-    const { data: existingWorkout } = await supabase
-      .from('workouts')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('strava_activity_id', activityData.id)
-      .single();
-    if (existingWorkout) return;
-
-    const date = new Date(activityData.start_date_local || activityData.start_date).toISOString().split('T')[0];
-    const timestamp = new Date(activityData.start_date || activityData.start_date_local || Date.now()).toISOString();
-    const duration = Math.max(0, Math.round((activityData.moving_time || 0) / 60));
-    // Strava returns distance in meters. Persist both raw meters and normalized km.
-    const distance_meters = Number.isFinite(activityData.distance) ? Number(activityData.distance) : null;
-    const distance_km = distance_meters != null ? Number((distance_meters / 1000).toFixed(3)) : null;
-
-    // Try to enrich with streams
-    let gps_track: any[] | null = null;
-    let sensor_data: any[] | null = null;
-    let cadAvgComputed: number | null = null;
-    let cadMaxComputed: number | null = null;
+    // Fetch streams to enrich the activity
+    let streams: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[] } | null = null;
     try {
       const token = (await supabase.from('device_connections').select('connection_data').eq('user_id', userId).eq('provider', 'strava').single()).data?.connection_data?.access_token;
       if (token) {
-        const streams = await fetchStravaStreamsData(activityData.id, token);
+        streams = await fetchStravaStreamsData(activityData.id, token);
         if (streams) {
-          const startEpochSec = Math.floor(new Date(activityData.start_date).getTime() / 1000);
-          if (streams.latlng && streams.latlng.length > 0) {
-            const len = streams.latlng.length;
-            const altLen = streams.altitude?.length || 0;
-            const timeLen = streams.time?.length || 0;
-            const useLen = Math.min(len, altLen || len, timeLen || len);
-            gps_track = new Array(useLen).fill(0).map((_, i) => {
-              const [lat, lng] = streams.latlng![i];
-              const elev = streams.altitude && Number.isFinite(streams.altitude[i]) ? streams.altitude[i] : null;
-              const tRel = streams.time && Number.isFinite(streams.time[i]) ? streams.time[i] : i;
-              return { lat, lng, elevation: elev, startTimeInSeconds: startEpochSec + (tRel as number), timestamp: (startEpochSec + (tRel as number)) * 1000 };
-            });
-          }
-          if (streams.heartrate && streams.time) {
-            const len = Math.min(streams.heartrate.length, streams.time.length);
-            sensor_data = new Array(len).fill(0).map((_, i) => {
-              const t = Math.floor(new Date(activityData.start_date).getTime() / 1000) + streams.time![i];
-              return { heartRate: streams.heartrate![i], startTimeInSeconds: t, timestamp: t * 1000 };
-            });
-          }
-
-          // Cadence stream → compute avg/max and best-5s window for runs
-          if (streams.cadence && streams.cadence.length > 0) {
-            const cadArray = (streams.cadence as number[]).filter((v) => Number.isFinite(v));
-            if (cadArray.length > 0) {
-              const cMax = Math.round(Math.max(...cadArray));
-              const cAvg = Math.round(cadArray.reduce((a, b) => a + b, 0) / cadArray.length);
-              cadMaxComputed = cMax; cadAvgComputed = cAvg;
-
-              // For run/walk, compute a best-5s average cadence window using stream time
-              const sport = (activityData.sport_type || activityData.type || '').toLowerCase();
-              const isRunWalkStream = sport.includes('run') || sport.includes('walk');
-              if (isRunWalkStream && streams.time && streams.time.length === (streams.cadence as number[]).length) {
-                const times = streams.time as number[]; // seconds
-                const windowSec = 5;
-                let start = 0;
-                let sum = 0;
-                let bestAvg = 0;
-                for (let i = 0; i < cadArray.length; i++) {
-                  sum += cadArray[i];
-                  while (times[i] - times[start] > windowSec && start < i) {
-                    sum -= cadArray[start];
-                    start++;
-                  }
-                  const len = i - start + 1;
-                  if (len > 0) {
-                    const avgWin = sum / len;
-                    if (avgWin > bestAvg) bestAvg = avgWin;
-                  }
-                }
-                // We keep cadMaxComputed as the true peak sample to match Strava UI; best-5s is available if we ever need smoothing
-              }
-              // annotate sensor_data when present
-              if (sensor_data && streams.time && streams.time.length > 0) {
-                const useLen = Math.min(sensor_data.length, streams.cadence.length, streams.time.length);
-                for (let i = 0; i < useLen; i++) {
-                  const cv = streams.cadence[i];
-                  if (Number.isFinite(cv)) {
-                    sensor_data[i].cadence = Math.round(cv as number);
-                  }
-                }
-              }
-            }
-          }
+          console.log(`📊 Fetched streams for activity ${activityData.id}: hr=${streams.heartrate?.length || 0}, cad=${streams.cadence?.length || 0}, watts=${streams.watts?.length || 0}, latlng=${streams.latlng?.length || 0}`);
         }
       }
-    } catch {}
-
-    // Normalize cadence to steps/min for runs/walks
-    const sportLower = (activityData.sport_type || activityData.type || '').toLowerCase();
-    const isRunWalk = sportLower.includes('run') || sportLower.includes('walk');
-    let avgCadNorm = Number.isFinite(activityData.average_cadence) ? Math.round(activityData.average_cadence) : (cadAvgComputed != null ? cadAvgComputed : null);
-    let maxCadNorm = Number.isFinite(activityData.max_cadence) ? Math.round(activityData.max_cadence) : (cadMaxComputed != null ? cadMaxComputed : null);
-    if (isRunWalk) {
-      if (avgCadNorm != null && avgCadNorm < 120) avgCadNorm = avgCadNorm * 2;
-      if (maxCadNorm != null && maxCadNorm < 120) maxCadNorm = maxCadNorm * 2;
+    } catch (e) {
+      console.warn(`⚠️ Could not fetch streams for activity ${activityData.id}:`, e);
     }
 
-    const row: any = {
-      user_id: userId,
-      name: activityData.name || 'Strava Activity',
-      type,
-      date,
-      timestamp,
-      duration,
-      distance: distance_km, // store km to match imports/UI
-      description: `Imported from Strava: ${activityData.name || ''}`.trim(),
-      workout_status: 'completed',
-      completedmanually: false,
-      strava_activity_id: activityData.id,
-      source: 'strava',
-      is_strava_imported: true,
-      start_position_lat: activityData.start_latlng?.[0] ?? null,
-      start_position_long: activityData.start_latlng?.[1] ?? null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      gps_track: gps_track ? JSON.stringify(gps_track) : null,
-      gps_trackpoints: activityData.map?.polyline || activityData.map?.summary_polyline || null,
-      sensor_data: sensor_data ? JSON.stringify(sensor_data) : null,
-      // Parity fields using existing columns
-      moving_time: activityData.moving_time != null ? Math.round(activityData.moving_time / 60) : null,
-      elapsed_time: activityData.elapsed_time != null ? Math.round(activityData.elapsed_time / 60) : null,
-      elevation_gain: Number.isFinite(activityData.total_elevation_gain) ? Math.round(activityData.total_elevation_gain) : null,
-      avg_heart_rate: Number.isFinite(activityData.average_heartrate) ? Math.round(activityData.average_heartrate) : null,
-      max_heart_rate: Number.isFinite(activityData.max_heartrate) ? Math.round(activityData.max_heartrate) : null,
-      avg_cadence: avgCadNorm,
-      max_cadence: maxCadNorm,
-      avg_temperature: Number.isFinite((activityData as any).average_temp) ? Math.round((activityData as any).average_temp) : null,
-      max_temperature: Number.isFinite((activityData as any).max_temp) ? Math.round((activityData as any).max_temp) : null,
-      calories: Number.isFinite(activityData.calories) ? Math.round(activityData.calories) : null,
-      avg_speed: activityData.average_speed != null ? Number((activityData.average_speed * 3.6).toFixed(2)) : null,
-      max_speed: activityData.max_speed != null ? Number((activityData.max_speed * 3.6).toFixed(2)) : null,
-      // pace (sec/km)
-      avg_pace: activityData.average_speed && activityData.average_speed > 0 ? Math.round(1000 / activityData.average_speed) : null,
-      max_pace: activityData.max_speed && activityData.max_speed > 0 ? Math.round(1000 / activityData.max_speed) : null,
-      // power
-      avg_power: Number.isFinite((activityData as any).average_watts) ? Math.round((activityData as any).average_watts) : null,
-      max_power: Number.isFinite((activityData as any).max_watts) ? Math.round((activityData as any).max_watts) : null,
-      normalized_power: Number.isFinite((activityData as any).weighted_average_watts) ? Math.round((activityData as any).weighted_average_watts) : null,
-      provider_sport: activityData.sport_type || activityData.type || null,
+    // Package activity with streams and call ingest-activity
+    const enrichedActivity = {
+      ...activityData,
+      streams: streams || undefined
     };
 
-    // Idempotent write on (user_id, strava_activity_id)
-    const { error } = await supabase
-      .from('workouts')
-      .upsert(row, { onConflict: 'user_id,strava_activity_id' });
-    if (error) console.error(`❌ Upsert workout for Strava activity ${activityData.id} failed:`, error);
-    else console.log(`✅ Upserted workout for Strava activity ${activityData.id}`);
+    const ingestUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ingest-activity`;
+    const ingestPayload = {
+      userId,
+      provider: 'strava',
+      activity: enrichedActivity
+    };
+
+    console.log(`🔄 Calling ingest-activity for Strava activity ${activityData.id}...`);
+    
+    const response = await fetch(ingestUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+      },
+      body: JSON.stringify(ingestPayload)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`❌ ingest-activity failed for Strava activity ${activityData.id}: ${response.status} - ${errText}`);
+    } else {
+      console.log(`✅ ingest-activity succeeded for Strava activity ${activityData.id}`);
+    }
   } catch (error) {
     console.error(`❌ Error in createWorkoutFromStravaActivity:`, error);
   }

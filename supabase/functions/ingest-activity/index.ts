@@ -165,28 +165,138 @@ function mapStravaToWorkout(activity, userId) {
   const distanceKm = activity.distance != null ? Number((activity.distance / 1000).toFixed(3)) : null;
   const sport = (activity.sport_type || activity.type || '').toLowerCase();
   const type = sport.includes('run') ? 'run' : sport.includes('ride') || sport.includes('bike') ? 'ride' : sport.includes('swim') ? 'swim' : sport.includes('walk') || sport.includes('hike') ? 'walk' : 'strength';
+  const isRunWalk = sport.includes('run') || sport.includes('walk');
+
+  // Process embedded streams from strava-webhook/import-strava-history
+  const streams = activity.streams || {};
+  let gps_track: any[] | null = null;
+  let sensor_data: any[] | null = null;
+  let cadAvgComputed: number | null = null;
+  let cadMaxComputed: number | null = null;
+
+  const startEpochSec = Math.floor(new Date(activity.start_date).getTime() / 1000);
+
+  // Build gps_track from latlng/altitude/time streams
+  if (streams.latlng && streams.latlng.length > 0) {
+    const len = streams.latlng.length;
+    const altLen = streams.altitude?.length || 0;
+    const timeLen = streams.time?.length || 0;
+    const useLen = Math.min(len, altLen || len, timeLen || len);
+    gps_track = new Array(useLen).fill(0).map((_, i) => {
+      const [lat, lng] = streams.latlng[i];
+      const elev = streams.altitude && Number.isFinite(streams.altitude[i]) ? streams.altitude[i] : null;
+      const tRel = streams.time && Number.isFinite(streams.time[i]) ? streams.time[i] : i;
+      return { lat, lng, elevation: elev, startTimeInSeconds: startEpochSec + tRel, timestamp: (startEpochSec + tRel) * 1000 };
+    });
+    console.log(`📍 Built gps_track with ${useLen} points for Strava activity ${activity.id}`);
+  }
+
+  // Build sensor_data from heartrate/time streams
+  if (streams.heartrate && streams.time) {
+    const len = Math.min(streams.heartrate.length, streams.time.length);
+    sensor_data = new Array(len).fill(0).map((_, i) => {
+      const t = startEpochSec + streams.time[i];
+      return { heartRate: streams.heartrate[i], startTimeInSeconds: t, timestamp: t * 1000 };
+    });
+    console.log(`💓 Built sensor_data with ${len} HR points for Strava activity ${activity.id}`);
+  }
+
+  // Add cadence to sensor_data
+  if (streams.cadence && streams.cadence.length > 0) {
+    const cadArray = (streams.cadence as number[]).filter((v) => Number.isFinite(v));
+    if (cadArray.length > 0) {
+      cadMaxComputed = Math.round(Math.max(...cadArray));
+      cadAvgComputed = Math.round(cadArray.reduce((a, b) => a + b, 0) / cadArray.length);
+
+      // Create sensor_data if it doesn't exist
+      if (!sensor_data && streams.time && streams.time.length > 0) {
+        const timeLen = streams.time.length;
+        sensor_data = new Array(timeLen).fill(0).map((_, i) => {
+          const t = startEpochSec + streams.time[i];
+          return { startTimeInSeconds: t, timestamp: t * 1000 };
+        });
+      }
+
+      // Attach cadence to sensor_data
+      if (sensor_data && streams.time && streams.time.length > 0) {
+        const useLen = Math.min(sensor_data.length, streams.cadence.length, streams.time.length);
+        for (let i = 0; i < useLen; i++) {
+          const cv = streams.cadence[i];
+          if (Number.isFinite(cv)) {
+            sensor_data[i].cadence = Math.round(cv as number);
+          }
+        }
+        console.log(`🦵 Added cadence to sensor_data: ${useLen} points for Strava activity ${activity.id}`);
+      }
+    }
+  }
+
+  // Add power (watts) to sensor_data
+  if (streams.watts && streams.watts.length > 0) {
+    const wattsArray = (streams.watts as number[]).filter((v) => Number.isFinite(v) && v >= 0);
+    if (wattsArray.length > 0) {
+      // Create sensor_data if it doesn't exist
+      if (!sensor_data && streams.time && streams.time.length > 0) {
+        const timeLen = streams.time.length;
+        sensor_data = new Array(timeLen).fill(0).map((_, i) => {
+          const t = startEpochSec + streams.time[i];
+          return { startTimeInSeconds: t, timestamp: t * 1000 };
+        });
+      }
+
+      // Attach power to sensor_data
+      if (sensor_data && streams.time && streams.time.length > 0) {
+        const useLen = Math.min(sensor_data.length, streams.watts.length);
+        for (let i = 0; i < useLen; i++) {
+          const w = streams.watts[i];
+          if (Number.isFinite(w) && w >= 0) {
+            sensor_data[i].power = Math.round(w);
+            sensor_data[i].watts = Math.round(w); // Alias for compatibility
+          }
+        }
+        console.log(`⚡ Added power to sensor_data: ${useLen} points for Strava activity ${activity.id}`);
+      }
+    }
+  }
+
+  // Normalize cadence for runs/walks (Strava reports half-cadence)
+  let avgCadNorm = Number.isFinite(activity.average_cadence) ? Math.round(activity.average_cadence) : cadAvgComputed;
+  let maxCadNorm = Number.isFinite(activity.max_cadence) ? Math.round(activity.max_cadence) : cadMaxComputed;
+  if (isRunWalk) {
+    if (avgCadNorm != null && avgCadNorm < 120) avgCadNorm = avgCadNorm * 2;
+    if (maxCadNorm != null && maxCadNorm < 120) maxCadNorm = maxCadNorm * 2;
+  }
+
+  // Build activity object with sensor_data for computeComputedFromActivity
+  const activityWithSensors = {
+    ...activity,
+    sensor_data: sensor_data ? { samples: sensor_data } : null
+  };
+
   // Attempt to compute summary (GAP, cadence) if samples are present
   let computedSummary = null;
   try {
-    computedSummary = computeComputedFromActivity(activity);
-  } catch  {}
+    computedSummary = computeComputedFromActivity(activityWithSensors);
+  } catch {}
   const computedJsonObj = computedSummary || null;
-  const derivedAvgCadence = (()=>{
+
+  const derivedAvgCadence = (() => {
     try {
       const v = computedSummary?.overall?.avg_cadence_spm;
       return Number.isFinite(v) ? Math.round(v) : null;
-    } catch  {
+    } catch {
       return null;
     }
   })();
-  const derivedMaxCadence = (()=>{
+  const derivedMaxCadence = (() => {
     try {
       const v = computedSummary?.overall?.max_cadence_spm;
       return Number.isFinite(v) ? Math.round(v) : null;
-    } catch  {
+    } catch {
       return null;
     }
   })();
+
   return {
     user_id: userId,
     name: activity.name || 'Strava Activity',
@@ -220,18 +330,26 @@ function mapStravaToWorkout(activity, userId) {
     // Location
     start_position_lat: Array.isArray(activity.start_latlng) ? activity.start_latlng[0] ?? null : null,
     start_position_long: Array.isArray(activity.start_latlng) ? activity.start_latlng[1] ?? null : null,
-    // Optional JSON fields if provided by caller (e.g., enriched client or webhook)
-    gps_track: activity.gps_track ?? null,
-    sensor_data: activity.sensor_data ?? null,
+    // GPS track built from streams or pre-provided
+    gps_track: gps_track ? JSON.stringify(gps_track) : (activity.gps_track ?? null),
+    // Sensor data built from streams or pre-provided
+    sensor_data: sensor_data ? JSON.stringify({ samples: sensor_data }) : (activity.sensor_data ?? null),
     swim_data: activity.swim_data ?? null,
     laps: activity.laps ?? null,
     // Polyline if available
     gps_trackpoints: activity.map?.polyline || activity.map?.summary_polyline || null,
-    // Cadence rollups (prefer Strava fields, else derived)
-    avg_cadence: Number.isFinite(activity.average_cadence) ? Math.round(activity.average_cadence) : derivedAvgCadence,
-    max_cadence: Number.isFinite(activity.max_cadence) ? Math.round(activity.max_cadence) : derivedMaxCadence,
+    // Cadence rollups (prefer normalized, then Strava fields, then derived from compute)
+    avg_cadence: avgCadNorm ?? derivedAvgCadence,
+    max_cadence: maxCadNorm ?? derivedMaxCadence,
+    // Power from Strava summary
+    avg_power: Number.isFinite(activity.average_watts) ? Math.round(activity.average_watts) : null,
+    max_power: Number.isFinite(activity.max_watts) ? Math.round(activity.max_watts) : null,
+    normalized_power: Number.isFinite(activity.weighted_average_watts) ? Math.round(activity.weighted_average_watts) : null,
+    // Temperature
+    avg_temperature: Number.isFinite(activity.average_temp) ? Math.round(activity.average_temp) : null,
+    max_temperature: Number.isFinite(activity.max_temp) ? Math.round(activity.max_temp) : null,
     // Server-computed summary for UI (includes GAP/cadence when available)
-    computed: computedJsonObj,
+    computed: computedJsonObj ? JSON.stringify(computedJsonObj) : null,
     normalization_version: 'v1',
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString()
