@@ -768,10 +768,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   return (
                     <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap">
                       <span className="text-gray-400 text-sm">via</span>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#007CC3" className="flex-shrink-0">
-                        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.824a9.176 9.176 0 110 18.352 9.176 9.176 0 010-18.352zm0 1.412A7.765 7.765 0 004.236 12 7.765 7.765 0 0012 19.764 7.765 7.765 0 0019.764 12 7.765 7.765 0 0012 4.236zm3.07 2.471l-4.235 3.53v4.942h2.118v-3.883l3.177-2.647-1.06-1.942z"/>
+                      {/* Garmin delta triangle - per brand guidelines */}
+                      <svg width="10" height="12" viewBox="0 0 10 12" className="flex-shrink-0">
+                        <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
                       </svg>
-                      <span className="text-[#007CC3] font-semibold text-sm">Garmin</span>
+                      <span className="text-gray-800 font-semibold text-sm">Garmin Connect</span>
                       {garminUrl && (
                         <>
                           <span className="text-gray-300 mx-0.5">•</span>
