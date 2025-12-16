@@ -861,6 +861,22 @@ function EffortsViewerMapbox({
   
   // Segment click state
   const [selectedSegment, setSelectedSegment] = useState<SegmentEffort | null>(null);
+  
+  // Memoize segments to prevent re-renders from clearing them
+  const memoizedSegments = useMemo(() => {
+    try {
+      const ach = workoutData?.achievements;
+      if (!ach) return undefined;
+      const parsed = typeof ach === 'string' ? JSON.parse(ach) : ach;
+      return parsed?.segment_efforts as SegmentEffort[] | undefined;
+    } catch { return undefined; }
+  }, [workoutData?.achievements]);
+  
+  // Memoize raw track to prevent unnecessary re-renders
+  const memoizedRawTrack = useMemo(() => {
+    return Array.isArray(trackLngLat) && trackLngLat.length > 1 ? trackLngLat : undefined;
+  }, [trackLngLat]);
+  
   useEffect(() => { try { window.localStorage.setItem('map_theme', theme); } catch {} }, [theme]);
 
   // Weather data
@@ -1685,20 +1701,13 @@ function EffortsViewerMapbox({
         currentDistance={currentDistanceFormatted}
         onScrub={handleScrub}
         
-        // Strava segments
-        segments={(() => {
-          try {
-            const ach = workoutData?.achievements;
-            if (!ach) return undefined;
-            const parsed = typeof ach === 'string' ? JSON.parse(ach) : ach;
-            return parsed?.segment_efforts;
-          } catch { return undefined; }
-        })()}
+        // Strava segments (memoized to prevent re-renders from clearing)
+        segments={memoizedSegments}
         onSegmentClick={(segment) => {
           setSelectedSegment(segment);
         }}
-        // Pass raw (unsimplified) track for segment index lookups
-        rawTrackLngLat={Array.isArray(trackLngLat) ? trackLngLat : undefined}
+        // Pass raw (unsimplified) track for segment index lookups (memoized)
+        rawTrackLngLat={memoizedRawTrack}
       />
       
       {/* Segment info popup */}

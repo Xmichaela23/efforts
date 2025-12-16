@@ -460,6 +460,9 @@ export default function MapEffort({
     }
   }, [coords, ready, theme]);
 
+  // Track if segments have been successfully drawn (to prevent clearing on transient state)
+  const segmentsDrawnRef = useRef(false);
+  
   // Update segment overlays when segments prop changes
   useEffect(() => {
     const map = mapRef.current;
@@ -472,9 +475,13 @@ export default function MapEffort({
     // Strava's start_index/end_index refer to the original GPS track, not simplified
     const rawTrack = rawTrackLngLat && rawTrackLngLat.length > 1 ? rawTrackLngLat : null;
     
+    // Don't clear if we previously drew segments and data is just temporarily unavailable
     if (!rawTrack || !segments || segments.length === 0) {
-      // Clear segments if no data
-      segmentsSrc.setData({ type: 'FeatureCollection', features: [] });
+      // Only clear if we explicitly have no segments (not just undefined during re-render)
+      if (segments && segments.length === 0) {
+        segmentsSrc.setData({ type: 'FeatureCollection', features: [] });
+        segmentsDrawnRef.current = false;
+      }
       return;
     }
     
@@ -506,9 +513,9 @@ export default function MapEffort({
       })
       .filter((f) => f.geometry.coordinates.length >= 2); // Must have at least 2 points
     
-    segmentsSrc.setData({ type: 'FeatureCollection', features });
-    
     if (features.length > 0) {
+      segmentsSrc.setData({ type: 'FeatureCollection', features });
+      segmentsDrawnRef.current = true;
       console.log(`[MapEffort] Drew ${features.length} segments on map (using raw track with ${rawTrack.length} points)`);
     }
   }, [rawTrackLngLat, ready, segments]);
