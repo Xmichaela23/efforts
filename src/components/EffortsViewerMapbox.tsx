@@ -2,7 +2,7 @@
 // Drop-in, responsive, scrub-synced charts + MapLibre mini-map with "all-metrics" InfoCard.
 
 import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
-import MapEffort from "./MapEffort";
+import MapEffort, { SegmentEffort } from "./MapEffort";
 import WeatherDisplay from "./WeatherDisplay";
 import { useWeather } from "../hooks/useWeather";
 import { formatSpeed } from "../utils/workoutFormatting";
@@ -858,6 +858,9 @@ function EffortsViewerMapbox({
       return (v === 'hybrid' || v === 'outdoor' || v === 'topo') ? (v as any) : 'topo';
     } catch { return 'topo'; }
   });
+  
+  // Segment click state
+  const [selectedSegment, setSelectedSegment] = useState<SegmentEffort | null>(null);
   useEffect(() => { try { window.localStorage.setItem('map_theme', theme); } catch {} }, [theme]);
 
   // Weather data
@@ -1681,7 +1684,94 @@ function EffortsViewerMapbox({
         currentGrade={currentGrade}
         currentDistance={currentDistanceFormatted}
         onScrub={handleScrub}
+        
+        // Strava segments
+        segments={(() => {
+          try {
+            const ach = workoutData?.achievements;
+            if (!ach) return undefined;
+            const parsed = typeof ach === 'string' ? JSON.parse(ach) : ach;
+            return parsed?.segment_efforts;
+          } catch { return undefined; }
+        })()}
+        onSegmentClick={(segment) => {
+          setSelectedSegment(segment);
+        }}
       />
+      
+      {/* Segment info popup */}
+      {selectedSegment && (
+        <div 
+          style={{
+            position: 'relative',
+            margin: '8px 6px',
+            padding: '12px 16px',
+            background: selectedSegment.pr_rank === 1 ? '#fef3c7' : '#fff7ed',
+            border: `1px solid ${selectedSegment.pr_rank === 1 ? '#fbbf24' : '#f97316'}`,
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              {selectedSegment.pr_rank === 1 && (
+                <span style={{ 
+                  background: '#fbbf24', 
+                  color: '#78350f', 
+                  fontSize: 10, 
+                  fontWeight: 700, 
+                  padding: '2px 6px', 
+                  borderRadius: 4,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  PR
+                </span>
+              )}
+              <span style={{ fontWeight: 600, color: '#1f2937', fontSize: 14 }}>
+                {selectedSegment.name}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#6b7280' }}>
+              {selectedSegment.elapsed_time && (
+                <span>
+                  {Math.floor(selectedSegment.elapsed_time / 60)}:{String(selectedSegment.elapsed_time % 60).padStart(2, '0')}
+                </span>
+              )}
+              {selectedSegment.distance && (
+                <span>
+                  {useMiles 
+                    ? `${(selectedSegment.distance / 1609.34).toFixed(2)} mi`
+                    : `${(selectedSegment.distance / 1000).toFixed(2)} km`
+                  }
+                </span>
+              )}
+              {selectedSegment.kom_rank && selectedSegment.kom_rank <= 10 && (
+                <span style={{ color: '#059669', fontWeight: 500 }}>
+                  #{selectedSegment.kom_rank} overall
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setSelectedSegment(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: 18,
+              color: '#9ca3af',
+              cursor: 'pointer',
+              padding: 4,
+              lineHeight: 1
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>

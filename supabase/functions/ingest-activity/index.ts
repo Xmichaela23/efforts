@@ -409,7 +409,10 @@ function mapStravaToWorkout(activity, userId) {
           kom_rank: e.kom_rank,
           achievements: e.achievements,
           average_watts: e.average_watts,
-          average_heartrate: e.average_heartrate
+          average_heartrate: e.average_heartrate,
+          // GPS track indices for map visualization
+          start_index: e.start_index,
+          end_index: e.end_index
         }));
       }
       

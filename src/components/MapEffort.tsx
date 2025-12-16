@@ -4,6 +4,18 @@ import maplibregl from 'maplibre-gl';
 import { cumulativeMeters, pointAtDistance, sanitizeLngLat, type LngLat } from '../lib/geo';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
+// Segment effort type for Strava segments
+export type SegmentEffort = {
+  name: string;
+  distance?: number;
+  elapsed_time?: number;
+  moving_time?: number;
+  pr_rank?: number | null;
+  kom_rank?: number | null;
+  start_index?: number;
+  end_index?: number;
+};
+
 export type MapEffortProps = {
   trackLngLat: [number, number][];
   cursorDist_m: number;
@@ -27,6 +39,9 @@ export type MapEffortProps = {
   currentGrade?: string;
   currentDistance?: string;
   onScrub?: (distance_m: number) => void;
+  // Strava segments
+  segments?: SegmentEffort[];
+  onSegmentClick?: (segment: SegmentEffort) => void;
 };
 
 // Layer IDs
@@ -40,6 +55,12 @@ const ROUTE_LINE = 'route-line';
 const ROUTE_HALO = 'route-halo';
 const CURSOR_HALO = 'cursor-halo';
 const CURSOR_PT = 'cursor-pt';
+// Segment layer IDs
+const SEGMENTS_SRC = 'segments-source';
+const SEGMENT_LINE = 'segment-line';
+const SEGMENT_PR_LINE = 'segment-pr-line';
+const SEGMENT_START_MARKER = 'segment-start-marker';
+const SEGMENT_END_MARKER = 'segment-end-marker';
 
 function styleUrl(theme: 'outdoor' | 'hybrid' | 'topo') {
   const key = import.meta.env.VITE_MAPTILER_KEY as string | undefined;
@@ -75,6 +96,9 @@ export default function MapEffort({
   currentGrade,
   currentDistance,
   onScrub,
+  // Strava segments
+  segments,
+  onSegmentClick,
 }: MapEffortProps) {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const divRef = useRef<HTMLDivElement>(null);
@@ -298,6 +322,47 @@ export default function MapEffort({
         });
       }
       
+      // SEGMENT LAYERS (Strava segments)
+      // Source for all segments (GeoJSON FeatureCollection)
+      if (!map.getSource(SEGMENTS_SRC)) {
+        map.addSource(SEGMENTS_SRC, {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+      }
+      
+      // Segment line - Orange/gold for regular segments
+      if (!map.getLayer(SEGMENT_LINE)) {
+        map.addLayer({
+          id: SEGMENT_LINE,
+          type: 'line',
+          source: SEGMENTS_SRC,
+          filter: ['!=', ['get', 'isPR'], true],
+          paint: {
+            'line-color': '#f97316',  // Orange
+            'line-width': 5,
+            'line-opacity': 0.85
+          },
+          layout: { 'line-cap': 'round', 'line-join': 'round' }
+        });
+      }
+      
+      // PR segment line - Gold/amber with glow for PRs
+      if (!map.getLayer(SEGMENT_PR_LINE)) {
+        map.addLayer({
+          id: SEGMENT_PR_LINE,
+          type: 'line',
+          source: SEGMENTS_SRC,
+          filter: ['==', ['get', 'isPR'], true],
+          paint: {
+            'line-color': '#fbbf24',  // Amber/gold for PRs
+            'line-width': 6,
+            'line-opacity': 1
+          },
+          layout: { 'line-cap': 'round', 'line-join': 'round' }
+        });
+      }
+      
       layersAttachedRef.current = true;
     };
     // Expose a safe reattach for later effects
@@ -391,6 +456,91 @@ export default function MapEffort({
       });
     }
   }, [coords, ready, theme]);
+
+  // Update segment overlays when segments prop changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    
+    const segmentsSrc = map.getSource(SEGMENTS_SRC) as maplibregl.GeoJSONSource | undefined;
+    if (!segmentsSrc) return;
+    
+    // Build GeoJSON features for each segment
+    const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
+    if (valid.length < 2 || !segments || segments.length === 0) {
+      // Clear segments if no data
+      segmentsSrc.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+    
+    const features = segments
+      .filter((seg) => 
+        typeof seg.start_index === 'number' && 
+        typeof seg.end_index === 'number' &&
+        seg.start_index >= 0 &&
+        seg.end_index <= valid.length
+      )
+      .map((seg) => {
+        // Extract the segment portion of the route
+        const segmentCoords = valid.slice(seg.start_index!, seg.end_index! + 1);
+        return {
+          type: 'Feature' as const,
+          properties: {
+            name: seg.name,
+            distance: seg.distance,
+            elapsed_time: seg.elapsed_time,
+            pr_rank: seg.pr_rank,
+            kom_rank: seg.kom_rank,
+            isPR: seg.pr_rank === 1
+          },
+          geometry: {
+            type: 'LineString' as const,
+            coordinates: segmentCoords
+          }
+        };
+      });
+    
+    segmentsSrc.setData({ type: 'FeatureCollection', features });
+    
+    if (features.length > 0) {
+      console.log(`[MapEffort] Drew ${features.length} segments on map`);
+    }
+  }, [coords, ready, segments]);
+
+  // Handle segment click events
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !onSegmentClick || !segments || segments.length === 0) return;
+    
+    const handleSegmentClick = (e: maplibregl.MapMouseEvent) => {
+      const features = map.queryRenderedFeatures(e.point, { 
+        layers: [SEGMENT_LINE, SEGMENT_PR_LINE] 
+      });
+      if (features.length > 0) {
+        const props = features[0].properties;
+        // Find matching segment
+        const clickedSegment = segments.find((s) => s.name === props?.name);
+        if (clickedSegment) {
+          onSegmentClick(clickedSegment);
+        }
+      }
+    };
+    
+    // Add click handlers for both segment layers
+    map.on('click', SEGMENT_LINE, handleSegmentClick);
+    map.on('click', SEGMENT_PR_LINE, handleSegmentClick);
+    
+    // Change cursor on hover
+    map.on('mouseenter', SEGMENT_LINE, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', SEGMENT_LINE, () => { map.getCanvas().style.cursor = ''; });
+    map.on('mouseenter', SEGMENT_PR_LINE, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', SEGMENT_PR_LINE, () => { map.getCanvas().style.cursor = ''; });
+    
+    return () => {
+      map.off('click', SEGMENT_LINE, handleSegmentClick);
+      map.off('click', SEGMENT_PR_LINE, handleSegmentClick);
+    };
+  }, [ready, segments, onSegmentClick]);
 
   // Handle zoom when expanding/collapsing (Strava-style)
   useEffect(() => {
