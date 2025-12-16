@@ -735,15 +735,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
                 if (source === 'strava' || stravaId || isStravaImported) {
                   const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
-                  // Get PR count from achievements
-                  const achievements = (() => {
-                    try {
-                      const ach = (workout as any)?.achievements;
-                      if (typeof ach === 'string') return JSON.parse(ach);
-                      return ach;
-                    } catch { return null; }
-                  })();
-                  const prCount = achievements?.pr_count || 0;
                   
                   return (
                     <div className="flex items-center gap-1.5">
@@ -760,11 +751,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         </svg>
                         <span className="text-[#FC4C02] font-semibold text-base">Strava</span>
                       </a>
-                      {prCount > 0 && (
-                        <span className="ml-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
-                          {prCount} PR{prCount > 1 ? 's' : ''}
-                        </span>
-                      )}
                     </div>
                   );
                 }

@@ -1635,14 +1635,32 @@ function EffortsViewerMapbox({
     <div style={{ maxWidth: 780, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
       {/* Map header with weather, source, and theme toggle */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 6px 6px 6px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <WeatherDisplay 
             weather={weather}
             loading={weatherLoading}
             fallbackTemperature={workoutData?.avg_temperature ? Number(workoutData.avg_temperature) : undefined}
           />
+          {/* PR count badge */}
+          {(() => {
+            const prCount = memoizedSegments?.filter(s => s.pr_rank === 1).length || 0;
+            if (prCount === 0) return null;
+            return (
+              <span style={{ 
+                background: '#fef3c7', 
+                color: '#92400e', 
+                fontSize: 12, 
+                fontWeight: 600, 
+                padding: '2px 8px', 
+                borderRadius: 12,
+                whiteSpace: 'nowrap'
+              }}>
+                {prCount} PR{prCount > 1 ? 's' : ''}
+              </span>
+            );
+          })()}
           {memoizedSegments && memoizedSegments.length > 0 && (
-            <span style={{ color: '#94a3b8', fontSize: 12, fontStyle: 'italic' }}>
+            <span style={{ color: '#94a3b8', fontSize: 11, fontStyle: 'italic' }}>
               Tap colored sections to see performance
             </span>
           )}
