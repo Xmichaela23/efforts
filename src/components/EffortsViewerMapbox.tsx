@@ -1627,6 +1627,7 @@ function EffortsViewerMapbox({
             const source = workoutData?.source;
             const stravaId = workoutData?.strava_activity_id;
             const garminId = workoutData?.garmin_activity_id;
+            const isStravaImported = workoutData?.is_strava_imported;
             const deviceInfo = (() => {
               try {
                 const di = workoutData?.device_info || workoutData?.deviceInfo;
@@ -1636,7 +1637,7 @@ function EffortsViewerMapbox({
             })();
             const deviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
             
-            if (source === 'strava' || stravaId) {
+            if (source === 'strava' || stravaId || isStravaImported) {
               const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
               return (
                 <a 

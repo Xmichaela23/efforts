@@ -223,6 +223,8 @@ export const useWorkouts = () => {
           'strength_exercises','mobility_exercises',
           // workload data
           'workload_planned','workload_actual','intensity_factor',
+          // source tracking for display
+          'source','is_strava_imported','strava_activity_id','garmin_activity_id','device_info',
           'created_at','updated_at'
         ].join(','))
         .eq("user_id", user.id)
@@ -774,6 +776,10 @@ export const useWorkouts = () => {
         garmin_activity_id: w.garmin_activity_id,
         // Strava-specific link if present from webhook-imported workouts
         strava_activity_id: w.strava_activity_id,
+        // Source tracking for display
+        source: w.source,
+        is_strava_imported: w.is_strava_imported,
+        device_info: w.device_info,
         // Ensure JSON fields are parsed for downstream calculations (e.g., max cadence from samples)
         gps_track: (() => {
           try {
