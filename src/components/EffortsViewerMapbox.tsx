@@ -1112,13 +1112,45 @@ function EffortsViewerMapbox({
       // TODO: MIGRATION CODE - Remove cadSeries fallback after backfill
       const cad = hasDataInSamples ? cadFromSamples : (cadSeries && cadSeries.length ? cadSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN));
       
-      // Remove impossible cadence outliers (< 40 or > 220 for cycling, reasonable range for running)
-      const clamped = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
+      // Mark coasting/invalid values as NaN (cadence < 40 or > 220)
+      const validOnly = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
       
-      // Apply consistent smoothing with other metrics (power uses 15-25, HR uses 7)
-      const wins = winsorize(clamped as number[], 5, 95);
-      const smoothingWindow = isOutdoorGlobal ? 15 : 20;
-      const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.5);
+      // Interpolate through coasting gaps to create smooth transitions
+      // This avoids the sharp V-shaped dips when pedaling stops/starts
+      const interpolated: number[] = new Array(validOnly.length).fill(NaN);
+      let lastValid: number | null = null;
+      let lastValidIdx = -1;
+      
+      for (let i = 0; i < validOnly.length; i++) {
+        const v = validOnly[i];
+        if (Number.isFinite(v)) {
+          // Fill gap from last valid to here with linear interpolation
+          if (lastValid !== null && lastValidIdx >= 0 && i - lastValidIdx > 1) {
+            const gap = i - lastValidIdx;
+            for (let j = lastValidIdx + 1; j < i; j++) {
+              const t = (j - lastValidIdx) / gap;
+              interpolated[j] = lastValid + t * (v - lastValid);
+            }
+          }
+          interpolated[i] = v;
+          lastValid = v;
+          lastValidIdx = i;
+        }
+      }
+      
+      // Fill any remaining NaNs at start/end with nearest valid
+      const firstValid = interpolated.find(v => Number.isFinite(v));
+      const lastValidVal = [...interpolated].reverse().find(v => Number.isFinite(v));
+      for (let i = 0; i < interpolated.length; i++) {
+        if (!Number.isFinite(interpolated[i])) {
+          interpolated[i] = i < lastValidIdx ? (firstValid ?? 80) : (lastValidVal ?? 80);
+        }
+      }
+      
+      // Now apply heavy smoothing - cadence needs more than power due to natural variation
+      const wins = winsorize(interpolated, 5, 95);
+      const smoothingWindow = isOutdoorGlobal ? 35 : 40;
+      const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.0);
       return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Power (prefer normalizedSamples, fallback to pwrSeries for historical workouts)
