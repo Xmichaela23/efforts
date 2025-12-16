@@ -773,6 +773,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
                       </svg>
                       <span className="text-gray-800 font-semibold text-sm">Garmin Connect</span>
+                      {deviceName && <span className="text-gray-400 text-sm">({deviceName})</span>}
                       {garminUrl && (
                         <>
                           <span className="text-gray-300 mx-0.5">•</span>
