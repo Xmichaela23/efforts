@@ -731,7 +731,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     return di;
                   } catch { return null; }
                 })();
-                const deviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
+                const rawDeviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
+                // Remove "Garmin " prefix to save space (already showing "Garmin Connect")
+                const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
 
                 if (source === 'strava' || stravaId || isStravaImported) {
                   const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
