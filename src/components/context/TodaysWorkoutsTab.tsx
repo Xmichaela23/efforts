@@ -900,10 +900,11 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                             
                             if (isStrava) {
                               return (
-                                <span className="flex items-center gap-1">
-                                  <span>Powered by</span>
-                                  <span className="text-[#FC5200] font-medium">Strava</span>
-                                </span>
+                                <img 
+                                  src="/icons/strava-powered-by.svg" 
+                                  alt="Powered by Strava" 
+                                  className="h-2.5"
+                                />
                               );
                             }
                             if (isGarmin) {
