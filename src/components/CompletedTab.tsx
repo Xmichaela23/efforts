@@ -1419,21 +1419,6 @@ const formatMovingTime = () => {
         return null;
       })()}
       {/* (Removed old mini zones histograms to avoid duplicate zones under splits) */}
-      {((hydrated||workoutData)?.computed?.analysis?.bests) && (
-        <div className="mx-[-16px] px-3 py-2 space-y-1">
-          <div className="text-sm mb-1">Bests</div>
-          {Array.isArray((hydrated||workoutData).computed.analysis.bests?.pace_s_per_km) && (hydrated||workoutData).computed.analysis.bests.pace_s_per_km.length > 0 && (
-            <div className="text-sm">
-              {(hydrated||workoutData).computed.analysis.bests.pace_s_per_km.map((b:any, i:number) => (
-                <div key={`bp-${i}`} className="flex items-baseline justify-between">
-                  <div className="text-[#666666]">{b.duration_s/60} min</div>
-                  <div className="font-mono">{`${Math.floor(b.value/60)}:${String(Math.round(b.value%60)).padStart(2,'0')}/km`}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
       {/* Single page-level attribution for map tiles */}
       <div className="mx-[-16px] px-3 pt-2 pb-6">
         <small style={{ display: 'block', fontSize: 10, color: '#9aa6b2' }}>
