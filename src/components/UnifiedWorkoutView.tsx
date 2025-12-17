@@ -744,7 +744,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       <img 
                         src="/icons/strava-powered-by.svg" 
                         alt="Powered by Strava" 
-                        className="h-4"
+                        className="h-3"
                       />
                       {stravaUrl && (
                         <>
