@@ -960,18 +960,21 @@ const Connections: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Last Sync:</span>
-                    <span className="flex items-center space-x-1">
-                      <Clock className="h-3 w-3" />
-                      <span>
-                        {connection.lastSync 
-                          ? new Date(connection.lastSync).toLocaleDateString()
-                          : 'Never'
-                        }
+                  {/* Last Sync - only show for Strava */}
+                  {connection.provider === 'strava' && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Last Import:</span>
+                      <span className="flex items-center space-x-1">
+                        <Clock className="h-3 w-3" />
+                        <span>
+                          {connection.lastSync 
+                            ? new Date(connection.lastSync).toLocaleDateString()
+                            : 'Never'
+                          }
+                        </span>
                       </span>
-                    </span>
-                  </div>
+                    </div>
+                  )}
 
 
                   {/* Strava Date Range Picker */}
