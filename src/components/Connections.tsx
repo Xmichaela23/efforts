@@ -1244,6 +1244,19 @@ const Connections: React.FC = () => {
           Historical import is for bringing in your past activities. This may take a few minutes.
         </p>
       </div>
+
+      <div className="text-center text-xs text-gray-400 mt-4">
+        <p>
+          If you want to delete your Strava or Garmin data from the app,{' '}
+          <a 
+            href="mailto:support@efforts.work?subject=Data%20Deletion%20Request&body=Please%20delete%20my%20Strava%2FGarmin%20activity%20data%20from%20efforts."
+            className="underline hover:text-gray-600"
+          >
+            email support@efforts.work
+          </a>
+          {' '}and request data deletion.
+        </p>
+      </div>
         </div>
       </main>
     </div>
