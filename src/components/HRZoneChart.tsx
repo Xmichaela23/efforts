@@ -234,7 +234,7 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg">
+        <CardTitle className="font-semibold text-lg">
           {title}
         </CardTitle>
       </CardHeader>
@@ -242,15 +242,15 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <div className="text-lg font-semibold">{fmtTime(totalTime)}</div>
+            <div className="font-semibold text-lg">{fmtTime(totalTime)}</div>
             <div className="text-xs text-muted-foreground">Duration</div>
           </div>
           <div>
-            <div className="text-lg font-semibold">{Math.round(avgHr)}</div>
+            <div className="font-semibold text-lg">{Math.round(avgHr)}</div>
             <div className="text-xs text-muted-foreground">Avg HR</div>
           </div>
           <div>
-            <div className="text-lg font-semibold">{Math.round(maxHr)}</div>
+            <div className="font-semibold text-lg">{Math.round(maxHr)}</div>
             <div className="text-xs text-muted-foreground">Max HR</div>
           </div>
         </div>
