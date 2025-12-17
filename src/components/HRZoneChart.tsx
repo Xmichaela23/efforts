@@ -259,23 +259,23 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
 
         {/* Zone Table */}
         <div>
-          <h3 className="text-sm font-medium mb-3">Zone Details</h3>
-          <div className="space-y-2">
+          <h3 className="text-xs font-medium mb-2 text-muted-foreground">Zone Details</h3>
+          <div className="space-y-1">
             {zoneData.filter(z => z.duration > 0).map((zone) => (
-              <div key={zone.zone} className="flex items-center justify-between p-3 rounded-lg border">
-                <div className="flex items-center gap-3">
+              <div key={zone.zone} className="flex items-center justify-between p-2 rounded-lg border">
+                <div className="flex items-center gap-2">
                   <div 
-                    className="w-4 h-4 rounded-full" 
+                    className="w-3 h-3 rounded-full" 
                     style={{ backgroundColor: zone.color }}
                   />
-                  <span className="font-medium">{zone.zone}</span>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm font-medium">{zone.zone}</span>
+                  <span className="text-xs text-muted-foreground">
                     {zoneDefs[(zone as any).zoneIndex]?.min}-{zoneDefs[(zone as any).zoneIndex]?.max} bpm
                   </span>
                 </div>
                 <div className="text-right">
-                  <div className="font-medium">{fmtTime(zone.duration)}</div>
-                  <div className="text-sm text-muted-foreground">{pctFmt(zone.percentage)}</div>
+                  <div className="text-sm font-medium">{fmtTime(zone.duration)}</div>
+                  <div className="text-xs text-muted-foreground">{pctFmt(zone.percentage)}</div>
                 </div>
               </div>
             ))}
