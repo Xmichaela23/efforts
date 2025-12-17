@@ -872,7 +872,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               })()}
             </p>
           </div>
-        </div>
         {assocOpen && (
           <AssociatePlannedDialog
             workout={workout}
@@ -880,14 +879,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             onClose={()=>setAssocOpen(false)}
             onAssociated={async(pid)=>{ 
               setAssocOpen(false);
-              // Just dispatch invalidation - AppLayout and useEffects will handle the rest
               try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
               try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
               try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
             }}
           />
         )}
-        {/* Close X removed per product decision; back handled by native nav */}
       </div>
 
       {/* Tabs */}
