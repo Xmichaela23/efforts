@@ -1131,26 +1131,33 @@ const Connections: React.FC = () => {
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <Button
-                    onClick={() => {
-                      if (connection.provider === 'strava') {
-                        connectStrava();
-                      } else if (connection.provider === 'garmin') {
-                        connectGarmin();
-                      }
-                    }}
-                    disabled={loading}
-                    className={`w-full ${
-                      connection.provider === 'garmin' 
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                        : connection.provider === 'strava'
-                        ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                        : ''
-                    }`}
-                  >
-                    <Link2 className="h-4 w-4 mr-2" />
-                    Connect {getProviderName(connection.provider)}
-                  </Button>
+                  {connection.provider === 'strava' ? (
+                    /* Official Strava "Connect with Strava" button per brand guidelines */
+                    <button
+                      onClick={connectStrava}
+                      disabled={loading}
+                      className="inline-block hover:opacity-90 transition-opacity disabled:opacity-50"
+                    >
+                      <img 
+                        src="/icons/strava-connect.svg" 
+                        alt="Connect with Strava" 
+                        className="h-12"
+                      />
+                    </button>
+                  ) : (
+                    <Button
+                      onClick={() => {
+                        if (connection.provider === 'garmin') {
+                          connectGarmin();
+                        }
+                      }}
+                      disabled={loading}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Link2 className="h-4 w-4 mr-2" />
+                      Connect {getProviderName(connection.provider)}
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>

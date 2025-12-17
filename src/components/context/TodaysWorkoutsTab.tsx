@@ -888,9 +888,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                         <div className="text-sm text-gray-500">
                           Analysis Complete
                         </div>
-                        {/* Data source attribution */}
+                        {/* Data source attribution - per Strava brand guidelines */}
                         <div className="text-xs text-gray-400 mt-0.5 flex items-center justify-end gap-1">
-                          <span>data via</span>
                           {(() => {
                             const source = workout?.source;
                             const isStravaImported = workout?.is_strava_imported;
@@ -901,27 +900,26 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                             
                             if (isStrava) {
                               return (
-                                <span className="flex items-center gap-0.5">
-                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="#FC4C02">
-                                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066l-2.084 4.116zM7.878 14.794l2.835 5.594h4.17L7.878 6.149l-6.994 14.239h4.169l2.825-5.594z"/>
-                                  </svg>
-                                  <span className="text-[#FC4C02]">strava</span>
+                                <span className="flex items-center gap-1">
+                                  <span>Powered by</span>
+                                  <span className="text-[#FC5200] font-medium">Strava</span>
                                 </span>
                               );
                             }
                             if (isGarmin) {
                               return (
                                 <span className="flex items-center gap-0.5">
+                                  <span>via</span>
                                   <svg width="8" height="10" viewBox="0 0 10 12">
                                     <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
                                   </svg>
-                                  <span className="text-[#007CC3]">garmin</span>
+                                  <span className="text-[#007CC3]">Garmin</span>
                                 </span>
                               );
                             }
-                            return <span>device</span>;
+                            return <span>via device</span>;
                           })()}
-                          <span>, analysis by efforts</span>
+                          <span>• analysis by efforts</span>
                         </div>
                       </div>
                     </div>
