@@ -7,7 +7,6 @@ import { Separator } from './ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { 
   Activity, 
-  RefreshCw, 
   Clock,
   Zap,
   Settings,
@@ -1085,16 +1084,6 @@ const Connections: React.FC = () => {
                       </Button>
                     )}
 
-                    {/* Refresh button */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadConnectionStatus()}
-                      disabled={loading}
-                    >
-                      <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    </Button>
-
                     {/* Disconnect button */}
                     <Button
                       variant="outline"
@@ -1109,7 +1098,8 @@ const Connections: React.FC = () => {
                       disabled={loading}
                       className="text-gray-500 hover:text-red-600 hover:border-red-300"
                     >
-                      <Unlink className="h-4 w-4" />
+                      <Unlink className="h-4 w-4 mr-1" />
+                      Disconnect
                     </Button>
                   </div>
                     
