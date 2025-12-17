@@ -739,7 +739,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
                   
                   return (
-                    <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
+                    <div className="flex flex-col gap-0.5">
                       {/* Official "Powered by Strava" logo per brand guidelines */}
                       <img 
                         src="/icons/strava-powered-by.svg" 
@@ -747,17 +747,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         className="h-3"
                       />
                       {stravaUrl && (
-                        <>
-                          <span className="text-gray-300">•</span>
-                          <a 
-                            href={stravaUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm text-[#FC5200] font-medium underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
-                          >
-                            View on Strava
-                          </a>
-                        </>
+                        <a 
+                          href={stravaUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm text-[#FC5200] font-medium underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
+                        >
+                          View on Strava
+                        </a>
                       )}
                     </div>
                   );
@@ -766,26 +763,25 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 if (source === 'garmin' || garminId) {
                   const garminUrl = garminId ? `https://connect.garmin.com/modern/activity/${garminId}` : null;
                   return (
-                    <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap flex-wrap">
-                      <span className="text-gray-400 text-sm">via</span>
-                      {/* Garmin delta triangle - per brand guidelines */}
-                      <svg width="10" height="12" viewBox="0 0 10 12" className="flex-shrink-0">
-                        <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
-                      </svg>
-                      <span className="text-[#007CC3] font-semibold text-sm">Garmin Connect</span>
-                      {deviceName && <span className="text-gray-400 text-sm">({deviceName})</span>}
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-gray-400 text-sm">via</span>
+                        {/* Garmin delta triangle - per brand guidelines */}
+                        <svg width="10" height="12" viewBox="0 0 10 12" className="flex-shrink-0">
+                          <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
+                        </svg>
+                        <span className="text-[#007CC3] font-semibold text-sm">Garmin Connect</span>
+                        {deviceName && <span className="text-gray-400 text-sm">({deviceName})</span>}
+                      </div>
                       {garminUrl && (
-                        <>
-                          <span className="text-gray-300">•</span>
-                          <a
-                            href={garminUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-[#007CC3] font-medium underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
-                          >
-                            View on Garmin
-                          </a>
-                        </>
+                        <a
+                          href={garminUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-[#007CC3] font-medium underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
+                        >
+                          View on Garmin
+                        </a>
                       )}
                     </div>
                   );
