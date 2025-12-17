@@ -706,90 +706,126 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-1 border-b">
-        <div className="flex items-center gap-3">
-          <div className="p-2" />
-          <div>
-            <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap">
-              <h2 className="font-semibold text-lg">
-                {(() => {
-                  const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
-                  if (st) return st;
-                  return generateWorkoutTitle();
-                })()}
-              </h2>
-              {/* Source Logo (Strava/Garmin) */}
-              {(() => {
-                const source = (workout as any)?.source;
-                const isStravaImported = (workout as any)?.is_strava_imported;
-                const stravaId = (workout as any)?.strava_activity_id;
-                const garminId = (workout as any)?.garmin_activity_id;
-                const deviceInfo = (() => {
+      <div className="p-2 border-b">
+        {/* Row 1: Title + Attach/Unattach */}
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-lg">
+            {(() => {
+              const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
+              if (st) return st;
+              return generateWorkoutTitle();
+            })()}
+          </h2>
+          {/* Attach/Unattach button - moved here */}
+          {isCompleted && (
+            (!currentPlannedId && !linkedPlanned) ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={()=>setAssocOpen(true)}
+              >Attach</Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async()=>{
                   try {
-                    const di = (workout as any)?.device_info || (workout as any)?.deviceInfo;
-                    if (typeof di === 'string') return JSON.parse(di);
-                    return di;
-                  } catch { return null; }
-                })();
-                const rawDeviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
-                // Remove "Garmin " prefix to save space (already showing "Garmin Connect")
-                const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
+                    const pid = String(currentPlannedId || (linkedPlanned as any)?.id || '');
+                    const wid = String((workout as any)?.id || '');
+                    if (!pid || !wid) return;
+                    suppressRelinkUntil.current = Date.now() + 15000;
+                    try {
+                      await supabase.from('workouts').update({ planned_id: null } as any).eq('id', wid);
+                      await supabase.from('planned_workouts').update({ workout_status: 'planned' } as any).eq('id', pid);
+                    } catch {}
+                    setCurrentPlannedId(null);
+                    setLinkedPlanned(null);
+                    setHydratedPlanned(null);
+                    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                    setActiveTab('completed');
+                  } catch {}
+                }}
+              >Unattach</Button>
+            )
+          )}
+        </div>
+        
+        {/* Row 2: Source attribution + View link */}
+        {(() => {
+          const source = (workout as any)?.source;
+          const isStravaImported = (workout as any)?.is_strava_imported;
+          const stravaId = (workout as any)?.strava_activity_id;
+          const garminId = (workout as any)?.garmin_activity_id;
+          const deviceInfo = (() => {
+            try {
+              const di = (workout as any)?.device_info || (workout as any)?.deviceInfo;
+              if (typeof di === 'string') return JSON.parse(di);
+              return di;
+            } catch { return null; }
+          })();
+          const rawDeviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
+          const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
 
-                if (source === 'strava' || stravaId || isStravaImported) {
-                  const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
-                  
-                  return (
-                    <div className="flex flex-col gap-0.5">
-                      {/* Official "Powered by Strava" logo per brand guidelines */}
-                      <img 
-                        src="/icons/strava-powered-by.svg" 
-                        alt="Powered by Strava" 
-                        className="h-3"
-                      />
-                      {stravaUrl && (
-                        <a 
-                          href={stravaUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-sm text-[#FC5200] font-medium underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
-                        >
-                          View on Strava
-                        </a>
-                      )}
-                    </div>
-                  );
-                }
+          if (source === 'strava' || stravaId || isStravaImported) {
+            const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
+            
+            return (
+              <div className="flex items-center gap-2 mt-0.5">
+                <img 
+                  src="/icons/strava-powered-by.svg" 
+                  alt="Powered by Strava" 
+                  className="h-3"
+                />
+                {stravaUrl && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <a 
+                      href={stravaUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-[#FC5200] font-medium underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
+                    >
+                      View on Strava
+                    </a>
+                  </>
+                )}
+              </div>
+            );
+          }
 
-                if (source === 'garmin' || garminId) {
-                  const garminUrl = garminId ? `https://connect.garmin.com/modern/activity/${garminId}` : null;
-                  return (
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-gray-400 text-sm">via</span>
-                        {/* Garmin delta triangle - per brand guidelines */}
-                        <svg width="10" height="12" viewBox="0 0 10 12" className="flex-shrink-0">
-                          <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
-                        </svg>
-                        <span className="text-[#007CC3] font-semibold text-sm">Garmin Connect</span>
-                        {deviceName && <span className="text-gray-400 text-sm">({deviceName})</span>}
-                      </div>
-                      {garminUrl && (
-                        <a
-                          href={garminUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-[#007CC3] font-medium underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
-                        >
-                          View on Garmin
-                        </a>
-                      )}
-                    </div>
-                  );
-                }
+          if (source === 'garmin' || garminId) {
+            const garminUrl = garminId ? `https://connect.garmin.com/modern/activity/${garminId}` : null;
+            return (
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                <span className="text-gray-400 text-xs">via</span>
+                <svg width="8" height="10" viewBox="0 0 10 12" className="flex-shrink-0">
+                  <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
+                </svg>
+                <span className="text-[#007CC3] font-medium text-xs">Garmin Connect</span>
+                {deviceName && <span className="text-gray-400 text-xs">({deviceName})</span>}
+                {garminUrl && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <a
+                      href={garminUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-[#007CC3] font-medium underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
+                    >
+                      View
+                    </a>
+                  </>
+                )}
+              </div>
+            );
+          }
 
-                return null;
-              })()}
-            </div>
+          return null;
+        })()}
+        
+        {/* Row 3: Date */}
+        <div>
             <p className="text-sm text-muted-foreground leading-snug font-sans [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline">
               {(() => {
                 try {
@@ -835,50 +871,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 return 'Planned';
               })()}
             </p>
-            {/* Auto-linked badge removed per product decision */}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {isCompleted && (
-            (() => {
-              return (!currentPlannedId && !linkedPlanned) ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={()=>setAssocOpen(true)}
-                >Attach</Button>
-              ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={async()=>{
-                  try {
-                    const pid = String(currentPlannedId || (linkedPlanned as any)?.id || '');
-                    const wid = String((workout as any)?.id || '');
-                    if (!pid || !wid) return;
-                    // disable re-link noise then detach
-                    suppressRelinkUntil.current = Date.now() + 15000; // 15s
-                    // Remove the database link (preserve analysis - don't clear it)
-                    try {
-                      await supabase.from('workouts').update({ 
-                        planned_id: null
-                        // Don't clear workout_analysis - preserve it so adherence data isn't lost
-                      } as any).eq('id', wid);
-                      await supabase.from('planned_workouts').update({ workout_status: 'planned' } as any).eq('id', pid);
-                    } catch {}
-                    // Clear local state
-                    setCurrentPlannedId(null);
-                    setLinkedPlanned(null);
-                    setHydratedPlanned(null); // Also clear hydratedPlanned
-                    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                    setActiveTab('completed');
-                  } catch {}
-                }}
-              >Unattach</Button>
-              );
-            })()
-          )}
         </div>
         {assocOpen && (
           <AssociatePlannedDialog
