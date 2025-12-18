@@ -1631,9 +1631,29 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
     const lines: string[] = [];
     lines.push(`# ${plan.name || 'Training Plan'}`);
-    if (plan.description) lines.push(`${plan.description}`);
-    const duration = plan.duration || plan.duration_weeks || (plan.weeks ? plan.weeks.length : undefined);
-    if (duration) lines.push(`Duration: ${duration} weeks`);
+    if (plan.description) lines.push(`\n${plan.description}`);
+    lines.push('');
+
+    // Add generation parameters if available (from wizard flow)
+    const config = plan.config || {};
+    if (config.source === 'generated' || config.approach) {
+      lines.push('## Plan Parameters');
+      lines.push('');
+      if (config.distance) lines.push(`- **Distance:** ${config.distance}`);
+      if (config.fitness) lines.push(`- **Fitness Level:** ${config.fitness}`);
+      if (config.goal) lines.push(`- **Goal:** ${config.goal}`);
+      const duration = plan.duration || plan.duration_weeks || config.duration_weeks;
+      if (duration) lines.push(`- **Duration:** ${duration} weeks`);
+      if (config.approach) lines.push(`- **Approach:** ${config.approach.replace(/_/g, ' ')}`);
+      if (config.days_per_week) lines.push(`- **Days/Week:** ${config.days_per_week}`);
+      if (typeof config.strength_frequency === 'number') lines.push(`- **Strength:** ${config.strength_frequency === 0 ? 'None' : `${config.strength_frequency}x/week`}`);
+      if (config.user_selected_start_date) lines.push(`- **Start Date:** ${config.user_selected_start_date}`);
+      lines.push('');
+    } else {
+      const duration = plan.duration || plan.duration_weeks || (plan.weeks ? plan.weeks.length : undefined);
+      if (duration) lines.push(`**Duration:** ${duration} weeks\n`);
+    }
+    lines.push('---');
     lines.push('');
 
     const weeks: any[] = (plan.weeks || []).slice().sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0));
@@ -1729,10 +1749,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               return null;
             })()}
 
-            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
-              <Download className="h-4 w-4 sm:hidden" />
-              <span className="hidden sm:inline">Download</span>
-            </button>
+            <div className="hidden sm:block">
+              <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
+                Download
+              </button>
+            </div>
             <div className="sm:hidden">
               <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
                 Info
