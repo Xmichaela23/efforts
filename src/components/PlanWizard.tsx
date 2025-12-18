@@ -327,7 +327,6 @@ export default function PlanWizard() {
                 type="date"
                 value={state.startDate}
                 onChange={(e) => updateState('startDate', e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
                 className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <p className="text-sm text-gray-500">
@@ -380,7 +379,7 @@ export default function PlanWizard() {
           </StepContainer>
         );
 
-      case 6:
+      case 7:
         const availableDays = getAvailableDays(state.approach);
         return (
           <StepContainer title="Days per week">
