@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target, Activity, Bike, Waves, Dumbbell, ChevronDown, Moon, ArrowUpDown, Send } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target, Activity, Bike, Waves, Dumbbell, ChevronDown, Moon, ArrowUpDown, Send, Download } from 'lucide-react';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 // Planned workouts hook deprecated; unified server paths are the source of truth
@@ -1729,11 +1729,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               return null;
             })()}
 
-            <div className="hidden sm:block">
-              <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
-                Download
-              </button>
-            </div>
+            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
+              <Download className="h-4 w-4 sm:hidden" />
+              <span className="hidden sm:inline">Download</span>
+            </button>
             <div className="sm:hidden">
               <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
                 Info
