@@ -259,8 +259,8 @@ export default function PlanWizard() {
       description: "Setting up your training schedule...",
     });
 
-    // Navigate immediately
-    navigate('/', { state: { openPlans: true, focusPlanId: generatedPlan.plan_id } });
+    // Navigate to dashboard (plan will appear in Plans dropdown when ready)
+    navigate('/');
     
     // Activate in background (don't await - it can be slow)
     supabase.functions.invoke('activate-plan', {
@@ -268,12 +268,12 @@ export default function PlanWizard() {
     }).then(() => {
       toast({
         title: "Plan ready",
-        description: "Your training plan is now active.",
+        description: "Open Plans to see your new training schedule.",
       });
     }).catch(err => {
       console.error('Activation error:', err);
       toast({
-        title: "Activation issue",
+        title: "Activation issue", 
         description: "Plan saved but may need refresh.",
         variant: "destructive",
       });
