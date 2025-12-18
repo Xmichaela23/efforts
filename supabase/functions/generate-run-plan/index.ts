@@ -152,8 +152,8 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Calculate start date (next Monday or race_date - duration)
-    const startDate = calculateStartDate(request.duration_weeks, request.race_date);
+    // Calculate start date (use provided, or next Monday, or race_date - duration)
+    const startDate = request.start_date || calculateStartDate(request.duration_weeks, request.race_date);
 
     const { data: insertedPlan, error: insertError } = await supabase
       .from('plans')

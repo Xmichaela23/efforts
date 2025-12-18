@@ -10,6 +10,7 @@ export interface GeneratePlanRequest {
   fitness: 'beginner' | 'intermediate' | 'advanced';
   goal: 'complete' | 'speed';
   duration_weeks: number;
+  start_date?: string; // ISO date string (YYYY-MM-DD)
   approach: 'balanced_build' | 'time_efficient' | 'volume_progression' | 'cumulative_load' | 'hybrid_athlete';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
   strength_frequency?: 0 | 1 | 2 | 3;

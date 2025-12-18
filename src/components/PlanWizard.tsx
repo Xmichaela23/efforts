@@ -23,6 +23,7 @@ interface WizardState {
   fitness: Fitness | null;
   goal: Goal | null;
   duration: number;
+  startDate: string; // ISO date string
   approach: Approach | null;
   daysPerWeek: DaysPerWeek | null;
   strengthFrequency: 0 | 1 | 2 | 3;
@@ -88,12 +89,22 @@ export default function PlanWizard() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Default to next Monday
+  const getNextMonday = () => {
+    const today = new Date();
+    const daysUntilMonday = (8 - today.getDay()) % 7 || 7;
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + daysUntilMonday);
+    return nextMonday.toISOString().split('T')[0];
+  };
+
   const [state, setState] = useState<WizardState>({
     discipline: null,
     distance: null,
     fitness: null,
     goal: null,
     duration: 12,
+    startDate: getNextMonday(),
     approach: null,
     daysPerWeek: null,
     strengthFrequency: 0
@@ -118,9 +129,10 @@ export default function PlanWizard() {
       case 2: return state.fitness !== null;
       case 3: return state.goal !== null;
       case 4: return state.duration >= 4;
-      case 5: return state.approach !== null;
-      case 6: return state.daysPerWeek !== null;
-      case 7: return true; // Strength is optional
+      case 5: return state.startDate !== '';
+      case 6: return state.approach !== null;
+      case 7: return state.daysPerWeek !== null;
+      case 8: return true; // Strength is optional
       default: return false;
     }
   };
@@ -130,7 +142,7 @@ export default function PlanWizard() {
       // Non-run disciplines do nothing for now
       return;
     }
-    if (step < 7) {
+    if (step < 8) {
       setStep(step + 1);
     } else {
       handleGenerate();
@@ -163,6 +175,7 @@ export default function PlanWizard() {
           fitness: state.fitness,
           goal: state.goal,
           duration_weeks: state.duration,
+          start_date: state.startDate,
           approach: state.approach,
           days_per_week: state.daysPerWeek,
           strength_frequency: state.strengthFrequency
@@ -307,6 +320,24 @@ export default function PlanWizard() {
         );
 
       case 5:
+        return (
+          <StepContainer title="When do you want to start?">
+            <div className="space-y-4">
+              <input
+                type="date"
+                value={state.startDate}
+                onChange={(e) => updateState('startDate', e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-sm text-gray-500">
+                Plan ends: {state.startDate && new Date(new Date(state.startDate).getTime() + (state.duration * 7 - 1) * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </p>
+            </div>
+          </StepContainer>
+        );
+
+      case 6:
         const availableApproaches = getAvailableApproaches(state.fitness, state.goal);
         return (
           <StepContainer title="Training approach">
@@ -366,7 +397,7 @@ export default function PlanWizard() {
           </StepContainer>
         );
 
-      case 7:
+      case 8:
         return (
           <StepContainer title="Add strength training?">
             <RadioGroup
@@ -387,7 +418,7 @@ export default function PlanWizard() {
     }
   };
 
-  const getStepCount = () => 8; // 0-7
+  const getStepCount = () => 9; // 0-8
 
   return (
     <div className="min-h-screen bg-white">
@@ -448,7 +479,7 @@ export default function PlanWizard() {
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Generating...
               </>
-            ) : step === 7 ? (
+            ) : step === 8 ? (
               'Generate Plan'
             ) : (
               <>
