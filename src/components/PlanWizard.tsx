@@ -191,17 +191,13 @@ export default function PlanWizard() {
         throw new Error(result.error || 'Failed to generate plan');
       }
 
-      // Activate the plan
-      const activateResponse = await supabase.functions.invoke('activate-plan', {
+      // Navigate to calendar immediately - activation happens in background
+      navigate('/');
+      
+      // Activate the plan in background (don't await)
+      supabase.functions.invoke('activate-plan', {
         body: { plan_id: result.plan_id }
-      });
-
-      if (activateResponse.error) {
-        console.error('Activation error:', activateResponse.error);
-      }
-
-      // Navigate to calendar with plan focused
-      navigate('/', { state: { openPlans: true, focusPlanId: result.plan_id } });
+      }).catch(err => console.error('Activation error:', err));
 
     } catch (err) {
       console.error('Generation error:', err);
