@@ -87,6 +87,7 @@ export default function PlanWizard() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generateProgress, setGenerateProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   
   // Default to next Monday
@@ -158,15 +159,27 @@ export default function PlanWizard() {
 
   const handleGenerate = async () => {
     setIsGenerating(true);
+    setGenerateProgress(0);
     setError(null);
+
+    // Simulate progress while waiting
+    const progressInterval = setInterval(() => {
+      setGenerateProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + Math.random() * 15;
+      });
+    }, 500);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setError('Please sign in to generate a plan');
         setIsGenerating(false);
+        clearInterval(progressInterval);
         return;
       }
+
+      setGenerateProgress(20);
 
       const response = await supabase.functions.invoke('generate-run-plan', {
         body: {
@@ -182,6 +195,9 @@ export default function PlanWizard() {
         }
       });
 
+      clearInterval(progressInterval);
+      setGenerateProgress(95);
+
       if (response.error) {
         throw new Error(response.error.message);
       }
@@ -190,6 +206,8 @@ export default function PlanWizard() {
       if (!result.success) {
         throw new Error(result.error || 'Failed to generate plan');
       }
+
+      setGenerateProgress(100);
 
       // Activate the plan in background (don't await)
       supabase.functions.invoke('activate-plan', {
@@ -200,6 +218,7 @@ export default function PlanWizard() {
       navigate('/', { state: { openPlans: true, focusPlanId: result.plan_id } });
 
     } catch (err) {
+      clearInterval(progressInterval);
       console.error('Generation error:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate plan');
     } finally {
@@ -414,6 +433,37 @@ export default function PlanWizard() {
   };
 
   const getStepCount = () => 9; // 0-8
+
+  // Show generating overlay
+  if (isGenerating) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-xs space-y-6">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">Building your plan</h2>
+            <p className="text-sm text-gray-500">
+              Creating {state.duration} weeks of personalized training...
+            </p>
+          </div>
+          
+          {/* Progress bar */}
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${Math.min(generateProgress, 100)}%` }}
+            />
+          </div>
+          
+          <p className="text-center text-sm text-gray-400">
+            {generateProgress < 30 ? 'Analyzing parameters...' :
+             generateProgress < 60 ? 'Generating sessions...' :
+             generateProgress < 90 ? 'Optimizing schedule...' :
+             'Finalizing plan...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
