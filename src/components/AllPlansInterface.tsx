@@ -1671,15 +1671,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         lines.push(`### ${d}`);
         for (const w of groups[d]) {
           const meta: string[] = [];
-          // Handle intensity - could be string or object
-          if (w.intensity) {
-            if (typeof w.intensity === 'string') {
-              meta.push(w.intensity);
-            } else if (typeof w.intensity === 'object' && w.intensity.label) {
-              meta.push(w.intensity.label);
-            }
+          // Handle intensity - only include if it's a valid string
+          if (w.intensity && typeof w.intensity === 'string' && w.intensity.length > 0) {
+            meta.push(w.intensity);
           }
-          if (typeof w.duration === 'number') meta.push(fmtHM(w.duration));
+          if (typeof w.duration === 'number' && w.duration > 0) meta.push(fmtHM(w.duration));
           lines.push(`- ${w.name}${meta.length ? ` (${meta.join(' • ')})` : ''}`);
           if (w.description) lines.push(`  - ${w.description}`);
         }
