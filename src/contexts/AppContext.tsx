@@ -274,6 +274,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [plansAuthReady]);
 
+  // Listen for plans:refresh event (triggered after plan generation)
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('[AppContext] Received plans:refresh event');
+      loadPlans();
+    };
+    window.addEventListener('plans:refresh', handleRefresh);
+    return () => window.removeEventListener('plans:refresh', handleRefresh);
+  }, []);
+
   const saveUserBaselines = async (data: BaselineData) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();

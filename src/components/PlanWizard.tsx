@@ -253,29 +253,35 @@ export default function PlanWizard() {
   const handleAccept = () => {
     if (!generatedPlan) return;
     
-    // Show toast immediately
+    // Show toast with info about background processing
     toast({
-      title: "Plan accepted",
-      description: "Setting up your training schedule...",
+      title: "Building your schedule",
+      description: "This takes about 30 seconds. Feel free to leave - your plan will be ready when you return.",
+      duration: 10000,
     });
 
-    // Navigate to dashboard (plan will appear in Plans dropdown when ready)
+    // Navigate to dashboard
     navigate('/');
     
-    // Activate in background (don't await - it can be slow)
+    // Activate in background
     supabase.functions.invoke('activate-plan', {
       body: { plan_id: generatedPlan.plan_id }
     }).then(() => {
+      // Trigger plans refresh
+      window.dispatchEvent(new CustomEvent('plans:refresh'));
+      
       toast({
-        title: "Plan ready",
-        description: "Open Plans to see your new training schedule.",
+        title: "Plan ready!",
+        description: "Your training schedule is now in the Plans menu.",
+        duration: 5000,
       });
     }).catch(err => {
       console.error('Activation error:', err);
       toast({
         title: "Activation issue", 
-        description: "Plan saved but may need refresh.",
+        description: "Plan saved. Try refreshing the app.",
         variant: "destructive",
+        duration: 8000,
       });
     });
   };
