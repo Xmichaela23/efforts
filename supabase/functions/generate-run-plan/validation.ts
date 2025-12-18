@@ -1,0 +1,360 @@
+// Validation module for generated run plans
+// Ensures plans conform to schema and use valid tokens
+
+import { 
+  GeneratePlanRequest, 
+  TrainingPlan, 
+  ValidationResult,
+  APPROACH_CONSTRAINTS 
+} from './types.ts';
+
+// ============================================================================
+// REQUEST VALIDATION
+// ============================================================================
+
+/**
+ * Validate the incoming generation request
+ */
+export function validateRequest(request: GeneratePlanRequest): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Required fields
+  if (!request.user_id) {
+    errors.push('user_id is required');
+  }
+
+  if (!request.distance) {
+    errors.push('distance is required');
+  } else if (!['5k', '10k', 'half', 'marathon', 'maintenance'].includes(request.distance)) {
+    errors.push(`Invalid distance: ${request.distance}. Must be 5k, 10k, half, marathon, or maintenance`);
+  }
+
+  if (!request.fitness) {
+    errors.push('fitness is required');
+  } else if (!['beginner', 'intermediate', 'advanced'].includes(request.fitness)) {
+    errors.push(`Invalid fitness: ${request.fitness}. Must be beginner, intermediate, or advanced`);
+  }
+
+  if (!request.duration_weeks) {
+    errors.push('duration_weeks is required');
+  } else if (request.duration_weeks < 4) {
+    errors.push('duration_weeks must be at least 4');
+  } else if (request.duration_weeks > 52) {
+    errors.push('duration_weeks cannot exceed 52');
+  }
+
+  if (!request.approach) {
+    errors.push('approach is required');
+  } else if (!Object.keys(APPROACH_CONSTRAINTS).includes(request.approach)) {
+    errors.push(`Invalid approach: ${request.approach}`);
+  }
+
+  if (!request.days_per_week) {
+    errors.push('days_per_week is required');
+  } else if (!['3-4', '4-5', '5-6', '6-7'].includes(request.days_per_week)) {
+    errors.push(`Invalid days_per_week: ${request.days_per_week}`);
+  }
+
+  // Validate approach + days_per_week compatibility
+  if (request.approach && request.days_per_week) {
+    const constraints = APPROACH_CONSTRAINTS[request.approach];
+    if (constraints && !constraints.supported_days.includes(request.days_per_week)) {
+      errors.push(
+        `${request.approach} does not support ${request.days_per_week} days/week. ` +
+        `Supported: ${constraints.supported_days.join(', ')}`
+      );
+    }
+  }
+
+  // Goal validation (required for non-maintenance)
+  if (request.distance !== 'maintenance' && !request.goal) {
+    warnings.push('goal is recommended for race-focused plans');
+  }
+
+  // Strength frequency validation
+  if (request.strength_frequency !== undefined) {
+    if (![0, 1, 2, 3].includes(request.strength_frequency)) {
+      errors.push('strength_frequency must be 0, 1, 2, or 3');
+    }
+  }
+
+  // Race date validation
+  if (request.race_date) {
+    const raceDate = new Date(request.race_date);
+    const now = new Date();
+    if (isNaN(raceDate.getTime())) {
+      errors.push('Invalid race_date format. Use ISO date format (YYYY-MM-DD)');
+    } else if (raceDate < now) {
+      errors.push('race_date must be in the future');
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings
+  };
+}
+
+// ============================================================================
+// PLAN SCHEMA VALIDATION
+// ============================================================================
+
+/**
+ * Validate generated plan structure matches authoring schema
+ */
+export function validatePlanSchema(plan: TrainingPlan): ValidationResult {
+  const errors: string[] = [];
+
+  // Required top-level fields
+  if (!plan.name) errors.push('Plan name is required');
+  if (!plan.description) errors.push('Plan description is required');
+  if (!plan.duration_weeks || plan.duration_weeks < 1) {
+    errors.push('Valid duration_weeks is required');
+  }
+  if (!plan.units || !['imperial', 'metric'].includes(plan.units)) {
+    errors.push('units must be "imperial" or "metric"');
+  }
+
+  // Sessions validation
+  if (!plan.sessions_by_week || Object.keys(plan.sessions_by_week).length === 0) {
+    errors.push('sessions_by_week is required and cannot be empty');
+  } else {
+    for (const [week, sessions] of Object.entries(plan.sessions_by_week)) {
+      const weekNum = parseInt(week, 10);
+      if (isNaN(weekNum) || weekNum < 1) {
+        errors.push(`Invalid week key: ${week}`);
+        continue;
+      }
+
+      if (!Array.isArray(sessions)) {
+        errors.push(`Week ${week} sessions must be an array`);
+        continue;
+      }
+
+      for (let i = 0; i < sessions.length; i++) {
+        const session = sessions[i];
+        const prefix = `Week ${week}, session ${i + 1}`;
+
+        // Required session fields
+        if (!session.day) {
+          errors.push(`${prefix}: day is required`);
+        } else if (!isValidDay(session.day)) {
+          errors.push(`${prefix}: invalid day "${session.day}". Must be Title Case (Monday, Tuesday, etc.)`);
+        }
+
+        if (!session.type) {
+          errors.push(`${prefix}: type is required`);
+        } else if (!['run', 'bike', 'swim', 'strength'].includes(session.type)) {
+          errors.push(`${prefix}: invalid type "${session.type}". Must be run, bike, swim, or strength`);
+        }
+
+        if (!session.name) {
+          errors.push(`${prefix}: name is required`);
+        }
+
+        if (typeof session.duration !== 'number' || session.duration <= 0) {
+          errors.push(`${prefix}: duration must be a positive number`);
+        }
+
+        // Type-specific validation
+        if (session.type === 'strength') {
+          if (!session.strength_exercises || !Array.isArray(session.strength_exercises)) {
+            errors.push(`${prefix}: strength sessions require strength_exercises array`);
+          } else {
+            for (const ex of session.strength_exercises) {
+              if (!ex.name) errors.push(`${prefix}: strength exercise missing name`);
+              if (typeof ex.sets !== 'number') errors.push(`${prefix}: strength exercise ${ex.name} missing sets`);
+            }
+          }
+          if (session.steps_preset) {
+            errors.push(`${prefix}: strength sessions should not have steps_preset`);
+          }
+        } else {
+          // Run/bike/swim should have steps_preset
+          if (!session.steps_preset || !Array.isArray(session.steps_preset) || session.steps_preset.length === 0) {
+            errors.push(`${prefix}: ${session.type} sessions require steps_preset array`);
+          }
+        }
+
+        if (!session.tags || !Array.isArray(session.tags)) {
+          errors.push(`${prefix}: tags array is required`);
+        }
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+// ============================================================================
+// TOKEN VALIDATION
+// ============================================================================
+
+// Known valid token patterns (simplified - in production, load from token library)
+const VALID_TOKEN_PATTERNS = [
+  /^warmup_run_(easy|quality)_\d+min$/,
+  /^cooldown_easy_\d+min$/,
+  /^run_easy_\d+min$/,
+  /^longrun_\d+min_(easypace|easy)(_last\d+min_MP)?$/,
+  /^interval_\d+x\d+(m|mi)_5kpace_[rR]\d+(s|min)?$/,
+  /^tempo_\d+(min|mi)_5kpace(_plus\d+:\d+)?$/,
+  /^cruise_\d+x\d+mi_T_pace_r\d+s$/,
+  /^strides_\d+x\d+[sm]$/
+];
+
+/**
+ * Validate that all tokens in the plan are recognized
+ */
+export function validateTokens(plan: TrainingPlan): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const unknownTokens = new Set<string>();
+
+  for (const [week, sessions] of Object.entries(plan.sessions_by_week)) {
+    for (const session of sessions) {
+      if (session.steps_preset) {
+        for (const token of session.steps_preset) {
+          if (!isValidToken(token)) {
+            unknownTokens.add(token);
+            warnings.push(`Week ${week}, ${session.name}: Unknown token "${token}"`);
+          }
+        }
+      }
+    }
+  }
+
+  // Only error if ALL tokens are unknown (plan would be unusable)
+  if (unknownTokens.size > 0) {
+    // Just warnings for now - materialize-plan may still handle them
+  }
+
+  return {
+    valid: true, // Tokens are warnings, not errors
+    errors,
+    warnings
+  };
+}
+
+/**
+ * Check if a token matches known patterns
+ */
+function isValidToken(token: string): boolean {
+  // Check against known patterns
+  for (const pattern of VALID_TOKEN_PATTERNS) {
+    if (pattern.test(token)) {
+      return true;
+    }
+  }
+
+  // Check specific known tokens
+  const knownTokens = [
+    'warmup_run_easy_10min',
+    'warmup_run_quality_12min',
+    'cooldown_easy_10min',
+    'strides_6x20s',
+    'strides_4x100m'
+  ];
+
+  return knownTokens.includes(token);
+}
+
+/**
+ * Validate day name is Title Case
+ */
+function isValidDay(day: string): boolean {
+  const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  return validDays.includes(day);
+}
+
+// ============================================================================
+// CONFLICT DETECTION (for schedule validation)
+// ============================================================================
+
+export interface ScheduleConflict {
+  week: number;
+  day: string;
+  sessions: string[];
+  reason: string;
+  severity: 'error' | 'warning';
+}
+
+/**
+ * Detect scheduling conflicts in generated plan
+ */
+export function detectScheduleConflicts(plan: TrainingPlan): ScheduleConflict[] {
+  const conflicts: ScheduleConflict[] = [];
+
+  for (const [weekStr, sessions] of Object.entries(plan.sessions_by_week)) {
+    const week = parseInt(weekStr, 10);
+    
+    // Group sessions by day
+    const byDay: Record<string, typeof sessions> = {};
+    for (const session of sessions) {
+      if (!byDay[session.day]) byDay[session.day] = [];
+      byDay[session.day].push(session);
+    }
+
+    // Check for multiple hard sessions on same day
+    for (const [day, daySessions] of Object.entries(byDay)) {
+      const hardSessions = daySessions.filter(s => 
+        s.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold'].includes(t))
+      );
+      
+      if (hardSessions.length > 1) {
+        conflicts.push({
+          week,
+          day,
+          sessions: hardSessions.map(s => s.name),
+          reason: 'Multiple hard sessions on same day',
+          severity: 'error'
+        });
+      }
+
+      // Strength + hard run on same day
+      const strengthSessions = daySessions.filter(s => s.type === 'strength');
+      if (strengthSessions.length > 0 && hardSessions.length > 0) {
+        conflicts.push({
+          week,
+          day,
+          sessions: [...strengthSessions, ...hardSessions].map(s => s.name),
+          reason: 'Strength and hard run on same day',
+          severity: 'warning'
+        });
+      }
+    }
+
+    // Check consecutive days
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < dayOrder.length - 1; i++) {
+      const today = byDay[dayOrder[i]] || [];
+      const tomorrow = byDay[dayOrder[i + 1]] || [];
+
+      const todayHasHard = today.some(s => 
+        s.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold'].includes(t))
+      );
+      const tomorrowHasHard = tomorrow.some(s => 
+        s.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold'].includes(t))
+      );
+
+      if (todayHasHard && tomorrowHasHard) {
+        conflicts.push({
+          week,
+          day: dayOrder[i],
+          sessions: [
+            ...today.filter(s => s.tags.some(t => ['hard_run', 'intervals', 'tempo'].includes(t))),
+            ...tomorrow.filter(s => s.tags.some(t => ['hard_run', 'intervals', 'tempo'].includes(t)))
+          ].map(s => s.name),
+          reason: 'Hard sessions on consecutive days',
+          severity: 'warning'
+        });
+      }
+    }
+  }
+
+  return conflicts;
+}

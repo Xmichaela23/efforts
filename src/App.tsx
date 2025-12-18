@@ -18,6 +18,7 @@ import PlansAdminImport from "./pages/PlansAdminImport";
 import PlansCatalogPage from "./pages/PlansCatalog.tsx";
 import MobilityPlanBuilderPage from "./pages/PTPlanBuilderPage";
 import PlansBuild from "./pages/PlansBuild";
+import PlanWizard from "./components/PlanWizard";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => (
 <Route path="/plans/catalog" element={<PlansCatalogPage />} />
 <Route path="/plans/build" element={<PlansBuild />} />
 <Route path="/plans/pt" element={<MobilityPlanBuilderPage />} />
+<Route path="/plans/generate" element={<PlanWizard />} />
 <Route path="*" element={<NotFound />} />
 </Routes>
 </BrowserRouter>

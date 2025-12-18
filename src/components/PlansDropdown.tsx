@@ -143,6 +143,15 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           <span>Build plans</span>
         </DropdownMenuItem>
 
+        {/* Plan generation wizard */}
+        <DropdownMenuItem
+          onClick={() => { navigate('/plans/generate'); }}
+          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <span>Build a plan</span>
+        </DropdownMenuItem>
+
         {/* Removed View Current Plans entry per design */}
       </DropdownMenuContent>
     </DropdownMenu>

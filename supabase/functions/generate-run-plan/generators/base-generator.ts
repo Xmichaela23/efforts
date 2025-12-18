@@ -1,0 +1,548 @@
+// Abstract base class for run plan generators
+// Provides common methods used by all approach-specific generators
+
+import {
+  TrainingPlan,
+  GeneratorParams,
+  PhaseStructure,
+  Phase,
+  Session,
+  WeeklySummary,
+  FITNESS_TO_VOLUME,
+  TOKEN_PATTERNS
+} from '../types.ts';
+
+export abstract class BaseGenerator {
+  protected params: GeneratorParams;
+
+  constructor(params: GeneratorParams) {
+    this.params = params;
+  }
+
+  // Main generation method (implemented by subclasses)
+  abstract generatePlan(): TrainingPlan;
+
+  // ============================================================================
+  // VOLUME CALCULATIONS
+  // ============================================================================
+
+  /**
+   * Calculate starting weekly volume based on fitness level and distance
+   */
+  protected calculateStartingVolume(): number {
+    const volumeParams = FITNESS_TO_VOLUME[this.params.distance]?.[this.params.fitness];
+    if (!volumeParams) {
+      throw new Error(`No volume parameters for ${this.params.distance} ${this.params.fitness}`);
+    }
+    return volumeParams.startWeekly;
+  }
+
+  /**
+   * Calculate peak weekly volume
+   */
+  protected calculatePeakVolume(): number {
+    const volumeParams = FITNESS_TO_VOLUME[this.params.distance]?.[this.params.fitness];
+    if (!volumeParams) {
+      throw new Error(`No volume parameters for ${this.params.distance} ${this.params.fitness}`);
+    }
+    return volumeParams.peakWeekly;
+  }
+
+  /**
+   * Get long run cap for fitness level
+   */
+  protected getLongRunCap(): number {
+    const volumeParams = FITNESS_TO_VOLUME[this.params.distance]?.[this.params.fitness];
+    if (!volumeParams) {
+      throw new Error(`No volume parameters for ${this.params.distance} ${this.params.fitness}`);
+    }
+    return volumeParams.longRunCap;
+  }
+
+  /**
+   * Get weekly increase allowance
+   */
+  protected getWeeklyIncrease(): number {
+    const volumeParams = FITNESS_TO_VOLUME[this.params.distance]?.[this.params.fitness];
+    if (!volumeParams) {
+      throw new Error(`No volume parameters for ${this.params.distance} ${this.params.fitness}`);
+    }
+    return volumeParams.weeklyIncrease;
+  }
+
+  // ============================================================================
+  // PHASE STRUCTURE CALCULATION
+  // ============================================================================
+
+  /**
+   * Determine phase structure based on total duration
+   * Returns phases with start/end weeks and characteristics
+   */
+  protected determinePhaseStructure(): PhaseStructure {
+    const duration = this.params.duration_weeks;
+
+    if (duration < 4) {
+      throw new Error('Minimum 4 weeks required for training plan');
+    }
+
+    let phases: Phase[];
+
+    if (duration >= 4 && duration <= 6) {
+      // Short plans: Base + Speed + Taper
+      const baseWeeks = Math.round(duration * 0.4);
+      const speedWeeks = Math.round(duration * 0.4);
+      const taperWeeks = Math.max(1, duration - baseWeeks - speedWeeks);
+
+      phases = [
+        {
+          name: 'Base',
+          start_week: 1,
+          end_week: baseWeeks,
+          weeks_in_phase: baseWeeks,
+          focus: 'Aerobic foundation and movement patterns',
+          quality_density: 'low',
+          volume_multiplier: 0.7
+        },
+        {
+          name: 'Speed',
+          start_week: baseWeeks + 1,
+          end_week: baseWeeks + speedWeeks,
+          weeks_in_phase: speedWeeks,
+          focus: 'VO2max development and race pace',
+          quality_density: 'high',
+          volume_multiplier: 1.0
+        },
+        {
+          name: 'Taper',
+          start_week: baseWeeks + speedWeeks + 1,
+          end_week: duration,
+          weeks_in_phase: taperWeeks,
+          focus: 'Recovery and race preparation',
+          quality_density: 'low',
+          volume_multiplier: 0.6
+        }
+      ];
+    } else if (duration >= 7 && duration <= 11) {
+      // Medium plans: Base + Speed + Race Prep + Taper
+      const baseWeeks = Math.round(duration * 0.33);
+      const speedWeeks = Math.round(duration * 0.33);
+      const racePrepWeeks = Math.round(duration * 0.20);
+      const taperWeeks = Math.max(1, duration - baseWeeks - speedWeeks - racePrepWeeks);
+
+      phases = [
+        {
+          name: 'Base',
+          start_week: 1,
+          end_week: baseWeeks,
+          weeks_in_phase: baseWeeks,
+          focus: 'Aerobic foundation',
+          quality_density: 'low',
+          volume_multiplier: 0.7
+        },
+        {
+          name: 'Speed',
+          start_week: baseWeeks + 1,
+          end_week: baseWeeks + speedWeeks,
+          weeks_in_phase: speedWeeks,
+          focus: 'VO2max and speed development',
+          quality_density: 'high',
+          volume_multiplier: 0.95
+        },
+        {
+          name: 'Race Prep',
+          start_week: baseWeeks + speedWeeks + 1,
+          end_week: baseWeeks + speedWeeks + racePrepWeeks,
+          weeks_in_phase: racePrepWeeks,
+          focus: 'Race-specific work',
+          quality_density: 'medium',
+          volume_multiplier: 1.0
+        },
+        {
+          name: 'Taper',
+          start_week: baseWeeks + speedWeeks + racePrepWeeks + 1,
+          end_week: duration,
+          weeks_in_phase: taperWeeks,
+          focus: 'Recovery and sharpening',
+          quality_density: 'low',
+          volume_multiplier: 0.6
+        }
+      ];
+    } else {
+      // Long plans (12+ weeks): Base + Speed + Race Prep + Taper
+      const baseWeeks = Math.round(duration * 0.30);
+      const speedWeeks = Math.round(duration * 0.35);
+      const racePrepWeeks = Math.round(duration * 0.25);
+      const taperWeeks = Math.max(2, duration - baseWeeks - speedWeeks - racePrepWeeks);
+
+      phases = [
+        {
+          name: 'Base',
+          start_week: 1,
+          end_week: baseWeeks,
+          weeks_in_phase: baseWeeks,
+          focus: 'Aerobic foundation building',
+          quality_density: 'low',
+          volume_multiplier: 0.75
+        },
+        {
+          name: 'Speed',
+          start_week: baseWeeks + 1,
+          end_week: baseWeeks + speedWeeks,
+          weeks_in_phase: speedWeeks,
+          focus: 'Speed and VO2max development',
+          quality_density: 'high',
+          volume_multiplier: 0.95
+        },
+        {
+          name: 'Race Prep',
+          start_week: baseWeeks + speedWeeks + 1,
+          end_week: baseWeeks + speedWeeks + racePrepWeeks,
+          weeks_in_phase: racePrepWeeks,
+          focus: 'Race-specific work',
+          quality_density: 'medium',
+          volume_multiplier: 1.0
+        },
+        {
+          name: 'Taper',
+          start_week: baseWeeks + speedWeeks + racePrepWeeks + 1,
+          end_week: duration,
+          weeks_in_phase: taperWeeks,
+          focus: 'Recovery and race readiness',
+          quality_density: 'low',
+          volume_multiplier: 0.6
+        }
+      ];
+    }
+
+    // Insert recovery weeks (every 4th week within phases)
+    const recovery_weeks: number[] = [];
+    for (let week = 4; week <= duration; week += 4) {
+      // Don't make taper weeks recovery weeks
+      const taperPhase = phases.find(p => p.name === 'Taper');
+      if (taperPhase && week >= taperPhase.start_week) {
+        continue;
+      }
+      recovery_weeks.push(week);
+    }
+
+    return { phases, recovery_weeks };
+  }
+
+  /**
+   * Get the current phase for a given week number
+   */
+  protected getCurrentPhase(weekNumber: number, phaseStructure: PhaseStructure): Phase {
+    for (const phase of phaseStructure.phases) {
+      if (weekNumber >= phase.start_week && weekNumber <= phase.end_week) {
+        return phase;
+      }
+    }
+    // Default to last phase if not found
+    return phaseStructure.phases[phaseStructure.phases.length - 1];
+  }
+
+  /**
+   * Check if a week is a recovery week
+   */
+  protected isRecoveryWeek(weekNumber: number, phaseStructure: PhaseStructure): boolean {
+    return phaseStructure.recovery_weeks.includes(weekNumber);
+  }
+
+  // ============================================================================
+  // WORKOUT CREATION HELPERS
+  // ============================================================================
+
+  /**
+   * Create session object matching schema requirements
+   */
+  protected createSession(
+    day: string,
+    name: string,
+    description: string,
+    duration: number,
+    steps_preset: string[],
+    tags: string[]
+  ): Session {
+    return {
+      day,
+      type: 'run',
+      name,
+      description,
+      duration,
+      steps_preset,
+      tags
+    };
+  }
+
+  /**
+   * Create an easy run session
+   */
+  protected createEasyRun(durationMinutes: number, day: string = 'Monday'): Session {
+    return this.createSession(
+      day,
+      'Easy Run',
+      `Easy aerobic run at conversational pace`,
+      durationMinutes,
+      [TOKEN_PATTERNS.easy_run(durationMinutes)],
+      ['easy_run']
+    );
+  }
+
+  /**
+   * Create a long run session
+   */
+  protected createLongRun(durationMinutes: number, day: string = 'Sunday', withMPFinish: boolean = false, mpMinutes: number = 0): Session {
+    const tokens = withMPFinish && mpMinutes > 0
+      ? [TOKEN_PATTERNS.long_run_with_mp(durationMinutes, mpMinutes)]
+      : [TOKEN_PATTERNS.long_run(durationMinutes)];
+
+    const description = withMPFinish && mpMinutes > 0
+      ? `Long run with final ${mpMinutes} minutes at marathon pace`
+      : `Long run at easy, conversational pace`;
+
+    return this.createSession(
+      day,
+      'Long Run',
+      description,
+      durationMinutes,
+      tokens,
+      ['long_run']
+    );
+  }
+
+  /**
+   * Create a strides session (easy run with strides)
+   */
+  protected createStridesSession(baseDurationMinutes: number = 35, day: string = 'Tuesday'): Session {
+    return this.createSession(
+      day,
+      'Easy Run + Strides',
+      'Easy run with 6x20s strides at the end',
+      baseDurationMinutes + 5,
+      [TOKEN_PATTERNS.easy_run(baseDurationMinutes), TOKEN_PATTERNS.strides_6x20s],
+      ['easy_run', 'strides']
+    );
+  }
+
+  /**
+   * Calculate target volume for specific week based on phase and recovery
+   */
+  protected calculateWeekVolume(
+    weekNumber: number,
+    phase: Phase,
+    phaseStructure: PhaseStructure
+  ): number {
+    const startVolume = this.calculateStartingVolume();
+    const peakVolume = this.calculatePeakVolume();
+
+    // Linear progression within phase
+    const progressInPhase = (weekNumber - phase.start_week) / Math.max(1, phase.weeks_in_phase - 1);
+    const targetVolume = startVolume + (peakVolume - startVolume) * progressInPhase * phase.volume_multiplier;
+
+    // Apply recovery week reduction
+    if (this.isRecoveryWeek(weekNumber, phaseStructure)) {
+      return Math.round(targetVolume * 0.7); // 30% reduction
+    }
+
+    return Math.round(targetVolume);
+  }
+
+  /**
+   * Parse days per week string to number range
+   */
+  protected parseDaysPerWeek(): { min: number; max: number } {
+    const parts = this.params.days_per_week.split('-').map(n => parseInt(n, 10));
+    return {
+      min: parts[0],
+      max: parts[1] || parts[0]
+    };
+  }
+
+  /**
+   * Get the target number of running days based on days_per_week
+   */
+  protected getRunningDays(): number {
+    const { min, max } = this.parseDaysPerWeek();
+    return Math.round((min + max) / 2);
+  }
+
+  /**
+   * Assign days to sessions based on workout type
+   * Prioritizes: Long run → Quality → Easy
+   */
+  protected assignDaysToSessions(sessions: Session[], _numDays: number): Session[] {
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    
+    // Separate by type
+    const longRuns = sessions.filter(s => s.tags.includes('long_run'));
+    const hardSessions = sessions.filter(s => 
+      s.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold'].includes(t))
+    );
+    const easySessions = sessions.filter(s => 
+      !s.tags.includes('long_run') && 
+      !s.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold'].includes(t))
+    );
+
+    const assignedSessions: Session[] = [];
+    const usedDays = new Set<string>();
+
+    // Long run on Saturday or Sunday
+    for (const longRun of longRuns) {
+      const preferredDay = 'Sunday';
+      if (!usedDays.has(preferredDay)) {
+        longRun.day = preferredDay;
+        usedDays.add(preferredDay);
+        assignedSessions.push(longRun);
+      }
+    }
+
+    // Hard sessions on Tuesday and Thursday (avoid consecutive)
+    const hardDays = ['Tuesday', 'Thursday', 'Saturday'];
+    for (const hardSession of hardSessions) {
+      for (const day of hardDays) {
+        if (!usedDays.has(day)) {
+          hardSession.day = day;
+          usedDays.add(day);
+          assignedSessions.push(hardSession);
+          break;
+        }
+      }
+    }
+
+    // Easy sessions on remaining days
+    for (const easySession of easySessions) {
+      for (const day of dayOrder) {
+        if (!usedDays.has(day)) {
+          easySession.day = day;
+          usedDays.add(day);
+          assignedSessions.push(easySession);
+          break;
+        }
+      }
+    }
+
+    return assignedSessions;
+  }
+
+  /**
+   * Distribute weekly volume across sessions
+   */
+  protected distributeVolume(
+    weeklyVolume: number,
+    numDays: number,
+    includeLongRun: boolean
+  ): number[] {
+    const distribution: number[] = [];
+
+    if (includeLongRun) {
+      // Long run is 25-30% of weekly volume
+      const longRunMiles = Math.min(
+        weeklyVolume * 0.28,
+        this.getLongRunCap()
+      );
+      distribution.push(longRunMiles);
+
+      // Distribute remaining across other days
+      const remainingVolume = weeklyVolume - longRunMiles;
+      const remainingDays = numDays - 1;
+      for (let i = 0; i < remainingDays; i++) {
+        distribution.push(remainingVolume / remainingDays);
+      }
+    } else {
+      // Evenly distribute
+      for (let i = 0; i < numDays; i++) {
+        distribution.push(weeklyVolume / numDays);
+      }
+    }
+
+    return distribution.map(v => Math.round(v));
+  }
+
+  /**
+   * Convert miles to approximate minutes at easy pace
+   * Assumes ~9:00/mile for beginners, ~8:00 for intermediate, ~7:30 for advanced
+   */
+  protected milesToMinutes(miles: number): number {
+    const paceMinPerMile: Record<string, number> = {
+      'beginner': 10,
+      'intermediate': 9,
+      'advanced': 8
+    };
+    const pace = paceMinPerMile[this.params.fitness] || 9;
+    return Math.round(miles * pace);
+  }
+
+  /**
+   * Round duration to nearest 5 minutes
+   */
+  protected roundToFiveMinutes(minutes: number): number {
+    return Math.round(minutes / 5) * 5;
+  }
+
+  // ============================================================================
+  // PLAN METADATA GENERATION
+  // ============================================================================
+
+  /**
+   * Generate plan name based on parameters
+   */
+  protected generatePlanName(): string {
+    const distanceNames: Record<string, string> = {
+      '5k': '5K',
+      '10k': '10K',
+      'half': 'Half Marathon',
+      'marathon': 'Marathon',
+      'maintenance': 'Base Fitness'
+    };
+    
+    const goalNames: Record<string, string> = {
+      'complete': 'Finisher',
+      'speed': 'Fast'
+    };
+
+    const distance = distanceNames[this.params.distance] || this.params.distance;
+    const goal = this.params.goal ? goalNames[this.params.goal] : '';
+    
+    return `${distance} ${goal} Plan - ${this.params.duration_weeks} Weeks`.trim().replace(/\s+/g, ' ');
+  }
+
+  /**
+   * Generate plan description
+   */
+  protected generatePlanDescription(): string {
+    const phaseStructure = this.determinePhaseStructure();
+    const phaseNames = phaseStructure.phases.map(p => p.name).join(' → ');
+    
+    return `A ${this.params.duration_weeks}-week progressive training plan designed for ${this.params.fitness}-level runners. ` +
+      `Builds through ${phaseNames} phases with ${this.getRunningDays()} running days per week.`;
+  }
+
+  /**
+   * Generate weekly summary for a given week
+   */
+  protected generateWeeklySummary(
+    weekNumber: number,
+    sessions: Session[],
+    phase: Phase,
+    isRecovery: boolean
+  ): WeeklySummary {
+    const hardSessions = sessions.filter(s => 
+      s.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold'].includes(t))
+    );
+    
+    const totalDuration = sessions.reduce((sum, s) => sum + s.duration, 0);
+    const hours = Math.round(totalDuration / 60 * 10) / 10;
+
+    const keyWorkouts = sessions
+      .filter(s => s.tags.includes('long_run') || s.tags.some(t => ['intervals', 'tempo'].includes(t)))
+      .map(s => s.name);
+
+    return {
+      focus: isRecovery ? 'Recovery Week' : phase.focus,
+      key_workouts: keyWorkouts,
+      estimated_hours: hours,
+      hard_sessions: hardSessions.length,
+      notes: isRecovery ? 'Reduced volume for recovery and adaptation' : ''
+    };
+  }
+}
