@@ -5,6 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/use-toast';
 
 // ============================================================================
 // TYPES
@@ -94,6 +95,7 @@ interface GeneratedPlan {
 
 export default function PlanWizard() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [step, setStep] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateProgress, setGenerateProgress] = useState(0);
@@ -248,25 +250,34 @@ export default function PlanWizard() {
     }
   };
 
-  const handleAccept = async () => {
+  const handleAccept = () => {
     if (!generatedPlan) return;
     
-    setIsActivating(true);
-    setError(null);
+    // Show toast immediately
+    toast({
+      title: "Plan accepted",
+      description: "Setting up your training schedule...",
+    });
 
-    try {
-      // Activate the plan
-      await supabase.functions.invoke('activate-plan', {
-        body: { plan_id: generatedPlan.plan_id }
+    // Navigate immediately
+    navigate('/', { state: { openPlans: true, focusPlanId: generatedPlan.plan_id } });
+    
+    // Activate in background (don't await - it can be slow)
+    supabase.functions.invoke('activate-plan', {
+      body: { plan_id: generatedPlan.plan_id }
+    }).then(() => {
+      toast({
+        title: "Plan ready",
+        description: "Your training plan is now active.",
       });
-
-      // Navigate to weekly view with plan focused
-      navigate('/', { state: { openPlans: true, focusPlanId: generatedPlan.plan_id } });
-    } catch (err) {
+    }).catch(err => {
       console.error('Activation error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to activate plan');
-      setIsActivating(false);
-    }
+      toast({
+        title: "Activation issue",
+        description: "Plan saved but may need refresh.",
+        variant: "destructive",
+      });
+    });
   };
 
   const handleReject = async () => {
@@ -592,23 +603,14 @@ export default function PlanWizard() {
               variant="outline"
               onClick={handleReject}
               className="flex-1"
-              disabled={isActivating}
             >
               Start Over
             </Button>
             <Button
               onClick={handleAccept}
               className="flex-1"
-              disabled={isActivating}
             >
-              {isActivating ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Activating...
-                </>
-              ) : (
-                'Accept Plan'
-              )}
+              Accept Plan
             </Button>
           </div>
         </div>
