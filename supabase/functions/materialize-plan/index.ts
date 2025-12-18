@@ -1155,7 +1155,11 @@ Deno.serve(async (req) => {
           const v3 = withIndex.map(toV3Step);
           // Recalculate total from v3 steps (which have calculated durations for distance-based steps)
           const actualTotal = v3.reduce((sum:number, st:any) => sum + (Number(st?.seconds) || 0), 0);
-          const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: actualTotal }, total_duration_seconds: actualTotal, duration: Math.max(1, Math.round(actualTotal/60)) };
+          // For strength workouts with no calculated duration, preserve the original duration from the plan
+          const originalDuration = typeof row.duration === 'number' && row.duration > 0 ? row.duration : 0;
+          const finalTotalSeconds = actualTotal > 0 ? actualTotal : (originalDuration * 60);
+          const finalDuration = actualTotal > 0 ? Math.round(actualTotal / 60) : (originalDuration > 0 ? originalDuration : 1);
+          const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds }, total_duration_seconds: finalTotalSeconds, duration: Math.max(1, finalDuration) };
           
           // Debug: Log band exercises before DB write
           const bandSteps = v3.filter((st:any) => st?.kind === 'strength' && st?.strength?.name?.toLowerCase().includes('band'));

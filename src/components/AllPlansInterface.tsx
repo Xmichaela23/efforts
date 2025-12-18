@@ -1671,7 +1671,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         lines.push(`### ${d}`);
         for (const w of groups[d]) {
           const meta: string[] = [];
-          if (w.intensity) meta.push(`${w.intensity}`);
+          // Handle intensity - could be string or object
+          if (w.intensity) {
+            if (typeof w.intensity === 'string') {
+              meta.push(w.intensity);
+            } else if (typeof w.intensity === 'object' && w.intensity.label) {
+              meta.push(w.intensity.label);
+            }
+          }
           if (typeof w.duration === 'number') meta.push(fmtHM(w.duration));
           lines.push(`- ${w.name}${meta.length ? ` (${meta.join(' • ')})` : ''}`);
           if (w.description) lines.push(`  - ${w.description}`);

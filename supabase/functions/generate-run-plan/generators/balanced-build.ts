@@ -53,28 +53,31 @@ export class BalancedBuildGenerator extends BaseGenerator {
     const longRunMiles = Math.min(weekVolume * 0.28, this.getLongRunCap());
     const longRunMinutes = this.roundToFiveMinutes(this.milesToMinutes(longRunMiles));
 
-    // Long run (always on Sunday unless very short plan in early base)
-    if (phase.name !== 'Base' || weekNumber > 2) {
-      const withMP = phase.name === 'Race Prep' && !isRecovery && 
-                     (this.params.distance === 'marathon' || this.params.distance === 'half');
-      const mpMinutes = withMP ? Math.round(longRunMinutes * 0.15) : 0;
-      
-      sessions.push(this.createLongRun(
-        isRecovery ? Math.round(longRunMinutes * 0.7) : longRunMinutes,
-        'Sunday',
-        withMP,
-        mpMinutes
-      ));
-    }
+    // Long run (always on Sunday)
+    const withMP = phase.name === 'Race Prep' && !isRecovery && 
+                   (this.params.distance === 'marathon' || this.params.distance === 'half');
+    const mpMinutes = withMP ? Math.round(longRunMinutes * 0.15) : 0;
+    
+    sessions.push(this.createLongRun(
+      isRecovery ? Math.round(longRunMinutes * 0.7) : longRunMinutes,
+      'Sunday',
+      withMP,
+      mpMinutes
+    ));
 
     // Quality sessions based on phase (Daniels 2Q system)
     if (!isRecovery) {
       switch (phase.name) {
         case 'Base':
-          // Foundation phase: Easy + strides only
+          // Foundation phase: Build aerobic base with strides and light fartlek
           sessions.push(this.createStridesSession(35, 'Tuesday'));
           if (runningDays >= 5) {
-            sessions.push(this.createStridesSession(30, 'Thursday'));
+            // Add fartlek or hill strides for variety in Base phase
+            if (weekNumber >= 2) {
+              sessions.push(this.createBaseFartlek(weekNumber));
+            } else {
+              sessions.push(this.createStridesSession(30, 'Thursday'));
+            }
           }
           break;
 
@@ -291,6 +294,27 @@ export class BalancedBuildGenerator extends BaseGenerator {
         TOKEN_PATTERNS.cooldown_easy_10min
       ],
       ['hard_run', 'intervals']
+    );
+  }
+
+  /**
+   * Create base phase fartlek session
+   * Unstructured speed play to build aerobic capacity
+   */
+  private createBaseFartlek(weekNumber: number): Session {
+    const pickups = 4 + Math.min(weekNumber, 4); // 5-8 pickups as weeks progress
+    
+    return this.createSession(
+      'Thursday',
+      'Aerobic Fartlek',
+      `${pickups}x30-60s pickups at comfortably hard effort with easy jogging recovery`,
+      40,
+      [
+        TOKEN_PATTERNS.warmup_easy_10min,
+        `fartlek_${pickups}x30-60s_moderate`,
+        TOKEN_PATTERNS.cooldown_easy_10min
+      ],
+      ['moderate_run', 'fartlek']
     );
   }
 }
