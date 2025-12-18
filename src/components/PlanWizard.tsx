@@ -256,8 +256,8 @@ export default function PlanWizard() {
     // Show toast with info about background processing
     toast({
       title: "Building your schedule",
-      description: "This takes about 30 seconds. Feel free to leave - your plan will be ready when you return.",
-      duration: 10000,
+      description: "This takes 1-2 minutes. Feel free to use the app or leave - your plan will be ready when you return.",
+      duration: 15000,
     });
 
     // Navigate to dashboard
