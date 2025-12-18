@@ -83,12 +83,23 @@ function getAvailableDays(approach: Approach | null): DaysPerWeek[] {
 // COMPONENT
 // ============================================================================
 
+interface GeneratedPlan {
+  plan_id: string;
+  name: string;
+  description: string;
+  duration_weeks: number;
+  first_week_sessions: any[];
+  preview: any;
+}
+
 export default function PlanWizard() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateProgress, setGenerateProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [generatedPlan, setGeneratedPlan] = useState<GeneratedPlan | null>(null);
+  const [isActivating, setIsActivating] = useState(false);
   
   // Default to next Monday
   const getNextMonday = () => {
@@ -209,13 +220,24 @@ export default function PlanWizard() {
 
       setGenerateProgress(100);
 
-      // Activate the plan in background (don't await)
-      supabase.functions.invoke('activate-plan', {
-        body: { plan_id: result.plan_id }
-      }).catch(err => console.error('Activation error:', err));
+      // Fetch the plan to get first week sessions
+      const { data: planData } = await supabase
+        .from('plans')
+        .select('name, description, sessions_by_week')
+        .eq('id', result.plan_id)
+        .single();
 
-      // Navigate to weekly view with plan focused
-      navigate('/', { state: { openPlans: true, focusPlanId: result.plan_id } });
+      const firstWeekSessions = planData?.sessions_by_week?.['1'] || [];
+
+      // Store generated plan for preview
+      setGeneratedPlan({
+        plan_id: result.plan_id,
+        name: planData?.name || result.preview?.name || 'Training Plan',
+        description: planData?.description || result.preview?.description || '',
+        duration_weeks: state.duration,
+        first_week_sessions: firstWeekSessions,
+        preview: result.preview
+      });
 
     } catch (err) {
       clearInterval(progressInterval);
@@ -224,6 +246,41 @@ export default function PlanWizard() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleAccept = async () => {
+    if (!generatedPlan) return;
+    
+    setIsActivating(true);
+    setError(null);
+
+    try {
+      // Activate the plan
+      await supabase.functions.invoke('activate-plan', {
+        body: { plan_id: generatedPlan.plan_id }
+      });
+
+      // Navigate to weekly view with plan focused
+      navigate('/', { state: { openPlans: true, focusPlanId: generatedPlan.plan_id } });
+    } catch (err) {
+      console.error('Activation error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to activate plan');
+      setIsActivating(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!generatedPlan) return;
+    
+    // Delete the generated plan
+    await supabase
+      .from('plans')
+      .delete()
+      .eq('id', generatedPlan.plan_id);
+
+    // Go back to wizard
+    setGeneratedPlan(null);
+    setStep(8); // Back to last step
   };
 
   // ============================================================================
@@ -460,6 +517,100 @@ export default function PlanWizard() {
              generateProgress < 90 ? 'Optimizing schedule...' :
              'Finalizing plan...'}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show plan preview
+  if (generatedPlan) {
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const sortedSessions = [...generatedPlan.first_week_sessions].sort((a, b) => 
+      dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day)
+    );
+
+    return (
+      <div className="min-h-screen bg-white">
+        {/* Header */}
+        <div className="border-b px-4 py-3">
+          <h1 className="text-lg font-semibold text-center">Your Plan</h1>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 pb-32 max-w-lg mx-auto">
+          {/* Plan summary */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold mb-2">{generatedPlan.name}</h2>
+            <p className="text-sm text-gray-600 mb-3">{generatedPlan.description}</p>
+            <div className="flex gap-4 text-sm text-gray-500">
+              <span>{generatedPlan.duration_weeks} weeks</span>
+              <span>Starts {new Date(state.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+            </div>
+          </div>
+
+          {/* Week 1 preview */}
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-gray-500 mb-3">WEEK 1 PREVIEW</h3>
+            <div className="space-y-2">
+              {sortedSessions.length > 0 ? (
+                sortedSessions.map((session: any, idx: number) => (
+                  <div 
+                    key={idx} 
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-400 w-12">
+                          {session.day?.slice(0, 3)}
+                        </span>
+                        <span className="font-medium text-sm">{session.name}</span>
+                      </div>
+                      {session.description && (
+                        <p className="text-xs text-gray-500 mt-1 ml-14">{session.description}</p>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400">{session.duration}m</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">No sessions in week 1</p>
+              )}
+            </div>
+          </div>
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-4">
+          <div className="max-w-lg mx-auto flex gap-3">
+            <Button
+              variant="outline"
+              onClick={handleReject}
+              className="flex-1"
+              disabled={isActivating}
+            >
+              Start Over
+            </Button>
+            <Button
+              onClick={handleAccept}
+              className="flex-1"
+              disabled={isActivating}
+            >
+              {isActivating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Activating...
+                </>
+              ) : (
+                'Accept Plan'
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     );
