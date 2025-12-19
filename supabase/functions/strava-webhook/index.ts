@@ -534,6 +534,8 @@ async function updateWorkoutFromStravaActivity(userId: string, activityData: any
       description: `Updated from Strava: ${activityData.name || ''}`.trim(),
       workout_status: 'completed',
       updated_at: new Date().toISOString(),
+      // Extract local date directly from start_date_local without timezone conversion
+      date: (activityData.start_date_local || activityData.start_date || '').split('T')[0] || undefined,
       timestamp: new Date(activityData.start_date || activityData.start_date_local || Date.now()).toISOString(),
       is_strava_imported: true,
       gps_trackpoints: activityData.map?.polyline || activityData.map?.summary_polyline || null,

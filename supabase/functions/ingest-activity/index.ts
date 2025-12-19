@@ -20,6 +20,21 @@ function toIsoDate(dateLike) {
     return null;
   }
 }
+
+// Extract local date from Strava's start_date_local without timezone conversion
+// Strava's start_date_local is already in local time format (e.g., "2025-12-19T08:30:00Z" represents local time)
+// We just need to extract the YYYY-MM-DD portion directly
+function extractStravaLocalDate(startDateLocal: string | null | undefined, startDateUtc: string | null | undefined): string | null {
+  // Prefer start_date_local - extract date portion directly without Date parsing
+  if (startDateLocal && typeof startDateLocal === 'string' && startDateLocal.includes('T')) {
+    return startDateLocal.split('T')[0];
+  }
+  // Fallback to start_date (UTC) - this may be off by a day for some timezones
+  if (startDateUtc && typeof startDateUtc === 'string' && startDateUtc.includes('T')) {
+    return startDateUtc.split('T')[0];
+  }
+  return null;
+}
 function toIso(dateLike) {
   try {
     if (!dateLike) return null;
@@ -160,7 +175,7 @@ function garminLocalDateAndTimestamp(a) {
   };
 }
 function mapStravaToWorkout(activity, userId) {
-  const start = activity.start_date || activity.start_date_local;
+  // Use start_date_local for the calendar date (user's local day), start_date for UTC timestamp
   const durationMin = activity.moving_time != null ? Math.max(0, Math.round(activity.moving_time / 60)) : null;
   const distanceKm = activity.distance != null ? Number((activity.distance / 1000).toFixed(3)) : null;
   const sport = (activity.sport_type || activity.type || '').toLowerCase();
@@ -439,7 +454,7 @@ function mapStravaToWorkout(activity, userId) {
     user_id: userId,
     name: activity.name || 'Strava Activity',
     type,
-    date: toIsoDate(start),
+    date: extractStravaLocalDate(activity.start_date_local, activity.start_date),
     timestamp: toIso(activity.start_date || activity.start_date_local || new Date()),
     duration: durationMin,
     moving_time: durationMin,

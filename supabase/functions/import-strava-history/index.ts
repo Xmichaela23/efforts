@@ -579,7 +579,9 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     type,
     user_id: userId,
 
-    date: new Date(a.start_date_local || a.start_date).toISOString().split('T')[0],
+    // Extract local date directly from start_date_local without timezone conversion
+    // Strava's start_date_local is already the user's local time - just extract YYYY-MM-DD
+    date: (a.start_date_local || a.start_date || '').split('T')[0] || new Date().toISOString().split('T')[0],
     timestamp: new Date(a.start_date).toISOString(),
 
     duration,
