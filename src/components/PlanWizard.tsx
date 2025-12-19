@@ -67,24 +67,29 @@ const FITNESS_LEVELS = {
     mpwRange: '0-12 mpw',
     description: 'New to running or returning from break',
     availableMethodologies: [] as Approach[],
+    marathonMethodologies: [] as Approach[],
   },
   beginner: {
     label: 'Beginner',
     mpwRange: '12-25 mpw',
     description: 'Running 3-4 days/week, comfortable with 6-8 mile runs',
     availableMethodologies: ['balanced_build', 'time_efficient', 'hybrid_athlete'] as Approach[],
+    // Marathon: Time Efficient locked (only 3 days/32 mpw is risky for first marathon)
+    marathonMethodologies: ['balanced_build', 'hybrid_athlete'] as Approach[],
   },
   intermediate: {
     label: 'Intermediate',
     mpwRange: '25-40 mpw',
     description: 'Running 5-6 days/week, regular 10-12 mile long runs',
     availableMethodologies: ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'] as Approach[],
+    marathonMethodologies: ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'] as Approach[],
   },
   advanced: {
     label: 'Advanced',
     mpwRange: '40+ mpw',
     description: 'Experienced runner, 6-7 days/week, 14+ mile long runs',
     availableMethodologies: ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'] as Approach[],
+    marathonMethodologies: ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'] as Approach[],
   }
 };
 
@@ -92,17 +97,31 @@ const FITNESS_LEVELS = {
 // GATING LOGIC
 // ============================================================================
 
-function getAvailableApproaches(fitness: Fitness | null): Approach[] {
+function getAvailableApproaches(fitness: Fitness | null, distance: Distance | null): Approach[] {
   if (!fitness || fitness === 'novice') return [];
-  return FITNESS_LEVELS[fitness].availableMethodologies;
+  
+  const level = FITNESS_LEVELS[fitness];
+  
+  // Use marathon-specific gating for marathon distance
+  if (distance === 'marathon') {
+    return level.marathonMethodologies;
+  }
+  
+  return level.availableMethodologies;
 }
 
-function isApproachLocked(approach: Approach, fitness: Fitness | null): boolean {
+function isApproachLocked(approach: Approach, fitness: Fitness | null, distance: Distance | null): boolean {
   if (!fitness) return true;
-  return !FITNESS_LEVELS[fitness].availableMethodologies.includes(approach);
+  const available = getAvailableApproaches(fitness, distance);
+  return !available.includes(approach);
 }
 
-function getLockedReason(approach: Approach): string {
+function getLockedReason(approach: Approach, fitness: Fitness | null, distance: Distance | null): string {
+  // Time Efficient locked for beginner marathon
+  if (approach === 'time_efficient' && fitness === 'beginner' && distance === 'marathon') {
+    return 'Only 3 runs/week (32 mpw peak) is risky for first marathon. Unlocks at Intermediate+ fitness.';
+  }
+  
   if (approach === 'volume_progression') {
     return 'Requires Intermediate+ fitness (25+ mpw). Starts at 35 mpw with 6-7 days/week.';
   }
@@ -522,7 +541,9 @@ export default function PlanWizard() {
         );
 
       case 6:
-        const availableApproaches = getAvailableApproaches(state.fitness);
+        const availableApproaches = getAvailableApproaches(state.fitness, state.distance);
+        const isMarathonBeginner = state.fitness === 'beginner' && state.distance === 'marathon';
+        
         return (
           <StepContainer title="Training approach">
             <RadioGroup
@@ -530,42 +551,61 @@ export default function PlanWizard() {
               onValueChange={(v) => updateState('approach', v as Approach)}
               className="space-y-3"
             >
+              {/* Balanced Build - always available for non-novice */}
               <RadioOption 
                 value="balanced_build" 
-                label="Balanced Build" 
+                label={isMarathonBeginner ? "Balanced Build (Recommended)" : "Balanced Build"}
                 description={APPROACH_CONSTRAINTS.balanced_build.description}
                 disabled={!availableApproaches.includes('balanced_build')}
               />
-              <RadioOption 
+              
+              {/* Time Efficient - locked for marathon beginners */}
+              <LockedRadioOption 
                 value="time_efficient" 
                 label="Time Efficient" 
                 description={APPROACH_CONSTRAINTS.time_efficient.description}
-                disabled={!availableApproaches.includes('time_efficient')}
+                locked={isApproachLocked('time_efficient', state.fitness, state.distance)}
+                lockedReason={getLockedReason('time_efficient', state.fitness, state.distance)}
+                onValueChange={(v) => updateState('approach', v as Approach)}
+                currentValue={state.approach || ''}
               />
+              
+              {/* Volume Progression - locked for beginners */}
               <LockedRadioOption 
                 value="volume_progression" 
                 label="Volume Progression" 
                 description={APPROACH_CONSTRAINTS.volume_progression.description}
-                locked={isApproachLocked('volume_progression', state.fitness)}
-                lockedReason={getLockedReason('volume_progression')}
+                locked={isApproachLocked('volume_progression', state.fitness, state.distance)}
+                lockedReason={getLockedReason('volume_progression', state.fitness, state.distance)}
                 onValueChange={(v) => updateState('approach', v as Approach)}
                 currentValue={state.approach || ''}
               />
+              
+              {/* Cumulative Load - locked for beginners */}
               <LockedRadioOption 
                 value="cumulative_load" 
                 label="Cumulative Load" 
                 description={APPROACH_CONSTRAINTS.cumulative_load.description}
-                locked={isApproachLocked('cumulative_load', state.fitness)}
-                lockedReason={getLockedReason('cumulative_load')}
+                locked={isApproachLocked('cumulative_load', state.fitness, state.distance)}
+                lockedReason={getLockedReason('cumulative_load', state.fitness, state.distance)}
                 onValueChange={(v) => updateState('approach', v as Approach)}
                 currentValue={state.approach || ''}
               />
-              <RadioOption 
-                value="hybrid_athlete" 
-                label="Hybrid Athlete" 
-                description={APPROACH_CONSTRAINTS.hybrid_athlete.description}
-                disabled={!availableApproaches.includes('hybrid_athlete')}
-              />
+              
+              {/* Hybrid Athlete - available with note for marathon */}
+              <div>
+                <RadioOption 
+                  value="hybrid_athlete" 
+                  label="Hybrid Athlete" 
+                  description={APPROACH_CONSTRAINTS.hybrid_athlete.description}
+                  disabled={!availableApproaches.includes('hybrid_athlete')}
+                />
+                {isMarathonBeginner && state.approach !== 'hybrid_athlete' && (
+                  <p className="text-xs text-amber-600 mt-1 ml-7">
+                    Note: Running volume reduced to 40 mpw to accommodate strength training.
+                  </p>
+                )}
+              </div>
             </RadioGroup>
           </StepContainer>
         );
