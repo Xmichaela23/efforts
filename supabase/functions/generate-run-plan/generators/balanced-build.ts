@@ -54,9 +54,12 @@ export class BalancedBuildGenerator extends BaseGenerator {
     const longRunMinutes = this.calculateLongRunMinutes(weekNumber, phase, isRecovery, phaseStructure);
     
     // Long run (always on Sunday)
-    const withMP = phase.name === 'Race Prep' && !isRecovery && !isCompletionGoal &&
+    // For Race Prep phase, add MP segments (even for completion goal - they need race pace familiarity)
+    const withMP = phase.name === 'Race Prep' && !isRecovery && 
                    (this.params.distance === 'marathon' || this.params.distance === 'half');
-    const mpMinutes = withMP ? Math.round(longRunMinutes * 0.15) : 0;
+    // Completion goal: shorter MP segments (10-15%), Speed goal: longer (15-20%)
+    const mpPercent = isCompletionGoal ? 0.10 : 0.15;
+    const mpMinutes = withMP ? Math.round(longRunMinutes * mpPercent) : 0;
     
     sessions.push(this.createLongRun(longRunMinutes, 'Sunday', withMP, mpMinutes));
 
@@ -194,8 +197,8 @@ export class BalancedBuildGenerator extends BaseGenerator {
         break;
 
       case 'Taper':
-        // Light fartlek to stay fresh
-        sessions.push(this.createBaseFartlek(weekNumber));
+        // Very easy week - just strides to stay sharp, no hard effort
+        sessions.push(this.createStridesSession(30, 'Tuesday'));
         break;
     }
   }
@@ -250,6 +253,10 @@ export class BalancedBuildGenerator extends BaseGenerator {
   // EASY RUN FILLER
   // ============================================================================
 
+  /**
+   * ALWAYS fill to target day count with easy runs
+   * This ensures consistent training frequency regardless of volume
+   */
   private fillWithEasyRuns(
     sessions: Session[], 
     runningDays: number,
@@ -257,18 +264,31 @@ export class BalancedBuildGenerator extends BaseGenerator {
     phase: Phase,
     phaseStructure: PhaseStructure
   ): void {
-    const weekVolume = this.calculateWeekVolume(weekNumber, phase, phaseStructure);
-    const usedVolume = sessions.reduce((sum, s) => sum + (s.duration / 9), 0); // rough miles estimate
-    const remainingVolume = Math.max(0, weekVolume - usedVolume);
     const remainingDays = Math.max(0, runningDays - sessions.length);
     
-    if (remainingDays > 0 && remainingVolume > 0) {
+    if (remainingDays <= 0) return;
+
+    // Calculate easy run duration based on phase and fitness
+    const weekVolume = this.calculateWeekVolume(weekNumber, phase, phaseStructure);
+    const usedVolume = sessions.reduce((sum, s) => sum + (s.duration / 9), 0);
+    const remainingVolume = Math.max(0, weekVolume - usedVolume);
+    
+    // Determine easy run duration
+    let easyMinutes: number;
+    if (remainingVolume > 0) {
       const easyMilesEach = remainingVolume / remainingDays;
-      const easyMinutes = this.roundToFiveMinutes(this.milesToMinutes(easyMilesEach));
-      
-      for (let i = 0; i < remainingDays; i++) {
-        sessions.push(this.createEasyRun(Math.max(25, Math.min(60, easyMinutes))));
-      }
+      easyMinutes = this.roundToFiveMinutes(this.milesToMinutes(easyMilesEach));
+    } else {
+      // Even if volume is "used up", still add minimum easy runs for frequency
+      easyMinutes = this.params.fitness === 'beginner' ? 25 : 
+                    this.params.fitness === 'intermediate' ? 30 : 35;
+    }
+    
+    // Clamp to reasonable range
+    easyMinutes = Math.max(25, Math.min(50, easyMinutes));
+    
+    for (let i = 0; i < remainingDays; i++) {
+      sessions.push(this.createEasyRun(easyMinutes));
     }
   }
 
@@ -302,13 +322,14 @@ export class BalancedBuildGenerator extends BaseGenerator {
 
   /**
    * Race prep for completion goal
-   * Short marathon pace segments for familiarity
+   * Short marathon pace segments for familiarity - PROGRESSIVE
    */
   private createCompletionRacePrepSession(weekNumber: number, phase: Phase): Session {
     const weekInPhase = weekNumber - phase.start_week + 1;
     
-    // Short MP work: 2-4 miles max for beginners
-    const mpMiles = Math.min(4, 2 + weekInPhase);
+    // Progressive MP work: 2→3→4→5 miles (capped at 5 for beginners)
+    const maxMiles = this.params.fitness === 'beginner' ? 5 : 6;
+    const mpMiles = Math.min(maxMiles, 1 + weekInPhase);
     
     if (this.params.distance === 'marathon' || this.params.distance === 'half') {
       return this.createSession(
