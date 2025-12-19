@@ -13,53 +13,70 @@ import { TrainingPlan, Session, Phase, PhaseStructure, TOKEN_PATTERNS } from '..
 
 // Long run progression by fitness level (in miles)
 // Index = week number - 1
+// Design principles:
+// - Recovery weeks (4, 8, 12) drop ~30%
+// - Post-recovery jumps stay under 40%
+// - Smooth linear build to peak
+// - Peak at week 15, taper at week 16
 const LONG_RUN_PROGRESSION: Record<string, Record<string, number[]>> = {
   'marathon': {
     'beginner': [
-      8, 9, 10, 7,      // Weeks 1-4 (Base, recovery at 4)
-      11, 12, 13, 9,    // Weeks 5-8 (Base continues, recovery at 8)
-      14, 15, 16, 11,   // Weeks 9-12 (Speed, recovery at 12)
-      17, 18, 20, 12    // Weeks 13-16 (Race Prep, Taper)
+      // Weeks 1-4: Base building
+      8, 9, 10, 7,          // Recovery week 4: 30% drop
+      // Weeks 5-8: Continue base (post-recovery: 7→10 = +43%)
+      10, 11, 12, 8,        // Recovery week 8: 33% drop
+      // Weeks 9-12: Speed phase (post-recovery: 8→11 = +38%)
+      11, 13, 15, 10,       // Recovery week 12: 33% drop
+      // Weeks 13-16: Race Prep + Taper (post-recovery: 10→14 = +40%)
+      14, 16, 18, 10        // Week 15 PEAK (18mi), Week 16 Taper (10mi)
     ],
     'intermediate': [
-      10, 12, 14, 10,   // Weeks 1-4
-      15, 16, 17, 12,   // Weeks 5-8
-      18, 19, 20, 14,   // Weeks 9-12
-      20, 21, 22, 12    // Weeks 13-16
+      // Weeks 1-4
+      10, 12, 14, 10,       // Recovery: 10mi
+      // Weeks 5-8 (post-recovery: 10→13 = +30%)
+      13, 15, 17, 12,       // Recovery: 12mi
+      // Weeks 9-12 (post-recovery: 12→16 = +33%)
+      16, 18, 20, 14,       // Recovery: 14mi
+      // Weeks 13-16 (post-recovery: 14→18 = +29%)
+      18, 20, 22, 12        // Peak 22mi, Taper 12mi
     ],
     'advanced': [
-      12, 14, 16, 11,   // Weeks 1-4
-      17, 18, 19, 14,   // Weeks 5-8
-      20, 21, 22, 16,   // Weeks 9-12
-      22, 22, 22, 14    // Weeks 13-16
+      // Weeks 1-4
+      12, 14, 16, 11,       // Recovery: 11mi
+      // Weeks 5-8 (post-recovery: 11→15 = +36%)
+      15, 17, 19, 14,       // Recovery: 14mi
+      // Weeks 9-12 (post-recovery: 14→18 = +29%)
+      18, 20, 22, 16,       // Recovery: 16mi
+      // Weeks 13-16 (post-recovery: 16→20 = +25%)
+      20, 22, 22, 14        // Peak 22mi (week 14-15), Taper 14mi
     ]
   },
   'half': {
     'beginner': [
-      6, 7, 8, 6,       // Weeks 1-4
-      9, 10, 11, 8,     // Weeks 5-8
-      11, 12, 13, 10    // Weeks 9-12
+      6, 7, 8, 6,           // Weeks 1-4
+      8, 9, 10, 7,          // Weeks 5-8 (post-recovery: 6→8 = +33%)
+      9, 10, 12, 8          // Weeks 9-12 (post-recovery: 7→9 = +29%), Peak 12mi
     ],
     'intermediate': [
-      8, 9, 10, 7,
-      11, 12, 13, 10,
-      14, 14, 15, 10
+      8, 9, 10, 7,          // Weeks 1-4
+      9, 11, 12, 9,         // Weeks 5-8 (post-recovery: 7→9 = +29%)
+      11, 13, 14, 10        // Weeks 9-12 (post-recovery: 9→11 = +22%), Peak 14mi
     ],
     'advanced': [
-      10, 11, 12, 9,
-      13, 14, 15, 11,
-      16, 16, 16, 12
+      10, 11, 12, 9,        // Weeks 1-4
+      11, 13, 14, 10,       // Weeks 5-8 (post-recovery: 9→11 = +22%)
+      12, 14, 16, 12        // Weeks 9-12 (post-recovery: 10→12 = +20%), Peak 16mi
     ]
   },
   '10k': {
-    'beginner': [5, 6, 7, 5, 8, 8, 9, 6, 9, 10, 10, 7],
-    'intermediate': [7, 8, 9, 7, 10, 10, 11, 8, 11, 12, 12, 8],
-    'advanced': [9, 10, 11, 8, 12, 12, 13, 10, 13, 14, 14, 10]
+    'beginner': [5, 6, 7, 5, 6, 7, 8, 6, 7, 8, 9, 6],
+    'intermediate': [7, 8, 9, 7, 8, 9, 10, 8, 9, 10, 11, 8],
+    'advanced': [9, 10, 11, 8, 10, 11, 12, 9, 11, 12, 13, 10]
   },
   '5k': {
-    'beginner': [4, 5, 5, 4, 6, 6, 7, 5, 7, 8, 8, 5],
-    'intermediate': [6, 7, 7, 5, 8, 8, 9, 6, 9, 10, 10, 7],
-    'advanced': [8, 9, 9, 7, 10, 10, 11, 8, 11, 12, 12, 8]
+    'beginner': [4, 5, 5, 4, 5, 6, 6, 5, 6, 7, 7, 5],
+    'intermediate': [6, 7, 7, 5, 6, 7, 8, 6, 7, 8, 9, 6],
+    'advanced': [8, 9, 9, 7, 8, 9, 10, 8, 9, 10, 11, 8]
   }
 };
 
@@ -276,9 +293,14 @@ export class BalancedBuildGenerator extends BaseGenerator {
 
       case 'Speed':
         // For completion goal: Tempo runs instead of intervals
+        // Phase in gradually: Week 1 of Speed = tempo only, Week 2+ add fartlek
+        const weekInSpeedPhase = weekNumber - phase.start_week + 1;
+        
         sessions.push(this.createTempoRun(weekNumber, phase));
         mileageUsed += 5; // Tempo ~5 miles with warmup/cooldown
-        if (runningDays >= 5) {
+        
+        // Only add fartlek after first week in Speed phase (gradual introduction)
+        if (runningDays >= 5 && weekInSpeedPhase >= 2) {
           sessions.push(this.createFartlekSession(weekNumber));
           mileageUsed += 4;
         }
@@ -345,9 +367,14 @@ export class BalancedBuildGenerator extends BaseGenerator {
 
       case 'Speed':
         // Quality phase: Intervals + Threshold
+        // Phase in gradually: Week 1 = intervals only, Week 2+ add threshold
+        const speedWeekInPhase = weekNumber - phase.start_week + 1;
+        
         sessions.push(this.createIntervalSession(weekNumber, phase));
         mileageUsed += 5; // Intervals ~5 miles total
-        if (runningDays >= 5) {
+        
+        // Only add threshold after first week in Speed phase (gradual introduction)
+        if (runningDays >= 5 && speedWeekInPhase >= 2) {
           sessions.push(this.createThresholdSession(weekNumber, phase));
           mileageUsed += 6; // Threshold ~6 miles
         }
