@@ -197,13 +197,33 @@ export function validatePlanSchema(plan: TrainingPlan): ValidationResult {
 
 // Known valid token patterns (simplified - in production, load from token library)
 const VALID_TOKEN_PATTERNS = [
+  // Warmup/Cooldown - time based
   /^warmup_run_(easy|quality)_\d+min$/,
   /^cooldown_easy_\d+min$/,
+  // Warmup/Cooldown - distance based
+  /^warmup_run_easy_\d+mi$/,
+  /^cooldown_easy_\d+mi$/,
+  // Easy runs - time and distance based
   /^run_easy_\d+min$/,
+  /^run_easy_\d+mi$/,
+  // Long runs - time based
   /^longrun_\d+min_(easypace|easy)(_last\d+min_MP)?$/,
+  // Long runs - distance based
+  /^longrun_\d+mi_easypace$/,
+  /^longrun_\d+mi_easypace_last\d+mi_MP$/,
+  // Marathon pace runs
+  /^run_mp_\d+mi$/,
+  // Intervals
   /^interval_\d+x\d+(m|mi)_5kpace_[rR]\d+(s|min)?$/,
+  // Tempo - legacy (5kpace) and new (threshold)
   /^tempo_\d+(min|mi)_5kpace(_plus\d+:\d+)?$/,
+  /^tempo_\d+(min|mi)_threshold$/,
+  // Cruise intervals
   /^cruise_\d+x\d+mi_T_pace_r\d+s$/,
+  /^cruise_\d+x\d+mi_threshold_r\d+s$/,
+  // Fartlek
+  /^fartlek_\d+x\d+-\d+s_moderate$/,
+  // Strides
   /^strides_\d+x\d+[sm]$/
 ];
 
@@ -255,7 +275,9 @@ function isValidToken(token: string): boolean {
   const knownTokens = [
     'warmup_run_easy_10min',
     'warmup_run_quality_12min',
+    'warmup_run_easy_1mi',
     'cooldown_easy_10min',
+    'cooldown_easy_1mi',
     'strides_6x20s',
     'strides_4x100m'
   ];

@@ -10,7 +10,13 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-type Baselines = { ftp?: number; fiveK_pace?: any; fiveKPace?: any; fiveK?: any; easyPace?: any; easy_pace?: any; equipment?: any };
+type Baselines = { 
+  ftp?: number; 
+  fiveK_pace?: any; fiveKPace?: any; fiveK?: any; 
+  easyPace?: any; easy_pace?: any; 
+  marathonPace?: any; marathon_pace?: any;
+  equipment?: any 
+};
 
 function parsePaceToSecPerMi(v: any): number | null {
   try {
@@ -34,8 +40,20 @@ function parsePaceToSecPerMi(v: any): number | null {
   return null;
 }
 
-function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'): number | null {
-  const raw = which==='fivek' ? (b.fiveK_pace ?? b.fiveKPace ?? b.fiveK) : (b.easyPace ?? b.easy_pace);
+function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'): number | null {
+  let raw: any;
+  if (which === 'fivek') {
+    raw = b.fiveK_pace ?? b.fiveKPace ?? b.fiveK;
+  } else if (which === 'marathon') {
+    raw = b.marathonPace ?? b.marathon_pace;
+    // If no marathon pace, estimate from easy pace (+30sec slower)
+    if (raw == null && (b.easyPace || b.easy_pace)) {
+      const easyPace = parsePaceToSecPerMi(b.easyPace ?? b.easy_pace);
+      if (easyPace) return easyPace - 30; // Marathon is faster than easy, typically ~30s/mi
+    }
+  } else {
+    raw = b.easyPace ?? b.easy_pace;
+  }
   return parsePaceToSecPerMi(raw);
 }
 
@@ -383,23 +401,108 @@ function minutesTokenToSeconds(tok: string): number | null {
 function expandRunToken(tok: string, baselines: Baselines): any[] {
   const out: any[] = [];
   const lower = tok.toLowerCase();
-  // warmup/cooldown
+  
+  // Helper: convert miles to meters
+  const milesToMeters = (mi: number) => Math.round(mi * 1609.34);
+  
+  // warmup/cooldown - TIME based
   if (/warmup/.test(lower) && /min/.test(lower)) {
     const sec = minutesTokenToSeconds(lower) ?? 600; out.push({ id: uid(), kind:'warmup', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }
   if (/cooldown/.test(lower) && /min/.test(lower)) {
     const sec = minutesTokenToSeconds(lower) ?? 600; out.push({ id: uid(), kind:'cooldown', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }
-  // long run time based (support longrun_Xmin and long_run_Xmin)
+  
+  // warmup/cooldown - DISTANCE based (1mi)
+  if (/warmup.*1mi/.test(lower)) {
+    out.push({ id: uid(), kind:'warmup', distance_m: milesToMeters(1), pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
+  }
+  if (/cooldown.*1mi/.test(lower)) {
+    out.push({ id: uid(), kind:'cooldown', distance_m: milesToMeters(1), pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
+  }
+  
+  // Long run DISTANCE based with MP segment: longrun_18mi_easypace_last3mi_MP
+  if (/longrun_\d+mi_easypace_last\d+mi_mp/.test(lower)) {
+    const m = lower.match(/longrun_(\d+)mi_easypace_last(\d+)mi_mp/);
+    if (m) {
+      const totalMiles = parseInt(m[1], 10);
+      const mpMiles = parseInt(m[2], 10);
+      const easyMiles = totalMiles - mpMiles;
+      const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
+      const mpPace = secPerMiFromBaseline(baselines, 'marathon') || easyPace; // Fall back to easy if no MP baseline
+      // Easy portion
+      out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(easyMiles), pace_sec_per_mi: easyPace });
+      // MP portion
+      out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(mpMiles), pace_sec_per_mi: mpPace });
+      return out;
+    }
+  }
+  
+  // Long run DISTANCE based: longrun_18mi_easypace
+  if (/longrun_\d+mi_easypace/.test(lower)) {
+    const m = lower.match(/longrun_(\d+)mi/);
+    if (m) {
+      const miles = parseInt(m[1], 10);
+      out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: secPerMiFromBaseline(baselines, 'easy') || undefined });
+      return out;
+    }
+  }
+  
+  // long run TIME based (support longrun_Xmin and long_run_Xmin)
   if (/long[_-]?run_\d+min/.test(lower)) {
     const m = lower.match(/longrun_(\d+)min/); const sec = m ? parseInt(m[1],10)*60 : 3600; out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }
-  // easy run: run_easy_Xmin
+  
+  // Easy run DISTANCE based: run_easy_5mi
+  if (/run_easy_\d+mi/.test(lower)) {
+    const m = lower.match(/run_easy_(\d+)mi/);
+    if (m) {
+      const miles = parseInt(m[1], 10);
+      out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: secPerMiFromBaseline(baselines, 'easy') || undefined });
+      return out;
+    }
+  }
+  
+  // easy run TIME based: run_easy_Xmin
   if (/run_easy_\d+min/.test(lower)) {
     const m = lower.match(/run_easy_(\d+)min/); const sec = m ? parseInt(m[1],10)*60 : 1800; out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }
-  // Tempo: tempo_25min_5kpace_plus0:45 (duration-based)
-  if (/tempo_\d+min/.test(lower)) {
+  
+  // Marathon pace run DISTANCE based: run_mp_5mi
+  if (/run_mp_\d+mi/.test(lower)) {
+    const m = lower.match(/run_mp_(\d+)mi/);
+    if (m) {
+      const miles = parseInt(m[1], 10);
+      const mpPace = secPerMiFromBaseline(baselines, 'marathon') || secPerMiFromBaseline(baselines, 'easy') || undefined;
+      out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: mpPace });
+      return out;
+    }
+  }
+  // Tempo: tempo_25min_threshold (new style)
+  if (/tempo_\d+min_threshold/.test(lower)) {
+    const m = lower.match(/tempo_(\d+)min_threshold/);
+    const sec = m ? parseInt(m[1],10)*60 : 1500;
+    // Threshold pace is ~5K pace + 15-20 sec
+    const fkp = secPerMiFromBaseline(baselines,'fivek');
+    const pace = fkp != null ? (fkp + 20) : undefined;
+    out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: pace }); 
+    return out;
+  }
+  
+  // Tempo: tempo_5mi_threshold (distance-based threshold)
+  if (/tempo_\d+mi_threshold/.test(lower)) {
+    const m = lower.match(/tempo_(\d+)mi_threshold/);
+    if (m) {
+      const miles = parseInt(m[1],10);
+      const fkp = secPerMiFromBaseline(baselines,'fivek');
+      const pace = fkp != null ? (fkp + 20) : undefined;
+      out.push({ id: uid(), kind:'work', distance_m: milesToMeters(miles), pace_sec_per_mi: pace });
+      return out;
+    }
+  }
+  
+  // Tempo: tempo_25min_5kpace_plus0:45 (legacy style)
+  if (/tempo_\d+min_5kpace/.test(lower)) {
     const m = lower.match(/tempo_(\d+)min_5kpace(?:_plus(\d+):(\d+))?/);
     const sec = m ? parseInt(m[1],10)*60 : 1500;
     const fkp = secPerMiFromBaseline(baselines,'fivek');
@@ -407,8 +510,8 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
     const pace = (fkp!=null) ? (fkp + plus) : undefined;
     out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: pace }); return out;
   }
-  // Tempo: tempo_5mi_5kpace_plus1:00 (distance-based)
-  if (/tempo_\d+mi/.test(lower)) {
+  // Tempo: tempo_5mi_5kpace_plus1:00 (legacy distance-based)
+  if (/tempo_\d+mi_5kpace/.test(lower)) {
     const m = lower.match(/tempo_(\d+)mi_5kpace(?:_plus(\d+):(\d+))?/);
     if (m) {
       const miles = parseInt(m[1],10);
@@ -417,6 +520,45 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
       const plus = (m[2] && m[3]) ? (parseInt(m[2],10)*60 + parseInt(m[3],10)) : 0;
       const pace = (fkp!=null) ? (fkp + plus) : undefined;
       out.push({ id: uid(), kind:'work', distance_m: dist_m, pace_sec_per_mi: pace });
+      return out;
+    }
+  }
+  
+  // Fartlek: fartlek_6x30-60s_moderate
+  if (/fartlek_\d+x\d+-\d+s/.test(lower)) {
+    const m = lower.match(/fartlek_(\d+)x(\d+)-(\d+)s/);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const minSec = parseInt(m[2], 10);
+      const maxSec = parseInt(m[3], 10);
+      const avgSec = Math.round((minSec + maxSec) / 2);
+      const fkp = secPerMiFromBaseline(baselines, 'fivek');
+      const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
+      // Fartlek pickups are ~10K pace (5K + 10-15 sec)
+      const pickupPace = fkp != null ? (fkp + 12) : undefined;
+      for (let i = 0; i < reps; i++) {
+        out.push({ id: uid(), kind: 'work', duration_s: avgSec, pace_sec_per_mi: pickupPace });
+        // Recovery is roughly equal duration at easy pace
+        if (i < reps - 1) out.push({ id: uid(), kind: 'recovery', duration_s: avgSec, pace_sec_per_mi: easyPace });
+      }
+      return out;
+    }
+  }
+  
+  // Cruise intervals: cruise_4x1mi_threshold_r60s
+  if (/cruise_\d+x\d+mi_threshold/.test(lower)) {
+    const m = lower.match(/cruise_(\d+)x(\d+)mi_threshold(?:_r(\d+)s)?/);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const miles = parseInt(m[2], 10);
+      const rest_s = m[3] ? parseInt(m[3], 10) : 60;
+      const fkp = secPerMiFromBaseline(baselines, 'fivek');
+      const thresholdPace = fkp != null ? (fkp + 20) : undefined;
+      const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
+      for (let i = 0; i < reps; i++) {
+        out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: thresholdPace });
+        if (rest_s > 0 && i < reps - 1) out.push({ id: uid(), kind: 'recovery', duration_s: rest_s, pace_sec_per_mi: easyPace });
+      }
       return out;
     }
   }
