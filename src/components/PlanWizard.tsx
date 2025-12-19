@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 
 type Discipline = 'run' | 'ride' | 'swim' | 'triathlon' | 'hybrid';
 type Distance = '5k' | '10k' | 'half' | 'marathon';
-type Fitness = 'beginner' | 'intermediate' | 'advanced';
+type Fitness = 'novice' | 'beginner' | 'intermediate' | 'advanced';
 type Goal = 'complete' | 'speed';
 type Approach = 'balanced_build' | 'time_efficient' | 'volume_progression' | 'cumulative_load' | 'hybrid_athlete';
 type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
@@ -58,21 +58,58 @@ const APPROACH_CONSTRAINTS: Record<Approach, { supported_days: DaysPerWeek[]; de
 };
 
 // ============================================================================
+// FITNESS LEVEL DEFINITIONS
+// ============================================================================
+
+const FITNESS_LEVELS = {
+  novice: {
+    label: 'Novice',
+    mpwRange: '0-12 mpw',
+    description: 'New to running or returning from break',
+    availableMethodologies: [] as Approach[],
+  },
+  beginner: {
+    label: 'Beginner',
+    mpwRange: '12-25 mpw',
+    description: 'Running 3-4 days/week, comfortable with 6-8 mile runs',
+    availableMethodologies: ['balanced_build', 'time_efficient', 'hybrid_athlete'] as Approach[],
+  },
+  intermediate: {
+    label: 'Intermediate',
+    mpwRange: '25-40 mpw',
+    description: 'Running 5-6 days/week, regular 10-12 mile long runs',
+    availableMethodologies: ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'] as Approach[],
+  },
+  advanced: {
+    label: 'Advanced',
+    mpwRange: '40+ mpw',
+    description: 'Experienced runner, 6-7 days/week, 14+ mile long runs',
+    availableMethodologies: ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'] as Approach[],
+  }
+};
+
+// ============================================================================
 // GATING LOGIC
 // ============================================================================
 
-function getAvailableApproaches(fitness: Fitness | null, goal: Goal | null): Approach[] {
-  const all: Approach[] = ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'];
-  
-  // Always available
-  const available: Approach[] = ['balanced_build', 'time_efficient', 'hybrid_athlete'];
-  
-  // Volume Progression & Cumulative Load: intermediate/advanced + speed only
-  if (fitness !== 'beginner' && goal === 'speed') {
-    available.push('volume_progression', 'cumulative_load');
+function getAvailableApproaches(fitness: Fitness | null): Approach[] {
+  if (!fitness || fitness === 'novice') return [];
+  return FITNESS_LEVELS[fitness].availableMethodologies;
+}
+
+function isApproachLocked(approach: Approach, fitness: Fitness | null): boolean {
+  if (!fitness) return true;
+  return !FITNESS_LEVELS[fitness].availableMethodologies.includes(approach);
+}
+
+function getLockedReason(approach: Approach): string {
+  if (approach === 'volume_progression') {
+    return 'Requires Intermediate+ fitness (25+ mpw). Starts at 35 mpw with 6-7 days/week.';
   }
-  
-  return all.filter(a => available.includes(a));
+  if (approach === 'cumulative_load') {
+    return 'Requires Intermediate+ fitness (25+ mpw). Includes back-to-back long runs.';
+  }
+  return '';
 }
 
 function getAvailableDays(approach: Approach | null): DaysPerWeek[] {
@@ -140,7 +177,7 @@ export default function PlanWizard() {
     switch (step) {
       case 0: return state.discipline !== null;
       case 1: return state.distance !== null;
-      case 2: return state.fitness !== null;
+      case 2: return state.fitness !== null && state.fitness !== 'novice'; // Novice cannot proceed
       case 3: return state.goal !== null;
       case 4: return state.duration >= 4;
       case 5: return state.startDate !== '';
@@ -150,6 +187,8 @@ export default function PlanWizard() {
       default: return false;
     }
   };
+
+  const isNovice = state.fitness === 'novice';
 
   const handleNext = () => {
     if (step === 0 && state.discipline !== 'run') {
@@ -340,16 +379,73 @@ export default function PlanWizard() {
         );
 
       case 2:
+        // Show base-building prompt for novice
+        if (state.fitness === 'novice') {
+          return (
+            <div className="space-y-6">
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <h3 className="font-semibold text-amber-800 mb-2">Build Your Base First</h3>
+                <p className="text-sm text-amber-700 mb-4">
+                  Your current fitness level (0-12 mpw) needs base building before structured training plans.
+                </p>
+                <div className="text-sm text-amber-700 space-y-2">
+                  <p className="font-medium">All training plans require:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Ability to run 6+ miles comfortably</li>
+                    <li>Current base of 12-15 miles/week minimum</li>
+                    <li>Consistent running 3-4 days/week</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="font-semibold text-blue-800 mb-2">Recommended: 8-12 Week Base Building</h3>
+                <p className="text-sm text-blue-700 mb-3">
+                  Start with easy running 3x per week, gradually building to 15-20 miles per week with comfortable 8-mile long runs.
+                </p>
+                <p className="text-xs text-blue-600">
+                  Once you're running 12+ miles per week consistently, return here to start a training plan.
+                </p>
+              </div>
+
+              <Button
+                variant="outline"
+                onClick={() => updateState('fitness', null)}
+                className="w-full"
+              >
+                Select Different Fitness Level
+              </Button>
+            </div>
+          );
+        }
+
         return (
-          <StepContainer title="Current fitness level">
+          <StepContainer title="Current weekly mileage">
             <RadioGroup
               value={state.fitness || ''}
               onValueChange={(v) => updateState('fitness', v as Fitness)}
-              className="space-y-3"
+              className="space-y-4"
             >
-              <RadioOption value="beginner" label="Beginner" description="0-20 miles per week" />
-              <RadioOption value="intermediate" label="Intermediate" description="20-40 miles per week" />
-              <RadioOption value="advanced" label="Advanced" description="40+ miles per week" />
+              <RadioOption 
+                value="novice" 
+                label="Novice" 
+                description="0-12 mpw — New to running or returning from break" 
+              />
+              <RadioOption 
+                value="beginner" 
+                label="Beginner" 
+                description="12-25 mpw — Running 3-4 days/week, comfortable 6-8 mile runs" 
+              />
+              <RadioOption 
+                value="intermediate" 
+                label="Intermediate" 
+                description="25-40 mpw — Running 5-6 days/week, regular 10-12 mile long runs" 
+              />
+              <RadioOption 
+                value="advanced" 
+                label="Advanced" 
+                description="40+ mpw — Experienced runner, 6-7 days/week, 14+ mile long runs" 
+              />
             </RadioGroup>
           </StepContainer>
         );
@@ -426,7 +522,7 @@ export default function PlanWizard() {
         );
 
       case 6:
-        const availableApproaches = getAvailableApproaches(state.fitness, state.goal);
+        const availableApproaches = getAvailableApproaches(state.fitness);
         return (
           <StepContainer title="Training approach">
             <RadioGroup
@@ -446,17 +542,23 @@ export default function PlanWizard() {
                 description={APPROACH_CONSTRAINTS.time_efficient.description}
                 disabled={!availableApproaches.includes('time_efficient')}
               />
-              <RadioOption 
+              <LockedRadioOption 
                 value="volume_progression" 
                 label="Volume Progression" 
                 description={APPROACH_CONSTRAINTS.volume_progression.description}
-                disabled={!availableApproaches.includes('volume_progression')}
+                locked={isApproachLocked('volume_progression', state.fitness)}
+                lockedReason={getLockedReason('volume_progression')}
+                onValueChange={(v) => updateState('approach', v as Approach)}
+                currentValue={state.approach || ''}
               />
-              <RadioOption 
+              <LockedRadioOption 
                 value="cumulative_load" 
                 label="Cumulative Load" 
                 description={APPROACH_CONSTRAINTS.cumulative_load.description}
-                disabled={!availableApproaches.includes('cumulative_load')}
+                locked={isApproachLocked('cumulative_load', state.fitness)}
+                lockedReason={getLockedReason('cumulative_load')}
+                onValueChange={(v) => updateState('approach', v as Approach)}
+                currentValue={state.approach || ''}
               />
               <RadioOption 
                 value="hybrid_athlete" 
@@ -723,6 +825,49 @@ function RadioOption({ value, label, description, disabled }: RadioOptionProps) 
     <div className={`flex items-start space-x-3 ${disabled ? 'opacity-40' : ''}`}>
       <RadioGroupItem value={value} id={value} disabled={disabled} className="mt-1" />
       <Label htmlFor={value} className={`flex-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+        <span className="block font-medium">{label}</span>
+        {description && (
+          <span className="block text-sm text-gray-500 mt-0.5">{description}</span>
+        )}
+      </Label>
+    </div>
+  );
+}
+
+interface LockedRadioOptionProps {
+  value: string;
+  label: string;
+  description?: string;
+  locked: boolean;
+  lockedReason: string;
+  onValueChange: (value: string) => void;
+  currentValue: string;
+}
+
+function LockedRadioOption({ value, label, description, locked, lockedReason, onValueChange, currentValue }: LockedRadioOptionProps) {
+  if (locked) {
+    return (
+      <div className="flex items-start space-x-3 opacity-50 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="mt-0.5 w-4 h-4 rounded-full border-2 border-gray-300 flex items-center justify-center">
+          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <span className="block font-medium text-gray-500">{label}</span>
+          {description && (
+            <span className="block text-sm text-gray-400 mt-0.5">{description}</span>
+          )}
+          <span className="block text-xs text-amber-600 mt-1">{lockedReason}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start space-x-3">
+      <RadioGroupItem value={value} id={value} className="mt-1" />
+      <Label htmlFor={value} className="flex-1 cursor-pointer">
         <span className="block font-medium">{label}</span>
         {description && (
           <span className="block text-sm text-gray-500 mt-0.5">{description}</span>
