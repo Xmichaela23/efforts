@@ -274,8 +274,27 @@ export abstract class BaseGenerator {
     };
   }
 
+  // ============================================================================
+  // DISTANCE-BASED WORKOUT CREATORS
+  // ============================================================================
+
   /**
-   * Create an easy run session
+   * Create an easy run session - DISTANCE BASED
+   */
+  protected createEasyRunMiles(miles: number, day: string = 'Monday'): Session {
+    const duration = this.milesToMinutes(miles);
+    return this.createSession(
+      day,
+      'Easy Run',
+      `${miles} miles at easy, conversational pace`,
+      duration,
+      [TOKEN_PATTERNS.easy_run_miles(miles)],
+      ['easy_run']
+    );
+  }
+
+  /**
+   * Create an easy run session (time-based - backward compat)
    */
   protected createEasyRun(durationMinutes: number, day: string = 'Monday'): Session {
     return this.createSession(
@@ -289,7 +308,31 @@ export abstract class BaseGenerator {
   }
 
   /**
-   * Create a long run session
+   * Create a long run session - DISTANCE BASED
+   */
+  protected createLongRunMiles(miles: number, day: string = 'Sunday', mpMiles: number = 0): Session {
+    const duration = this.milesToMinutes(miles);
+    
+    const tokens = mpMiles > 0
+      ? [TOKEN_PATTERNS.long_run_with_mp_miles(miles, mpMiles)]
+      : [TOKEN_PATTERNS.long_run_miles(miles)];
+
+    const description = mpMiles > 0
+      ? `${miles} miles - Long run with final ${mpMiles} miles at marathon pace`
+      : `${miles} miles at easy, conversational pace`;
+
+    return this.createSession(
+      day,
+      'Long Run',
+      description,
+      duration,
+      tokens,
+      ['long_run']
+    );
+  }
+
+  /**
+   * Create a long run session (time-based - backward compat)
    */
   protected createLongRun(durationMinutes: number, day: string = 'Sunday', withMPFinish: boolean = false, mpMinutes: number = 0): Session {
     const tokens = withMPFinish && mpMinutes > 0
@@ -311,7 +354,44 @@ export abstract class BaseGenerator {
   }
 
   /**
-   * Create a strides session (easy run with strides)
+   * Create marathon pace run - DISTANCE BASED
+   */
+  protected createMarathonPaceRun(miles: number, day: string = 'Tuesday'): Session {
+    const mpPace = this.getMarathonPaceMinPerMile();
+    const workoutDuration = this.calculateDuration(miles, mpPace);
+    const totalDuration = workoutDuration + 20; // Add warmup/cooldown
+
+    return this.createSession(
+      day,
+      'Goal Pace Practice',
+      `${miles} miles at goal marathon pace`,
+      totalDuration,
+      [
+        TOKEN_PATTERNS.warmup_1mi,
+        TOKEN_PATTERNS.mp_run_miles(miles),
+        TOKEN_PATTERNS.cooldown_1mi
+      ],
+      ['moderate_run', 'marathon_pace']
+    );
+  }
+
+  /**
+   * Create a strides session (easy run with strides) - DISTANCE BASED
+   */
+  protected createStridesSessionMiles(baseMiles: number = 3, day: string = 'Tuesday'): Session {
+    const duration = this.milesToMinutes(baseMiles) + 5; // +5 for strides
+    return this.createSession(
+      day,
+      'Easy Run + Strides',
+      `${baseMiles} miles easy with 6x20s strides at the end`,
+      duration,
+      [TOKEN_PATTERNS.easy_run_miles(baseMiles), TOKEN_PATTERNS.strides_6x20s],
+      ['easy_run', 'strides']
+    );
+  }
+
+  /**
+   * Create a strides session (time-based - backward compat)
    */
   protected createStridesSession(baseDurationMinutes: number = 35, day: string = 'Tuesday'): Session {
     return this.createSession(
@@ -458,18 +538,58 @@ export abstract class BaseGenerator {
     return distribution.map(v => Math.round(v));
   }
 
+  // ============================================================================
+  // PACE ESTIMATION HELPERS
+  // ============================================================================
+
+  /**
+   * Get easy pace estimate (min per mile) based on fitness
+   */
+  protected getEasyPaceMinPerMile(): number {
+    const paces: Record<string, number> = {
+      'beginner': 11.0,    // 11:00/mile
+      'intermediate': 9.5, // 9:30/mile
+      'advanced': 8.0      // 8:00/mile
+    };
+    return paces[this.params.fitness] || 9.5;
+  }
+
+  /**
+   * Get marathon pace estimate (min per mile) based on fitness
+   */
+  protected getMarathonPaceMinPerMile(): number {
+    const paces: Record<string, number> = {
+      'beginner': 10.5,    // 10:30/mile (~4:35 finish)
+      'intermediate': 9.0, // 9:00/mile (~3:56 finish)
+      'advanced': 7.5      // 7:30/mile (~3:17 finish)
+    };
+    return paces[this.params.fitness] || 9.0;
+  }
+
+  /**
+   * Get threshold pace estimate (min per mile) based on fitness
+   */
+  protected getThresholdPaceMinPerMile(): number {
+    const paces: Record<string, number> = {
+      'beginner': 9.5,     // 9:30/mile
+      'intermediate': 8.0, // 8:00/mile
+      'advanced': 6.5      // 6:30/mile
+    };
+    return paces[this.params.fitness] || 8.0;
+  }
+
+  /**
+   * Calculate duration in minutes from distance and pace
+   */
+  protected calculateDuration(miles: number, paceMinPerMile: number): number {
+    return Math.round(miles * paceMinPerMile);
+  }
+
   /**
    * Convert miles to approximate minutes at easy pace
-   * Assumes ~9:00/mile for beginners, ~8:00 for intermediate, ~7:30 for advanced
    */
   protected milesToMinutes(miles: number): number {
-    const paceMinPerMile: Record<string, number> = {
-      'beginner': 10,
-      'intermediate': 9,
-      'advanced': 8
-    };
-    const pace = paceMinPerMile[this.params.fitness] || 9;
-    return Math.round(miles * pace);
+    return this.calculateDuration(miles, this.getEasyPaceMinPerMile());
   }
 
   /**

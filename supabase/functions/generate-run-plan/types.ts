@@ -204,19 +204,43 @@ export const FITNESS_TO_VOLUME: Record<string, Record<string, VolumeParameters>>
 };
 
 // ============================================================================
-// TOKEN PATTERNS
+// TOKEN PATTERNS - DISTANCE BASED
 // ============================================================================
 
 export const TOKEN_PATTERNS = {
+  // Warmup/Cooldown (time-based is fine)
   warmup_easy_10min: 'warmup_run_easy_10min',
   warmup_quality_12min: 'warmup_run_quality_12min',
+  warmup_1mi: 'warmup_run_easy_1mi',
   cooldown_easy_10min: 'cooldown_easy_10min',
+  cooldown_1mi: 'cooldown_easy_1mi',
+  
+  // Strides
   strides_6x20s: 'strides_6x20s',
   strides_4x100m: 'strides_4x100m',
-  easy_run: (minutes: number) => `run_easy_${minutes}min`,
-  long_run: (minutes: number) => `longrun_${minutes}min_easypace`,
+  
+  // Easy Runs - DISTANCE BASED
+  easy_run_miles: (miles: number) => `run_easy_${miles}mi`,
+  easy_run: (minutes: number) => `run_easy_${minutes}min`, // Keep for backward compat
+  
+  // Long Runs - DISTANCE BASED
+  long_run_miles: (miles: number) => `longrun_${miles}mi_easypace`,
+  long_run: (minutes: number) => `longrun_${minutes}min_easypace`, // Keep for backward compat
+  
+  // Long Runs with MP Segments - DISTANCE BASED
+  long_run_with_mp_miles: (totalMiles: number, mpMiles: number) => 
+    `longrun_${totalMiles}mi_easypace_last${mpMiles}mi_MP`,
   long_run_with_mp: (totalMin: number, mpMin: number) => 
-    `longrun_${totalMin}min_easypace_last${mpMin}min_MP`,
+    `longrun_${totalMin}min_easypace_last${mpMin}min_MP`, // Keep for backward compat
+  
+  // Marathon Pace Runs - DISTANCE BASED
+  mp_run_miles: (miles: number) => `run_mp_${miles}mi`,
+  
+  // Tempo Runs (keep time-based per Jack Daniels philosophy)
+  tempo_minutes: (minutes: number) => `tempo_${minutes}min_threshold`,
+  tempo_miles: (miles: number) => `tempo_${miles}mi_threshold`,
+  
+  // Intervals
   intervals_800: (reps: number, rest_sec: number) => 
     `interval_${reps}x800m_5kpace_r${rest_sec}s`,
   intervals_1000: (reps: number, rest_sec: number) => 
@@ -225,10 +249,13 @@ export const TOKEN_PATTERNS = {
     `interval_${reps}x1200m_5kpace_r${rest_sec}s`,
   intervals_1mi: (reps: number, rest_min: number) => 
     `interval_${reps}x1mi_5kpace_R${rest_min}min`,
-  tempo_miles: (miles: number) => `tempo_${miles}mi_5kpace_plus0:45`,
-  tempo_minutes: (minutes: number) => `tempo_${minutes}min_5kpace_plus0:45`,
+  
+  // Cruise Intervals
   cruise_intervals: (reps: number, miles_each: number) => 
-    `cruise_${reps}x${miles_each}mi_T_pace_r60s`
+    `cruise_${reps}x${miles_each}mi_threshold_r60s`,
+  
+  // Fartlek
+  fartlek: (pickups: number) => `fartlek_${pickups}x30-60s_moderate`
 } as const;
 
 // ============================================================================

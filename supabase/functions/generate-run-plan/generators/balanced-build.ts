@@ -1,6 +1,7 @@
 // Balanced Build Generator - Jack Daniels Inspired
 // 
 // Philosophy:
+// - DISTANCE-BASED: All runs specified in miles, not minutes
 // - VDOT-based pacing (all paces derived from 5K time)
 // - Phase-based: Foundation → Early Quality → Transition Quality → Taper
 // - 2Q System: Two quality workouts per week, rest is easy running
@@ -9,6 +10,82 @@
 
 import { BaseGenerator } from './base-generator.ts';
 import { TrainingPlan, Session, Phase, PhaseStructure, TOKEN_PATTERNS } from '../types.ts';
+
+// Long run progression by fitness level (in miles)
+// Index = week number - 1
+const LONG_RUN_PROGRESSION: Record<string, Record<string, number[]>> = {
+  'marathon': {
+    'beginner': [
+      8, 9, 10, 7,      // Weeks 1-4 (Base, recovery at 4)
+      11, 12, 13, 9,    // Weeks 5-8 (Base continues, recovery at 8)
+      14, 15, 16, 11,   // Weeks 9-12 (Speed, recovery at 12)
+      17, 18, 20, 12    // Weeks 13-16 (Race Prep, Taper)
+    ],
+    'intermediate': [
+      10, 12, 14, 10,   // Weeks 1-4
+      15, 16, 17, 12,   // Weeks 5-8
+      18, 19, 20, 14,   // Weeks 9-12
+      20, 21, 22, 12    // Weeks 13-16
+    ],
+    'advanced': [
+      12, 14, 16, 11,   // Weeks 1-4
+      17, 18, 19, 14,   // Weeks 5-8
+      20, 21, 22, 16,   // Weeks 9-12
+      22, 22, 22, 14    // Weeks 13-16
+    ]
+  },
+  'half': {
+    'beginner': [
+      6, 7, 8, 6,       // Weeks 1-4
+      9, 10, 11, 8,     // Weeks 5-8
+      11, 12, 13, 10    // Weeks 9-12
+    ],
+    'intermediate': [
+      8, 9, 10, 7,
+      11, 12, 13, 10,
+      14, 14, 15, 10
+    ],
+    'advanced': [
+      10, 11, 12, 9,
+      13, 14, 15, 11,
+      16, 16, 16, 12
+    ]
+  },
+  '10k': {
+    'beginner': [5, 6, 7, 5, 8, 8, 9, 6, 9, 10, 10, 7],
+    'intermediate': [7, 8, 9, 7, 10, 10, 11, 8, 11, 12, 12, 8],
+    'advanced': [9, 10, 11, 8, 12, 12, 13, 10, 13, 14, 14, 10]
+  },
+  '5k': {
+    'beginner': [4, 5, 5, 4, 6, 6, 7, 5, 7, 8, 8, 5],
+    'intermediate': [6, 7, 7, 5, 8, 8, 9, 6, 9, 10, 10, 7],
+    'advanced': [8, 9, 9, 7, 10, 10, 11, 8, 11, 12, 12, 8]
+  }
+};
+
+// Weekly mileage targets by fitness (start → peak)
+const WEEKLY_MILEAGE: Record<string, Record<string, { start: number; peak: number }>> = {
+  'marathon': {
+    'beginner': { start: 25, peak: 50 },
+    'intermediate': { start: 35, peak: 65 },
+    'advanced': { start: 50, peak: 85 }
+  },
+  'half': {
+    'beginner': { start: 20, peak: 40 },
+    'intermediate': { start: 30, peak: 50 },
+    'advanced': { start: 40, peak: 60 }
+  },
+  '10k': {
+    'beginner': { start: 15, peak: 30 },
+    'intermediate': { start: 25, peak: 40 },
+    'advanced': { start: 35, peak: 55 }
+  },
+  '5k': {
+    'beginner': { start: 12, peak: 25 },
+    'intermediate': { start: 20, peak: 35 },
+    'advanced': { start: 30, peak: 50 }
+  }
+};
 
 export class BalancedBuildGenerator extends BaseGenerator {
   generatePlan(): TrainingPlan {
@@ -50,111 +127,123 @@ export class BalancedBuildGenerator extends BaseGenerator {
     const runningDays = this.getRunningDays();
     const isCompletionGoal = this.params.goal === 'complete';
 
-    // Calculate long run with SMOOTH progression
-    const longRunMinutes = this.calculateLongRunMinutes(weekNumber, phase, isRecovery, phaseStructure);
+    // Get target weekly mileage
+    const weeklyMiles = this.calculateWeeklyMileage(weekNumber, phase, isRecovery, phaseStructure);
     
-    // Long run (always on Sunday)
-    // For Race Prep phase, add MP segments (even for completion goal - they need race pace familiarity)
+    // Get long run distance
+    const longRunMiles = this.getLongRunMiles(weekNumber, isRecovery);
+    
+    // Long run with MP segments in Race Prep phase
     const withMP = phase.name === 'Race Prep' && !isRecovery && 
                    (this.params.distance === 'marathon' || this.params.distance === 'half');
-    // Completion goal: shorter MP segments (10-15%), Speed goal: longer (15-20%)
-    const mpPercent = isCompletionGoal ? 0.10 : 0.15;
-    const mpMinutes = withMP ? Math.round(longRunMinutes * mpPercent) : 0;
+    // MP segment: 2-3 miles for completion, 2-4 miles for speed
+    const mpMiles = withMP ? this.getMPSegmentMiles(weekNumber, phase, isCompletionGoal) : 0;
     
-    sessions.push(this.createLongRun(longRunMinutes, 'Sunday', withMP, mpMinutes));
+    sessions.push(this.createLongRunMiles(longRunMiles, 'Sunday', mpMiles));
+
+    // Track mileage used
+    let usedMiles = longRunMiles;
 
     // Quality sessions based on phase AND GOAL
     if (!isRecovery) {
       if (isCompletionGoal) {
-        // COMPLETION GOAL: No intervals, focus on aerobic development
-        this.addCompletionQualitySessions(sessions, weekNumber, phase, runningDays);
+        usedMiles += this.addCompletionQualitySessions(sessions, weekNumber, phase, runningDays);
       } else {
-        // SPEED GOAL: Full Daniels 2Q system
-        this.addSpeedQualitySessions(sessions, weekNumber, phase, runningDays);
+        usedMiles += this.addSpeedQualitySessions(sessions, weekNumber, phase, runningDays);
       }
     } else {
       // Recovery week: Just easy with strides
-      sessions.push(this.createStridesSession(30, 'Tuesday'));
+      sessions.push(this.createStridesSessionMiles(3, 'Tuesday'));
+      usedMiles += 3;
     }
 
-    // Fill remaining days with easy runs
-    this.fillWithEasyRuns(sessions, runningDays, weekNumber, phase, phaseStructure);
+    // Fill remaining days with easy runs to hit target mileage
+    this.fillWithEasyRunsMiles(sessions, runningDays, weeklyMiles - usedMiles);
 
     // Assign specific days to sessions
     return this.assignDaysToSessions(sessions, runningDays);
   }
 
   // ============================================================================
-  // LONG RUN PROGRESSION
+  // MILEAGE CALCULATIONS
   // ============================================================================
 
   /**
-   * Calculate long run duration with SMOOTH linear progression
+   * Calculate weekly mileage target based on week and phase
    */
-  private calculateLongRunMinutes(
+  private calculateWeeklyMileage(
     weekNumber: number, 
     phase: Phase, 
     isRecovery: boolean,
     phaseStructure: PhaseStructure
   ): number {
+    const mileageConfig = WEEKLY_MILEAGE[this.params.distance]?.[this.params.fitness];
+    if (!mileageConfig) {
+      return 30; // Default fallback
+    }
+
+    const { start, peak } = mileageConfig;
     const totalWeeks = this.params.duration_weeks;
-    const isCompletionGoal = this.params.goal === 'complete';
     
-    // Peak long run based on distance and fitness
-    const peakMinutes = this.getPeakLongRunMinutes();
+    // Find taper phase
+    const taperPhase = phaseStructure.phases.find(p => p.name === 'Taper');
+    const taperStart = taperPhase?.start_week || totalWeeks;
     
-    // Starting long run (week 1)
-    const startMinutes = this.getStartingLongRunMinutes();
-    
-    // Find peak week (2-3 weeks before end for taper)
-    const taperWeeks = phase.name === 'Taper' ? phaseStructure.phases.find(p => p.name === 'Taper')?.weeks_in_phase || 2 : 0;
-    const peakWeek = totalWeeks - taperWeeks - 1;
-    
-    // Linear progression to peak
-    let targetMinutes: number;
-    if (weekNumber <= peakWeek) {
-      const progress = (weekNumber - 1) / Math.max(1, peakWeek - 1);
-      targetMinutes = startMinutes + (peakMinutes - startMinutes) * progress;
+    // Linear progression to peak (excluding taper)
+    let targetMiles: number;
+    if (weekNumber < taperStart) {
+      const progress = (weekNumber - 1) / Math.max(1, taperStart - 2);
+      targetMiles = start + (peak - start) * Math.min(1, progress);
     } else {
       // Taper: reduce from peak
-      const taperProgress = (weekNumber - peakWeek) / taperWeeks;
-      targetMinutes = peakMinutes * (1 - taperProgress * 0.4); // 40% reduction by race week
+      const weekInTaper = weekNumber - taperStart + 1;
+      const taperWeeks = totalWeeks - taperStart + 1;
+      if (weekInTaper === 1) {
+        targetMiles = peak * 0.65; // First taper week: 65%
+      } else {
+        targetMiles = peak * 0.4; // Race week: 40%
+      }
     }
     
-    // Recovery week: 30% reduction
+    // Recovery week: 70% of target
     if (isRecovery) {
-      targetMinutes = targetMinutes * 0.7;
+      targetMiles = targetMiles * 0.7;
     }
     
-    return this.roundToFiveMinutes(Math.max(40, targetMinutes));
+    return Math.round(targetMiles);
   }
 
-  private getPeakLongRunMinutes(): number {
-    const fitness = this.params.fitness;
-    const distance = this.params.distance;
+  /**
+   * Get long run miles for specific week
+   */
+  private getLongRunMiles(weekNumber: number, isRecovery: boolean): number {
+    const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
+    if (!progression) {
+      return 10; // Default fallback
+    }
     
-    // Peak long run in minutes based on distance and fitness
-    const peaks: Record<string, Record<string, number>> = {
-      'marathon': { 'beginner': 150, 'intermediate': 165, 'advanced': 180 }, // 2.5-3 hours
-      'half': { 'beginner': 100, 'intermediate': 110, 'advanced': 120 },
-      '10k': { 'beginner': 70, 'intermediate': 80, 'advanced': 90 },
-      '5k': { 'beginner': 55, 'intermediate': 65, 'advanced': 75 }
-    };
+    // Clamp week to array bounds
+    const index = Math.min(weekNumber - 1, progression.length - 1);
+    let miles = progression[index] || 10;
     
-    return peaks[distance]?.[fitness] || 120;
+    // Recovery weeks already have reduced long runs in the progression
+    // but ensure we don't exceed the table
+    return miles;
   }
 
-  private getStartingLongRunMinutes(): number {
-    const fitness = this.params.fitness;
+  /**
+   * Get MP segment miles for Race Prep long runs
+   */
+  private getMPSegmentMiles(weekNumber: number, phase: Phase, isCompletion: boolean): number {
+    const weekInPhase = weekNumber - phase.start_week + 1;
     
-    // Starting long run based on fitness
-    const starts: Record<string, number> = {
-      'beginner': 50,
-      'intermediate': 70,
-      'advanced': 90
-    };
-    
-    return starts[fitness] || 60;
+    if (isCompletion) {
+      // Conservative MP segments for completion goal: 2 miles
+      return 2;
+    } else {
+      // Progressive MP segments for speed goal: 2 → 3 → 4 miles
+      return Math.min(4, 1 + weekInPhase);
+    }
   }
 
   // ============================================================================
@@ -164,43 +253,66 @@ export class BalancedBuildGenerator extends BaseGenerator {
   /**
    * Quality sessions for COMPLETION goal
    * Focus: Aerobic development, tempo runs, NO intervals
+   * Returns miles used by quality sessions
    */
   private addCompletionQualitySessions(
     sessions: Session[], 
     weekNumber: number, 
     phase: Phase, 
     runningDays: number
-  ): void {
+  ): number {
+    let mileageUsed = 0;
+    
     switch (phase.name) {
       case 'Base':
         // Foundation: Fartlek and strides only
-        sessions.push(this.createStridesSession(35, 'Tuesday'));
+        sessions.push(this.createStridesSessionMiles(4, 'Tuesday'));
+        mileageUsed += 4;
         if (runningDays >= 5 && weekNumber >= 2) {
-          sessions.push(this.createBaseFartlek(weekNumber));
+          sessions.push(this.createFartlekSession(weekNumber));
+          mileageUsed += 4; // Fartlek ~4 miles total
         }
         break;
 
       case 'Speed':
         // For completion goal: Tempo runs instead of intervals
         sessions.push(this.createTempoRun(weekNumber, phase));
+        mileageUsed += 5; // Tempo ~5 miles with warmup/cooldown
         if (runningDays >= 5) {
-          sessions.push(this.createBaseFartlek(weekNumber));
+          sessions.push(this.createFartlekSession(weekNumber));
+          mileageUsed += 4;
         }
         break;
 
       case 'Race Prep':
         // Race prep for completion: Moderate tempo + race pace familiarity
-        sessions.push(this.createCompletionRacePrepSession(weekNumber, phase));
+        const mpMiles = this.getCompletionMPRunMiles(weekNumber, phase);
+        sessions.push(this.createMarathonPaceRun(mpMiles, 'Tuesday'));
+        mileageUsed += mpMiles + 2; // +2 for warmup/cooldown
         if (runningDays >= 5) {
           sessions.push(this.createTempoRun(weekNumber, phase));
+          mileageUsed += 5;
         }
         break;
 
       case 'Taper':
-        // Very easy week - just strides to stay sharp, no hard effort
-        sessions.push(this.createStridesSession(30, 'Tuesday'));
+        // Very easy week - just strides to stay sharp
+        sessions.push(this.createStridesSessionMiles(3, 'Tuesday'));
+        mileageUsed += 3;
         break;
     }
+    
+    return mileageUsed;
+  }
+
+  /**
+   * Get MP run miles for completion goal - progressive
+   */
+  private getCompletionMPRunMiles(weekNumber: number, phase: Phase): number {
+    const weekInPhase = weekNumber - phase.start_week + 1;
+    // Progressive: 2 → 3 → 4 → 5 miles (capped at 5 for beginners)
+    const maxMiles = this.params.fitness === 'beginner' ? 5 : 6;
+    return Math.min(maxMiles, 1 + weekInPhase);
   }
 
   // ============================================================================
@@ -210,85 +322,81 @@ export class BalancedBuildGenerator extends BaseGenerator {
   /**
    * Quality sessions for SPEED goal
    * Full Daniels 2Q system with intervals and threshold
+   * Returns miles used
    */
   private addSpeedQualitySessions(
     sessions: Session[], 
     weekNumber: number, 
     phase: Phase, 
     runningDays: number
-  ): void {
+  ): number {
+    let mileageUsed = 0;
+    
     switch (phase.name) {
       case 'Base':
         // Foundation: Strides and fartlek
-        sessions.push(this.createStridesSession(35, 'Tuesday'));
+        sessions.push(this.createStridesSessionMiles(4, 'Tuesday'));
+        mileageUsed += 4;
         if (runningDays >= 5 && weekNumber >= 2) {
-          sessions.push(this.createBaseFartlek(weekNumber));
+          sessions.push(this.createFartlekSession(weekNumber));
+          mileageUsed += 4;
         }
         break;
 
       case 'Speed':
         // Quality phase: Intervals + Threshold
         sessions.push(this.createIntervalSession(weekNumber, phase));
+        mileageUsed += 5; // Intervals ~5 miles total
         if (runningDays >= 5) {
           sessions.push(this.createThresholdSession(weekNumber, phase));
+          mileageUsed += 6; // Threshold ~6 miles
         }
         break;
 
       case 'Race Prep':
         // Transition phase: Race-specific work
         sessions.push(this.createRacePrepSession(weekNumber, phase));
+        mileageUsed += 6;
         if (runningDays >= 5) {
           sessions.push(this.createCruiseIntervalSession(weekNumber, phase));
+          mileageUsed += 6;
         }
         break;
 
       case 'Taper':
         // Sharpening: Light quality, reduced volume
         sessions.push(this.createTaperSharpener());
+        mileageUsed += 4;
         break;
     }
+    
+    return mileageUsed;
   }
 
   // ============================================================================
-  // EASY RUN FILLER
+  // EASY RUN FILLER - DISTANCE BASED
   // ============================================================================
 
   /**
-   * ALWAYS fill to target day count with easy runs
-   * This ensures consistent training frequency regardless of volume
+   * Fill remaining days with easy runs to hit target mileage
    */
-  private fillWithEasyRuns(
+  private fillWithEasyRunsMiles(
     sessions: Session[], 
-    runningDays: number,
-    weekNumber: number,
-    phase: Phase,
-    phaseStructure: PhaseStructure
+    targetDays: number,
+    remainingMiles: number
   ): void {
-    const remainingDays = Math.max(0, runningDays - sessions.length);
+    const remainingDays = Math.max(0, targetDays - sessions.length);
     
     if (remainingDays <= 0) return;
 
-    // Calculate easy run duration based on phase and fitness
-    const weekVolume = this.calculateWeekVolume(weekNumber, phase, phaseStructure);
-    const usedVolume = sessions.reduce((sum, s) => sum + (s.duration / 9), 0);
-    const remainingVolume = Math.max(0, weekVolume - usedVolume);
+    // Distribute remaining miles across easy run days
+    const milesPerDay = Math.max(3, Math.round(remainingMiles / remainingDays));
     
-    // Determine easy run duration
-    let easyMinutes: number;
-    if (remainingVolume > 0) {
-      const easyMilesEach = remainingVolume / remainingDays;
-      easyMinutes = this.roundToFiveMinutes(this.milesToMinutes(easyMilesEach));
-    } else {
-      // Even if volume is "used up", still add minimum easy runs for frequency
-      easyMinutes = this.params.fitness === 'beginner' ? 25 : 
-                    this.params.fitness === 'intermediate' ? 30 : 35;
-    }
-    
-    // Clamp to reasonable range
-    easyMinutes = Math.max(25, Math.min(50, easyMinutes));
+    // Clamp to reasonable range (3-7 miles for easy runs)
+    const easyMiles = Math.max(3, Math.min(7, milesPerDay));
     
     for (let i = 0; i < remainingDays; i++) {
-      sessions.push(this.createEasyRun(easyMinutes));
+      sessions.push(this.createEasyRunMiles(easyMiles));
     }
   }
 
@@ -303,50 +411,21 @@ export class BalancedBuildGenerator extends BaseGenerator {
   private createTempoRun(weekNumber: number, phase: Phase): Session {
     const weekInPhase = weekNumber - phase.start_week + 1;
     
-    // Progressive tempo duration: 15 → 25 min
+    // Progressive tempo duration: 15 → 25 min (time-based per Daniels)
     const tempoMinutes = Math.min(25, 15 + weekInPhase * 2);
 
     return this.createSession(
       'Tuesday',
       'Tempo Run',
-      `${tempoMinutes} minutes at comfortably hard pace`,
+      `${tempoMinutes} minutes at comfortably hard pace (~3.5 miles)`,
       tempoMinutes + 20,
       [
-        TOKEN_PATTERNS.warmup_easy_10min,
+        TOKEN_PATTERNS.warmup_1mi,
         TOKEN_PATTERNS.tempo_minutes(tempoMinutes),
-        TOKEN_PATTERNS.cooldown_easy_10min
+        TOKEN_PATTERNS.cooldown_1mi
       ],
       ['moderate_run', 'tempo']
     );
-  }
-
-  /**
-   * Race prep for completion goal
-   * Short marathon pace segments for familiarity - PROGRESSIVE
-   */
-  private createCompletionRacePrepSession(weekNumber: number, phase: Phase): Session {
-    const weekInPhase = weekNumber - phase.start_week + 1;
-    
-    // Progressive MP work: 2→3→4→5 miles (capped at 5 for beginners)
-    const maxMiles = this.params.fitness === 'beginner' ? 5 : 6;
-    const mpMiles = Math.min(maxMiles, 1 + weekInPhase);
-    
-    if (this.params.distance === 'marathon' || this.params.distance === 'half') {
-      return this.createSession(
-        'Tuesday',
-        'Goal Pace Practice',
-        `${mpMiles} miles at goal race pace for familiarity`,
-        this.milesToMinutes(mpMiles) + 20,
-        [
-          TOKEN_PATTERNS.warmup_easy_10min,
-          TOKEN_PATTERNS.tempo_miles(mpMiles),
-          TOKEN_PATTERNS.cooldown_easy_10min
-        ],
-        ['moderate_run', 'race_pace']
-      );
-    } else {
-      return this.createTempoRun(weekNumber, phase);
-    }
   }
 
   /**
@@ -356,7 +435,7 @@ export class BalancedBuildGenerator extends BaseGenerator {
   private createIntervalSession(weekNumber: number, phase: Phase): Session {
     const weekInPhase = weekNumber - phase.start_week + 1;
     
-    // Progressive interval volume (Daniels style)
+    // Progressive interval volume
     let reps: number;
     let distance: '800' | '1000' | '1200';
     let restSec: number;
@@ -375,20 +454,20 @@ export class BalancedBuildGenerator extends BaseGenerator {
       restSec = 120;
     }
 
-    const tokens: string[] = [
-      TOKEN_PATTERNS.warmup_quality_12min,
-      distance === '800' 
-        ? TOKEN_PATTERNS.intervals_800(reps, restSec)
-        : TOKEN_PATTERNS.intervals_1000(reps, restSec),
-      TOKEN_PATTERNS.cooldown_easy_10min
-    ];
-
+    const intervalMiles = distance === '800' ? reps * 0.5 : reps * 0.62;
+    
     return this.createSession(
       'Tuesday',
       '5K Pace Intervals',
-      `${reps}×${distance}m at 5K pace with ${restSec}s recovery`,
+      `${reps}×${distance}m at 5K pace (~${intervalMiles.toFixed(1)} miles of quality)`,
       50,
-      tokens,
+      [
+        TOKEN_PATTERNS.warmup_1mi,
+        distance === '800' 
+          ? TOKEN_PATTERNS.intervals_800(reps, restSec)
+          : TOKEN_PATTERNS.intervals_1000(reps, restSec),
+        TOKEN_PATTERNS.cooldown_1mi
+      ],
       ['hard_run', 'intervals', 'vo2max']
     );
   }
@@ -399,18 +478,18 @@ export class BalancedBuildGenerator extends BaseGenerator {
   private createThresholdSession(weekNumber: number, phase: Phase): Session {
     const weekInPhase = weekNumber - phase.start_week + 1;
     
-    // Progressive tempo duration
+    // Progressive tempo: 18 → 30 min
     const tempoMinutes = Math.min(30, 18 + weekInPhase * 2);
 
     return this.createSession(
       'Thursday',
       'Threshold Run',
-      `${tempoMinutes} minutes at threshold pace`,
+      `${tempoMinutes} minutes at threshold pace (~${Math.round(tempoMinutes / 8)} miles)`,
       tempoMinutes + 25,
       [
-        TOKEN_PATTERNS.warmup_quality_12min,
+        TOKEN_PATTERNS.warmup_1mi,
         TOKEN_PATTERNS.tempo_minutes(tempoMinutes),
-        TOKEN_PATTERNS.cooldown_easy_10min
+        TOKEN_PATTERNS.cooldown_1mi
       ],
       ['hard_run', 'tempo', 'threshold']
     );
@@ -434,9 +513,9 @@ export class BalancedBuildGenerator extends BaseGenerator {
         `${mpMiles} miles at goal marathon pace`,
         this.milesToMinutes(mpMiles) + 25,
         [
-          TOKEN_PATTERNS.warmup_quality_12min,
-          TOKEN_PATTERNS.tempo_miles(mpMiles),
-          TOKEN_PATTERNS.cooldown_easy_10min
+          TOKEN_PATTERNS.warmup_1mi,
+          TOKEN_PATTERNS.mp_run_miles(mpMiles),
+          TOKEN_PATTERNS.cooldown_1mi
         ],
         ['hard_run', 'marathon_pace']
       );
@@ -446,12 +525,12 @@ export class BalancedBuildGenerator extends BaseGenerator {
       return this.createSession(
         'Tuesday',
         'Race Pace Intervals',
-        `${reps}×1K at goal race pace`,
+        `${reps}×1K at goal race pace (~${(reps * 0.62).toFixed(1)} miles)`,
         45,
         [
-          TOKEN_PATTERNS.warmup_quality_12min,
+          TOKEN_PATTERNS.warmup_1mi,
           TOKEN_PATTERNS.intervals_1000(reps, 90),
-          TOKEN_PATTERNS.cooldown_easy_10min
+          TOKEN_PATTERNS.cooldown_1mi
         ],
         ['hard_run', 'intervals']
       );
@@ -459,12 +538,12 @@ export class BalancedBuildGenerator extends BaseGenerator {
   }
 
   /**
-   * Create cruise interval session - with PROGRESSION
+   * Create cruise interval session - progressive
    */
   private createCruiseIntervalSession(weekNumber: number, phase: Phase): Session {
     const weekInPhase = weekNumber - phase.start_week + 1;
     
-    // Progressive cruise intervals: 3 → 5 x 1 mile
+    // Progressive: 3 → 5 × 1 mile
     const reps = Math.min(5, 2 + weekInPhase);
     
     return this.createSession(
@@ -473,9 +552,9 @@ export class BalancedBuildGenerator extends BaseGenerator {
       `${reps}×1mi at threshold pace with 60s recovery`,
       45 + reps * 2,
       [
-        TOKEN_PATTERNS.warmup_quality_12min,
+        TOKEN_PATTERNS.warmup_1mi,
         TOKEN_PATTERNS.cruise_intervals(reps, 1),
-        TOKEN_PATTERNS.cooldown_easy_10min
+        TOKEN_PATTERNS.cooldown_1mi
       ],
       ['hard_run', 'threshold']
     );
@@ -490,32 +569,32 @@ export class BalancedBuildGenerator extends BaseGenerator {
     return this.createSession(
       'Tuesday',
       'Race Tune-up',
-      `Light intervals: ${reps}×800m to maintain sharpness`,
+      `Light intervals: ${reps}×800m to maintain sharpness (~${(reps * 0.5).toFixed(1)} miles)`,
       35,
       [
-        TOKEN_PATTERNS.warmup_quality_12min,
+        TOKEN_PATTERNS.warmup_1mi,
         TOKEN_PATTERNS.intervals_800(reps, 120),
-        TOKEN_PATTERNS.cooldown_easy_10min
+        TOKEN_PATTERNS.cooldown_1mi
       ],
       ['moderate_run', 'intervals']
     );
   }
 
   /**
-   * Create base phase fartlek session
+   * Create fartlek session
    */
-  private createBaseFartlek(weekNumber: number): Session {
+  private createFartlekSession(weekNumber: number): Session {
     const pickups = Math.min(8, 4 + Math.floor(weekNumber / 2));
     
     return this.createSession(
       'Thursday',
       'Aerobic Fartlek',
-      `${pickups}×30-60s pickups at comfortably hard effort`,
+      `${pickups}×30-60s pickups at comfortably hard effort (~4 miles total)`,
       40,
       [
-        TOKEN_PATTERNS.warmup_easy_10min,
-        `fartlek_${pickups}x30-60s_moderate`,
-        TOKEN_PATTERNS.cooldown_easy_10min
+        TOKEN_PATTERNS.warmup_1mi,
+        TOKEN_PATTERNS.fartlek(pickups),
+        TOKEN_PATTERNS.cooldown_1mi
       ],
       ['moderate_run', 'fartlek']
     );
