@@ -187,7 +187,7 @@ const METHODOLOGIES: Record<Approach, {
   },
   'balanced_build': {
     name: 'Balanced Build',
-    shortDescription: 'Structured quality with VDOT-based pacing',
+    shortDescription: 'Structured quality with personalized pacing',
     longDescription: 'Two quality workouts per week with structured intervals and tempo runs. All paces calculated from your 5K time.',
     basedOn: 'Based on Jack Daniels\' Running Formula principles',
     supported_days: ['4-5', '5-6', '6-7']
@@ -788,7 +788,7 @@ export default function PlanWizard() {
                       </span>
                     ) : (
                       <span className="block text-xs text-blue-600 mt-2">
-                        → Uses Balanced Build plan (VDOT pacing, structured intervals)
+                        → Uses Balanced Build plan (Effort Score pacing, structured intervals)
                       </span>
                     )}
                   </Label>
