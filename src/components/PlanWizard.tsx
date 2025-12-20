@@ -781,7 +781,7 @@ export default function PlanWizard() {
                     <span className="block font-medium">
                       {state.fitness === 'beginner' ? 'Speed (Locked)' : 'Speed'}
                     </span>
-                    <span className="block text-sm text-gray-500 mt-0.5">Train for your fastest race</span>
+                    <span className="block text-sm text-gray-500 mt-0.5">Train with a time goal</span>
                     {state.fitness === 'beginner' ? (
                       <span className="block text-xs text-amber-600 mt-2">
                         Requires Intermediate+ fitness (25+ mpw). Build your base first!
