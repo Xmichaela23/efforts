@@ -17,6 +17,12 @@ import { validateRequest, validatePlanSchema, validateTokens, detectScheduleConf
 import { SimpleCompletionGenerator } from './generators/simple-completion.ts';
 import { BalancedBuildGenerator } from './generators/balanced-build.ts';
 import { overlayStrength } from './strength-overlay.ts';
+import { 
+  calculateEffortScore, 
+  getPacesFromScore, 
+  estimateScoreFromFitness,
+  type TrainingPaces 
+} from './effort-score.ts';
 
 // ============================================================================
 // MAIN HANDLER
@@ -57,6 +63,35 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Calculate Effort Score for Balanced Build plans
+    let effortScore: number | undefined;
+    let effortPaces: TrainingPaces | undefined;
+    
+    if (request.approach === 'balanced_build') {
+      // Calculate score from source race if provided
+      if (request.effort_source_distance && request.effort_source_time) {
+        effortScore = calculateEffortScore(
+          request.effort_source_distance,
+          request.effort_source_time
+        );
+        console.log(`[EffortScore] Calculated from race: ${effortScore}`);
+      } 
+      // Or use provided score directly
+      else if (request.effort_score) {
+        effortScore = request.effort_score;
+        console.log(`[EffortScore] Using provided score: ${effortScore}`);
+      }
+      // Fallback to estimate from fitness level
+      else {
+        effortScore = estimateScoreFromFitness(request.fitness);
+        console.log(`[EffortScore] Estimated from fitness: ${effortScore}`);
+      }
+      
+      // Calculate paces from score
+      effortPaces = getPacesFromScore(effortScore);
+      console.log(`[EffortScore] Paces - Base: ${effortPaces.base}s/mi, Race: ${effortPaces.race}s/mi`);
+    }
+
     // Select and run generator
     const generatorParams = {
       distance: request.distance,
@@ -65,7 +100,9 @@ Deno.serve(async (req: Request) => {
       duration_weeks: request.duration_weeks,
       days_per_week: request.days_per_week,
       user_id: request.user_id,
-      race_date: request.race_date
+      race_date: request.race_date,
+      effort_score: effortScore,
+      effort_paces: effortPaces
     };
 
     let plan: TrainingPlan;
@@ -169,6 +206,29 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ success: false, error: 'Failed to save plan', details: insertError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Save Effort Score to user_baselines (for Balanced Build plans)
+    if (request.approach === 'balanced_build' && effortScore) {
+      const { error: baselinesError } = await supabase
+        .from('user_baselines')
+        .upsert({
+          user_id: request.user_id,
+          effort_score: effortScore,
+          effort_source_distance: request.effort_source_distance || null,
+          effort_source_time: request.effort_source_time || null,
+          effort_score_status: request.effort_score_status || 'estimated',
+          effort_updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (baselinesError) {
+        console.warn('Failed to save Effort Score to baselines:', baselinesError);
+        // Non-fatal - continue with plan generation
+      } else {
+        console.log(`[EffortScore] Saved to user_baselines: ${effortScore}`);
+      }
     }
 
     // Generate preview

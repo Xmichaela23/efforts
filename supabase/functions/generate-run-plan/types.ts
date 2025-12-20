@@ -17,6 +17,11 @@ export interface GeneratePlanRequest {
   strength_tier?: 'injury_prevention' | 'strength_power';
   equipment_type?: 'home_gym' | 'commercial_gym';
   race_date?: string;
+  // Effort Score (for Balanced Build / speed goal)
+  effort_score?: number;
+  effort_source_distance?: number; // meters
+  effort_source_time?: number; // seconds
+  effort_score_status?: 'verified' | 'estimated';
 }
 
 export interface GeneratePlanResponse {
@@ -57,6 +62,15 @@ export interface GeneratorParams {
   days_per_week: string;
   user_id: string;
   race_date?: string;
+  // Effort Score for pace calculations (Balanced Build only)
+  effort_score?: number;
+  effort_paces?: {
+    base: number;    // seconds per mile
+    race: number;    // seconds per mile
+    steady: number;  // seconds per mile
+    power: number;   // seconds per mile
+    speed: number;   // seconds per mile
+  };
 }
 
 export interface TrainingPlan {

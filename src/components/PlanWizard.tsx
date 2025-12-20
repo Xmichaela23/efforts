@@ -6,6 +6,17 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
+import {
+  calculateEffortScoreResult,
+  raceDistanceToMeters,
+  parseTimeToSeconds,
+  formatPace,
+  adjustScoreForRecency,
+  estimateScoreFromFitness,
+  type RaceDistance,
+  type RaceRecency,
+  type TrainingPaces,
+} from '@/lib/effort-score';
 
 // ============================================================================
 // TYPES
@@ -27,6 +38,15 @@ interface WizardState {
   fitness: Fitness | null;
   currentMpw: MpwRange | null; // Actual weekly mileage for precise gating
   goal: Goal | null;
+  // Effort Score (for Balanced Build / speed goal only)
+  hasRecentRace: boolean | null; // null = not answered
+  effortRaceDistance: RaceDistance | null;
+  effortRaceTime: string; // "MM:SS" or "HH:MM:SS"
+  effortRaceRecency: RaceRecency | null;
+  effortScore: number | null;
+  effortScoreStatus: 'verified' | 'estimated' | null;
+  effortPaces: TrainingPaces | null;
+  // Plan timing
   hasRaceDate: boolean | null; // null = not answered yet
   raceDate: string; // ISO date string for race day
   duration: number;
@@ -261,6 +281,15 @@ export default function PlanWizard() {
     fitness: null,
     currentMpw: null,
     goal: null,
+    // Effort Score fields
+    hasRecentRace: null,
+    effortRaceDistance: null,
+    effortRaceTime: '',
+    effortRaceRecency: null,
+    effortScore: null,
+    effortScoreStatus: null,
+    effortPaces: null,
+    // Plan timing
     hasRaceDate: null,
     raceDate: '',
     duration: 12,
@@ -328,27 +357,54 @@ export default function PlanWizard() {
   // Check if we need MPW for this fitness/distance combo
   const needsMpwQuestion = state.fitness === 'beginner' && state.distance === 'marathon';
 
+  // Map logical step to actual step based on whether we need Effort Score
+  const getLogicalStep = (physicalStep: number): string => {
+    if (!needsEffortScore) {
+      // Complete goal: no effort score step
+      const steps = ['discipline', 'distance', 'fitness', 'goal', 'duration', 'startDate', 'strength', 'runningDays'];
+      return steps[physicalStep] || 'unknown';
+    } else {
+      // Speed goal: includes effort score step
+      const steps = ['discipline', 'distance', 'fitness', 'goal', 'effortScore', 'duration', 'startDate', 'strength', 'runningDays'];
+      return steps[physicalStep] || 'unknown';
+    }
+  };
+
   const canProceed = (): boolean => {
-    switch (step) {
-      case 0: return state.discipline !== null;
-      case 1: return state.distance !== null;
-      case 2: 
+    const logicalStep = getLogicalStep(step);
+    
+    switch (logicalStep) {
+      case 'discipline': return state.discipline !== null;
+      case 'distance': return state.distance !== null;
+      case 'fitness': 
         // Novice cannot proceed
         if (state.fitness === 'novice') return false;
         // Beginner marathon needs MPW answer
         if (needsMpwQuestion && !state.currentMpw) return false;
         return state.fitness !== null;
-      case 3: return state.goal !== null && !methodologyResult.locked; // Can't proceed if methodology locked
-      case 4: 
+      case 'goal': return state.goal !== null && !methodologyResult.locked;
+      case 'effortScore':
+        // Must have answered whether they have a recent race
+        if (state.hasRecentRace === null) return false;
+        // If they have a race, must have entered time and recency
+        if (state.hasRecentRace) {
+          if (!state.effortRaceDistance || !state.effortRaceTime || !state.effortRaceRecency) return false;
+          // Validate time format
+          const seconds = parseTimeToSeconds(state.effortRaceTime);
+          if (!seconds || seconds < 600) return false; // At least 10 minutes
+        }
+        // Must have a score (either calculated or estimated)
+        return state.effortScore !== null;
+      case 'duration': 
         // Must answer race date question
         if (state.hasRaceDate === null) return false;
         // If has race date, must have selected one
         if (state.hasRaceDate && !state.raceDate) return false;
         // Must have valid duration
         return state.duration >= 4;
-      case 5: return state.startDate !== '';
-      case 6: return true; // Strength is optional (moved before running days)
-      case 7: return state.daysPerWeek !== null; // Running days (now after strength)
+      case 'startDate': return state.startDate !== '';
+      case 'strength': return true; // Strength is optional
+      case 'runningDays': return state.daysPerWeek !== null;
       default: return false;
     }
   };
@@ -406,20 +462,38 @@ export default function PlanWizard() {
 
       setGenerateProgress(20);
 
-      const response = await supabase.functions.invoke('generate-run-plan', {
-        body: {
-          user_id: user.id,
-          distance: state.distance,
-          fitness: state.fitness,
-          goal: state.goal,
-          duration_weeks: state.duration,
-          start_date: state.startDate,
-          approach: state.approach,
-          days_per_week: state.daysPerWeek,
-          strength_frequency: state.strengthFrequency,
-          strength_tier: state.strengthTier,
-          equipment_type: state.equipmentType
+      // Build request body
+      const requestBody: Record<string, unknown> = {
+        user_id: user.id,
+        distance: state.distance,
+        fitness: state.fitness,
+        goal: state.goal,
+        duration_weeks: state.duration,
+        start_date: state.startDate,
+        approach: state.approach,
+        days_per_week: state.daysPerWeek,
+        strength_frequency: state.strengthFrequency,
+        strength_tier: state.strengthTier,
+        equipment_type: state.equipmentType
+      };
+
+      // Add Effort Score data for Balanced Build plans
+      if (state.approach === 'balanced_build' && state.effortScore) {
+        requestBody.effort_score = state.effortScore;
+        requestBody.effort_score_status = state.effortScoreStatus;
+        
+        // Include source race data if available (for verified scores)
+        if (state.effortScoreStatus === 'verified' && state.effortRaceDistance && state.effortRaceTime) {
+          const timeSeconds = parseTimeToSeconds(state.effortRaceTime);
+          if (timeSeconds) {
+            requestBody.effort_source_distance = raceDistanceToMeters(state.effortRaceDistance);
+            requestBody.effort_source_time = timeSeconds;
+          }
         }
+      }
+
+      const response = await supabase.functions.invoke('generate-run-plan', {
+        body: requestBody
       });
 
       clearInterval(progressInterval);
@@ -524,8 +598,10 @@ export default function PlanWizard() {
   // ============================================================================
 
   const renderStep = () => {
-    switch (step) {
-      case 0:
+    const logicalStep = getLogicalStep(step);
+    
+    switch (logicalStep) {
+      case 'discipline':
         return (
           <StepContainer title="Select discipline">
             <RadioGroup
@@ -542,7 +618,7 @@ export default function PlanWizard() {
           </StepContainer>
         );
 
-      case 1:
+      case 'distance':
         return (
           <StepContainer title="What distance?">
             <RadioGroup
@@ -558,7 +634,7 @@ export default function PlanWizard() {
           </StepContainer>
         );
 
-      case 2:
+      case 'fitness':
         // Show base-building prompt for novice
         if (state.fitness === 'novice') {
           return (
@@ -670,7 +746,7 @@ export default function PlanWizard() {
           </StepContainer>
         );
 
-      case 3:
+      case 'goal':
         return (
           <StepContainer title="What's your goal?">
             <RadioGroup
@@ -732,7 +808,233 @@ export default function PlanWizard() {
           </StepContainer>
         );
 
-      case 4:
+      case 'effortScore':
+        // EFFORT SCORE STEP (only for speed/Balanced Build goal)
+        // Calculate score when user enters race time
+        const handleRaceTimeChange = (timeStr: string) => {
+          setState(prev => {
+            const newState = { ...prev, effortRaceTime: timeStr };
+            
+            // If we have all the data, calculate the score
+            if (prev.effortRaceDistance && timeStr && prev.effortRaceRecency) {
+              const seconds = parseTimeToSeconds(timeStr);
+              if (seconds && seconds >= 600) {
+                const meters = raceDistanceToMeters(prev.effortRaceDistance);
+                const result = calculateEffortScoreResult(meters, seconds);
+                const adjustedScore = adjustScoreForRecency(
+                  result.score, 
+                  prev.effortRaceRecency,
+                  true // assume currently training
+                );
+                newState.effortScore = adjustedScore;
+                newState.effortPaces = result.paces;
+                newState.effortScoreStatus = 'verified';
+              }
+            }
+            return newState;
+          });
+        };
+        
+        const handleRaceDistanceChange = (dist: RaceDistance) => {
+          setState(prev => {
+            const newState = { ...prev, effortRaceDistance: dist };
+            
+            // Recalculate if we have time
+            if (prev.effortRaceTime && prev.effortRaceRecency) {
+              const seconds = parseTimeToSeconds(prev.effortRaceTime);
+              if (seconds && seconds >= 600) {
+                const meters = raceDistanceToMeters(dist);
+                const result = calculateEffortScoreResult(meters, seconds);
+                const adjustedScore = adjustScoreForRecency(
+                  result.score,
+                  prev.effortRaceRecency,
+                  true
+                );
+                newState.effortScore = adjustedScore;
+                newState.effortPaces = result.paces;
+                newState.effortScoreStatus = 'verified';
+              }
+            }
+            return newState;
+          });
+        };
+        
+        const handleRecencyChange = (recency: RaceRecency) => {
+          setState(prev => {
+            const newState = { ...prev, effortRaceRecency: recency };
+            
+            // Recalculate with new recency
+            if (prev.effortRaceDistance && prev.effortRaceTime) {
+              const seconds = parseTimeToSeconds(prev.effortRaceTime);
+              if (seconds && seconds >= 600) {
+                const meters = raceDistanceToMeters(prev.effortRaceDistance);
+                const result = calculateEffortScoreResult(meters, seconds);
+                const adjustedScore = adjustScoreForRecency(result.score, recency, true);
+                newState.effortScore = adjustedScore;
+                newState.effortPaces = result.paces;
+                newState.effortScoreStatus = 'verified';
+              }
+            }
+            return newState;
+          });
+        };
+        
+        const handleEstimateFromFitness = (level: 'beginner' | 'intermediate' | 'advanced') => {
+          const score = estimateScoreFromFitness(level);
+          const result = calculateEffortScoreResult(5000, 
+            level === 'beginner' ? 1800 : level === 'intermediate' ? 1440 : 1200
+          );
+          setState(prev => ({
+            ...prev,
+            effortScore: score,
+            effortPaces: result.paces,
+            effortScoreStatus: 'estimated'
+          }));
+        };
+        
+        return (
+          <StepContainer title="What's your running fitness?">
+            <div className="space-y-6">
+              {/* Has recent race? */}
+              <RadioGroup
+                value={state.hasRecentRace === null ? '' : state.hasRecentRace ? 'yes' : 'no'}
+                onValueChange={(v) => {
+                  const hasRace = v === 'yes';
+                  setState(prev => ({
+                    ...prev,
+                    hasRecentRace: hasRace,
+                    effortRaceDistance: hasRace ? prev.effortRaceDistance : null,
+                    effortRaceTime: hasRace ? prev.effortRaceTime : '',
+                    effortRaceRecency: hasRace ? prev.effortRaceRecency : null,
+                    effortScore: hasRace ? prev.effortScore : null,
+                    effortPaces: hasRace ? prev.effortPaces : null,
+                    effortScoreStatus: null
+                  }));
+                }}
+                className="space-y-2"
+              >
+                <RadioOption value="yes" label="I have a recent race time" description="Recommended for accurate pacing" />
+                <RadioOption value="no" label="Estimate for me" description="We'll set a starting point" />
+              </RadioGroup>
+              
+              {/* Race time entry */}
+              {state.hasRecentRace === true && (
+                <div className="space-y-4 pt-4 border-t">
+                  <p className="text-sm text-gray-600">Which race distance?</p>
+                  <div className="flex gap-2">
+                    {(['5k', '10k', 'half', 'marathon'] as RaceDistance[]).map(dist => (
+                      <button
+                        key={dist}
+                        type="button"
+                        onClick={() => handleRaceDistanceChange(dist)}
+                        className={`px-4 py-2 rounded-lg border text-sm ${
+                          state.effortRaceDistance === dist 
+                            ? 'bg-black text-white border-black' 
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        {dist === 'half' ? 'Half' : dist === 'marathon' ? 'Marathon' : dist.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {state.effortRaceDistance && (
+                    <>
+                      <p className="text-sm text-gray-600 pt-2">Your time?</p>
+                      <input
+                        type="text"
+                        placeholder={state.effortRaceDistance === 'marathon' || state.effortRaceDistance === 'half' ? 'H:MM:SS' : 'MM:SS'}
+                        value={state.effortRaceTime}
+                        onChange={(e) => handleRaceTimeChange(e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded-lg text-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </>
+                  )}
+                  
+                  {state.effortRaceDistance && state.effortRaceTime && (
+                    <>
+                      <p className="text-sm text-gray-600 pt-2">When did you run this?</p>
+                      <RadioGroup
+                        value={state.effortRaceRecency || ''}
+                        onValueChange={(v) => handleRecencyChange(v as RaceRecency)}
+                        className="space-y-2"
+                      >
+                        <RadioOption value="recent" label="Last 3 months" />
+                        <RadioOption value="3-6months" label="3-6 months ago" />
+                        <RadioOption value="6-12months" label="6-12 months ago" />
+                        <RadioOption value="over1year" label="Over a year ago" />
+                      </RadioGroup>
+                    </>
+                  )}
+                  
+                  {/* Show calculated score */}
+                  {state.effortScore && state.effortPaces && (
+                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-lg font-semibold text-blue-900">
+                        Effort Score: {state.effortScore}
+                      </p>
+                      <div className="mt-2 text-sm text-blue-700 space-y-1">
+                        <p>Base pace: {formatPace(state.effortPaces.base)}/mi</p>
+                        <p>Race pace: {formatPace(state.effortPaces.race)}/mi</p>
+                        <p>Steady pace: {formatPace(state.effortPaces.steady)}/mi</p>
+                      </div>
+                      {state.effortRaceRecency && state.effortRaceRecency !== 'recent' && (
+                        <p className="mt-2 text-xs text-blue-600">
+                          Adjusted for race recency. Update anytime with a new race.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Estimate from fitness level */}
+              {state.hasRecentRace === false && (
+                <div className="space-y-4 pt-4 border-t">
+                  <p className="text-sm text-gray-600">How would you describe your running?</p>
+                  <RadioGroup
+                    value={state.effortScoreStatus === 'estimated' ? 
+                      (state.effortScore === 32 ? 'beginner' : state.effortScore === 40 ? 'intermediate' : 'advanced') 
+                      : ''
+                    }
+                    onValueChange={(v) => handleEstimateFromFitness(v as 'beginner' | 'intermediate' | 'advanced')}
+                    className="space-y-2"
+                  >
+                    <RadioOption 
+                      value="beginner" 
+                      label="Building consistency" 
+                      description="20-30 miles/week, few races"
+                    />
+                    <RadioOption 
+                      value="intermediate" 
+                      label="Regular runner" 
+                      description="30-40 miles/week, some race experience"
+                    />
+                    <RadioOption 
+                      value="advanced" 
+                      label="Experienced competitor" 
+                      description="40+ miles/week, regular racing"
+                    />
+                  </RadioGroup>
+                  
+                  {/* Show estimated score */}
+                  {state.effortScore && state.effortScoreStatus === 'estimated' && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-lg font-semibold text-gray-900">
+                        Estimated Effort Score: {state.effortScore}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600">
+                        You can update this anytime with a race result.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </StepContainer>
+        );
+
+      case 'duration':
         const durationGating = getDurationGating(state.distance, state.fitness, state.currentMpw, state.duration);
         
         // Get recommended quick-select buttons based on fitness
@@ -931,7 +1233,7 @@ export default function PlanWizard() {
           </StepContainer>
         );
 
-      case 5:
+      case 'startDate':
         // If they have a race date, start date is already set - just confirm
         // If no race date, let them pick start date
         const planEndDate = state.startDate 
@@ -988,7 +1290,7 @@ export default function PlanWizard() {
           </StepContainer>
         );
 
-      case 6:
+      case 'strength':
         // STRENGTH STEP (moved before running days)
         return (
           <StepContainer title="Add strength training?">
@@ -1113,7 +1415,7 @@ export default function PlanWizard() {
           </StepContainer>
         );
 
-      case 7:
+      case 'runningDays':
         // RUNNING DAYS STEP (now after strength, with recommendations)
         const availableDays = getAvailableDays(state.approach);
         
@@ -1280,7 +1582,9 @@ export default function PlanWizard() {
     }
   };
 
-  const getStepCount = () => 8; // 0-7 (strength now at 6, running days at 7)
+  // Step count varies: speed goal adds Effort Score step (step 4)
+  const needsEffortScore = state.goal === 'speed';
+  const getStepCount = () => needsEffortScore ? 9 : 8;
 
   // Show generating overlay
   if (isGenerating) {
@@ -1461,7 +1765,7 @@ export default function PlanWizard() {
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Generating...
               </>
-            ) : step === 7 ? (
+            ) : getLogicalStep(step) === 'runningDays' ? (
               'Generate Plan'
             ) : (
               <>
