@@ -988,8 +988,9 @@ export default function PlanWizard() {
                           <span>Base pace:</span>
                           <input
                             type="text"
-                            value={formatPace(state.effortPaces.base)}
-                            onChange={(e) => {
+                            key={`base-${state.effortPaces.base}`}
+                            defaultValue={formatPace(state.effortPaces.base)}
+                            onBlur={(e) => {
                               const seconds = parsePace(e.target.value);
                               if (seconds && state.effortPaces) {
                                 setState(prev => ({
@@ -997,6 +998,9 @@ export default function PlanWizard() {
                                   effortPaces: { ...prev.effortPaces!, base: seconds },
                                   effortPacesSource: 'manual'
                                 }));
+                              } else {
+                                // Reset to original if invalid
+                                e.target.value = formatPace(state.effortPaces!.base);
                               }
                             }}
                             className="w-20 px-2 py-1 text-right font-mono border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -1006,8 +1010,9 @@ export default function PlanWizard() {
                           <span>Race pace:</span>
                           <input
                             type="text"
-                            value={formatPace(state.effortPaces.race)}
-                            onChange={(e) => {
+                            key={`race-${state.effortPaces.race}`}
+                            defaultValue={formatPace(state.effortPaces.race)}
+                            onBlur={(e) => {
                               const seconds = parsePace(e.target.value);
                               if (seconds && state.effortPaces) {
                                 setState(prev => ({
@@ -1015,6 +1020,8 @@ export default function PlanWizard() {
                                   effortPaces: { ...prev.effortPaces!, race: seconds },
                                   effortPacesSource: 'manual'
                                 }));
+                              } else {
+                                e.target.value = formatPace(state.effortPaces!.race);
                               }
                             }}
                             className="w-20 px-2 py-1 text-right font-mono border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -1024,8 +1031,9 @@ export default function PlanWizard() {
                           <span>Steady pace:</span>
                           <input
                             type="text"
-                            value={formatPace(state.effortPaces.steady)}
-                            onChange={(e) => {
+                            key={`steady-${state.effortPaces.steady}`}
+                            defaultValue={formatPace(state.effortPaces.steady)}
+                            onBlur={(e) => {
                               const seconds = parsePace(e.target.value);
                               if (seconds && state.effortPaces) {
                                 setState(prev => ({
@@ -1033,6 +1041,8 @@ export default function PlanWizard() {
                                   effortPaces: { ...prev.effortPaces!, steady: seconds },
                                   effortPacesSource: 'manual'
                                 }));
+                              } else {
+                                e.target.value = formatPace(state.effortPaces!.steady);
                               }
                             }}
                             className="w-20 px-2 py-1 text-right font-mono border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -1091,8 +1101,9 @@ export default function PlanWizard() {
                           <span>Base pace:</span>
                           <input
                             type="text"
-                            value={formatPace(state.effortPaces.base)}
-                            onChange={(e) => {
+                            key={`est-base-${state.effortPaces.base}`}
+                            defaultValue={formatPace(state.effortPaces.base)}
+                            onBlur={(e) => {
                               const seconds = parsePace(e.target.value);
                               if (seconds && state.effortPaces) {
                                 setState(prev => ({
@@ -1100,6 +1111,8 @@ export default function PlanWizard() {
                                   effortPaces: { ...prev.effortPaces!, base: seconds },
                                   effortPacesSource: 'manual'
                                 }));
+                              } else {
+                                e.target.value = formatPace(state.effortPaces!.base);
                               }
                             }}
                             className="w-20 px-2 py-1 text-right font-mono border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -1109,8 +1122,9 @@ export default function PlanWizard() {
                           <span>Race pace:</span>
                           <input
                             type="text"
-                            value={formatPace(state.effortPaces.race)}
-                            onChange={(e) => {
+                            key={`est-race-${state.effortPaces.race}`}
+                            defaultValue={formatPace(state.effortPaces.race)}
+                            onBlur={(e) => {
                               const seconds = parsePace(e.target.value);
                               if (seconds && state.effortPaces) {
                                 setState(prev => ({
@@ -1118,6 +1132,8 @@ export default function PlanWizard() {
                                   effortPaces: { ...prev.effortPaces!, race: seconds },
                                   effortPacesSource: 'manual'
                                 }));
+                              } else {
+                                e.target.value = formatPace(state.effortPaces!.race);
                               }
                             }}
                             className="w-20 px-2 py-1 text-right font-mono border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -1127,8 +1143,9 @@ export default function PlanWizard() {
                           <span>Steady pace:</span>
                           <input
                             type="text"
-                            value={formatPace(state.effortPaces.steady)}
-                            onChange={(e) => {
+                            key={`est-steady-${state.effortPaces.steady}`}
+                            defaultValue={formatPace(state.effortPaces.steady)}
+                            onBlur={(e) => {
                               const seconds = parsePace(e.target.value);
                               if (seconds && state.effortPaces) {
                                 setState(prev => ({
@@ -1136,6 +1153,8 @@ export default function PlanWizard() {
                                   effortPaces: { ...prev.effortPaces!, steady: seconds },
                                   effortPacesSource: 'manual'
                                 }));
+                              } else {
+                                e.target.value = formatPace(state.effortPaces!.steady);
                               }
                             }}
                             className="w-20 px-2 py-1 text-right font-mono border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
