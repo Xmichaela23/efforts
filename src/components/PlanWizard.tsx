@@ -974,24 +974,25 @@ export default function PlanWizard() {
               <RadioOption 
                 value="3-4" 
                 label="3-4 days" 
+                description="3 on recovery weeks"
                 disabled={!availableDays.includes('3-4')} 
               />
               <RadioOption 
                 value="4-5" 
                 label="4-5 days" 
-                description={runRec.recommended === '4-5' ? 'Recommended' : undefined}
+                description={runRec.recommended === '4-5' ? 'Recommended • 4 on recovery weeks' : '4 on recovery weeks'}
                 disabled={!availableDays.includes('4-5')} 
               />
               <RadioOption 
                 value="5-6" 
                 label="5-6 days" 
-                description={state.strengthFrequency === 3 ? 'High volume' : (runRec.recommended === '5-6' ? 'Recommended' : undefined)}
+                description={state.strengthFrequency === 3 ? 'High volume • 5 on recovery weeks' : (runRec.recommended === '5-6' ? 'Recommended • 5 on recovery weeks' : '5 on recovery weeks')}
                 disabled={!availableDays.includes('5-6')} 
               />
               <RadioOption 
                 value="6-7" 
                 label="6 days" 
-                description={state.strengthFrequency > 0 ? 'Very high volume' : 'Saturday rest before long run'}
+                description={state.strengthFrequency > 0 ? 'Very high volume • No reduction on recovery' : 'No reduction on recovery weeks'}
                 disabled={!availableDays.includes('6-7')} 
               />
             </RadioGroup>
