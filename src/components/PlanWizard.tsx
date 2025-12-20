@@ -913,7 +913,9 @@ export default function PlanWizard() {
                             Rack, bench, barbell, dumbbells, bands
                           </span>
                           <span className="block text-xs text-gray-400 mt-1">
-                            Uses: Inverted rows, bench jumps, band work
+                            {state.strengthFrequency === 3 
+                              ? 'Uses: Squats, hip thrusts, RDL, inverted rows, bench jumps'
+                              : 'Uses: Squats, hip thrusts, RDL, bench jumps'}
                           </span>
                         </Label>
                       </div>
@@ -927,7 +929,9 @@ export default function PlanWizard() {
                             Full gym access with cable machines
                           </span>
                           <span className="block text-xs text-gray-400 mt-1">
-                            Uses: Lat pulldowns, cable face pulls, box jumps
+                            {state.strengthFrequency === 3 
+                              ? 'Uses: Squats, hip thrusts, lat pulldowns, box jumps'
+                              : 'Uses: Squats, hip thrusts, RDL, box jumps'}
                           </span>
                         </Label>
                       </div>
