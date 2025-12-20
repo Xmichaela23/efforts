@@ -923,16 +923,17 @@ export default function PlanWizard() {
         };
         
         // Handler for known paces calculation
-        const handleKnownPacesChange = (easyPace: string, fiveKPace: string) => {
+        const handleKnownPacesChange = (easyPace: string, fiveKTime: string) => {
           const easySeconds = parsePace(easyPace);
-          const fiveKSeconds = parsePace(fiveKPace);
+          // Parse 5K time (MM:SS format) and convert to pace
+          const fiveKTimeSeconds = parsePace(fiveKTime); // Reuse pace parser for MM:SS
           
-          if (!easySeconds || !fiveKSeconds) {
-            // Clear results if either pace is invalid
+          if (!easySeconds || !fiveKTimeSeconds) {
+            // Clear results if either value is invalid
             setState(prev => ({
               ...prev,
               knownEasyPace: easyPace,
-              knownFiveKPace: fiveKPace,
+              knownFiveKPace: fiveKTime,
               effortScore: null,
               effortPaces: null,
               effortScoreStatus: null,
@@ -941,14 +942,17 @@ export default function PlanWizard() {
             return;
           }
           
+          // Convert 5K time to pace: time / 3.1 miles
+          const fiveKPaceSeconds = Math.round(fiveKTimeSeconds / 3.1);
+          
           // Calculate paces and validate
-          const result = calculatePacesFromKnownPaces(easySeconds, fiveKSeconds);
-          const validation = validatePaceConsistency(easySeconds, fiveKSeconds);
+          const result = calculatePacesFromKnownPaces(easySeconds, fiveKPaceSeconds);
+          const validation = validatePaceConsistency(easySeconds, fiveKPaceSeconds);
           
           setState(prev => ({
             ...prev,
             knownEasyPace: easyPace,
-            knownFiveKPace: fiveKPace,
+            knownFiveKPace: fiveKTime,
             effortScore: result.score,
             effortPaces: result.paces,
             effortScoreStatus: 'from_paces',
@@ -983,7 +987,7 @@ export default function PlanWizard() {
                 className="space-y-2"
               >
                 <RadioOption value="race" label="I have a recent race time" description="Recommended for accurate pacing" />
-                <RadioOption value="paces" label="I know my easy pace and 5K pace" description="We'll calculate your training zones" />
+                <RadioOption value="paces" label="I know my easy pace and 5K time" description="We'll calculate your training zones" />
                 <RadioOption value="estimate" label="Estimate for me" description="We'll set a starting point" />
               </RadioGroup>
               
@@ -1142,21 +1146,21 @@ export default function PlanWizard() {
                     </div>
                   </div>
                   
-                  {/* 5K Pace Input */}
+                  {/* 5K Time Input */}
                   <div>
-                    <p className="text-sm font-medium text-gray-900 mb-1">5K pace</p>
+                    <p className="text-sm font-medium text-gray-900 mb-1">5K time</p>
                     <p className="text-xs text-gray-500 mb-2">
-                      The pace you could hold for a 5K race (3.1 miles). This is hard but sustainable for 20-30 minutes. If you've run a 25:00 5K, that's about 8:04/mi.
+                      Your best recent 5K time (3.1 miles). This is an all-out race effort, hard but sustainable for 20-30 minutes.
                     </p>
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
-                        placeholder="8:00"
+                        placeholder="25:00"
                         value={state.knownFiveKPace}
                         onChange={(e) => handleKnownPacesChange(state.knownEasyPace, e.target.value)}
                         className="w-24 p-3 border border-gray-300 rounded-lg text-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      <span className="text-gray-600">/mi</span>
+                      <span className="text-gray-600">MM:SS</span>
                     </div>
                   </div>
                   
@@ -1174,7 +1178,7 @@ export default function PlanWizard() {
                         Effort Score: {state.effortScore}
                       </p>
                       <p className="text-xs text-green-700 mt-1 mb-3">
-                        Calculated from your 5K pace. Your easy pace is used as-is.
+                        Calculated from your 5K time. Your easy pace is used as-is.
                       </p>
                       <div className="text-sm text-green-700 space-y-2">
                         <div className="flex items-center justify-between">
