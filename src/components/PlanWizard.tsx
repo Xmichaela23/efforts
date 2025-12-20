@@ -856,8 +856,20 @@ export default function PlanWizard() {
                   className="space-y-2"
                 >
                   <RadioOption value="0" label="No strength" />
-                  <RadioOption value="2" label="2 days per week" description="Recommended" />
-                  <RadioOption value="3" label="3 days per week" description="Full body + upper + lower" />
+                  <RadioOption 
+                    value="2" 
+                    label="2 days per week" 
+                    description={state.strengthTier === 'strength_power' 
+                      ? "Lower body focus (Mon/Fri) - 80-90 min/week" 
+                      : "Recommended"} 
+                  />
+                  <RadioOption 
+                    value="3" 
+                    label="3 days per week" 
+                    description={state.strengthTier === 'strength_power'
+                      ? "Lower body + optional upper (Mon/Wed/Fri)"
+                      : "Full body + upper + lower"} 
+                  />
                 </RadioGroup>
               </div>
               
@@ -896,10 +908,13 @@ export default function PlanWizard() {
                             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">Advanced</span>
                           </span>
                           <span className="block text-sm text-gray-500 mt-1">
-                            Heavy compounds + hip thrusts + explosive power
+                            Lower body focus: Hip thrusts, RDL, squats, plyometrics
                           </span>
                           <span className="block text-xs text-gray-400 mt-1">
                             Equipment: Rack, bench, barbell required
+                          </span>
+                          <span className="block text-xs text-amber-600 mt-1">
+                            Upper body optional - minimal running benefit
                           </span>
                         </Label>
                       </div>
