@@ -257,20 +257,54 @@ export default function PlanWizard() {
     strengthFrequency: 0
   });
 
-  const updateState = <K extends keyof WizardState>(key: K, value: WizardState[K]) => {
-    setState(prev => ({ ...prev, [key]: value }));
+  // Get default duration based on distance, fitness, and MPW
+  const getDefaultDuration = (distance: Distance | null, fitness: Fitness | null, mpw: MpwRange | null): number => {
+    if (distance !== 'marathon') {
+      // Shorter distances: 12 weeks default
+      return 12;
+    }
+    
+    // Marathon defaults based on fitness
+    if (fitness === 'beginner') {
+      const mpwNum = mpw ? getMpwMidpoint(mpw) : 18;
+      return mpwNum <= 17 ? 20 : 18; // Low beginner: 20, High beginner: 18
+    }
+    if (fitness === 'intermediate') return 16;
+    if (fitness === 'advanced') return 12;
+    return 16;
+  };
 
-    // Reset dependent fields when parent changes
-    if (key === 'fitness') {
-      // Reset MPW when fitness changes
-      setState(prev => ({ ...prev, [key]: value, currentMpw: null }));
-    }
-    if (key === 'fitness' || key === 'goal') {
-      setState(prev => ({ ...prev, [key]: value, approach: null, daysPerWeek: null }));
-    }
-    if (key === 'approach') {
-      setState(prev => ({ ...prev, [key]: value, daysPerWeek: null }));
-    }
+  const updateState = <K extends keyof WizardState>(key: K, value: WizardState[K]) => {
+    setState(prev => {
+      const newState = { ...prev, [key]: value };
+      
+      // Reset dependent fields when parent changes
+      if (key === 'fitness') {
+        newState.currentMpw = null;
+        newState.approach = null;
+        newState.daysPerWeek = null;
+        // Set default duration for non-marathon or non-beginner
+        if (prev.distance !== 'marathon' || value !== 'beginner') {
+          newState.duration = getDefaultDuration(prev.distance, value as Fitness, null);
+        }
+      }
+      
+      if (key === 'currentMpw') {
+        // Set default duration based on MPW
+        newState.duration = getDefaultDuration(prev.distance, prev.fitness, value as MpwRange);
+      }
+      
+      if (key === 'goal') {
+        newState.approach = null;
+        newState.daysPerWeek = null;
+      }
+      
+      if (key === 'approach') {
+        newState.daysPerWeek = null;
+      }
+      
+      return newState;
+    });
   };
 
   // Get methodology based on goal and fitness
@@ -709,16 +743,16 @@ export default function PlanWizard() {
                 </Button>
               </div>
               <p className="text-sm text-gray-500">weeks of training</p>
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-4 pt-2 text-sm">
                 {getQuickDurations().map(w => (
-                  <Button
+                  <button
                     key={w}
-                    variant={state.duration === w ? 'default' : 'outline'}
-                    size="sm"
+                    type="button"
                     onClick={() => updateState('duration', w)}
+                    className={`${state.duration === w ? 'font-semibold text-black' : 'text-gray-500 hover:text-black'}`}
                   >
                     {w}
-                  </Button>
+                  </button>
                 ))}
               </div>
               
@@ -739,28 +773,21 @@ export default function PlanWizard() {
                   }`}>
                     {durationGating.warningMessage}
                   </p>
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-left justify-start"
+                  <div className="space-y-1 text-sm">
+                    <button
+                      type="button"
                       onClick={() => updateState('duration', durationGating.recommended)}
+                      className="block text-left underline hover:no-underline"
                     >
-                      Change to {durationGating.recommended} weeks (Recommended)
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-left justify-start"
+                      Use {durationGating.recommended} weeks instead (recommended)
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => updateState('duration', durationGating.minSafe)}
+                      className="block text-left text-gray-600 hover:underline"
                     >
-                      Change to {durationGating.minSafe} weeks (Minimum safe)
-                    </Button>
-                    <p className={`text-xs mt-2 ${
-                      durationGating.riskLevel === 'high_risk' ? 'text-red-600' : 'text-amber-600'
-                    }`}>
-                      Or continue with {state.duration} weeks{durationGating.riskLevel === 'high_risk' ? ' (high injury risk)' : ' (compressed timeline)'}
-                    </p>
+                      Use {durationGating.minSafe} weeks (minimum safe)
+                    </button>
                   </div>
                 </div>
               )}
