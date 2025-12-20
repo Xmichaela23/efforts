@@ -1590,7 +1590,7 @@ export default function PlanWizard() {
                   <RadioOption 
                     value="3" 
                     label="3 days per week" 
-                    description="Add optional upper body Wed"
+                    description="Add upper body for balance and aesthetics"
                   />
                 </RadioGroup>
               </div>
