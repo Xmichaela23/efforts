@@ -962,6 +962,9 @@ export default function PlanWizard() {
         
         return (
           <StepContainer title="What's your running fitness?">
+            <p className="text-sm text-gray-600 mb-4">
+              We use this to calculate your personalized training paces and estimate your race pace for your goal distance.
+            </p>
             <div className="space-y-6">
               {/* Input method selection */}
               <RadioGroup
