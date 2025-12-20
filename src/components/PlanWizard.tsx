@@ -402,16 +402,22 @@ export default function PlanWizard() {
         return state.fitness !== null;
       case 'goal': return state.goal !== null && !methodologyResult.locked;
       case 'effortScore':
-        // Must have answered whether they have a recent race
-        if (state.hasRecentRace === null) return false;
-        // If they have a race, must have entered time and recency
-        if (state.hasRecentRace) {
+        // Must have selected an input method
+        if (state.paceInputMethod === null) return false;
+        // If they have a race time, must have entered time and recency
+        if (state.paceInputMethod === 'race') {
           if (!state.effortRaceDistance || !state.effortRaceTime || !state.effortRaceRecency) return false;
           // Validate time format (pass distance for correct parsing)
           const seconds = parseTimeToSeconds(state.effortRaceTime, state.effortRaceDistance);
           if (!seconds || seconds < 600) return false; // At least 10 minutes
         }
-        // Must have a score (either calculated or estimated)
+        // If they know their paces, must have entered both paces
+        if (state.paceInputMethod === 'paces') {
+          const easySeconds = parsePace(state.knownEasyPace);
+          const fiveKSeconds = parsePace(state.knownFiveKPace);
+          if (!easySeconds || !fiveKSeconds) return false;
+        }
+        // Must have a score (calculated, estimated, or from paces)
         return state.effortScore !== null;
       case 'duration': 
         // Must answer race date question
