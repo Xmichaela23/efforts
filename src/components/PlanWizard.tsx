@@ -821,10 +821,12 @@ export default function PlanWizard() {
               if (seconds && seconds >= 600) {
                 const meters = raceDistanceToMeters(prev.effortRaceDistance);
                 const result = calculateEffortScoreResult(meters, seconds);
+                // Get current MPW for adjustment (use state.currentMpw or infer from fitness)
+                const currentMpw = state.currentMpw || (state.fitness === 'advanced' ? '35-45' : state.fitness === 'intermediate' ? '25-35' : '16-19');
                 const adjustedScore = adjustScoreForRecency(
                   result.score, 
                   prev.effortRaceRecency,
-                  true // assume currently training
+                  currentMpw
                 );
                 newState.effortScore = adjustedScore;
                 newState.effortPaces = result.paces;
@@ -845,10 +847,11 @@ export default function PlanWizard() {
               if (seconds && seconds >= 600) {
                 const meters = raceDistanceToMeters(dist);
                 const result = calculateEffortScoreResult(meters, seconds);
+                const currentMpw = state.currentMpw || (state.fitness === 'advanced' ? '35-45' : state.fitness === 'intermediate' ? '25-35' : '16-19');
                 const adjustedScore = adjustScoreForRecency(
                   result.score,
                   prev.effortRaceRecency,
-                  true
+                  currentMpw
                 );
                 newState.effortScore = adjustedScore;
                 newState.effortPaces = result.paces;
@@ -869,7 +872,8 @@ export default function PlanWizard() {
               if (seconds && seconds >= 600) {
                 const meters = raceDistanceToMeters(prev.effortRaceDistance);
                 const result = calculateEffortScoreResult(meters, seconds);
-                const adjustedScore = adjustScoreForRecency(result.score, recency, true);
+                const currentMpw = state.currentMpw || (state.fitness === 'advanced' ? '35-45' : state.fitness === 'intermediate' ? '25-35' : '16-19');
+                const adjustedScore = adjustScoreForRecency(result.score, recency, currentMpw);
                 newState.effortScore = adjustedScore;
                 newState.effortPaces = result.paces;
                 newState.effortScoreStatus = 'verified';

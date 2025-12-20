@@ -247,31 +247,73 @@ export function calculateEffortScoreResult(
 // ============================================================================
 
 export type RaceRecency = 'recent' | '3-6months' | '6-12months' | 'over1year';
+export type VolumeLevel = 'low' | 'medium' | 'high';
 
 /**
- * Adjust Effort Score based on how old the race result is
- * Fitness decays over time without training
+ * Fitness Stability Matrix
+ * Adjusts decay based on both recency AND current training volume
+ * 
+ * | Recency      | Low (<20 mpw) | Med (20-35 mpw) | High (35+ mpw) |
+ * |--------------|---------------|-----------------|----------------|
+ * | <3 Months    | 0             | 0               | +1             |
+ * | 3-6 Months   | -2            | -1              | 0              |
+ * | 6-12 Months  | -4            | -2              | -1             |
+ * | >1 Year      | -6            | -4              | -2             |
+ */
+const FITNESS_STABILITY_MATRIX: Record<RaceRecency, Record<VolumeLevel, number>> = {
+  'recent': { low: 0, medium: 0, high: 1 },
+  '3-6months': { low: -2, medium: -1, high: 0 },
+  '6-12months': { low: -4, medium: -2, high: -1 },
+  'over1year': { low: -6, medium: -4, high: -2 },
+};
+
+/**
+ * Convert MPW to volume level for matrix lookup
+ */
+export function mpwToVolumeLevel(mpw: number): VolumeLevel {
+  if (mpw >= 35) return 'high';
+  if (mpw >= 20) return 'medium';
+  return 'low';
+}
+
+/**
+ * Convert MPW range string to approximate midpoint
+ */
+export function mpwRangeToNumber(mpwRange: string | null): number {
+  const ranges: Record<string, number> = {
+    '12-15': 13.5,
+    '16-19': 17.5,
+    '20-25': 22.5,
+    '25-35': 30,
+    '35-45': 40,
+    '45+': 50,
+  };
+  return ranges[mpwRange || ''] || 25; // Default to medium
+}
+
+/**
+ * Adjust Effort Score based on race recency AND current training volume
+ * Uses the Fitness Stability Matrix for intelligent decay calculation
  */
 export function adjustScoreForRecency(
   score: number,
   recency: RaceRecency,
-  currentlyTraining: boolean = false
+  currentMpw?: number | string | null
 ): number {
-  const adjustments: Record<RaceRecency, number> = {
-    'recent': 0,           // Last 3 months - no adjustment
-    '3-6months': -2,       // Slight decline
-    '6-12months': -4,      // Moderate decline
-    'over1year': -6,       // Significant decline (unless maintaining)
-  };
-
-  let adjustment = adjustments[recency];
-  
-  // If they're currently training at a decent level, reduce the penalty
-  if (currentlyTraining && recency !== 'recent') {
-    adjustment = Math.round(adjustment / 2);
+  // Convert MPW to number if it's a range string
+  let mpwNum: number;
+  if (typeof currentMpw === 'string') {
+    mpwNum = mpwRangeToNumber(currentMpw);
+  } else if (typeof currentMpw === 'number') {
+    mpwNum = currentMpw;
+  } else {
+    mpwNum = 25; // Default to medium volume
   }
-
-  return Math.max(30, score + adjustment); // Don't go below 30
+  
+  const volumeLevel = mpwToVolumeLevel(mpwNum);
+  const adjustment = FITNESS_STABILITY_MATRIX[recency][volumeLevel];
+  
+  return Math.max(30, Math.round((score + adjustment) * 10) / 10); // Don't go below 30
 }
 
 // ============================================================================
