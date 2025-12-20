@@ -859,16 +859,12 @@ export default function PlanWizard() {
                   <RadioOption 
                     value="2" 
                     label="2 days per week" 
-                    description={state.strengthTier === 'strength_power' 
-                      ? "Lower body focus (Mon/Fri) - 80-90 min/week" 
-                      : "Recommended"} 
+                    description="Recommended"
                   />
                   <RadioOption 
                     value="3" 
                     label="3 days per week" 
-                    description={state.strengthTier === 'strength_power'
-                      ? "Lower body + optional upper (Mon/Wed/Fri)"
-                      : "Full body + upper + lower"} 
+                    description="Add optional upper body Wed"
                   />
                 </RadioGroup>
               </div>
@@ -914,7 +910,7 @@ export default function PlanWizard() {
                             Equipment: Rack, bench, barbell required
                           </span>
                           <span className="block text-xs text-amber-600 mt-1">
-                            Upper body optional - minimal running benefit
+                            Upper body optional - minimal running benefit. Only add for balance and aesthetics.
                           </span>
                         </Label>
                       </div>
