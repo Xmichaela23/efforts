@@ -1024,7 +1024,16 @@ export default function PlanWizard() {
                 {(() => {
                   const runDays = state.daysPerWeek === '3-4' ? 4 : state.daysPerWeek === '4-5' ? 5 : 6; // 5-6 and 6-7 both cap at 6
                   const strengthDays = state.strengthFrequency;
-                  const doubleDays = Math.min(strengthDays, runDays - 1); // Strength days overlap with run days (not long run)
+                  // Count actual doubles: strength on Mon/Fri + upper on Wed
+                  // Mon always has a run, Wed has run if 5+ days, Fri has run only if 6 days
+                  let doubleDays = 0;
+                  if (strengthDays >= 2) {
+                    doubleDays += 1; // Monday always has Easy + Strength
+                    if (runDays >= 6) doubleDays += 1; // Friday only has run if 6 days
+                  }
+                  if (strengthDays >= 3 && runDays >= 5) {
+                    doubleDays += 1; // Wednesday has Easy + Upper if 5+ days
+                  }
                   
                   // Build day-by-day breakdown based on actual selections
                   const days: { day: string; activities: string[] }[] = [
