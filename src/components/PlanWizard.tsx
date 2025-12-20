@@ -954,20 +954,21 @@ export default function PlanWizard() {
 
         {/* Actions */}
         <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-4">
-          <div className="max-w-lg mx-auto flex gap-3">
-            <Button
-              variant="outline"
+          <div className="max-w-lg mx-auto flex justify-between items-center">
+            <button
+              type="button"
               onClick={handleReject}
-              className="flex-1"
+              className="text-gray-500 hover:text-black"
             >
               Start Over
-            </Button>
-            <Button
+            </button>
+            <button
+              type="button"
               onClick={handleAccept}
-              className="flex-1"
+              className="font-medium hover:underline"
             >
               Accept Plan
-            </Button>
+            </button>
           </div>
         </div>
       </div>
