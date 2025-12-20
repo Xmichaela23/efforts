@@ -82,7 +82,7 @@ function getDurationGating(
           minSafe: 18,
           recommended: 20,
           riskLevel: selectedWeeks < 16 ? 'high_risk' : 'caution',
-          warningTitle: selectedWeeks < 16 ? '⚠️ High Injury Risk' : '⚠️ Compressed Timeline',
+          warningTitle: selectedWeeks < 16 ? 'High Injury Risk' : 'Compressed Timeline',
           warningMessage: `Current base: ~${mpwNum} miles/week\nMarathon peak: 40+ miles/week\n\n` +
             `${selectedWeeks} weeks requires ${Math.round((40/mpwNum - 1) * 100 / selectedWeeks)}%+ weekly increases — ` +
             `significantly above safe 10% guideline.\n\n` +
@@ -96,7 +96,7 @@ function getDurationGating(
           minSafe: 16,
           recommended: 18,
           riskLevel: selectedWeeks < 14 ? 'high_risk' : 'caution',
-          warningTitle: '⚠️ Compressed Timeline',
+          warningTitle: 'Compressed Timeline',
           warningMessage: `Current base: ~${mpwNum} miles/week\nMarathon peak: 45+ miles/week\n\n` +
             `You're close to intermediate fitness, so this is POSSIBLE but compressed.\n` +
             `Requires consistent execution with ${Math.round((45/mpwNum - 1) * 100 / selectedWeeks)}% weekly increases.`
@@ -109,7 +109,7 @@ function getDurationGating(
         minSafe: 12,
         recommended: 16,
         riskLevel: selectedWeeks < 10 ? 'high_risk' : 'caution',
-        warningTitle: '⚠️ Short Timeline',
+        warningTitle: 'Short Timeline',
         warningMessage: `12 weeks is the minimum recommended for intermediate marathon training.\n` +
           `16+ weeks allows proper periodization and taper.`
       };
@@ -120,7 +120,7 @@ function getDurationGating(
         minSafe: 10,
         recommended: 12,
         riskLevel: 'caution',
-        warningTitle: '⚠️ Aggressive Timeline',
+        warningTitle: 'Aggressive Timeline',
         warningMessage: `Even with your fitness base, 10+ weeks is recommended for proper marathon prep.`
       };
     }
@@ -641,7 +641,7 @@ export default function PlanWizard() {
                   />
                   <Label htmlFor="speed" className={`flex-1 ${state.fitness === 'beginner' ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                     <span className="block font-medium">
-                      {state.fitness === 'beginner' ? '🔒 Speed' : 'Speed'}
+                      {state.fitness === 'beginner' ? 'Speed (Locked)' : 'Speed'}
                     </span>
                     <span className="block text-sm text-gray-500 mt-0.5">Train for your fastest race</span>
                     {state.fitness === 'beginner' ? (
@@ -746,7 +746,7 @@ export default function PlanWizard() {
                       className="w-full text-left justify-start"
                       onClick={() => updateState('duration', durationGating.recommended)}
                     >
-                      ✓ Change to {durationGating.recommended} weeks (Recommended)
+                      Change to {durationGating.recommended} weeks (Recommended)
                     </Button>
                     <Button
                       variant="outline"
