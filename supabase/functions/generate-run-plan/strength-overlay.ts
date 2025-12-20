@@ -414,7 +414,7 @@ function createStrengthPowerUpperBody(phase: Phase, params: StrengthPowerParams,
     type: 'strength',
     name: 'Upper Body Strength & Power',
     description: `${weekDesc} - ${phaseNote}`,
-    duration: isRecovery ? 35 : 45,
+    duration: isRecovery ? 35 : (phase.name === 'Race Prep' ? 35 : 45),
     strength_exercises: exercises,
     tags: ['strength', 'upper_body', 'strength_power', `phase:${phase.name.toLowerCase()}`, equipment]
   };
