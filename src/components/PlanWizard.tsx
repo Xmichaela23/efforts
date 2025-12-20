@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/use-toast';
 type Discipline = 'run' | 'ride' | 'swim' | 'triathlon' | 'hybrid';
 type Distance = '5k' | '10k' | 'half' | 'marathon';
 type Fitness = 'novice' | 'beginner' | 'intermediate' | 'advanced';
+type MpwRange = '12-15' | '16-19' | '20-25' | '25-35' | '35-45' | '45+';
 type Goal = 'complete' | 'speed';
 type Approach = 'simple_completion' | 'balanced_build';
 type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
@@ -22,12 +23,122 @@ interface WizardState {
   discipline: Discipline | null;
   distance: Distance | null;
   fitness: Fitness | null;
+  currentMpw: MpwRange | null; // Actual weekly mileage for precise gating
   goal: Goal | null;
   duration: number;
   startDate: string; // ISO date string
   approach: Approach | null;
   daysPerWeek: DaysPerWeek | null;
   strengthFrequency: 0 | 1 | 2 | 3;
+}
+
+// ============================================================================
+// DURATION GATING - MPW BASED
+// ============================================================================
+
+interface DurationGating {
+  minSafe: number;
+  recommended: number;
+  riskLevel: 'safe' | 'caution' | 'high_risk';
+  warningTitle: string;
+  warningMessage: string;
+}
+
+/**
+ * Get duration requirements based on distance, fitness, and current MPW
+ */
+function getDurationGating(
+  distance: Distance | null,
+  fitness: Fitness | null,
+  currentMpw: MpwRange | null,
+  selectedWeeks: number
+): DurationGating | null {
+  if (!distance || !fitness) return null;
+  
+  // Only marathon needs granular MPW gating for now
+  if (distance !== 'marathon') {
+    // Simple gating for shorter distances
+    const minWeeks = distance === 'half' ? 10 : distance === '10k' ? 8 : 6;
+    if (selectedWeeks < minWeeks) {
+      return {
+        minSafe: minWeeks,
+        recommended: minWeeks + 2,
+        riskLevel: 'caution',
+        warningTitle: 'Short Timeline',
+        warningMessage: `${minWeeks} weeks is the minimum recommended for ${distance}.`
+      };
+    }
+    return null;
+  }
+  
+  // Marathon-specific gating based on fitness + MPW
+  if (fitness === 'beginner' && currentMpw) {
+    const mpwNum = getMpwMidpoint(currentMpw);
+    
+    if (mpwNum <= 17) {
+      // Low beginner (12-17 mpw)
+      if (selectedWeeks < 18) {
+        return {
+          minSafe: 18,
+          recommended: 20,
+          riskLevel: selectedWeeks < 16 ? 'high_risk' : 'caution',
+          warningTitle: selectedWeeks < 16 ? '⚠️ High Injury Risk' : '⚠️ Compressed Timeline',
+          warningMessage: `Current base: ~${mpwNum} miles/week\nMarathon peak: 40+ miles/week\n\n` +
+            `${selectedWeeks} weeks requires ${Math.round((40/mpwNum - 1) * 100 / selectedWeeks)}%+ weekly increases — ` +
+            `significantly above safe 10% guideline.\n\n` +
+            `This means TRIPLING your mileage in ${selectedWeeks} weeks.`
+        };
+      }
+    } else {
+      // High beginner (18-25 mpw)
+      if (selectedWeeks < 16) {
+        return {
+          minSafe: 16,
+          recommended: 18,
+          riskLevel: selectedWeeks < 14 ? 'high_risk' : 'caution',
+          warningTitle: '⚠️ Compressed Timeline',
+          warningMessage: `Current base: ~${mpwNum} miles/week\nMarathon peak: 45+ miles/week\n\n` +
+            `You're close to intermediate fitness, so this is POSSIBLE but compressed.\n` +
+            `Requires consistent execution with ${Math.round((45/mpwNum - 1) * 100 / selectedWeeks)}% weekly increases.`
+        };
+      }
+    }
+  } else if (fitness === 'intermediate') {
+    if (selectedWeeks < 12) {
+      return {
+        minSafe: 12,
+        recommended: 16,
+        riskLevel: selectedWeeks < 10 ? 'high_risk' : 'caution',
+        warningTitle: '⚠️ Short Timeline',
+        warningMessage: `12 weeks is the minimum recommended for intermediate marathon training.\n` +
+          `16+ weeks allows proper periodization and taper.`
+      };
+    }
+  } else if (fitness === 'advanced') {
+    if (selectedWeeks < 10) {
+      return {
+        minSafe: 10,
+        recommended: 12,
+        riskLevel: 'caution',
+        warningTitle: '⚠️ Aggressive Timeline',
+        warningMessage: `Even with your fitness base, 10+ weeks is recommended for proper marathon prep.`
+      };
+    }
+  }
+  
+  return null;
+}
+
+function getMpwMidpoint(mpw: MpwRange): number {
+  switch (mpw) {
+    case '12-15': return 14;
+    case '16-19': return 18;
+    case '20-25': return 22;
+    case '25-35': return 30;
+    case '35-45': return 40;
+    case '45+': return 50;
+    default: return 20;
+  }
 }
 
 // ============================================================================
@@ -137,6 +248,7 @@ export default function PlanWizard() {
     discipline: null,
     distance: null,
     fitness: null,
+    currentMpw: null,
     goal: null,
     duration: 12,
     startDate: getNextMonday(),
@@ -147,8 +259,12 @@ export default function PlanWizard() {
 
   const updateState = <K extends keyof WizardState>(key: K, value: WizardState[K]) => {
     setState(prev => ({ ...prev, [key]: value }));
-    
+
     // Reset dependent fields when parent changes
+    if (key === 'fitness') {
+      // Reset MPW when fitness changes
+      setState(prev => ({ ...prev, [key]: value, currentMpw: null }));
+    }
     if (key === 'fitness' || key === 'goal') {
       setState(prev => ({ ...prev, [key]: value, approach: null, daysPerWeek: null }));
     }
@@ -160,11 +276,19 @@ export default function PlanWizard() {
   // Get methodology based on goal and fitness
   const methodologyResult = getMethodologyForGoal(state.goal, state.fitness);
 
+  // Check if we need MPW for this fitness/distance combo
+  const needsMpwQuestion = state.fitness === 'beginner' && state.distance === 'marathon';
+
   const canProceed = (): boolean => {
     switch (step) {
       case 0: return state.discipline !== null;
       case 1: return state.distance !== null;
-      case 2: return state.fitness !== null && state.fitness !== 'novice'; // Novice cannot proceed
+      case 2: 
+        // Novice cannot proceed
+        if (state.fitness === 'novice') return false;
+        // Beginner marathon needs MPW answer
+        if (needsMpwQuestion && !state.currentMpw) return false;
+        return state.fitness !== null;
       case 3: return state.goal !== null && !methodologyResult.locked; // Can't proceed if methodology locked
       case 4: return state.duration >= 4;
       case 5: return state.startDate !== '';
@@ -412,9 +536,49 @@ export default function PlanWizard() {
             </div>
           );
         }
+        
+        // Show MPW follow-up for beginner marathon
+        if (state.fitness === 'beginner' && state.distance === 'marathon') {
+          return (
+            <StepContainer title="What's your current weekly mileage?">
+              <p className="text-sm text-gray-500 mb-4">
+                This helps us recommend the right plan duration for your base.
+              </p>
+              <RadioGroup
+                value={state.currentMpw || ''}
+                onValueChange={(v) => updateState('currentMpw', v as MpwRange)}
+                className="space-y-3"
+              >
+                <RadioOption 
+                  value="12-15" 
+                  label="12-15 miles/week" 
+                  description="Lower range — will need more time to build safely" 
+                />
+                <RadioOption 
+                  value="16-19" 
+                  label="16-19 miles/week" 
+                  description="Mid range — standard beginner timeline" 
+                />
+                <RadioOption 
+                  value="20-25" 
+                  label="20-25 miles/week" 
+                  description="Upper range — closer to intermediate, more flexibility" 
+                />
+              </RadioGroup>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => updateState('fitness', null)}
+                className="mt-4 text-gray-500"
+              >
+                ← Change fitness level
+              </Button>
+            </StepContainer>
+          );
+        }
 
         return (
-          <StepContainer title="Current weekly mileage">
+          <StepContainer title="Current fitness level">
             <RadioGroup
               value={state.fitness || ''}
               onValueChange={(v) => updateState('fitness', v as Fitness)}
@@ -507,6 +671,21 @@ export default function PlanWizard() {
         );
 
       case 4:
+        const durationGating = getDurationGating(state.distance, state.fitness, state.currentMpw, state.duration);
+        
+        // Get recommended quick-select buttons based on fitness
+        const getQuickDurations = () => {
+          if (state.distance === 'marathon') {
+            if (state.fitness === 'beginner') {
+              const mpwNum = state.currentMpw ? getMpwMidpoint(state.currentMpw) : 18;
+              return mpwNum <= 17 ? [16, 18, 20, 22] : [14, 16, 18, 20];
+            }
+            if (state.fitness === 'intermediate') return [12, 14, 16, 18];
+            if (state.fitness === 'advanced') return [10, 12, 14, 16];
+          }
+          return [8, 12, 16, 18];
+        };
+        
         return (
           <StepContainer title="How many weeks?">
             <div className="space-y-4">
@@ -531,7 +710,7 @@ export default function PlanWizard() {
               </div>
               <p className="text-sm text-gray-500">weeks of training</p>
               <div className="flex gap-2 pt-2">
-                {[8, 12, 16, 18].map(w => (
+                {getQuickDurations().map(w => (
                   <Button
                     key={w}
                     variant={state.duration === w ? 'default' : 'outline'}
@@ -542,6 +721,49 @@ export default function PlanWizard() {
                   </Button>
                 ))}
               </div>
+              
+              {/* MPW-based duration warning */}
+              {durationGating && (
+                <div className={`mt-4 p-4 rounded-lg border ${
+                  durationGating.riskLevel === 'high_risk' 
+                    ? 'bg-red-50 border-red-200' 
+                    : 'bg-amber-50 border-amber-200'
+                }`}>
+                  <h4 className={`font-semibold text-sm mb-2 ${
+                    durationGating.riskLevel === 'high_risk' ? 'text-red-800' : 'text-amber-800'
+                  }`}>
+                    {durationGating.warningTitle}
+                  </h4>
+                  <p className={`text-xs whitespace-pre-line mb-3 ${
+                    durationGating.riskLevel === 'high_risk' ? 'text-red-700' : 'text-amber-700'
+                  }`}>
+                    {durationGating.warningMessage}
+                  </p>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-left justify-start"
+                      onClick={() => updateState('duration', durationGating.recommended)}
+                    >
+                      ✓ Change to {durationGating.recommended} weeks (Recommended)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-left justify-start"
+                      onClick={() => updateState('duration', durationGating.minSafe)}
+                    >
+                      Change to {durationGating.minSafe} weeks (Minimum safe)
+                    </Button>
+                    <p className={`text-xs mt-2 ${
+                      durationGating.riskLevel === 'high_risk' ? 'text-red-600' : 'text-amber-600'
+                    }`}>
+                      Or continue with {state.duration} weeks{durationGating.riskLevel === 'high_risk' ? ' (high injury risk)' : ' (compressed timeline)'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </StepContainer>
         );
