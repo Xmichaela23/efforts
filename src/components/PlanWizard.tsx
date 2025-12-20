@@ -51,7 +51,7 @@ interface WizardState {
   effortRaceTime: string; // "MM:SS" or "HH:MM:SS"
   effortRaceRecency: RaceRecency | null;
   effortScore: number | null;
-  effortScoreStatus: 'verified' | 'estimated' | 'from_paces' | null;
+  effortScoreStatus: 'verified' | 'estimated' | null;
   effortPaces: TrainingPaces | null;
   effortPacesSource: 'calculated' | 'manual'; // Track if user edited paces
   // Known paces input (for "I know my paces" option)
@@ -1172,7 +1172,7 @@ export default function PlanWizard() {
                   )}
                   
                   {/* Show calculated paces */}
-                  {state.effortScore && state.effortPaces && state.effortScoreStatus === 'from_paces' && (
+                  {state.effortScore && state.effortPaces && state.paceInputMethod === 'paces' && (
                     <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
                       <p className="text-lg font-semibold text-green-900">
                         Effort Score: {state.effortScore}
