@@ -337,8 +337,8 @@ export default function PlanWizard() {
       case 3: return state.goal !== null && !methodologyResult.locked; // Can't proceed if methodology locked
       case 4: return state.duration >= 4;
       case 5: return state.startDate !== '';
-      case 6: return state.daysPerWeek !== null; // Skip approach step - auto-selected
-      case 7: return true; // Strength is optional
+      case 6: return true; // Strength is optional (moved before running days)
+      case 7: return state.daysPerWeek !== null; // Running days (now after strength)
       default: return false;
     }
   };
@@ -819,31 +819,7 @@ export default function PlanWizard() {
         );
 
       case 6:
-        const availableDays = getAvailableDays(state.approach);
-        return (
-          <StepContainer title="Days per week">
-            <RadioGroup
-              value={state.daysPerWeek || ''}
-              onValueChange={(v) => updateState('daysPerWeek', v as DaysPerWeek)}
-              className="space-y-3"
-            >
-              <RadioOption value="3-4" label="3-4 days" disabled={!availableDays.includes('3-4')} />
-              <RadioOption value="4-5" label="4-5 days" disabled={!availableDays.includes('4-5')} />
-              <RadioOption value="5-6" label="5-6 days" disabled={!availableDays.includes('5-6')} />
-              <RadioOption value="6-7" label="6-7 days" disabled={!availableDays.includes('6-7')} />
-            </RadioGroup>
-            
-            {/* Show selected methodology info */}
-            {state.approach && (
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium">{METHODOLOGIES[state.approach].name}</p>
-                <p className="text-xs text-gray-500 mt-1">{METHODOLOGIES[state.approach].shortDescription}</p>
-              </div>
-            )}
-          </StepContainer>
-        );
-
-      case 7:
+        // STRENGTH STEP (moved before running days)
         return (
           <StepContainer title="Add strength training?">
             <div className="space-y-6">
@@ -963,12 +939,91 @@ export default function PlanWizard() {
           </StepContainer>
         );
 
+      case 7:
+        // RUNNING DAYS STEP (now after strength, with recommendations)
+        const availableDays = getAvailableDays(state.approach);
+        
+        // Get recommended running days based on strength selection
+        const getRunDaysRecommendation = () => {
+          if (state.strengthFrequency === 0) {
+            return { recommended: '5-6', warn: null };
+          }
+          if (state.strengthFrequency === 2) {
+            return { recommended: '4-5', warn: '6-7' };
+          }
+          // 3x strength
+          return { recommended: '4-5', warn: '5-6' };
+        };
+        const runRec = getRunDaysRecommendation();
+        
+        // Check if current selection is high volume
+        const isHighVolume = (days: DaysPerWeek | null) => {
+          if (!days) return false;
+          if (state.strengthFrequency === 3 && (days === '5-6' || days === '6-7')) return true;
+          if (state.strengthFrequency === 2 && days === '6-7') return true;
+          return false;
+        };
+        
+        return (
+          <StepContainer title="Running days per week">
+            <RadioGroup
+              value={state.daysPerWeek || ''}
+              onValueChange={(v) => updateState('daysPerWeek', v as DaysPerWeek)}
+              className="space-y-3"
+            >
+              <RadioOption 
+                value="3-4" 
+                label="3-4 days" 
+                disabled={!availableDays.includes('3-4')} 
+              />
+              <RadioOption 
+                value="4-5" 
+                label="4-5 days" 
+                description={runRec.recommended === '4-5' ? 'Recommended' : undefined}
+                disabled={!availableDays.includes('4-5')} 
+              />
+              <RadioOption 
+                value="5-6" 
+                label="5-6 days" 
+                description={state.strengthFrequency === 3 ? 'High volume' : (runRec.recommended === '5-6' ? 'Recommended' : undefined)}
+                disabled={!availableDays.includes('5-6')} 
+              />
+              <RadioOption 
+                value="6-7" 
+                label="6-7 days" 
+                description={state.strengthFrequency > 0 ? 'Very high volume' : undefined}
+                disabled={!availableDays.includes('6-7')} 
+              />
+            </RadioGroup>
+            
+            {/* Show volume warning */}
+            {isHighVolume(state.daysPerWeek) && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-sm font-medium text-amber-800">High Training Volume</p>
+                <p className="text-xs text-amber-700 mt-1">
+                  {state.daysPerWeek === '6-7' ? '6-7' : '5-6'} days running + {state.strengthFrequency}x strength = 10+ hours/week. 
+                  This is advanced volume. Consider {runRec.recommended} days running for better recovery.
+                </p>
+              </div>
+            )}
+            
+            {/* Show total weekly estimate */}
+            {state.daysPerWeek && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs text-gray-500">
+                  Weekly training: {state.daysPerWeek} running {state.strengthFrequency > 0 ? `+ ${state.strengthFrequency}x strength` : ''}
+                </p>
+              </div>
+            )}
+          </StepContainer>
+        );
+
       default:
         return null;
     }
   };
 
-  const getStepCount = () => 8; // 0-7 (removed separate approach step)
+  const getStepCount = () => 8; // 0-7 (strength now at 6, running days at 7)
 
   // Show generating overlay
   if (isGenerating) {
