@@ -476,9 +476,14 @@ export default function PlanWizard() {
       
       toast({
         title: "Plan ready!",
-        description: "Your training schedule is now in the Plans menu.",
-        duration: 5000,
+        description: "Opening your training schedule...",
+        duration: 3000,
       });
+      
+      // Navigate to weekly view of the new plan
+      setTimeout(() => {
+        navigate('/', { state: { openPlans: true, focusPlanId: generatedPlan.plan_id } });
+      }, 500);
     }).catch(err => {
       console.error('Activation error:', err);
       toast({
