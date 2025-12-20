@@ -136,7 +136,8 @@ export class SimpleCompletionGenerator extends BaseGenerator {
     isRecovery: boolean
   ): Session[] {
     const sessions: Session[] = [];
-    const runningDays = this.getRunningDays();
+    // Use week-specific day count (fewer days on recovery weeks)
+    const runningDays = this.getRunningDaysForWeek(weekNumber, phaseStructure);
 
     // Get target weekly mileage
     const weeklyMiles = this.calculateWeeklyMileage(weekNumber, phase, isRecovery, phaseStructure);

@@ -990,8 +990,8 @@ export default function PlanWizard() {
               />
               <RadioOption 
                 value="6-7" 
-                label="6-7 days" 
-                description={state.strengthFrequency > 0 ? 'Very high volume' : undefined}
+                label="6 days" 
+                description={state.strengthFrequency > 0 ? 'Very high volume' : 'Saturday rest before long run'}
                 disabled={!availableDays.includes('6-7')} 
               />
             </RadioGroup>
@@ -1001,7 +1001,7 @@ export default function PlanWizard() {
               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <p className="text-sm font-medium text-amber-800">High Training Volume</p>
                 <p className="text-xs text-amber-700 mt-1">
-                  {state.daysPerWeek === '6-7' ? '6-7' : '5-6'} days running + {state.strengthFrequency}x strength = 10+ hours/week. 
+                  {state.daysPerWeek === '6-7' ? '6' : '5-6'} days running + {state.strengthFrequency}x strength = 10+ hours/week. 
                   This is advanced volume. Consider {runRec.recommended} days running for better recovery.
                 </p>
               </div>

@@ -440,18 +440,47 @@ export abstract class BaseGenerator {
 
   /**
    * Get the target number of running days based on days_per_week
+   * Returns the MAX value (use getRunningDaysForWeek for week-specific logic)
+   * Caps at 6 days to ensure at least 1 rest day per week
    */
   protected getRunningDays(): number {
+    const { max } = this.parseDaysPerWeek();
+    // Cap at 6 days max - always need at least 1 rest day
+    return Math.min(6, max);
+  }
+
+  /**
+   * Get running days for a specific week
+   * Recovery weeks use fewer days, build weeks use more
+   */
+  protected getRunningDaysForWeek(weekNumber: number, phaseStructure: PhaseStructure): number {
     const { min, max } = this.parseDaysPerWeek();
-    return Math.round((min + max) / 2);
+    const isRecovery = this.isRecoveryWeek(weekNumber, phaseStructure);
+    const phase = this.getCurrentPhase(weekNumber, phaseStructure);
+    
+    // Recovery weeks and taper: use minimum days
+    if (isRecovery || phase.name === 'Taper') {
+      return Math.min(6, min);
+    }
+    
+    // Build weeks: use maximum days
+    return Math.min(6, max);
   }
 
   /**
    * Assign days to sessions based on workout type
    * Prioritizes: Long run → Quality → Easy
+   * 
+   * Rest day strategy:
+   * - Saturday is ALWAYS a rest day (prep for Sunday long run)
+   * - Friday becomes rest if running 5 or fewer days
+   * - Quality days (hard workouts) on Tuesday and Thursday
+   * - Easy runs fill Monday, Wednesday, and optionally Friday
    */
   protected assignDaysToSessions(sessions: Session[], _numDays: number): Session[] {
-    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    // Days available for running (Saturday always OFF for long run prep)
+    const easyDayOrder = ['Monday', 'Wednesday', 'Friday'];
+    const qualityDays = ['Tuesday', 'Thursday'];
     
     // Separate by type
     const longRuns = sessions.filter(s => s.tags.includes('long_run'));
@@ -465,22 +494,24 @@ export abstract class BaseGenerator {
 
     const assignedSessions: Session[] = [];
     const usedDays = new Set<string>();
+    
+    // Saturday is always a rest day (don't add it to usedDays, just never use it)
+    const restDays = new Set(['Saturday']);
 
-    // Long run on Saturday or Sunday
+    // Long run on Sunday
     for (const longRun of longRuns) {
       const preferredDay = 'Sunday';
-      if (!usedDays.has(preferredDay)) {
+      if (!usedDays.has(preferredDay) && !restDays.has(preferredDay)) {
         longRun.day = preferredDay;
         usedDays.add(preferredDay);
         assignedSessions.push(longRun);
       }
     }
 
-    // Hard sessions on Tuesday and Thursday (avoid consecutive)
-    const hardDays = ['Tuesday', 'Thursday', 'Saturday'];
+    // Hard sessions on Tuesday and Thursday (2Q system)
     for (const hardSession of hardSessions) {
-      for (const day of hardDays) {
-        if (!usedDays.has(day)) {
+      for (const day of qualityDays) {
+        if (!usedDays.has(day) && !restDays.has(day)) {
           hardSession.day = day;
           usedDays.add(day);
           assignedSessions.push(hardSession);
@@ -489,10 +520,10 @@ export abstract class BaseGenerator {
       }
     }
 
-    // Easy sessions on remaining days
+    // Easy sessions on Monday, Wednesday, Friday (in that order)
     for (const easySession of easySessions) {
-      for (const day of dayOrder) {
-        if (!usedDays.has(day)) {
+      for (const day of easyDayOrder) {
+        if (!usedDays.has(day) && !restDays.has(day)) {
           easySession.day = day;
           usedDays.add(day);
           assignedSessions.push(easySession);

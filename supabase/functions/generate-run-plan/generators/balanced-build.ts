@@ -117,7 +117,8 @@ export class BalancedBuildGenerator extends BaseGenerator {
     isRecovery: boolean
   ): Session[] {
     const sessions: Session[] = [];
-    const runningDays = this.getRunningDays();
+    // Use week-specific day count (fewer days on recovery weeks)
+    const runningDays = this.getRunningDaysForWeek(weekNumber, phaseStructure);
 
     // Get targets
     const weeklyMiles = this.calculateWeeklyMileage(weekNumber, phase, isRecovery, phaseStructure);
@@ -198,7 +199,7 @@ export class BalancedBuildGenerator extends BaseGenerator {
         // Phase III: Marathon-specific M pace work
         if (this.params.distance === 'marathon' || this.params.distance === 'half') {
           // Q1 Tuesday: MP run
-          sessions.push(this.createMarathonPaceRun(weekInPhase));
+          sessions.push(this.createMPaceSession(weekInPhase));
           mileageUsed += 6;
           
           // Q2 Thursday: Cruise intervals
@@ -281,6 +282,27 @@ export class BalancedBuildGenerator extends BaseGenerator {
   // MILEAGE CALCULATIONS
   // ============================================================================
 
+  /**
+   * Get days-per-week multiplier for weekly mileage
+   * Fewer running days = lower weekly mileage target
+   */
+  private getDaysPerWeekMultiplier(): number {
+    const daysPerWeek = this.params.days_per_week;
+    
+    switch (daysPerWeek) {
+      case '3-4':
+        return 0.65;  // 35% reduction
+      case '4-5':
+        return 0.80;  // 20% reduction
+      case '5-6':
+        return 0.95;  // 5% reduction (base target)
+      case '6-7':
+        return 1.0;   // Full mileage
+      default:
+        return 0.85;
+    }
+  }
+
   private calculateWeeklyMileage(
     weekNumber: number, 
     phase: Phase, 
@@ -293,16 +315,21 @@ export class BalancedBuildGenerator extends BaseGenerator {
     const { start, peak } = mileageConfig;
     const totalWeeks = this.params.duration_weeks;
     
+    // Apply days-per-week multiplier
+    const daysMultiplier = this.getDaysPerWeekMultiplier();
+    const adjustedStart = start * daysMultiplier;
+    const adjustedPeak = peak * daysMultiplier;
+    
     const taperPhase = phaseStructure.phases.find(p => p.name === 'Taper');
     const taperStart = taperPhase?.start_week || totalWeeks;
     
     let targetMiles: number;
     if (weekNumber < taperStart) {
       const progress = (weekNumber - 1) / Math.max(1, taperStart - 2);
-      targetMiles = start + (peak - start) * Math.min(1, progress);
+      targetMiles = adjustedStart + (adjustedPeak - adjustedStart) * Math.min(1, progress);
     } else {
       const weekInTaper = weekNumber - taperStart + 1;
-      targetMiles = peak * (weekInTaper === 1 ? 0.6 : 0.4);
+      targetMiles = adjustedPeak * (weekInTaper === 1 ? 0.6 : 0.4);
     }
     
     if (isRecovery) {
@@ -447,9 +474,9 @@ export class BalancedBuildGenerator extends BaseGenerator {
   }
 
   /**
-   * Marathon pace run
+   * Marathon pace run (M pace session)
    */
-  private createMarathonPaceRun(weekInPhase: number): Session {
+  private createMPaceSession(weekInPhase: number): Session {
     // Progressive: 4 → 6 miles at MP
     const mpMiles = Math.min(6, 3 + weekInPhase);
 
@@ -505,7 +532,29 @@ export class BalancedBuildGenerator extends BaseGenerator {
   }
 
   /**
+   * Get appropriate easy run distance based on days_per_week selection
+   * Fewer days = shorter easy runs to keep weekly volume appropriate
+   */
+  private getEasyRunCaps(): { min: number; max: number } {
+    const daysPerWeek = this.params.days_per_week;
+    
+    switch (daysPerWeek) {
+      case '3-4':
+        return { min: 3, max: 5 };
+      case '4-5':
+        return { min: 4, max: 6 };  // Reduced from 4-8
+      case '5-6':
+        return { min: 5, max: 7 };
+      case '6-7':
+        return { min: 5, max: 8 };
+      default:
+        return { min: 4, max: 6 };
+    }
+  }
+
+  /**
    * Fill remaining days with easy runs
+   * Scales easy run distance based on days_per_week selection
    */
   private fillWithEasyRuns(
     sessions: Session[], 
@@ -515,8 +564,9 @@ export class BalancedBuildGenerator extends BaseGenerator {
     const remainingDays = Math.max(0, targetDays - sessions.length);
     if (remainingDays <= 0) return;
 
-    const milesPerDay = Math.max(4, Math.round(remainingMiles / remainingDays));
-    const easyMiles = Math.max(4, Math.min(8, milesPerDay));
+    const { min, max } = this.getEasyRunCaps();
+    const milesPerDay = Math.max(min, Math.round(remainingMiles / remainingDays));
+    const easyMiles = Math.max(min, Math.min(max, milesPerDay));
     
     for (let i = 0; i < remainingDays; i++) {
       sessions.push(this.createSession(
