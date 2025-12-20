@@ -457,3 +457,128 @@ export function parsePace(paceStr: string): number | null {
   if (parts.length !== 2 || parts.some(isNaN)) return null;
   return parts[0] * 60 + parts[1];
 }
+
+// ============================================================================
+// CALCULATE FROM KNOWN PACES (Easy + 5K)
+// ============================================================================
+
+/**
+ * Calculate Effort Score from 5K pace (seconds per mile)
+ * 
+ * This allows users who know their 5K pace to get all training paces
+ * without needing a specific race time.
+ */
+export function calculateScoreFrom5kPace(paceSecondsPerMile: number): number {
+  // Convert pace to 5K time: pace * 3.1 miles
+  const estimated5kTime = paceSecondsPerMile * 3.1;
+  
+  // Find the VDOT that matches this 5K time
+  let lower = VDOT_TABLE[0];
+  let upper = VDOT_TABLE[VDOT_TABLE.length - 1];
+
+  for (let i = 0; i < VDOT_TABLE.length - 1; i++) {
+    const current = VDOT_TABLE[i];
+    const next = VDOT_TABLE[i + 1];
+    
+    if (estimated5kTime <= current.times['5k'] && estimated5kTime >= next.times['5k']) {
+      lower = current;
+      upper = next;
+      break;
+    }
+  }
+
+  // Handle edge cases
+  if (estimated5kTime >= lower.times['5k']) {
+    return lower.vdot;
+  }
+  if (estimated5kTime <= upper.times['5k']) {
+    return upper.vdot;
+  }
+
+  // Linear interpolation
+  const lowerTime = lower.times['5k'];
+  const upperTime = upper.times['5k'];
+  const timeDiff = lowerTime - upperTime;
+  const vdotDiff = upper.vdot - lower.vdot;
+  
+  const fraction = (lowerTime - estimated5kTime) / timeDiff;
+  const vdot = lower.vdot + (fraction * vdotDiff);
+
+  return Math.round(vdot * 10) / 10;
+}
+
+/**
+ * Get expected easy pace range for a given VDOT
+ * Returns { min, max } in seconds per mile
+ * 
+ * Easy pace typically has a range of ~30 seconds per mile
+ */
+export function getExpectedEasyPaceRange(score: number): { min: number; max: number } {
+  const paces = getPacesFromScore(score);
+  // Easy pace range: base pace ± 15 seconds
+  return {
+    min: paces.base - 15,  // Faster end of easy
+    max: paces.base + 30,  // Slower end of easy (more generous)
+  };
+}
+
+/**
+ * Validate if user's easy pace is consistent with their 5K pace
+ * Returns validation result with feedback
+ */
+export function validatePaceConsistency(
+  easyPaceSeconds: number,
+  fiveKPaceSeconds: number
+): { 
+  isValid: boolean; 
+  warning?: string;
+  suggestedEasyPace?: number;
+} {
+  const score = calculateScoreFrom5kPace(fiveKPaceSeconds);
+  const expectedRange = getExpectedEasyPaceRange(score);
+  
+  if (easyPaceSeconds >= expectedRange.min && easyPaceSeconds <= expectedRange.max) {
+    return { isValid: true };
+  }
+  
+  const expectedPaces = getPacesFromScore(score);
+  
+  if (easyPaceSeconds < expectedRange.min) {
+    // Easy pace is too fast for their 5K
+    return {
+      isValid: false,
+      warning: `Your easy pace seems fast for a ${formatPace(fiveKPaceSeconds)}/mi 5K pace. Expected around ${formatPace(expectedPaces.base)}/mi.`,
+      suggestedEasyPace: expectedPaces.base,
+    };
+  } else {
+    // Easy pace is slower than expected (this is usually fine)
+    return {
+      isValid: true, // Still valid, just noting the difference
+      warning: `Your easy pace is slower than typical for your 5K pace, but that's okay if it feels right.`,
+    };
+  }
+}
+
+/**
+ * Calculate all training paces from easy pace and 5K pace
+ * Primary calculation uses 5K pace; easy pace is used for validation
+ * User can override with their actual easy pace
+ */
+export function calculatePacesFromKnownPaces(
+  easyPaceSeconds: number,
+  fiveKPaceSeconds: number
+): EffortScoreResult {
+  // Calculate score from 5K pace
+  const score = calculateScoreFrom5kPace(fiveKPaceSeconds);
+  
+  // Get standard paces for this score
+  const paces = getPacesFromScore(score);
+  
+  // Override the base pace with user's actual easy pace
+  // (they know their body better than the formula)
+  paces.base = easyPaceSeconds;
+  
+  const pacesKm = pacesToKm(paces);
+  
+  return { score, paces, pacesKm };
+}

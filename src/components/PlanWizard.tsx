@@ -15,6 +15,8 @@ import {
   adjustScoreForRecency,
   estimateScoreFromFitness,
   getPacesFromScore,
+  calculatePacesFromKnownPaces,
+  validatePaceConsistency,
   type RaceDistance,
   type RaceRecency,
   type TrainingPaces,
@@ -34,6 +36,8 @@ type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
 type StrengthTier = 'injury_prevention' | 'strength_power';
 type EquipmentType = 'home_gym' | 'commercial_gym';
 
+type PaceInputMethod = 'race' | 'paces' | 'estimate' | null;
+
 interface WizardState {
   discipline: Discipline | null;
   distance: Distance | null;
@@ -41,14 +45,19 @@ interface WizardState {
   currentMpw: MpwRange | null; // Actual weekly mileage for precise gating
   goal: Goal | null;
   // Effort Score (for Balanced Build / speed goal only)
-  hasRecentRace: boolean | null; // null = not answered
+  paceInputMethod: PaceInputMethod; // How user wants to input their fitness
+  hasRecentRace: boolean | null; // null = not answered (legacy, kept for compatibility)
   effortRaceDistance: RaceDistance | null;
   effortRaceTime: string; // "MM:SS" or "HH:MM:SS"
   effortRaceRecency: RaceRecency | null;
   effortScore: number | null;
-  effortScoreStatus: 'verified' | 'estimated' | null;
+  effortScoreStatus: 'verified' | 'estimated' | 'from_paces' | null;
   effortPaces: TrainingPaces | null;
   effortPacesSource: 'calculated' | 'manual'; // Track if user edited paces
+  // Known paces input (for "I know my paces" option)
+  knownEasyPace: string; // "MM:SS" format
+  knownFiveKPace: string; // "MM:SS" format
+  paceValidationWarning: string | null;
   // Plan timing
   hasRaceDate: boolean | null; // null = not answered yet
   raceDate: string; // ISO date string for race day
@@ -285,6 +294,7 @@ export default function PlanWizard() {
     currentMpw: null,
     goal: null,
     // Effort Score fields
+    paceInputMethod: null,
     hasRecentRace: null,
     effortRaceDistance: null,
     effortRaceTime: '',
@@ -293,6 +303,10 @@ export default function PlanWizard() {
     effortScoreStatus: null,
     effortPaces: null,
     effortPacesSource: 'calculated',
+    // Known paces input
+    knownEasyPace: '',
+    knownFiveKPace: '',
+    paceValidationWarning: null,
     // Plan timing
     hasRaceDate: null,
     raceDate: '',
@@ -902,33 +916,73 @@ export default function PlanWizard() {
           }));
         };
         
+        // Handler for known paces calculation
+        const handleKnownPacesChange = (easyPace: string, fiveKPace: string) => {
+          const easySeconds = parsePace(easyPace);
+          const fiveKSeconds = parsePace(fiveKPace);
+          
+          if (!easySeconds || !fiveKSeconds) {
+            // Clear results if either pace is invalid
+            setState(prev => ({
+              ...prev,
+              knownEasyPace: easyPace,
+              knownFiveKPace: fiveKPace,
+              effortScore: null,
+              effortPaces: null,
+              effortScoreStatus: null,
+              paceValidationWarning: null
+            }));
+            return;
+          }
+          
+          // Calculate paces and validate
+          const result = calculatePacesFromKnownPaces(easySeconds, fiveKSeconds);
+          const validation = validatePaceConsistency(easySeconds, fiveKSeconds);
+          
+          setState(prev => ({
+            ...prev,
+            knownEasyPace: easyPace,
+            knownFiveKPace: fiveKPace,
+            effortScore: result.score,
+            effortPaces: result.paces,
+            effortScoreStatus: 'from_paces',
+            paceValidationWarning: validation.warning || null
+          }));
+        };
+        
         return (
           <StepContainer title="What's your running fitness?">
             <div className="space-y-6">
-              {/* Has recent race? */}
+              {/* Input method selection */}
               <RadioGroup
-                value={state.hasRecentRace === null ? '' : state.hasRecentRace ? 'yes' : 'no'}
+                value={state.paceInputMethod || ''}
                 onValueChange={(v) => {
-                  const hasRace = v === 'yes';
+                  const method = v as PaceInputMethod;
                   setState(prev => ({
                     ...prev,
-                    hasRecentRace: hasRace,
-                    effortRaceDistance: hasRace ? prev.effortRaceDistance : null,
-                    effortRaceTime: hasRace ? prev.effortRaceTime : '',
-                    effortRaceRecency: hasRace ? prev.effortRaceRecency : null,
-                    effortScore: hasRace ? prev.effortScore : null,
-                    effortPaces: hasRace ? prev.effortPaces : null,
-                    effortScoreStatus: null
+                    paceInputMethod: method,
+                    hasRecentRace: method === 'race' ? true : method === 'estimate' ? false : null,
+                    // Clear previous data when switching methods
+                    effortRaceDistance: method === 'race' ? prev.effortRaceDistance : null,
+                    effortRaceTime: method === 'race' ? prev.effortRaceTime : '',
+                    effortRaceRecency: method === 'race' ? prev.effortRaceRecency : null,
+                    knownEasyPace: method === 'paces' ? prev.knownEasyPace : '',
+                    knownFiveKPace: method === 'paces' ? prev.knownFiveKPace : '',
+                    effortScore: null,
+                    effortPaces: null,
+                    effortScoreStatus: null,
+                    paceValidationWarning: null
                   }));
                 }}
                 className="space-y-2"
               >
-                <RadioOption value="yes" label="I have a recent race time" description="Recommended for accurate pacing" />
-                <RadioOption value="no" label="Estimate for me" description="We'll set a starting point" />
+                <RadioOption value="race" label="I have a recent race time" description="Recommended for accurate pacing" />
+                <RadioOption value="paces" label="I know my easy pace and 5K pace" description="We'll calculate your training zones" />
+                <RadioOption value="estimate" label="Estimate for me" description="We'll set a starting point" />
               </RadioGroup>
               
               {/* Race time entry */}
-              {state.hasRecentRace === true && (
+              {state.paceInputMethod === 'race' && (
                 <div className="space-y-4 pt-4 border-t">
                   <p className="text-sm text-gray-600">Which race distance?</p>
                   <div className="flex gap-2">
@@ -1061,8 +1115,82 @@ export default function PlanWizard() {
                 </div>
               )}
               
+              {/* Known paces entry */}
+              {state.paceInputMethod === 'paces' && (
+                <div className="space-y-4 pt-4 border-t">
+                  {/* Easy Pace Input */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 mb-1">Easy pace</p>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Your comfortable, conversational pace. You could talk in full sentences while running at this pace. Most of your training miles should feel this easy.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="10:30"
+                        value={state.knownEasyPace}
+                        onChange={(e) => handleKnownPacesChange(e.target.value, state.knownFiveKPace)}
+                        className="w-24 p-3 border border-gray-300 rounded-lg text-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-600">/mi</span>
+                    </div>
+                  </div>
+                  
+                  {/* 5K Pace Input */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 mb-1">5K pace</p>
+                    <p className="text-xs text-gray-500 mb-2">
+                      The pace you could hold for a 5K race (3.1 miles). This is hard but sustainable for 20-30 minutes. If you've run a 25:00 5K, that's about 8:04/mi.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="8:00"
+                        value={state.knownFiveKPace}
+                        onChange={(e) => handleKnownPacesChange(state.knownEasyPace, e.target.value)}
+                        className="w-24 p-3 border border-gray-300 rounded-lg text-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-600">/mi</span>
+                    </div>
+                  </div>
+                  
+                  {/* Validation warning */}
+                  {state.paceValidationWarning && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm text-amber-800">{state.paceValidationWarning}</p>
+                    </div>
+                  )}
+                  
+                  {/* Show calculated paces */}
+                  {state.effortScore && state.effortPaces && state.effortScoreStatus === 'from_paces' && (
+                    <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-lg font-semibold text-green-900">
+                        Effort Score: {state.effortScore}
+                      </p>
+                      <p className="text-xs text-green-700 mt-1 mb-3">
+                        Calculated from your 5K pace. Your easy pace is used as-is.
+                      </p>
+                      <div className="text-sm text-green-700 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span>Base pace:</span>
+                          <span className="font-mono">{formatPace(state.effortPaces.base)}/mi</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Race pace <span className="text-xs text-green-600">(marathon)</span>:</span>
+                          <span className="font-mono font-semibold">{formatPace(state.effortPaces.race)}/mi</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Steady pace <span className="text-xs text-green-600">(threshold)</span>:</span>
+                          <span className="font-mono">{formatPace(state.effortPaces.steady)}/mi</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               {/* Estimate from fitness level */}
-              {state.hasRecentRace === false && (
+              {state.paceInputMethod === 'estimate' && (
                 <div className="space-y-4 pt-4 border-t">
                   <p className="text-sm text-gray-600">How would you describe your running?</p>
                   <RadioGroup
