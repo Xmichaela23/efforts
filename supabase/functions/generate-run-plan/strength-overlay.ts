@@ -118,8 +118,9 @@ function getInjuryPreventionSessions(
   sessions.push(createInjuryPreventionLowerBody(phase, params, phaseWeek, isRecovery));
   
   // Session 3: Upper Body (Wednesday) - only for 3x frequency
-  if (frequency >= 3 && !isRecovery) {
-    sessions.push(createInjuryPreventionUpperBody(phase, params, phaseWeek));
+  // Keep upper body in recovery weeks but with reduced volume
+  if (frequency >= 3) {
+    sessions.push(createInjuryPreventionUpperBody(phase, params, phaseWeek, isRecovery));
   }
   
   return sessions;
@@ -168,8 +169,15 @@ function createInjuryPreventionFullBody(phase: Phase, params: InjuryPreventionPa
   };
 }
 
-function createInjuryPreventionUpperBody(phase: Phase, params: InjuryPreventionParams, weekInPhase: number): Session {
-  const exercises: StrengthExercise[] = phase.name === 'Base' ? [
+function createInjuryPreventionUpperBody(phase: Phase, params: InjuryPreventionParams, weekInPhase: number, isRecovery: boolean = false): Session {
+  // Recovery weeks: reduced sets
+  const exercises: StrengthExercise[] = isRecovery ? [
+    { name: 'Push-ups', sets: 2, reps: 12, weight: 'Bodyweight' },
+    { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Bodyweight' },
+    { name: 'YTW Raises', sets: 2, reps: 10, weight: '5 lbs' },
+    { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Resistance Band' },
+    { name: 'Plank', sets: 2, reps: '30s', weight: 'Bodyweight' }
+  ] : phase.name === 'Base' ? [
     { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
     { name: 'Inverted Rows', sets: params.sets, reps: 12, weight: 'Bodyweight' },
     { name: 'Pike Push-ups', sets: params.sets, reps: 8, weight: 'Bodyweight' },
@@ -191,12 +199,15 @@ function createInjuryPreventionUpperBody(phase: Phase, params: InjuryPreventionP
     { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
   ];
 
+  const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
+  const intensity = isRecovery ? 'light (RPE 5/10). Reduced volume for recovery.' : params.intensity;
+
   return {
     day: 'Wednesday',
     type: 'strength',
     name: 'Upper Body Injury Prevention',
-    description: `Week ${weekInPhase} ${phase.name} - ${params.intensity}. Shoulder stability and posture for arm drive.`,
-    duration: params.duration - 5,
+    description: `${weekDesc} - ${intensity} Shoulder stability and posture for arm drive.`,
+    duration: isRecovery ? 30 : params.duration - 5,
     strength_exercises: exercises,
     tags: ['strength', 'upper_body', 'injury_prevention', `phase:${phase.name.toLowerCase()}`]
   };
@@ -221,7 +232,7 @@ function createInjuryPreventionLowerBody(phase: Phase, params: InjuryPreventionP
     { name: 'Reverse Lunges', sets: params.sets, reps: 10, weight: '15 lbs per hand' },
     { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: '25 lbs per hand' },
     { name: 'Hip Thrusts', sets: params.sets, reps: 12, weight: 'Bodyweight' },
-    { name: 'Lateral Lunges', sets: params.sets, reps: 8, weight: 'Bodyweight' },
+    { name: 'Clamshells', sets: params.sets, reps: 15, weight: 'Bodyweight' },
     { name: 'Single Leg Calf Raises', sets: params.sets, reps: 15, weight: 'Bodyweight' }
   ] : [
     { name: 'Walking Lunges', sets: params.sets, reps: 12, weight: '15 lbs per hand' },
@@ -297,8 +308,9 @@ function getStrengthPowerSessions(
   sessions.push(createStrengthPowerLowerBody(phase, params, weekInPhase, isRecovery, equipment));
   
   // Session 3: Upper Body (Wednesday) - only for 3x frequency
-  if (frequency >= 3 && !isRecovery) {
-    sessions.push(createStrengthPowerUpperBody(phase, params, weekInPhase, equipment));
+  // Keep upper body in recovery weeks but with reduced volume (handled by isRecovery param)
+  if (frequency >= 3) {
+    sessions.push(createStrengthPowerUpperBody(phase, params, weekInPhase, equipment, isRecovery));
   }
   
   return sessions;
@@ -355,14 +367,20 @@ function createStrengthPowerFullBody(phase: Phase, params: StrengthPowerParams, 
   };
 }
 
-function createStrengthPowerUpperBody(phase: Phase, params: StrengthPowerParams, weekInPhase: number, equipment: EquipmentType): Session {
+function createStrengthPowerUpperBody(phase: Phase, params: StrengthPowerParams, weekInPhase: number, equipment: EquipmentType, isRecovery: boolean = false): Session {
   const latExercise = equipment === 'commercial_gym'
-    ? { name: 'Lat Pulldown', sets: 3, reps: 10, weight: '65% Bodyweight' }
-    : { name: 'Inverted Rows', sets: 3, reps: 10, weight: 'Bodyweight' };
+    ? { name: 'Lat Pulldown', sets: isRecovery ? 2 : 3, reps: 10, weight: '65% Bodyweight' }
+    : { name: 'Inverted Rows', sets: isRecovery ? 2 : 3, reps: 10, weight: 'Bodyweight' };
   
   const facePullWeight = equipment === 'commercial_gym' ? 'Cable' : 'Resistance Band';
   
-  const exercises: StrengthExercise[] = phase.name === 'Base' ? [
+  // Recovery weeks: reduce sets by ~30%
+  const exercises: StrengthExercise[] = isRecovery ? [
+    { name: 'Bench Press', sets: 2, reps: 6, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Barbell Row', sets: 2, reps: 8, weight: `${params.compoundPercent - 5}% 1RM` },
+    latExercise,
+    { name: 'Face Pulls', sets: 2, reps: 15, weight: facePullWeight }
+  ] : phase.name === 'Base' ? [
     { name: 'Bench Press', sets: 4, reps: 6, weight: `${params.compoundPercent}% 1RM` },
     { name: 'Barbell Row', sets: 3, reps: 8, weight: `${params.compoundPercent - 5}% 1RM` },
     { name: 'Overhead Press', sets: 3, reps: 6, weight: `${params.compoundPercent - 5}% 1RM` },
@@ -382,7 +400,10 @@ function createStrengthPowerUpperBody(phase: Phase, params: StrengthPowerParams,
     { name: 'Face Pulls', sets: 2, reps: 15, weight: facePullWeight }
   ];
 
-  const phaseNote = phase.name === 'Speed' 
+  const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
+  const phaseNote = isRecovery 
+    ? 'Reduced volume for recovery. Maintain movement patterns.'
+    : phase.name === 'Speed' 
     ? 'Push press for explosive overhead power. Plyo push-ups for upper body power.'
     : 'Heavy pressing and pulling for running posture.';
 
@@ -390,8 +411,8 @@ function createStrengthPowerUpperBody(phase: Phase, params: StrengthPowerParams,
     day: 'Wednesday',
     type: 'strength',
     name: 'Upper Body Strength & Power',
-    description: `Week ${weekInPhase} ${phase.name} - ${phaseNote}`,
-    duration: 45,
+    description: `${weekDesc} - ${phaseNote}`,
+    duration: isRecovery ? 35 : 45,
     strength_exercises: exercises,
     tags: ['strength', 'upper_body', 'strength_power', `phase:${phase.name.toLowerCase()}`, equipment]
   };
