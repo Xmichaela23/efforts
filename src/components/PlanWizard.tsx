@@ -914,8 +914,8 @@ export default function PlanWizard() {
                           </span>
                           <span className="block text-xs text-gray-400 mt-1">
                             {state.strengthFrequency === 3 
-                              ? 'Uses: Squats, hip thrusts, RDL, inverted rows, bench jumps'
-                              : 'Uses: Squats, hip thrusts, RDL, bench jumps'}
+                              ? 'Rack for: Squats, inverted rows. Barbell for: Hip thrusts, RDL'
+                              : 'Rack for: Squats. Barbell for: Hip thrusts, RDL'}
                           </span>
                         </Label>
                       </div>
@@ -930,8 +930,8 @@ export default function PlanWizard() {
                           </span>
                           <span className="block text-xs text-gray-400 mt-1">
                             {state.strengthFrequency === 3 
-                              ? 'Uses: Squats, hip thrusts, lat pulldowns, box jumps'
-                              : 'Uses: Squats, hip thrusts, RDL, box jumps'}
+                              ? 'Adds: Lat pulldowns, cable work, box jumps'
+                              : 'Adds: Box jumps, cable face pulls'}
                           </span>
                         </Label>
                       </div>
