@@ -17,6 +17,8 @@ import {
   getPacesFromScore,
   calculatePacesFromKnownPaces,
   validatePaceConsistency,
+  getProjectedFinishTime,
+  formatFinishTime,
   type RaceDistance,
   type RaceRecency,
   type TrainingPaces,
@@ -1521,6 +1523,11 @@ export default function PlanWizard() {
           ? new Date(new Date(state.startDate + 'T00:00:00').getTime() + (state.duration * 7 - 1) * 24 * 60 * 60 * 1000)
           : null;
         
+        // Calculate projected finish time if we have effort score
+        const projectedFinishTime = state.effortScore && state.distance
+          ? getProjectedFinishTime(state.effortScore, state.distance as RaceDistance)
+          : null;
+        
         return (
           <StepContainer title={state.hasRaceDate ? "Confirm your schedule" : "When do you want to start?"}>
             <div className="space-y-4">
@@ -1543,6 +1550,32 @@ export default function PlanWizard() {
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Show Effort Score and projected finish time for Speed goal */}
+                  {state.effortScore && projectedFinishTime && (
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-blue-700">Effort Score:</span>
+                          <span className="font-semibold text-blue-900">{state.effortScore}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-blue-700">Projected finish:</span>
+                          <span className="font-semibold text-blue-900">{formatFinishTime(projectedFinishTime)}</span>
+                        </div>
+                        {state.effortPaces && (
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">Goal pace:</span>
+                            <span className="font-semibold text-blue-900">{formatPace(state.effortPaces.race)}/mi</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-blue-600 mt-2">
+                        Based on your fitness level. All workouts will use these paces.
+                      </p>
+                    </div>
+                  )}
+                  
                   <button
                     type="button"
                     onClick={() => setState(prev => ({ ...prev, hasRaceDate: null, raceDate: '' }))}

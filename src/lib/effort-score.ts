@@ -243,6 +243,61 @@ export function calculateEffortScoreResult(
 }
 
 // ============================================================================
+// PROJECTED FINISH TIMES
+// ============================================================================
+
+/**
+ * Get projected finish time for a given distance from Effort Score
+ * Returns time in seconds
+ */
+export function getProjectedFinishTime(score: number, distance: RaceDistance): number {
+  // Find the two VDOT entries that bracket this score
+  let lower = VDOT_TABLE[0];
+  let upper = VDOT_TABLE[VDOT_TABLE.length - 1];
+
+  for (let i = 0; i < VDOT_TABLE.length - 1; i++) {
+    const current = VDOT_TABLE[i];
+    const next = VDOT_TABLE[i + 1];
+    
+    if (score >= current.vdot && score <= next.vdot) {
+      lower = current;
+      upper = next;
+      break;
+    }
+  }
+
+  // Handle edge cases
+  if (score <= lower.vdot) {
+    return lower.times[distance];
+  }
+  if (score >= upper.vdot) {
+    return upper.times[distance];
+  }
+
+  // Linear interpolation
+  const fraction = (score - lower.vdot) / (upper.vdot - lower.vdot);
+  const lowerTime = lower.times[distance];
+  const upperTime = upper.times[distance];
+  
+  return Math.round(lowerTime - fraction * (lowerTime - upperTime));
+}
+
+/**
+ * Format projected finish time in a user-friendly way
+ * e.g., "3:45:30" for marathon, "1:42:15" for half, "22:30" for 5K
+ */
+export function formatFinishTime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// ============================================================================
 // RECENCY ADJUSTMENT
 // ============================================================================
 
