@@ -153,6 +153,9 @@ export class BalancedBuildGenerator extends BaseGenerator {
 
   /**
    * Add quality sessions based on phase
+   * 2Q System: Two quality days EVERY non-recovery week
+   * Q1 = Tuesday (Intervals)
+   * Q2 = Thursday (Tempo/Cruise)
    * Returns total quality miles added
    */
   private addQualitySessions(
@@ -166,22 +169,25 @@ export class BalancedBuildGenerator extends BaseGenerator {
 
     switch (phase.name) {
       case 'Base':
-        // Phase I: Foundation - introduce T pace
-        sessions.push(this.createEasyWithStrides(5, 'Tuesday'));
+        // Phase I: Foundation - 2Q from Week 1
+        // Q1 Tuesday: Introductory intervals (lower volume)
+        sessions.push(this.createBaseIntervalSession(weekInPhase));
         mileageUsed += 5;
-        if (runningDays >= 5 && weekNumber >= 2) {
-          sessions.push(this.createTempoRun(weekInPhase));
-          mileageUsed += 6;
+        
+        // Q2 Thursday: Cruise intervals (T pace)
+        if (runningDays >= 5) {
+          sessions.push(this.createBaseCruiseSession(weekInPhase));
+          mileageUsed += 5;
         }
         break;
 
       case 'Speed':
-        // Phase II: Add I pace intervals, continue T work
-        // Q1: Intervals (Tuesday)
+        // Phase II: Full I + T work
+        // Q1 Tuesday: Intervals
         sessions.push(this.createIntervalSession(weekInPhase));
         mileageUsed += 6;
         
-        // Q2: Cruise Intervals or Tempo (Thursday)
+        // Q2 Thursday: Cruise Intervals
         if (runningDays >= 5) {
           sessions.push(this.createCruiseIntervals(weekInPhase));
           mileageUsed += 7;
@@ -191,17 +197,17 @@ export class BalancedBuildGenerator extends BaseGenerator {
       case 'Race Prep':
         // Phase III: Marathon-specific M pace work
         if (this.params.distance === 'marathon' || this.params.distance === 'half') {
-          // Q1: Tempo or MP run
+          // Q1 Tuesday: MP run
           sessions.push(this.createMarathonPaceRun(weekInPhase));
           mileageUsed += 6;
           
-          // Q2: Cruise intervals
+          // Q2 Thursday: Cruise intervals
           if (runningDays >= 5) {
             sessions.push(this.createCruiseIntervals(weekInPhase));
             mileageUsed += 7;
           }
         } else {
-          // Shorter distances: continue intervals
+          // Shorter distances: continue I + T
           sessions.push(this.createIntervalSession(weekInPhase));
           mileageUsed += 6;
           if (runningDays >= 5) {
@@ -212,13 +218,63 @@ export class BalancedBuildGenerator extends BaseGenerator {
         break;
 
       case 'Taper':
-        // Phase IV: Reduced volume sharpening
+        // Phase IV: Reduced volume sharpening - 1Q only
         sessions.push(this.createTaperInterval());
         mileageUsed += 4;
         break;
     }
 
     return mileageUsed;
+  }
+
+  /**
+   * Base phase intervals - introductory volume
+   * Week 1: 4×800m, Week 2: 5×800m, Week 3: 6×800m
+   */
+  private createBaseIntervalSession(weekInPhase: number): Session {
+    const reps = Math.min(6, 3 + weekInPhase); // 4, 5, 6
+    const restSec = 120;
+    const qualityMiles = reps * 0.5;
+
+    return this.createSession(
+      'Tuesday',
+      'I Pace Intervals',
+      `${reps}×800m at I pace (5K effort). ` +
+      `Jog ${restSec}s recovery between reps. ` +
+      `Total quality: ~${qualityMiles.toFixed(1)} miles.`,
+      45,
+      [
+        TOKEN_PATTERNS.warmup_1mi,
+        TOKEN_PATTERNS.intervals_800(reps, restSec),
+        TOKEN_PATTERNS.cooldown_1mi
+      ],
+      ['hard_run', 'intervals', 'vo2max']
+    );
+  }
+
+  /**
+   * Base phase cruise intervals - introductory T pace
+   * Week 1: 3×1mi, Week 2: 3×1mi, Week 3: 3×1.5mi
+   */
+  private createBaseCruiseSession(weekInPhase: number): Session {
+    const reps = 3;
+    const milesEach = weekInPhase >= 3 ? 1.5 : 1;
+    const totalQuality = reps * milesEach;
+
+    return this.createSession(
+      'Thursday',
+      'Cruise Intervals',
+      `${reps}×${milesEach}mi at T pace with 60s jog recovery. ` +
+      `Total: ${totalQuality} miles @ T (comfortably hard, ~10K effort). ` +
+      `These build lactate threshold.`,
+      45,
+      [
+        TOKEN_PATTERNS.warmup_1mi,
+        TOKEN_PATTERNS.cruise_intervals(reps, milesEach),
+        TOKEN_PATTERNS.cooldown_1mi
+      ],
+      ['hard_run', 'threshold']
+    );
   }
 
   // ============================================================================
