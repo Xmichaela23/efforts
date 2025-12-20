@@ -21,7 +21,7 @@ export interface GeneratePlanRequest {
   effort_score?: number;
   effort_source_distance?: number; // meters
   effort_source_time?: number; // seconds
-  effort_score_status?: 'verified' | 'estimated' | 'from_paces';
+  effort_score_status?: 'verified' | 'estimated';
   effort_paces?: {
     base: number;    // seconds per mile
     race: number;    // seconds per mile  

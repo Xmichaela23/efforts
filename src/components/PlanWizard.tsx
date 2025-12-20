@@ -955,7 +955,7 @@ export default function PlanWizard() {
             knownFiveKPace: fiveKTime,
             effortScore: result.score,
             effortPaces: result.paces,
-            effortScoreStatus: 'from_paces',
+            effortScoreStatus: 'estimated',
             paceValidationWarning: validation.warning || null
           }));
         };
