@@ -1012,35 +1012,76 @@ export default function PlanWizard() {
               <div className="mt-4 p-3 bg-gray-50 rounded-lg space-y-2">
                 <p className="text-sm font-medium text-gray-700">Your typical week:</p>
                 {(() => {
-                  const runDays = state.daysPerWeek === '3-4' ? 4 : state.daysPerWeek === '4-5' ? 5 : state.daysPerWeek === '5-6' ? 6 : 6;
+                  const runDays = state.daysPerWeek === '3-4' ? 4 : state.daysPerWeek === '4-5' ? 5 : 6; // 5-6 and 6-7 both cap at 6
                   const strengthDays = state.strengthFrequency;
                   const doubleDays = Math.min(strengthDays, runDays - 1); // Strength days overlap with run days (not long run)
-                  const restDays = 7 - runDays;
                   
-                  // Build day breakdown
-                  const dayBreakdown = [];
-                  if (strengthDays === 0) {
-                    dayBreakdown.push(`${runDays} running days`);
-                  } else if (strengthDays === 2) {
-                    dayBreakdown.push('Mon, Fri: Running + Strength');
-                    dayBreakdown.push('Tue: Intervals, Thu: Tempo');
-                    if (runDays >= 5) dayBreakdown.push('Wed: Easy run');
-                    dayBreakdown.push('Sun: Long run');
-                  } else if (strengthDays === 3) {
-                    dayBreakdown.push('Mon, Fri: Running + Lower body');
-                    dayBreakdown.push('Wed: Running + Upper body (optional)');
-                    dayBreakdown.push('Tue: Intervals, Thu: Tempo');
-                    dayBreakdown.push('Sun: Long run');
+                  // Build day-by-day breakdown based on actual selections
+                  const days: { day: string; activities: string[] }[] = [
+                    { day: 'Mon', activities: [] },
+                    { day: 'Tue', activities: [] },
+                    { day: 'Wed', activities: [] },
+                    { day: 'Thu', activities: [] },
+                    { day: 'Fri', activities: [] },
+                    { day: 'Sat', activities: [] },
+                    { day: 'Sun', activities: [] },
+                  ];
+                  
+                  // Sunday: Always long run
+                  days[6].activities.push('Long run');
+                  
+                  // Tuesday: Q1 (Intervals)
+                  days[1].activities.push('Intervals');
+                  
+                  // Thursday: Q2 (Tempo)
+                  days[3].activities.push('Tempo');
+                  
+                  // Saturday: Always rest
+                  days[5].activities.push('Rest');
+                  
+                  // Strength placement
+                  if (strengthDays >= 2) {
+                    days[0].activities.push('Strength'); // Monday
+                    days[4].activities.push('Strength'); // Friday
                   }
+                  if (strengthDays === 3) {
+                    days[2].activities.push('Upper (opt)'); // Wednesday
+                  }
+                  
+                  // Easy runs based on running days
+                  // Always have runs on Mon, Tue, Thu, Sun (4 days minimum)
+                  if (!days[0].activities.includes('Intervals') && !days[0].activities.includes('Tempo')) {
+                    days[0].activities.unshift('Easy');
+                  }
+                  
+                  // 5+ days: Add Wednesday easy
+                  if (runDays >= 5 && !days[2].activities.some(a => a.includes('Upper'))) {
+                    days[2].activities.unshift('Easy');
+                  } else if (runDays >= 5 && days[2].activities.some(a => a.includes('Upper'))) {
+                    days[2].activities.unshift('Easy');
+                  }
+                  
+                  // 6 days: Add Friday easy
+                  if (runDays >= 6) {
+                    days[4].activities.unshift('Easy');
+                  }
+                  
+                  // Format output
+                  const formatDay = (d: { day: string; activities: string[] }) => {
+                    if (d.activities.length === 0) return null;
+                    if (d.activities[0] === 'Rest') return `${d.day}: OFF`;
+                    return `${d.day}: ${d.activities.join(' + ')}`;
+                  };
+                  
+                  const dayLines = days.map(formatDay).filter(Boolean);
                   
                   return (
                     <div className="text-xs text-gray-600 space-y-1">
-                      {dayBreakdown.map((line, i) => (
+                      {dayLines.map((line, i) => (
                         <p key={i}>{line}</p>
                       ))}
                       <p className="text-gray-500 mt-2 pt-2 border-t border-gray-200">
-                        {restDays > 0 ? `Sat: Rest before long run` : 'No rest days'}
-                        {strengthDays > 0 && ` • ${doubleDays} double days/week`}
+                        {runDays} running days • {strengthDays > 0 ? `${doubleDays} doubles` : 'No strength'}
                       </p>
                     </div>
                   );
