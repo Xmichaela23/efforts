@@ -69,7 +69,8 @@ export interface GeneratorParams {
   duration_weeks: number;
   days_per_week: string;
   user_id: string;
-  race_date?: string;
+  start_date?: string;  // ISO date string (YYYY-MM-DD) - plan start date
+  race_date?: string;   // ISO date string (YYYY-MM-DD) - race day
   // Effort Score for pace calculations (Balanced Build only)
   effort_score?: number;
   effort_paces?: {

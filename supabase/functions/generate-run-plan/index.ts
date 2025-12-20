@@ -95,6 +95,9 @@ Deno.serve(async (req: Request) => {
       console.log(`[EffortScore] Paces - Base: ${effortPaces.base}s/mi, Race: ${effortPaces.race}s/mi`);
     }
 
+    // Calculate start date early so generators can use it for race-day-aware tapering
+    const startDate = request.start_date || calculateStartDate(request.duration_weeks, request.race_date);
+
     // Select and run generator
     const generatorParams = {
       distance: request.distance,
@@ -103,6 +106,7 @@ Deno.serve(async (req: Request) => {
       duration_weeks: request.duration_weeks,
       days_per_week: request.days_per_week,
       user_id: request.user_id,
+      start_date: startDate,
       race_date: request.race_date,
       effort_score: effortScore,
       effort_paces: effortPaces
@@ -170,8 +174,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Calculate start date (use provided, or next Monday, or race_date - duration)
-    const startDate = request.start_date || calculateStartDate(request.duration_weeks, request.race_date);
+    // startDate was already calculated above for the generator
 
     const { data: insertedPlan, error: insertError } = await supabase
       .from('plans')

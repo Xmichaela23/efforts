@@ -124,13 +124,34 @@ export class BalancedBuildGenerator extends BaseGenerator {
     const weeklyMiles = this.calculateWeeklyMileage(weekNumber, phase, isRecovery, phaseStructure);
     const longRunMiles = this.getLongRunMiles(weekNumber, isRecovery);
     
+    // Check race proximity for each day - this enables smart tapering
+    const raceProximity = this.checkWeekRaceProximity(weekNumber);
+    
+    // If any day this week is within 7 days of race, use race-aware session generation
+    if (raceProximity.hasRaceWeekSessions) {
+      return this.generateRaceWeekSessions(weekNumber, raceProximity, runningDays);
+    }
+    
     // Long run (Sunday) - with MP segments in Phase III
-    const withMP = phase.name === 'Race Prep' && !isRecovery && 
-                   (this.params.distance === 'marathon' || this.params.distance === 'half');
-    const mpMiles = withMP ? this.getMPSegmentMiles(weekNumber, phase) : 0;
-    sessions.push(this.createVDOTLongRun(longRunMiles, mpMiles));
+    // Skip if Sunday is too close to race
+    const sundayProximity = this.getRaceProximitySession(
+      this.getDaysUntilRace(weekNumber, 'Sunday', this.params.start_date, this.params.race_date)
+    );
+    
+    if (sundayProximity === 'normal' || sundayProximity === 'reduced_quality') {
+      const withMP = phase.name === 'Race Prep' && !isRecovery && 
+                     (this.params.distance === 'marathon' || this.params.distance === 'half');
+      const mpMiles = withMP ? this.getMPSegmentMiles(weekNumber, phase) : 0;
+      
+      // Reduce long run if in reduced_quality zone (8-14 days out)
+      const adjustedLongRunMiles = sundayProximity === 'reduced_quality' 
+        ? Math.min(longRunMiles, 12) 
+        : longRunMiles;
+      
+      sessions.push(this.createVDOTLongRun(adjustedLongRunMiles, mpMiles));
+    }
 
-    let usedMiles = longRunMiles;
+    let usedMiles = sessions.length > 0 ? longRunMiles : 0;
 
     // Two Quality Days (2Q System) - not in recovery or taper
     if (!isRecovery) {
@@ -146,6 +167,106 @@ export class BalancedBuildGenerator extends BaseGenerator {
     this.fillWithEasyRuns(sessions, runningDays, weeklyMiles - usedMiles);
 
     return this.assignDaysToSessions(sessions, runningDays);
+  }
+
+  /**
+   * Check race proximity for all days in a week
+   * Returns info about whether any sessions need race-aware adjustments
+   */
+  private checkWeekRaceProximity(weekNumber: number): {
+    hasRaceWeekSessions: boolean;
+    dayProximity: Record<string, ReturnType<typeof this.getRaceProximitySession>>;
+  } {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const dayProximity: Record<string, ReturnType<typeof this.getRaceProximitySession>> = {};
+    let hasRaceWeekSessions = false;
+
+    for (const day of days) {
+      const daysUntil = this.getDaysUntilRace(weekNumber, day, this.params.start_date, this.params.race_date);
+      const proximity = this.getRaceProximitySession(daysUntil);
+      dayProximity[day] = proximity;
+      
+      // If any day is within easy_medium range (7 days), this is a race week
+      if (proximity === 'race' || proximity === 'shakeout' || proximity === 'easy_short' || proximity === 'easy_medium') {
+        hasRaceWeekSessions = true;
+      }
+    }
+
+    return { hasRaceWeekSessions, dayProximity };
+  }
+
+  /**
+   * Generate sessions for a race week (within 7 days of race)
+   * Uses race-day-aware logic to taper appropriately
+   */
+  private generateRaceWeekSessions(
+    weekNumber: number,
+    raceProximity: { dayProximity: Record<string, ReturnType<typeof this.getRaceProximitySession>> },
+    runningDays: number
+  ): Session[] {
+    const sessions: Session[] = [];
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    for (const day of days) {
+      const proximity = raceProximity.dayProximity[day];
+
+      switch (proximity) {
+        case 'race':
+          // Race day - don't add a training session
+          // (The race itself would be handled separately or not included in plan)
+          break;
+          
+        case 'shakeout':
+          // 1-2 days before race: very short shakeout
+          sessions.push(this.createShakeoutRun(day));
+          break;
+          
+        case 'easy_short':
+          // 3-4 days before race: short easy run
+          sessions.push(this.createSession(
+            day,
+            'Easy Run',
+            '4 miles very easy. Stay fresh for race day.',
+            this.milesToMinutes(4),
+            [TOKEN_PATTERNS.easy_run_miles(4)],
+            ['easy_run', 'taper']
+          ));
+          break;
+          
+        case 'easy_medium':
+          // 5-7 days before race: normal easy or light quality
+          if (day === 'Tuesday') {
+            // Light sharpening workout
+            sessions.push(this.createTaperInterval());
+          } else if (day === 'Sunday') {
+            // Reduced long run (8-10 miles max)
+            sessions.push(this.createVDOTLongRun(8, 0));
+          } else if (sessions.length < runningDays) {
+            sessions.push(this.createSession(
+              day,
+              'Easy Run',
+              '5 miles easy. Maintaining fitness while resting.',
+              this.milesToMinutes(5),
+              [TOKEN_PATTERNS.easy_run_miles(5)],
+              ['easy_run', 'taper']
+            ));
+          }
+          break;
+          
+        case 'reduced_quality':
+        case 'normal':
+          // More than 7 days out - handled by normal logic
+          break;
+      }
+    }
+
+    // Ensure we have Saturday as rest
+    const hasSaturday = sessions.some(s => s.day === 'Saturday');
+    if (!hasSaturday) {
+      // Saturday is rest (no session added)
+    }
+
+    return sessions;
   }
 
   // ============================================================================

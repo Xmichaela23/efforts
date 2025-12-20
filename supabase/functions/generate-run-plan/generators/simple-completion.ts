@@ -145,10 +145,28 @@ export class SimpleCompletionGenerator extends BaseGenerator {
     // Get long run distance
     const longRunMiles = this.getLongRunMiles(weekNumber);
     
-    // Long run (always on Sunday)
-    sessions.push(this.createSimpleLongRun(longRunMiles));
+    // Check race proximity for each day - this enables smart tapering
+    const raceProximity = this.checkWeekRaceProximity(weekNumber);
+    
+    // If any day this week is within 7 days of race, use race-aware session generation
+    if (raceProximity.hasRaceWeekSessions) {
+      return this.generateRaceWeekSessions(weekNumber, raceProximity, runningDays);
+    }
+    
+    // Check Sunday proximity for long run adjustments
+    const sundayProximity = this.getRaceProximitySession(
+      this.getDaysUntilRace(weekNumber, 'Sunday', this.params.start_date, this.params.race_date)
+    );
+    
+    // Long run (always on Sunday) - reduce if close to race
+    if (sundayProximity === 'normal' || sundayProximity === 'reduced_quality') {
+      const adjustedLongRunMiles = sundayProximity === 'reduced_quality' 
+        ? Math.min(longRunMiles, 10) 
+        : longRunMiles;
+      sessions.push(this.createSimpleLongRun(adjustedLongRunMiles));
+    }
 
-    let usedMiles = longRunMiles;
+    let usedMiles = sessions.length > 0 ? longRunMiles : 0;
 
     // Add optional speedwork (not in recovery weeks or taper)
     if (!isRecovery && phase.name !== 'Taper') {
@@ -165,6 +183,99 @@ export class SimpleCompletionGenerator extends BaseGenerator {
 
     // Assign days
     return this.assignDaysToSessions(sessions, runningDays);
+  }
+
+  /**
+   * Check race proximity for all days in a week
+   * Returns info about whether any sessions need race-aware adjustments
+   */
+  private checkWeekRaceProximity(weekNumber: number): {
+    hasRaceWeekSessions: boolean;
+    dayProximity: Record<string, ReturnType<typeof this.getRaceProximitySession>>;
+  } {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const dayProximity: Record<string, ReturnType<typeof this.getRaceProximitySession>> = {};
+    let hasRaceWeekSessions = false;
+
+    for (const day of days) {
+      const daysUntil = this.getDaysUntilRace(weekNumber, day, this.params.start_date, this.params.race_date);
+      const proximity = this.getRaceProximitySession(daysUntil);
+      dayProximity[day] = proximity;
+      
+      // If any day is within easy_medium range (7 days), this is a race week
+      if (proximity === 'race' || proximity === 'shakeout' || proximity === 'easy_short' || proximity === 'easy_medium') {
+        hasRaceWeekSessions = true;
+      }
+    }
+
+    return { hasRaceWeekSessions, dayProximity };
+  }
+
+  /**
+   * Generate sessions for a race week (within 7 days of race)
+   * Uses race-day-aware logic to taper appropriately
+   */
+  private generateRaceWeekSessions(
+    weekNumber: number,
+    raceProximity: { dayProximity: Record<string, ReturnType<typeof this.getRaceProximitySession>> },
+    runningDays: number
+  ): Session[] {
+    const sessions: Session[] = [];
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    for (const day of days) {
+      const proximity = raceProximity.dayProximity[day];
+
+      switch (proximity) {
+        case 'race':
+          // Race day - don't add a training session
+          break;
+          
+        case 'shakeout':
+          // 1-2 days before race: very short shakeout
+          sessions.push(this.createShakeoutRun(day));
+          break;
+          
+        case 'easy_short':
+          // 3-4 days before race: short easy run
+          sessions.push(this.createSession(
+            day,
+            'Easy Run',
+            '3-4 miles very easy. Keep the legs loose and stay relaxed.',
+            this.milesToMinutes(4),
+            [TOKEN_PATTERNS.easy_run_miles(4)],
+            ['easy_run', 'taper']
+          ));
+          break;
+          
+        case 'easy_medium':
+          // 5-7 days before race: normal easy, maybe light strides
+          if (day === 'Tuesday' && sessions.length < runningDays) {
+            // Light strides to stay sharp
+            sessions.push(this.createSession(
+              day,
+              'Easy + Strides',
+              '4 miles easy with 4×100m strides. Keep it light and fun!',
+              this.milesToMinutes(4) + 5,
+              [TOKEN_PATTERNS.easy_run_miles(4), TOKEN_PATTERNS.strides_4x100m],
+              ['easy_run', 'strides', 'taper']
+            ));
+          } else if (day === 'Sunday') {
+            // Reduced long run
+            sessions.push(this.createSimpleLongRun(8));
+          } else if (sessions.length < runningDays) {
+            sessions.push(this.createSimpleEasyRun(4, day));
+          }
+          break;
+          
+        case 'reduced_quality':
+        case 'normal':
+          // More than 7 days out - handled by normal logic
+          break;
+      }
+    }
+
+    return sessions;
   }
 
   // ============================================================================

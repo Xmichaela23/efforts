@@ -23,6 +23,102 @@ export abstract class BaseGenerator {
   abstract generatePlan(): TrainingPlan;
 
   // ============================================================================
+  // RACE DATE AWARENESS
+  // ============================================================================
+
+  /**
+   * Calculate the date for a specific day in a given week
+   * Week 1 starts on startDate (Monday), days are Monday=0, Tuesday=1, ..., Sunday=6
+   */
+  protected getDateForSession(weekNumber: number, dayOfWeek: string, startDate?: string): Date | null {
+    if (!startDate) return null;
+    
+    const dayOffsets: Record<string, number> = {
+      'Monday': 0,
+      'Tuesday': 1,
+      'Wednesday': 2,
+      'Thursday': 3,
+      'Friday': 4,
+      'Saturday': 5,
+      'Sunday': 6
+    };
+    
+    const dayOffset = dayOffsets[dayOfWeek] ?? 0;
+    const weekOffset = (weekNumber - 1) * 7;
+    
+    const start = new Date(startDate + 'T00:00:00');
+    const sessionDate = new Date(start.getTime() + (weekOffset + dayOffset) * 24 * 60 * 60 * 1000);
+    
+    return sessionDate;
+  }
+
+  /**
+   * Calculate days until race for a given session
+   * Returns null if no race date is set
+   */
+  protected getDaysUntilRace(weekNumber: number, dayOfWeek: string, startDate?: string, raceDate?: string): number | null {
+    if (!raceDate || !startDate) return null;
+    
+    const sessionDate = this.getDateForSession(weekNumber, dayOfWeek, startDate);
+    if (!sessionDate) return null;
+    
+    const race = new Date(raceDate + 'T00:00:00');
+    const diffMs = race.getTime() - sessionDate.getTime();
+    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    
+    return diffDays;
+  }
+
+  /**
+   * Determine what type of session is appropriate based on days until race
+   * 
+   * Returns:
+   * - 'race': This is race day
+   * - 'shakeout': 1-2 days before race (2-3 mi easy only)
+   * - 'easy_short': 3-4 days before race (4-5 mi easy max, no quality)
+   * - 'easy_medium': 5-7 days before race (normal easy, no long run)
+   * - 'reduced_quality': 8-14 days before race (reduced long run, light quality)
+   * - 'normal': More than 14 days out, train normally
+   */
+  protected getRaceProximitySession(daysUntilRace: number | null): 'race' | 'shakeout' | 'easy_short' | 'easy_medium' | 'reduced_quality' | 'normal' {
+    if (daysUntilRace === null) return 'normal';
+    if (daysUntilRace <= 0) return 'race';
+    if (daysUntilRace <= 2) return 'shakeout';
+    if (daysUntilRace <= 4) return 'easy_short';
+    if (daysUntilRace <= 7) return 'easy_medium';
+    if (daysUntilRace <= 14) return 'reduced_quality';
+    return 'normal';
+  }
+
+  /**
+   * Create a shakeout run (1-2 days before race)
+   */
+  protected createShakeoutRun(day: string = 'Saturday'): Session {
+    return this.createSession(
+      day,
+      'Shakeout Run',
+      '2-3 miles very easy with a few strides. Stay loose and relaxed.',
+      25,
+      [TOKEN_PATTERNS.easy_run_miles(3), TOKEN_PATTERNS.strides_4x100m],
+      ['easy_run', 'shakeout']
+    );
+  }
+
+  /**
+   * Create rest day placeholder (for race day or day before)
+   */
+  protected createRestDay(day: string = 'Saturday', reason: string = 'Race preparation'): Session {
+    return this.createSession(
+      day,
+      'Rest',
+      reason,
+      0,
+      [],
+      ['rest']
+    );
+  }
+
+  // ============================================================================
   // VOLUME CALCULATIONS
   // ============================================================================
 
