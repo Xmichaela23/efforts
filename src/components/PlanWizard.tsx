@@ -238,10 +238,15 @@ export default function PlanWizard() {
   // Default to next Monday
   const getNextMonday = () => {
     const today = new Date();
-    const daysUntilMonday = (8 - today.getDay()) % 7 || 7;
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ...
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
     const nextMonday = new Date(today);
     nextMonday.setDate(today.getDate() + daysUntilMonday);
-    return nextMonday.toISOString().split('T')[0];
+    // Use local date, not UTC
+    const year = nextMonday.getFullYear();
+    const month = String(nextMonday.getMonth() + 1).padStart(2, '0');
+    const day = String(nextMonday.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const [state, setState] = useState<WizardState>({
