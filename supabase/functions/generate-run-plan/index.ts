@@ -68,27 +68,30 @@ Deno.serve(async (req: Request) => {
     let effortPaces: TrainingPaces | undefined;
     
     if (request.approach === 'balanced_build') {
-      // Calculate score from source race if provided
-      if (request.effort_source_distance && request.effort_source_time) {
+      // Use provided score (from wizard) or calculate from race data
+      if (request.effort_score) {
+        effortScore = request.effort_score;
+        console.log(`[EffortScore] Using provided score: ${effortScore}`);
+      } else if (request.effort_source_distance && request.effort_source_time) {
         effortScore = calculateEffortScore(
           request.effort_source_distance,
           request.effort_source_time
         );
         console.log(`[EffortScore] Calculated from race: ${effortScore}`);
-      } 
-      // Or use provided score directly
-      else if (request.effort_score) {
-        effortScore = request.effort_score;
-        console.log(`[EffortScore] Using provided score: ${effortScore}`);
-      }
-      // Fallback to estimate from fitness level
-      else {
+      } else {
+        // Fallback to estimate from fitness level
         effortScore = estimateScoreFromFitness(request.fitness);
         console.log(`[EffortScore] Estimated from fitness: ${effortScore}`);
       }
       
-      // Calculate paces from score
-      effortPaces = getPacesFromScore(effortScore);
+      // Use provided paces (may be manually edited) or calculate from score
+      if (request.effort_paces) {
+        effortPaces = request.effort_paces;
+        console.log(`[EffortScore] Using provided paces (source: ${request.effort_paces_source || 'unknown'})`);
+      } else {
+        effortPaces = getPacesFromScore(effortScore);
+        console.log(`[EffortScore] Calculated paces from score`);
+      }
       console.log(`[EffortScore] Paces - Base: ${effortPaces.base}s/mi, Race: ${effortPaces.race}s/mi`);
     }
 
@@ -208,8 +211,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Save Effort Score to user_baselines (for Balanced Build plans)
-    if (request.approach === 'balanced_build' && effortScore) {
+    // Save Effort Score and paces to user_baselines (for Balanced Build plans)
+    if (request.approach === 'balanced_build' && effortScore && effortPaces) {
       const { error: baselinesError } = await supabase
         .from('user_baselines')
         .upsert({
@@ -218,6 +221,8 @@ Deno.serve(async (req: Request) => {
           effort_source_distance: request.effort_source_distance || null,
           effort_source_time: request.effort_source_time || null,
           effort_score_status: request.effort_score_status || 'estimated',
+          effort_paces: effortPaces,
+          effort_paces_source: request.effort_paces_source || 'calculated',
           effort_updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id'
@@ -227,7 +232,7 @@ Deno.serve(async (req: Request) => {
         console.warn('Failed to save Effort Score to baselines:', baselinesError);
         // Non-fatal - continue with plan generation
       } else {
-        console.log(`[EffortScore] Saved to user_baselines: ${effortScore}`);
+        console.log(`[EffortScore] Saved to user_baselines: ${effortScore}, paces_source: ${request.effort_paces_source || 'calculated'}`);
       }
     }
 

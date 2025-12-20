@@ -11,8 +11,10 @@ import {
   raceDistanceToMeters,
   parseTimeToSeconds,
   formatPace,
+  parsePace,
   adjustScoreForRecency,
   estimateScoreFromFitness,
+  getPacesFromScore,
   type RaceDistance,
   type RaceRecency,
   type TrainingPaces,
@@ -46,6 +48,7 @@ interface WizardState {
   effortScore: number | null;
   effortScoreStatus: 'verified' | 'estimated' | null;
   effortPaces: TrainingPaces | null;
+  effortPacesSource: 'calculated' | 'manual'; // Track if user edited paces
   // Plan timing
   hasRaceDate: boolean | null; // null = not answered yet
   raceDate: string; // ISO date string for race day
@@ -289,6 +292,7 @@ export default function PlanWizard() {
     effortScore: null,
     effortScoreStatus: null,
     effortPaces: null,
+    effortPacesSource: 'calculated',
     // Plan timing
     hasRaceDate: null,
     raceDate: '',
@@ -478,9 +482,11 @@ export default function PlanWizard() {
       };
 
       // Add Effort Score data for Balanced Build plans
-      if (state.approach === 'balanced_build' && state.effortScore) {
+      if (state.approach === 'balanced_build' && state.effortScore && state.effortPaces) {
         requestBody.effort_score = state.effortScore;
         requestBody.effort_score_status = state.effortScoreStatus;
+        requestBody.effort_paces = state.effortPaces;
+        requestBody.effort_paces_source = state.effortPacesSource;
         
         // Include source race data if available (for verified scores)
         if (state.effortScoreStatus === 'verified' && state.effortRaceDistance && state.effortRaceTime) {
@@ -971,22 +977,75 @@ export default function PlanWizard() {
                     </>
                   )}
                   
-                  {/* Show calculated score */}
+                  {/* Show calculated score with editable paces */}
                   {state.effortScore && state.effortPaces && (
                     <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                       <p className="text-lg font-semibold text-blue-900">
                         Effort Score: {state.effortScore}
                       </p>
-                      <div className="mt-2 text-sm text-blue-700 space-y-1">
-                        <p>Base pace: {formatPace(state.effortPaces.base)}/mi</p>
-                        <p>Race pace: {formatPace(state.effortPaces.race)}/mi</p>
-                        <p>Steady pace: {formatPace(state.effortPaces.steady)}/mi</p>
+                      <div className="mt-3 text-sm text-blue-700 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span>Base pace:</span>
+                          <input
+                            type="text"
+                            value={formatPace(state.effortPaces.base)}
+                            onChange={(e) => {
+                              const seconds = parsePace(e.target.value);
+                              if (seconds && state.effortPaces) {
+                                setState(prev => ({
+                                  ...prev,
+                                  effortPaces: { ...prev.effortPaces!, base: seconds },
+                                  effortPacesSource: 'manual'
+                                }));
+                              }
+                            }}
+                            className="w-20 px-2 py-1 text-right font-mono border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          /><span className="ml-1">/mi</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Race pace:</span>
+                          <input
+                            type="text"
+                            value={formatPace(state.effortPaces.race)}
+                            onChange={(e) => {
+                              const seconds = parsePace(e.target.value);
+                              if (seconds && state.effortPaces) {
+                                setState(prev => ({
+                                  ...prev,
+                                  effortPaces: { ...prev.effortPaces!, race: seconds },
+                                  effortPacesSource: 'manual'
+                                }));
+                              }
+                            }}
+                            className="w-20 px-2 py-1 text-right font-mono border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          /><span className="ml-1">/mi</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Steady pace:</span>
+                          <input
+                            type="text"
+                            value={formatPace(state.effortPaces.steady)}
+                            onChange={(e) => {
+                              const seconds = parsePace(e.target.value);
+                              if (seconds && state.effortPaces) {
+                                setState(prev => ({
+                                  ...prev,
+                                  effortPaces: { ...prev.effortPaces!, steady: seconds },
+                                  effortPacesSource: 'manual'
+                                }));
+                              }
+                            }}
+                            className="w-20 px-2 py-1 text-right font-mono border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          /><span className="ml-1">/mi</span>
+                        </div>
                       </div>
-                      {state.effortRaceRecency && state.effortRaceRecency !== 'recent' && (
-                        <p className="mt-2 text-xs text-blue-600">
-                          Adjusted for race recency. Update anytime with a new race.
-                        </p>
-                      )}
+                      <p className="mt-3 text-xs text-blue-600">
+                        {state.effortPacesSource === 'manual' 
+                          ? 'Using your custom paces.' 
+                          : state.effortRaceRecency && state.effortRaceRecency !== 'recent'
+                            ? 'Adjusted for race recency. Tap to customize.'
+                            : 'Tap to customize.'}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1021,14 +1080,72 @@ export default function PlanWizard() {
                     />
                   </RadioGroup>
                   
-                  {/* Show estimated score */}
-                  {state.effortScore && state.effortScoreStatus === 'estimated' && (
+                  {/* Show estimated score with paces */}
+                  {state.effortScore && state.effortPaces && state.effortScoreStatus === 'estimated' && (
                     <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                       <p className="text-lg font-semibold text-gray-900">
                         Estimated Effort Score: {state.effortScore}
                       </p>
-                      <p className="mt-1 text-sm text-gray-600">
-                        You can update this anytime with a race result.
+                      <div className="mt-3 text-sm text-gray-700 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span>Base pace:</span>
+                          <input
+                            type="text"
+                            value={formatPace(state.effortPaces.base)}
+                            onChange={(e) => {
+                              const seconds = parsePace(e.target.value);
+                              if (seconds && state.effortPaces) {
+                                setState(prev => ({
+                                  ...prev,
+                                  effortPaces: { ...prev.effortPaces!, base: seconds },
+                                  effortPacesSource: 'manual'
+                                }));
+                              }
+                            }}
+                            className="w-20 px-2 py-1 text-right font-mono border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          /><span className="ml-1">/mi</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Race pace:</span>
+                          <input
+                            type="text"
+                            value={formatPace(state.effortPaces.race)}
+                            onChange={(e) => {
+                              const seconds = parsePace(e.target.value);
+                              if (seconds && state.effortPaces) {
+                                setState(prev => ({
+                                  ...prev,
+                                  effortPaces: { ...prev.effortPaces!, race: seconds },
+                                  effortPacesSource: 'manual'
+                                }));
+                              }
+                            }}
+                            className="w-20 px-2 py-1 text-right font-mono border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          /><span className="ml-1">/mi</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Steady pace:</span>
+                          <input
+                            type="text"
+                            value={formatPace(state.effortPaces.steady)}
+                            onChange={(e) => {
+                              const seconds = parsePace(e.target.value);
+                              if (seconds && state.effortPaces) {
+                                setState(prev => ({
+                                  ...prev,
+                                  effortPaces: { ...prev.effortPaces!, steady: seconds },
+                                  effortPacesSource: 'manual'
+                                }));
+                              }
+                            }}
+                            className="w-20 px-2 py-1 text-right font-mono border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          /><span className="ml-1">/mi</span>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-xs text-gray-500">
+                        {state.effortPacesSource === 'manual' 
+                          ? 'Using your custom paces.' 
+                          : 'Tap to adjust. Update anytime with a race result.'}
                       </p>
                     </div>
                   )}

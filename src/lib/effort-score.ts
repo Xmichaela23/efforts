@@ -444,3 +444,16 @@ export function getZoneDescriptions(paces: TrainingPaces, unit: 'mi' | 'km'): {
     },
   ];
 }
+
+// ============================================================================
+// PACE PARSING
+// ============================================================================
+
+/**
+ * Parse pace string (MM:SS) to seconds
+ */
+export function parsePace(paceStr: string): number | null {
+  const parts = paceStr.split(':').map(p => parseInt(p, 10));
+  if (parts.length !== 2 || parts.some(isNaN)) return null;
+  return parts[0] * 60 + parts[1];
+}
