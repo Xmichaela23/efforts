@@ -93,8 +93,9 @@ Deno.serve(async (req: Request) => {
 
     // Apply strength overlay if requested
     if (request.strength_frequency && request.strength_frequency > 0) {
-      const tier = request.strength_tier || 'runner_specific';
-      plan = overlayStrength(plan, request.strength_frequency as 1 | 2 | 3, phaseStructure, tier);
+      const tier = request.strength_tier || 'injury_prevention';
+      const equipment = request.equipment_type || 'home_gym';
+      plan = overlayStrength(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment);
     }
 
     // Validate generated plan

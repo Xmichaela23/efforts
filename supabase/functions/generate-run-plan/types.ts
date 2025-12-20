@@ -13,8 +13,9 @@ export interface GeneratePlanRequest {
   start_date?: string; // ISO date string (YYYY-MM-DD)
   approach: 'simple_completion' | 'balanced_build';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
-  strength_frequency?: 0 | 1 | 2 | 3;
-  strength_tier?: 'runner_specific' | 'strength_development';
+  strength_frequency?: 0 | 2 | 3;
+  strength_tier?: 'injury_prevention' | 'strength_power';
+  equipment_type?: 'home_gym' | 'commercial_gym';
   race_date?: string;
 }
 

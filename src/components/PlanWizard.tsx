@@ -18,7 +18,8 @@ type MpwRange = '12-15' | '16-19' | '20-25' | '25-35' | '35-45' | '45+';
 type Goal = 'complete' | 'speed';
 type Approach = 'simple_completion' | 'balanced_build';
 type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
-type StrengthTier = 'runner_specific' | 'strength_development';
+type StrengthTier = 'injury_prevention' | 'strength_power';
+type EquipmentType = 'home_gym' | 'commercial_gym';
 
 interface WizardState {
   discipline: Discipline | null;
@@ -30,8 +31,9 @@ interface WizardState {
   startDate: string; // ISO date string
   approach: Approach | null;
   daysPerWeek: DaysPerWeek | null;
-  strengthFrequency: 0 | 1 | 2 | 3;
+  strengthFrequency: 0 | 2 | 3;
   strengthTier: StrengthTier;
+  equipmentType: EquipmentType;
 }
 
 // ============================================================================
@@ -262,7 +264,8 @@ export default function PlanWizard() {
     approach: null,
     daysPerWeek: null,
     strengthFrequency: 0,
-    strengthTier: 'runner_specific'
+    strengthTier: 'injury_prevention',
+    equipmentType: 'home_gym'
   });
 
   // Get default duration based on distance, fitness, and MPW
@@ -404,7 +407,8 @@ export default function PlanWizard() {
           approach: state.approach,
           days_per_week: state.daysPerWeek,
           strength_frequency: state.strengthFrequency,
-          strength_tier: state.strengthTier
+          strength_tier: state.strengthTier,
+          equipment_type: state.equipmentType
         }
       });
 
@@ -848,16 +852,16 @@ export default function PlanWizard() {
                 <p className="text-sm text-gray-500 mb-3">How often?</p>
                 <RadioGroup
                   value={state.strengthFrequency.toString()}
-                  onValueChange={(v) => updateState('strengthFrequency', parseInt(v) as 0 | 1 | 2 | 3)}
+                  onValueChange={(v) => updateState('strengthFrequency', parseInt(v) as 0 | 2 | 3)}
                   className="space-y-2"
                 >
                   <RadioOption value="0" label="No strength" />
                   <RadioOption value="2" label="2 days per week" description="Recommended" />
-                  <RadioOption value="3" label="3 days per week" description="Base phase, reduces in later phases" />
+                  <RadioOption value="3" label="3 days per week" description="Full body + upper + lower" />
                 </RadioGroup>
               </div>
               
-              {/* Tier - only show if frequency > 0 */}
+              {/* Tier selection - only show if frequency > 0 */}
               {state.strengthFrequency > 0 && (
                 <div className="pt-4 border-t">
                   <p className="text-sm text-gray-500 mb-3">What type?</p>
@@ -866,30 +870,77 @@ export default function PlanWizard() {
                     onValueChange={(v) => updateState('strengthTier', v as StrengthTier)}
                     className="space-y-3"
                   >
-                    <div className="p-3 border rounded-lg hover:bg-gray-50">
+                    <div className={`p-3 border rounded-lg ${state.strengthTier === 'injury_prevention' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
                       <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="runner_specific" id="runner_specific" className="mt-1" />
-                        <Label htmlFor="runner_specific" className="flex-1 cursor-pointer">
-                          <span className="block font-medium">Runner-Specific</span>
-                          <span className="block text-sm text-gray-500 mt-0.5">
-                            Single-leg work, hip stability, injury prevention
+                        <RadioGroupItem value="injury_prevention" id="injury_prevention" className="mt-1" />
+                        <Label htmlFor="injury_prevention" className="flex-1 cursor-pointer">
+                          <span className="flex items-center gap-2">
+                            <span className="font-medium">Injury Prevention</span>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Recommended</span>
+                          </span>
+                          <span className="block text-sm text-gray-500 mt-1">
+                            Single-leg stability, hip strength, injury prevention
                           </span>
                           <span className="block text-xs text-gray-400 mt-1">
-                            Equipment: Bodyweight, dumbbells, bands
+                            Equipment: Bodyweight + dumbbells (15-25 lbs)
                           </span>
                         </Label>
                       </div>
                     </div>
-                    <div className="p-3 border rounded-lg hover:bg-gray-50">
+                    <div className={`p-3 border rounded-lg ${state.strengthTier === 'strength_power' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
                       <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="strength_development" id="strength_development" className="mt-1" />
-                        <Label htmlFor="strength_development" className="flex-1 cursor-pointer">
-                          <span className="block font-medium">Strength Development</span>
-                          <span className="block text-sm text-gray-500 mt-0.5">
-                            Heavy compound lifts, maximum strength focus
+                        <RadioGroupItem value="strength_power" id="strength_power" className="mt-1" />
+                        <Label htmlFor="strength_power" className="flex-1 cursor-pointer">
+                          <span className="flex items-center gap-2">
+                            <span className="font-medium">Strength & Power</span>
+                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">Advanced</span>
+                          </span>
+                          <span className="block text-sm text-gray-500 mt-1">
+                            Heavy compounds + hip thrusts + explosive power
                           </span>
                           <span className="block text-xs text-gray-400 mt-1">
-                            Equipment: Barbell, rack, bench required
+                            Equipment: Rack, bench, barbell required
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+              
+              {/* Equipment selection - only show if Strength & Power tier */}
+              {state.strengthFrequency > 0 && state.strengthTier === 'strength_power' && (
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-gray-500 mb-3">Where will you train?</p>
+                  <RadioGroup
+                    value={state.equipmentType}
+                    onValueChange={(v) => updateState('equipmentType', v as EquipmentType)}
+                    className="space-y-3"
+                  >
+                    <div className={`p-3 border rounded-lg ${state.equipmentType === 'home_gym' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="home_gym" id="home_gym" className="mt-1" />
+                        <Label htmlFor="home_gym" className="flex-1 cursor-pointer">
+                          <span className="font-medium">Home Gym</span>
+                          <span className="block text-sm text-gray-500 mt-1">
+                            Rack, bench, barbell, dumbbells, bands
+                          </span>
+                          <span className="block text-xs text-gray-400 mt-1">
+                            Uses: Inverted rows, bench jumps, band work
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
+                    <div className={`p-3 border rounded-lg ${state.equipmentType === 'commercial_gym' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="commercial_gym" id="commercial_gym" className="mt-1" />
+                        <Label htmlFor="commercial_gym" className="flex-1 cursor-pointer">
+                          <span className="font-medium">Commercial Gym</span>
+                          <span className="block text-sm text-gray-500 mt-1">
+                            Full gym access with cable machines
+                          </span>
+                          <span className="block text-xs text-gray-400 mt-1">
+                            Uses: Lat pulldowns, cable face pulls, box jumps
                           </span>
                         </Label>
                       </div>

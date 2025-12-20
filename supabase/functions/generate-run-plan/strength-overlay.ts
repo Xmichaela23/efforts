@@ -1,19 +1,25 @@
-// Strength Overlay System
+// Two-Tier Strength Overlay System
 // 
-// Two Tiers:
-// 1. Runner-Specific (Default): Single-leg work, bodyweight + dumbbells, injury prevention
-// 2. Strength Development: Heavy compound lifts, barbell training, max strength
+// TIER 1: Injury Prevention
+// - Single-leg work, hip stability, bodyweight + light dumbbells
+// - Focus: Injury prevention, movement quality, runner-specific weaknesses
+// - Equipment: Bodyweight, dumbbells (15-25 lbs), resistance band
 //
-// SCHEDULE:
-// - Base Phase: Full frequency (2-3x/week)
-// - Speed Phase: Maintain (2x/week max)
-// - Race Prep: Maintain (2x/week)
-// - Taper: None
-// - Recovery weeks: Reduce by 1 session
+// TIER 2: Strength & Power
+// - Heavy compound lifts, loaded hip thrusts, explosive plyometrics
+// - Focus: Maximum strength + power for running performance
+// - Equipment: Rack, bench, barbell, dumbbells, bands (home gym OR commercial gym)
+//
+// SCHEDULE (both tiers):
+// - 3x/week: Full Body (Mon), Upper (Wed), Lower (Fri)
+// - 2x/week: Full Body (Mon), Lower (Fri)
+// - Recovery weeks (4, 8): Reduce volume
+// - Taper (week 12+): None or minimal
 
 import { TrainingPlan, Session, StrengthExercise, Phase, PhaseStructure } from './types.ts';
 
-type StrengthTier = 'runner_specific' | 'strength_development';
+type StrengthTier = 'injury_prevention' | 'strength_power';
+type EquipmentType = 'home_gym' | 'commercial_gym';
 
 // ============================================================================
 // MAIN OVERLAY FUNCTION
@@ -21,21 +27,30 @@ type StrengthTier = 'runner_specific' | 'strength_development';
 
 export function overlayStrength(
   plan: TrainingPlan,
-  frequency: 1 | 2 | 3,
+  frequency: 2 | 3,
   phaseStructure: PhaseStructure,
-  tier: StrengthTier = 'runner_specific'
+  tier: StrengthTier = 'injury_prevention',
+  equipment: EquipmentType = 'home_gym'
 ): TrainingPlan {
   const modifiedPlan = { ...plan };
   const modifiedSessions: Record<string, Session[]> = {};
+  const totalWeeks = Object.keys(plan.sessions_by_week).length;
 
   for (const [weekStr, sessions] of Object.entries(plan.sessions_by_week)) {
     const week = parseInt(weekStr, 10);
     const phase = getCurrentPhase(week, phaseStructure);
     const isRecovery = phaseStructure.recovery_weeks.includes(week);
+    const isTaper = phase.name === 'Taper';
     
-    const strengthSessions = tier === 'runner_specific'
-      ? getRunnerSpecificSessions(week, phase, frequency, isRecovery, sessions)
-      : getStrengthDevelopmentSessions(week, phase, frequency, isRecovery, sessions);
+    // No strength in taper
+    if (isTaper) {
+      modifiedSessions[weekStr] = [...sessions];
+      continue;
+    }
+    
+    const strengthSessions = tier === 'injury_prevention'
+      ? getInjuryPreventionSessions(week, phase, frequency, isRecovery, sessions)
+      : getStrengthPowerSessions(week, phase, frequency, isRecovery, sessions, equipment);
 
     modifiedSessions[weekStr] = [...sessions, ...strengthSessions];
   }
@@ -45,264 +60,387 @@ export function overlayStrength(
   // Baselines depend on tier
   modifiedPlan.baselines_required = {
     ...modifiedPlan.baselines_required,
-    strength: tier === 'strength_development' 
-      ? ['squat1RM', 'deadlift1RM', 'bench1RM']
-      : [] // Runner-specific doesn't need 1RM baselines
+    strength: tier === 'strength_power' 
+      ? ['squat1RM', 'deadlift1RM', 'bench1RM', 'hipThrust1RM']
+      : [] // Injury Prevention doesn't need 1RM baselines
   };
 
   return modifiedPlan;
 }
 
 // ============================================================================
-// RUNNER-SPECIFIC TIER
+// TIER 1: INJURY PREVENTION
 // ============================================================================
 
-function getRunnerSpecificSessions(
+interface InjuryPreventionParams {
+  sets: number;
+  reps: string;
+  duration: number;
+  equipment: string;
+  intensity: string;
+}
+
+function getInjuryPreventionParams(phaseName: string, isRecovery: boolean): InjuryPreventionParams {
+  if (isRecovery) {
+    return { sets: 2, reps: '12-15', duration: 30, equipment: 'Bodyweight only', intensity: 'light (RPE 5/10)' };
+  }
+  
+  switch (phaseName) {
+    case 'Base':
+      return { sets: 3, reps: '12-15', duration: 45, equipment: 'Bodyweight + light DBs', intensity: 'moderate (RPE 6-7/10)' };
+    case 'Speed':
+      return { sets: 3, reps: '10-12', duration: 40, equipment: 'Bodyweight + DBs (20-25 lbs)', intensity: 'moderate (RPE 6-7/10)' };
+    case 'Race Prep':
+      return { sets: 2, reps: '12-15', duration: 35, equipment: 'Bodyweight + light DBs', intensity: 'light (RPE 5-6/10)' };
+    default:
+      return { sets: 3, reps: '12-15', duration: 45, equipment: 'Bodyweight + light DBs', intensity: 'moderate (RPE 6-7/10)' };
+  }
+}
+
+function getInjuryPreventionSessions(
   week: number,
   phase: Phase,
-  requestedFrequency: number,
+  frequency: number,
   isRecovery: boolean,
   runningSessions: Session[]
 ): Session[] {
   const sessions: Session[] = [];
+  const params = getInjuryPreventionParams(phase.name, isRecovery);
+  const phaseWeek = week - phase.start_week + 1;
   
-  let phaseFrequency = getPhaseFrequency(phase.name, requestedFrequency);
-  if (isRecovery && phaseFrequency > 0) {
-    phaseFrequency = Math.max(0, phaseFrequency - 1);
-  }
+  // Session 1: Full Body (Monday)
+  sessions.push(createInjuryPreventionFullBody(phase, params, phaseWeek, isRecovery));
   
-  if (phaseFrequency === 0) return sessions;
+  // Session 2: Lower Body (Friday) - always included for 2x or 3x
+  sessions.push(createInjuryPreventionLowerBody(phase, params, phaseWeek, isRecovery));
   
-  const availableDays = findAvailableStrengthDays(runningSessions);
-  const phaseParams = getRunnerSpecificParams(phase.name, isRecovery);
-  
-  // Session 1: Full Body or Lower Body (Monday preferred)
-  if (phaseFrequency >= 1 && availableDays.includes('Monday')) {
-    sessions.push(createRunnerFullBody(phase, phaseParams, 'Monday'));
-  }
-  
-  // Session 2: Lower Body (Thursday/Friday preferred)
-  if (phaseFrequency >= 2) {
-    const day = availableDays.includes('Thursday') ? 'Thursday' 
-              : availableDays.includes('Friday') ? 'Friday' 
-              : availableDays.includes('Wednesday') ? 'Wednesday' : null;
-    if (day) {
-      sessions.push(createRunnerLowerBody(phase, phaseParams, day));
-    }
-  }
-  
-  // Session 3: Upper Body (Wednesday preferred) - Base phase only
-  if (phaseFrequency >= 3 && availableDays.includes('Wednesday')) {
-    sessions.push(createRunnerUpperBody(phase, phaseParams, 'Wednesday'));
+  // Session 3: Upper Body (Wednesday) - only for 3x frequency
+  if (frequency >= 3 && !isRecovery) {
+    sessions.push(createInjuryPreventionUpperBody(phase, params, phaseWeek));
   }
   
   return sessions;
 }
 
-interface RunnerParams {
+function createInjuryPreventionFullBody(phase: Phase, params: InjuryPreventionParams, weekInPhase: number, isRecovery: boolean): Session {
+  const exercises: StrengthExercise[] = isRecovery ? [
+    { name: 'Bulgarian Split Squat', sets: 2, reps: 12, weight: 'Bodyweight' },
+    { name: 'Single Leg RDL', sets: 2, reps: 10, weight: 'Bodyweight' },
+    { name: 'Push-ups', sets: 2, reps: 12, weight: 'Bodyweight' },
+    { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Bodyweight' },
+    { name: 'Plank', sets: 2, reps: '45s', weight: 'Bodyweight' }
+  ] : phase.name === 'Base' ? [
+    { name: 'Bulgarian Split Squat', sets: params.sets, reps: 12, weight: weekInPhase >= 3 ? '15-20 lbs per hand' : 'Bodyweight' },
+    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: weekInPhase >= 3 ? '15 lbs per hand' : 'Bodyweight' },
+    { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Inverted Rows', sets: params.sets, reps: 12, weight: 'Bodyweight' },
+    { name: 'Dead Bugs', sets: params.sets, reps: 10, weight: 'Bodyweight' },
+    { name: 'Plank', sets: params.sets, reps: '60s', weight: 'Bodyweight' }
+  ] : phase.name === 'Speed' ? [
+    { name: 'Bulgarian Split Squat', sets: params.sets, reps: 10, weight: '20 lbs per hand' },
+    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: '25 lbs per hand' },
+    { name: 'Push-ups', sets: params.sets, reps: 12, weight: 'Bodyweight' },
+    { name: 'Inverted Rows', sets: params.sets, reps: 10, weight: 'Bodyweight' },
+    { name: 'Pallof Press', sets: params.sets, reps: 10, weight: 'Resistance Band' },
+    { name: 'Side Plank', sets: params.sets, reps: '45s each', weight: 'Bodyweight' }
+  ] : [
+    { name: 'Walking Lunges', sets: params.sets, reps: 12, weight: '15 lbs per hand' },
+    { name: 'Glute Bridges', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Inverted Rows', sets: params.sets, reps: 12, weight: 'Bodyweight' },
+    { name: 'Bird Dogs', sets: params.sets, reps: 8, weight: 'Bodyweight' },
+    { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
+  ];
+
+  const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
+  
+  return {
+    day: 'Monday',
+    type: 'strength',
+    name: 'Full Body Injury Prevention',
+    description: `${weekDesc} - ${params.intensity}. Single-leg stability and core strength for injury prevention.`,
+    duration: params.duration,
+    strength_exercises: exercises,
+    tags: ['strength', 'full_body', 'injury_prevention', `phase:${phase.name.toLowerCase()}`]
+  };
+}
+
+function createInjuryPreventionUpperBody(phase: Phase, params: InjuryPreventionParams, weekInPhase: number): Session {
+  const exercises: StrengthExercise[] = phase.name === 'Base' ? [
+    { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Inverted Rows', sets: params.sets, reps: 12, weight: 'Bodyweight' },
+    { name: 'Pike Push-ups', sets: params.sets, reps: 8, weight: 'Bodyweight' },
+    { name: 'YTW Raises', sets: params.sets, reps: 10, weight: '5 lbs' },
+    { name: 'Face Pulls', sets: params.sets, reps: 15, weight: 'Resistance Band' },
+    { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
+  ] : phase.name === 'Speed' ? [
+    { name: 'Push-ups', sets: params.sets, reps: 12, weight: 'Bodyweight' },
+    { name: 'Inverted Rows', sets: params.sets, reps: 10, weight: 'Bodyweight' },
+    { name: 'Pike Push-ups', sets: params.sets, reps: 10, weight: 'Bodyweight' },
+    { name: 'Lateral Raises', sets: params.sets, reps: 12, weight: '10 lbs' },
+    { name: 'Reverse Flyes', sets: params.sets, reps: 12, weight: '8 lbs' },
+    { name: 'Plank', sets: params.sets, reps: '60s', weight: 'Bodyweight' }
+  ] : [
+    { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Inverted Rows', sets: params.sets, reps: 12, weight: 'Bodyweight' },
+    { name: 'YTW Raises', sets: params.sets, reps: 12, weight: '5 lbs' },
+    { name: 'Face Pulls', sets: params.sets, reps: 15, weight: 'Resistance Band' },
+    { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
+  ];
+
+  return {
+    day: 'Wednesday',
+    type: 'strength',
+    name: 'Upper Body Injury Prevention',
+    description: `Week ${weekInPhase} ${phase.name} - ${params.intensity}. Shoulder stability and posture for arm drive.`,
+    duration: params.duration - 5,
+    strength_exercises: exercises,
+    tags: ['strength', 'upper_body', 'injury_prevention', `phase:${phase.name.toLowerCase()}`]
+  };
+}
+
+function createInjuryPreventionLowerBody(phase: Phase, params: InjuryPreventionParams, weekInPhase: number, isRecovery: boolean): Session {
+  const exercises: StrengthExercise[] = isRecovery ? [
+    { name: 'Walking Lunges', sets: 2, reps: 12, weight: 'Bodyweight' },
+    { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
+    { name: 'Single Leg RDL', sets: 2, reps: 10, weight: 'Bodyweight' },
+    { name: 'Clamshells', sets: 2, reps: 15, weight: 'Bodyweight' },
+    { name: 'Side Plank', sets: 2, reps: '30s each', weight: 'Bodyweight' }
+  ] : phase.name === 'Base' ? [
+    { name: 'Bulgarian Split Squat', sets: params.sets, reps: 12, weight: weekInPhase >= 3 ? '15-20 lbs per hand' : 'Bodyweight' },
+    { name: 'Walking Lunges', sets: params.sets, reps: 12, weight: 'Bodyweight' },
+    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: 'Bodyweight' },
+    { name: 'Hip Thrusts', sets: params.sets, reps: 12, weight: 'Bodyweight' },
+    { name: 'Clamshells', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Calf Raises', sets: params.sets, reps: 20, weight: 'Bodyweight' }
+  ] : phase.name === 'Speed' ? [
+    { name: 'Bulgarian Split Squat', sets: params.sets, reps: 10, weight: '20 lbs per hand' },
+    { name: 'Reverse Lunges', sets: params.sets, reps: 10, weight: '15 lbs per hand' },
+    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: '25 lbs per hand' },
+    { name: 'Hip Thrusts', sets: params.sets, reps: 12, weight: 'Bodyweight' },
+    { name: 'Lateral Lunges', sets: params.sets, reps: 8, weight: 'Bodyweight' },
+    { name: 'Single Leg Calf Raises', sets: params.sets, reps: 15, weight: 'Bodyweight' }
+  ] : [
+    { name: 'Walking Lunges', sets: params.sets, reps: 12, weight: '15 lbs per hand' },
+    { name: 'Glute Bridges', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: 'Bodyweight' },
+    { name: 'Clamshells', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Side Plank', sets: params.sets, reps: '45s each', weight: 'Bodyweight' }
+  ];
+
+  const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
+  
+  return {
+    day: 'Friday',
+    type: 'strength',
+    name: 'Lower Body Injury Prevention',
+    description: `${weekDesc} - ${params.intensity}. Hip stability and glute activation for injury prevention.`,
+    duration: params.duration,
+    strength_exercises: exercises,
+    tags: ['strength', 'lower_body', 'injury_prevention', `phase:${phase.name.toLowerCase()}`]
+  };
+}
+
+// ============================================================================
+// TIER 2: STRENGTH & POWER
+// ============================================================================
+
+interface StrengthPowerParams {
+  compoundPercent: number;
+  hipThrustPercent: number;
   sets: number;
   reps: number;
   duration: number;
 }
 
-function getRunnerSpecificParams(phaseName: string, isRecovery: boolean): RunnerParams {
-  const base: Record<string, RunnerParams> = {
-    'Base': { sets: 3, reps: 12, duration: 45 },
-    'Speed': { sets: 3, reps: 10, duration: 40 },
-    'Race Prep': { sets: 2, reps: 12, duration: 35 },
-    'Taper': { sets: 2, reps: 10, duration: 30 }
-  };
-  
-  const params = base[phaseName] || base['Base'];
-  
+function getStrengthPowerParams(phaseName: string, weekInPhase: number, isRecovery: boolean): StrengthPowerParams {
   if (isRecovery) {
-    return { sets: 2, reps: params.reps, duration: 30 };
+    // Recovery weeks: drop intensity
+    return { compoundPercent: 70, hipThrustPercent: 70, sets: 3, reps: 6, duration: 40 };
   }
   
-  return params;
+  switch (phaseName) {
+    case 'Base':
+      // Week 1: 70%, Week 2: 72%, Week 3: 75%
+      const basePercent = 70 + (weekInPhase - 1) * 2;
+      return { compoundPercent: Math.min(75, basePercent), hipThrustPercent: Math.min(75, basePercent), sets: 4, reps: 6, duration: 50 };
+    case 'Speed':
+      // Week 1: 65%, Week 2: 67%, Week 3: 70%
+      const speedPercent = 65 + (weekInPhase - 1) * 2;
+      return { compoundPercent: Math.min(70, speedPercent), hipThrustPercent: Math.min(70, speedPercent), sets: 3, reps: 6, duration: 50 };
+    case 'Race Prep':
+      return { compoundPercent: 65, hipThrustPercent: 60, sets: 2, reps: 8, duration: 35 };
+    default:
+      return { compoundPercent: 70, hipThrustPercent: 70, sets: 4, reps: 6, duration: 50 };
+  }
 }
 
-function createRunnerFullBody(phase: Phase, params: RunnerParams, day: string): Session {
-  const exercises: StrengthExercise[] = [
-    { name: 'Bulgarian Split Squat', sets: params.sets, reps: params.reps, weight: 'Bodyweight or light DBs' },
-    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: 'Bodyweight or light DBs' },
-    { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
-    { name: 'Inverted Rows', sets: params.sets, reps: params.reps, weight: 'Bodyweight' },
-    { name: 'Dead Bugs', sets: params.sets, reps: 10, weight: 'Bodyweight' },
-    { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
-  ];
-
-  return {
-    day,
-    type: 'strength',
-    name: 'Full Body Strength',
-    description: `Single-leg work and core stability (${phase.name} phase)`,
-    duration: params.duration,
-    strength_exercises: exercises,
-    tags: ['strength', 'full_body', 'runner_specific']
-  };
-}
-
-function createRunnerLowerBody(phase: Phase, params: RunnerParams, day: string): Session {
-  const exercises: StrengthExercise[] = [
-    { name: 'Walking Lunges', sets: params.sets, reps: params.reps, weight: 'Bodyweight or light DBs' },
-    { name: 'Glute Bridges', sets: params.sets, reps: 15, weight: 'Bodyweight' },
-    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: 'Bodyweight or light DBs' },
-    { name: 'Clamshells', sets: params.sets, reps: 15, weight: 'Bodyweight' },
-    { name: 'Side Plank', sets: params.sets, reps: '30s', weight: 'Bodyweight' },
-    { name: 'Calf Raises', sets: params.sets, reps: 20, weight: 'Bodyweight' }
-  ];
-
-  return {
-    day,
-    type: 'strength',
-    name: 'Lower Body Strength',
-    description: `Hip stability and glute activation (${phase.name} phase)`,
-    duration: params.duration,
-    strength_exercises: exercises,
-    tags: ['strength', 'lower_body', 'runner_specific']
-  };
-}
-
-function createRunnerUpperBody(phase: Phase, params: RunnerParams, day: string): Session {
-  const exercises: StrengthExercise[] = [
-    { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
-    { name: 'Inverted Rows', sets: params.sets, reps: params.reps, weight: 'Bodyweight' },
-    { name: 'Pike Push-ups', sets: params.sets, reps: 8, weight: 'Bodyweight' },
-    { name: 'YTW Raises', sets: params.sets, reps: 10, weight: 'Light DBs or bands' },
-    { name: 'Face Pulls', sets: params.sets, reps: 15, weight: 'Band' },
-    { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
-  ];
-
-  return {
-    day,
-    type: 'strength',
-    name: 'Upper Body Strength',
-    description: `Posture and shoulder stability (${phase.name} phase)`,
-    duration: params.duration - 5,
-    strength_exercises: exercises,
-    tags: ['strength', 'upper_body', 'runner_specific']
-  };
-}
-
-// ============================================================================
-// STRENGTH DEVELOPMENT TIER (Original approach)
-// ============================================================================
-
-function getStrengthDevelopmentSessions(
+function getStrengthPowerSessions(
   week: number,
   phase: Phase,
-  requestedFrequency: number,
+  frequency: number,
   isRecovery: boolean,
-  runningSessions: Session[]
+  runningSessions: Session[],
+  equipment: EquipmentType
 ): Session[] {
   const sessions: Session[] = [];
+  const weekInPhase = week - phase.start_week + 1;
+  const params = getStrengthPowerParams(phase.name, weekInPhase, isRecovery);
   
-  let phaseFrequency = getPhaseFrequency(phase.name, requestedFrequency);
-  if (isRecovery && phaseFrequency > 0) {
-    phaseFrequency = Math.max(0, phaseFrequency - 1);
-  }
+  // Session 1: Full Body (Monday)
+  sessions.push(createStrengthPowerFullBody(phase, params, weekInPhase, isRecovery, equipment));
   
-  if (phaseFrequency === 0) return sessions;
+  // Session 2: Lower Body (Friday)
+  sessions.push(createStrengthPowerLowerBody(phase, params, weekInPhase, isRecovery, equipment));
   
-  const availableDays = findAvailableStrengthDays(runningSessions);
-  const intensity = getStrengthDevIntensity(phase.name);
-  
-  // Full Body (Monday)
-  if (phaseFrequency >= 1 && availableDays.includes('Monday')) {
-    sessions.push(createStrengthDevFullBody(phase, intensity, 'Monday'));
-  }
-  
-  // Lower Body (Thursday/Friday)
-  if (phaseFrequency >= 2) {
-    const day = availableDays.includes('Thursday') ? 'Thursday' 
-              : availableDays.includes('Friday') ? 'Friday' : null;
-    if (day) {
-      sessions.push(createStrengthDevLowerBody(phase, intensity, day));
-    }
-  }
-  
-  // Upper Body (Wednesday) - Base phase only
-  if (phaseFrequency >= 3 && availableDays.includes('Wednesday')) {
-    sessions.push(createStrengthDevUpperBody(phase, intensity, 'Wednesday'));
+  // Session 3: Upper Body (Wednesday) - only for 3x frequency
+  if (frequency >= 3 && !isRecovery) {
+    sessions.push(createStrengthPowerUpperBody(phase, params, weekInPhase, equipment));
   }
   
   return sessions;
 }
 
-interface StrengthDevParams {
-  percent: number;
-  sets: number;
-  reps: number;
-}
-
-function getStrengthDevIntensity(phaseName: string): StrengthDevParams {
-  switch (phaseName) {
-    case 'Base': return { percent: 75, sets: 4, reps: 6 };
-    case 'Speed': return { percent: 70, sets: 3, reps: 6 };
-    case 'Race Prep': return { percent: 65, sets: 3, reps: 8 };
-    case 'Taper': return { percent: 60, sets: 2, reps: 8 };
-    default: return { percent: 70, sets: 3, reps: 6 };
-  }
-}
-
-function createStrengthDevFullBody(_phase: Phase, intensity: StrengthDevParams, day: string): Session {
-  const exercises: StrengthExercise[] = [
-    { name: 'Back Squat', sets: intensity.sets, reps: intensity.reps, weight: `${intensity.percent}% 1RM` },
-    { name: 'Bench Press', sets: intensity.sets, reps: intensity.reps, weight: `${intensity.percent}% 1RM` },
-    { name: 'Romanian Deadlift', sets: intensity.sets - 1, reps: intensity.reps + 2, weight: `${intensity.percent - 10}% 1RM` },
-    { name: 'Barbell Row', sets: intensity.sets - 1, reps: intensity.reps + 2, weight: `${intensity.percent - 5}% 1RM` },
+function createStrengthPowerFullBody(phase: Phase, params: StrengthPowerParams, weekInPhase: number, isRecovery: boolean, equipment: EquipmentType): Session {
+  const plyoExercise = equipment === 'commercial_gym' 
+    ? { name: 'Box Jumps', sets: 3, reps: 5, weight: 'Bodyweight' }
+    : { name: 'Bench Jumps', sets: 3, reps: 5, weight: 'Bodyweight' };
+  
+  const exercises: StrengthExercise[] = isRecovery ? [
+    { name: 'Back Squat', sets: 3, reps: 6, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Hip Thrusts', sets: 3, reps: 8, weight: `${params.hipThrustPercent}% 1RM` },
+    { name: 'Bench Press', sets: 3, reps: 6, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Bulgarian Split Squat', sets: 2, reps: 8, weight: '25 lbs per hand' },
+    { name: plyoExercise.name, sets: 2, reps: plyoExercise.reps, weight: plyoExercise.weight }
+  ] : phase.name === 'Base' ? [
+    { name: 'Back Squat', sets: params.sets, reps: params.reps, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Hip Thrusts', sets: weekInPhase >= 3 ? 4 : 3, reps: 8, weight: `${params.hipThrustPercent}% 1RM` },
+    { name: 'Bench Press', sets: 3, reps: params.reps, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: `${25 + (weekInPhase - 1) * 5} lbs per hand` },
+    { ...plyoExercise, reps: weekInPhase >= 3 ? 6 : 5 },
+    { name: 'Plank', sets: 3, reps: '60s', weight: 'Bodyweight' }
+  ] : phase.name === 'Speed' ? [
+    { name: 'Back Squat', sets: params.sets, reps: params.reps, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Hip Thrusts', sets: 3, reps: 10, weight: `${params.hipThrustPercent}% 1RM` },
+    { name: 'Bench Press', sets: 3, reps: params.reps, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Single Leg Squat to Box', sets: 3, reps: 6, weight: 'Bodyweight' },
+    { name: 'Jump Squats', sets: 3, reps: weekInPhase >= 2 ? 8 : 6, weight: 'Bodyweight' },
     { name: 'Plank', sets: 3, reps: '45s', weight: 'Bodyweight' }
+  ] : [
+    { name: 'Back Squat', sets: params.sets, reps: params.reps, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Hip Thrusts', sets: 2, reps: 12, weight: `${params.hipThrustPercent}% 1RM` },
+    { name: 'Push-ups', sets: 2, reps: 15, weight: 'Bodyweight' },
+    { name: 'Bulgarian Split Squat', sets: 2, reps: 10, weight: 'Bodyweight' },
+    { name: plyoExercise.name, sets: 2, reps: 5, weight: plyoExercise.weight }
   ];
 
+  const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
+  const phaseNote = phase.name === 'Base' 
+    ? 'Heavy compounds build foundation. Hip thrusts are CRITICAL for running power.'
+    : phase.name === 'Speed' 
+    ? 'Explosive emphasis with jump squats. Focus on bar speed.'
+    : 'Maintenance during high running volume.';
+
   return {
-    day,
+    day: 'Monday',
     type: 'strength',
-    name: 'Full Body Strength',
-    description: 'Heavy compound lifts for maximum strength',
-    duration: 50,
+    name: 'Full Body Strength & Power',
+    description: `${weekDesc} - ${phaseNote} Target: ${params.sets} sets @ ${params.compoundPercent}% 1RM, RIR 2-3.`,
+    duration: params.duration,
     strength_exercises: exercises,
-    tags: ['strength', 'full_body', 'strength_development']
+    tags: ['strength', 'full_body', 'strength_power', `phase:${phase.name.toLowerCase()}`, equipment]
   };
 }
 
-function createStrengthDevUpperBody(_phase: Phase, intensity: StrengthDevParams, day: string): Session {
-  const exercises: StrengthExercise[] = [
-    { name: 'Bench Press', sets: intensity.sets, reps: intensity.reps, weight: `${intensity.percent}% 1RM` },
-    { name: 'Barbell Row', sets: intensity.sets, reps: intensity.reps + 2, weight: `${intensity.percent - 5}% 1RM` },
-    { name: 'Overhead Press', sets: intensity.sets - 1, reps: intensity.reps, weight: `${intensity.percent - 5}% 1RM` },
-    { name: 'Pull-ups', sets: 3, reps: 'AMRAP', weight: 'Bodyweight' },
-    { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Light' }
+function createStrengthPowerUpperBody(phase: Phase, params: StrengthPowerParams, weekInPhase: number, equipment: EquipmentType): Session {
+  const latExercise = equipment === 'commercial_gym'
+    ? { name: 'Lat Pulldown', sets: 3, reps: 10, weight: '65% Bodyweight' }
+    : { name: 'Inverted Rows', sets: 3, reps: 10, weight: 'Bodyweight' };
+  
+  const facePullWeight = equipment === 'commercial_gym' ? 'Cable' : 'Resistance Band';
+  
+  const exercises: StrengthExercise[] = phase.name === 'Base' ? [
+    { name: 'Bench Press', sets: 4, reps: 6, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Barbell Row', sets: 3, reps: 8, weight: `${params.compoundPercent - 5}% 1RM` },
+    { name: 'Overhead Press', sets: 3, reps: 6, weight: `${params.compoundPercent - 5}% 1RM` },
+    latExercise,
+    { name: 'Face Pulls', sets: 3, reps: 15, weight: facePullWeight },
+    { name: 'Plank', sets: 3, reps: '60s', weight: 'Bodyweight' }
+  ] : phase.name === 'Speed' ? [
+    { name: 'Bench Press', sets: 3, reps: 6, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Barbell Row', sets: 3, reps: 8, weight: `${params.compoundPercent - 5}% 1RM` },
+    { name: 'Push Press', sets: 3, reps: 6, weight: `${params.compoundPercent}% 1RM` },
+    latExercise,
+    { name: 'Plyometric Push-ups', sets: 3, reps: 6, weight: 'Bodyweight' }
+  ] : [
+    { name: 'Bench Press', sets: 2, reps: 8, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Barbell Row', sets: 2, reps: 10, weight: `${params.compoundPercent - 5}% 1RM` },
+    latExercise,
+    { name: 'Face Pulls', sets: 2, reps: 15, weight: facePullWeight }
   ];
 
+  const phaseNote = phase.name === 'Speed' 
+    ? 'Push press for explosive overhead power. Plyo push-ups for upper body power.'
+    : 'Heavy pressing and pulling for running posture.';
+
   return {
-    day,
+    day: 'Wednesday',
     type: 'strength',
-    name: 'Upper Body Strength',
-    description: 'Upper body for posture and arm drive',
+    name: 'Upper Body Strength & Power',
+    description: `Week ${weekInPhase} ${phase.name} - ${phaseNote}`,
     duration: 45,
     strength_exercises: exercises,
-    tags: ['strength', 'upper_body', 'strength_development']
+    tags: ['strength', 'upper_body', 'strength_power', `phase:${phase.name.toLowerCase()}`, equipment]
   };
 }
 
-function createStrengthDevLowerBody(_phase: Phase, intensity: StrengthDevParams, day: string): Session {
-  const exercises: StrengthExercise[] = [
-    { name: 'Back Squat', sets: intensity.sets, reps: intensity.reps, weight: `${intensity.percent}% 1RM` },
-    { name: 'Romanian Deadlift', sets: intensity.sets - 1, reps: intensity.reps + 2, weight: `${intensity.percent - 10}% 1RM` },
-    { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: 'Moderate DBs' },
-    { name: 'Hip Thrusts', sets: 3, reps: 10, weight: `${intensity.percent - 5}% 1RM` },
+function createStrengthPowerLowerBody(phase: Phase, params: StrengthPowerParams, weekInPhase: number, isRecovery: boolean, equipment: EquipmentType): Session {
+  const plyoExercise = phase.name === 'Speed'
+    ? { name: 'Bounding', sets: 3, reps: '6 per leg', weight: 'Bodyweight' }
+    : { name: 'Broad Jumps', sets: 3, reps: 3, weight: 'Bodyweight' };
+
+  const exercises: StrengthExercise[] = isRecovery ? [
+    { name: 'Deadlift', sets: 2, reps: 8, weight: `${params.compoundPercent - 5}% 1RM` },
+    { name: 'Hip Thrusts', sets: 2, reps: 10, weight: `${params.hipThrustPercent}% 1RM` },
+    { name: 'Bulgarian Split Squat', sets: 2, reps: 10, weight: '20 lbs per hand' },
+    { name: 'Broad Jumps', sets: 2, reps: 3, weight: 'Bodyweight' }
+  ] : phase.name === 'Base' ? [
+    { name: 'Deadlift', sets: 4, reps: 6, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Hip Thrusts', sets: 4, reps: 8, weight: `${params.hipThrustPercent}% 1RM` },
+    { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: '30 lbs per hand' },
+    { name: 'Single Leg RDL', sets: 3, reps: 8, weight: '25 lbs per hand' },
+    { name: 'Broad Jumps', sets: 3, reps: 3, weight: 'Bodyweight' },
     { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight' }
+  ] : phase.name === 'Speed' ? [
+    { name: 'Deadlift', sets: 3, reps: 6, weight: `${params.compoundPercent}% 1RM` },
+    { name: 'Hip Thrusts', sets: 3, reps: 10, weight: `${params.hipThrustPercent}% 1RM` },
+    { name: 'Single Leg Squat to Box', sets: 3, reps: 6, weight: 'Bodyweight' },
+    { name: 'Single Leg RDL', sets: 3, reps: 8, weight: '25 lbs per hand' },
+    plyoExercise,
+    { name: 'Single Leg Calf Raises', sets: 3, reps: 12, weight: 'Bodyweight' }
+  ] : [
+    { name: 'Romanian Deadlift', sets: 2, reps: 8, weight: `${params.compoundPercent - 5}% 1RM` },
+    { name: 'Hip Thrusts', sets: 2, reps: 12, weight: 'Bodyweight' },
+    { name: 'Walking Lunges', sets: 2, reps: 12, weight: '20 lbs per hand' },
+    { name: 'Single Leg RDL', sets: 2, reps: 10, weight: 'Bodyweight' },
+    { name: 'Clamshells', sets: 2, reps: 15, weight: 'Bodyweight' }
   ];
 
+  const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
+  const phaseNote = phase.name === 'Base'
+    ? 'HEAVY hip thrusts for running power. Deadlifts build posterior chain.'
+    : phase.name === 'Speed'
+    ? 'Bounding develops horizontal power for stride length. Maintain hip thrust volume.'
+    : 'Switch to RDL (less fatiguing), bodyweight hip thrusts for glute activation.';
+
   return {
-    day,
+    day: 'Friday',
     type: 'strength',
-    name: 'Lower Body Strength',
-    description: 'Heavy lower body for running power',
-    duration: 50,
+    name: 'Lower Body Strength & Power',
+    description: `${weekDesc} - ${phaseNote}`,
+    duration: params.duration,
     strength_exercises: exercises,
-    tags: ['strength', 'lower_body', 'strength_development']
+    tags: ['strength', 'lower_body', 'strength_power', `phase:${phase.name.toLowerCase()}`, equipment]
   };
 }
 
@@ -317,47 +455,4 @@ function getCurrentPhase(weekNumber: number, phaseStructure: PhaseStructure): Ph
     }
   }
   return phaseStructure.phases[phaseStructure.phases.length - 1];
-}
-
-function getPhaseFrequency(phaseName: string, requestedFrequency: number): number {
-  switch (phaseName) {
-    case 'Base': return requestedFrequency;
-    case 'Speed': return Math.min(2, requestedFrequency);
-    case 'Race Prep': return Math.min(2, requestedFrequency);
-    case 'Taper': return 0;
-    default: return requestedFrequency;
-  }
-}
-
-function findAvailableStrengthDays(sessions: Session[]): string[] {
-  const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  
-  const hardDays = new Set<string>();
-  const longRunDays = new Set<string>();
-  
-  for (const session of sessions) {
-    if (session.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold', 'vo2max'].includes(t))) {
-      hardDays.add(session.day);
-    }
-    if (session.tags.includes('long_run')) {
-      longRunDays.add(session.day);
-    }
-  }
-
-  const daysBeforeLongRun = new Set<string>();
-  const dayBefore: Record<string, string> = {
-    'Sunday': 'Saturday', 'Saturday': 'Friday', 'Friday': 'Thursday',
-    'Thursday': 'Wednesday', 'Wednesday': 'Tuesday', 'Tuesday': 'Monday', 'Monday': 'Sunday'
-  };
-  
-  for (const longDay of longRunDays) {
-    const beforeDay = dayBefore[longDay];
-    if (beforeDay) daysBeforeLongRun.add(beforeDay);
-  }
-
-  return allDays.filter(day => 
-    !hardDays.has(day) && 
-    !daysBeforeLongRun.has(day) &&
-    !longRunDays.has(day)
-  );
 }
