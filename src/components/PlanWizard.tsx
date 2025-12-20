@@ -758,24 +758,30 @@ export default function PlanWizard() {
               
               {/* MPW-based duration warning */}
               {durationGating && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className={`text-sm mb-2 ${
-                    durationGating.riskLevel === 'high_risk' ? 'text-red-600' : 'text-amber-600'
+                <div className={`mt-4 p-4 rounded-lg border ${
+                  durationGating.riskLevel === 'high_risk' 
+                    ? 'bg-red-50 border-red-200' 
+                    : 'bg-amber-50 border-amber-200'
+                }`}>
+                  <p className={`text-sm font-medium mb-2 ${
+                    durationGating.riskLevel === 'high_risk' ? 'text-red-800' : 'text-amber-800'
                   }`}>
                     {durationGating.warningTitle}
                   </p>
-                  <p className="text-xs text-gray-500 whitespace-pre-line mb-3">
+                  <p className={`text-xs whitespace-pre-line mb-3 ${
+                    durationGating.riskLevel === 'high_risk' ? 'text-red-700' : 'text-amber-700'
+                  }`}>
                     {durationGating.warningMessage}
                   </p>
-                  <div className="space-y-1 text-sm">
-                    <button
-                      type="button"
-                      onClick={() => updateState('duration', durationGating.recommended)}
-                      className="block text-left underline hover:no-underline"
-                    >
-                      Use {durationGating.recommended} weeks instead
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => updateState('duration', durationGating.recommended)}
+                    className={`text-sm underline hover:no-underline ${
+                      durationGating.riskLevel === 'high_risk' ? 'text-red-800' : 'text-amber-800'
+                    }`}
+                  >
+                    Use {durationGating.recommended} weeks instead
+                  </button>
                 </div>
               )}
             </div>
@@ -1000,22 +1006,25 @@ export default function PlanWizard() {
 
       {/* Navigation */}
       <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-4">
-        <div className="max-w-md mx-auto flex gap-3">
-          {step > 0 && (
-            <Button
-              variant="outline"
+        <div className="max-w-md mx-auto flex justify-between items-center">
+          {step > 0 ? (
+            <button
+              type="button"
               onClick={handleBack}
-              className="flex-1"
               disabled={isGenerating}
+              className="text-gray-500 hover:text-black disabled:opacity-50 flex items-center"
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back
-            </Button>
+            </button>
+          ) : (
+            <div />
           )}
-          <Button
+          <button
+            type="button"
             onClick={handleNext}
             disabled={!canProceed() || isGenerating || (step === 0 && state.discipline !== 'run')}
-            className="flex-1"
+            className="font-medium hover:underline disabled:opacity-50 disabled:no-underline flex items-center"
           >
             {isGenerating ? (
               <>
@@ -1030,7 +1039,7 @@ export default function PlanWizard() {
                 <ChevronRight className="w-4 h-4 ml-1" />
               </>
             )}
-          </Button>
+          </button>
         </div>
       </div>
     </div>
