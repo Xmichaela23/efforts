@@ -265,7 +265,7 @@ export default function PlanWizard() {
     daysPerWeek: null,
     strengthFrequency: 0,
     strengthTier: 'injury_prevention',
-    equipmentType: 'home_gym'
+    equipmentType: 'commercial_gym'
   });
 
   // Get default duration based on distance, fitness, and MPW
@@ -904,6 +904,22 @@ export default function PlanWizard() {
                     onValueChange={(v) => updateState('equipmentType', v as EquipmentType)}
                     className="space-y-3"
                   >
+                    <div className={`p-3 border rounded-lg ${state.equipmentType === 'commercial_gym' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="commercial_gym" id="commercial_gym" className="mt-1" />
+                        <Label htmlFor="commercial_gym" className="flex-1 cursor-pointer">
+                          <span className="font-medium">Commercial Gym</span>
+                          <span className="block text-sm text-gray-500 mt-1">
+                            Full gym with rack, cables, machines
+                          </span>
+                          <span className="block text-xs text-gray-400 mt-1">
+                            {state.strengthFrequency === 3 
+                              ? 'Squats, hip thrusts, lat pulldowns, box jumps'
+                              : 'Squats, hip thrusts, RDL, box jumps'}
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
                     <div className={`p-3 border rounded-lg ${state.equipmentType === 'home_gym' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
                       <div className="flex items-start space-x-3">
                         <RadioGroupItem value="home_gym" id="home_gym" className="mt-1" />
@@ -916,22 +932,6 @@ export default function PlanWizard() {
                             {state.strengthFrequency === 3 
                               ? 'Rack for: Squats, inverted rows. Barbell for: Hip thrusts, RDL'
                               : 'Rack for: Squats. Barbell for: Hip thrusts, RDL'}
-                          </span>
-                        </Label>
-                      </div>
-                    </div>
-                    <div className={`p-3 border rounded-lg ${state.equipmentType === 'commercial_gym' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
-                      <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="commercial_gym" id="commercial_gym" className="mt-1" />
-                        <Label htmlFor="commercial_gym" className="flex-1 cursor-pointer">
-                          <span className="font-medium">Commercial Gym</span>
-                          <span className="block text-sm text-gray-500 mt-1">
-                            Full gym access with cable machines
-                          </span>
-                          <span className="block text-xs text-gray-400 mt-1">
-                            {state.strengthFrequency === 3 
-                              ? 'Adds: Lat pulldowns, cable work, box jumps'
-                              : 'Adds: Box jumps, cable face pulls'}
                           </span>
                         </Label>
                       </div>
