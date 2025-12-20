@@ -27,6 +27,8 @@ interface WizardState {
   fitness: Fitness | null;
   currentMpw: MpwRange | null; // Actual weekly mileage for precise gating
   goal: Goal | null;
+  hasRaceDate: boolean | null; // null = not answered yet
+  raceDate: string; // ISO date string for race day
   duration: number;
   startDate: string; // ISO date string
   approach: Approach | null;
@@ -259,6 +261,8 @@ export default function PlanWizard() {
     fitness: null,
     currentMpw: null,
     goal: null,
+    hasRaceDate: null,
+    raceDate: '',
     duration: 12,
     startDate: getNextMonday(),
     approach: null,
@@ -335,7 +339,13 @@ export default function PlanWizard() {
         if (needsMpwQuestion && !state.currentMpw) return false;
         return state.fitness !== null;
       case 3: return state.goal !== null && !methodologyResult.locked; // Can't proceed if methodology locked
-      case 4: return state.duration >= 4;
+      case 4: 
+        // Must answer race date question
+        if (state.hasRaceDate === null) return false;
+        // If has race date, must have selected one
+        if (state.hasRaceDate && !state.raceDate) return false;
+        // Must have valid duration
+        return state.duration >= 4;
       case 5: return state.startDate !== '';
       case 6: return true; // Strength is optional (moved before running days)
       case 7: return state.daysPerWeek !== null; // Running days (now after strength)
@@ -738,68 +748,183 @@ export default function PlanWizard() {
           return [8, 12, 16, 18];
         };
         
+        // Calculate weeks from race date
+        const calculateWeeksFromRaceDate = (raceDate: string): number => {
+          if (!raceDate) return 12;
+          const race = new Date(raceDate + 'T00:00:00');
+          const nextMon = new Date(getNextMonday() + 'T00:00:00');
+          const diffMs = race.getTime() - nextMon.getTime();
+          const diffWeeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
+          return Math.max(4, Math.min(24, diffWeeks));
+        };
+        
+        // Calculate start date from race date and duration
+        const calculateStartFromRace = (raceDate: string, weeks: number): string => {
+          if (!raceDate) return getNextMonday();
+          const race = new Date(raceDate + 'T00:00:00');
+          const start = new Date(race.getTime() - (weeks * 7 * 24 * 60 * 60 * 1000));
+          // Adjust to Monday
+          const dayOfWeek = start.getDay();
+          const daysToMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 8 - dayOfWeek);
+          start.setDate(start.getDate() + daysToMonday);
+          const year = start.getFullYear();
+          const month = String(start.getMonth() + 1).padStart(2, '0');
+          const day = String(start.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        
+        // Get minimum date for race (at least 8 weeks from now)
+        const getMinRaceDate = () => {
+          const today = new Date();
+          today.setDate(today.getDate() + 8 * 7);
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        
+        // Handle race date selection
+        const handleRaceDateChange = (raceDate: string) => {
+          const weeks = calculateWeeksFromRaceDate(raceDate);
+          const startDate = calculateStartFromRace(raceDate, weeks);
+          setState(prev => ({
+            ...prev,
+            raceDate,
+            duration: weeks,
+            startDate
+          }));
+        };
+        
         return (
-          <StepContainer title="How many weeks?">
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => updateState('duration', Math.max(4, state.duration - 1))}
-                  disabled={state.duration <= 4}
-                >
-                  -
-                </Button>
-                <span className="text-2xl font-semibold w-16 text-center">{state.duration}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => updateState('duration', Math.min(24, state.duration + 1))}
-                  disabled={state.duration >= 24}
-                >
-                  +
-                </Button>
-              </div>
-              <p className="text-sm text-gray-500">weeks of training</p>
-              <div className="flex gap-4 pt-2 text-sm">
-                {getQuickDurations().map(w => (
-                  <button
-                    key={w}
-                    type="button"
-                    onClick={() => updateState('duration', w)}
-                    className={`${state.duration === w ? 'font-semibold text-black' : 'text-gray-500 hover:text-black'}`}
-                  >
-                    {w}
-                  </button>
-                ))}
-              </div>
+          <StepContainer title="Do you have a target race?">
+            <div className="space-y-6">
+              {/* Race date toggle */}
+              <RadioGroup
+                value={state.hasRaceDate === null ? '' : state.hasRaceDate ? 'yes' : 'no'}
+                onValueChange={(v) => {
+                  const hasRace = v === 'yes';
+                  setState(prev => ({
+                    ...prev,
+                    hasRaceDate: hasRace,
+                    raceDate: hasRace ? prev.raceDate : '',
+                    startDate: hasRace ? prev.startDate : getNextMonday()
+                  }));
+                }}
+                className="space-y-2"
+              >
+                <RadioOption value="yes" label="Yes, I have a race date" />
+                <RadioOption value="no" label="No, just building fitness" />
+              </RadioGroup>
               
-              {/* MPW-based duration warning */}
-              {durationGating && (
-                <div className={`mt-4 p-4 rounded-lg border ${
-                  durationGating.riskLevel === 'high_risk' 
-                    ? 'bg-red-50 border-red-200' 
-                    : 'bg-amber-50 border-amber-200'
-                }`}>
-                  <p className={`text-sm font-medium mb-2 ${
-                    durationGating.riskLevel === 'high_risk' ? 'text-red-800' : 'text-amber-800'
-                  }`}>
-                    {durationGating.warningTitle}
-                  </p>
-                  <p className={`text-xs whitespace-pre-line mb-3 ${
-                    durationGating.riskLevel === 'high_risk' ? 'text-red-700' : 'text-amber-700'
-                  }`}>
-                    {durationGating.warningMessage}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => updateState('duration', durationGating.recommended)}
-                    className={`text-sm underline hover:no-underline ${
-                      durationGating.riskLevel === 'high_risk' ? 'text-red-800' : 'text-amber-800'
-                    }`}
-                  >
-                    Use {durationGating.recommended} weeks instead
-                  </button>
+              {/* Race date picker */}
+              {state.hasRaceDate === true && (
+                <div className="space-y-4 pt-4 border-t">
+                  <p className="text-sm text-gray-600">When is your race?</p>
+                  <input
+                    type="date"
+                    value={state.raceDate}
+                    min={getMinRaceDate()}
+                    onChange={(e) => handleRaceDateChange(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  {state.raceDate && (
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm text-blue-800">
+                        <span className="font-medium">{state.duration} week plan</span>
+                        <br />
+                        <span className="text-blue-600">
+                          Starts {new Date(state.startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Warning if weeks are outside recommended range */}
+                  {state.raceDate && durationGating && (
+                    <div className={`p-4 rounded-lg border ${
+                      durationGating.riskLevel === 'high_risk' 
+                        ? 'bg-red-50 border-red-200' 
+                        : 'bg-amber-50 border-amber-200'
+                    }`}>
+                      <p className={`text-sm font-medium mb-1 ${
+                        durationGating.riskLevel === 'high_risk' ? 'text-red-800' : 'text-amber-800'
+                      }`}>
+                        {durationGating.warningTitle}
+                      </p>
+                      <p className={`text-xs ${
+                        durationGating.riskLevel === 'high_risk' ? 'text-red-700' : 'text-amber-700'
+                      }`}>
+                        {durationGating.warningMessage}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Manual weeks selector (no race date) */}
+              {state.hasRaceDate === false && (
+                <div className="space-y-4 pt-4 border-t">
+                  <p className="text-sm text-gray-600">How many weeks?</p>
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updateState('duration', Math.max(4, state.duration - 1))}
+                      disabled={state.duration <= 4}
+                    >
+                      -
+                    </Button>
+                    <span className="text-2xl font-semibold w-16 text-center">{state.duration}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updateState('duration', Math.min(24, state.duration + 1))}
+                      disabled={state.duration >= 24}
+                    >
+                      +
+                    </Button>
+                  </div>
+                  <div className="flex gap-4 text-sm">
+                    {getQuickDurations().map(w => (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => updateState('duration', w)}
+                        className={`${state.duration === w ? 'font-semibold text-black' : 'text-gray-500 hover:text-black'}`}
+                      >
+                        {w}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* MPW-based duration warning */}
+                  {durationGating && (
+                    <div className={`mt-2 p-4 rounded-lg border ${
+                      durationGating.riskLevel === 'high_risk' 
+                        ? 'bg-red-50 border-red-200' 
+                        : 'bg-amber-50 border-amber-200'
+                    }`}>
+                      <p className={`text-sm font-medium mb-2 ${
+                        durationGating.riskLevel === 'high_risk' ? 'text-red-800' : 'text-amber-800'
+                      }`}>
+                        {durationGating.warningTitle}
+                      </p>
+                      <p className={`text-xs whitespace-pre-line mb-3 ${
+                        durationGating.riskLevel === 'high_risk' ? 'text-red-700' : 'text-amber-700'
+                      }`}>
+                        {durationGating.warningMessage}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => updateState('duration', durationGating.recommended)}
+                        className={`text-sm underline hover:no-underline ${
+                          durationGating.riskLevel === 'high_risk' ? 'text-red-800' : 'text-amber-800'
+                        }`}
+                      >
+                        Use {durationGating.recommended} weeks instead
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -807,18 +932,58 @@ export default function PlanWizard() {
         );
 
       case 5:
+        // If they have a race date, start date is already set - just confirm
+        // If no race date, let them pick start date
+        const planEndDate = state.startDate 
+          ? new Date(new Date(state.startDate + 'T00:00:00').getTime() + (state.duration * 7 - 1) * 24 * 60 * 60 * 1000)
+          : null;
+        
         return (
-          <StepContainer title="When do you want to start?">
+          <StepContainer title={state.hasRaceDate ? "Confirm your schedule" : "When do you want to start?"}>
             <div className="space-y-4">
-              <input
-                type="date"
-                value={state.startDate}
-                onChange={(e) => updateState('startDate', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <p className="text-sm text-gray-500">
-                Plan ends: {state.startDate && new Date(new Date(state.startDate).getTime() + (state.duration * 7 - 1) * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </p>
+              {state.hasRaceDate ? (
+                // Race date mode - show summary
+                <div className="space-y-4">
+                  <div className="p-4 bg-gray-50 rounded-lg border">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Race day:</span>
+                        <span className="font-medium">{new Date(state.raceDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Plan starts:</span>
+                        <span className="font-medium">{new Date(state.startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Duration:</span>
+                        <span className="font-medium">{state.duration} weeks</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setState(prev => ({ ...prev, hasRaceDate: null, raceDate: '' }))}
+                    className="text-sm text-gray-500 hover:text-black underline"
+                  >
+                    Change race date
+                  </button>
+                </div>
+              ) : (
+                // No race date - pick start date
+                <>
+                  <input
+                    type="date"
+                    value={state.startDate}
+                    onChange={(e) => updateState('startDate', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  {planEndDate && (
+                    <p className="text-sm text-gray-500">
+                      Plan ends: {planEndDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </StepContainer>
         );
