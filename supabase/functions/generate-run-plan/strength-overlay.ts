@@ -266,7 +266,7 @@ function createInjuryPreventionLowerBody(phase: Phase, params: InjuryPreventionP
 // Key changes from hybrid programming:
 // - No conventional deadlifts (use RDL instead - less CNS fatigue)
 // - No heavy overhead pressing (not running-specific)
-// - Hip thrusts 2x/week (CRITICAL for horizontal force production)
+// - Hip thrusts 2x/week (good for glute strength and horizontal power)
 // - Frequent single-leg work for running stability
 // ============================================================================
 
@@ -350,7 +350,7 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
       { name: 'Plank', sets: 2, reps: '60s', weight: 'Bodyweight' }
     ];
     duration = 45;
-    description = `Week ${weekInPhase} Base - Hip thrusts are CRITICAL for running power (horizontal force production). RDL builds hamstring/glute strength with minimal CNS fatigue. Target: 4 sets @ ${load}% 1RM, RIR 2-3.`;
+    description = `Week ${weekInPhase} Base - Hip thrusts build glute strength for running power. RDL develops hamstring/glute with minimal fatigue. Target: 4 sets @ ${load}% 1RM, RIR 2-3.`;
   } else if (phase.name === 'Speed') {
     // Speed phase (Weeks 5-7): Explosive emphasis
     exercises = [
@@ -417,7 +417,7 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
       { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight' }
     ];
     duration = 45;
-    description = `Week ${weekInPhase} Base - Back squat builds quad strength. Hip thrusts maintain glute power (lighter than Monday). Single-leg work critical for running stability. Target: 4 sets @ ${load}% 1RM, RIR 2-3.`;
+    description = `Week ${weekInPhase} Base - Back squat builds quad strength. Hip thrusts for glute power. Single-leg work for running stability. Target: 4 sets @ ${load}% 1RM, RIR 2-3.`;
   } else if (phase.name === 'Speed') {
     // Speed phase (Weeks 5-7): Add horizontal power
     exercises = [
