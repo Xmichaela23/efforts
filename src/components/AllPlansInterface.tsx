@@ -1997,10 +1997,24 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                     : 'Build';
                   const count = (currentWeekData?.workouts || []).filter((w:any)=>w.type!=='rest').length;
                   const isCur = selectedWeek === (selectedPlanDetail.currentWeek || 0);
+                  
+                  // Get total miles from weekly summary or calculate from workouts
+                  const weeklySummariesObj: any = (selectedPlanDetail as any)?.config?.weekly_summaries || 
+                    (selectedPlanDetail as any)?.weekly_summaries || {};
+                  const wsKey = String(selectedWeek);
+                  const ws: any = weeklySummariesObj?.[wsKey] || {};
+                  const totalMiles = typeof ws?.total_miles === 'number' ? ws.total_miles : null;
+                  
                   return (
                     <span>
                       <span className="font-medium">{stage}</span>
                       <span className="text-gray-400"> • </span>
+                      {totalMiles !== null && (
+                        <>
+                          <span className="font-medium">{totalMiles} mi</span>
+                          <span className="text-gray-400"> • </span>
+                        </>
+                      )}
                       <span className="font-medium">{formatDuration(getWeeklyVolume(currentWeekData))}</span>
                       <span className="text-gray-400"> • </span>
                       <span>{count} workouts</span>

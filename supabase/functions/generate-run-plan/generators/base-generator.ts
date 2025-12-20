@@ -684,6 +684,9 @@ export abstract class BaseGenerator {
     const totalDuration = sessions.reduce((sum, s) => sum + s.duration, 0);
     const hours = Math.round(totalDuration / 60 * 10) / 10;
 
+    // Calculate total miles from run session tokens
+    const totalMiles = this.calculateTotalMilesFromSessions(sessions);
+
     const keyWorkouts = sessions
       .filter(s => s.tags.includes('long_run') || s.tags.some(t => ['intervals', 'tempo'].includes(t)))
       .map(s => s.name);
@@ -693,7 +696,46 @@ export abstract class BaseGenerator {
       key_workouts: keyWorkouts,
       estimated_hours: hours,
       hard_sessions: hardSessions.length,
+      total_miles: totalMiles,
       notes: isRecovery ? 'Reduced volume for recovery and adaptation' : ''
     };
+  }
+
+  /**
+   * Calculate total running miles from session tokens
+   * Parses tokens like run_easy_5mi, longrun_10mi_easypace, etc.
+   */
+  protected calculateTotalMilesFromSessions(sessions: Session[]): number {
+    let totalMiles = 0;
+    
+    for (const session of sessions) {
+      if (session.type !== 'run') continue;
+      
+      const tokens = session.steps_preset || [];
+      for (const token of tokens) {
+        // Match patterns like: run_easy_5mi, longrun_10mi_easypace, run_mp_4mi, tempo_3mi_threshold
+        // Also: longrun_12mi_easypace_last2mi_MP, cruise_3x1mi_threshold_r60s
+        const miMatch = token.match(/(\d+(?:\.\d+)?)\s*mi/);
+        if (miMatch) {
+          totalMiles += parseFloat(miMatch[1]);
+        }
+        
+        // For cruise intervals like cruise_3x1.5mi, calculate total
+        const cruiseMatch = token.match(/cruise_(\d+)x([\d.]+)mi/);
+        if (cruiseMatch) {
+          totalMiles += parseInt(cruiseMatch[1]) * parseFloat(cruiseMatch[2]);
+        }
+        
+        // For interval tokens, estimate based on distance (800m = 0.5mi, 1000m = 0.62mi)
+        const intervalMatch = token.match(/interval_(\d+)x(\d+)m/);
+        if (intervalMatch) {
+          const reps = parseInt(intervalMatch[1]);
+          const meters = parseInt(intervalMatch[2]);
+          totalMiles += reps * (meters / 1609.34);
+        }
+      }
+    }
+    
+    return Math.round(totalMiles * 10) / 10; // Round to 1 decimal
   }
 }

@@ -99,6 +99,7 @@ export interface WeeklySummary {
   key_workouts: string[];
   estimated_hours: number;
   hard_sessions: number;
+  total_miles?: number;
   notes: string;
 }
 
