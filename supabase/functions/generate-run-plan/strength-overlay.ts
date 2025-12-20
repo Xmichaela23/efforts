@@ -350,7 +350,9 @@ function createStrengthPowerFullBody(phase: Phase, params: StrengthPowerParams, 
   ];
 
   const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
-  const phaseNote = phase.name === 'Base' 
+  const phaseNote = isRecovery
+    ? 'Reduced volume for adaptation. No plyometrics - save legs for next build phase.'
+    : phase.name === 'Base' 
     ? 'Heavy compounds build foundation. Hip thrusts are CRITICAL for running power.'
     : phase.name === 'Speed' 
     ? 'Explosive emphasis with jump squats. Focus on bar speed.'
@@ -360,7 +362,7 @@ function createStrengthPowerFullBody(phase: Phase, params: StrengthPowerParams, 
     day: 'Monday',
     type: 'strength',
     name: 'Full Body Strength & Power',
-    description: `${weekDesc} - ${phaseNote} Target: ${params.sets} sets @ ${params.compoundPercent}% 1RM, RIR 2-3.`,
+    description: `${weekDesc} - ${phaseNote} Target: ${params.sets} sets @ ${params.compoundPercent}% 1RM, RIR ${isRecovery ? '4-5' : '2-3'}.`,
     duration: params.duration,
     strength_exercises: exercises,
     tags: ['strength', 'full_body', 'strength_power', `phase:${phase.name.toLowerCase()}`, equipment]
@@ -451,7 +453,9 @@ function createStrengthPowerLowerBody(phase: Phase, params: StrengthPowerParams,
   ];
 
   const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
-  const phaseNote = phase.name === 'Base'
+  const phaseNote = isRecovery
+    ? 'Reduced volume, no plyometrics. Maintain hip thrust activation with lighter loads.'
+    : phase.name === 'Base'
     ? 'HEAVY hip thrusts for running power. Deadlifts build posterior chain.'
     : phase.name === 'Speed'
     ? 'Bounding develops horizontal power for stride length. Maintain hip thrust volume.'
