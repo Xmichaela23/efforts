@@ -446,12 +446,12 @@ export default function PlanWizard() {
       updateState('approach', methodologyResult.approach);
     }
     
-    if (step < 7) {
-      // Skip step 6 (old approach selection) - it's now auto-selected
-      const nextStep = step === 5 ? 6 : step + 1;
-      setStep(nextStep);
-    } else {
+    // Check if we're on the last step (runningDays) - if so, generate
+    const logicalStep = getLogicalStep(step);
+    if (logicalStep === 'runningDays') {
       handleGenerate();
+    } else {
+      setStep(step + 1);
     }
   };
 
