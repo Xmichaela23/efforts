@@ -1038,9 +1038,9 @@ export default function PlanWizard() {
                       {dayBreakdown.map((line, i) => (
                         <p key={i}>{line}</p>
                       ))}
-                      <p className="text-gray-400 mt-2">
-                        {restDays > 0 ? `Sat off (rest before long run)` : 'No rest days'}
-                        {strengthDays > 0 && ` • ${doubleDays} double days`}
+                      <p className="text-gray-500 mt-2 pt-2 border-t border-gray-200">
+                        {restDays > 0 ? `Sat: Rest before long run` : 'No rest days'}
+                        {strengthDays > 0 && ` • ${doubleDays} double days/week`}
                       </p>
                     </div>
                   );
