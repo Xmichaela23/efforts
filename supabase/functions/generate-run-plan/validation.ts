@@ -46,8 +46,8 @@ export function validateRequest(request: GeneratePlanRequest): ValidationResult 
 
   if (!request.approach) {
     errors.push('approach is required');
-  } else if (!Object.keys(APPROACH_CONSTRAINTS).includes(request.approach)) {
-    errors.push(`Invalid approach: ${request.approach}`);
+  } else if (!['simple_completion', 'balanced_build'].includes(request.approach)) {
+    errors.push(`Invalid approach: ${request.approach}. Must be simple_completion or balanced_build`);
   }
 
   if (!request.days_per_week) {

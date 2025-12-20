@@ -222,6 +222,10 @@ Deno.serve(async (req) => {
         });
         console.log('[auto-attach-planned] compute-workout-summary status:', computeResponse.status);
         
+        // Wait for compute-workout-summary to commit computed.intervals before analysis
+        console.log('[auto-attach-planned] explicit: Summary computed, waiting 1s for DB commit...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         // Ensure computed.analysis is populated (needed for max pace, etc.)
         console.log('[auto-attach-planned] Calling compute-workout-analysis');
         const analysisUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
@@ -332,6 +336,11 @@ Deno.serve(async (req) => {
         .eq('id', w.id)
         .eq('user_id', w.user_id);
 
+      // Wait for database transaction to commit before calling analysis functions
+      // This ensures planned_id is visible to subsequent function calls
+      console.log('[auto-attach-planned] strength/mobility: Workout linked, waiting 1s for DB commit...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // Ensure planned is materialized
       try {
         const baseUrl = Deno.env.get('SUPABASE_URL');
@@ -349,6 +358,10 @@ Deno.serve(async (req) => {
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
         await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
       } catch {}
+
+      // Wait for compute-workout-summary to commit computed.intervals before analysis
+      console.log('[auto-attach-planned] strength/mobility: Summary computed, waiting 1s for DB commit...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Trigger discipline-specific analysis (same as explicit attach path)
       try {
@@ -489,6 +502,12 @@ Deno.serve(async (req) => {
         .eq('user_id', w.user_id);
     }
 
+    // Wait for database transaction to commit before calling analysis functions
+    // This ensures planned_id is visible to subsequent function calls
+    // (matches the delay in the explicit attach path)
+    console.log('[auto-attach-planned] heuristic: Workout linked, waiting 1s for DB commit...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // Ensure planned is materialized now that it's linked (guarantees steps for Summary)
     try {
       const baseUrl = Deno.env.get('SUPABASE_URL');
@@ -505,6 +524,23 @@ Deno.serve(async (req) => {
       const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
       const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
       await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+    } catch {}
+
+    // Wait for compute-workout-summary to commit computed.intervals before analysis
+    console.log('[auto-attach-planned] heuristic: Summary computed, waiting 1s for DB commit...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Call compute-workout-analysis to normalize sensor data (matches explicit attach path)
+    try {
+      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+      console.log('[auto-attach-planned] heuristic: Calling compute-workout-analysis');
+      const analysisUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
+      const analysisResponse = await fetch(analysisUrl, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
+        body: JSON.stringify({ workout_id: w.id }) 
+      });
+      console.log('[auto-attach-planned] heuristic: compute-workout-analysis status:', analysisResponse.status);
     } catch {}
 
     // Trigger discipline-specific analysis (same as explicit attach path)

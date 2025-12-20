@@ -1,12 +1,9 @@
 // Edge Function: generate-run-plan
 // 
 // Purpose: Generate personalized run training plans based on user parameters
-// Supports 5 training approaches inspired by:
-// - Jack Daniels (Balanced Build)
-// - FIRST/Furman (Time Efficient)
-// - Pete Pfitzinger (Volume Progression)
-// - Hansons (Cumulative Load)
-// - Custom (Hybrid Athlete)
+// Supports 2 training approaches:
+// - Simple Completion (Hal Higdon inspired) - for completion goals
+// - Balanced Build (Jack Daniels inspired) - for time/speed goals
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { 
@@ -17,11 +14,8 @@ import {
   TrainingPlan
 } from './types.ts';
 import { validateRequest, validatePlanSchema, validateTokens, detectScheduleConflicts } from './validation.ts';
+import { SimpleCompletionGenerator } from './generators/simple-completion.ts';
 import { BalancedBuildGenerator } from './generators/balanced-build.ts';
-import { TimeEfficientGenerator } from './generators/time-efficient.ts';
-import { VolumeProgressionGenerator } from './generators/volume-progression.ts';
-import { CumulativeLoadGenerator } from './generators/cumulative-load.ts';
-import { HybridAthleteGenerator } from './generators/hybrid-athlete.ts';
 import { overlayStrength } from './strength-overlay.ts';
 
 // ============================================================================
@@ -78,32 +72,14 @@ Deno.serve(async (req: Request) => {
     let phaseStructure;
 
     switch (request.approach) {
+      case 'simple_completion': {
+        const generator = new SimpleCompletionGenerator(generatorParams);
+        plan = generator.generatePlan();
+        phaseStructure = generator['determinePhaseStructure']();
+        break;
+      }
       case 'balanced_build': {
         const generator = new BalancedBuildGenerator(generatorParams);
-        plan = generator.generatePlan();
-        phaseStructure = generator['determinePhaseStructure']();
-        break;
-      }
-      case 'time_efficient': {
-        const generator = new TimeEfficientGenerator(generatorParams);
-        plan = generator.generatePlan();
-        phaseStructure = generator['determinePhaseStructure']();
-        break;
-      }
-      case 'volume_progression': {
-        const generator = new VolumeProgressionGenerator(generatorParams);
-        plan = generator.generatePlan();
-        phaseStructure = generator['determinePhaseStructure']();
-        break;
-      }
-      case 'cumulative_load': {
-        const generator = new CumulativeLoadGenerator(generatorParams);
-        plan = generator.generatePlan();
-        phaseStructure = generator['determinePhaseStructure']();
-        break;
-      }
-      case 'hybrid_athlete': {
-        const generator = new HybridAthleteGenerator(generatorParams);
         plan = generator.generatePlan();
         phaseStructure = generator['determinePhaseStructure']();
         break;
@@ -115,8 +91,8 @@ Deno.serve(async (req: Request) => {
         );
     }
 
-    // Apply strength overlay if requested (and not hybrid_athlete which already has strength)
-    if (request.strength_frequency && request.strength_frequency > 0 && request.approach !== 'hybrid_athlete') {
+    // Apply strength overlay if requested
+    if (request.strength_frequency && request.strength_frequency > 0) {
       plan = overlayStrength(plan, request.strength_frequency as 1 | 2 | 3, phaseStructure);
     }
 

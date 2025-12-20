@@ -755,14 +755,15 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       : plannedPowerLower;
     
     // Extract actual values from executed object
+    // Note: compute-workout-summary outputs avg_power_w (with _w suffix) and avg_hr (not avg_heart_rate)
     const actualDuration = interval.executed?.duration_s || interval.duration_s || 0;
-    const actualPower = interval.executed?.avg_power || interval.granular_metrics?.avg_power || 0;
+    const actualPower = interval.executed?.avg_power_w || interval.executed?.avg_power || interval.granular_metrics?.avg_power || 0;
     const normalizedPower = interval.granular_metrics?.normalized_power || actualPower;
     const actualDistance = interval.executed?.distance_m || 0;
     
     // Heart rate from interval
-    const avgHR = interval.executed?.avg_heart_rate || interval.granular_metrics?.avg_heart_rate || null;
-    const maxHR = interval.executed?.max_heart_rate || null;
+    const avgHR = interval.executed?.avg_hr || interval.executed?.avg_heart_rate || interval.granular_metrics?.avg_heart_rate || null;
+    const maxHR = interval.executed?.max_hr || interval.executed?.max_heart_rate || null;
     
     // Calculate duration adherence: how close actual is to planned
     let durationAdherence = 0;

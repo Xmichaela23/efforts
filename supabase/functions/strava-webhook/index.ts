@@ -280,6 +280,13 @@ async function fetchStravaActivityWithStatus(activityId: number, accessToken: st
       return { data: null, status: response.status };
     }
     const json = await response.json();
+    // Debug: Log the date fields from Strava
+    console.log(`📅 Strava activity ${activityId} date fields:`, {
+      start_date: json.start_date,
+      start_date_local: json.start_date_local,
+      timezone: json.timezone,
+      name: json.name
+    });
     return { data: json, status: 200 };
   } catch (error) {
     console.error(`❌ Error fetching Strava activity ${activityId}:`, error);

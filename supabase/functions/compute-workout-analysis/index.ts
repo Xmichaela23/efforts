@@ -913,30 +913,34 @@ Deno.serve(async (req) => {
     } catch {}
 
     // Correct workouts.date to provider-local date (prefer explicit local seconds if present)
-    try {
-      const tsIso: string | null = (w as any)?.timestamp || null;
-      let expectedLocal: string | null = null;
-      if (ga) {
-        // Fallback: parse from raw_data if columns are not present
-        try {
-          const raw = parseJson(ga.raw_data) || {};
-          const gSummary = raw?.summary || raw;
-          const gIn = Number(gSummary?.startTimeInSeconds ?? raw?.startTimeInSeconds);
-          const gOff = Number(gSummary?.startTimeOffsetInSeconds ?? raw?.startTimeOffsetInSeconds ?? ga.start_time_offset_seconds);
-          if (Number.isFinite(gIn) && Number.isFinite(gOff)) {
-            expectedLocal = new Date((gIn + gOff) * 1000).toISOString().split('T')[0];
-          } else if (ga.start_time && Number.isFinite(ga.start_time_offset_seconds)) {
-            expectedLocal = new Date(Date.parse(ga.start_time) + Number(ga.start_time_offset_seconds) * 1000).toISOString().split('T')[0];
-          }
-        } catch {}
-      } else if (tsIso) {
-        // As a last resort, treat timestamp as local already
-        try { expectedLocal = new Date(tsIso).toISOString().split('T')[0]; } catch {}
-      }
-      if (expectedLocal && expectedLocal !== (w as any)?.date) {
-        await supabase.from('workouts').update({ date: expectedLocal }).eq('id', (w as any).id);
-      }
-    } catch {}
+    // Skip for Strava - the date is already set correctly from start_date_local in ingest-activity
+    const isStrava = (w as any)?.source === 'strava' || (w as any)?.strava_activity_id;
+    if (!isStrava) {
+      try {
+        const tsIso: string | null = (w as any)?.timestamp || null;
+        let expectedLocal: string | null = null;
+        if (ga) {
+          // Fallback: parse from raw_data if columns are not present
+          try {
+            const raw = parseJson(ga.raw_data) || {};
+            const gSummary = raw?.summary || raw;
+            const gIn = Number(gSummary?.startTimeInSeconds ?? raw?.startTimeInSeconds);
+            const gOff = Number(gSummary?.startTimeOffsetInSeconds ?? raw?.startTimeOffsetInSeconds ?? ga.start_time_offset_seconds);
+            if (Number.isFinite(gIn) && Number.isFinite(gOff)) {
+              expectedLocal = new Date((gIn + gOff) * 1000).toISOString().split('T')[0];
+            } else if (ga.start_time && Number.isFinite(ga.start_time_offset_seconds)) {
+              expectedLocal = new Date(Date.parse(ga.start_time) + Number(ga.start_time_offset_seconds) * 1000).toISOString().split('T')[0];
+            }
+          } catch {}
+        } else if (tsIso) {
+          // As a last resort, treat timestamp as local already
+          try { expectedLocal = new Date(tsIso).toISOString().split('T')[0]; } catch {}
+        }
+        if (expectedLocal && expectedLocal !== (w as any)?.date) {
+          await supabase.from('workouts').update({ date: expectedLocal }).eq('id', (w as any).id);
+        }
+      } catch {}
+    }
 
     // If workouts JSON is empty, fall back to Garmin heavy JSON
     if (((sensor?.length ?? 0) < 2) && ((gps?.length ?? 0) < 2) && ga) {

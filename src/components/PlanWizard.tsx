@@ -15,7 +15,7 @@ type Discipline = 'run' | 'ride' | 'swim' | 'triathlon' | 'hybrid';
 type Distance = '5k' | '10k' | 'half' | 'marathon';
 type Fitness = 'novice' | 'beginner' | 'intermediate' | 'advanced';
 type Goal = 'complete' | 'speed';
-type Approach = 'balanced_build' | 'time_efficient' | 'volume_progression' | 'cumulative_load' | 'hybrid_athlete';
+type Approach = 'simple_completion' | 'balanced_build';
 type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
 
 interface WizardState {
@@ -31,109 +31,74 @@ interface WizardState {
 }
 
 // ============================================================================
-// CONSTANTS
+// METHODOLOGY DEFINITIONS
 // ============================================================================
 
-const APPROACH_CONSTRAINTS: Record<Approach, { supported_days: DaysPerWeek[]; description: string }> = {
+const METHODOLOGIES: Record<Approach, {
+  name: string;
+  shortDescription: string;
+  longDescription: string;
+  basedOn: string;
+  supported_days: DaysPerWeek[];
+}> = {
+  'simple_completion': {
+    name: 'Simple Completion',
+    shortDescription: 'Easy-to-follow plan focused on finishing healthy',
+    longDescription: 'Effort-based pacing (easy, moderate, hard) with minimal speedwork. Conservative progression designed to get you to the finish line.',
+    basedOn: 'Based on Hal Higdon\'s progressive training principles',
+    supported_days: ['3-4', '4-5', '5-6']
+  },
   'balanced_build': {
-    supported_days: ['4-5', '5-6', '6-7'],
-    description: 'Phase-based progression with structured quality sessions'
-  },
-  'time_efficient': {
-    supported_days: ['3-4'],
-    description: '3 focused runs per week, cross-training on other days'
-  },
-  'volume_progression': {
-    supported_days: ['5-6', '6-7'],
-    description: 'High mileage approach with medium-long runs midweek'
-  },
-  'cumulative_load': {
-    supported_days: ['5-6', '6-7'],
-    description: 'Train on tired legs, long runs capped at 16 miles'
-  },
-  'hybrid_athlete': {
-    supported_days: ['4-5', '5-6'],
-    description: 'Integrated strength training with interference management'
+    name: 'Balanced Build',
+    shortDescription: 'Structured quality with VDOT-based pacing',
+    longDescription: 'Two quality workouts per week with structured intervals and tempo runs. All paces calculated from your 5K time.',
+    basedOn: 'Based on Jack Daniels\' Running Formula principles',
+    supported_days: ['4-5', '5-6', '6-7']
   }
 };
 
 // ============================================================================
-// FITNESS LEVEL DEFINITIONS
+// GATING LOGIC - GOAL BASED
 // ============================================================================
 
-const FITNESS_LEVELS = {
-  novice: {
-    label: 'Novice',
-    mpwRange: '0-12 mpw',
-    description: 'New to running or returning from break',
-    availableMethodologies: [] as Approach[],
-    marathonMethodologies: [] as Approach[],
-  },
-  beginner: {
-    label: 'Beginner',
-    mpwRange: '12-25 mpw',
-    description: 'Running 3-4 days/week, comfortable with 6-8 mile runs',
-    availableMethodologies: ['balanced_build', 'time_efficient', 'hybrid_athlete'] as Approach[],
-    // Marathon: Time Efficient locked (only 3 days/32 mpw is risky for first marathon)
-    marathonMethodologies: ['balanced_build', 'hybrid_athlete'] as Approach[],
-  },
-  intermediate: {
-    label: 'Intermediate',
-    mpwRange: '25-40 mpw',
-    description: 'Running 5-6 days/week, regular 10-12 mile long runs',
-    availableMethodologies: ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'] as Approach[],
-    marathonMethodologies: ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'] as Approach[],
-  },
-  advanced: {
-    label: 'Advanced',
-    mpwRange: '40+ mpw',
-    description: 'Experienced runner, 6-7 days/week, 14+ mile long runs',
-    availableMethodologies: ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'] as Approach[],
-    marathonMethodologies: ['balanced_build', 'time_efficient', 'volume_progression', 'cumulative_load', 'hybrid_athlete'] as Approach[],
+/**
+ * Get the available methodology based on goal and fitness
+ * - complete goal → Simple Completion only
+ * - speed goal + beginner → Balanced Build locked
+ * - speed goal + intermediate/advanced → Balanced Build only
+ */
+function getMethodologyForGoal(goal: Goal | null, fitness: Fitness | null): {
+  approach: Approach | null;
+  locked: boolean;
+  lockedReason: string;
+} {
+  if (!goal || !fitness || fitness === 'novice') {
+    return { approach: null, locked: true, lockedReason: '' };
   }
-};
 
-// ============================================================================
-// GATING LOGIC
-// ============================================================================
+  if (goal === 'complete') {
+    // Complete goal → Simple Completion for all fitness levels
+    return { approach: 'simple_completion', locked: false, lockedReason: '' };
+  }
 
-function getAvailableApproaches(fitness: Fitness | null, distance: Distance | null): Approach[] {
-  if (!fitness || fitness === 'novice') return [];
-  
-  const level = FITNESS_LEVELS[fitness];
-  
-  // Use marathon-specific gating for marathon distance
-  if (distance === 'marathon') {
-    return level.marathonMethodologies;
+  if (goal === 'speed') {
+    // Speed goal → Balanced Build, but locked for beginners
+    if (fitness === 'beginner') {
+      return {
+        approach: 'balanced_build',
+        locked: true,
+        lockedReason: 'Balanced Build requires Intermediate+ fitness (25+ mpw) and experience with structured speedwork. Consider selecting "Complete" goal to access Simple Completion, or build your base to 25+ mpw.'
+      };
+    }
+    return { approach: 'balanced_build', locked: false, lockedReason: '' };
   }
-  
-  return level.availableMethodologies;
-}
 
-function isApproachLocked(approach: Approach, fitness: Fitness | null, distance: Distance | null): boolean {
-  if (!fitness) return true;
-  const available = getAvailableApproaches(fitness, distance);
-  return !available.includes(approach);
-}
-
-function getLockedReason(approach: Approach, fitness: Fitness | null, distance: Distance | null): string {
-  // Time Efficient locked for beginner marathon
-  if (approach === 'time_efficient' && fitness === 'beginner' && distance === 'marathon') {
-    return 'Only 3 runs/week (32 mpw peak) is risky for first marathon. Unlocks at Intermediate+ fitness.';
-  }
-  
-  if (approach === 'volume_progression') {
-    return 'Requires Intermediate+ fitness (25+ mpw). Starts at 35 mpw with 6-7 days/week.';
-  }
-  if (approach === 'cumulative_load') {
-    return 'Requires Intermediate+ fitness (25+ mpw). Includes back-to-back long runs.';
-  }
-  return '';
+  return { approach: null, locked: true, lockedReason: '' };
 }
 
 function getAvailableDays(approach: Approach | null): DaysPerWeek[] {
   if (!approach) return ['3-4', '4-5', '5-6', '6-7'];
-  return APPROACH_CONSTRAINTS[approach].supported_days;
+  return METHODOLOGIES[approach].supported_days;
 }
 
 // ============================================================================
@@ -192,17 +157,19 @@ export default function PlanWizard() {
     }
   };
 
+  // Get methodology based on goal and fitness
+  const methodologyResult = getMethodologyForGoal(state.goal, state.fitness);
+
   const canProceed = (): boolean => {
     switch (step) {
       case 0: return state.discipline !== null;
       case 1: return state.distance !== null;
       case 2: return state.fitness !== null && state.fitness !== 'novice'; // Novice cannot proceed
-      case 3: return state.goal !== null;
+      case 3: return state.goal !== null && !methodologyResult.locked; // Can't proceed if methodology locked
       case 4: return state.duration >= 4;
       case 5: return state.startDate !== '';
-      case 6: return state.approach !== null;
-      case 7: return state.daysPerWeek !== null;
-      case 8: return true; // Strength is optional
+      case 6: return state.daysPerWeek !== null; // Skip approach step - auto-selected
+      case 7: return true; // Strength is optional
       default: return false;
     }
   };
@@ -214,8 +181,16 @@ export default function PlanWizard() {
       // Non-run disciplines do nothing for now
       return;
     }
-    if (step < 8) {
-      setStep(step + 1);
+    
+    // When moving past goal step, auto-select the methodology
+    if (step === 3 && !methodologyResult.locked && methodologyResult.approach) {
+      updateState('approach', methodologyResult.approach);
+    }
+    
+    if (step < 7) {
+      // Skip step 6 (old approach selection) - it's now auto-selected
+      const nextStep = step === 5 ? 6 : step + 1;
+      setStep(nextStep);
     } else {
       handleGenerate();
     }
@@ -475,11 +450,59 @@ export default function PlanWizard() {
             <RadioGroup
               value={state.goal || ''}
               onValueChange={(v) => updateState('goal', v as Goal)}
-              className="space-y-3"
+              className="space-y-4"
             >
-              <RadioOption value="complete" label="Complete" description="Finish the distance comfortably" />
-              <RadioOption value="speed" label="Speed" description="Train for your fastest race" />
+              {/* Complete Goal → Simple Completion */}
+              <div className="p-3 border rounded-lg hover:bg-gray-50">
+                <div className="flex items-start space-x-3">
+                  <RadioGroupItem value="complete" id="complete" className="mt-1" />
+                  <Label htmlFor="complete" className="flex-1 cursor-pointer">
+                    <span className="block font-medium">Complete</span>
+                    <span className="block text-sm text-gray-500 mt-0.5">Finish the distance comfortably</span>
+                    <span className="block text-xs text-blue-600 mt-2">
+                      → Uses Simple Completion plan (effort-based, flexible)
+                    </span>
+                  </Label>
+                </div>
+              </div>
+              
+              {/* Speed Goal → Balanced Build (may be locked) */}
+              <div className={`p-3 border rounded-lg ${state.fitness === 'beginner' ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}`}>
+                <div className="flex items-start space-x-3">
+                  <RadioGroupItem 
+                    value="speed" 
+                    id="speed" 
+                    className="mt-1" 
+                    disabled={state.fitness === 'beginner'}
+                  />
+                  <Label htmlFor="speed" className={`flex-1 ${state.fitness === 'beginner' ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <span className="block font-medium">
+                      {state.fitness === 'beginner' ? '🔒 Speed' : 'Speed'}
+                    </span>
+                    <span className="block text-sm text-gray-500 mt-0.5">Train for your fastest race</span>
+                    {state.fitness === 'beginner' ? (
+                      <span className="block text-xs text-amber-600 mt-2">
+                        Requires Intermediate+ fitness (25+ mpw). Build your base first!
+                      </span>
+                    ) : (
+                      <span className="block text-xs text-blue-600 mt-2">
+                        → Uses Balanced Build plan (VDOT pacing, structured intervals)
+                      </span>
+                    )}
+                  </Label>
+                </div>
+              </div>
             </RadioGroup>
+            
+            {/* Disclaimer */}
+            {state.goal && (
+              <p className="text-xs text-gray-400 mt-4">
+                {state.goal === 'complete' 
+                  ? 'Plan based on Hal Higdon\'s progressive training principles.'
+                  : 'Plan based on Jack Daniels\' Running Formula principles.'}
+                {' '}Not officially endorsed.
+              </p>
+            )}
           </StepContainer>
         );
 
@@ -541,76 +564,6 @@ export default function PlanWizard() {
         );
 
       case 6:
-        const availableApproaches = getAvailableApproaches(state.fitness, state.distance);
-        const isMarathonBeginner = state.fitness === 'beginner' && state.distance === 'marathon';
-        
-        return (
-          <StepContainer title="Training approach">
-            <RadioGroup
-              value={state.approach || ''}
-              onValueChange={(v) => updateState('approach', v as Approach)}
-              className="space-y-3"
-            >
-              {/* Balanced Build - always available for non-novice */}
-              <RadioOption 
-                value="balanced_build" 
-                label={isMarathonBeginner ? "Balanced Build (Recommended)" : "Balanced Build"}
-                description={APPROACH_CONSTRAINTS.balanced_build.description}
-                disabled={!availableApproaches.includes('balanced_build')}
-              />
-              
-              {/* Time Efficient - locked for marathon beginners */}
-              <LockedRadioOption 
-                value="time_efficient" 
-                label="Time Efficient" 
-                description={APPROACH_CONSTRAINTS.time_efficient.description}
-                locked={isApproachLocked('time_efficient', state.fitness, state.distance)}
-                lockedReason={getLockedReason('time_efficient', state.fitness, state.distance)}
-                onValueChange={(v) => updateState('approach', v as Approach)}
-                currentValue={state.approach || ''}
-              />
-              
-              {/* Volume Progression - locked for beginners */}
-              <LockedRadioOption 
-                value="volume_progression" 
-                label="Volume Progression" 
-                description={APPROACH_CONSTRAINTS.volume_progression.description}
-                locked={isApproachLocked('volume_progression', state.fitness, state.distance)}
-                lockedReason={getLockedReason('volume_progression', state.fitness, state.distance)}
-                onValueChange={(v) => updateState('approach', v as Approach)}
-                currentValue={state.approach || ''}
-              />
-              
-              {/* Cumulative Load - locked for beginners */}
-              <LockedRadioOption 
-                value="cumulative_load" 
-                label="Cumulative Load" 
-                description={APPROACH_CONSTRAINTS.cumulative_load.description}
-                locked={isApproachLocked('cumulative_load', state.fitness, state.distance)}
-                lockedReason={getLockedReason('cumulative_load', state.fitness, state.distance)}
-                onValueChange={(v) => updateState('approach', v as Approach)}
-                currentValue={state.approach || ''}
-              />
-              
-              {/* Hybrid Athlete - available with note for marathon */}
-              <div>
-                <RadioOption 
-                  value="hybrid_athlete" 
-                  label="Hybrid Athlete" 
-                  description={APPROACH_CONSTRAINTS.hybrid_athlete.description}
-                  disabled={!availableApproaches.includes('hybrid_athlete')}
-                />
-                {isMarathonBeginner && state.approach !== 'hybrid_athlete' && (
-                  <p className="text-xs text-amber-600 mt-1 ml-7">
-                    Note: Running volume reduced to 40 mpw to accommodate strength training.
-                  </p>
-                )}
-              </div>
-            </RadioGroup>
-          </StepContainer>
-        );
-
-      case 7:
         const availableDays = getAvailableDays(state.approach);
         return (
           <StepContainer title="Days per week">
@@ -624,10 +577,18 @@ export default function PlanWizard() {
               <RadioOption value="5-6" label="5-6 days" disabled={!availableDays.includes('5-6')} />
               <RadioOption value="6-7" label="6-7 days" disabled={!availableDays.includes('6-7')} />
             </RadioGroup>
+            
+            {/* Show selected methodology info */}
+            {state.approach && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm font-medium">{METHODOLOGIES[state.approach].name}</p>
+                <p className="text-xs text-gray-500 mt-1">{METHODOLOGIES[state.approach].shortDescription}</p>
+              </div>
+            )}
           </StepContainer>
         );
 
-      case 8:
+      case 7:
         return (
           <StepContainer title="Add strength training?">
             <RadioGroup
@@ -648,7 +609,7 @@ export default function PlanWizard() {
     }
   };
 
-  const getStepCount = () => 9; // 0-8
+  const getStepCount = () => 8; // 0-7 (removed separate approach step)
 
   // Show generating overlay
   if (isGenerating) {
@@ -825,7 +786,7 @@ export default function PlanWizard() {
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Generating...
               </>
-            ) : step === 8 ? (
+            ) : step === 7 ? (
               'Generate Plan'
             ) : (
               <>

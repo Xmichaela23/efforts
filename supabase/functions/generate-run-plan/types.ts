@@ -11,7 +11,7 @@ export interface GeneratePlanRequest {
   goal: 'complete' | 'speed';
   duration_weeks: number;
   start_date?: string; // ISO date string (YYYY-MM-DD)
-  approach: 'balanced_build' | 'time_efficient' | 'volume_progression' | 'cumulative_load' | 'hybrid_athlete';
+  approach: 'simple_completion' | 'balanced_build';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
   strength_frequency?: 0 | 1 | 2 | 3;
   race_date?: string;
@@ -120,9 +120,59 @@ export interface Phase {
 }
 
 // ============================================================================
-// APPROACH CONSTRAINTS
+// METHODOLOGY DEFINITIONS
 // ============================================================================
 
+export interface MethodologyDefinition {
+  id: string;
+  name: string;
+  shortDescription: string;
+  longDescription: string;
+  basedOn: string;
+  availableForGoals: ('complete' | 'speed')[];
+  requiredFitness: ('beginner' | 'intermediate' | 'advanced')[];
+  supported_days: string[];
+  characteristics: string[];
+}
+
+export const METHODOLOGIES: Record<string, MethodologyDefinition> = {
+  'simple_completion': {
+    id: 'simple_completion',
+    name: 'Simple Completion',
+    shortDescription: 'Easy-to-follow plan focused on finishing healthy',
+    longDescription: 'Straightforward training using effort-based pacing (easy, moderate, hard) so you don\'t need complicated pace charts. Minimal speedwork keeps training enjoyable while building the endurance needed to cross the finish line.',
+    basedOn: 'Adapted from Hal Higdon\'s progressive training principles',
+    availableForGoals: ['complete'],
+    requiredFitness: ['beginner', 'intermediate', 'advanced'],
+    supported_days: ['3-4', '4-5', '5-6'],
+    characteristics: [
+      'Effort-based pacing (no pace charts needed)',
+      'Optional speedwork (strides and light fartlek)',
+      'Conservative volume progression',
+      'Flexible schedule',
+      'Completion-focused'
+    ]
+  },
+  'balanced_build': {
+    id: 'balanced_build',
+    name: 'Balanced Build',
+    shortDescription: 'Structured quality with VDOT-based pacing',
+    longDescription: 'Science-based training with precise pace zones (Easy, Marathon, Threshold, Interval) calculated from your 5K time. Two quality days per week with structured intervals and tempo runs.',
+    basedOn: 'Adapted from principles in Jack Daniels\' Running Formula',
+    availableForGoals: ['speed'],
+    requiredFitness: ['intermediate', 'advanced'],
+    supported_days: ['4-5', '5-6', '6-7'],
+    characteristics: [
+      'VDOT-based pacing system',
+      'Structured intervals (e.g., 6×800m)',
+      'Two quality days per week',
+      'Progressive 4-phase structure',
+      'Performance-focused'
+    ]
+  }
+};
+
+// Legacy compatibility
 export interface ApproachConstraints {
   min_days: string;
   max_days: string;
@@ -132,40 +182,19 @@ export interface ApproachConstraints {
 }
 
 export const APPROACH_CONSTRAINTS: Record<string, ApproachConstraints> = {
+  'simple_completion': {
+    min_days: '3-4',
+    max_days: '5-6',
+    supported_days: ['3-4', '4-5', '5-6'],
+    description: 'Easy-to-follow plan focused on finishing healthy',
+    philosophy: 'Effort-based pacing, minimal speedwork, conservative progression. Based on Hal Higdon\'s principles.'
+  },
   'balanced_build': {
     min_days: '4-5',
     max_days: '6-7',
     supported_days: ['4-5', '5-6', '6-7'],
-    description: 'Phase-based progression with quality limits',
-    philosophy: 'Build aerobic base, add speed work, race-specific training, taper. Quality capped at 10K per session. 2Q system - two quality workouts per week.'
-  },
-  'time_efficient': {
-    min_days: '3-4',
-    max_days: '3-4',
-    supported_days: ['3-4'],
-    description: '3 focused runs plus cross-training',
-    philosophy: 'Every run has purpose: speed, tempo, long. Cross-training fills gaps. Maximum efficiency with quality over quantity.'
-  },
-  'volume_progression': {
-    min_days: '5-6',
-    max_days: '6-7',
-    supported_days: ['5-6', '6-7'],
-    description: 'High mileage with progressive build',
-    philosophy: 'Volume is king. Medium-long runs midweek, long runs with race pace segments. Progressive weekly increases with 10% rule.'
-  },
-  'cumulative_load': {
-    min_days: '5-6',
-    max_days: '6-7',
-    supported_days: ['5-6', '6-7'],
-    description: 'Frequent race-pace work, capped long runs',
-    philosophy: 'Train to race on tired legs. Race pace work throughout week. Long runs capped at 16mi - simulate last 16 of marathon, not first 16.'
-  },
-  'hybrid_athlete': {
-    min_days: '4-5',
-    max_days: '5-6',
-    supported_days: ['4-5', '5-6'],
-    description: 'Run training plus strength integration',
-    philosophy: 'Strength training from day one with interference management. Build complete athlete with proper recovery between modalities.'
+    description: 'Structured quality with VDOT-based pacing',
+    philosophy: 'VDOT pacing, 2Q system, structured intervals. Based on Jack Daniels\' principles.'
   }
 };
 

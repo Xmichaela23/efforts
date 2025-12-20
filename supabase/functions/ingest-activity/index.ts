@@ -25,14 +25,21 @@ function toIsoDate(dateLike) {
 // Strava's start_date_local is already in local time format (e.g., "2025-12-19T08:30:00Z" represents local time)
 // We just need to extract the YYYY-MM-DD portion directly
 function extractStravaLocalDate(startDateLocal: string | null | undefined, startDateUtc: string | null | undefined): string | null {
+  console.log(`📅 extractStravaLocalDate called with: start_date_local="${startDateLocal}", start_date="${startDateUtc}"`);
+  
   // Prefer start_date_local - extract date portion directly without Date parsing
   if (startDateLocal && typeof startDateLocal === 'string' && startDateLocal.includes('T')) {
-    return startDateLocal.split('T')[0];
+    const result = startDateLocal.split('T')[0];
+    console.log(`📅 Using start_date_local, extracted date: ${result}`);
+    return result;
   }
   // Fallback to start_date (UTC) - this may be off by a day for some timezones
   if (startDateUtc && typeof startDateUtc === 'string' && startDateUtc.includes('T')) {
-    return startDateUtc.split('T')[0];
+    const result = startDateUtc.split('T')[0];
+    console.log(`📅 Falling back to start_date (UTC), extracted date: ${result}`);
+    return result;
   }
+  console.log(`📅 No valid date found, returning null`);
   return null;
 }
 function toIso(dateLike) {
@@ -1190,9 +1197,24 @@ Deno.serve(async (req)=>{
       });
     }
     // Idempotent upsert by provider-specific unique index
+    console.log(`📅 About to upsert workout with date: ${row.date}, strava_activity_id: ${row.strava_activity_id}`);
     const { error } = await supabase.from('workouts').upsert(row, {
       onConflict
     });
+    
+    // Explicitly update date field to ensure it's correct (upsert might not update on conflict)
+    if (!error && provider === 'strava' && row.date && row.strava_activity_id) {
+      const { error: dateUpdateErr } = await supabase.from('workouts')
+        .update({ date: row.date })
+        .eq('user_id', row.user_id)
+        .eq('strava_activity_id', row.strava_activity_id);
+      if (dateUpdateErr) {
+        console.log(`⚠️ Failed to update date: ${dateUpdateErr.message}`);
+      } else {
+        console.log(`📅 Explicitly updated date to ${row.date} for strava_activity_id ${row.strava_activity_id}`);
+      }
+    }
+    
     if (error) {
       return new Response(JSON.stringify({
         success: false,
