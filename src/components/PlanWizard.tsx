@@ -758,19 +758,13 @@ export default function PlanWizard() {
               
               {/* MPW-based duration warning */}
               {durationGating && (
-                <div className={`mt-4 p-4 rounded-lg border ${
-                  durationGating.riskLevel === 'high_risk' 
-                    ? 'bg-red-50 border-red-200' 
-                    : 'bg-amber-50 border-amber-200'
-                }`}>
-                  <h4 className={`font-semibold text-sm mb-2 ${
-                    durationGating.riskLevel === 'high_risk' ? 'text-red-800' : 'text-amber-800'
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <p className={`text-sm mb-2 ${
+                    durationGating.riskLevel === 'high_risk' ? 'text-red-600' : 'text-amber-600'
                   }`}>
                     {durationGating.warningTitle}
-                  </h4>
-                  <p className={`text-xs whitespace-pre-line mb-3 ${
-                    durationGating.riskLevel === 'high_risk' ? 'text-red-700' : 'text-amber-700'
-                  }`}>
+                  </p>
+                  <p className="text-xs text-gray-500 whitespace-pre-line mb-3">
                     {durationGating.warningMessage}
                   </p>
                   <div className="space-y-1 text-sm">
@@ -779,14 +773,7 @@ export default function PlanWizard() {
                       onClick={() => updateState('duration', durationGating.recommended)}
                       className="block text-left underline hover:no-underline"
                     >
-                      Use {durationGating.recommended} weeks instead (recommended)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateState('duration', durationGating.minSafe)}
-                      className="block text-left text-gray-600 hover:underline"
-                    >
-                      Use {durationGating.minSafe} weeks (minimum safe)
+                      Use {durationGating.recommended} weeks instead
                     </button>
                   </div>
                 </div>
