@@ -23,3 +23,4 @@ WHERE source = 'strava'
   AND strava_data IS NOT NULL
   AND strava_data->'original_activity'->>'start_date_local' IS NOT NULL
   AND date != SPLIT_PART(strava_data->'original_activity'->>'start_date_local', 'T', 1)::date;
+

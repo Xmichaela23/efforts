@@ -1007,12 +1007,44 @@ export default function PlanWizard() {
               </div>
             )}
             
-            {/* Show total weekly estimate */}
+            {/* Show detailed weekly structure based on strength + running selection */}
             {state.daysPerWeek && (
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">
-                  Weekly training: {state.daysPerWeek} running {state.strengthFrequency > 0 ? `+ ${state.strengthFrequency}x strength` : ''}
-                </p>
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg space-y-2">
+                <p className="text-sm font-medium text-gray-700">Your typical week:</p>
+                {(() => {
+                  const runDays = state.daysPerWeek === '3-4' ? 4 : state.daysPerWeek === '4-5' ? 5 : state.daysPerWeek === '5-6' ? 6 : 6;
+                  const strengthDays = state.strengthFrequency;
+                  const doubleDays = Math.min(strengthDays, runDays - 1); // Strength days overlap with run days (not long run)
+                  const restDays = 7 - runDays;
+                  
+                  // Build day breakdown
+                  const dayBreakdown = [];
+                  if (strengthDays === 0) {
+                    dayBreakdown.push(`${runDays} running days`);
+                  } else if (strengthDays === 2) {
+                    dayBreakdown.push('Mon, Fri: Running + Strength');
+                    dayBreakdown.push('Tue: Intervals, Thu: Tempo');
+                    if (runDays >= 5) dayBreakdown.push('Wed: Easy run');
+                    dayBreakdown.push('Sun: Long run');
+                  } else if (strengthDays === 3) {
+                    dayBreakdown.push('Mon, Fri: Running + Lower body');
+                    dayBreakdown.push('Wed: Running + Upper body (optional)');
+                    dayBreakdown.push('Tue: Intervals, Thu: Tempo');
+                    dayBreakdown.push('Sun: Long run');
+                  }
+                  
+                  return (
+                    <div className="text-xs text-gray-600 space-y-1">
+                      {dayBreakdown.map((line, i) => (
+                        <p key={i}>{line}</p>
+                      ))}
+                      <p className="text-gray-400 mt-2">
+                        {restDays > 0 ? `Sat off (rest before long run)` : 'No rest days'}
+                        {strengthDays > 0 && ` • ${doubleDays} double days`}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </StepContainer>
