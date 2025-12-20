@@ -42,15 +42,18 @@ export function overlayStrength(
     const isRecovery = phaseStructure.recovery_weeks.includes(week);
     const isTaper = phase.name === 'Taper';
     
-    // No strength in taper
-    if (isTaper) {
-      modifiedSessions[weekStr] = [...sessions];
-      continue;
-    }
+    let strengthSessions: Session[];
     
-    const strengthSessions = tier === 'injury_prevention'
-      ? getInjuryPreventionSessions(week, phase, frequency, isRecovery, sessions)
-      : getStrengthPowerSessions(week, phase, frequency, isRecovery, sessions, equipment);
+    if (isTaper) {
+      // Minimal taper week strength to maintain neuromuscular patterns
+      strengthSessions = tier === 'injury_prevention'
+        ? [createTaperSessionTier1()]
+        : [createTaperSessionTier2(equipment)];
+    } else {
+      strengthSessions = tier === 'injury_prevention'
+        ? getInjuryPreventionSessions(week, phase, frequency, isRecovery, sessions)
+        : getStrengthPowerSessions(week, phase, frequency, isRecovery, sessions, equipment);
+    }
 
     modifiedSessions[weekStr] = [...sessions, ...strengthSessions];
   }
@@ -441,6 +444,48 @@ function createStrengthPowerLowerBody(phase: Phase, params: StrengthPowerParams,
     duration: params.duration,
     strength_exercises: exercises,
     tags: ['strength', 'lower_body', 'strength_power', `phase:${phase.name.toLowerCase()}`, equipment]
+  };
+}
+
+// ============================================================================
+// TAPER WEEK SESSIONS
+// ============================================================================
+
+function createTaperSessionTier1(): Session {
+  return {
+    day: 'Monday',
+    type: 'strength',
+    name: 'Full Body Injury Prevention - Taper',
+    description: 'Taper Week - Minimal volume to maintain neuromuscular patterns. Very light (RPE 4-5/10). Just keep movement patterns active before race.',
+    duration: 25,
+    strength_exercises: [
+      { name: 'Bodyweight Squats', sets: 2, reps: 10, weight: 'Bodyweight' },
+      { name: 'Push-ups', sets: 2, reps: 10, weight: 'Bodyweight' },
+      { name: 'Glute Bridges', sets: 2, reps: 12, weight: 'Bodyweight' },
+      { name: 'Plank', sets: 2, reps: '30s', weight: 'Bodyweight' }
+    ],
+    tags: ['strength', 'full_body', 'injury_prevention', 'phase:taper']
+  };
+}
+
+function createTaperSessionTier2(equipment: EquipmentType): Session {
+  const jumpExercise = equipment === 'commercial_gym'
+    ? { name: 'Box Jumps', sets: 2, reps: 3, weight: 'Bodyweight' }
+    : { name: 'Bench Jumps', sets: 2, reps: 3, weight: 'Bodyweight' };
+
+  return {
+    day: 'Monday',
+    type: 'strength',
+    name: 'Full Body Strength & Power - Taper',
+    description: 'Taper Week - Absolute minimum to maintain patterns. 2x5 @ 50% 1RM. Keep movements sharp but fresh for race week.',
+    duration: 25,
+    strength_exercises: [
+      { name: 'Back Squat', sets: 2, reps: 5, weight: '50% 1RM' },
+      { name: 'Hip Thrusts', sets: 2, reps: 10, weight: 'Bodyweight' },
+      { name: 'Push-ups', sets: 2, reps: 10, weight: 'Bodyweight' },
+      jumpExercise
+    ],
+    tags: ['strength', 'full_body', 'strength_power', 'phase:taper', equipment]
   };
 }
 
