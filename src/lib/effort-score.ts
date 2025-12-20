@@ -328,18 +328,26 @@ export function formatTime(seconds: number): string {
 }
 
 /**
- * Parse time string (MM:SS or HH:MM:SS) to seconds
+ * Parse time string to seconds
+ * - For 5K/10K: MM:SS format (e.g., "22:00" = 22 minutes)
+ * - For Half/Marathon: H:MM or H:MM:SS format (e.g., "3:55" = 3 hours 55 minutes)
  */
-export function parseTimeToSeconds(timeStr: string): number | null {
+export function parseTimeToSeconds(timeStr: string, distance?: RaceDistance): number | null {
   const parts = timeStr.split(':').map(p => parseInt(p, 10));
   
   if (parts.some(isNaN)) return null;
   
   if (parts.length === 2) {
-    // MM:SS
-    return parts[0] * 60 + parts[1];
+    // Two-part time: could be MM:SS or H:MM depending on context
+    if (distance === 'marathon' || distance === 'half') {
+      // For marathon/half, interpret as H:MM (hours:minutes)
+      return parts[0] * 3600 + parts[1] * 60;
+    } else {
+      // For 5K/10K, interpret as MM:SS (minutes:seconds)
+      return parts[0] * 60 + parts[1];
+    }
   } else if (parts.length === 3) {
-    // HH:MM:SS
+    // Three-part time: always HH:MM:SS
     return parts[0] * 3600 + parts[1] * 60 + parts[2];
   }
   

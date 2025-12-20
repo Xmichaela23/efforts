@@ -389,8 +389,8 @@ export default function PlanWizard() {
         // If they have a race, must have entered time and recency
         if (state.hasRecentRace) {
           if (!state.effortRaceDistance || !state.effortRaceTime || !state.effortRaceRecency) return false;
-          // Validate time format
-          const seconds = parseTimeToSeconds(state.effortRaceTime);
+          // Validate time format (pass distance for correct parsing)
+          const seconds = parseTimeToSeconds(state.effortRaceTime, state.effortRaceDistance);
           if (!seconds || seconds < 600) return false; // At least 10 minutes
         }
         // Must have a score (either calculated or estimated)
@@ -484,7 +484,7 @@ export default function PlanWizard() {
         
         // Include source race data if available (for verified scores)
         if (state.effortScoreStatus === 'verified' && state.effortRaceDistance && state.effortRaceTime) {
-          const timeSeconds = parseTimeToSeconds(state.effortRaceTime);
+          const timeSeconds = parseTimeToSeconds(state.effortRaceTime, state.effortRaceDistance);
           if (timeSeconds) {
             requestBody.effort_source_distance = raceDistanceToMeters(state.effortRaceDistance);
             requestBody.effort_source_time = timeSeconds;
@@ -817,7 +817,7 @@ export default function PlanWizard() {
             
             // If we have all the data, calculate the score
             if (prev.effortRaceDistance && timeStr && prev.effortRaceRecency) {
-              const seconds = parseTimeToSeconds(timeStr);
+              const seconds = parseTimeToSeconds(timeStr, prev.effortRaceDistance);
               if (seconds && seconds >= 600) {
                 const meters = raceDistanceToMeters(prev.effortRaceDistance);
                 const result = calculateEffortScoreResult(meters, seconds);
@@ -841,7 +841,7 @@ export default function PlanWizard() {
             
             // Recalculate if we have time
             if (prev.effortRaceTime && prev.effortRaceRecency) {
-              const seconds = parseTimeToSeconds(prev.effortRaceTime);
+              const seconds = parseTimeToSeconds(prev.effortRaceTime, dist);
               if (seconds && seconds >= 600) {
                 const meters = raceDistanceToMeters(dist);
                 const result = calculateEffortScoreResult(meters, seconds);
@@ -865,7 +865,7 @@ export default function PlanWizard() {
             
             // Recalculate with new recency
             if (prev.effortRaceDistance && prev.effortRaceTime) {
-              const seconds = parseTimeToSeconds(prev.effortRaceTime);
+              const seconds = parseTimeToSeconds(prev.effortRaceTime, prev.effortRaceDistance);
               if (seconds && seconds >= 600) {
                 const meters = raceDistanceToMeters(prev.effortRaceDistance);
                 const result = calculateEffortScoreResult(meters, seconds);
@@ -929,7 +929,7 @@ export default function PlanWizard() {
                         onClick={() => handleRaceDistanceChange(dist)}
                         className={`px-4 py-2 rounded-lg border text-sm ${
                           state.effortRaceDistance === dist 
-                            ? 'bg-black text-white border-black' 
+                            ? 'bg-gray-100 border-gray-900 font-medium' 
                             : 'border-gray-300 hover:border-gray-400'
                         }`}
                       >
