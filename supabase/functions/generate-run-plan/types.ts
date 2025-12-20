@@ -14,6 +14,7 @@ export interface GeneratePlanRequest {
   approach: 'simple_completion' | 'balanced_build';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
   strength_frequency?: 0 | 1 | 2 | 3;
+  strength_tier?: 'runner_specific' | 'strength_development';
   race_date?: string;
 }
 

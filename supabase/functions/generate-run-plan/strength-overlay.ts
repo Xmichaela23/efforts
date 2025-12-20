@@ -1,29 +1,29 @@
 // Strength Overlay System
 // 
-// Purpose: Add strength sessions to run plans with interference management
-// Used when user requests strength frequency (1-3x/week) with non-hybrid approaches
+// Two Tiers:
+// 1. Runner-Specific (Default): Single-leg work, bodyweight + dumbbells, injury prevention
+// 2. Strength Development: Heavy compound lifts, barbell training, max strength
 //
 // SCHEDULE:
-// - Base Phase (3x): Mon Full Body, Wed Upper, Fri Lower
-// - Speed Phase (2x): Mon Full Body, Thu Lower  
-// - Race Prep (2x): Mon Full Body, Thu Lower (maintain 2x through peak)
-// - Taper: No strength
+// - Base Phase: Full frequency (2-3x/week)
+// - Speed Phase: Maintain (2x/week max)
+// - Race Prep: Maintain (2x/week)
+// - Taper: None
 // - Recovery weeks: Reduce by 1 session
 
 import { TrainingPlan, Session, StrengthExercise, Phase, PhaseStructure } from './types.ts';
 
+type StrengthTier = 'runner_specific' | 'strength_development';
+
 // ============================================================================
-// STRENGTH OVERLAY FUNCTION
+// MAIN OVERLAY FUNCTION
 // ============================================================================
 
-/**
- * Overlay strength sessions onto a running plan
- * Follows interference management rules
- */
 export function overlayStrength(
   plan: TrainingPlan,
   frequency: 1 | 2 | 3,
-  phaseStructure: PhaseStructure
+  phaseStructure: PhaseStructure,
+  tier: StrengthTier = 'runner_specific'
 ): TrainingPlan {
   const modifiedPlan = { ...plan };
   const modifiedSessions: Record<string, Session[]> = {};
@@ -33,37 +33,31 @@ export function overlayStrength(
     const phase = getCurrentPhase(week, phaseStructure);
     const isRecovery = phaseStructure.recovery_weeks.includes(week);
     
-    // Get strength sessions for this week
-    const strengthSessions = getStrengthSessionsForWeek(
-      week,
-      phase,
-      frequency,
-      isRecovery,
-      sessions
-    );
+    const strengthSessions = tier === 'runner_specific'
+      ? getRunnerSpecificSessions(week, phase, frequency, isRecovery, sessions)
+      : getStrengthDevelopmentSessions(week, phase, frequency, isRecovery, sessions);
 
     modifiedSessions[weekStr] = [...sessions, ...strengthSessions];
   }
 
   modifiedPlan.sessions_by_week = modifiedSessions;
   
-  // Add strength baselines requirement
+  // Baselines depend on tier
   modifiedPlan.baselines_required = {
     ...modifiedPlan.baselines_required,
-    strength: ['squat', 'deadlift', 'bench', 'overheadPress1RM']
+    strength: tier === 'strength_development' 
+      ? ['squat1RM', 'deadlift1RM', 'bench1RM']
+      : [] // Runner-specific doesn't need 1RM baselines
   };
 
   return modifiedPlan;
 }
 
 // ============================================================================
-// CORE LOGIC
+// RUNNER-SPECIFIC TIER
 // ============================================================================
 
-/**
- * Get strength sessions for a specific week based on phase and recovery status
- */
-function getStrengthSessionsForWeek(
+function getRunnerSpecificSessions(
   week: number,
   phase: Phase,
   requestedFrequency: number,
@@ -72,191 +66,187 @@ function getStrengthSessionsForWeek(
 ): Session[] {
   const sessions: Session[] = [];
   
-  // Determine base frequency for this phase
   let phaseFrequency = getPhaseFrequency(phase.name, requestedFrequency);
-  
-  // Recovery weeks: reduce by 1
   if (isRecovery && phaseFrequency > 0) {
     phaseFrequency = Math.max(0, phaseFrequency - 1);
   }
   
-  if (phaseFrequency === 0) {
-    return sessions;
+  if (phaseFrequency === 0) return sessions;
+  
+  const availableDays = findAvailableStrengthDays(runningSessions);
+  const phaseParams = getRunnerSpecificParams(phase.name, isRecovery);
+  
+  // Session 1: Full Body or Lower Body (Monday preferred)
+  if (phaseFrequency >= 1 && availableDays.includes('Monday')) {
+    sessions.push(createRunnerFullBody(phase, phaseParams, 'Monday'));
   }
   
-  // Find days that are safe for strength (not before long run, not on hard run days)
-  const availableDays = findAvailableStrengthDays(runningSessions);
+  // Session 2: Lower Body (Thursday/Friday preferred)
+  if (phaseFrequency >= 2) {
+    const day = availableDays.includes('Thursday') ? 'Thursday' 
+              : availableDays.includes('Friday') ? 'Friday' 
+              : availableDays.includes('Wednesday') ? 'Wednesday' : null;
+    if (day) {
+      sessions.push(createRunnerLowerBody(phase, phaseParams, day));
+    }
+  }
   
-  // Phase-specific strength programming
-  switch (phase.name) {
-    case 'Base':
-      // Base phase: Build strength foundation
-      // 3x: Mon Full Body, Wed Upper, Fri Lower
-      // 2x: Mon Full Body, Fri Lower
-      // 1x: Mon Full Body
-      if (phaseFrequency >= 1 && availableDays.includes('Monday')) {
-        sessions.push(createFullBodySession(week, phase, 'Monday'));
-      }
-      if (phaseFrequency >= 2 && availableDays.includes('Friday')) {
-        sessions.push(createLowerBodySession(week, phase, 'Friday'));
-      } else if (phaseFrequency >= 2 && availableDays.includes('Thursday')) {
-        sessions.push(createLowerBodySession(week, phase, 'Thursday'));
-      }
-      if (phaseFrequency >= 3 && availableDays.includes('Wednesday')) {
-        sessions.push(createUpperBodySession(week, phase, 'Wednesday'));
-      }
-      break;
-      
-    case 'Speed':
-      // Speed phase: Maintain strength with less interference
-      // 2x: Mon Full Body, Thu Lower
-      // 1x: Mon Full Body
-      if (phaseFrequency >= 1 && availableDays.includes('Monday')) {
-        sessions.push(createFullBodySession(week, phase, 'Monday'));
-      }
-      if (phaseFrequency >= 2) {
-        if (availableDays.includes('Thursday')) {
-          sessions.push(createLowerBodySession(week, phase, 'Thursday'));
-        } else if (availableDays.includes('Wednesday')) {
-          sessions.push(createLowerBodySession(week, phase, 'Wednesday'));
-        }
-      }
-      break;
-      
-    case 'Race Prep':
-      // Race prep: Maintain 2x/week full body - reduce intensity, not frequency
-      // Keep strength until taper starts
-      if (phaseFrequency >= 1 && availableDays.includes('Monday')) {
-        sessions.push(createFullBodySession(week, phase, 'Monday'));
-      }
-      if (phaseFrequency >= 2) {
-        if (availableDays.includes('Thursday')) {
-          sessions.push(createLowerBodySession(week, phase, 'Thursday'));
-        } else if (availableDays.includes('Wednesday')) {
-          sessions.push(createLowerBodySession(week, phase, 'Wednesday'));
-        }
-      }
-      break;
-      
-    case 'Taper':
-      // Taper: No strength - focus on race freshness
-      // Could optionally add very light upper body, but default to none
-      break;
+  // Session 3: Upper Body (Wednesday preferred) - Base phase only
+  if (phaseFrequency >= 3 && availableDays.includes('Wednesday')) {
+    sessions.push(createRunnerUpperBody(phase, phaseParams, 'Wednesday'));
   }
   
   return sessions;
 }
 
-/**
- * Get base frequency for phase (before recovery adjustment)
- */
-function getPhaseFrequency(phaseName: string, requestedFrequency: number): number {
-  switch (phaseName) {
-    case 'Base':
-      // Base phase: Full requested frequency
-      return requestedFrequency;
-    case 'Speed':
-      // Speed phase: Cap at 2x, reduce from 3 to 2
-      return Math.min(2, requestedFrequency);
-    case 'Race Prep':
-      // Race prep: Maintain 2x (same as speed, reduce intensity not frequency)
-      return Math.min(2, requestedFrequency);
-    case 'Taper':
-      // Taper: None
-      return 0;
-    default:
-      return requestedFrequency;
-  }
+interface RunnerParams {
+  sets: number;
+  reps: number;
+  duration: number;
 }
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-function getCurrentPhase(weekNumber: number, phaseStructure: PhaseStructure): Phase {
-  for (const phase of phaseStructure.phases) {
-    if (weekNumber >= phase.start_week && weekNumber <= phase.end_week) {
-      return phase;
-    }
-  }
-  return phaseStructure.phases[phaseStructure.phases.length - 1];
-}
-
-/**
- * Find days available for strength training
- * Rules:
- * - NEVER on interval/tempo/VO2 days
- * - NEVER day before long run (Saturday if long run is Sunday)
- * - Prefer easy run days or rest days
- */
-function findAvailableStrengthDays(sessions: Session[]): string[] {
-  const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  
-  // Find days with hard workouts
-  const hardDays = new Set<string>();
-  const longRunDays = new Set<string>();
-  
-  for (const session of sessions) {
-    if (session.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold', 'vo2max'].includes(t))) {
-      hardDays.add(session.day);
-    }
-    if (session.tags.includes('long_run')) {
-      longRunDays.add(session.day);
-    }
-  }
-
-  // Day before long run is off-limits for lower body
-  const daysBeforeLongRun = new Set<string>();
-  const dayBefore: Record<string, string> = {
-    'Sunday': 'Saturday',
-    'Saturday': 'Friday',
-    'Friday': 'Thursday',
-    'Thursday': 'Wednesday',
-    'Wednesday': 'Tuesday',
-    'Tuesday': 'Monday',
-    'Monday': 'Sunday'
+function getRunnerSpecificParams(phaseName: string, isRecovery: boolean): RunnerParams {
+  const base: Record<string, RunnerParams> = {
+    'Base': { sets: 3, reps: 12, duration: 45 },
+    'Speed': { sets: 3, reps: 10, duration: 40 },
+    'Race Prep': { sets: 2, reps: 12, duration: 35 },
+    'Taper': { sets: 2, reps: 10, duration: 30 }
   };
   
-  for (const longDay of longRunDays) {
-    const beforeDay = dayBefore[longDay];
-    if (beforeDay) {
-      daysBeforeLongRun.add(beforeDay);
+  const params = base[phaseName] || base['Base'];
+  
+  if (isRecovery) {
+    return { sets: 2, reps: params.reps, duration: 30 };
+  }
+  
+  return params;
+}
+
+function createRunnerFullBody(phase: Phase, params: RunnerParams, day: string): Session {
+  const exercises: StrengthExercise[] = [
+    { name: 'Bulgarian Split Squat', sets: params.sets, reps: params.reps, weight: 'Bodyweight or light DBs' },
+    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: 'Bodyweight or light DBs' },
+    { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Inverted Rows', sets: params.sets, reps: params.reps, weight: 'Bodyweight' },
+    { name: 'Dead Bugs', sets: params.sets, reps: 10, weight: 'Bodyweight' },
+    { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
+  ];
+
+  return {
+    day,
+    type: 'strength',
+    name: 'Full Body Strength',
+    description: `Single-leg work and core stability (${phase.name} phase)`,
+    duration: params.duration,
+    strength_exercises: exercises,
+    tags: ['strength', 'full_body', 'runner_specific']
+  };
+}
+
+function createRunnerLowerBody(phase: Phase, params: RunnerParams, day: string): Session {
+  const exercises: StrengthExercise[] = [
+    { name: 'Walking Lunges', sets: params.sets, reps: params.reps, weight: 'Bodyweight or light DBs' },
+    { name: 'Glute Bridges', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: 'Bodyweight or light DBs' },
+    { name: 'Clamshells', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Side Plank', sets: params.sets, reps: '30s', weight: 'Bodyweight' },
+    { name: 'Calf Raises', sets: params.sets, reps: 20, weight: 'Bodyweight' }
+  ];
+
+  return {
+    day,
+    type: 'strength',
+    name: 'Lower Body Strength',
+    description: `Hip stability and glute activation (${phase.name} phase)`,
+    duration: params.duration,
+    strength_exercises: exercises,
+    tags: ['strength', 'lower_body', 'runner_specific']
+  };
+}
+
+function createRunnerUpperBody(phase: Phase, params: RunnerParams, day: string): Session {
+  const exercises: StrengthExercise[] = [
+    { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Inverted Rows', sets: params.sets, reps: params.reps, weight: 'Bodyweight' },
+    { name: 'Pike Push-ups', sets: params.sets, reps: 8, weight: 'Bodyweight' },
+    { name: 'YTW Raises', sets: params.sets, reps: 10, weight: 'Light DBs or bands' },
+    { name: 'Face Pulls', sets: params.sets, reps: 15, weight: 'Band' },
+    { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
+  ];
+
+  return {
+    day,
+    type: 'strength',
+    name: 'Upper Body Strength',
+    description: `Posture and shoulder stability (${phase.name} phase)`,
+    duration: params.duration - 5,
+    strength_exercises: exercises,
+    tags: ['strength', 'upper_body', 'runner_specific']
+  };
+}
+
+// ============================================================================
+// STRENGTH DEVELOPMENT TIER (Original approach)
+// ============================================================================
+
+function getStrengthDevelopmentSessions(
+  week: number,
+  phase: Phase,
+  requestedFrequency: number,
+  isRecovery: boolean,
+  runningSessions: Session[]
+): Session[] {
+  const sessions: Session[] = [];
+  
+  let phaseFrequency = getPhaseFrequency(phase.name, requestedFrequency);
+  if (isRecovery && phaseFrequency > 0) {
+    phaseFrequency = Math.max(0, phaseFrequency - 1);
+  }
+  
+  if (phaseFrequency === 0) return sessions;
+  
+  const availableDays = findAvailableStrengthDays(runningSessions);
+  const intensity = getStrengthDevIntensity(phase.name);
+  
+  // Full Body (Monday)
+  if (phaseFrequency >= 1 && availableDays.includes('Monday')) {
+    sessions.push(createStrengthDevFullBody(phase, intensity, 'Monday'));
+  }
+  
+  // Lower Body (Thursday/Friday)
+  if (phaseFrequency >= 2) {
+    const day = availableDays.includes('Thursday') ? 'Thursday' 
+              : availableDays.includes('Friday') ? 'Friday' : null;
+    if (day) {
+      sessions.push(createStrengthDevLowerBody(phase, intensity, day));
     }
   }
-
-  // Filter available days
-  return allDays.filter(day => 
-    !hardDays.has(day) && 
-    !daysBeforeLongRun.has(day) &&
-    !longRunDays.has(day)
-  );
+  
+  // Upper Body (Wednesday) - Base phase only
+  if (phaseFrequency >= 3 && availableDays.includes('Wednesday')) {
+    sessions.push(createStrengthDevUpperBody(phase, intensity, 'Wednesday'));
+  }
+  
+  return sessions;
 }
 
-/**
- * Get intensity parameters based on phase
- */
-function getPhaseIntensity(phaseName: string): { percent: number; sets: number; reps: number } {
+interface StrengthDevParams {
+  percent: number;
+  sets: number;
+  reps: number;
+}
+
+function getStrengthDevIntensity(phaseName: string): StrengthDevParams {
   switch (phaseName) {
-    case 'Base':
-      return { percent: 75, sets: 4, reps: 6 };
-    case 'Speed':
-      return { percent: 70, sets: 3, reps: 6 };
-    case 'Race Prep':
-      return { percent: 65, sets: 3, reps: 8 }; // Lighter, more reps
-    case 'Taper':
-      return { percent: 60, sets: 2, reps: 8 };
-    default:
-      return { percent: 70, sets: 3, reps: 6 };
+    case 'Base': return { percent: 75, sets: 4, reps: 6 };
+    case 'Speed': return { percent: 70, sets: 3, reps: 6 };
+    case 'Race Prep': return { percent: 65, sets: 3, reps: 8 };
+    case 'Taper': return { percent: 60, sets: 2, reps: 8 };
+    default: return { percent: 70, sets: 3, reps: 6 };
   }
 }
 
-// ============================================================================
-// SESSION CREATORS
-// ============================================================================
-
-function createFullBodySession(_week: number, phase: Phase, day: string): Session {
-  const intensity = getPhaseIntensity(phase.name);
-  
+function createStrengthDevFullBody(_phase: Phase, intensity: StrengthDevParams, day: string): Session {
   const exercises: StrengthExercise[] = [
     { name: 'Back Squat', sets: intensity.sets, reps: intensity.reps, weight: `${intensity.percent}% 1RM` },
     { name: 'Bench Press', sets: intensity.sets, reps: intensity.reps, weight: `${intensity.percent}% 1RM` },
@@ -269,16 +259,14 @@ function createFullBodySession(_week: number, phase: Phase, day: string): Sessio
     day,
     type: 'strength',
     name: 'Full Body Strength',
-    description: `Compound lifts for running strength (${phase.name} phase)`,
-    duration: 45,
+    description: 'Heavy compound lifts for maximum strength',
+    duration: 50,
     strength_exercises: exercises,
-    tags: ['strength', 'full_body']
+    tags: ['strength', 'full_body', 'strength_development']
   };
 }
 
-function createUpperBodySession(_week: number, phase: Phase, day: string): Session {
-  const intensity = getPhaseIntensity(phase.name);
-  
+function createStrengthDevUpperBody(_phase: Phase, intensity: StrengthDevParams, day: string): Session {
   const exercises: StrengthExercise[] = [
     { name: 'Bench Press', sets: intensity.sets, reps: intensity.reps, weight: `${intensity.percent}% 1RM` },
     { name: 'Barbell Row', sets: intensity.sets, reps: intensity.reps + 2, weight: `${intensity.percent - 5}% 1RM` },
@@ -291,20 +279,18 @@ function createUpperBodySession(_week: number, phase: Phase, day: string): Sessi
     day,
     type: 'strength',
     name: 'Upper Body Strength',
-    description: `Upper body for posture and arm drive (${phase.name} phase)`,
-    duration: 40,
+    description: 'Upper body for posture and arm drive',
+    duration: 45,
     strength_exercises: exercises,
-    tags: ['strength', 'upper_body']
+    tags: ['strength', 'upper_body', 'strength_development']
   };
 }
 
-function createLowerBodySession(_week: number, phase: Phase, day: string): Session {
-  const intensity = getPhaseIntensity(phase.name);
-  
+function createStrengthDevLowerBody(_phase: Phase, intensity: StrengthDevParams, day: string): Session {
   const exercises: StrengthExercise[] = [
     { name: 'Back Squat', sets: intensity.sets, reps: intensity.reps, weight: `${intensity.percent}% 1RM` },
     { name: 'Romanian Deadlift', sets: intensity.sets - 1, reps: intensity.reps + 2, weight: `${intensity.percent - 10}% 1RM` },
-    { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: 'Bodyweight' },
+    { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: 'Moderate DBs' },
     { name: 'Hip Thrusts', sets: 3, reps: 10, weight: `${intensity.percent - 5}% 1RM` },
     { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight' }
   ];
@@ -313,33 +299,65 @@ function createLowerBodySession(_week: number, phase: Phase, day: string): Sessi
     day,
     type: 'strength',
     name: 'Lower Body Strength',
-    description: `Runner-focused lower body (${phase.name} phase)`,
-    duration: 45,
+    description: 'Heavy lower body for running power',
+    duration: 50,
     strength_exercises: exercises,
-    tags: ['strength', 'lower_body']
+    tags: ['strength', 'lower_body', 'strength_development']
   };
 }
 
-/**
- * Light upper body session for Race Prep phase
- * NO lower body to avoid interference with peak running
- */
-function createUpperBodyMaintenanceSession(_week: number, phase: Phase, day: string): Session {
-  const exercises: StrengthExercise[] = [
-    { name: 'Push-ups', sets: 3, reps: 15, weight: 'Bodyweight' },
-    { name: 'Inverted Row', sets: 3, reps: 12, weight: 'Bodyweight' },
-    { name: 'Overhead Press', sets: 3, reps: 10, weight: '60% 1RM' },
-    { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Light' },
-    { name: 'Plank', sets: 3, reps: '60s', weight: 'Bodyweight' }
-  ];
+// ============================================================================
+// SHARED HELPERS
+// ============================================================================
 
-  return {
-    day,
-    type: 'strength',
-    name: 'Upper Body Maintenance',
-    description: 'Light upper body to maintain strength during peak running',
-    duration: 30,
-    strength_exercises: exercises,
-    tags: ['strength', 'upper_body', 'maintenance']
+function getCurrentPhase(weekNumber: number, phaseStructure: PhaseStructure): Phase {
+  for (const phase of phaseStructure.phases) {
+    if (weekNumber >= phase.start_week && weekNumber <= phase.end_week) {
+      return phase;
+    }
+  }
+  return phaseStructure.phases[phaseStructure.phases.length - 1];
+}
+
+function getPhaseFrequency(phaseName: string, requestedFrequency: number): number {
+  switch (phaseName) {
+    case 'Base': return requestedFrequency;
+    case 'Speed': return Math.min(2, requestedFrequency);
+    case 'Race Prep': return Math.min(2, requestedFrequency);
+    case 'Taper': return 0;
+    default: return requestedFrequency;
+  }
+}
+
+function findAvailableStrengthDays(sessions: Session[]): string[] {
+  const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  
+  const hardDays = new Set<string>();
+  const longRunDays = new Set<string>();
+  
+  for (const session of sessions) {
+    if (session.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold', 'vo2max'].includes(t))) {
+      hardDays.add(session.day);
+    }
+    if (session.tags.includes('long_run')) {
+      longRunDays.add(session.day);
+    }
+  }
+
+  const daysBeforeLongRun = new Set<string>();
+  const dayBefore: Record<string, string> = {
+    'Sunday': 'Saturday', 'Saturday': 'Friday', 'Friday': 'Thursday',
+    'Thursday': 'Wednesday', 'Wednesday': 'Tuesday', 'Tuesday': 'Monday', 'Monday': 'Sunday'
   };
+  
+  for (const longDay of longRunDays) {
+    const beforeDay = dayBefore[longDay];
+    if (beforeDay) daysBeforeLongRun.add(beforeDay);
+  }
+
+  return allDays.filter(day => 
+    !hardDays.has(day) && 
+    !daysBeforeLongRun.has(day) &&
+    !longRunDays.has(day)
+  );
 }

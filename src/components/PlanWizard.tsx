@@ -18,6 +18,7 @@ type MpwRange = '12-15' | '16-19' | '20-25' | '25-35' | '35-45' | '45+';
 type Goal = 'complete' | 'speed';
 type Approach = 'simple_completion' | 'balanced_build';
 type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
+type StrengthTier = 'runner_specific' | 'strength_development';
 
 interface WizardState {
   discipline: Discipline | null;
@@ -30,6 +31,7 @@ interface WizardState {
   approach: Approach | null;
   daysPerWeek: DaysPerWeek | null;
   strengthFrequency: 0 | 1 | 2 | 3;
+  strengthTier: StrengthTier;
 }
 
 // ============================================================================
@@ -259,7 +261,8 @@ export default function PlanWizard() {
     startDate: getNextMonday(),
     approach: null,
     daysPerWeek: null,
-    strengthFrequency: 0
+    strengthFrequency: 0,
+    strengthTier: 'runner_specific'
   });
 
   // Get default duration based on distance, fitness, and MPW
@@ -400,7 +403,8 @@ export default function PlanWizard() {
           start_date: state.startDate,
           approach: state.approach,
           days_per_week: state.daysPerWeek,
-          strength_frequency: state.strengthFrequency
+          strength_frequency: state.strengthFrequency,
+          strength_tier: state.strengthTier
         }
       });
 
@@ -838,16 +842,62 @@ export default function PlanWizard() {
       case 7:
         return (
           <StepContainer title="Add strength training?">
-            <RadioGroup
-              value={state.strengthFrequency.toString()}
-              onValueChange={(v) => updateState('strengthFrequency', parseInt(v) as 0 | 1 | 2 | 3)}
-              className="space-y-3"
-            >
-              <RadioOption value="0" label="No strength" />
-              <RadioOption value="1" label="1 day per week" />
-              <RadioOption value="2" label="2 days per week" />
-              <RadioOption value="3" label="3 days per week" description="Base phase only" />
-            </RadioGroup>
+            <div className="space-y-6">
+              {/* Frequency */}
+              <div>
+                <p className="text-sm text-gray-500 mb-3">How often?</p>
+                <RadioGroup
+                  value={state.strengthFrequency.toString()}
+                  onValueChange={(v) => updateState('strengthFrequency', parseInt(v) as 0 | 1 | 2 | 3)}
+                  className="space-y-2"
+                >
+                  <RadioOption value="0" label="No strength" />
+                  <RadioOption value="2" label="2 days per week" description="Recommended" />
+                  <RadioOption value="3" label="3 days per week" description="Base phase, reduces in later phases" />
+                </RadioGroup>
+              </div>
+              
+              {/* Tier - only show if frequency > 0 */}
+              {state.strengthFrequency > 0 && (
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-gray-500 mb-3">What type?</p>
+                  <RadioGroup
+                    value={state.strengthTier}
+                    onValueChange={(v) => updateState('strengthTier', v as StrengthTier)}
+                    className="space-y-3"
+                  >
+                    <div className="p-3 border rounded-lg hover:bg-gray-50">
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="runner_specific" id="runner_specific" className="mt-1" />
+                        <Label htmlFor="runner_specific" className="flex-1 cursor-pointer">
+                          <span className="block font-medium">Runner-Specific</span>
+                          <span className="block text-sm text-gray-500 mt-0.5">
+                            Single-leg work, hip stability, injury prevention
+                          </span>
+                          <span className="block text-xs text-gray-400 mt-1">
+                            Equipment: Bodyweight, dumbbells, bands
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
+                    <div className="p-3 border rounded-lg hover:bg-gray-50">
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="strength_development" id="strength_development" className="mt-1" />
+                        <Label htmlFor="strength_development" className="flex-1 cursor-pointer">
+                          <span className="block font-medium">Strength Development</span>
+                          <span className="block text-sm text-gray-500 mt-0.5">
+                            Heavy compound lifts, maximum strength focus
+                          </span>
+                          <span className="block text-xs text-gray-400 mt-1">
+                            Equipment: Barbell, rack, bench required
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+            </div>
           </StepContainer>
         );
 
