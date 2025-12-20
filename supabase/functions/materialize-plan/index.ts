@@ -15,7 +15,15 @@ type Baselines = {
   fiveK_pace?: any; fiveKPace?: any; fiveK?: any; 
   easyPace?: any; easy_pace?: any; 
   marathonPace?: any; marathon_pace?: any;
-  equipment?: any 
+  equipment?: any;
+  // New effort_paces from PlanWizard (seconds per mile)
+  effort_paces?: {
+    base: number;    // Easy pace
+    race: number;    // Marathon pace
+    steady: number;  // Threshold pace
+    power: number;   // Interval/5K pace
+    speed: number;   // Repetition pace
+  };
 };
 
 function parsePaceToSecPerMi(v: any): number | null {
@@ -40,7 +48,28 @@ function parsePaceToSecPerMi(v: any): number | null {
   return null;
 }
 
-function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'): number | null {
+function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'threshold'): number | null {
+  // PREFER effort_paces from PlanWizard (already in seconds per mile)
+  if (b.effort_paces) {
+    if (which === 'fivek' && b.effort_paces.power) {
+      console.log(`[Paces] Using effort_paces.power for 5K: ${b.effort_paces.power}s/mi`);
+      return b.effort_paces.power;
+    }
+    if (which === 'easy' && b.effort_paces.base) {
+      console.log(`[Paces] Using effort_paces.base for easy: ${b.effort_paces.base}s/mi`);
+      return b.effort_paces.base;
+    }
+    if (which === 'marathon' && b.effort_paces.race) {
+      console.log(`[Paces] Using effort_paces.race for marathon: ${b.effort_paces.race}s/mi`);
+      return b.effort_paces.race;
+    }
+    if (which === 'threshold' && b.effort_paces.steady) {
+      console.log(`[Paces] Using effort_paces.steady for threshold: ${b.effort_paces.steady}s/mi`);
+      return b.effort_paces.steady;
+    }
+  }
+  
+  // FALLBACK to legacy performance_numbers
   let raw: any;
   if (which === 'fivek') {
     raw = b.fiveK_pace ?? b.fiveKPace ?? b.fiveK;
@@ -51,6 +80,11 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'): n
       const easyPace = parsePaceToSecPerMi(b.easyPace ?? b.easy_pace);
       if (easyPace) return easyPace - 30; // Marathon is faster than easy, typically ~30s/mi
     }
+  } else if (which === 'threshold') {
+    // Threshold not in legacy - estimate from 5K pace + 20s
+    const fkp = secPerMiFromBaseline(b, 'fivek');
+    if (fkp) return fkp + 20;
+    return null;
   } else {
     raw = b.easyPace ?? b.easy_pace;
   }
@@ -1270,11 +1304,15 @@ Deno.serve(async (req) => {
     const userId = rows[0]?.user_id;
     let baselines: Baselines = {};
     try {
-      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, equipment').eq('user_id', userId).maybeSingle();
+      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, equipment, effort_paces').eq('user_id', userId).maybeSingle();
       baselines = {
         ...(ub?.performance_numbers || {}),
-        equipment: ub?.equipment || {}
+        equipment: ub?.equipment || {},
+        effort_paces: ub?.effort_paces || undefined
       } as any;
+      if (ub?.effort_paces) {
+        console.log(`[Paces] Found effort_paces from PlanWizard:`, ub.effort_paces);
+      }
       console.log(`🔍 [FTP DEBUG] User ${userId} baselines:`, baselines);
       console.log(`🔍 [FTP DEBUG] FTP value:`, baselines?.ftp);
       console.log(`🔍 [EQUIPMENT DEBUG] Equipment:`, baselines?.equipment);
