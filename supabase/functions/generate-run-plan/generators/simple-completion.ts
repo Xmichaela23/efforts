@@ -14,42 +14,47 @@ import { BaseGenerator } from './base-generator.ts';
 import { TrainingPlan, Session, Phase, PhaseStructure, TOKEN_PATTERNS } from '../types.ts';
 
 // Long run progression by fitness level (in miles)
-// Conservative progression focused on completion
+// SMOOTH progression: max +1 mile per week, recovery weeks reduce by ~30%
+// Post-recovery: resume at pre-recovery level (not beyond)
 const LONG_RUN_PROGRESSION: Record<string, Record<string, number[]>> = {
   'marathon': {
     'beginner': [
-      6, 7, 8, 5,       // Weeks 1-4 (recovery at 4)
-      9, 10, 11, 7,     // Weeks 5-8 (recovery at 8)
-      12, 13, 14, 10,   // Weeks 9-12 (recovery at 12)
-      16, 18, 20, 8     // Weeks 13-16 (peak at 15, taper at 16)
+      // Weeks 1-4: Build 6→8, recovery drops to 6
+      6, 7, 8, 6,
+      // Weeks 5-8: Resume 8→11, recovery drops to 8  
+      8, 9, 10, 8,
+      // Weeks 9-12: Resume 10→13, recovery drops to 10
+      10, 11, 12, 10,
+      // Weeks 13-16: Peak at 18, taper
+      14, 16, 18, 10
     ],
     'intermediate': [
-      8, 10, 12, 8,     // Weeks 1-4
-      13, 14, 15, 10,   // Weeks 5-8
-      16, 17, 18, 12,   // Weeks 9-12
-      18, 20, 20, 10    // Weeks 13-16
+      8, 9, 10, 8,      // Weeks 1-4
+      10, 11, 12, 10,   // Weeks 5-8
+      12, 14, 16, 12,   // Weeks 9-12
+      16, 18, 20, 12    // Weeks 13-16
     ],
     'advanced': [
-      10, 12, 14, 10,   // Weeks 1-4
-      15, 16, 17, 12,   // Weeks 5-8
-      18, 19, 20, 14,   // Weeks 9-12
-      20, 20, 20, 12    // Weeks 13-16
+      10, 11, 12, 10,   // Weeks 1-4
+      12, 14, 16, 12,   // Weeks 5-8
+      16, 18, 20, 14,   // Weeks 9-12
+      18, 20, 20, 14    // Weeks 13-16
     ]
   },
   'half': {
-    'beginner': [5, 6, 7, 5, 8, 9, 10, 7, 10, 11, 12, 6],
-    'intermediate': [6, 8, 9, 6, 10, 11, 12, 8, 12, 13, 14, 8],
-    'advanced': [8, 10, 11, 8, 12, 13, 14, 10, 14, 14, 14, 10]
+    'beginner': [5, 6, 7, 5, 7, 8, 9, 7, 9, 10, 11, 8],
+    'intermediate': [6, 7, 8, 6, 8, 9, 10, 8, 10, 11, 12, 8],
+    'advanced': [8, 9, 10, 8, 10, 11, 12, 10, 12, 13, 14, 10]
   },
   '10k': {
-    'beginner': [4, 5, 5, 4, 6, 6, 7, 5, 7, 8, 8, 5],
-    'intermediate': [5, 6, 7, 5, 7, 8, 9, 6, 9, 10, 10, 6],
-    'advanced': [7, 8, 9, 7, 9, 10, 11, 8, 11, 12, 12, 8]
+    'beginner': [4, 5, 6, 4, 5, 6, 7, 5, 7, 8, 8, 6],
+    'intermediate': [5, 6, 7, 5, 7, 8, 9, 7, 9, 10, 10, 7],
+    'advanced': [7, 8, 9, 7, 9, 10, 11, 8, 10, 11, 12, 8]
   },
   '5k': {
-    'beginner': [3, 4, 4, 3, 5, 5, 6, 4, 6, 6, 6, 4],
-    'intermediate': [4, 5, 5, 4, 6, 6, 7, 5, 7, 8, 8, 5],
-    'advanced': [5, 6, 7, 5, 7, 8, 8, 6, 8, 9, 9, 6]
+    'beginner': [3, 4, 4, 3, 4, 5, 5, 4, 5, 6, 6, 4],
+    'intermediate': [4, 5, 5, 4, 5, 6, 6, 5, 6, 7, 7, 5],
+    'advanced': [5, 6, 7, 5, 7, 8, 8, 6, 8, 9, 9, 7]
   }
 };
 
@@ -121,7 +126,7 @@ export class SimpleCompletionGenerator extends BaseGenerator {
   protected generatePlanDescription(): string {
     return `A ${this.params.duration_weeks}-week plan designed to get you to the finish line healthy and confident. ` +
       `Uses effort-based pacing (no complicated pace charts) with optional light speedwork. ` +
-      `Based on progressive training principles.`;
+      `Based on Hal Higdon's progressive training approach (not officially endorsed).`;
   }
 
   private generateWeekSessions(
@@ -231,14 +236,16 @@ export class SimpleCompletionGenerator extends BaseGenerator {
   private createOptionalSpeedwork(weekNumber: number, phase: Phase): Session {
     // Alternate between strides and fartlek
     const useStrides = weekNumber % 2 === 0;
+    const baseMiles = 4;
+    const baseDuration = this.milesToMinutes(baseMiles);
     
     if (useStrides) {
       return this.createSession(
         'Tuesday',
         'Easy Run + Strides',
-        `4 miles easy, then 6×100m strides (quick but relaxed sprints with full recovery). Strides are optional - skip if tired. Focus on good form and having fun.`,
-        this.milesToMinutes(4) + 10,
-        [TOKEN_PATTERNS.easy_run_miles(4), TOKEN_PATTERNS.strides_4x100m],
+        `${baseMiles} miles easy, then 6×100m strides (quick but relaxed sprints with full recovery). Strides are optional - skip if tired. Focus on good form and having fun.`,
+        baseDuration + 10, // 10 min for strides
+        [TOKEN_PATTERNS.easy_run_miles(baseMiles), TOKEN_PATTERNS.strides_4x100m],
         ['easy_run', 'strides']
       );
     } else {
@@ -246,9 +253,9 @@ export class SimpleCompletionGenerator extends BaseGenerator {
       return this.createSession(
         'Tuesday',
         'Fartlek Run',
-        `4 miles with ${pickups} pick-ups: run comfortably hard for 30-60 seconds when you feel like it, then easy jog to recover. No watch needed - run by feel and enjoy it!`,
-        this.milesToMinutes(4) + 5,
-        [TOKEN_PATTERNS.fartlek(pickups)],
+        `${baseMiles} miles with ${pickups} pick-ups: run comfortably hard for 30-60 seconds when you feel like it, then easy jog to recover. No watch needed - run by feel and enjoy it!`,
+        baseDuration, // Fartlek is within the 4 mile run, not additional
+        [TOKEN_PATTERNS.easy_run_miles(baseMiles), TOKEN_PATTERNS.fartlek(pickups)],
         ['easy_run', 'fartlek']
       );
     }

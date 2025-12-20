@@ -6,7 +6,7 @@
 // SCHEDULE:
 // - Base Phase (3x): Mon Full Body, Wed Upper, Fri Lower
 // - Speed Phase (2x): Mon Full Body, Thu Lower  
-// - Race Prep (1x): Mon Upper ONLY (no legs - peak running load)
+// - Race Prep (2x): Mon Full Body, Thu Lower (maintain 2x through peak)
 // - Taper: No strength
 // - Recovery weeks: Reduce by 1 session
 
@@ -124,10 +124,17 @@ function getStrengthSessionsForWeek(
       break;
       
     case 'Race Prep':
-      // Race prep: Upper body ONLY - legs are peak running load
-      // No lower body strength to avoid interference with 17-20mi long runs + MP work
+      // Race prep: Maintain 2x/week full body - reduce intensity, not frequency
+      // Keep strength until taper starts
       if (phaseFrequency >= 1 && availableDays.includes('Monday')) {
-        sessions.push(createUpperBodyMaintenanceSession(week, phase, 'Monday'));
+        sessions.push(createFullBodySession(week, phase, 'Monday'));
+      }
+      if (phaseFrequency >= 2) {
+        if (availableDays.includes('Thursday')) {
+          sessions.push(createLowerBodySession(week, phase, 'Thursday'));
+        } else if (availableDays.includes('Wednesday')) {
+          sessions.push(createLowerBodySession(week, phase, 'Wednesday'));
+        }
       }
       break;
       
@@ -152,8 +159,8 @@ function getPhaseFrequency(phaseName: string, requestedFrequency: number): numbe
       // Speed phase: Cap at 2x, reduce from 3 to 2
       return Math.min(2, requestedFrequency);
     case 'Race Prep':
-      // Race prep: Cap at 1x (upper body only)
-      return Math.min(1, requestedFrequency);
+      // Race prep: Maintain 2x (same as speed, reduce intensity not frequency)
+      return Math.min(2, requestedFrequency);
     case 'Taper':
       // Taper: None
       return 0;
