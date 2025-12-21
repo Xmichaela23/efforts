@@ -1726,52 +1726,46 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     return (
       <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
         <div className="flex items-center justify-between">
-          <button onClick={handleBack} className="flex items-center gap-1 p-0 h-auto text-gray-600 hover:text-black transition-colors text-sm">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Plans</span>
+          <button onClick={handleBack} className="flex items-center gap-1 p-0 h-auto text-gray-600 hover:text-black transition-colors text-xs sm:text-sm">
+            <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+            Plans
           </button>
           
-          <div className="flex items-center gap-0 sm:gap-1">
+          <div className="flex items-center">
             {(() => {
               console.log('[Button Render] planStatus:', planStatus, 'selectedPlanDetail.status:', selectedPlanDetail?.status);
               if (planStatus === 'active') {
                 return (
-                  <button onClick={handlePausePlan} className="flex items-center gap-1 px-2 py-1.5 text-gray-600 hover:text-black transition-colors text-sm">
-                    <Pause className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Pause</span>
+                  <button onClick={handlePausePlan} className="px-1.5 sm:px-2 py-1 text-gray-600 hover:text-black transition-colors text-xs sm:text-sm">
+                    Pause
                   </button>
                 );
               } else if (planStatus === 'paused') {
                 return (
-                  <button onClick={handleResumePlan} className="flex items-center gap-1 px-2 py-1.5 text-gray-600 hover:text-black transition-colors text-sm">
-                    <Play className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Resume</span>
+                  <button onClick={handleResumePlan} className="px-1.5 sm:px-2 py-1 text-gray-600 hover:text-black transition-colors text-xs sm:text-sm">
+                    Resume
                   </button>
                 );
               }
               return null;
             })()}
 
-            <div className="hidden sm:block">
-              <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="flex items-center gap-1 px-2 py-1.5 text-gray-600 hover:text-black transition-colors text-sm">
-                Download
-              </button>
-            </div>
-            <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="flex items-center gap-1 px-2 py-1.5 text-gray-600 hover:text-black transition-colors text-sm sm:hidden">
-              <Info className="h-3.5 w-3.5" />
+            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="hidden sm:block px-2 py-1 text-gray-600 hover:text-black transition-colors text-sm">
+              Download
+            </button>
+            <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="px-1.5 sm:px-2 py-1 text-gray-600 hover:text-black transition-colors text-xs sm:text-sm sm:hidden">
+              Info
             </button>
             
-            <button className="flex items-center gap-1 px-2 py-1.5 text-gray-600 hover:text-black transition-colors text-sm">
-              <Edit className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Modify</span>
+            <button className="px-1.5 sm:px-2 py-1 text-gray-600 hover:text-black transition-colors text-xs sm:text-sm">
+              Modify
             </button>
             
             {(planStatus === 'active' || planStatus === 'paused') && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <button className="flex items-center gap-1 px-2 py-1.5 text-orange-600 hover:text-orange-700 transition-colors text-sm whitespace-nowrap">
-                    <XCircle className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">End Plan</span>
+                  <button className="px-1.5 sm:px-2 py-1 text-orange-600 hover:text-orange-700 transition-colors text-xs sm:text-sm">
+                    End
                   </button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -1793,9 +1787,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <button className="flex items-center gap-1 px-2 py-1.5 text-gray-600 hover:text-red-600 transition-colors text-sm">
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Delete</span>
+                <button className="px-1.5 sm:px-2 py-1 text-gray-600 hover:text-red-600 transition-colors text-xs sm:text-sm">
+                  Delete
                 </button>
               </AlertDialogTrigger>
               <AlertDialogContent>
