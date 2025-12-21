@@ -1532,37 +1532,46 @@ export default function PlanWizard() {
                     )}
                   </div>
                   {state.raceDate && (
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-blue-800 font-medium">{state.duration} week plan</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newWeeks = Math.max(4, state.duration - 1);
-                              const newStart = calculateStartFromRace(state.raceDate, newWeeks);
-                              setState(prev => ({ ...prev, duration: newWeeks, startDate: newStart }));
-                            }}
-                            className="w-8 h-8 rounded-full border border-blue-300 text-blue-700 hover:bg-blue-100 flex items-center justify-center"
-                          >
-                            −
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newWeeks = Math.min(24, state.duration + 1);
-                              const newStart = calculateStartFromRace(state.raceDate, newWeeks);
-                              setState(prev => ({ ...prev, duration: newWeeks, startDate: newStart }));
-                            }}
-                            className="w-8 h-8 rounded-full border border-blue-300 text-blue-700 hover:bg-blue-100 flex items-center justify-center"
-                          >
-                            +
-                          </button>
-                        </div>
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-600">When do you want to start training?</p>
+                      <input
+                        type="date"
+                        value={state.startDate}
+                        max={(() => {
+                          // Max start date is 4 weeks before race
+                          const race = new Date(state.raceDate + 'T00:00:00');
+                          race.setDate(race.getDate() - 4 * 7);
+                          const year = race.getFullYear();
+                          const month = String(race.getMonth() + 1).padStart(2, '0');
+                          const day = String(race.getDate()).padStart(2, '0');
+                          return `${year}-${month}-${day}`;
+                        })()}
+                        min={(() => {
+                          // Min start date is tomorrow
+                          const tomorrow = new Date();
+                          tomorrow.setDate(tomorrow.getDate() + 1);
+                          const year = tomorrow.getFullYear();
+                          const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+                          const day = String(tomorrow.getDate()).padStart(2, '0');
+                          return `${year}-${month}-${day}`;
+                        })()}
+                        onChange={(e) => {
+                          const newStart = e.target.value;
+                          // Calculate weeks from start to race
+                          const startDate = new Date(newStart + 'T00:00:00');
+                          const raceDate = new Date(state.raceDate + 'T00:00:00');
+                          const diffMs = raceDate.getTime() - startDate.getTime();
+                          const weeks = Math.max(4, Math.min(24, Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000))));
+                          setState(prev => ({ ...prev, startDate: newStart, duration: weeks }));
+                        }}
+                        className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm text-blue-800 font-medium">{state.duration} week plan</p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          {new Date(state.startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} → {new Date(state.raceDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                        </p>
                       </div>
-                      <p className="text-sm text-blue-600">
-                        Starts {new Date(state.startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                      </p>
                     </div>
                   )}
                   
