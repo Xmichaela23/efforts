@@ -84,12 +84,23 @@ const isMainCompound = (exerciseName: string): boolean => {
   const name = exerciseName.toLowerCase();
   // Main compounds: squat, deadlift, bench, overhead press
   return /squat|deadlift|bench|overhead|ohp/.test(name) && 
-         !/goblet|bulgarian|split|romanian|sumo|stiff/.test(name);
+         !/goblet|bulgarian|split|romanian|sumo|stiff|jump/.test(name);
+};
+
+// Check if exercise is a plyometric/explosive movement
+const isPlyometric = (exerciseName: string): boolean => {
+  const name = exerciseName.toLowerCase();
+  return /jump|bound|hop|box jump|bench jump|broad jump|depth jump|squat jump|tuck jump|split jump|plyo|explosive/.test(name);
 };
 
 // Calculate rest time based on exercise type and reps
 const calculateRestTime = (exerciseName: string, reps: number | undefined): number => {
   if (!reps || reps === 0) return 90; // Default 90 seconds
+  
+  // Plyometrics need full recovery between sets (2-3 min)
+  if (isPlyometric(exerciseName)) {
+    return 150; // 2:30 for neural recovery
+  }
   
   const isCompound = isMainCompound(exerciseName);
   
@@ -392,7 +403,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const isBodyweightMove = (raw?: string): boolean => {
     try {
       const n = String(raw || '').toLowerCase().replace(/[\s-]/g,'');
-      return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls|swissballwalk|swissball|walkout/.test(n);
+      // Include plyometrics as bodyweight (jumps, bounds, hops)
+      return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls|swissballwalk|swissball|walkout|jump|bound|hop|plyo/.test(n);
     } catch { return false; }
   };
 
@@ -2822,12 +2834,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           />
                         );
                       })()}
-                      {/* RIR input - hidden for mobility mode and duration-based exercises */}
+                      {/* RIR input - hidden for mobility mode, duration-based, and plyometric exercises */}
                       {(() => {
                         const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                         const isMobilityMode = loggerMode === 'mobility';
                         // Duration-based exercises (planks, holds, carries) don't use RIR
-                        if (isMobilityMode || isDurationBased) return null;
+                        // Plyometrics are explosive - you don't gauge effort, you just do max power reps
+                        if (isMobilityMode || isDurationBased || isPlyometric(exercise.name)) return null;
                         return (
                           <Input
                             type="number"
