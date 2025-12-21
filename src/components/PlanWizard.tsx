@@ -1796,11 +1796,11 @@ export default function PlanWizard() {
                         <RadioGroupItem value="injury_prevention" id="injury_prevention" className="mt-1" />
                         <Label htmlFor="injury_prevention" className="flex-1 cursor-pointer">
                           <span className="flex items-center gap-2">
-                            <span className="font-medium">Injury Prevention</span>
+                            <span className="font-medium">Functional Strength</span>
                             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Recommended</span>
                           </span>
                           <span className="block text-sm text-gray-500 mt-1">
-                            Single-leg stability, hip strength, injury prevention
+                            Single-leg stability, hip strength, movement quality
                           </span>
                           <span className="block text-xs text-gray-400 mt-1">
                             Equipment: Bodyweight + dumbbells (15-25 lbs)
