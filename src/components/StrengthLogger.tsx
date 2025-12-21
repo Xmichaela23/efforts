@@ -407,6 +407,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const n = String(name || '').toLowerCase();
     return n.includes('core work') && (n.includes('min') || n.includes('choice'));
   };
+  
+  // Helper: parse duration in seconds from exercise name (e.g., "5 min" -> 300, "3 min" -> 180)
+  const parseCoreWorkDuration = (name: string): number => {
+    const n = String(name || '').toLowerCase();
+    const match = n.match(/(\d+)\s*min/);
+    if (match) {
+      return parseInt(match[1], 10) * 60;
+    }
+    return 300; // Default 5 minutes
+  };
 
   // Helper: get RPE label
   const getRPELabel = (rpe: number): string => {
@@ -2443,6 +2453,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {isCoreWorkExercise(exercise.name) ? (
               <div className="p-2">
                 <CoreTimer
+                  initialDuration={parseCoreWorkDuration(exercise.name)}
                   onComplete={(coreExercises, totalSeconds) => {
                     // Store the completed core exercises in notes
                     const coreNotes = coreExercises

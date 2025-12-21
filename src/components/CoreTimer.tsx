@@ -152,7 +152,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-orange-800">Core Timer</h3>
-        <span className="text-sm text-orange-600">5 min - your choice</span>
+        <span className="text-sm text-orange-600">{Math.floor(initialDuration / 60)} min - your choice</span>
       </div>
       
       {/* Timer Display */}
