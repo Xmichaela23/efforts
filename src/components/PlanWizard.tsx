@@ -1434,13 +1434,13 @@ export default function PlanWizard() {
           return [8, 12, 16, 18];
         };
         
-        // Calculate weeks from race date
+        // Calculate weeks from race date (use ceil to include race week)
         const calculateWeeksFromRaceDate = (raceDate: string): number => {
           if (!raceDate) return 12;
           const race = new Date(raceDate + 'T00:00:00');
           const nextMon = new Date(getNextMonday() + 'T00:00:00');
           const diffMs = race.getTime() - nextMon.getTime();
-          const diffWeeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
+          const diffWeeks = Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000));
           return Math.max(4, Math.min(24, diffWeeks));
         };
         
@@ -1557,11 +1557,11 @@ export default function PlanWizard() {
                         })()}
                         onChange={(e) => {
                           const newStart = e.target.value;
-                          // Calculate weeks from start to race
+                          // Calculate weeks from start to race (use ceil to include race week)
                           const startDate = new Date(newStart + 'T00:00:00');
                           const raceDate = new Date(state.raceDate + 'T00:00:00');
                           const diffMs = raceDate.getTime() - startDate.getTime();
-                          const weeks = Math.max(4, Math.min(24, Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000))));
+                          const weeks = Math.max(4, Math.min(24, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))));
                           setState(prev => ({ ...prev, startDate: newStart, duration: weeks }));
                         }}
                         className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
