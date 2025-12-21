@@ -1725,24 +1725,24 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
     return (
       <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
-        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-          <button onClick={handleBack} className="flex items-center gap-1 p-0 h-auto text-gray-600 hover:text-black transition-colors text-xs sm:text-sm">
-            <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <button onClick={handleBack} className="flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm">
+            <ArrowLeft className="h-3.5 w-3.5" />
             Plans
           </button>
           
-          <div className="flex items-center">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {(() => {
               console.log('[Button Render] planStatus:', planStatus, 'selectedPlanDetail.status:', selectedPlanDetail?.status);
               if (planStatus === 'active') {
                 return (
-                  <button onClick={handlePausePlan} className="px-1.5 sm:px-2 py-1 text-gray-600 hover:text-black transition-colors text-xs sm:text-sm">
+                  <button onClick={handlePausePlan} className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm">
                     Pause
                   </button>
                 );
               } else if (planStatus === 'paused') {
                 return (
-                  <button onClick={handleResumePlan} className="px-1.5 sm:px-2 py-1 text-gray-600 hover:text-black transition-colors text-xs sm:text-sm">
+                  <button onClick={handleResumePlan} className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm">
                     Resume
                   </button>
                 );
@@ -1750,21 +1750,21 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               return null;
             })()}
 
-            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="hidden sm:block px-2 py-1 text-gray-600 hover:text-black transition-colors text-sm">
+            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="hidden sm:block px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm">
               Download
             </button>
-            <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="px-1.5 sm:px-2 py-1 text-gray-600 hover:text-black transition-colors text-xs sm:text-sm sm:hidden">
+            <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm sm:hidden">
               Info
             </button>
             
-            <button className="px-1.5 sm:px-2 py-1 text-gray-600 hover:text-black transition-colors text-xs sm:text-sm">
+            <button className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm">
               Modify
             </button>
             
             {(planStatus === 'active' || planStatus === 'paused') && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <button className="px-1.5 sm:px-2 py-1 text-orange-600 hover:text-orange-700 transition-colors text-xs sm:text-sm">
+                  <button className="px-2 py-1 rounded-md border border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 transition-colors text-sm">
                     End
                   </button>
                 </AlertDialogTrigger>
@@ -1787,7 +1787,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <button className="px-1.5 sm:px-2 py-1 text-gray-600 hover:text-red-600 transition-colors text-xs sm:text-sm">
+                <button className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors text-sm">
                   Delete
                 </button>
               </AlertDialogTrigger>
