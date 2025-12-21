@@ -94,6 +94,13 @@ export class BalancedBuildGenerator extends BaseGenerator {
   }
 
   protected generatePlanName(): string {
+    // If we have a race name, use it (e.g., "Boston Marathon 2025 Performance Plan")
+    if (this.params.race_name && this.params.race_date) {
+      const year = new Date(this.params.race_date + 'T00:00:00').getFullYear();
+      return `${this.params.race_name} ${year} Performance Plan`;
+    }
+    
+    // Fallback to distance-based naming
     const distanceNames: Record<string, string> = {
       '5k': '5K',
       '10k': '10K',

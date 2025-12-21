@@ -72,6 +72,7 @@ export interface GeneratorParams {
   user_id: string;
   start_date?: string;  // ISO date string (YYYY-MM-DD) - plan start date
   race_date?: string;   // ISO date string (YYYY-MM-DD) - race day
+  race_name?: string;   // Optional race name (e.g., "Boston Marathon")
   // Effort Score for pace calculations (Balanced Build only)
   effort_score?: number;
   effort_paces?: {

@@ -109,6 +109,7 @@ Deno.serve(async (req: Request) => {
       user_id: request.user_id,
       start_date: startDate,
       race_date: request.race_date,
+      race_name: request.race_name,
       effort_score: effortScore,
       effort_paces: effortPaces
     };
