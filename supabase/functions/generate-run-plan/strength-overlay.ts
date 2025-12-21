@@ -132,28 +132,28 @@ function createInjuryPreventionFullBody(phase: Phase, params: InjuryPreventionPa
     { name: 'Single Leg RDL', sets: 2, reps: 10, weight: 'Bodyweight' },
     { name: 'Push-ups', sets: 2, reps: 12, weight: 'Bodyweight' },
     { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Bodyweight' },
-    { name: 'Plank', sets: 2, reps: '45s', weight: 'Bodyweight' }
+    { name: 'Plank', sets: 2, reps: '45s hold', weight: 'Bodyweight' }
   ] : phase.name === 'Base' ? [
     { name: 'Bulgarian Split Squat', sets: params.sets, reps: 12, weight: weekInPhase >= 3 ? '15-20 lbs per hand' : 'Bodyweight' },
     { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: weekInPhase >= 3 ? '15 lbs per hand' : 'Bodyweight' },
     { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
     { name: 'Inverted Rows', sets: params.sets, reps: 12, weight: 'Bodyweight' },
-    { name: 'Dead Bugs', sets: params.sets, reps: 10, weight: 'Bodyweight' },
-    { name: 'Plank', sets: params.sets, reps: '60s', weight: 'Bodyweight' }
+    { name: 'Dead Bugs', sets: params.sets, reps: '10 each side', weight: 'Bodyweight' },
+    { name: 'Plank', sets: params.sets, reps: '60s hold', weight: 'Bodyweight' }
   ] : phase.name === 'Speed' ? [
     { name: 'Bulgarian Split Squat', sets: params.sets, reps: 10, weight: '20 lbs per hand' },
     { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: '25 lbs per hand' },
     { name: 'Push-ups', sets: params.sets, reps: 12, weight: 'Bodyweight' },
     { name: 'Inverted Rows', sets: params.sets, reps: 10, weight: 'Bodyweight' },
-    { name: 'Pallof Press', sets: params.sets, reps: 10, weight: 'Resistance Band' },
-    { name: 'Side Plank', sets: params.sets, reps: '45s each', weight: 'Bodyweight' }
+    { name: 'Pallof Press', sets: params.sets, reps: '10 each side', weight: 'Light band' },
+    { name: 'Side Plank', sets: params.sets, reps: '45s hold each side', weight: 'Bodyweight' }
   ] : [
-    { name: 'Walking Lunges', sets: params.sets, reps: 12, weight: '15 lbs per hand' },
+    { name: 'Walking Lunges', sets: params.sets, reps: '12 per leg', weight: '15 lbs per hand' },
     { name: 'Glute Bridges', sets: params.sets, reps: 15, weight: 'Bodyweight' },
     { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
     { name: 'Inverted Rows', sets: params.sets, reps: 12, weight: 'Bodyweight' },
-    { name: 'Bird Dogs', sets: params.sets, reps: 8, weight: 'Bodyweight' },
-    { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
+    { name: 'Bird Dogs', sets: params.sets, reps: '8 each side', weight: 'Bodyweight' },
+    { name: 'Plank', sets: params.sets, reps: '45s hold', weight: 'Bodyweight' }
   ];
 
   const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
@@ -174,29 +174,29 @@ function createInjuryPreventionUpperBody(phase: Phase, params: InjuryPreventionP
   const exercises: StrengthExercise[] = isRecovery ? [
     { name: 'Push-ups', sets: 2, reps: 12, weight: 'Bodyweight' },
     { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Bodyweight' },
-    { name: 'YTW Raises', sets: 2, reps: 10, weight: '5 lbs' },
-    { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Resistance Band' },
-    { name: 'Plank', sets: 2, reps: '30s', weight: 'Bodyweight' }
+    { name: 'YTW Raises', sets: 2, reps: '10 each position', weight: '5 lbs per hand' },
+    { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Light band' },
+    { name: 'Plank', sets: 2, reps: '30s hold', weight: 'Bodyweight' }
   ] : phase.name === 'Base' ? [
     { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
     { name: 'Inverted Rows', sets: params.sets, reps: 12, weight: 'Bodyweight' },
     { name: 'Pike Push-ups', sets: params.sets, reps: 8, weight: 'Bodyweight' },
-    { name: 'YTW Raises', sets: params.sets, reps: 10, weight: '5 lbs' },
-    { name: 'Face Pulls', sets: params.sets, reps: 15, weight: 'Resistance Band' },
-    { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
+    { name: 'YTW Raises', sets: params.sets, reps: '10 each position', weight: '5 lbs per hand' },
+    { name: 'Face Pulls', sets: params.sets, reps: 15, weight: 'Light band' },
+    { name: 'Plank', sets: params.sets, reps: '45s hold', weight: 'Bodyweight' }
   ] : phase.name === 'Speed' ? [
     { name: 'Push-ups', sets: params.sets, reps: 12, weight: 'Bodyweight' },
     { name: 'Inverted Rows', sets: params.sets, reps: 10, weight: 'Bodyweight' },
     { name: 'Pike Push-ups', sets: params.sets, reps: 10, weight: 'Bodyweight' },
-    { name: 'Lateral Raises', sets: params.sets, reps: 12, weight: '10 lbs' },
-    { name: 'Reverse Flyes', sets: params.sets, reps: 12, weight: '8 lbs' },
-    { name: 'Plank', sets: params.sets, reps: '60s', weight: 'Bodyweight' }
+    { name: 'Lateral Raises', sets: params.sets, reps: 12, weight: '8-12 lbs per hand' },
+    { name: 'Reverse Flyes', sets: params.sets, reps: 12, weight: '5-10 lbs per hand' },
+    { name: 'Plank', sets: params.sets, reps: '60s hold', weight: 'Bodyweight' }
   ] : [
     { name: 'Push-ups', sets: params.sets, reps: 15, weight: 'Bodyweight' },
     { name: 'Inverted Rows', sets: params.sets, reps: 12, weight: 'Bodyweight' },
-    { name: 'YTW Raises', sets: params.sets, reps: 12, weight: '5 lbs' },
-    { name: 'Face Pulls', sets: params.sets, reps: 15, weight: 'Resistance Band' },
-    { name: 'Plank', sets: params.sets, reps: '45s', weight: 'Bodyweight' }
+    { name: 'YTW Raises', sets: params.sets, reps: '12 each position', weight: '5 lbs per hand' },
+    { name: 'Face Pulls', sets: params.sets, reps: 15, weight: 'Light band' },
+    { name: 'Plank', sets: params.sets, reps: '45s hold', weight: 'Bodyweight' }
   ];
 
   const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
@@ -215,31 +215,31 @@ function createInjuryPreventionUpperBody(phase: Phase, params: InjuryPreventionP
 
 function createInjuryPreventionLowerBody(phase: Phase, params: InjuryPreventionParams, weekInPhase: number, isRecovery: boolean): Session {
   const exercises: StrengthExercise[] = isRecovery ? [
-    { name: 'Walking Lunges', sets: 2, reps: 12, weight: 'Bodyweight' },
+    { name: 'Walking Lunges', sets: 2, reps: '12 per leg', weight: 'Bodyweight' },
     { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
-    { name: 'Single Leg RDL', sets: 2, reps: 10, weight: 'Bodyweight' },
-    { name: 'Clamshells', sets: 2, reps: 15, weight: 'Bodyweight' },
-    { name: 'Side Plank', sets: 2, reps: '30s each', weight: 'Bodyweight' }
+    { name: 'Single Leg RDL', sets: 2, reps: '10 per leg', weight: 'Bodyweight' },
+    { name: 'Clamshells', sets: 2, reps: '15 per side', weight: 'Bodyweight or light band' },
+    { name: 'Side Plank', sets: 2, reps: '30s hold each side', weight: 'Bodyweight' }
   ] : phase.name === 'Base' ? [
-    { name: 'Bulgarian Split Squat', sets: params.sets, reps: 12, weight: weekInPhase >= 3 ? '15-20 lbs per hand' : 'Bodyweight' },
-    { name: 'Walking Lunges', sets: params.sets, reps: 12, weight: 'Bodyweight' },
-    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: 'Bodyweight' },
+    { name: 'Bulgarian Split Squat', sets: params.sets, reps: '12 per leg', weight: weekInPhase >= 3 ? '15-20 lbs per hand' : 'Bodyweight' },
+    { name: 'Walking Lunges', sets: params.sets, reps: '12 per leg', weight: 'Bodyweight' },
+    { name: 'Single Leg RDL', sets: params.sets, reps: '10 per leg', weight: 'Bodyweight' },
     { name: 'Hip Thrusts', sets: params.sets, reps: 12, weight: 'Bodyweight' },
-    { name: 'Clamshells', sets: params.sets, reps: 15, weight: 'Bodyweight' },
+    { name: 'Clamshells', sets: params.sets, reps: '15 per side', weight: 'Bodyweight or light band' },
     { name: 'Calf Raises', sets: params.sets, reps: 20, weight: 'Bodyweight' }
   ] : phase.name === 'Speed' ? [
-    { name: 'Bulgarian Split Squat', sets: params.sets, reps: 10, weight: '20 lbs per hand' },
-    { name: 'Reverse Lunges', sets: params.sets, reps: 10, weight: '15 lbs per hand' },
-    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: '25 lbs per hand' },
+    { name: 'Bulgarian Split Squat', sets: params.sets, reps: '10 per leg', weight: '20 lbs per hand' },
+    { name: 'Reverse Lunges', sets: params.sets, reps: '10 per leg', weight: '15 lbs per hand' },
+    { name: 'Single Leg RDL', sets: params.sets, reps: '10 per leg', weight: '25 lbs per hand' },
     { name: 'Hip Thrusts', sets: params.sets, reps: 12, weight: 'Bodyweight' },
-    { name: 'Clamshells', sets: params.sets, reps: 15, weight: 'Bodyweight' },
-    { name: 'Single Leg Calf Raises', sets: params.sets, reps: 15, weight: 'Bodyweight' }
+    { name: 'Clamshells', sets: params.sets, reps: '15 per side', weight: 'Light band' },
+    { name: 'Single Leg Calf Raises', sets: params.sets, reps: '15 per leg', weight: 'Bodyweight' }
   ] : [
-    { name: 'Walking Lunges', sets: params.sets, reps: 12, weight: '15 lbs per hand' },
+    { name: 'Walking Lunges', sets: params.sets, reps: '12 per leg', weight: '15 lbs per hand' },
     { name: 'Glute Bridges', sets: params.sets, reps: 15, weight: 'Bodyweight' },
-    { name: 'Single Leg RDL', sets: params.sets, reps: 10, weight: 'Bodyweight' },
-    { name: 'Clamshells', sets: params.sets, reps: 15, weight: 'Bodyweight' },
-    { name: 'Side Plank', sets: params.sets, reps: '45s each', weight: 'Bodyweight' }
+    { name: 'Single Leg RDL', sets: params.sets, reps: '10 per leg', weight: 'Bodyweight' },
+    { name: 'Clamshells', sets: params.sets, reps: '15 per side', weight: 'Bodyweight or light band' },
+    { name: 'Side Plank', sets: params.sets, reps: '45s hold each side', weight: 'Bodyweight' }
   ];
 
   const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
@@ -334,9 +334,9 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
     exercises = [
       { name: 'Hip Thrusts', sets: 3, reps: 8, weight: '70% 1RM' },
       { name: 'Romanian Deadlift', sets: 3, reps: 8, weight: '70% 1RM' },
-      { name: 'Bulgarian Split Squat', sets: 2, reps: 8, weight: 'Dumbbell' },
+      { name: 'Bulgarian Split Squat', sets: 2, reps: 8, weight: '15-20 lbs per hand' },
       { name: plyoExercise.name, sets: 2, reps: 3, weight: 'Bodyweight' },
-      { name: 'Plank', sets: 2, reps: '45s', weight: 'Bodyweight' }
+      { name: 'Plank', sets: 2, reps: '45s hold', weight: 'Bodyweight' }
     ];
     duration = 40;
     description = `Recovery - Reduced volume for adaptation. No heavy plyometrics. Target: 3 sets @ 70% 1RM, RIR 4-5.`;
@@ -345,9 +345,9 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
     exercises = [
       { name: 'Hip Thrusts', sets: 4, reps: 8, weight: `${load}% 1RM` },
       { name: 'Romanian Deadlift', sets: 3, reps: 8, weight: `${load}% 1RM` },
-      { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: 'Dumbbell' },
+      { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: '20-25 lbs per hand' },
       { name: plyoExercise.name, sets: 3, reps: weekInPhase >= 3 ? 6 : 5, weight: 'Bodyweight' },
-      { name: 'Plank', sets: 2, reps: '60s', weight: 'Bodyweight' }
+      { name: 'Plank', sets: 2, reps: '60s hold', weight: 'Bodyweight' }
     ];
     duration = 45;
     description = `Week ${weekInPhase} Base - Hip thrusts build glute strength for running power. RDL develops hamstring/glute with minimal fatigue. Target: 4 sets @ ${load}% 1RM, RIR 2-3.`;
@@ -356,20 +356,20 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
     exercises = [
       { name: 'Hip Thrusts', sets: 3, reps: 10, weight: `${load}% 1RM` },
       { name: 'Romanian Deadlift', sets: 3, reps: 8, weight: `${load}% 1RM` },
-      { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: 'Dumbbell' },
+      { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: '25-30 lbs per hand' },
       { name: 'Jump Squats', sets: 3, reps: weekInPhase >= 2 ? 8 : 6, weight: 'Bodyweight' },
-      { name: 'Bounding', sets: 3, reps: '6 per leg', weight: 'Bodyweight' }
+      { name: 'Power Skips', sets: 3, reps: '6 per leg', weight: 'Bodyweight' }
     ];
     duration = 45;
-    description = `Week ${weekInPhase} Speed - Explosive emphasis with jump squats and bounding. RDL maintains posterior chain. Target: 3 sets @ ${load}% 1RM, RIR 2-3.`;
+    description = `Week ${weekInPhase} Speed - Explosive emphasis with jump squats and power skips. RDL maintains posterior chain. Target: 3 sets @ ${load}% 1RM, RIR 2-3.`;
   } else {
     // Race Prep (Weeks 9-11): Maintenance only
     exercises = [
       { name: 'Hip Thrusts', sets: 2, reps: 12, weight: 'Bodyweight' },
       { name: 'Romanian Deadlift', sets: 2, reps: 10, weight: '60% 1RM' },
-      { name: 'Single Leg RDL', sets: 2, reps: 10, weight: 'Dumbbell' },
+      { name: 'Single Leg RDL', sets: 2, reps: '10 per leg', weight: '15-20 lbs per hand' },
       { name: plyoExercise.name, sets: 2, reps: 5, weight: 'Bodyweight' },
-      { name: 'Plank', sets: 2, reps: '45s', weight: 'Bodyweight' }
+      { name: 'Plank', sets: 2, reps: '45s hold', weight: 'Bodyweight' }
     ];
     duration = 35;
     description = `Week ${weekInPhase} Race Prep - Maintenance only during high running volume. Bodyweight hip thrusts for glute activation. Target: 2 sets @ 60% 1RM or Bodyweight, RIR 3-4.`;
@@ -399,9 +399,9 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
   if (isRecovery) {
     // Recovery weeks (4, 8): Lighter squat variation, reduced volume
     exercises = [
-      { name: 'Goblet Squat', sets: 3, reps: 10, weight: '60% 1RM' },
+      { name: 'Goblet Squat', sets: 3, reps: 10, weight: '25-35 lbs' },
       { name: 'Hip Thrusts', sets: 2, reps: 10, weight: 'Bodyweight' },
-      { name: 'Bulgarian Split Squat', sets: 2, reps: 8, weight: 'Dumbbell' },
+      { name: 'Bulgarian Split Squat', sets: 2, reps: 8, weight: '15-20 lbs per hand' },
       { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
       { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
     ];
@@ -412,8 +412,8 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
     exercises = [
       { name: 'Back Squat', sets: 4, reps: 6, weight: `${load}% 1RM` },
       { name: 'Hip Thrusts', sets: 3, reps: 8, weight: `${Math.max(65, load - 5)}% 1RM` },
-      { name: 'Walking Lunges', sets: 3, reps: '10 per leg', weight: 'Dumbbell' },
-      { name: 'Single Leg RDL', sets: 3, reps: 8, weight: 'Dumbbell' },
+      { name: 'Walking Lunges', sets: 3, reps: '10 per leg', weight: '15-25 lbs per hand' },
+      { name: 'Single Leg RDL', sets: 3, reps: 8, weight: '15-20 lbs per hand' },
       { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight' }
     ];
     duration = 45;
@@ -423,7 +423,7 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
     exercises = [
       { name: 'Back Squat', sets: 3, reps: 6, weight: `${load}% 1RM` },
       { name: 'Hip Thrusts', sets: 3, reps: 10, weight: `${load}% 1RM` },
-      { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: 'Dumbbell' },
+      { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: '25-30 lbs per hand' },
       { name: 'Broad Jumps', sets: 3, reps: 3, weight: 'Bodyweight' },
       { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight' }
     ];
@@ -432,10 +432,10 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
   } else {
     // Race Prep (Weeks 9-11): Single-leg stability maintenance
     exercises = [
-      { name: 'Goblet Squat', sets: 2, reps: 10, weight: '60% 1RM' },
+      { name: 'Goblet Squat', sets: 2, reps: 10, weight: '25-35 lbs' },
       { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
-      { name: 'Bulgarian Split Squat', sets: 2, reps: 10, weight: 'Dumbbell' },
-      { name: 'Single Leg RDL', sets: 2, reps: 10, weight: 'Dumbbell' },
+      { name: 'Bulgarian Split Squat', sets: 2, reps: 10, weight: '15-20 lbs per hand' },
+      { name: 'Single Leg RDL', sets: 2, reps: 10, weight: '15-20 lbs per hand' },
       { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
     ];
     duration = 35;
@@ -461,18 +461,18 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
 
 function createUpperBodyOptional(phase: Phase, weekInPhase: number, isRecovery: boolean, equipment: EquipmentType): Session {
   const pushExercise = equipment === 'commercial_gym'
-    ? { name: 'Dumbbell Bench Press', sets: 3, reps: isRecovery ? 12 : 10, weight: '65% 1RM' }
+    ? { name: 'Dumbbell Bench Press', sets: 3, reps: isRecovery ? 12 : 10, weight: '20-35 lbs per hand' }
     : { name: 'Push-ups', sets: 3, reps: isRecovery ? 12 : 15, weight: 'Bodyweight' };
   
   const rowExercise = equipment === 'commercial_gym'
-    ? { name: 'Dumbbell Rows', sets: 3, reps: isRecovery ? 12 : 10, weight: '65% 1RM' }
+    ? { name: 'Dumbbell Rows', sets: 3, reps: isRecovery ? 12 : 10, weight: '25-40 lbs per hand' }
     : { name: 'Inverted Rows', sets: 3, reps: isRecovery ? 12 : 10, weight: 'Bodyweight' };
 
   const exercises: StrengthExercise[] = [
     pushExercise,
     rowExercise,
-    { name: 'Plank', sets: 3, reps: isRecovery ? '45s' : '60s', weight: 'Bodyweight' },
-    { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Resistance Band' }
+    { name: 'Plank', sets: 3, reps: isRecovery ? '45s hold' : '60s hold', weight: 'Bodyweight' },
+    { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Light band' }
   ];
 
   const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
@@ -503,7 +503,7 @@ function createTaperSessionTier1(): Session {
       { name: 'Bodyweight Squats', sets: 2, reps: 10, weight: 'Bodyweight' },
       { name: 'Push-ups', sets: 2, reps: 10, weight: 'Bodyweight' },
       { name: 'Glute Bridges', sets: 2, reps: 12, weight: 'Bodyweight' },
-      { name: 'Plank', sets: 2, reps: '30s', weight: 'Bodyweight' }
+      { name: 'Plank', sets: 2, reps: '30s hold', weight: 'Bodyweight' }
     ],
     tags: ['strength', 'full_body', 'injury_prevention', 'phase:taper']
   };
