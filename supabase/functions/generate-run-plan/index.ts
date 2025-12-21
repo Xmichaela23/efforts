@@ -21,6 +21,7 @@ import {
   calculateEffortScore, 
   getPacesFromScore, 
   estimateScoreFromFitness,
+  getTargetTime,
   type TrainingPaces 
 } from './effort-score.ts';
 
@@ -195,6 +196,9 @@ Deno.serve(async (req: Request) => {
           days_per_week: request.days_per_week,
           strength_frequency: request.strength_frequency || 0,
           user_selected_start_date: startDate,
+          race_date: request.race_date || null,
+          effort_score: effortScore || null,
+          target_time: effortScore && request.distance ? getTargetTime(effortScore, request.distance) : null,
           baselines_required: plan.baselines_required,
           units: plan.units,
           weekly_summaries: plan.weekly_summaries

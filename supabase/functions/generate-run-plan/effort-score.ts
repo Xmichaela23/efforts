@@ -205,3 +205,49 @@ export function formatPace(seconds: number): string {
   const secs = seconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
+
+/**
+ * Get projected finish time for a given Effort Score and distance
+ * Returns time in seconds
+ */
+export function getTargetTime(score: number, distance: string): number | null {
+  // Map distance strings to RaceDistance
+  const distanceMap: Record<string, RaceDistance> = {
+    '5k': '5k',
+    '10k': '10k',
+    'half': 'half',
+    'half_marathon': 'half',
+    'marathon': 'marathon'
+  };
+  
+  const raceDistance = distanceMap[distance.toLowerCase()];
+  if (!raceDistance) return null;
+
+  let lower = VDOT_TABLE[0];
+  let upper = VDOT_TABLE[VDOT_TABLE.length - 1];
+
+  for (let i = 0; i < VDOT_TABLE.length - 1; i++) {
+    const current = VDOT_TABLE[i];
+    const next = VDOT_TABLE[i + 1];
+    
+    if (score >= current.vdot && score <= next.vdot) {
+      lower = current;
+      upper = next;
+      break;
+    }
+  }
+
+  if (score <= lower.vdot) {
+    return lower.times[raceDistance];
+  }
+  if (score >= upper.vdot) {
+    return upper.times[raceDistance];
+  }
+
+  // Interpolate between table entries
+  const fraction = (score - lower.vdot) / (upper.vdot - lower.vdot);
+  const lowerTime = lower.times[raceDistance];
+  const upperTime = upper.times[raceDistance];
+  
+  return Math.round(lowerTime - fraction * (lowerTime - upperTime));
+}

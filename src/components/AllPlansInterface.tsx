@@ -1835,6 +1835,72 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             </div>
           </div>
           <div className="p-2">
+            {/* Race date and Effort Score row */}
+            {(() => {
+              const config = selectedPlanDetail?.config || {};
+              const raceDate = config.race_date;
+              const effortScore = config.effort_score;
+              const targetTime = config.target_time;
+              const distance = config.distance;
+              
+              // Calculate weeks till race
+              const weeksToRace = raceDate ? (() => {
+                const race = new Date(raceDate + 'T00:00:00');
+                const now = new Date();
+                const diffMs = race.getTime() - now.getTime();
+                const diffWeeks = Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000));
+                return diffWeeks > 0 ? diffWeeks : 0;
+              })() : null;
+
+              // Format target time
+              const formatTime = (seconds: number | null): string => {
+                if (!seconds) return '';
+                const hrs = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                const secs = seconds % 60;
+                if (hrs > 0) {
+                  return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+              };
+
+              // Format distance for display
+              const distanceLabel = distance === 'half' ? 'Half Marathon' : 
+                distance === 'marathon' ? 'Marathon' : 
+                distance?.toUpperCase() || '';
+
+              if (!raceDate && !effortScore) return null;
+
+              return (
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600 mb-3 pb-3 border-b border-gray-200">
+                  {raceDate && (
+                    <>
+                      <span>
+                        <span className="font-semibold text-gray-900">
+                          {new Date(raceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span> race
+                      </span>
+                      {weeksToRace !== null && weeksToRace > 0 && (
+                        <span>
+                          <span className="font-semibold text-gray-900">{weeksToRace}</span> weeks to go
+                        </span>
+                      )}
+                    </>
+                  )}
+                  {effortScore && (
+                    <span>
+                      Effort Score <span className="font-semibold text-gray-900">{effortScore}</span>
+                    </span>
+                  )}
+                  {targetTime && distanceLabel && (
+                    <span>
+                      Goal <span className="font-semibold text-gray-900">{formatTime(targetTime)}</span> {distanceLabel}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
+            
             {/* Compact, single-line stats */}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600 mb-3">
               <span>
@@ -2004,6 +2070,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   const wsKey = String(selectedWeek);
                   const ws: any = weeklySummariesObj?.[wsKey] || {};
                   const totalMiles = typeof ws?.total_miles === 'number' ? ws.total_miles : null;
+
+                  // Calculate weeks till race for this week
+                  const raceDate = (selectedPlanDetail as any)?.config?.race_date;
+                  const weeksToRace = raceDate ? (() => {
+                    const totalWeeks = selectedPlanDetail.duration || selectedPlanDetail.duration_weeks || 0;
+                    return Math.max(0, totalWeeks - selectedWeek + 1);
+                  })() : null;
                   
                   return (
                     <span>
@@ -2018,6 +2091,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                       <span className="font-medium">{formatDuration(getWeeklyVolume(currentWeekData))}</span>
                       <span className="text-gray-400"> • </span>
                       <span>{count} workouts</span>
+                      {weeksToRace !== null && weeksToRace > 0 && (
+                        <>
+                          <span className="text-gray-400"> • </span>
+                          <span>{weeksToRace} {weeksToRace === 1 ? 'week' : 'weeks'} till race</span>
+                        </>
+                      )}
                       {isCur ? <span className="ml-2 text-blue-600">Current</span> : null}
                     </span>
                   );
