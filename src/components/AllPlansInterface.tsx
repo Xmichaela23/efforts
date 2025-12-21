@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target, Activity, Bike, Waves, Dumbbell, ChevronDown, Moon, ArrowUpDown, Send, Download } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target, Activity, Bike, Waves, Dumbbell, ChevronDown, Moon, ArrowUpDown, Send, Download, Info, XCircle } from 'lucide-react';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 // Planned workouts hook deprecated; unified server paths are the source of truth
@@ -1758,7 +1758,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               </button>
             </div>
             <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="flex items-center gap-1 px-2 py-1.5 text-gray-600 hover:text-black transition-colors text-sm sm:hidden">
-              Info
+              <Info className="h-3.5 w-3.5" />
             </button>
             
             <button className="flex items-center gap-1 px-2 py-1.5 text-gray-600 hover:text-black transition-colors text-sm">
@@ -1770,7 +1770,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <button className="flex items-center gap-1 px-2 py-1.5 text-orange-600 hover:text-orange-700 transition-colors text-sm whitespace-nowrap">
-                    <span className="sm:hidden">End</span>
+                    <XCircle className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">End Plan</span>
                   </button>
                 </AlertDialogTrigger>
