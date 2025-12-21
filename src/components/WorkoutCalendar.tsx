@@ -921,6 +921,25 @@ export default function WorkoutCalendar({
                     }
                     return null;
                   })()}
+                  
+                  {/* Training plan context - phase and race countdown */}
+                  {trainingPlanContext && (
+                    <div className="pt-2 mt-2 border-t border-gray-200 text-xs text-gray-600">
+                      <div className="flex items-center gap-1">
+                        {trainingPlanContext.focus && (
+                          <span className="font-medium text-gray-700">{trainingPlanContext.focus}</span>
+                        )}
+                        {trainingPlanContext.focus && trainingPlanContext.weeksToRace && (
+                          <span className="text-gray-400">•</span>
+                        )}
+                        {trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
+                          <span>
+                            {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

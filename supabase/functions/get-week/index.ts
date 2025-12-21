@@ -1045,19 +1045,29 @@ Deno.serve(async (req)=>{
     const trainingPlanId = plannedWorkouts.find((p)=>p.planned?.training_plan_id)?.planned?.training_plan_id;
     if (trainingPlanId) {
       try {
-        const { data: planData } = await supabase.from('plans').select('config, name, current_week').eq('id', trainingPlanId).single();
+        const { data: planData } = await supabase.from('plans').select('config, name, current_week, duration_weeks').eq('id', trainingPlanId).single();
         if (planData?.config) {
           const config = planData.config;
           const weeklySummaries = config.weekly_summaries || {};
           // Use current_week from database instead of calculating
           const currentWeek = planData.current_week || 1;
           const weekSummary = weeklySummaries[String(currentWeek)] || {};
+          
+          // Calculate weeks till race
+          const durationWeeks = planData.duration_weeks || config.duration_weeks || 0;
+          const weeksToRace = durationWeeks > 0 ? Math.max(0, durationWeeks - currentWeek + 1) : null;
+          
           trainingPlanContext = {
             planName: planData.name,
             currentWeek,
+            durationWeeks,
             focus: weekSummary.focus,
             notes: weekSummary.notes,
-            keyWorkouts: weekSummary.key_workouts || []
+            keyWorkouts: weekSummary.key_workouts || [],
+            // Race info from config
+            raceDate: config.race_date || null,
+            raceName: config.race_name || null,
+            weeksToRace
           };
         }
       } catch (error) {
