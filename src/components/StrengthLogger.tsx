@@ -10,6 +10,7 @@ import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle } from 'l
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
+import CoreTimer from '@/components/CoreTimer';
 
 interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
@@ -399,6 +400,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const isDurationBasedExercise = (name: string): boolean => {
     const n = String(name || '').toLowerCase();
     return /plank|hold|carry|farmer|suitcase|wall sit|iso|isometric|time|seconds?|sec/.test(n);
+  };
+  
+  // Helper: detect if this is a Core Work exercise that should use CoreTimer
+  const isCoreWorkExercise = (name: string): boolean => {
+    const n = String(name || '').toLowerCase();
+    return n.includes('core work') && (n.includes('min') || n.includes('choice'));
   };
 
   // Helper: get RPE label
@@ -2432,6 +2439,38 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         )}
         {exercises.map((exercise, exerciseIndex) => (
           <div key={exercise.id} className="bg-white">
+            {/* Core Work exercises use the CoreTimer component */}
+            {isCoreWorkExercise(exercise.name) ? (
+              <div className="p-2">
+                <CoreTimer
+                  onComplete={(coreExercises, totalSeconds) => {
+                    // Store the completed core exercises in notes
+                    const coreNotes = coreExercises
+                      .filter(e => e.name && e.completed)
+                      .map(e => `${e.name}: ${e.amount}`)
+                      .join(', ');
+                    setExercises(prev => prev.map(ex => 
+                      ex.id === exercise.id 
+                        ? { ...ex, notes: coreNotes || 'Core work completed' }
+                        : ex
+                    ));
+                  }}
+                />
+                {exercises.length > 1 && (
+                  <div className="flex justify-end mt-2">
+                    <Button 
+                      onClick={() => deleteExercise(exercise.id)} 
+                      variant="ghost" 
+                      size="sm"
+                      className="text-gray-600 hover:text-gray-800"
+                    >
+                      <X className="h-4 w-4 mr-1" /> Remove
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+            <>
             <div className="p-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 relative">
@@ -2926,6 +2965,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   return null;
                 })()}
               </div>
+            )}
+            </>
             )}
           </div>
         ))}

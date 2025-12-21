@@ -340,6 +340,76 @@ export const STRENGTH_EXERCISES: StrengthExercise[] = [
   }
 ];
 
+// Core Exercise Library - for Core Timer component
+export interface CoreExercise {
+  name: string;
+  category: 'abs' | 'obliques' | 'lower_back' | 'full_core' | 'stability';
+  equipment: string[];
+  defaultAmount: string; // e.g., "20 reps", "60s", "30s each side"
+}
+
+export const CORE_EXERCISES: CoreExercise[] = [
+  // Abs - Front Core
+  { name: 'Crunch', category: 'abs', equipment: [], defaultAmount: '20' },
+  { name: 'Reverse Crunch', category: 'abs', equipment: [], defaultAmount: '15' },
+  { name: 'Bicycle Crunch', category: 'abs', equipment: [], defaultAmount: '20 each' },
+  { name: 'V-Up', category: 'abs', equipment: [], defaultAmount: '12' },
+  { name: 'Toe Touch', category: 'abs', equipment: [], defaultAmount: '15' },
+  { name: 'Leg Raise', category: 'abs', equipment: [], defaultAmount: '12' },
+  { name: 'Hanging Leg Raise', category: 'abs', equipment: ['pull_up_bar'], defaultAmount: '10' },
+  { name: 'Flutter Kicks', category: 'abs', equipment: [], defaultAmount: '30s' },
+  { name: 'Scissor Kicks', category: 'abs', equipment: [], defaultAmount: '30s' },
+  { name: 'Hollow Body Hold', category: 'abs', equipment: [], defaultAmount: '30s' },
+  { name: 'Hollow Body Rock', category: 'abs', equipment: [], defaultAmount: '20' },
+  { name: 'Sit-Up', category: 'abs', equipment: [], defaultAmount: '20' },
+  { name: 'Ab Rollout', category: 'abs', equipment: ['ab_wheel'], defaultAmount: '10' },
+  { name: 'Cable Crunch', category: 'abs', equipment: ['cable'], defaultAmount: '15' },
+  { name: 'Decline Crunch', category: 'abs', equipment: ['decline_bench'], defaultAmount: '15' },
+  
+  // Obliques - Side Core
+  { name: 'Russian Twist', category: 'obliques', equipment: [], defaultAmount: '20 each' },
+  { name: 'Side Crunch', category: 'obliques', equipment: [], defaultAmount: '15 each' },
+  { name: 'Bicycle', category: 'obliques', equipment: [], defaultAmount: '20 each' },
+  { name: 'Heel Touch', category: 'obliques', equipment: [], defaultAmount: '20 each' },
+  { name: 'Woodchop', category: 'obliques', equipment: ['cable', 'dumbbell'], defaultAmount: '12 each' },
+  { name: 'Side Bend', category: 'obliques', equipment: ['dumbbell'], defaultAmount: '15 each' },
+  { name: 'Hanging Knee Raise (Oblique)', category: 'obliques', equipment: ['pull_up_bar'], defaultAmount: '10 each' },
+  { name: 'Pallof Press', category: 'obliques', equipment: ['cable', 'band'], defaultAmount: '10 each' },
+  { name: 'Landmine Rotation', category: 'obliques', equipment: ['barbell'], defaultAmount: '10 each' },
+  
+  // Lower Back
+  { name: 'Superman', category: 'lower_back', equipment: [], defaultAmount: '12' },
+  { name: 'Back Extension', category: 'lower_back', equipment: ['back_extension_bench'], defaultAmount: '15' },
+  { name: 'Reverse Hyper', category: 'lower_back', equipment: ['reverse_hyper'], defaultAmount: '12' },
+  { name: 'Bird Dog', category: 'lower_back', equipment: [], defaultAmount: '10 each' },
+  { name: 'Good Morning (Bodyweight)', category: 'lower_back', equipment: [], defaultAmount: '15' },
+  
+  // Full Core / Stability
+  { name: 'Plank', category: 'stability', equipment: [], defaultAmount: '60s' },
+  { name: 'Side Plank', category: 'stability', equipment: [], defaultAmount: '30s each' },
+  { name: 'Plank Shoulder Tap', category: 'stability', equipment: [], defaultAmount: '20' },
+  { name: 'Plank Hip Dip', category: 'stability', equipment: [], defaultAmount: '15 each' },
+  { name: 'Mountain Climber', category: 'stability', equipment: [], defaultAmount: '30s' },
+  { name: 'Bear Crawl', category: 'stability', equipment: [], defaultAmount: '30s' },
+  { name: 'Dead Bug', category: 'stability', equipment: [], defaultAmount: '10 each' },
+  { name: 'Stir the Pot', category: 'stability', equipment: ['stability_ball'], defaultAmount: '10 each' },
+  { name: 'Body Saw', category: 'stability', equipment: [], defaultAmount: '10' },
+  { name: 'Copenhagen Plank', category: 'stability', equipment: ['bench'], defaultAmount: '20s each' },
+  { name: 'Turkish Get-Up', category: 'full_core', equipment: ['kettlebell'], defaultAmount: '3 each' },
+  { name: 'Farmer Carry', category: 'full_core', equipment: ['dumbbells', 'kettlebells'], defaultAmount: '40s' },
+  { name: 'Suitcase Carry', category: 'full_core', equipment: ['dumbbell', 'kettlebell'], defaultAmount: '30s each' },
+  { name: 'L-Sit', category: 'full_core', equipment: [], defaultAmount: '20s' },
+  { name: 'Dragon Flag', category: 'full_core', equipment: ['bench'], defaultAmount: '5' },
+  { name: 'Ab Wheel Rollout', category: 'full_core', equipment: ['ab_wheel'], defaultAmount: '10' },
+];
+
+// Helper to get core exercise names for autocomplete
+export const getCoreExerciseNames = (): string[] => CORE_EXERCISES.map(e => e.name);
+
+// Helper to find a core exercise by name
+export const findCoreExercise = (name: string): CoreExercise | undefined => 
+  CORE_EXERCISES.find(e => e.name.toLowerCase() === name.toLowerCase());
+
 // Mobility Exercise Library
 export const MOBILITY_EXERCISES: MobilityExercise[] = [
   // Swim-Specific Mobility
