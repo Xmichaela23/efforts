@@ -40,6 +40,96 @@ type EquipmentType = 'home_gym' | 'commercial_gym';
 
 type PaceInputMethod = 'race' | 'paces' | 'estimate' | null;
 
+// ============================================================================
+// MAJOR MARATHONS DATABASE
+// ============================================================================
+
+interface MajorMarathon {
+  name: string;
+  city: string;
+  country: string;
+  // Date pattern: month (1-12), weekday (0=Sun, 1=Mon, etc.), weekNum (1=first, -1=last)
+  // OR fixed date: month, day
+  datePattern: { month: number; weekday: number; weekNum: number } | { month: number; day: number };
+}
+
+const MAJOR_MARATHONS: MajorMarathon[] = [
+  // World Marathon Majors
+  { name: 'Boston Marathon', city: 'Boston', country: 'USA', datePattern: { month: 4, weekday: 1, weekNum: 3 } }, // 3rd Monday of April
+  { name: 'London Marathon', city: 'London', country: 'UK', datePattern: { month: 4, weekday: 0, weekNum: 4 } }, // 4th Sunday of April
+  { name: 'Berlin Marathon', city: 'Berlin', country: 'Germany', datePattern: { month: 9, weekday: 0, weekNum: -1 } }, // Last Sunday of September
+  { name: 'Chicago Marathon', city: 'Chicago', country: 'USA', datePattern: { month: 10, weekday: 0, weekNum: 2 } }, // 2nd Sunday of October
+  { name: 'NYC Marathon', city: 'New York', country: 'USA', datePattern: { month: 11, weekday: 0, weekNum: 1 } }, // 1st Sunday of November
+  { name: 'Tokyo Marathon', city: 'Tokyo', country: 'Japan', datePattern: { month: 3, weekday: 0, weekNum: 1 } }, // 1st Sunday of March
+  
+  // Major US Marathons
+  { name: 'LA Marathon', city: 'Los Angeles', country: 'USA', datePattern: { month: 3, weekday: 0, weekNum: 2 } }, // 2nd Sunday of March
+  { name: 'Marine Corps Marathon', city: 'Washington DC', country: 'USA', datePattern: { month: 10, weekday: 0, weekNum: -1 } }, // Last Sunday of October
+  { name: 'Philadelphia Marathon', city: 'Philadelphia', country: 'USA', datePattern: { month: 11, weekday: 0, weekNum: 3 } }, // 3rd Sunday of November
+  { name: 'Houston Marathon', city: 'Houston', country: 'USA', datePattern: { month: 1, weekday: 0, weekNum: 2 } }, // 2nd Sunday of January
+  { name: 'Austin Marathon', city: 'Austin', country: 'USA', datePattern: { month: 2, weekday: 0, weekNum: 2 } }, // 2nd Sunday of February
+  { name: 'Twin Cities Marathon', city: 'Minneapolis', country: 'USA', datePattern: { month: 10, weekday: 0, weekNum: 1 } }, // 1st Sunday of October
+  { name: 'Big Sur Marathon', city: 'Carmel', country: 'USA', datePattern: { month: 4, weekday: 0, weekNum: -1 } }, // Last Sunday of April
+  { name: 'Grandmas Marathon', city: 'Duluth', country: 'USA', datePattern: { month: 6, weekday: 6, weekNum: 3 } }, // 3rd Saturday of June
+  { name: 'San Francisco Marathon', city: 'San Francisco', country: 'USA', datePattern: { month: 7, weekday: 0, weekNum: -1 } }, // Last Sunday of July
+  { name: 'Richmond Marathon', city: 'Richmond', country: 'USA', datePattern: { month: 11, weekday: 6, weekNum: 2 } }, // 2nd Saturday of November
+  { name: 'CIM Sacramento', city: 'Sacramento', country: 'USA', datePattern: { month: 12, weekday: 0, weekNum: 1 } }, // 1st Sunday of December
+  { name: 'St. George Marathon', city: 'St. George', country: 'USA', datePattern: { month: 10, weekday: 6, weekNum: 1 } }, // 1st Saturday of October
+];
+
+// Get the Nth weekday of a month (or last if weekNum is -1)
+function getNthWeekdayOfMonth(year: number, month: number, weekday: number, weekNum: number): Date {
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
+  
+  if (weekNum === -1) {
+    // Last occurrence of weekday in month
+    let day = lastDay.getDate();
+    while (new Date(year, month - 1, day).getDay() !== weekday) {
+      day--;
+    }
+    return new Date(year, month - 1, day);
+  }
+  
+  // Find first occurrence of weekday
+  let firstOccurrence = 1;
+  while (new Date(year, month - 1, firstOccurrence).getDay() !== weekday) {
+    firstOccurrence++;
+  }
+  
+  // Add weeks to get to Nth occurrence
+  const day = firstOccurrence + (weekNum - 1) * 7;
+  return new Date(year, month - 1, day);
+}
+
+// Get race date for a given year
+function getMarathonDate(marathon: MajorMarathon, year: number): Date {
+  const pattern = marathon.datePattern;
+  if ('day' in pattern) {
+    return new Date(year, pattern.month - 1, pattern.day);
+  }
+  return getNthWeekdayOfMonth(year, pattern.month, pattern.weekday, pattern.weekNum);
+}
+
+// Find matching marathon for a given date (within 3 days tolerance)
+function findMatchingMarathon(dateStr: string): MajorMarathon | null {
+  if (!dateStr) return null;
+  
+  const selectedDate = new Date(dateStr + 'T00:00:00');
+  const year = selectedDate.getFullYear();
+  
+  for (const marathon of MAJOR_MARATHONS) {
+    const marathonDate = getMarathonDate(marathon, year);
+    const diffDays = Math.abs((selectedDate.getTime() - marathonDate.getTime()) / (24 * 60 * 60 * 1000));
+    
+    if (diffDays <= 3) {
+      return marathon;
+    }
+  }
+  
+  return null;
+}
+
 interface WizardState {
   discipline: Discipline | null;
   distance: Distance | null;
@@ -1377,11 +1467,17 @@ export default function PlanWizard() {
         const handleRaceDateChange = (raceDate: string) => {
           const weeks = calculateWeeksFromRaceDate(raceDate);
           const startDate = calculateStartFromRace(raceDate, weeks);
+          
+          // Check if this matches a major marathon (only for marathon distance)
+          const matchingMarathon = state.distance === 'marathon' ? findMatchingMarathon(raceDate) : null;
+          
           setState(prev => ({
             ...prev,
             raceDate,
             duration: weeks,
-            startDate
+            startDate,
+            // Auto-fill race name if we found a match (but don't overwrite if user already entered one)
+            raceName: matchingMarathon && !prev.raceName ? matchingMarathon.name : prev.raceName
           }));
         };
         
@@ -1417,13 +1513,18 @@ export default function PlanWizard() {
                     onChange={(e) => handleRaceDateChange(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
-                  <input
-                    type="text"
-                    value={state.raceName}
-                    onChange={(e) => setState(prev => ({ ...prev, raceName: e.target.value }))}
-                    placeholder="Race name (optional, e.g., Boston Marathon)"
-                    className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      value={state.raceName}
+                      onChange={(e) => setState(prev => ({ ...prev, raceName: e.target.value }))}
+                      placeholder="Race name (optional)"
+                      className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    {state.distance === 'marathon' && state.raceDate && findMatchingMarathon(state.raceDate) && state.raceName === findMatchingMarathon(state.raceDate)?.name && (
+                      <p className="text-xs text-green-600">Auto-detected major marathon</p>
+                    )}
+                  </div>
                   {state.raceDate && (
                     <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                       <div className="flex items-center justify-between mb-2">
