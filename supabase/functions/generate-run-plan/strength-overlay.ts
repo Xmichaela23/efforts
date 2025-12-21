@@ -155,7 +155,7 @@ function createInjuryPreventionFullBody(phase: Phase, params: InjuryPreventionPa
   const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
   
   // Add core work to all sessions
-  exercises.push({ name: 'Core Work', sets: 1, reps: '5 min', weight: 'Your choice' });
+  exercises.push({ name: 'Core Work (5 min - your choice)', sets: 1, reps: 1, weight: '' });
   
   return {
     day: 'Monday',
@@ -199,7 +199,7 @@ function createInjuryPreventionUpperBody(phase: Phase, params: InjuryPreventionP
   const intensity = isRecovery ? 'light (RPE 5/10). Reduced volume for recovery.' : params.intensity;
 
   // Add core work to all sessions
-  exercises.push({ name: 'Core Work', sets: 1, reps: '5 min', weight: 'Your choice' });
+  exercises.push({ name: 'Core Work (5 min - your choice)', sets: 1, reps: 1, weight: '' });
 
   return {
     day: 'Wednesday',
@@ -242,7 +242,7 @@ function createInjuryPreventionLowerBody(phase: Phase, params: InjuryPreventionP
   const weekDesc = isRecovery ? 'Recovery' : `Week ${weekInPhase} ${phase.name}`;
   
   // Add core work to all sessions
-  exercises.push({ name: 'Core Work', sets: 1, reps: '5 min', weight: 'Your choice' });
+  exercises.push({ name: 'Core Work (5 min - your choice)', sets: 1, reps: 1, weight: '' });
   
   return {
     day: 'Friday',
@@ -378,7 +378,7 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
   }
 
   // Add core work to all sessions
-  exercises.push({ name: 'Core Work', sets: 1, reps: '5 min', weight: 'Your choice' });
+  exercises.push({ name: 'Core Work (5 min - your choice)', sets: 1, reps: 1, weight: '' });
 
   return {
     day: 'Monday',
@@ -448,7 +448,7 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
   }
 
   // Add core work to all sessions
-  exercises.push({ name: 'Core Work', sets: 1, reps: '5 min', weight: 'Your choice' });
+  exercises.push({ name: 'Core Work (5 min - your choice)', sets: 1, reps: 1, weight: '' });
 
   return {
     day: 'Friday',
@@ -481,7 +481,7 @@ function createUpperBodyOptional(phase: Phase, weekInPhase: number, isRecovery: 
       { name: 'Bench Press', sets: 2, reps: 10, weight: '60% 1RM' },
       { name: 'Barbell Rows', sets: 2, reps: 10, weight: '55% 1RM' },
       { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Light band' },
-      { name: 'Core Work', sets: 1, reps: '5 min', weight: 'Your choice' }
+      { name: 'Core Work (5 min - your choice)', sets: 1, reps: 1, weight: '' }
     ];
   } else {
     // Full sessions: chest, back, shoulders, triceps
@@ -493,7 +493,7 @@ function createUpperBodyOptional(phase: Phase, weekInPhase: number, isRecovery: 
       { name: 'Barbell Rows', sets: 3, reps: 8, weight: '70% 1RM' },
       { name: 'Lateral Raises', sets: 3, reps: 12, weight: '35% 1RM' },
       { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Light cable or band' },
-      { name: 'Core Work', sets: 1, reps: '5 min', weight: 'Your choice' }
+      { name: 'Core Work (5 min - your choice)', sets: 1, reps: 1, weight: '' }
     ];
   }
 

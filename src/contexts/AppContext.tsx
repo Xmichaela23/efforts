@@ -581,6 +581,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { error } = await supabase.functions.invoke('delete-plan', { body: { plan_id: String(planId) } }) as any;
       if (error) throw error as any;
       await loadPlans();
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
     } catch (error) {
       console.error('Error in deletePlan:', error);
@@ -597,6 +598,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error) throw error as any;
       if (!data?.success) throw new Error(data?.error || 'Failed to end plan');
       await loadPlans();
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
       return data;
     } catch (error) {
@@ -623,6 +625,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
       
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
       return data;
     } catch (error) {
