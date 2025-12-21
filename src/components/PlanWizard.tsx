@@ -883,9 +883,9 @@ export default function PlanWizard() {
                   <RadioGroupItem value="complete" id="complete" className="mt-1" />
                   <Label htmlFor="complete" className="flex-1 cursor-pointer">
                     <span className="block font-medium">Complete</span>
-                    <span className="block text-sm text-gray-500 mt-0.5">Finish the distance comfortably</span>
-                    <span className="block text-xs text-blue-600 mt-2">
-                      → Uses Simple Completion plan (effort-based, flexible)
+                    <span className="block text-xs text-gray-500 mt-0.5 italic">For those focused on the experience, returning to running, or first-timers who want to complete</span>
+                    <span className="block text-sm text-gray-600 mt-2">
+                      Build the endurance to finish strong. Training is effort-based (easy, moderate, hard) so you can run by feel.
                     </span>
                   </Label>
                 </div>
@@ -904,14 +904,14 @@ export default function PlanWizard() {
                     <span className="block font-medium">
                       {state.fitness === 'beginner' ? 'Speed (Locked)' : 'Speed'}
                     </span>
-                    <span className="block text-sm text-gray-500 mt-0.5">Train with a focus on speed</span>
+                    <span className="block text-xs text-gray-500 mt-0.5 italic">For experienced runners looking to improve their time</span>
                     {state.fitness === 'beginner' ? (
                       <span className="block text-xs text-amber-600 mt-2">
                         Requires Intermediate+ fitness (25+ mpw). Build your base first!
                       </span>
                     ) : (
-                      <span className="block text-xs text-blue-600 mt-2">
-                        → Uses Balanced Build plan (Effort Score pacing, structured intervals)
+                      <span className="block text-sm text-gray-600 mt-2">
+                        Train with a focus on improving speed. Includes structured intervals and tempo runs with paces calculated from your 5K.
                       </span>
                     )}
                   </Label>
