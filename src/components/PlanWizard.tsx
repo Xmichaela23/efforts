@@ -497,6 +497,7 @@ export default function PlanWizard() {
         goal: state.goal,
         duration_weeks: state.duration,
         start_date: state.startDate,
+        race_date: state.hasRaceDate ? state.raceDate : undefined,
         approach: state.approach,
         days_per_week: state.daysPerWeek,
         strength_frequency: state.strengthFrequency,
