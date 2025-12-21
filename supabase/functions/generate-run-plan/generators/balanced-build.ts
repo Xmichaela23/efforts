@@ -112,8 +112,8 @@ export class BalancedBuildGenerator extends BaseGenerator {
   }
 
   protected generatePlanDescription(): string {
-    return `A ${this.params.duration_weeks}-week performance-focused plan using VDOT-based pacing. ` +
-      `Features two quality workouts per week (intervals and tempo) with all paces calculated from your 5K time. ` +
+    return `A ${this.params.duration_weeks}-week performance-focused plan with personalized pace zones. ` +
+      `Features two quality workouts per week (intervals and tempo) with paces calculated from your race times. ` +
       `Based on proven training principles.`;
   }
 

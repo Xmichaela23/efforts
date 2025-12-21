@@ -169,7 +169,7 @@ export const METHODOLOGIES: Record<string, MethodologyDefinition> = {
     name: 'Simple Completion',
     shortDescription: 'Easy-to-follow plan focused on finishing healthy',
     longDescription: 'Straightforward training using effort-based pacing (easy, moderate, hard) so you don\'t need complicated pace charts. Minimal speedwork keeps training enjoyable while building the endurance needed to cross the finish line.',
-    basedOn: 'Adapted from Hal Higdon\'s progressive training principles',
+    basedOn: 'Adapted from progressive training principles',
     availableForGoals: ['complete'],
     requiredFitness: ['beginner', 'intermediate', 'advanced'],
     supported_days: ['3-4', '4-5', '5-6'],
@@ -184,14 +184,14 @@ export const METHODOLOGIES: Record<string, MethodologyDefinition> = {
   'balanced_build': {
     id: 'balanced_build',
     name: 'Balanced Build',
-    shortDescription: 'Structured quality with VDOT-based pacing',
-    longDescription: 'Science-based training with precise pace zones (Easy, Marathon, Threshold, Interval) calculated from your 5K time. Two quality days per week with structured intervals and tempo runs.',
-    basedOn: 'Adapted from principles in Jack Daniels\' Running Formula',
+    shortDescription: 'Structured quality with personalized pace zones',
+    longDescription: 'Science-based training with precise pace zones (Easy, Marathon, Threshold, Interval) calculated from your race times. Two quality days per week with structured intervals and tempo runs.',
+    basedOn: 'Adapted from established running science principles',
     availableForGoals: ['speed'],
     requiredFitness: ['intermediate', 'advanced'],
     supported_days: ['4-5', '5-6', '6-7'],
     characteristics: [
-      'VDOT-based pacing system',
+      'Personalized pace zones',
       'Structured intervals (e.g., 6×800m)',
       'Two quality days per week',
       'Progressive 4-phase structure',
@@ -215,14 +215,14 @@ export const APPROACH_CONSTRAINTS: Record<string, ApproachConstraints> = {
     max_days: '5-6',
     supported_days: ['3-4', '4-5', '5-6'],
     description: 'Easy-to-follow plan focused on finishing healthy',
-    philosophy: 'Effort-based pacing, minimal speedwork, conservative progression. Based on Hal Higdon\'s principles.'
+    philosophy: 'Effort-based pacing, minimal speedwork, conservative progression. Based on progressive training principles.'
   },
   'balanced_build': {
     min_days: '4-5',
     max_days: '6-7',
     supported_days: ['4-5', '5-6', '6-7'],
-    description: 'Structured quality with VDOT-based pacing',
-    philosophy: 'VDOT pacing, 2Q system, structured intervals. Based on Jack Daniels\' principles.'
+    description: 'Structured quality with personalized pace zones',
+    philosophy: 'Effort-based pacing, 2Q system, structured intervals. Based on established training science.'
   }
 };
 

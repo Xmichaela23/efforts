@@ -294,8 +294,8 @@ const METHODOLOGIES: Record<Approach, {
   'balanced_build': {
     name: 'Balanced Build',
     shortDescription: 'Structured quality with personalized pacing',
-    longDescription: 'Two quality workouts per week with structured intervals and tempo runs. All paces calculated from your 5K time.',
-    basedOn: 'Based on Jack Daniels\' Running Formula principles',
+    longDescription: 'Two quality workouts per week with structured intervals and tempo runs. All paces calculated from your race times.',
+    basedOn: 'Based on established running science',
     supported_days: ['4-5', '5-6', '6-7']
   }
 };
@@ -923,9 +923,9 @@ export default function PlanWizard() {
             {state.goal && (
               <p className="text-xs text-gray-400 mt-4">
                 {state.goal === 'complete' 
-                  ? 'Plan based on Hal Higdon\'s progressive training principles.'
-                  : 'Plan based on Jack Daniels\' Running Formula principles.'}
-                {' '}Not officially endorsed.
+                  ? 'Plan based on progressive training principles.'
+                  : 'Plan based on established running science.'}
+                {' '}Personalized to your fitness level.
               </p>
             )}
           </StepContainer>

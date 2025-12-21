@@ -133,7 +133,7 @@ export class SimpleCompletionGenerator extends BaseGenerator {
   protected generatePlanDescription(): string {
     return `A ${this.params.duration_weeks}-week plan designed to get you to the finish line healthy and confident. ` +
       `Uses effort-based pacing (no complicated pace charts) with optional light speedwork. ` +
-      `Based on Hal Higdon's progressive training approach (not officially endorsed).`;
+      `Based on progressive training principles.`;
   }
 
   private generateWeekSessions(
