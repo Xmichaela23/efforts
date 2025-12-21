@@ -353,15 +353,18 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
     description = `Week ${weekInPhase} Base - Hip thrusts build glute strength for running power. RDL develops hamstring/glute with minimal fatigue. Target: 4 sets @ ${load}% 1RM, RIR 2-3.`;
   } else if (phase.name === 'Speed') {
     // Speed phase (Weeks 5-7): Explosive emphasis
+    const swingExercise = equipment === 'commercial_gym'
+      ? { name: 'Kettlebell Swings', sets: 3, reps: 12, weight: '25-35 lbs' }
+      : { name: 'Dumbbell Swings', sets: 3, reps: 12, weight: '20-30 lbs' };
     exercises = [
       { name: 'Hip Thrusts', sets: 3, reps: 10, weight: `${load}% 1RM` },
       { name: 'Romanian Deadlift', sets: 3, reps: 8, weight: `${load}% 1RM` },
       { name: 'Bulgarian Split Squat', sets: 3, reps: 8, weight: '25-30 lbs per hand' },
       { name: 'Jump Squats', sets: 3, reps: weekInPhase >= 2 ? 8 : 6, weight: 'Bodyweight' },
-      { name: 'Power Skips', sets: 3, reps: '6 per leg', weight: 'Bodyweight' }
+      swingExercise
     ];
     duration = 45;
-    description = `Week ${weekInPhase} Speed - Explosive emphasis with jump squats and power skips. RDL maintains posterior chain. Target: 3 sets @ ${load}% 1RM, RIR 2-3.`;
+    description = `Week ${weekInPhase} Speed - Explosive emphasis with jump squats and swings. RDL maintains posterior chain. Target: 3 sets @ ${load}% 1RM, RIR 2-3.`;
   } else {
     // Race Prep (Weeks 9-11): Maintenance only
     exercises = [
