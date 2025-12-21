@@ -923,16 +923,16 @@ export default function WorkoutCalendar({
                   })()}
                   
                   {/* Training plan context - phase and race countdown */}
-                  {trainingPlanContext && (
+                  {trainingPlanContext && (trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
                     <div className="pt-2 mt-2 border-t border-gray-200 text-xs text-gray-600">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-wrap">
                         {trainingPlanContext.focus && (
                           <span className="font-medium text-gray-700">{trainingPlanContext.focus}</span>
                         )}
-                        {trainingPlanContext.focus && trainingPlanContext.weeksToRace && (
+                        {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && (
                           <span className="text-gray-400">•</span>
                         )}
-                        {trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
+                        {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
                           <span>
                             {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
                           </span>
