@@ -305,12 +305,13 @@ const METHODOLOGIES: Record<Approach, {
 // ============================================================================
 
 /**
- * Get the available methodology based on goal and fitness
+ * Get the available methodology based on goal, fitness, and distance
  * - complete goal → Simple Completion only
- * - speed goal + beginner → Balanced Build locked
+ * - speed goal + beginner + marathon → Balanced Build locked
+ * - speed goal + beginner + shorter distances → Balanced Build unlocked
  * - speed goal + intermediate/advanced → Balanced Build only
  */
-function getMethodologyForGoal(goal: Goal | null, fitness: Fitness | null): {
+function getMethodologyForGoal(goal: Goal | null, fitness: Fitness | null, distance: Distance | null): {
   approach: Approach | null;
   locked: boolean;
   lockedReason: string;
@@ -325,12 +326,12 @@ function getMethodologyForGoal(goal: Goal | null, fitness: Fitness | null): {
   }
 
   if (goal === 'speed') {
-    // Speed goal → Balanced Build, but locked for beginners
-    if (fitness === 'beginner') {
+    // Speed goal → Balanced Build, but locked for beginners doing marathon only
+    if (fitness === 'beginner' && distance === 'marathon') {
       return {
         approach: 'balanced_build',
         locked: true,
-        lockedReason: 'Balanced Build requires Intermediate+ fitness (25+ mpw) and experience with structured speedwork. Consider selecting "Complete" goal to access Simple Completion, or build your base to 25+ mpw.'
+        lockedReason: 'Speed-focused marathon training requires Intermediate+ fitness (25+ mpw). Consider selecting "Complete" goal, or build your base first.'
       };
     }
     return { approach: 'balanced_build', locked: false, lockedReason: '' };
@@ -464,8 +465,8 @@ export default function PlanWizard() {
     });
   };
 
-  // Get methodology based on goal and fitness
-  const methodologyResult = getMethodologyForGoal(state.goal, state.fitness);
+  // Get methodology based on goal, fitness, and distance
+  const methodologyResult = getMethodologyForGoal(state.goal, state.fitness, state.distance);
 
   // Check if we need MPW for this fitness/distance combo
   const needsMpwQuestion = state.fitness === 'beginner' && state.distance === 'marathon';
@@ -891,23 +892,26 @@ export default function PlanWizard() {
                 </div>
               </div>
               
-              {/* Speed Goal → Balanced Build (may be locked) */}
-              <div className={`p-3 border rounded-lg ${state.fitness === 'beginner' ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}`}>
+              {/* Speed Goal → Balanced Build (locked only for beginners doing marathon) */}
+              {(() => {
+                const isSpeedLocked = state.fitness === 'beginner' && state.distance === 'marathon';
+                return (
+              <div className={`p-3 border rounded-lg ${isSpeedLocked ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}`}>
                 <div className="flex items-start space-x-3">
                   <RadioGroupItem 
                     value="speed" 
                     id="speed" 
                     className="mt-1" 
-                    disabled={state.fitness === 'beginner'}
+                    disabled={isSpeedLocked}
                   />
-                  <Label htmlFor="speed" className={`flex-1 ${state.fitness === 'beginner' ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <Label htmlFor="speed" className={`flex-1 ${isSpeedLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                     <span className="block font-medium">
-                      {state.fitness === 'beginner' ? 'Speed (Locked)' : 'Speed'}
+                      {isSpeedLocked ? 'Speed (Locked)' : 'Speed'}
                     </span>
                     <span className="block text-xs text-gray-500 mt-0.5 italic">For experienced runners looking to improve their time</span>
-                    {state.fitness === 'beginner' ? (
+                    {isSpeedLocked ? (
                       <span className="block text-xs text-amber-600 mt-2">
-                        Requires Intermediate+ fitness (25+ mpw). Build your base first!
+                        Speed-focused marathon training requires Intermediate+ fitness (25+ mpw).
                       </span>
                     ) : (
                       <span className="block text-sm text-gray-600 mt-2">
@@ -917,6 +921,8 @@ export default function PlanWizard() {
                   </Label>
                 </div>
               </div>
+                );
+              })()}
             </RadioGroup>
             
             {/* Disclaimer */}
