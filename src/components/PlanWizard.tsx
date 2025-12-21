@@ -146,12 +146,13 @@ function getDurationGating(
   } else if (fitness === 'intermediate') {
     if (selectedWeeks < 12) {
       return {
-        minSafe: 12,
-        recommended: 16,
+        minSafe: 10,
+        recommended: 12,
         riskLevel: selectedWeeks < 10 ? 'high_risk' : 'caution',
-        warningTitle: 'Short Timeline',
-        warningMessage: `12 weeks is the minimum recommended for intermediate marathon training.\n` +
-          `16+ weeks allows proper periodization and taper.`
+        warningTitle: 'Compressed Timeline',
+        warningMessage: selectedWeeks < 10 
+          ? `10+ weeks recommended for proper build and taper.`
+          : `Doable with consistency. 12+ weeks gives more room for periodization.`
       };
     }
   } else if (fitness === 'advanced') {
