@@ -353,9 +353,11 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
     description = `Week ${weekInPhase} Base - Hip thrusts build glute strength for running power. RDL develops hamstring/glute with minimal fatigue. Target: 4 sets @ ${load}% 1RM, RIR 2-3.`;
   } else if (phase.name === 'Speed') {
     // Speed phase (Weeks 5-7): Explosive emphasis
+    // Swing weight scales with deadlift 1RM (~20-25% for explosive work)
+    const swingPercent = 20 + (weekInPhase * 2); // Week 1: 22%, Week 2: 24%, Week 3: 26%
     const swingExercise = equipment === 'commercial_gym'
-      ? { name: 'Kettlebell Swings', sets: 3, reps: 12, weight: '25-35 lbs' }
-      : { name: 'Dumbbell Swings', sets: 3, reps: 12, weight: '20-30 lbs' };
+      ? { name: 'Kettlebell Swings', sets: 3, reps: 12, weight: `${swingPercent}% deadlift 1RM` }
+      : { name: 'Dumbbell Swings', sets: 3, reps: 12, weight: `${swingPercent}% deadlift 1RM` };
     exercises = [
       { name: 'Hip Thrusts', sets: 3, reps: 10, weight: `${load}% 1RM` },
       { name: 'Romanian Deadlift', sets: 3, reps: 8, weight: `${load}% 1RM` },
