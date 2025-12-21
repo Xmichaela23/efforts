@@ -2112,29 +2112,47 @@ export default function PlanWizard() {
           <div className="mb-4">
             <h3 className="text-sm font-medium text-gray-500 mb-3">WEEK 1 PREVIEW</h3>
             <div className="space-y-2">
-              {sortedSessions.length > 0 ? (
-                sortedSessions.map((session: any, idx: number) => (
-                  <div 
-                    key={idx} 
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
+              {(() => {
+                // Group sessions by day
+                const sessionsByDay: Record<string, any[]> = {};
+                sortedSessions.forEach((session: any) => {
+                  const day = session.day || 'Unscheduled';
+                  if (!sessionsByDay[day]) sessionsByDay[day] = [];
+                  sessionsByDay[day].push(session);
+                });
+                
+                return dayOrder.map(day => {
+                  const daySessions = sessionsByDay[day] || [];
+                  const isRest = daySessions.length === 0;
+                  
+                  return (
+                    <div key={day} className={`p-3 rounded-lg ${isRest ? 'bg-gray-100' : 'bg-gray-50'}`}>
+                      <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-medium text-gray-400 w-12">
-                          {session.day?.slice(0, 3)}
+                          {day.slice(0, 3)}
                         </span>
-                        <span className="font-medium text-sm">{session.name}</span>
+                        {isRest ? (
+                          <span className="text-sm text-gray-400 italic">Rest</span>
+                        ) : (
+                          <div className="flex-1 space-y-2">
+                            {daySessions.map((session: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <span className="font-medium text-sm">{session.name}</span>
+                                  {session.description && (
+                                    <p className="text-xs text-gray-500 mt-0.5">{session.description}</p>
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-400 ml-2">{session.duration}m</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      {session.description && (
-                        <p className="text-xs text-gray-500 mt-1 ml-14">{session.description}</p>
-                      )}
                     </div>
-                    <span className="text-xs text-gray-400">{session.duration}m</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">No sessions in week 1</p>
-              )}
+                  );
+                });
+              })()}
             </div>
           </div>
 
