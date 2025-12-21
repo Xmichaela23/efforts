@@ -158,7 +158,7 @@ function createInjuryPreventionFullBody(phase: Phase, params: InjuryPreventionPa
     day: 'Monday',
     type: 'strength',
     name: 'Full Body Injury Prevention',
-    description: `${weekDesc} - ${params.intensity}. Single-leg stability and core strength for injury prevention.`,
+    description: `${weekDesc} - ${params.intensity}. Single-leg stability for injury prevention. Add 5 min core if desired.`,
     duration: params.duration,
     strength_exercises: exercises,
     tags: ['strength', 'full_body', 'injury_prevention', `phase:${phase.name.toLowerCase()}`]
@@ -198,7 +198,7 @@ function createInjuryPreventionUpperBody(phase: Phase, params: InjuryPreventionP
     day: 'Wednesday',
     type: 'strength',
     name: 'Upper Body Injury Prevention',
-    description: `${weekDesc} - ${intensity} Shoulder stability and posture for arm drive.`,
+    description: `${weekDesc} - ${intensity} Shoulder stability and posture for arm drive. Add 5 min core if desired.`,
     duration: isRecovery ? 30 : params.duration - 5,
     strength_exercises: exercises,
     tags: ['strength', 'upper_body', 'injury_prevention', `phase:${phase.name.toLowerCase()}`]
@@ -238,7 +238,7 @@ function createInjuryPreventionLowerBody(phase: Phase, params: InjuryPreventionP
     day: 'Friday',
     type: 'strength',
     name: 'Lower Body Injury Prevention',
-    description: `${weekDesc} - ${params.intensity}. Hip stability and glute activation for injury prevention.`,
+    description: `${weekDesc} - ${params.intensity}. Hip stability and glute activation for injury prevention. Add 5 min core if desired.`,
     duration: params.duration,
     strength_exercises: exercises,
     tags: ['strength', 'lower_body', 'injury_prevention', `phase:${phase.name.toLowerCase()}`]
@@ -328,7 +328,7 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
       { name: plyoExercise.name, sets: 2, reps: 3, weight: 'Bodyweight' }
     ];
     duration = 40;
-    description = `Recovery - Reduced volume for adaptation. No heavy plyometrics. Target: 3 sets @ 70% 1RM, RIR 4-5.`;
+    description = `Recovery - Reduced volume for adaptation. No heavy plyometrics. Target: 3 sets @ 70% 1RM, RIR 4-5. Add 5 min core if desired.`;
   } else if (phase.name === 'Base') {
     // Base phase (Weeks 1-3): Build foundation
     exercises = [
@@ -338,7 +338,7 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
       { name: plyoExercise.name, sets: 3, reps: weekInPhase >= 3 ? 6 : 5, weight: 'Bodyweight' }
     ];
     duration = 45;
-    description = `Week ${weekInPhase} Base - Hip thrusts build glute strength for running power. RDL develops hamstring/glute with minimal fatigue. Target: 4 sets @ ${load}% 1RM, RIR 2-3.`;
+    description = `Week ${weekInPhase} Base - Hip thrusts build glute strength for running power. RDL develops hamstring/glute with minimal fatigue. Target: 4 sets @ ${load}% 1RM, RIR 2-3. Add 5 min core if desired.`;
   } else if (phase.name === 'Speed') {
     // Speed phase (Weeks 5-7): Explosive emphasis
     // Swing weight scales with deadlift 1RM (~20-25% for explosive work)
@@ -354,7 +354,7 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
       swingExercise
     ];
     duration = 45;
-    description = `Week ${weekInPhase} Speed - Explosive emphasis with jump squats and swings. RDL maintains posterior chain. Target: 3 sets @ ${load}% 1RM, RIR 2-3.`;
+    description = `Week ${weekInPhase} Speed - Explosive emphasis with jump squats and swings. RDL maintains posterior chain. Target: 3 sets @ ${load}% 1RM, RIR 2-3. Add 5 min core if desired.`;
   } else {
     // Race Prep (Weeks 9-11): Maintenance only
     exercises = [
@@ -364,7 +364,7 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
       { name: plyoExercise.name, sets: 2, reps: 5, weight: 'Bodyweight' }
     ];
     duration = 35;
-    description = `Week ${weekInPhase} Race Prep - Maintenance only during high running volume. Bodyweight hip thrusts for glute activation. Target: 2 sets @ 60% 1RM or Bodyweight, RIR 3-4.`;
+    description = `Week ${weekInPhase} Race Prep - Maintenance only during high running volume. Bodyweight hip thrusts for glute activation. Target: 2 sets @ 60% 1RM or Bodyweight, RIR 3-4. Add 5 min core if desired.`;
   }
 
   return {
@@ -398,7 +398,7 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
       { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
     ];
     duration = 40;
-    description = `Recovery - Reduced volume, no heavy squats. Maintain single-leg patterns. Target: 3 sets @ 60-70% 1RM, RIR 4-5.`;
+    description = `Recovery - Reduced volume, no heavy squats. Maintain single-leg patterns. Target: 3 sets @ 60-70% 1RM, RIR 4-5. Add 5 min core if desired.`;
   } else if (phase.name === 'Base') {
     // Base phase (Weeks 1-3): Build quad strength
     exercises = [
@@ -409,7 +409,7 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
       { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight' }
     ];
     duration = 45;
-    description = `Week ${weekInPhase} Base - Back squat builds quad strength. Hip thrusts for glute power. Single-leg work for running stability. Target: 4 sets @ ${load}% 1RM, RIR 2-3.`;
+    description = `Week ${weekInPhase} Base - Back squat builds quad strength. Hip thrusts for glute power. Single-leg work for running stability. Target: 4 sets @ ${load}% 1RM, RIR 2-3. Add 5 min core if desired.`;
   } else if (phase.name === 'Speed') {
     // Speed phase (Weeks 5-7): Add horizontal power
     exercises = [
@@ -420,7 +420,7 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
       { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight' }
     ];
     duration = 45;
-    description = `Week ${weekInPhase} Speed - Reduced squat load to accommodate explosive work. Broad jumps develop horizontal power. Target: 3 sets @ ${load}% 1RM, RIR 2-3.`;
+    description = `Week ${weekInPhase} Speed - Reduced squat load to accommodate explosive work. Broad jumps develop horizontal power. Target: 3 sets @ ${load}% 1RM, RIR 2-3. Add 5 min core if desired.`;
   } else {
     // Race Prep (Weeks 9-11): Single-leg stability maintenance
     exercises = [
@@ -431,7 +431,7 @@ function createLowerBodyB(phase: Phase, weekInPhase: number, load: number, isRec
       { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
     ];
     duration = 35;
-    description = `Week ${weekInPhase} Race Prep - Focus on single-leg stability with minimal fatigue. No heavy barbell work. Target: 2 sets, light loads, RIR 3-4.`;
+    description = `Week ${weekInPhase} Race Prep - Focus on single-leg stability with minimal fatigue. No heavy barbell work. Target: 2 sets, light loads, RIR 3-4. Add 5 min core if desired.`;
   }
 
   return {
@@ -472,7 +472,7 @@ function createUpperBodyOptional(phase: Phase, weekInPhase: number, isRecovery: 
     day: 'Wednesday',
     type: 'strength',
     name: 'Upper Body Maintenance',
-    description: `${weekDesc} - Optional upper body for balance and posture. Push-ups, rows, and core maintain arm drive mechanics. Minimal running benefit - skip if fatigued.`,
+    description: `${weekDesc} - Optional upper body for balance and posture. Push-ups and rows maintain arm drive mechanics. Minimal running benefit - skip if fatigued. Add 5 min core if desired.`,
     duration: 30,
     strength_exercises: exercises,
     tags: ['strength', 'upper_body', 'strength_power', `phase:${phase.name.toLowerCase()}`, equipment, 'optional', 'focus:upper_maintenance']
