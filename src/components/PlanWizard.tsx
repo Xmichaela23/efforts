@@ -63,6 +63,7 @@ interface WizardState {
   // Plan timing
   hasRaceDate: boolean | null; // null = not answered yet
   raceDate: string; // ISO date string for race day
+  raceName: string; // Optional name for the race (e.g., "Boston Marathon")
   duration: number;
   startDate: string; // ISO date string
   approach: Approach | null;
@@ -313,6 +314,7 @@ export default function PlanWizard() {
     // Plan timing
     hasRaceDate: null,
     raceDate: '',
+    raceName: '',
     duration: 12,
     startDate: getNextMonday(),
     approach: null,
@@ -498,6 +500,7 @@ export default function PlanWizard() {
         duration_weeks: state.duration,
         start_date: state.startDate,
         race_date: state.hasRaceDate ? state.raceDate : undefined,
+        race_name: state.hasRaceDate && state.raceName ? state.raceName : undefined,
         approach: state.approach,
         days_per_week: state.daysPerWeek,
         strength_frequency: state.strengthFrequency,
@@ -1412,6 +1415,13 @@ export default function PlanWizard() {
                     value={state.raceDate}
                     min={getMinRaceDate()}
                     onChange={(e) => handleRaceDateChange(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <input
+                    type="text"
+                    value={state.raceName}
+                    onChange={(e) => setState(prev => ({ ...prev, raceName: e.target.value }))}
+                    placeholder="Race name (optional, e.g., Boston Marathon)"
                     className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   {state.raceDate && (

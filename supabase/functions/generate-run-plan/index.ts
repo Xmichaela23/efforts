@@ -197,6 +197,7 @@ Deno.serve(async (req: Request) => {
           strength_frequency: request.strength_frequency || 0,
           user_selected_start_date: startDate,
           race_date: request.race_date || null,
+          race_name: request.race_name || null,
           effort_score: effortScore || null,
           target_time: effortScore && request.distance ? getTargetTime(effortScore, request.distance) : null,
           baselines_required: plan.baselines_required,

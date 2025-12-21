@@ -17,6 +17,7 @@ export interface GeneratePlanRequest {
   strength_tier?: 'injury_prevention' | 'strength_power';
   equipment_type?: 'home_gym' | 'commercial_gym';
   race_date?: string;
+  race_name?: string;
   // Effort Score (for Balanced Build / speed goal)
   effort_score?: number;
   effort_source_distance?: number; // meters

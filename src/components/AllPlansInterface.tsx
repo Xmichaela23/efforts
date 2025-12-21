@@ -1839,6 +1839,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             {(() => {
               const config = selectedPlanDetail?.config || {};
               const raceDate = config.race_date;
+              const raceName = config.race_name;
               const effortScore = config.effort_score;
               const targetTime = config.target_time;
               const distance = config.distance;
@@ -1877,8 +1878,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                     <>
                       <span>
                         <span className="font-semibold text-gray-900">
-                          {new Date(raceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span> race
+                          {raceName || new Date(raceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                        {raceName && (
+                          <span className="text-gray-500 ml-1">
+                            ({new Date(raceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
+                          </span>
+                        )}
                       </span>
                       {weeksToRace !== null && weeksToRace > 0 && (
                         <span>
