@@ -113,7 +113,7 @@ export class BalancedBuildGenerator extends BaseGenerator {
 
   protected generatePlanDescription(): string {
     return `A ${this.params.duration_weeks}-week performance-focused plan with personalized pace zones. ` +
-      `Features two quality workouts per week (intervals and tempo) with paces calculated from your race times. ` +
+      `Features two quality workouts per week (intervals and tempo) with paces calculated from your 5K time. ` +
       `Based on proven training principles.`;
   }
 

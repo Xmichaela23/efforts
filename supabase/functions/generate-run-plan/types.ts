@@ -185,7 +185,7 @@ export const METHODOLOGIES: Record<string, MethodologyDefinition> = {
     id: 'balanced_build',
     name: 'Balanced Build',
     shortDescription: 'Structured quality with personalized pace zones',
-    longDescription: 'Science-based training with precise pace zones (Easy, Marathon, Threshold, Interval) calculated from your race times. Two quality days per week with structured intervals and tempo runs.',
+    longDescription: 'Science-based training with precise pace zones (Easy, Marathon, Threshold, Interval) calculated from your 5K time. Two quality days per week with structured intervals and tempo runs.',
     basedOn: 'Adapted from established running science principles',
     availableForGoals: ['speed'],
     requiredFitness: ['intermediate', 'advanced'],

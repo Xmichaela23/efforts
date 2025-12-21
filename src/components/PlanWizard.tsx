@@ -294,7 +294,7 @@ const METHODOLOGIES: Record<Approach, {
   'balanced_build': {
     name: 'Balanced Build',
     shortDescription: 'Structured quality with personalized pacing',
-    longDescription: 'Two quality workouts per week with structured intervals and tempo runs. All paces calculated from your race times.',
+    longDescription: 'Two quality workouts per week with structured intervals and tempo runs. All paces calculated from your 5K time.',
     basedOn: 'Based on established running science',
     supported_days: ['4-5', '5-6', '6-7']
   }
