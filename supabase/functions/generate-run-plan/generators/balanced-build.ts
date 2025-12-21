@@ -261,8 +261,37 @@ export class BalancedBuildGenerator extends BaseGenerator {
           break;
           
         case 'reduced_quality':
+          // 8-14 days before race - reduced but still training
+          if (day === 'Tuesday') {
+            // Quality workout but lighter
+            sessions.push(this.createTaperInterval());
+          } else if (day === 'Thursday') {
+            // Short tempo or easy
+            sessions.push(this.createSession(
+              day,
+              'Easy Run',
+              '4 miles at E pace. Recovery and aerobic maintenance.',
+              this.milesToMinutes(4),
+              [TOKEN_PATTERNS.easy_run_miles(4)],
+              ['easy_run']
+            ));
+          } else if (day === 'Sunday') {
+            // Reduced long run (10-12 miles max)
+            sessions.push(this.createVDOTLongRun(Math.min(12, this.getLongRunMiles(weekNumber, false)), 0));
+          } else if (sessions.length < runningDays && day !== 'Saturday') {
+            sessions.push(this.createSession(
+              day,
+              'Easy Run',
+              '5 miles at E pace. Recovery and aerobic maintenance.',
+              this.milesToMinutes(5),
+              [TOKEN_PATTERNS.easy_run_miles(5)],
+              ['easy_run']
+            ));
+          }
+          break;
+          
         case 'normal':
-          // More than 7 days out - handled by normal logic
+          // More than 14 days out - should not be in race week, skip
           break;
       }
     }

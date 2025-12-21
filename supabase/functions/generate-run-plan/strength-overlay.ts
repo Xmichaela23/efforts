@@ -354,7 +354,7 @@ function createLowerBodyA(phase: Phase, weekInPhase: number, load: number, isRec
       swingExercise
     ];
     duration = 45;
-    description = `Week ${weekInPhase} Speed - Explosive emphasis with jump squats and swings. RDL maintains posterior chain. Target: 3 sets @ ${load}% 1RM, RIR 2-3. Add 5 min core if desired.`;
+    description = `Week ${weekInPhase} Speed - Explosive power with jump squats and KB/DB swings. RDL maintains posterior chain. Target: 3 sets @ ${load}% 1RM, RIR 2-3. Add 5 min core if desired.`;
   } else {
     // Race Prep (Weeks 9-11): Maintenance only
     exercises = [

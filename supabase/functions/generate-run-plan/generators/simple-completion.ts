@@ -276,8 +276,26 @@ export class SimpleCompletionGenerator extends BaseGenerator {
           break;
           
         case 'reduced_quality':
+          // 8-14 days before race - reduced but still training
+          if (day === 'Tuesday' && sessions.length < runningDays) {
+            sessions.push(this.createSession(
+              day,
+              'Easy + Strides',
+              '4 miles easy with 4×100m strides. Keep it light!',
+              this.milesToMinutes(4) + 5,
+              [TOKEN_PATTERNS.easy_run_miles(4), TOKEN_PATTERNS.strides_4x100m],
+              ['easy_run', 'strides']
+            ));
+          } else if (day === 'Sunday') {
+            // Reduced long run (10 miles max)
+            sessions.push(this.createSimpleLongRun(Math.min(10, this.getLongRunMiles(weekNumber))));
+          } else if (sessions.length < runningDays && day !== 'Saturday') {
+            sessions.push(this.createSimpleEasyRun(5, day));
+          }
+          break;
+          
         case 'normal':
-          // More than 7 days out - handled by normal logic
+          // More than 14 days out - should not be in race week, skip
           break;
       }
     }
