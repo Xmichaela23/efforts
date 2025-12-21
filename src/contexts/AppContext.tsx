@@ -561,6 +561,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           supabase.functions.invoke('sweep-week', { body: { week_start: wk1Start } }).catch(()=>{});
           supabase.functions.invoke('get-week', { body: { from: wk1Start, to: wk1End } }).catch(()=>{});
         } catch {}
+        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
         try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
       } catch (mErr) {
         console.error('Activation error:', mErr);
