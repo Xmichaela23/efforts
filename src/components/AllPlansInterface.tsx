@@ -1725,7 +1725,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
     return (
       <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
           <button onClick={handleBack} className="flex items-center gap-1 p-0 h-auto text-gray-600 hover:text-black transition-colors text-xs sm:text-sm">
             <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
             Plans
