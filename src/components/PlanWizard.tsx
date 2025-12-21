@@ -1415,12 +1415,35 @@ export default function PlanWizard() {
                   />
                   {state.raceDate && (
                     <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <p className="text-sm text-blue-800">
-                        <span className="font-medium">{state.duration} week plan</span>
-                        <br />
-                        <span className="text-blue-600">
-                          Starts {new Date(state.startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                        </span>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-blue-800 font-medium">{state.duration} week plan</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newWeeks = Math.max(4, state.duration - 1);
+                              const newStart = calculateStartFromRace(state.raceDate, newWeeks);
+                              setState(prev => ({ ...prev, duration: newWeeks, startDate: newStart }));
+                            }}
+                            className="w-8 h-8 rounded-full border border-blue-300 text-blue-700 hover:bg-blue-100 flex items-center justify-center"
+                          >
+                            −
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newWeeks = Math.min(24, state.duration + 1);
+                              const newStart = calculateStartFromRace(state.raceDate, newWeeks);
+                              setState(prev => ({ ...prev, duration: newWeeks, startDate: newStart }));
+                            }}
+                            className="w-8 h-8 rounded-full border border-blue-300 text-blue-700 hover:bg-blue-100 flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-sm text-blue-600">
+                        Starts {new Date(state.startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                       </p>
                     </div>
                   )}
