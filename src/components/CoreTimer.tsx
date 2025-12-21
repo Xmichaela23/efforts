@@ -32,10 +32,15 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
   initialDuration = 300 
 }) => {
   // Timer state
+  const [duration, setDuration] = useState(initialDuration);
   const [timeRemaining, setTimeRemaining] = useState(initialDuration);
   const [isRunning, setIsRunning] = useState(false);
   const [totalElapsed, setTotalElapsed] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Duration editing state
+  const [isEditingDuration, setIsEditingDuration] = useState(false);
+  const [durationInput, setDurationInput] = useState('');
   
   // Exercise state
   const [exercises, setExercises] = useState<CoreExerciseEntry[]>([
@@ -81,8 +86,40 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
   
   const handleReset = () => {
     setIsRunning(false);
-    setTimeRemaining(initialDuration);
+    setTimeRemaining(duration);
     setTotalElapsed(0);
+  };
+  
+  // Duration editing
+  const handleDurationClick = () => {
+    if (!isRunning) {
+      const mins = Math.floor(duration / 60);
+      const secs = duration % 60;
+      setDurationInput(secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}`);
+      setIsEditingDuration(true);
+    }
+  };
+  
+  const handleDurationSubmit = () => {
+    const input = durationInput.trim();
+    let newSeconds = 0;
+    
+    // Parse "5:30" or "5" or "330" formats
+    if (input.includes(':')) {
+      const [mins, secs] = input.split(':');
+      newSeconds = (parseInt(mins, 10) || 0) * 60 + (parseInt(secs, 10) || 0);
+    } else {
+      const num = parseInt(input, 10) || 0;
+      // If number is small (<=20), treat as minutes; otherwise as seconds
+      newSeconds = num <= 20 ? num * 60 : num;
+    }
+    
+    if (newSeconds > 0) {
+      setDuration(newSeconds);
+      setTimeRemaining(newSeconds);
+      setTotalElapsed(0);
+    }
+    setIsEditingDuration(false);
   };
   
   // Exercise management
@@ -145,20 +182,24 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
   };
   
   // Progress percentage for timer ring
-  const progress = ((initialDuration - timeRemaining) / initialDuration) * 100;
+  const progress = ((duration - timeRemaining) / duration) * 100;
   
   return (
     <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border border-orange-200">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-orange-800">Core Timer</h3>
-        <span className="text-sm text-orange-600">{Math.floor(initialDuration / 60)} min - your choice</span>
+        <span className="text-sm text-orange-600">{Math.floor(duration / 60)} min - your choice</span>
       </div>
       
       {/* Timer Display */}
       <div className="flex items-center justify-center gap-6 mb-6">
         {/* Circular Timer */}
-        <div className="relative w-24 h-24">
+        <div 
+          className={`relative w-24 h-24 ${!isRunning ? 'cursor-pointer' : ''}`}
+          onClick={handleDurationClick}
+          title={!isRunning ? "Tap to change duration" : ""}
+        >
           <svg className="w-24 h-24 transform -rotate-90">
             <circle
               cx="48"
@@ -182,9 +223,22 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className={`text-2xl font-mono font-bold ${timeRemaining <= 30 ? 'text-red-600' : 'text-orange-700'}`}>
-              {formatTime(timeRemaining)}
-            </span>
+            {isEditingDuration ? (
+              <input
+                type="text"
+                value={durationInput}
+                onChange={(e) => setDurationInput(e.target.value)}
+                onBlur={handleDurationSubmit}
+                onKeyDown={(e) => e.key === 'Enter' && handleDurationSubmit()}
+                autoFocus
+                className="w-16 text-center text-xl font-mono font-bold bg-white border border-orange-300 rounded px-1"
+                placeholder="5:00"
+              />
+            ) : (
+              <span className={`text-2xl font-mono font-bold ${timeRemaining <= 30 ? 'text-red-600' : 'text-orange-700'}`}>
+                {formatTime(timeRemaining)}
+              </span>
+            )}
           </div>
         </div>
         
