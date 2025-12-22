@@ -10,34 +10,34 @@ export type Discipline = 'run' | 'ride' | 'swim' | 'strength' | 'walk' | 'bike' 
 
 // Primary discipline colors (for text, borders, accents)
 export const disciplineHex: Record<string, string> = {
-  run: '#22C55E',       // green-500
+  run: '#EAB308',       // yellow-500
   ride: '#F97316',      // orange-500
   bike: '#F97316',      // alias
   swim: '#0EA5E9',      // sky-500
   strength: '#8B5CF6',  // violet-500
-  walk: '#22C55E',      // map walk to run color
+  walk: '#EAB308',      // map walk to run color
   pilates_yoga: '#EC4899', // pink-500
 };
 
 // Light background colors for pills/cards (brighter -100 variants)
 export const disciplineBgLight: Record<string, string> = {
-  run: '#BBF7D0',       // green-200
+  run: '#FEF08A',       // yellow-200
   ride: '#FED7AA',      // orange-200
   bike: '#FED7AA',      // alias
   swim: '#BAE6FD',      // sky-200
   strength: '#DDD6FE',  // violet-200
-  walk: '#BBF7D0',      // map walk to run
+  walk: '#FEF08A',      // map walk to run
   pilates_yoga: '#FBCFE8', // pink-200
 };
 
 // Border colors (more saturated -400 variants)
 export const disciplineBorder: Record<string, string> = {
-  run: '#4ADE80',       // green-400
+  run: '#FACC15',       // yellow-400
   ride: '#FB923C',      // orange-400
   bike: '#FB923C',      // alias
   swim: '#38BDF8',      // sky-400
   strength: '#A78BFA',  // violet-400
-  walk: '#4ADE80',      // map walk to run
+  walk: '#FACC15',      // map walk to run
   pilates_yoga: '#F472B6', // pink-400
 };
 
@@ -69,7 +69,7 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
   switch (key) {
     case 'run':
     case 'walk':
-      return 'bg-green-100 border-green-400 text-green-800 hover:bg-green-200';
+      return 'bg-yellow-100 border-yellow-400 text-yellow-800 hover:bg-yellow-200';
     case 'ride':
     case 'bike':
       return 'bg-orange-100 border-orange-400 text-orange-800 hover:bg-orange-200';
