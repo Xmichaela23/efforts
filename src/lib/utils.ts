@@ -65,23 +65,8 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
     return 'bg-gradient-to-r from-green-100 to-gray-50 border border-gray-200 text-gray-600 hover:from-green-200 hover:to-gray-100';
   }
   
-  // Muji minimal: neutral base with earthy colored left accent (4px)
-  switch (key) {
-    case 'run':
-    case 'walk':
-      return 'bg-gray-50 border border-gray-200 border-l-4 border-l-[#C9922E] text-gray-700 hover:bg-gray-100';
-    case 'ride':
-    case 'bike':
-      return 'bg-gray-50 border border-gray-200 border-l-4 border-l-[#C65D3B] text-gray-700 hover:bg-gray-100';
-    case 'swim':
-      return 'bg-gray-50 border border-gray-200 border-l-4 border-l-[#2B5A8C] text-gray-700 hover:bg-gray-100';
-    case 'strength':
-      return 'bg-gray-50 border border-gray-200 border-l-4 border-l-[#5A7D5A] text-gray-700 hover:bg-gray-100';
-    case 'pilates_yoga':
-      return 'bg-gray-50 border border-gray-200 border-l-4 border-l-[#B07070] text-gray-700 hover:bg-gray-100';
-    default:
-      return 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100';
-  }
+  // Minimal: neutral pills (dot will be added separately in component)
+  return 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100';
 }
 
 // Time and pace formatting utilities

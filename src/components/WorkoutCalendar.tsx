@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
-import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses } from '@/lib/utils';
+import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineColor } from '@/lib/utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle, Info } from 'lucide-react';
@@ -693,10 +693,14 @@ export default function WorkoutCalendar({
                         tabIndex={0}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`cursor-pointer text-xs text-gray-700 px-1.5 py-0.5 rounded w-full text-center truncate border ${
+                        className={`cursor-pointer text-xs text-gray-700 px-1.5 py-0.5 rounded w-full truncate border flex items-center justify-center gap-1 ${
                           getDisciplinePillClasses(evt?._src?.type || evt?._src?.workout_type || '', isCompleted)
                         }`}
                       >
+                        <span 
+                          className="w-2 h-2 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: isCompleted ? '#22C55E' : getDisciplineColor(evt?._src?.type || evt?._src?.workout_type || '') }}
+                        />
                         {evt.label}
                       </span>
                     );
