@@ -10,6 +10,7 @@ import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
 import { mapUnifiedItemToPlanned, mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
+import { useToast } from '@/components/ui/use-toast';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -64,8 +65,55 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     enabled: !!dayLoc,
   });
 
+  const { toast } = useToast();
+  
   // Expanded details toggle per workout (id → boolean)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [sendingToGarmin, setSendingToGarmin] = useState<string | null>(null);
+  
+  // Send workout to Garmin
+  const handleSendToGarmin = async (e: React.MouseEvent, workout: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    try {
+      setSendingToGarmin(workout.id);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: 'Error', description: 'Please log in to send to Garmin', variant: 'destructive' });
+        return;
+      }
+      
+      const { data: result, error } = await supabase.functions.invoke('send-workout-to-garmin', {
+        body: { workoutId: workout.id, userId: user.id }
+      });
+      
+      if (error) {
+        toast({ title: 'Error', description: `Failed to send: ${error.message}`, variant: 'destructive' });
+      } else if (result?.success) {
+        toast({ title: 'Sent!', description: 'Workout sent to Garmin' });
+      } else {
+        toast({ title: 'Error', description: result?.error || 'Unknown error', variant: 'destructive' });
+      }
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to send to Garmin', variant: 'destructive' });
+    } finally {
+      setSendingToGarmin(null);
+    }
+  };
+  
+  // Check if workout is endurance type
+  const isEnduranceType = (type: string) => {
+    const t = (type || '').toLowerCase();
+    return ['run', 'ride', 'bike', 'swim', 'cycling'].includes(t);
+  };
+  
+  // Check if workout is strength/mobility type
+  const isStrengthOrMobility = (type: string) => {
+    const t = (type || '').toLowerCase();
+    return ['strength', 'mobility', 'pilates_yoga'].includes(t);
+  };
+  
   const toggleExpanded = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -710,10 +758,39 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
                   {workout.workout_status === 'planned' ? (
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={!expanded[String(workout.id)]} />
+                      <div className="flex items-center justify-between gap-2">
+                        {/* Left action: Send to Garmin or Go to workout */}
+                        <div className="flex-shrink-0">
+                          {isEnduranceType(workout.type || workout.workout_type || '') && (
+                            <span
+                              className="text-xs text-blue-600 hover:underline cursor-pointer"
+                              onClick={(e) => handleSendToGarmin(e, workout)}
+                            >
+                              {sendingToGarmin === workout.id ? 'Sending...' : 'Send to Garmin'}
+                            </span>
+                          )}
+                          {isStrengthOrMobility(workout.type || workout.workout_type || '') && (
+                            <span
+                              className="text-xs text-blue-600 hover:underline cursor-pointer"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onEditEffort && onEditEffort(workout);
+                              }}
+                            >
+                              Go to workout
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Center: workout summary */}
+                        <div className="flex-1 min-w-0">
+                          <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={!expanded[String(workout.id)]} />
+                        </div>
+                        
+                        {/* Right: details toggle */}
                         <span
-                          className="text-xs text-blue-600 hover:underline ml-2 cursor-pointer"
+                          className="text-xs text-gray-500 hover:underline cursor-pointer flex-shrink-0"
                           onClick={(e)=>{ 
                             e.preventDefault(); e.stopPropagation(); 
                             const key = String(workout.id);
@@ -734,7 +811,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             }
                           }}
                         >
-                          {expanded[String(workout.id)] ? 'Hide details' : 'Show details'}
+                          {expanded[String(workout.id)] ? 'hide' : 'details'}
                         </span>
                       </div>
                       {(() => { 
