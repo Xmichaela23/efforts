@@ -402,12 +402,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             const m = dur.match(/(\d+)\s*[x×]\s*(\d+)/i);
             const sets = m ? parseInt(m[1],10) : undefined;
             const reps = m ? parseInt(m[2],10) : undefined;
+            // Prefer weight_display (includes "each" for per-hand exercises)
+            const weightDisplay = it?.weight_display;
             let w = it?.weight; let wNum = (typeof w==='number') ? w : (typeof w==='string' ? parseFloat(w): 0);
             if (!Number.isFinite(wNum)) wNum = 0;
             const parts: string[] = [];
             parts.push(codeFromName(name));
             if (typeof sets==='number' && typeof reps==='number') parts.push(`${sets}×${reps}`);
-            if (wNum>0) parts.push(`@ ${Math.round(wNum)} lb`);
+            if (weightDisplay && weightDisplay !== 'Bodyweight' && weightDisplay !== 'Band') {
+              parts.push(`@ ${weightDisplay}`);
+            } else if (wNum>0) {
+              parts.push(`@ ${Math.round(wNum)} lb`);
+            }
             const val = parts.join(' ');
             return { icon: Dumbbell, value: val || codeFromName(name) };
           });

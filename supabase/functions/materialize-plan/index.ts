@@ -9,6 +9,7 @@
 // - Persists computed.steps and duration
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from './exercise-config.ts';
 
 type Baselines = { 
   ftp?: number; 
@@ -105,6 +106,51 @@ function oneRmFromBaselines(b: any, exerciseName: string): number | null {
     // Unknown or bodyweight: no 1RM baseline
     return null;
   } catch { return null; }
+}
+
+// Calculate weight using research-based exercise config
+function calculateWeightFromConfig(
+  exerciseName: string,
+  targetPercent: number,
+  baselines: any,
+  reps?: number
+): { weight: number | null; displayFormat: string; notes?: string } {
+  const config = getExerciseConfig(exerciseName);
+  
+  if (!config) {
+    // Fallback to legacy calculation for unknown exercises
+    return { weight: null, displayFormat: 'total' };
+  }
+  
+  if (config.displayFormat === 'bodyweight' || config.displayFormat === 'band') {
+    return { weight: 0, displayFormat: config.displayFormat, notes: config.notes };
+  }
+  
+  const base1RM = getBaseline1RM(config, baselines);
+  if (!base1RM) {
+    return { weight: null, displayFormat: config.displayFormat, notes: config.notes };
+  }
+  
+  // Calculate inferred 1RM for this exercise
+  const inferred1RM = base1RM * config.ratio;
+  
+  // Apply target percentage and rep adjustment
+  const repScale = repScaleFor(reps);
+  let prescribedTotal = inferred1RM * targetPercent * repScale;
+  
+  // Round to nearest 5 lbs
+  prescribedTotal = Math.max(5, Math.round(prescribedTotal / 5) * 5);
+  
+  // For perHand exercises, divide by 2
+  if (config.displayFormat === 'perHand') {
+    prescribedTotal = Math.max(5, Math.round(prescribedTotal / 2 / 5) * 5);
+  }
+  
+  return { 
+    weight: prescribedTotal, 
+    displayFormat: config.displayFormat,
+    notes: config.notes
+  };
 }
 function round5(n: number): number { return Math.max(5, Math.round(n / 5) * 5); }
 function pctWeight(oneRm: number | null, pct?: number): number | undefined {
@@ -739,19 +785,30 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             console.log(`🎯 Face Pulls substitution:`, { originalName, weight: (ex as any)?.weight, extractedPercent: percentRaw, finalNotes: equipmentNotes });
           }
           
-          // Band exercises: skip weight calculation, just use resistance notes
-          const isBandExercise = String(name).toLowerCase().includes('band');
+          // Use research-based exercise config for weight calculation
+          const exerciseConfig = getExerciseConfig(name);
+          const isBandExercise = exerciseConfig?.displayFormat === 'band' || String(name).toLowerCase().includes('band');
           
           let prescribed: number | undefined = undefined;
           let percent_1rm: number | undefined = undefined;
           let resolved_from: string | undefined = undefined;
+          let weightDisplay: string | undefined = undefined;
           
-          if (!isBandExercise) {
-            // Resolve base 1RM and accessory ratio using substituted name
+          if (!isBandExercise && exerciseConfig) {
+            // Use new research-based config
+            const targetPercent = typeof percentRaw === 'number' ? percentRaw : 0.70; // Default 70%
+            const result = calculateWeightFromConfig(name, targetPercent, baselines as any, reps);
+            if (result.weight != null && result.weight > 0) {
+              prescribed = result.weight;
+              weightDisplay = formatWeightDisplay(result.weight, result.displayFormat);
+            }
+            percent_1rm = targetPercent;
+            resolved_from = exerciseConfig.primaryRef || undefined;
+          } else if (!isBandExercise) {
+            // Fallback to legacy calculation for unknown exercises
             const pick = pickPrimary1RMAndBase(name, baselines as any);
             const base1RM = pick.base;
             const ratio = pick.ratio;
-            // Calculate inferred 1RM by applying ratio to base (e.g., Barbell Row = Bench × 0.90)
             const inferred1RM = (base1RM != null && ratio != null) ? base1RM * ratio : base1RM;
             const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
             if (parsed.weight != null) prescribed = parsed.weight;
@@ -759,17 +816,17 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
               const scaled = inferred1RM * percentRaw * repScaleFor(reps);
               prescribed = round5(scaled);
             }
-            
-            // For dumbbell exercises: divide by 2 to get per-hand weight
             if (prescribed != null && isDumbbellExercise(name)) {
               prescribed = round5(prescribed / 2);
+              weightDisplay = `${prescribed} lb each`;
+            } else if (prescribed != null) {
+              weightDisplay = `${prescribed} lb`;
             }
-            
             percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
             resolved_from = pick.ref || undefined;
           }
           
-          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from, notes: equipmentNotes } as any;
+          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes } as any;
           if (name.toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -813,18 +870,30 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           const name = substituted.name;
           const equipmentNotes = substituted.notes;
           
-          // Band exercises: skip weight calculation, just use resistance notes
-          const isBandExercise = String(name).toLowerCase().includes('band');
+          // Use research-based exercise config for weight calculation
+          const exerciseConfig = getExerciseConfig(name);
+          const isBandExercise = exerciseConfig?.displayFormat === 'band' || String(name).toLowerCase().includes('band');
           
           let prescribed: number | undefined = undefined;
           let percent_1rm: number | undefined = undefined;
           let resolved_from: string | undefined = undefined;
+          let weightDisplay: string | undefined = undefined;
           
-          if (!isBandExercise) {
+          if (!isBandExercise && exerciseConfig) {
+            // Use new research-based config
+            const targetPercent = typeof percentRaw === 'number' ? percentRaw : 0.70;
+            const result = calculateWeightFromConfig(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined);
+            if (result.weight != null && result.weight > 0) {
+              prescribed = result.weight;
+              weightDisplay = formatWeightDisplay(result.weight, result.displayFormat);
+            }
+            percent_1rm = targetPercent;
+            resolved_from = exerciseConfig.primaryRef || undefined;
+          } else if (!isBandExercise) {
+            // Fallback to legacy calculation
             const pick = pickPrimary1RMAndBase(name, baselines as any);
             const base1RM = pick.base;
             const ratio = pick.ratio;
-            // Calculate inferred 1RM by applying ratio to base (e.g., Barbell Row = Bench × 0.90)
             const inferred1RM = (base1RM != null && ratio != null) ? base1RM * ratio : base1RM;
             const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
             if (parsed.weight != null) prescribed = parsed.weight;
@@ -832,17 +901,17 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
               const scaled = inferred1RM * (percentRaw as number) * repScaleFor(typeof reps==='number'? reps : undefined);
               prescribed = round5(scaled);
             }
-            
-            // For dumbbell exercises: divide by 2 to get per-hand weight
             if (prescribed != null && isDumbbellExercise(name)) {
               prescribed = round5(prescribed / 2);
+              weightDisplay = `${prescribed} lb each`;
+            } else if (prescribed != null) {
+              weightDisplay = `${prescribed} lb`;
             }
-            
             percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
             resolved_from = pick.ref || undefined;
           }
           
-          const strength = { name, sets, reps, weight: prescribed, percent_1rm, resolved_from, notes: equipmentNotes } as any;
+          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes } as any;
           if (name.toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
