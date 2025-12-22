@@ -759,8 +759,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   {workout.workout_status === 'planned' ? (
                     <div className="space-y-1">
                       <div className="flex items-center justify-between gap-2">
-                        {/* Left action: Send to Garmin or Go to workout */}
-                        <div className="flex-shrink-0">
+                        {/* Left: workout summary */}
+                        <div className="flex-1 min-w-0">
+                          <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={!expanded[String(workout.id)]} />
+                        </div>
+                        
+                        {/* Right: action + details */}
+                        <div className="flex items-center gap-3 flex-shrink-0">
                           {isEnduranceType(workout.type || workout.workout_type || '') && (
                             <span
                               className="text-xs text-blue-600 hover:underline cursor-pointer"
@@ -775,44 +780,39 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                onEditEffort && onEditEffort(workout);
+                                // Open the logger with this workout pre-filled
+                                const w: any = { ...workout };
+                                w.__openLogger = true;
+                                onEditEffort && onEditEffort(w);
                               }}
                             >
                               Go to workout
                             </span>
                           )}
+                          <span
+                            className="text-xs text-gray-500 hover:underline cursor-pointer"
+                            onClick={(e)=>{ 
+                              e.preventDefault(); e.stopPropagation(); 
+                              const key = String(workout.id);
+                              const willOpen = !expanded[key];
+                              toggleExpanded(key);
+                              if (willOpen) {
+                                try {
+                                  const root = scrollRef.current;
+                                  const btn = (e.currentTarget as HTMLElement);
+                                  const card = btn.closest('button');
+                                  if (root && card) {
+                                    const rootTop = root.getBoundingClientRect().top;
+                                    const cardTop = (card as HTMLElement).getBoundingClientRect().top;
+                                    root.scrollTo({ top: root.scrollTop + (cardTop - rootTop) - 12, behavior: 'smooth' });
+                                  }
+                                } catch {}
+                              }
+                            }}
+                          >
+                            {expanded[String(workout.id)] ? 'hide' : 'details'}
+                          </span>
                         </div>
-                        
-                        {/* Center: workout summary */}
-                        <div className="flex-1 min-w-0">
-                          <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={!expanded[String(workout.id)]} />
-                        </div>
-                        
-                        {/* Right: details toggle */}
-                        <span
-                          className="text-xs text-gray-500 hover:underline cursor-pointer flex-shrink-0"
-                          onClick={(e)=>{ 
-                            e.preventDefault(); e.stopPropagation(); 
-                            const key = String(workout.id);
-                            const willOpen = !expanded[key];
-                            toggleExpanded(key);
-                            if (willOpen) {
-                              try {
-                                const root = scrollRef.current;
-                                const btn = (e.currentTarget as HTMLElement);
-                                const card = btn.closest('button');
-                                if (root && card) {
-                                  // Align the card near the top after expansion for easier scrolling
-                                  const rootTop = root.getBoundingClientRect().top;
-                                  const cardTop = (card as HTMLElement).getBoundingClientRect().top;
-                                  root.scrollTo({ top: root.scrollTop + (cardTop - rootTop) - 12, behavior: 'smooth' });
-                                }
-                              } catch {}
-                            }
-                          }}
-                        >
-                          {expanded[String(workout.id)] ? 'hide' : 'details'}
-                        </span>
                       </div>
                       {(() => { 
                         if (!expanded[String(workout.id)]) return null;
