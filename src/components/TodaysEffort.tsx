@@ -4,7 +4,7 @@ import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity } from 'lucide-react';
-import { getDisciplineColor } from '@/lib/utils';
+import { getDisciplineColor, getDisciplinePillClasses } from '@/lib/utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
@@ -701,12 +701,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     }
                     onEditEffort && onEditEffort(w);
                   }}
-                  className={`w-full text-left p-1.5 rounded-md transition-colors hover:bg-gray-50 ${
-                    workout.workout_status === 'completed' 
-                      ? 'bg-green-50' 
-                      : workout.workout_status === 'planned'
-                      ? 'bg-blue-50 border border-blue-200'
-                      : 'bg-white border border-gray-200'
+                  className={`w-full text-left p-1.5 rounded-md transition-colors border ${
+                    getDisciplinePillClasses(workout.type || workout.workout_type || '', workout.workout_status === 'completed')
                   }`}
                 >
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
