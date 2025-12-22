@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Waves, Bike, Activity, Dumbbell, Move, CircleDot } from 'lucide-react';
+import { ChevronUp, Waves, Bike, Activity, Dumbbell, Move, CircleDot } from 'lucide-react';
 
 interface LogEffortDropdownProps {
   onSelectType: (type: string) => void;
@@ -30,7 +30,7 @@ const LogEffortDropdown: React.FC<LogEffortDropdownProps> = ({ onSelectType }) =
           }}
         >
           Log
-          <ChevronDown className="h-4 w-4" />
+          <ChevronUp className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

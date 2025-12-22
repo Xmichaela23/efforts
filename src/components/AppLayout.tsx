@@ -1221,13 +1221,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Bottom Navigation Tab Bar - Instagram style */}
       {!(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
-        <div className="mobile-tabbar px-3 pt-0.5 flex items-center">
+        <div className="mobile-tabbar px-4 pb-2 pt-1 flex items-center">
           <div className="w-full">
-            <div className="flex justify-around items-center">
-              <NewEffortDropdown 
-                onSelectType={handleSelectEffortType} 
-                onOpenPlanBuilder={handleOpenPlanBuilder}
-              />
+            <div className="flex justify-center items-center gap-3">
+              {/* Build hidden for now */}
               <LogEffortDropdown onSelectType={handleSelectEffortType} />
               <PlansDropdown 
                 onSelectRoutine={handleSelectRoutine}
@@ -1237,7 +1234,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
               <Button
                 onClick={() => handleOpenContext()}
-                className="flex items-center gap-2 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-0 focus:border-0 active:outline-none active:ring-0 active:border-0"
+                className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-0 focus:border-0 active:outline-none active:ring-0 active:border-0"
                 style={{
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,

@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { ChevronDown, ArrowRight, Calendar } from 'lucide-react';
+import { ChevronUp, ArrowRight, Calendar } from 'lucide-react';
 // Planned workouts count removed from this menu to keep it focused on plans
 
 interface Plan {
@@ -62,7 +62,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           }}
         >
           Plans
-          <ChevronDown className="h-4 w-4" />
+          <ChevronUp className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
