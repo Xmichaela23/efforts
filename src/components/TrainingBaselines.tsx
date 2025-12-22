@@ -424,14 +424,14 @@ return (
                   <div className="space-y-3">
                     <h2 className="text-lg font-medium">Basic Information</h2>
                     
-                    <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-wrap items-end gap-2">
                       <div>
                         <label className="text-xs text-gray-500">Birthday</label>
                         <input
                           type="date"
                           value={data.birthday || ''}
                           onChange={(e) => setData(prev => ({ ...prev, birthday: e.target.value }))}
-                          className="block px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                          className="block h-9 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
                         />
                       </div>
                       <div>
@@ -439,7 +439,7 @@ return (
                         <select
                           value={data.gender || ''}
                           onChange={(e) => setData(prev => ({ ...prev, gender: e.target.value as any }))}
-                          className="block px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                          className="block h-9 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
                         >
                           <option value="">-</option>
                           <option value="male">M</option>
@@ -452,7 +452,7 @@ return (
                         <select
                           value={data.units || 'imperial'}
                           onChange={(e) => setData(prev => ({ ...prev, units: e.target.value as any }))}
-                          className="block px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                          className="block h-9 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
                         >
                           <option value="imperial">lbs/mi</option>
                           <option value="metric">kg/km</option>
@@ -465,7 +465,7 @@ return (
                           value={data.height || ''}
                           onChange={(e) => setData(prev => ({ ...prev, height: parseInt(e.target.value) || undefined }))}
                           placeholder={data.units === 'metric' ? '178' : '70'}
-                          className="block w-16 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                          className="block h-9 w-14 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
                         />
                       </div>
                       <div>
@@ -475,7 +475,7 @@ return (
                           value={data.weight || ''}
                           onChange={(e) => setData(prev => ({ ...prev, weight: parseInt(e.target.value) || undefined }))}
                           placeholder={data.units === 'metric' ? '80' : '175'}
-                          className="block w-16 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                          className="block h-9 w-14 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
                         />
                       </div>
                     </div>
@@ -488,7 +488,7 @@ return (
                       <p className="text-sm text-gray-500">Add your baselines for personalized plans</p>
                     </div>
                     
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="flex flex-wrap gap-2">
                       {disciplineOptions.map((discipline) => {
                         const Icon = discipline.icon;
                         const isSelected = data.disciplines.includes(discipline.id);
@@ -496,16 +496,16 @@ return (
                           <button
                             key={discipline.id}
                             onClick={() => toggleDiscipline(discipline.id)}
-                            className={`p-4 rounded-lg border text-center transition-colors ${
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-center transition-colors ${
                               isSelected
                                 ? 'border-gray-400 bg-gray-100'
                                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                             }`}
                           >
-                            <Icon className={`h-6 w-6 mx-auto mb-2 ${isSelected ? 'text-gray-700' : 'text-gray-400'}`} />
-                            <div className={`text-sm font-medium ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>
+                            <Icon className={`h-4 w-4 ${isSelected ? 'text-gray-700' : 'text-gray-400'}`} />
+                            <span className={`text-sm ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>
                               {discipline.name}
-                            </div>
+                            </span>
                           </button>
                         );
                       })}
