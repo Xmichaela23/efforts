@@ -528,11 +528,7 @@ return (
                             }`}
                           >
                             {!isActive && (
-                              <span className={`absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-[10px] flex items-center justify-center font-bold ${
-                                hasData 
-                                  ? 'bg-green-500 text-white' 
-                                  : 'bg-gray-300 text-gray-600'
-                              }`}>
+                              <span className="absolute -top-1 -right-1 text-[10px] text-gray-500">
                                 {hasData ? '✓' : '+'}
                               </span>
                             )}
