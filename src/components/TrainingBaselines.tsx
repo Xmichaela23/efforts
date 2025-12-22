@@ -402,8 +402,8 @@ return (
               )}
             </div>
 
-            {/* Tabs */}
-              <div className="flex mb-6">
+              {/* Tabs - Data Import hidden for now */}
+              {/* <div className="flex mb-6">
                 <button
                   onClick={() => setActiveTab('baselines')}
                   className={`flex-1 py-3 px-4 text-center font-medium border-b-2 ${
@@ -424,7 +424,7 @@ return (
                 >
                   Data Import
                 </button>
-              </div>
+              </div> */}
 
               {activeTab === 'baselines' ? (
                 <div className="space-y-6">
