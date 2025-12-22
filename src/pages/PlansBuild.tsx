@@ -3,16 +3,16 @@ import { useNavigate } from 'react-router-dom';
 
 export default function PlansBuild() {
   const navigate = useNavigate();
-  const Section: React.FC<{ title: string; desc: string; action?: { label: string; onClick: () => void; }; secondary?: { label: string; disabled?: boolean; } }>=({ title, desc, action, secondary })=> (
-    <div className="border rounded-md p-4">
+  const Section: React.FC<{ title: string; desc: string; action?: { label: string; onClick: () => void; }; disabled?: boolean }>=({ title, desc, action, disabled })=> (
+    <div className={`border rounded-md p-4 ${disabled ? 'opacity-30' : ''}`}>
       <div className="text-base font-semibold mb-1">{title}</div>
       <div className="text-sm text-gray-600 mb-3">{desc}</div>
       <div className="flex items-center gap-4">
-        {action && (
+        {action && !disabled && (
           <button className="text-sm text-blue-600 hover:text-blue-700" onClick={action.onClick}>{action.label}</button>
         )}
-        {secondary && (
-          <span className="text-sm text-gray-400">{secondary.label}{secondary.disabled? ' — coming soon' : ''}</span>
+        {disabled && (
+          <span className="text-sm text-gray-400">Build — coming soon</span>
         )}
       </div>
     </div>
@@ -34,20 +34,21 @@ export default function PlansBuild() {
       <Section
         title="Run"
         desc="Generate run sessions with simple language (intervals, tempo, long)."
-        secondary={{ label: 'Build', disabled: true }}
+        disabled
       />
 
       <Section
         title="Ride"
         desc="Create ride workouts (VO2, Threshold, Endurance) from short descriptions."
-        secondary={{ label: 'Build', disabled: true }}
+        disabled
       />
 
       <Section
-        title="Triathlon"
-        desc="Build multi-week triathlon plans that materialize swim/ride/run sessions."
-        secondary={{ label: 'Build', disabled: true }}
+        title="Strength"
+        desc="Build periodized strength routines with progressive overload."
+        disabled
       />
+
     </div>
   );
 }
