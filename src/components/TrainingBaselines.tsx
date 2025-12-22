@@ -73,6 +73,10 @@ const [saveMessage, setSaveMessage] = useState('');
 const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'baselines' | 'data-import'>('baselines');
   const [activeSport, setActiveSport] = useState<string | null>(null);
+  const [originalData, setOriginalData] = useState<string>(''); // JSON string for comparison
+  
+  // Check if data has changed from original
+  const hasChanges = JSON.stringify(data) !== originalData;
 
   // Strava connection state
 const [stravaConnected, setStravaConnected] = useState(false);
@@ -137,8 +141,12 @@ const loadBaselines = async () => {
     setLoading(true);
     const baselines = await loadUserBaselines();
     if (baselines) {
-        setData(baselines as BaselineData);
+      setData(baselines as BaselineData);
+      setOriginalData(JSON.stringify(baselines)); // Store original for comparison
       setLastUpdated(baselines.lastUpdated || null);
+    } else {
+      // No saved data yet - set original to current defaults
+      setOriginalData(JSON.stringify(data));
     }
     setLoading(false);
   } catch (error) {
@@ -151,10 +159,11 @@ const handleSave = async () => {
   try {
     setSaving(true);
     setSaveMessage('');
-      await saveUserBaselines(data as any);
-    setSaveMessage('Saved successfully!');
+    await saveUserBaselines(data as any);
+    setOriginalData(JSON.stringify(data)); // Update original after save
+    setSaveMessage('Saved!');
     setLastUpdated(new Date().toISOString());
-    setTimeout(() => setSaveMessage(''), 3000);
+    setTimeout(() => setSaveMessage(''), 2000);
   } catch (error) {
     console.error('Error saving baselines:', error);
     setSaveMessage('Error saving. Please try again.');
@@ -518,8 +527,14 @@ return (
                                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                             }`}
                           >
-                            {hasData && !isActive && (
-                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+                            {!isActive && (
+                              <span className={`absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-[10px] flex items-center justify-center font-bold ${
+                                hasData 
+                                  ? 'bg-green-500 text-white' 
+                                  : 'bg-gray-300 text-gray-600'
+                              }`}>
+                                {hasData ? '✓' : '+'}
+                              </span>
                             )}
                             <Icon className={`h-4 w-4 ${isActive ? 'text-gray-700' : hasData ? 'text-gray-600' : 'text-gray-400'}`} />
                             <span className={`text-xs font-medium ${isActive ? 'text-gray-700' : hasData ? 'text-gray-600' : 'text-gray-500'}`}>
@@ -915,13 +930,15 @@ return (
                     {saveMessage}
                   </div>
                 )}
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full py-3 text-gray-700 hover:text-gray-900 transition-colors font-medium disabled:text-gray-400"
-                >
-                  {saving ? 'Saving...' : 'Save Baselines'}
-                </button>
+                {hasChanges && (
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="w-full py-3 text-gray-700 hover:text-gray-900 transition-colors font-medium disabled:text-gray-400"
+                  >
+                    {saving ? 'Saving...' : 'Save Baselines'}
+                  </button>
+                )}
             </div>
           </>
         )}
