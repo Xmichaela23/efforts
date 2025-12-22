@@ -297,10 +297,10 @@ const disconnectGarmin = () => {
 };
 
   // Discipline options
-const disciplineOptions = [
-  { id: 'running', name: 'Running', icon: Activity },
-  { id: 'cycling', name: 'Cycling', icon: Bike },
-  { id: 'swimming', name: 'Swimming', icon: Waves },
+  const disciplineOptions = [
+    { id: 'running', name: 'Run', icon: Activity },
+    { id: 'cycling', name: 'Cycle', icon: Bike },
+    { id: 'swimming', name: 'Swim', icon: Waves },
     { id: 'strength', name: 'Strength', icon: Dumbbell }
   ];
 
@@ -419,27 +419,27 @@ return (
               </div>
 
               {activeTab === 'baselines' ? (
-                <div className="space-y-8">
+                <div className="space-y-6">
                   {/* Basic Information */}
-                  <div className="space-y-3">
-                    <h2 className="text-lg font-medium">Basic Information</h2>
+                  <div className="space-y-2">
+                    <h2 className="text-sm font-medium text-gray-700">Basic Information</h2>
                     
-                    <div className="flex flex-wrap items-end gap-2">
+                    <div className="grid grid-cols-5 gap-2">
                       <div>
-                        <label className="text-xs text-gray-500">Birthday</label>
+                        <label className="text-xs text-gray-500 mb-1 block">Birthday</label>
                         <input
                           type="date"
                           value={data.birthday || ''}
                           onChange={(e) => setData(prev => ({ ...prev, birthday: e.target.value }))}
-                          className="block h-9 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                          className="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">Gender</label>
+                        <label className="text-xs text-gray-500 mb-1 block">Gender</label>
                         <select
                           value={data.gender || ''}
                           onChange={(e) => setData(prev => ({ ...prev, gender: e.target.value as any }))}
-                          className="block h-9 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                          className="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
                         >
                           <option value="">-</option>
                           <option value="male">M</option>
@@ -448,47 +448,47 @@ return (
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">Units</label>
+                        <label className="text-xs text-gray-500 mb-1 block">Units</label>
                         <select
                           value={data.units || 'imperial'}
                           onChange={(e) => setData(prev => ({ ...prev, units: e.target.value as any }))}
-                          className="block h-9 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                          className="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
                         >
-                          <option value="imperial">lbs/mi</option>
-                          <option value="metric">kg/km</option>
+                          <option value="imperial">lbs</option>
+                          <option value="metric">kg</option>
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">Height ({data.units === 'metric' ? 'cm' : 'in'})</label>
+                        <label className="text-xs text-gray-500 mb-1 block">Ht ({data.units === 'metric' ? 'cm' : 'in'})</label>
                         <input
                           type="number"
                           value={data.height || ''}
                           onChange={(e) => setData(prev => ({ ...prev, height: parseInt(e.target.value) || undefined }))}
-                          placeholder={data.units === 'metric' ? '178' : '70'}
-                          className="block h-9 w-14 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                          placeholder="70"
+                          className="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">Weight ({data.units === 'metric' ? 'kg' : 'lbs'})</label>
+                        <label className="text-xs text-gray-500 mb-1 block">Wt ({data.units === 'metric' ? 'kg' : 'lb'})</label>
                         <input
                           type="number"
                           value={data.weight || ''}
                           onChange={(e) => setData(prev => ({ ...prev, weight: parseInt(e.target.value) || undefined }))}
-                          placeholder={data.units === 'metric' ? '80' : '175'}
-                          className="block h-9 w-14 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                          placeholder="160"
+                          className="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Disciplines */}
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     <div>
-                      <h2 className="text-lg font-medium">Your Sports</h2>
-                      <p className="text-sm text-gray-500">Add your baselines for personalized plans</p>
+                      <h2 className="text-sm font-medium text-gray-700">Your Sports</h2>
+                      <p className="text-xs text-gray-500">Add baselines for personalized plans</p>
                     </div>
                     
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                       {disciplineOptions.map((discipline) => {
                         const Icon = discipline.icon;
                         const isSelected = data.disciplines.includes(discipline.id);
@@ -496,14 +496,14 @@ return (
                           <button
                             key={discipline.id}
                             onClick={() => toggleDiscipline(discipline.id)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-center transition-colors ${
+                            className={`flex items-center justify-center gap-1.5 py-2 rounded border text-center transition-colors ${
                               isSelected
                                 ? 'border-gray-400 bg-gray-100'
                                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                             }`}
                           >
                             <Icon className={`h-4 w-4 ${isSelected ? 'text-gray-700' : 'text-gray-400'}`} />
-                            <span className={`text-sm ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>
+                            <span className={`text-xs font-medium ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>
                               {discipline.name}
                             </span>
                           </button>
@@ -514,8 +514,8 @@ return (
 
                   {/* Per-discipline performance numbers */}
                   {data.disciplines.length > 0 && (
-                    <div className="space-y-6">
-                      <h2 className="text-lg font-medium">Performance Numbers</h2>
+                    <div className="space-y-4">
+                      <h2 className="text-sm font-medium text-gray-700">Performance Numbers</h2>
 
                       {/* Running */}
                       {data.disciplines.includes('running') && (
