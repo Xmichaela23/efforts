@@ -420,74 +420,61 @@ return (
               {activeTab === 'baselines' ? (
                 <div className="space-y-8">
                   {/* Basic Information */}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <h2 className="text-lg font-medium">Basic Information</h2>
                     
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Birthday */}
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">Birthday</label>
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500">Birthday</label>
                         <input
                           type="date"
                           value={data.birthday || ''}
                           onChange={(e) => setData(prev => ({ ...prev, birthday: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                          className="block px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
                         />
                       </div>
-
-                      {/* Gender */}
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">Gender</label>
+                      <div>
+                        <label className="text-xs text-gray-500">Gender</label>
                         <select
                           value={data.gender || ''}
                           onChange={(e) => setData(prev => ({ ...prev, gender: e.target.value as any }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                          className="block px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
                         >
-                          <option value="">Select...</option>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                          <option value="prefer_not_to_say">Prefer not to say</option>
+                          <option value="">-</option>
+                          <option value="male">M</option>
+                          <option value="female">F</option>
+                          <option value="prefer_not_to_say">-</option>
                         </select>
                       </div>
-
-                      {/* Units */}
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">Units</label>
+                      <div>
+                        <label className="text-xs text-gray-500">Units</label>
                         <select
                           value={data.units || 'imperial'}
                           onChange={(e) => setData(prev => ({ ...prev, units: e.target.value as any }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                          className="block px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
                         >
-                          <option value="imperial">Imperial (lbs, mi)</option>
-                          <option value="metric">Metric (kg, km)</option>
+                          <option value="imperial">lbs/mi</option>
+                          <option value="metric">kg/km</option>
                         </select>
                       </div>
-
-                      {/* Height */}
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">
-                          Height ({data.units === 'metric' ? 'cm' : 'in'})
-                        </label>
+                      <div>
+                        <label className="text-xs text-gray-500">Height ({data.units === 'metric' ? 'cm' : 'in'})</label>
                         <input
                           type="number"
                           value={data.height || ''}
                           onChange={(e) => setData(prev => ({ ...prev, height: parseInt(e.target.value) || undefined }))}
                           placeholder={data.units === 'metric' ? '178' : '70'}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                          className="block w-16 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
                         />
                       </div>
-
-                      {/* Weight */}
-                      <div className="space-y-1 col-span-2 sm:col-span-1">
-                        <label className="text-sm font-medium text-gray-700">
-                          Weight ({data.units === 'metric' ? 'kg' : 'lbs'})
-                        </label>
+                      <div>
+                        <label className="text-xs text-gray-500">Weight ({data.units === 'metric' ? 'kg' : 'lbs'})</label>
                         <input
                           type="number"
                           value={data.weight || ''}
                           onChange={(e) => setData(prev => ({ ...prev, weight: parseInt(e.target.value) || undefined }))}
                           placeholder={data.units === 'metric' ? '80' : '175'}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                          className="block w-16 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-500"
                         />
                       </div>
                     </div>
