@@ -1221,7 +1221,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Bottom Navigation Tab Bar - Instagram style */}
       {!(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
-        <div className="mobile-tabbar px-4 pb-4 pt-2 flex items-center">
+        <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center">
           <div className="w-full">
             <div className="flex justify-center items-center gap-3">
               {/* Build hidden for now */}
