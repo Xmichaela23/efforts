@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -2186,21 +2187,46 @@ export default function PlanWizard() {
     );
   }
 
+  const safeBack = () => { if (window.history.length > 1) navigate(-1); else navigate('/'); };
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="mobile-app-container">
       {/* Header */}
-      <div className="border-b px-4 py-3 flex items-center justify-between">
-        <button 
-          onClick={() => navigate(-1)} 
-          className="text-gray-600 hover:text-gray-900"
-        >
-          Cancel
-        </button>
-        <span className="text-sm text-gray-500">
-          {step + 1} of {getStepCount()}
-        </span>
-        <div className="w-12" /> {/* Spacer */}
-      </div>
+      <header className="mobile-header">
+        <div className="w-full">
+          <div className="flex items-center justify-between h-16 w-full">
+            <div className="flex items-center space-x-1 pl-4">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="p-0.5">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuItem onClick={() => navigate('/baselines')}>Training Baselines</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/connections')}>Connections</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/')}>Dashboard</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <h1 className="text-2xl font-bold text-primary">efforts</h1>
+              <div className="flex items-center gap-3">
+                <Button onClick={safeBack} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  ← Back
+                </Button>
+                <Button onClick={() => navigate('/')} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  Dashboard
+                </Button>
+              </div>
+            </div>
+            <div className="pr-4">
+              <span className="text-sm text-gray-500">
+                {step + 1} of {getStepCount()}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
 
       {/* Progress bar */}
       <div className="h-1 bg-gray-100">
@@ -2210,55 +2236,57 @@ export default function PlanWizard() {
         />
       </div>
 
-      {/* Content */}
-      <div className="p-6 max-w-md mx-auto">
-        {renderStep()}
+      <main className="mobile-main-content">
+        {/* Content */}
+        <div className="p-6 max-w-md mx-auto">
+          {renderStep()}
 
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-            {error}
-          </div>
-        )}
-      </div>
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error}
+            </div>
+          )}
+        </div>
 
-      {/* Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-4">
-        <div className="max-w-md mx-auto flex justify-between items-center">
-          {step > 0 ? (
+        {/* Navigation */}
+        <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-4">
+          <div className="max-w-md mx-auto flex justify-between items-center">
+            {step > 0 ? (
+              <button
+                type="button"
+                onClick={handleBack}
+                disabled={isGenerating}
+                className="text-gray-500 hover:text-black disabled:opacity-50 flex items-center"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Back
+              </button>
+            ) : (
+              <div />
+            )}
             <button
               type="button"
-              onClick={handleBack}
-              disabled={isGenerating}
-              className="text-gray-500 hover:text-black disabled:opacity-50 flex items-center"
+              onClick={handleNext}
+              disabled={!canProceed() || isGenerating || (step === 0 && state.discipline !== 'run')}
+              className="font-medium hover:underline disabled:opacity-50 disabled:no-underline flex items-center"
             >
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Back
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : getLogicalStep(step) === 'runningDays' ? (
+                'Generate Plan'
+              ) : (
+                <>
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </>
+              )}
             </button>
-          ) : (
-            <div />
-          )}
-          <button
-            type="button"
-            onClick={handleNext}
-            disabled={!canProceed() || isGenerating || (step === 0 && state.discipline !== 'run')}
-            className="font-medium hover:underline disabled:opacity-50 disabled:no-underline flex items-center"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : getLogicalStep(step) === 'runningDays' ? (
-              'Generate Plan'
-            ) : (
-              <>
-                Next
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </>
-            )}
-          </button>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
