@@ -77,6 +77,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           onClick={() => { navigate('/plans/generate'); }}
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+          title="A step-by-step wizard that collects your goals, fitness, and schedule, then uses rule-based logic to build a personalized training plan with proper periodization."
         >
           <span>Build a training plan</span>
         </DropdownMenuItem>
