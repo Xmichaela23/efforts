@@ -72,6 +72,7 @@ const [saving, setSaving] = useState(false);
 const [saveMessage, setSaveMessage] = useState('');
 const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'baselines' | 'data-import'>('baselines');
+  const [activeSport, setActiveSport] = useState<string | null>(null);
 
   // Strava connection state
 const [stravaConnected, setStravaConnected] = useState(false);
@@ -305,12 +306,19 @@ const disconnectGarmin = () => {
   ];
 
   const toggleDiscipline = (disciplineId: string) => {
-    setData(prev => ({
-      ...prev,
-      disciplines: prev.disciplines.includes(disciplineId)
-        ? prev.disciplines.filter(d => d !== disciplineId)
-        : [...prev.disciplines, disciplineId]
-    }));
+    // If clicking the already active sport, close it
+    if (activeSport === disciplineId) {
+      setActiveSport(null);
+    } else {
+      // Switch to the new sport and ensure it's in disciplines
+      setActiveSport(disciplineId);
+      setData(prev => ({
+        ...prev,
+        disciplines: prev.disciplines.includes(disciplineId)
+          ? prev.disciplines
+          : [...prev.disciplines, disciplineId]
+      }));
+    }
   };
 
   // Equipment options
@@ -491,19 +499,22 @@ return (
                     <div className="grid grid-cols-4 gap-2">
                       {disciplineOptions.map((discipline) => {
                         const Icon = discipline.icon;
-                        const isSelected = data.disciplines.includes(discipline.id);
+                        const isActive = activeSport === discipline.id;
+                        const hasData = data.disciplines.includes(discipline.id);
                         return (
                           <button
                             key={discipline.id}
                             onClick={() => toggleDiscipline(discipline.id)}
                             className={`flex items-center justify-center gap-1.5 py-2 rounded border text-center transition-colors ${
-                              isSelected
+                              isActive
                                 ? 'border-gray-400 bg-gray-100'
-                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                : hasData
+                                  ? 'border-gray-300 bg-gray-50'
+                                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                             }`}
                           >
-                            <Icon className={`h-4 w-4 ${isSelected ? 'text-gray-700' : 'text-gray-400'}`} />
-                            <span className={`text-xs font-medium ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>
+                            <Icon className={`h-4 w-4 ${isActive ? 'text-gray-700' : hasData ? 'text-gray-600' : 'text-gray-400'}`} />
+                            <span className={`text-xs font-medium ${isActive ? 'text-gray-700' : hasData ? 'text-gray-600' : 'text-gray-500'}`}>
                               {discipline.name}
                             </span>
                           </button>
@@ -513,12 +524,12 @@ return (
                   </div>
 
                   {/* Per-discipline performance numbers */}
-                  {data.disciplines.length > 0 && (
+                  {activeSport && (
                     <div className="space-y-4">
                       <h2 className="text-sm font-medium text-gray-700">Performance Numbers</h2>
 
                       {/* Running */}
-                      {data.disciplines.includes('running') && (
+                      {activeSport === 'running' && (
                         <div className="space-y-4 pb-4 border-b border-gray-200">
                             <div className="flex items-center gap-2">
                             <Activity className="h-5 w-5" />
@@ -562,7 +573,7 @@ return (
                       )}
 
                       {/* Cycling */}
-                      {data.disciplines.includes('cycling') && (
+                      {activeSport === 'cycling' && (
                         <div className="space-y-4 pb-4 border-b border-gray-200">
                           <div className="flex items-center gap-2">
                             <Bike className="h-5 w-5" />
@@ -588,7 +599,7 @@ return (
                                 )}
 
                       {/* Swimming */}
-                      {data.disciplines.includes('swimming') && (
+                      {activeSport === 'swimming' && (
                         <div className="space-y-4 pb-4 border-b border-gray-200">
                           <div className="flex items-center gap-2">
                             <Waves className="h-5 w-5" />
@@ -637,7 +648,7 @@ return (
                                 )}
 
                       {/* Strength */}
-                      {data.disciplines.includes('strength') && (
+                      {activeSport === 'strength' && (
                         <div className="space-y-4 pb-4">
                           <div className="flex items-center gap-2">
                             <Dumbbell className="h-5 w-5" />
