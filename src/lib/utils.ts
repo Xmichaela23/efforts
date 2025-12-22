@@ -6,20 +6,82 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Global discipline color helpers
-export type Discipline = 'run' | 'ride' | 'swim' | 'strength' | 'walk' | 'bike';
+export type Discipline = 'run' | 'ride' | 'swim' | 'strength' | 'walk' | 'bike' | 'pilates_yoga';
 
+// Primary discipline colors (for text, borders, accents)
 export const disciplineHex: Record<string, string> = {
-  run: '#FF7F11',       // orange
-  ride: '#FFD60A',      // yellow-gold
-  bike: '#FFD60A',      // alias
-  swim: '#00B4D8',      // aqua
-  strength: '#2E2E2E',  // charcoal
-  walk: '#FF7F11',      // map walk to run color
+  run: '#22C55E',       // green-500
+  ride: '#F97316',      // orange-500
+  bike: '#F97316',      // alias
+  swim: '#0EA5E9',      // sky-500
+  strength: '#8B5CF6',  // violet-500
+  walk: '#22C55E',      // map walk to run color
+  pilates_yoga: '#EC4899', // pink-500
+};
+
+// Light background colors for pills/cards
+export const disciplineBgLight: Record<string, string> = {
+  run: '#DCFCE7',       // green-100
+  ride: '#FFEDD5',      // orange-100
+  bike: '#FFEDD5',      // alias
+  swim: '#E0F2FE',      // sky-100
+  strength: '#EDE9FE',  // violet-100
+  walk: '#DCFCE7',      // map walk to run
+  pilates_yoga: '#FCE7F3', // pink-100
+};
+
+// Border colors (slightly darker than bg)
+export const disciplineBorder: Record<string, string> = {
+  run: '#86EFAC',       // green-300
+  ride: '#FDBA74',      // orange-300
+  bike: '#FDBA74',      // alias
+  swim: '#7DD3FC',      // sky-300
+  strength: '#C4B5FD',  // violet-300
+  walk: '#86EFAC',      // map walk to run
+  pilates_yoga: '#F9A8D4', // pink-300
 };
 
 export function getDisciplineColor(type: string): string {
   const key = (type || '').toLowerCase();
-  return disciplineHex[key] || '#2E2E2E';
+  return disciplineHex[key] || '#6B7280'; // gray-500 fallback
+}
+
+export function getDisciplineBgLight(type: string): string {
+  const key = (type || '').toLowerCase();
+  return disciplineBgLight[key] || '#F3F4F6'; // gray-100 fallback
+}
+
+export function getDisciplineBorder(type: string): string {
+  const key = (type || '').toLowerCase();
+  return disciplineBorder[key] || '#D1D5DB'; // gray-300 fallback
+}
+
+// Get Tailwind classes for discipline-colored pills
+export function getDisciplinePillClasses(type: string, isCompleted: boolean = false): string {
+  const key = (type || '').toLowerCase();
+  
+  // Completed workouts get gray "crossed off" styling
+  if (isCompleted) {
+    return 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200';
+  }
+  
+  // Discipline-specific colors
+  switch (key) {
+    case 'run':
+    case 'walk':
+      return 'bg-green-50 border-green-200 hover:bg-green-100';
+    case 'ride':
+    case 'bike':
+      return 'bg-orange-50 border-orange-200 hover:bg-orange-100';
+    case 'swim':
+      return 'bg-sky-50 border-sky-200 hover:bg-sky-100';
+    case 'strength':
+      return 'bg-violet-50 border-violet-200 hover:bg-violet-100';
+    case 'pilates_yoga':
+      return 'bg-pink-50 border-pink-200 hover:bg-pink-100';
+    default:
+      return 'bg-gray-100 border-gray-200 hover:bg-gray-200';
+  }
 }
 
 // Time and pace formatting utilities

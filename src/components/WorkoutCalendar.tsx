@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
-import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
+import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses } from '@/lib/utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle, Info } from 'lucide-react';
@@ -694,11 +694,7 @@ export default function WorkoutCalendar({
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
                         className={`cursor-pointer text-xs text-gray-700 px-1.5 py-0.5 rounded w-full text-center truncate border ${
-                          isCompleted 
-                            ? 'bg-green-50 border-green-200 hover:bg-green-100' 
-                            : isPlanned
-                            ? 'bg-blue-50 border-blue-200 hover:bg-blue-100'
-                            : 'bg-gray-100 border-gray-200 hover:bg-gray-200'
+                          getDisciplinePillClasses(evt?._src?.type || evt?._src?.workout_type || '', isCompleted)
                         }`}
                       >
                         {evt.label}
