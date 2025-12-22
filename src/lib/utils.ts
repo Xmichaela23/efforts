@@ -60,9 +60,9 @@ export function getDisciplineBorder(type: string): string {
 export function getDisciplinePillClasses(type: string, isCompleted: boolean = false): string {
   const key = (type || '').toLowerCase();
   
-  // Completed workouts: light gray with green left accent
+  // Completed workouts: gradient fade from green to gray
   if (isCompleted) {
-    return 'bg-gray-50 border border-gray-200 border-l-4 border-l-green-500 text-gray-500 hover:bg-gray-100';
+    return 'bg-gradient-to-r from-green-100 to-gray-50 border border-gray-200 text-gray-600 hover:from-green-200 hover:to-gray-100';
   }
   
   // Discipline-specific colors (brighter/more saturated)

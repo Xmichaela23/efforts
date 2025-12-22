@@ -861,6 +861,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           {workout.workout_status === 'planned' && (
                             <span className="text-xs ml-2 text-gray-500">(planned)</span>
                           )}
+                          {workout.workout_status === 'completed' && (
+                            <span className="ml-2 text-green-600">✓</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-xs">
                           {workout.workout_status === 'planned' && (() => {
