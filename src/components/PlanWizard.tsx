@@ -2236,7 +2236,7 @@ export default function PlanWizard() {
         />
       </div>
 
-      <main className="mobile-main-content">
+      <main className="mobile-main-content pb-20">
         {/* Content */}
         <div className="p-6 max-w-md mx-auto">
           {renderStep()}
@@ -2247,46 +2247,46 @@ export default function PlanWizard() {
             </div>
           )}
         </div>
+      </main>
 
-        {/* Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-4">
-          <div className="max-w-md mx-auto flex justify-between items-center">
-            {step > 0 ? (
-              <button
-                type="button"
-                onClick={handleBack}
-                disabled={isGenerating}
-                className="text-gray-500 hover:text-black disabled:opacity-50 flex items-center"
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Back
-              </button>
-            ) : (
-              <div />
-            )}
+      {/* Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-4 z-50">
+        <div className="max-w-md mx-auto flex justify-between items-center">
+          {step > 0 ? (
             <button
               type="button"
-              onClick={handleNext}
-              disabled={!canProceed() || isGenerating || (step === 0 && state.discipline !== 'run')}
-              className="font-medium hover:underline disabled:opacity-50 disabled:no-underline flex items-center"
+              onClick={handleBack}
+              disabled={isGenerating}
+              className="text-gray-500 hover:text-black disabled:opacity-50 flex items-center"
             >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : getLogicalStep(step) === 'runningDays' ? (
-                'Generate Plan'
-              ) : (
-                <>
-                  Next
-                  <ChevronRight className="w-4 h-4 ml-1" />
-                </>
-              )}
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Back
             </button>
-          </div>
+          ) : (
+            <div />
+          )}
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={!canProceed() || isGenerating || (step === 0 && state.discipline !== 'run')}
+            className="font-medium hover:underline disabled:opacity-50 disabled:no-underline flex items-center"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : getLogicalStep(step) === 'runningDays' ? (
+              'Generate Plan'
+            ) : (
+              <>
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </>
+            )}
+          </button>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
