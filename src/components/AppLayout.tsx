@@ -632,6 +632,28 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const handleEditEffort = async (workout: any) => {
     const status = String((workout as any)?.workout_status || '').toLowerCase();
+    const workoutType = String((workout as any)?.type || '').toLowerCase();
+    
+    // Check if we should go directly to logger (from "Go to workout" button)
+    if ((workout as any)?.__openLogger && status === 'planned') {
+      const isStrengthOrMobility = ['strength', 'mobility'].includes(workoutType);
+      const isPilatesYoga = workoutType === 'pilates_yoga';
+      
+      if (isStrengthOrMobility) {
+        // Set the scheduled workout and open strength logger
+        setLoggerScheduledWorkout({
+          ...workout,
+          logger_mode: workoutType === 'mobility' ? 'mobility' : undefined,
+        });
+        setShowStrengthLogger(true);
+        return;
+      } else if (isPilatesYoga) {
+        setLoggerScheduledWorkout(workout);
+        setShowPilatesYogaLogger(true);
+        return;
+      }
+    }
+    
     if (status === 'completed') {
       let row = workout;
       try {
