@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Link } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
+import { Button } from './ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -52,6 +55,11 @@ equipment: {
 
 export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
+const navigate = useNavigate();
+
+const goToDashboard = () => {
+  navigate('/dashboard');
+};
 
 const [data, setData] = useState<BaselineData>({
   age: 0,
@@ -74,7 +82,7 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'baselines' | 'data-import'>('baselines');
   const [activeSport, setActiveSport] = useState<string | null>(null);
   const [originalData, setOriginalData] = useState<string>(''); // JSON string for comparison
-  
+
   // Check if data has changed from original
   const hasChanges = JSON.stringify(data) !== originalData;
 
@@ -94,7 +102,7 @@ useEffect(() => {
 }, []);
 
   // Auto-open leftmost sport with data, or Run as default
-  useEffect(() => {
+useEffect(() => {
     if (!loading && activeSport === null) {
       const sportOrder = ['running', 'cycling', 'swimming', 'strength'];
       const firstWithData = sportOrder.find(s => data.disciplines.includes(s));
@@ -316,7 +324,7 @@ const disconnectGarmin = () => {
 };
 
   // Discipline options
-  const disciplineOptions = [
+const disciplineOptions = [
     { id: 'running', name: 'Run', icon: Activity },
     { id: 'cycling', name: 'Cycle', icon: Bike },
     { id: 'swimming', name: 'Swim', icon: Waves },
@@ -393,15 +401,60 @@ return (
       <div className="w-full">
         <div className="flex items-center justify-between h-16 w-full px-4">
           <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="p-0.5">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem onClick={() => navigate('/')}>
+                  <Activity className="mr-2 h-4 w-4" />
+                  Training Baselines
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/connections')}>
+                  <Link className="mr-2 h-4 w-4" />
+                  Connections
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/')}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Export Data
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  Help & Support
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/')}>
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <h1 className="text-2xl font-bold text-primary">efforts</h1>
+            <button 
+              onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} 
+              className="text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Back
+              ← Back
             </button>
-            <h1 className="text-2xl font-bold">Training Baselines</h1>
           </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={goToDashboard} 
+              className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Dashboard
+            </button>
+          </div>
+        </div>
+        <div className="px-4 pb-2">
+          <h2 className="text-2xl font-bold">Training Baselines</h2>
         </div>
       </div>
     </header>
@@ -450,7 +503,7 @@ return (
               {activeTab === 'baselines' ? (
                 <div className="space-y-6">
                   {/* Basic Information */}
-                  <div className="space-y-2">
+                      <div className="space-y-2">
                     <h2 className="text-sm font-medium text-gray-700">Basic Information</h2>
                     
                     <div className="flex flex-wrap gap-3">
@@ -486,7 +539,7 @@ return (
                           <option value="imperial">lbs</option>
                           <option value="metric">kg</option>
                         </select>
-                      </div>
+                        </div>
                       <div className="flex items-center gap-2">
                         <label className="text-xs text-gray-500">Ht</label>
                         <input
@@ -539,17 +592,17 @@ return (
                             {!isActive && (
                               <span className="absolute -top-1 -right-1 text-[10px] text-gray-500">
                                 {hasData ? '✓' : '+'}
-                              </span>
+                                      </span>
                             )}
                             <Icon className={`h-4 w-4 ${isActive ? 'text-gray-700' : hasData ? 'text-gray-600' : 'text-gray-400'}`} />
                             <span className={`text-xs font-medium ${isActive ? 'text-gray-700' : hasData ? 'text-gray-600' : 'text-gray-500'}`}>
                               {discipline.name}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                                      </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
 
                   {/* Per-discipline performance numbers */}
                   {activeSport && (
@@ -562,42 +615,42 @@ return (
                           <div className="flex items-center gap-2">
                             <Activity className="h-4 w-4 text-gray-600" />
                             <h3 className="text-sm font-medium">Running</h3>
-                          </div>
+                                    </div>
                           <div className="flex flex-wrap gap-4">
                             <div className="flex items-center gap-2">
                               <label className="text-xs text-gray-500">5K Time</label>
-                              <input
-                                type="text"
-                                value={data.performanceNumbers?.fiveK || ''}
-                                onChange={(e) => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: {
-                                    ...prev.performanceNumbers,
+                                      <input
+                                        type="text"
+                                        value={data.performanceNumbers?.fiveK || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
                                     fiveK: e.target.value
-                                  }
-                                }))}
+                                          }
+                                        }))}
                                 placeholder="25:00"
                                 className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
-                              />
-                            </div>
+                                      />
+                                    </div>
                             <div className="flex items-center gap-2">
                               <label className="text-xs text-gray-500">Easy Pace</label>
-                              <input
-                                type="text"
-                                value={data.performanceNumbers?.easyPace || ''}
-                                onChange={(e) => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: {
-                                    ...prev.performanceNumbers,
-                                    easyPace: e.target.value
-                                  }
-                                }))}
+                                      <input
+                                        type="text"
+                                        value={data.performanceNumbers?.easyPace || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            easyPace: e.target.value
+                                          }
+                                        }))}
                                 placeholder="9:30"
                                 className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
-                              />
+                                      />
                               <span className="text-xs text-gray-400">/mi</span>
-                            </div>
-                          </div>
+                                    </div>
+                                    </div>
                         </div>
                       )}
 
@@ -610,23 +663,23 @@ return (
                           </div>
                           <div className="flex items-center gap-2">
                             <label className="text-xs text-gray-500">FTP</label>
-                            <input
+                                      <input
                               type="number"
                               value={data.performanceNumbers?.ftp || ''}
-                              onChange={(e) => setData(prev => ({
-                                ...prev,
-                                performanceNumbers: {
-                                  ...prev.performanceNumbers,
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
                                   ftp: parseInt(e.target.value) || undefined
-                                }
-                              }))}
+                                          }
+                                        }))}
                               placeholder="250"
                               className="w-20 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
-                            />
+                                      />
                             <span className="text-xs text-gray-400">watts</span>
-                          </div>
-                        </div>
-                      )}
+                                    </div>
+                                  </div>
+                                )}
 
                       {/* Swimming */}
                       {activeSport === 'swimming' && (
@@ -637,21 +690,21 @@ return (
                           </div>
                           <div className="flex items-center gap-2">
                             <label className="text-xs text-gray-500">100yd Pace</label>
-                            <input
-                              type="text"
-                              value={data.performanceNumbers?.swimPace100 || ''}
-                              onChange={(e) => setData(prev => ({
-                                ...prev,
-                                performanceNumbers: {
-                                  ...prev.performanceNumbers,
-                                  swimPace100: e.target.value
-                                }
-                              }))}
+                                      <input
+                                        type="text"
+                                        value={data.performanceNumbers?.swimPace100 || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            swimPace100: e.target.value
+                                          }
+                                        }))}
                               placeholder="1:45"
                               className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
-                            />
+                                      />
                             <span className="text-xs text-gray-400">mm:ss</span>
-                          </div>
+                                    </div>
                           <div className="space-y-2">
                             <label className="text-xs text-gray-500">Equipment</label>
                             <div className="flex flex-wrap gap-2">
@@ -672,9 +725,9 @@ return (
                                 );
                               })}
                             </div>
-                          </div>
-                        </div>
-                      )}
+                                    </div>
+                                  </div>
+                                )}
 
                       {/* Strength */}
                       {activeSport === 'strength' && (
@@ -687,75 +740,75 @@ return (
                           <div className="flex flex-wrap gap-3">
                             <div className="flex items-center gap-1">
                               <label className="text-xs text-gray-500">Squat</label>
-                              <input
-                                type="number"
-                                value={data.performanceNumbers?.squat || ''}
-                                onChange={(e) => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: {
-                                    ...prev.performanceNumbers,
-                                    squat: parseInt(e.target.value) || undefined
-                                  }
-                                }))}
+                                      <input
+                                        type="number"
+                                        value={data.performanceNumbers?.squat || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            squat: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
                                 placeholder="225"
                                 className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
-                              />
-                            </div>
+                                      />
+                                    </div>
                             <div className="flex items-center gap-1">
                               <label className="text-xs text-gray-500">DL</label>
-                              <input
-                                type="number"
-                                value={data.performanceNumbers?.deadlift || ''}
-                                onChange={(e) => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: {
-                                    ...prev.performanceNumbers,
-                                    deadlift: parseInt(e.target.value) || undefined
-                                  }
-                                }))}
+                                      <input
+                                        type="number"
+                                        value={data.performanceNumbers?.deadlift || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            deadlift: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
                                 placeholder="315"
                                 className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
-                              />
-                            </div>
+                                      />
+                                    </div>
                             <div className="flex items-center gap-1">
                               <label className="text-xs text-gray-500">Bench</label>
-                              <input
-                                type="number"
-                                value={data.performanceNumbers?.bench || ''}
-                                onChange={(e) => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: {
-                                    ...prev.performanceNumbers,
-                                    bench: parseInt(e.target.value) || undefined
-                                  }
-                                }))}
+                                      <input
+                                        type="number"
+                                        value={data.performanceNumbers?.bench || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            bench: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
                                 placeholder="185"
                                 className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
-                              />
-                            </div>
+                                      />
+                                    </div>
                             <div className="flex items-center gap-1">
                               <label className="text-xs text-gray-500">OHP</label>
-                              <input
-                                type="number"
-                                value={data.performanceNumbers?.overheadPress1RM || ''}
-                                onChange={(e) => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: {
-                                    ...prev.performanceNumbers,
-                                    overheadPress1RM: parseInt(e.target.value) || undefined
-                                  }
-                                }))}
+                                      <input
+                                        type="number"
+                                        value={data.performanceNumbers?.overheadPress1RM || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            overheadPress1RM: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
                                 placeholder="135"
                                 className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
-                              />
-                            </div>
-                          </div>
+                                      />
+                                    </div>
+                                  </div>
                           <div className="space-y-3">
                             <label className="text-xs text-gray-500">Equipment Access</label>
                             
                             {/* Commercial vs Home gym toggle */}
                             <div className="flex gap-4">
-                              <button
+                          <button
                                 onClick={() => {
                                   // Set to commercial gym, clear individual equipment
                                   setData(prev => ({
@@ -771,7 +824,7 @@ return (
                               >
                                 <span className={`w-3 h-3 rounded-full border-2 ${hasCommercialGym ? 'border-gray-600 bg-gray-600' : 'border-gray-400'}`} />
                                 Commercial gym
-                              </button>
+                          </button>
                               <button
                                 onClick={() => {
                                   // Switch to home gym - only clear if coming FROM commercial gym
@@ -792,8 +845,8 @@ return (
                                 <span className={`w-3 h-3 rounded-full border-2 ${!hasCommercialGym ? 'border-gray-600 bg-gray-600' : 'border-gray-400'}`} />
                                 Home gym
                               </button>
-                            </div>
-                            
+                  </div>
+
                             {/* Home gym equipment details - only show if not commercial */}
                             {!hasCommercialGym && (
                               <div className="space-y-2 pl-1">
@@ -802,7 +855,7 @@ return (
                                   {homeGymEquipmentOptions.map((option) => {
                                     const isSelected = (data.equipment.strength || []).includes(option);
                                     return (
-                                      <button
+                        <button
                                         key={option}
                                         onClick={() => toggleEquipment('strength', option)}
                                         className={`px-2 py-1 text-xs rounded-full transition-colors ${
@@ -811,14 +864,14 @@ return (
                                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                         }`}
                                       >
-                                        {option}
-                                      </button>
+                          {option}
+                        </button>
                                     );
                                   })}
-                                </div>
-                              </div>
+                    </div>
+                  </div>
                             )}
-                          </div>
+                </div>
                                     </div>
                                   )}
                                     </div>
@@ -936,13 +989,13 @@ return (
                   </div>
                 )}
                 {hasChanges && (
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
                     className="w-full py-3 text-gray-700 hover:text-gray-900 transition-colors font-medium disabled:text-gray-400"
-                  >
+                >
                     {saving ? 'Saving...' : 'Save Baselines'}
-                  </button>
+                </button>
                 )}
             </div>
           </>
