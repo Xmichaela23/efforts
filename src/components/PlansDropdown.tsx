@@ -72,11 +72,37 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
         className="bg-white border border-gray-200 shadow-xl"
         style={{borderRadius: '12px', padding: '8px', minWidth: '260px', maxWidth: '320px'}}
       >
-        {/* Removed the Planned Workouts item to avoid duplication below the plan */}
+        {/* Plan generation wizard - top priority */}
+        <DropdownMenuItem
+          onClick={() => { navigate('/plans/generate'); }}
+          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <span>Build a training plan</span>
+        </DropdownMenuItem>
+
+        {/* Builder hub */}
+        <DropdownMenuItem
+          onClick={() => { navigate('/plans/build'); }}
+          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <span>Build plans</span>
+        </DropdownMenuItem>
+
+        {/* Select from catalog */}
+        <DropdownMenuItem
+          onClick={() => { navigate('/plans/catalog'); }}
+          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <span>Select a plan (catalog)</span>
+        </DropdownMenuItem>
 
         {/* Current Plans */}
         {currentPlans.length > 0 && (
           <>
+            <DropdownMenuSeparator className="my-2" />
             {currentPlans.map((plan) => (
               <DropdownMenuItem
                 key={plan.id}
@@ -94,19 +120,13 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
                 </span>
               </DropdownMenuItem>
             ))}
-            
-            {completedPlans.length > 0 && (
-              <DropdownMenuSeparator className="my-2" />
-            )}
           </>
         )}
 
-        {/* Completed Plans - Navigation to full screen */}
+        {/* Completed Plans - at the bottom */}
         {completedPlans.length > 0 && (
           <>
-            {currentPlans.length > 0 && (
-              <DropdownMenuSeparator className="my-2" />
-            )}
+            <DropdownMenuSeparator className="my-2" />
             <DropdownMenuItem
               onClick={(e) => {
                 e.preventDefault();
@@ -121,38 +141,6 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
             </DropdownMenuItem>
           </>
         )}
-
-        {/* User: select a plan from catalog */}
-        {(currentPlans.length > 0 || completedPlans.length > 0) && (
-          <DropdownMenuSeparator className="my-2" />
-        )}
-        <DropdownMenuItem
-          onClick={() => { navigate('/plans/catalog'); }}
-          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
-        >
-          <span>Select a plan (catalog)</span>
-        </DropdownMenuItem>
-
-        {/* Builder hub */}
-        <DropdownMenuItem
-          onClick={() => { navigate('/plans/build'); }}
-          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
-        >
-          <span>Build plans</span>
-        </DropdownMenuItem>
-
-        {/* Plan generation wizard */}
-        <DropdownMenuItem
-          onClick={() => { navigate('/plans/generate'); }}
-          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
-        >
-          <span>Build a training plan</span>
-        </DropdownMenuItem>
-
-        {/* Removed View Current Plans entry per design */}
       </DropdownMenuContent>
     </DropdownMenu>
   );
