@@ -89,7 +89,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '52px'}}
         >
           <span>Build a routine</span>
-          <span className="text-xs text-gray-500 font-normal mt-0.5">Create workouts with simple language</span>
+          <span className="text-xs text-gray-500 font-normal mt-0.5">Create workout routines using simple language</span>
         </DropdownMenuItem>
 
         {/* Select from catalog */}
