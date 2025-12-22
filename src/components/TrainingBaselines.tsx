@@ -325,8 +325,14 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
   ];
 
   const strengthEquipmentOptions = [
-    "Home gym",
-    "Commercial gym"
+    "Barbell + plates",
+    "Dumbbells",
+    "Squat rack / Power cage",
+    "Bench (flat/adjustable)",
+    "Pull-up bar",
+    "Kettlebells",
+    "Cable machine",
+    "Resistance bands"
   ];
 
   const toggleEquipment = (disciplineId: string, option: string) => {
@@ -500,14 +506,14 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                           <button
                             key={discipline.id}
                             onClick={() => toggleDiscipline(discipline.id)}
-                            className={`p-4 rounded-lg border-2 text-center transition-colors ${
+                            className={`p-4 rounded-lg border text-center transition-colors ${
                               isSelected
-                                ? 'border-black bg-gray-50'
-                                : 'border-gray-200 hover:border-gray-400'
+                                ? 'border-gray-400 bg-gray-100'
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                             }`}
                           >
-                            <Icon className={`h-6 w-6 mx-auto mb-2 ${isSelected ? 'text-black' : 'text-gray-400'}`} />
-                            <div className={`text-sm font-medium ${isSelected ? 'text-black' : 'text-gray-500'}`}>
+                            <Icon className={`h-6 w-6 mx-auto mb-2 ${isSelected ? 'text-gray-700' : 'text-gray-400'}`} />
+                            <div className={`text-sm font-medium ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>
                               {discipline.name}
                             </div>
                           </button>
@@ -626,8 +632,8 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                                       onClick={() => toggleEquipment('swimming', option)}
                                       className={`px-3 py-1 text-sm rounded-full transition-colors ${
                                         isSelected
-                                          ? 'bg-black text-white'
-                                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                          ? 'bg-gray-300 text-gray-800'
+                                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                       }`}
                                     >
                                       {option}
@@ -715,7 +721,7 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                           </div>
                           <div className="space-y-2">
                             <label className="text-sm text-gray-600">Equipment Access</label>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                               {strengthEquipmentOptions.map((option) => {
                                 const isSelected = (data.equipment.strength || []).includes(option);
                                 return (
@@ -724,8 +730,8 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                                     onClick={() => toggleEquipment('strength', option)}
                                     className={`px-3 py-1 text-sm rounded-full transition-colors ${
                                       isSelected
-                                        ? 'bg-black text-white'
-                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        ? 'bg-gray-300 text-gray-800'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                                   >
                                     {option}
@@ -853,7 +859,7 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="w-full px-4 py-3 bg-black text-white hover:bg-gray-800 transition-colors font-medium rounded-md disabled:bg-gray-400"
+                  className="w-full px-4 py-3 bg-gray-600 text-white hover:bg-gray-700 transition-colors font-medium rounded-md disabled:bg-gray-300"
                 >
                   {saving ? 'Saving...' : 'Save Baselines'}
                 </button>
