@@ -65,22 +65,22 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
     return 'bg-gradient-to-r from-green-100 to-gray-50 border border-gray-200 text-gray-600 hover:from-green-200 hover:to-gray-100';
   }
   
-  // Discipline-specific colors (brighter/more saturated)
+  // Danish minimal: neutral base with colored left accent
   switch (key) {
     case 'run':
     case 'walk':
-      return 'bg-yellow-100 border-yellow-400 text-yellow-800 hover:bg-yellow-200';
+      return 'bg-gray-50 border border-gray-200 border-l-2 border-l-yellow-500 text-gray-700 hover:bg-gray-100';
     case 'ride':
     case 'bike':
-      return 'bg-orange-100 border-orange-400 text-orange-800 hover:bg-orange-200';
+      return 'bg-gray-50 border border-gray-200 border-l-2 border-l-orange-500 text-gray-700 hover:bg-gray-100';
     case 'swim':
-      return 'bg-sky-100 border-sky-400 text-sky-800 hover:bg-sky-200';
+      return 'bg-gray-50 border border-gray-200 border-l-2 border-l-sky-500 text-gray-700 hover:bg-gray-100';
     case 'strength':
-      return 'bg-violet-100 border-violet-400 text-violet-800 hover:bg-violet-200';
+      return 'bg-gray-50 border border-gray-200 border-l-2 border-l-violet-500 text-gray-700 hover:bg-gray-100';
     case 'pilates_yoga':
-      return 'bg-pink-100 border-pink-400 text-pink-800 hover:bg-pink-200';
+      return 'bg-gray-50 border border-gray-200 border-l-2 border-l-pink-500 text-gray-700 hover:bg-gray-100';
     default:
-      return 'bg-gray-200 border-gray-300 hover:bg-gray-300';
+      return 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100';
   }
 }
 
