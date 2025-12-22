@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Menu, User, Upload, Settings, Activity, Link } from 'lucide-react';
+import { Menu, User, Upload, Settings, Activity, Link, ArrowRight } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
@@ -1247,6 +1247,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 }}
               >
                 Context
+                <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
