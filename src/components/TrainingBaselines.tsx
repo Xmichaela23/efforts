@@ -93,6 +93,15 @@ useEffect(() => {
   loadBaselines();
 }, []);
 
+  // Auto-open leftmost sport with data, or Run as default
+  useEffect(() => {
+    if (!loading && activeSport === null) {
+      const sportOrder = ['running', 'cycling', 'swimming', 'strength'];
+      const firstWithData = sportOrder.find(s => data.disciplines.includes(s));
+      setActiveSport(firstWithData || 'running');
+    }
+  }, [loading, data.disciplines]);
+
   // Check for existing Strava token
 useEffect(() => {
   const existingToken = localStorage.getItem('strava_access_token');
