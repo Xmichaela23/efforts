@@ -332,8 +332,8 @@ const disconnectGarmin = () => {
     "Snorkel"
   ];
 
-  const strengthEquipmentOptions = [
-    "Commercial gym",
+  // Home gym equipment options (only shown when "Home gym" is selected)
+  const homeGymEquipmentOptions = [
     "Barbell + plates",
     "Dumbbells",
     "Squat rack / Power cage",
@@ -343,6 +343,9 @@ const disconnectGarmin = () => {
     "Cable machine",
     "Resistance bands"
   ];
+  
+  // Helper to check if user has commercial gym access
+  const hasCommercialGym = (data.equipment.strength || []).includes('Commercial gym');
 
 const toggleEquipment = (disciplineId: string, option: string) => {
   const currentItems = data.equipment[disciplineId as keyof typeof data.equipment] || [];
@@ -724,27 +727,72 @@ return (
                               />
                             </div>
                           </div>
-                    <div className="space-y-2">
-                            <label className="text-sm text-gray-600">Equipment Access</label>
-                            <div className="flex flex-wrap gap-2">
-                              {strengthEquipmentOptions.map((option) => {
-                                const isSelected = (data.equipment.strength || []).includes(option);
-                                return (
-                          <button
-                                    key={option}
-                                    onClick={() => toggleEquipment('strength', option)}
-                                    className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                                      isSelected
-                                        ? 'bg-gray-300 text-gray-800'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                                  >
-                            {option}
+                          <div className="space-y-3">
+                            <label className="text-xs text-gray-500">Equipment Access</label>
+                            
+                            {/* Commercial vs Home gym toggle */}
+                            <div className="flex gap-4">
+                              <button
+                                onClick={() => {
+                                  // Set to commercial gym, clear individual equipment
+                                  setData(prev => ({
+                                    ...prev,
+                                    equipment: { ...prev.equipment, strength: ['Commercial gym'] }
+                                  }));
+                                }}
+                                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded border transition-colors ${
+                                  hasCommercialGym
+                                    ? 'border-gray-400 bg-gray-100 text-gray-800'
+                                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                }`}
+                              >
+                                <span className={`w-3 h-3 rounded-full border-2 ${hasCommercialGym ? 'border-gray-600 bg-gray-600' : 'border-gray-400'}`} />
+                                Commercial gym
                               </button>
-                            );
-                          })}
-                        </div>
-                      </div>
+                              <button
+                                onClick={() => {
+                                  // Set to home gym, clear commercial gym flag
+                                  setData(prev => ({
+                                    ...prev,
+                                    equipment: { ...prev.equipment, strength: [] }
+                                  }));
+                                }}
+                                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded border transition-colors ${
+                                  !hasCommercialGym
+                                    ? 'border-gray-400 bg-gray-100 text-gray-800'
+                                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                }`}
+                              >
+                                <span className={`w-3 h-3 rounded-full border-2 ${!hasCommercialGym ? 'border-gray-600 bg-gray-600' : 'border-gray-400'}`} />
+                                Home gym
+                              </button>
+                            </div>
+                            
+                            {/* Home gym equipment details - only show if not commercial */}
+                            {!hasCommercialGym && (
+                              <div className="space-y-2 pl-1">
+                                <p className="text-xs text-gray-400">Select your equipment:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {homeGymEquipmentOptions.map((option) => {
+                                    const isSelected = (data.equipment.strength || []).includes(option);
+                                    return (
+                                      <button
+                                        key={option}
+                                        onClick={() => toggleEquipment('strength', option)}
+                                        className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                                          isSelected
+                                            ? 'bg-gray-300 text-gray-800'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                      >
+                                        {option}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                                     </div>
                                   )}
                                     </div>

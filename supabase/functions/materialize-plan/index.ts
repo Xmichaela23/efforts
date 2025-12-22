@@ -326,14 +326,17 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   const name = String(exerciseName || '').toLowerCase();
   const equipment = Array.isArray(userEquipment) ? userEquipment : [];
   
-  const hasBarbell = equipment.includes('Full barbell + plates') || equipment.includes('Squat rack or power cage') || equipment.includes('Full commercial gym access');
-  const hasDumbbells = equipment.includes('Adjustable dumbbells') || equipment.includes('Fixed dumbbells') || equipment.includes('Full commercial gym access');
-  const hasBench = equipment.includes('Bench (flat/adjustable)') || equipment.includes('Full commercial gym access');
-  const hasPullUpBar = equipment.includes('Pull-up bar') || equipment.includes('Full commercial gym access');
-  const hasCable = equipment.includes('Cable machine/functional trainer') || equipment.includes('Full commercial gym access');
-  const hasKettlebells = equipment.includes('Kettlebells') || equipment.includes('Full commercial gym access');
+  // Check for gym access (old and new naming conventions)
+  const hasGymAccess = equipment.includes('Full commercial gym access') || equipment.includes('Commercial gym');
+  
+  // Check for specific equipment (supporting both old and new names)
+  const hasBarbell = hasGymAccess || equipment.includes('Full barbell + plates') || equipment.includes('Barbell + plates') || equipment.includes('Squat rack or power cage') || equipment.includes('Squat rack / Power cage');
+  const hasDumbbells = hasGymAccess || equipment.includes('Adjustable dumbbells') || equipment.includes('Fixed dumbbells') || equipment.includes('Dumbbells');
+  const hasBench = hasGymAccess || equipment.includes('Bench (flat/adjustable)');
+  const hasPullUpBar = hasGymAccess || equipment.includes('Pull-up bar');
+  const hasCable = hasGymAccess || equipment.includes('Cable machine/functional trainer') || equipment.includes('Cable machine');
+  const hasKettlebells = hasGymAccess || equipment.includes('Kettlebells');
   const hasResistanceBands = equipment.includes('Resistance bands');
-  const hasGymAccess = equipment.includes('Full commercial gym access');
   const bodyweightOnly = equipment.includes('Bodyweight only') || equipment.length === 0;
   
   let resultName = exerciseName;
