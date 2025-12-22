@@ -8,15 +8,15 @@ export function cn(...inputs: ClassValue[]) {
 // Global discipline color helpers
 export type Discipline = 'run' | 'ride' | 'swim' | 'strength' | 'walk' | 'bike' | 'pilates_yoga';
 
-// Primary discipline colors (for text, borders, accents)
+// Primary discipline colors - Muji-inspired earthy tones
 export const disciplineHex: Record<string, string> = {
-  run: '#EAB308',       // yellow-500
-  ride: '#F97316',      // orange-500
-  bike: '#F97316',      // alias
-  swim: '#0EA5E9',      // sky-500
-  strength: '#8B5CF6',  // violet-500
-  walk: '#EAB308',      // map walk to run color
-  pilates_yoga: '#EC4899', // pink-500
+  run: '#C9922E',       // warm ochre/mustard
+  ride: '#C65D3B',      // terracotta
+  bike: '#C65D3B',      // alias
+  swim: '#2B5A8C',      // deep indigo
+  strength: '#5A7D5A',  // sage green
+  walk: '#C9922E',      // map walk to run color
+  pilates_yoga: '#B07070', // dusty rose
 };
 
 // Light background colors for pills/cards (brighter -100 variants)
@@ -65,20 +65,20 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
     return 'bg-gradient-to-r from-green-100 to-gray-50 border border-gray-200 text-gray-600 hover:from-green-200 hover:to-gray-100';
   }
   
-  // Danish minimal: neutral base with colored left accent
+  // Muji minimal: neutral base with earthy colored left accent (4px)
   switch (key) {
     case 'run':
     case 'walk':
-      return 'bg-gray-50 border border-gray-200 border-l-2 border-l-yellow-500 text-gray-700 hover:bg-gray-100';
+      return 'bg-gray-50 border border-gray-200 border-l-4 border-l-[#C9922E] text-gray-700 hover:bg-gray-100';
     case 'ride':
     case 'bike':
-      return 'bg-gray-50 border border-gray-200 border-l-2 border-l-orange-500 text-gray-700 hover:bg-gray-100';
+      return 'bg-gray-50 border border-gray-200 border-l-4 border-l-[#C65D3B] text-gray-700 hover:bg-gray-100';
     case 'swim':
-      return 'bg-gray-50 border border-gray-200 border-l-2 border-l-sky-500 text-gray-700 hover:bg-gray-100';
+      return 'bg-gray-50 border border-gray-200 border-l-4 border-l-[#2B5A8C] text-gray-700 hover:bg-gray-100';
     case 'strength':
-      return 'bg-gray-50 border border-gray-200 border-l-2 border-l-violet-500 text-gray-700 hover:bg-gray-100';
+      return 'bg-gray-50 border border-gray-200 border-l-4 border-l-[#5A7D5A] text-gray-700 hover:bg-gray-100';
     case 'pilates_yoga':
-      return 'bg-gray-50 border border-gray-200 border-l-2 border-l-pink-500 text-gray-700 hover:bg-gray-100';
+      return 'bg-gray-50 border border-gray-200 border-l-4 border-l-[#B07070] text-gray-700 hover:bg-gray-100';
     default:
       return 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100';
   }
