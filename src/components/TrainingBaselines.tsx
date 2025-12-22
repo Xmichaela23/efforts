@@ -510,7 +510,7 @@ return (
                           <button
                             key={discipline.id}
                             onClick={() => toggleDiscipline(discipline.id)}
-                            className={`flex items-center justify-center gap-1.5 py-2 rounded border text-center transition-colors ${
+                            className={`relative flex items-center justify-center gap-1.5 py-2 rounded border text-center transition-colors ${
                               isActive
                                 ? 'border-gray-400 bg-gray-100'
                                 : hasData
@@ -518,6 +518,9 @@ return (
                                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                             }`}
                           >
+                            {hasData && !isActive && (
+                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+                            )}
                             <Icon className={`h-4 w-4 ${isActive ? 'text-gray-700' : hasData ? 'text-gray-600' : 'text-gray-400'}`} />
                             <span className={`text-xs font-medium ${isActive ? 'text-gray-700' : hasData ? 'text-gray-600' : 'text-gray-500'}`}>
                               {discipline.name}
@@ -751,11 +754,14 @@ return (
                               </button>
                               <button
                                 onClick={() => {
-                                  // Set to home gym, clear commercial gym flag
-                                  setData(prev => ({
-                                    ...prev,
-                                    equipment: { ...prev.equipment, strength: [] }
-                                  }));
+                                  // Switch to home gym - only clear if coming FROM commercial gym
+                                  if (hasCommercialGym) {
+                                    setData(prev => ({
+                                      ...prev,
+                                      equipment: { ...prev.equipment, strength: [] }
+                                    }));
+                                  }
+                                  // If already home gym, do nothing - keep existing equipment
                                 }}
                                 className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded border transition-colors ${
                                   !hasCommercialGym
