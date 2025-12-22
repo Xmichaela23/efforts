@@ -19,26 +19,26 @@ export const disciplineHex: Record<string, string> = {
   pilates_yoga: '#EC4899', // pink-500
 };
 
-// Light background colors for pills/cards
+// Light background colors for pills/cards (brighter -100 variants)
 export const disciplineBgLight: Record<string, string> = {
-  run: '#DCFCE7',       // green-100
-  ride: '#FFEDD5',      // orange-100
-  bike: '#FFEDD5',      // alias
-  swim: '#E0F2FE',      // sky-100
-  strength: '#EDE9FE',  // violet-100
-  walk: '#DCFCE7',      // map walk to run
-  pilates_yoga: '#FCE7F3', // pink-100
+  run: '#BBF7D0',       // green-200
+  ride: '#FED7AA',      // orange-200
+  bike: '#FED7AA',      // alias
+  swim: '#BAE6FD',      // sky-200
+  strength: '#DDD6FE',  // violet-200
+  walk: '#BBF7D0',      // map walk to run
+  pilates_yoga: '#FBCFE8', // pink-200
 };
 
-// Border colors (slightly darker than bg)
+// Border colors (more saturated -400 variants)
 export const disciplineBorder: Record<string, string> = {
-  run: '#86EFAC',       // green-300
-  ride: '#FDBA74',      // orange-300
-  bike: '#FDBA74',      // alias
-  swim: '#7DD3FC',      // sky-300
-  strength: '#C4B5FD',  // violet-300
-  walk: '#86EFAC',      // map walk to run
-  pilates_yoga: '#F9A8D4', // pink-300
+  run: '#4ADE80',       // green-400
+  ride: '#FB923C',      // orange-400
+  bike: '#FB923C',      // alias
+  swim: '#38BDF8',      // sky-400
+  strength: '#A78BFA',  // violet-400
+  walk: '#4ADE80',      // map walk to run
+  pilates_yoga: '#F472B6', // pink-400
 };
 
 export function getDisciplineColor(type: string): string {
@@ -62,25 +62,25 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
   
   // Completed workouts get gray "crossed off" styling
   if (isCompleted) {
-    return 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200';
+    return 'bg-gray-200 border-gray-400 text-gray-500 hover:bg-gray-300';
   }
   
-  // Discipline-specific colors
+  // Discipline-specific colors (brighter/more saturated)
   switch (key) {
     case 'run':
     case 'walk':
-      return 'bg-green-50 border-green-200 hover:bg-green-100';
+      return 'bg-green-100 border-green-400 text-green-800 hover:bg-green-200';
     case 'ride':
     case 'bike':
-      return 'bg-orange-50 border-orange-200 hover:bg-orange-100';
+      return 'bg-orange-100 border-orange-400 text-orange-800 hover:bg-orange-200';
     case 'swim':
-      return 'bg-sky-50 border-sky-200 hover:bg-sky-100';
+      return 'bg-sky-100 border-sky-400 text-sky-800 hover:bg-sky-200';
     case 'strength':
-      return 'bg-violet-50 border-violet-200 hover:bg-violet-100';
+      return 'bg-violet-100 border-violet-400 text-violet-800 hover:bg-violet-200';
     case 'pilates_yoga':
-      return 'bg-pink-50 border-pink-200 hover:bg-pink-100';
+      return 'bg-pink-100 border-pink-400 text-pink-800 hover:bg-pink-200';
     default:
-      return 'bg-gray-100 border-gray-200 hover:bg-gray-200';
+      return 'bg-gray-200 border-gray-300 hover:bg-gray-300';
   }
 }
 
