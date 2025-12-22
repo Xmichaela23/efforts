@@ -332,7 +332,8 @@ const disciplineOptions = [
     "Pull-up bar",
     "Kettlebells",
     "Cable machine",
-    "Resistance bands"
+    "Resistance bands",
+    "Commercial gym"
   ];
 
 const toggleEquipment = (disciplineId: string, option: string) => {
@@ -482,8 +483,10 @@ return (
 
                   {/* Disciplines */}
                   <div className="space-y-4">
-                    <h2 className="text-lg font-medium">Your Sports</h2>
-                    <p className="text-sm text-gray-600">Select the sports you train</p>
+                    <div>
+                      <h2 className="text-lg font-medium">Your Sports</h2>
+                      <p className="text-sm text-gray-500">Add your baselines for personalized plans</p>
+                    </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {disciplineOptions.map((discipline) => {
