@@ -983,6 +983,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     return (
       <TrainingBaselines
         onClose={handleBackToDashboard}
+        onOpenBaselineTest={(testName: string) => {
+          const today = new Date().toISOString().split('T')[0];
+          setShowTrainingBaselines(false);
+          setLoggerScheduledWorkout({
+            name: testName,
+            type: 'strength',
+            date: today,
+            workout_status: 'planned'
+          });
+          setSelectedDate(today);
+          setShowStrengthLogger(true);
+        }}
       />
     );
   }

@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 interface TrainingBaselinesProps {
 onClose: () => void;
+onOpenBaselineTest?: (testName: string) => void;
 }
 
 interface BaselineData {
@@ -53,7 +54,7 @@ equipment: {
   trainingBackground: string;
 }
 
-export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
+export default function TrainingBaselines({ onClose, onOpenBaselineTest }: TrainingBaselinesProps) {
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
 const navigate = useNavigate();
 
@@ -747,17 +748,9 @@ return (
                               Log a{' '}
                               <button
                                 onClick={() => {
-                                  const today = new Date().toISOString().split('T')[0];
-                                  window.dispatchEvent(new CustomEvent('open:strengthLogger', {
-                                    detail: {
-                                      planned: {
-                                        name: 'Baseline Test: Lower Body',
-                                        type: 'strength',
-                                        date: today,
-                                        workout_status: 'planned'
-                                      }
-                                    }
-                                  }));
+                                  if (onOpenBaselineTest) {
+                                    onOpenBaselineTest('Baseline Test: Lower Body');
+                                  }
                                 }}
                                 className="text-blue-600 hover:text-blue-800 underline font-medium"
                               >
@@ -766,17 +759,9 @@ return (
                               {' '}or{' '}
                               <button
                                 onClick={() => {
-                                  const today = new Date().toISOString().split('T')[0];
-                                  window.dispatchEvent(new CustomEvent('open:strengthLogger', {
-                                    detail: {
-                                      planned: {
-                                        name: 'Baseline Test: Upper Body',
-                                        type: 'strength',
-                                        date: today,
-                                        workout_status: 'planned'
-                                      }
-                                    }
-                                  }));
+                                  if (onOpenBaselineTest) {
+                                    onOpenBaselineTest('Baseline Test: Upper Body');
+                                  }
                                 }}
                                 className="text-blue-600 hover:text-blue-800 underline font-medium"
                               >
@@ -785,7 +770,7 @@ return (
                               {' '}workout. We'll guide you through warmups and calculate your 1RM automatically.
                             </p>
                             <p className="text-xs text-gray-500 italic">
-                              💡 Tip: Retest every 8-12 weeks to track progress.
+                              Tip: Retest every 8-12 weeks to track progress.
                             </p>
                           </div>
                           
