@@ -735,8 +735,60 @@ return (
                           <div className="flex items-center gap-2">
                             <Dumbbell className="h-4 w-4 text-gray-600" />
                             <h3 className="text-sm font-medium">Strength</h3>
-                            <span className="text-xs text-gray-400">({data.units === 'metric' ? 'kg' : 'lbs'})</span>
+                            <span className="text-xs text-gray-400">1 rep max ({data.units === 'metric' ? 'kg' : 'lbs'})</span>
                           </div>
+                          
+                          {/* Baseline Test Note */}
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                            <p className="text-xs text-gray-700 mb-2">
+                              Don't know your numbers? Or want to retest?
+                            </p>
+                            <p className="text-xs text-gray-600 mb-2">
+                              Log a{' '}
+                              <button
+                                onClick={() => {
+                                  const today = new Date().toISOString().split('T')[0];
+                                  window.dispatchEvent(new CustomEvent('open:strengthLogger', {
+                                    detail: {
+                                      planned: {
+                                        name: 'Baseline Test: Lower Body',
+                                        type: 'strength',
+                                        date: today,
+                                        workout_status: 'planned'
+                                      }
+                                    }
+                                  }));
+                                }}
+                                className="text-blue-600 hover:text-blue-800 underline font-medium"
+                              >
+                                Baseline Test: Lower Body
+                              </button>
+                              {' '}or{' '}
+                              <button
+                                onClick={() => {
+                                  const today = new Date().toISOString().split('T')[0];
+                                  window.dispatchEvent(new CustomEvent('open:strengthLogger', {
+                                    detail: {
+                                      planned: {
+                                        name: 'Baseline Test: Upper Body',
+                                        type: 'strength',
+                                        date: today,
+                                        workout_status: 'planned'
+                                      }
+                                    }
+                                  }));
+                                }}
+                                className="text-blue-600 hover:text-blue-800 underline font-medium"
+                              >
+                                Upper Body
+                              </button>
+                              {' '}workout. We'll guide you through warmups and calculate your 1RM automatically.
+                            </p>
+                            <p className="text-xs text-gray-500 italic">
+                              💡 Tip: Retest every 8-12 weeks to track progress.
+                            </p>
+                          </div>
+                          
                           <div className="flex flex-wrap gap-3">
                             <div className="flex items-center gap-1">
                               <label className="text-xs text-gray-500">Squat</label>

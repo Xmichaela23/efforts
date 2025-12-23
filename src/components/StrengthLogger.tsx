@@ -20,6 +20,8 @@ interface LoggedSet {
   rir?: number;
   completed: boolean;
   barType?: string;
+  setType?: 'warmup' | 'working'; // For baseline test workouts
+  setHint?: string; // Hint text for baseline test sets
 }
 
 interface LoggedExercise {
@@ -437,6 +439,151 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (rpe <= 7) return 'Hard';
     if (rpe <= 9) return 'Very Hard';
     return 'Maximal';
+  };
+
+  // Helper: detect if this is a baseline test workout
+  const isBaselineTestWorkout = (workout: any): boolean => {
+    const name = String(workout?.name || '').toLowerCase();
+    return name.includes('baseline test');
+  };
+
+  // Helper: get baseline test type (lower/upper)
+  const getBaselineTestType = (workout: any): 'lower' | 'upper' | null => {
+    if (!isBaselineTestWorkout(workout)) return null;
+    const name = String(workout?.name || '').toLowerCase();
+    if (name.includes('lower')) return 'lower';
+    if (name.includes('upper')) return 'upper';
+    return null;
+  };
+
+  // Helper: identify which baseline this exercise maps to
+  const getBaselineKeyForExercise = (exerciseName: string): 'squat' | 'deadlift' | 'bench' | 'overheadPress1RM' | null => {
+    const name = exerciseName.toLowerCase();
+    if (name.includes('squat') && !name.includes('goblet') && !name.includes('jump')) return 'squat';
+    if (name.includes('deadlift')) return 'deadlift';
+    if (name.includes('bench') && name.includes('press')) return 'bench';
+    if ((name.includes('overhead') || name.includes('ohp')) && name.includes('press')) return 'overheadPress1RM';
+    return null;
+  };
+
+  // Helper: create baseline test exercise structure
+  const createBaselineTestExercise = (exerciseName: string): LoggedExercise => {
+    const isOHP = exerciseName.toLowerCase().includes('overhead') || exerciseName.toLowerCase().includes('ohp');
+    const emptyBarWeight = isOHP ? 0 : 45; // OHP might need lighter start
+    
+    return {
+      id: `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: exerciseName,
+      expanded: true,
+      sets: [
+        // Warmup 1: Empty bar
+        {
+          weight: emptyBarWeight,
+          reps: 10,
+          setType: 'warmup',
+          setHint: 'Should feel easy',
+          barType: 'standard',
+          completed: false
+        },
+        // Warmup 2: Add 25-50 lbs
+        {
+          weight: 0,
+          reps: 5,
+          setType: 'warmup',
+          setHint: 'Add 25-50 lbs, should feel easy',
+          barType: 'standard',
+          completed: false
+        },
+        // Warmup 3: Add 25-50 lbs more
+        {
+          weight: 0,
+          reps: 3,
+          setType: 'warmup',
+          setHint: 'Add 25-50 lbs, should feel moderate',
+          barType: 'standard',
+          completed: false
+        },
+        // Working set placeholder
+        {
+          weight: 0,
+          reps: undefined, // 5-8 reps, user fills in
+          setType: 'working',
+          setHint: 'Target: 5-8 reps at RIR 2-3 (moderately hard)',
+          barType: 'standard',
+          completed: false
+        }
+      ]
+    };
+  };
+
+  // Helper: calculate 1RM from weight and reps (Epley formula)
+  const calculate1RM = (weight: number, reps: number): number => {
+    if (!weight || !reps || reps <= 0) return 0;
+    return Math.round(weight * (1 + reps / 30));
+  };
+
+  // State for baseline test results
+  const [baselineTestResults, setBaselineTestResults] = useState<{
+    [exerciseId: string]: { weight: number; reps: number; estimated1RM: number; rounded1RM: number; baselineKey: string }
+  }>({});
+  const [savingBaseline, setSavingBaseline] = useState(false);
+
+  // Save baseline test results to user_baselines
+  const saveBaselineResults = async () => {
+    try {
+      setSavingBaseline(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('You must be logged in to save baselines');
+        return;
+      }
+
+      // Get current baselines
+      const { data: currentBaselines, error: fetchError } = await supabase
+        .from('user_baselines')
+        .select('performance_numbers')
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
+      }
+
+      // Merge new results into performance_numbers
+      const currentPerf = (currentBaselines?.performance_numbers || {}) as any;
+      const updatedPerf = { ...currentPerf };
+      
+      Object.values(baselineTestResults).forEach(result => {
+        updatedPerf[result.baselineKey] = result.rounded1RM;
+      });
+
+      // Update or insert baselines
+      if (currentBaselines) {
+        const { error } = await supabase
+          .from('user_baselines')
+          .update({ performance_numbers: updatedPerf })
+          .eq('user_id', user.id);
+        
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('user_baselines')
+          .insert([{
+            user_id: user.id,
+            performance_numbers: updatedPerf
+          }]);
+        
+        if (error) throw error;
+      }
+
+      alert('Baselines saved successfully!');
+      setBaselineTestResults({});
+    } catch (error: any) {
+      console.error('Error saving baselines:', error);
+      alert('Failed to save baselines: ' + (error.message || 'Unknown error'));
+    } finally {
+      setSavingBaseline(false);
+    }
   };
   
   // Session persistence key based on target date - use consistent date format
@@ -1173,6 +1320,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }
     }
     
+    // Check if this is a baseline test workout
+    if (isBaselineTestWorkout(workoutToLoad)) {
+      console.log('📝 Baseline test workout detected');
+      const testType = getBaselineTestType(workoutToLoad);
+      let testExercises: string[] = [];
+      
+      if (testType === 'lower') {
+        testExercises = ['Back Squat', 'Deadlift'];
+      } else if (testType === 'upper') {
+        testExercises = ['Bench Press', 'Overhead Press'];
+      }
+      
+      // Create baseline test structure for each exercise
+      const baselineExercises = testExercises.map(name => createBaselineTestExercise(name));
+      setExercises(baselineExercises);
+      exercisesLoadedFromWorkout = true;
+      setIsInitialized(true);
+      return;
+    }
+
     if (workoutToLoad && workoutToLoad.strength_exercises && workoutToLoad.strength_exercises.length > 0) {
       console.log('📝 Pre-populating with planned workout exercises');
       console.log('📝 Raw strength_exercises:', JSON.stringify(workoutToLoad.strength_exercises, null, 2));
@@ -1828,12 +1995,62 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
   };
 
+  // Add warmup set to baseline test exercise
+  const addWarmupSet = (exerciseId: string, insertBeforeIndex: number) => {
+    const updatedExercises = exercises.map(exercise => {
+      if (exercise.id === exerciseId) {
+        const newSets = [...exercise.sets];
+        // Find the last warmup set to suggest next weight
+        const warmupSets = newSets.filter(s => s.setType === 'warmup');
+        const lastWarmup = warmupSets[warmupSets.length - 1];
+        const suggestedWeight = lastWarmup && lastWarmup.weight > 0 ? lastWarmup.weight + 25 : 0;
+        
+        const newWarmupSet: LoggedSet = {
+          weight: suggestedWeight,
+          reps: 3,
+          setType: 'warmup',
+          setHint: 'Add 25-50 lbs, should feel moderate',
+          barType: 'standard',
+          completed: false
+        };
+        
+        newSets.splice(insertBeforeIndex, 0, newWarmupSet);
+        return { ...exercise, sets: newSets };
+      }
+      return exercise;
+    });
+    setExercises(updatedExercises);
+    saveSessionProgress(updatedExercises, attachedAddons, notesText, notesRpe);
+  };
+
   const updateSet = (exerciseId: string, setIndex: number, updates: Partial<LoggedSet>) => {
     const updatedExercises = exercises.map(exercise => {
       if (exercise.id === exerciseId) {
         const newSets = [...exercise.sets];
         const updatedSet = { ...newSets[setIndex], ...updates };
         newSets[setIndex] = updatedSet;
+        
+        // Check if this is a baseline test working set that was just completed with RIR 2-3
+        // Also check if RIR was just added to an already-completed working set
+        if (updatedSet.setType === 'working' && updatedSet.completed && updatedSet.rir !== undefined && 
+            updatedSet.rir >= 2 && updatedSet.rir <= 3 && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0) {
+          const baselineKey = getBaselineKeyForExercise(exercise.name);
+          if (baselineKey) {
+            const estimated1RM = calculate1RM(updatedSet.weight, updatedSet.reps);
+            const rounded1RM = Math.floor(estimated1RM / 5) * 5; // Round down to nearest 5
+            
+            setBaselineTestResults(prev => ({
+              ...prev,
+              [exerciseId]: {
+                weight: updatedSet.weight!,
+                reps: updatedSet.reps!,
+                estimated1RM,
+                rounded1RM,
+                baselineKey
+              }
+            }));
+          }
+        }
         
         // Auto-calculate rest time when reps change (for rep-based exercises)
         if ('reps' in updates && updatedSet.reps !== undefined && updatedSet.duration_seconds === undefined) {
@@ -2580,8 +2797,50 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     setIndex > 0 && 
                     exercise.sets.length > 1;
                   
+                  const isBaselineTest = isBaselineTestWorkout(scheduledWorkout || {});
+                  const isWarmup = set.setType === 'warmup';
+                  const isWorking = set.setType === 'working';
+                  const workingSetIndex = exercise.sets.findIndex(s => s.setType === 'working');
+                  const showAddWarmupButton = isBaselineTest && setIndex === workingSetIndex && workingSetIndex > 0;
+                  const result = baselineTestResults[exercise.id];
+                  
                   return (
                     <div key={setIndex} className="mb-1 last:mb-0">
+                      {/* Baseline test set type label and hint */}
+                      {isBaselineTest && (
+                        <div className="mb-1 ml-8">
+                          {isWarmup && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-blue-600">Warmup</span>
+                              {set.setHint && (
+                                <span className="text-xs text-gray-500 italic">{set.setHint}</span>
+                              )}
+                            </div>
+                          )}
+                          {isWorking && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-orange-600">Working Set - Add when ready</span>
+                              {set.setHint && (
+                                <span className="text-xs text-gray-500 italic">{set.setHint}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Add warmup set button (before working set) */}
+                      {showAddWarmupButton && (
+                        <div className="mb-2 ml-8">
+                          <button
+                            onClick={() => addWarmupSet(exercise.id, setIndex)}
+                            className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 flex items-center gap-1"
+                          >
+                            <Plus className="h-3 w-3" />
+                            Add warmup set
+                          </button>
+                        </div>
+                      )}
+                      
                       {/* Rest timer - only show when rest is actually needed */}
                       {showRestTimer && (
                         <div className="flex items-center gap-2 mb-0.5 ml-8 relative">
@@ -2941,9 +3200,31 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       }
                       return null;
                     })()}
+                    
+                    {/* Baseline test 1RM result display */}
+                    {isBaselineTest && isWorking && result && (
+                      <div className="mt-2 ml-8 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <div className="text-sm font-medium text-gray-900 mb-1">
+                          Estimated 1RM: {result.estimated1RM} lbs → We'll use {result.rounded1RM} lbs (rounded down)
+                        </div>
+                      </div>
+                    )}
                   </div>
                   );
                 })}
+                
+                {/* Baseline test save button (after all sets) */}
+                {isBaselineTestWorkout(scheduledWorkout || {}) && Object.keys(baselineTestResults).length > 0 && (
+                  <div className="mt-3 ml-8">
+                    <button
+                      onClick={saveBaselineResults}
+                      disabled={savingBaseline}
+                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {savingBaseline ? 'Saving...' : 'Save as baseline'}
+                    </button>
+                  </div>
+                )}
                 
                 <Button 
                   onClick={(e) => {
