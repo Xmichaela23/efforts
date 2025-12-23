@@ -578,6 +578,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
       alert('Baselines saved successfully!');
       setBaselineTestResults({});
+      
+      // Dispatch event to notify TrainingBaselines to reload
+      window.dispatchEvent(new CustomEvent('baseline:saved'));
     } catch (error: any) {
       console.error('Error saving baselines:', error);
       alert('Failed to save baselines: ' + (error.message || 'Unknown error'));

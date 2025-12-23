@@ -98,9 +98,30 @@ const [garminMessage, setGarminMessage] = useState('');
 const [garminAccessToken, setGarminAccessToken] = useState<string | null>(null);
 
   // Load existing baselines on mount
-useEffect(() => {
-  loadBaselines();
-}, []);
+  useEffect(() => {
+    loadBaselines();
+  }, []);
+
+  // Reload baselines when component becomes visible again (e.g., after saving from baseline test)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadBaselines();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Also listen for custom event to reload after baseline test save
+    const handleBaselineSaved = () => {
+      loadBaselines();
+    };
+    window.addEventListener('baseline:saved', handleBaselineSaved);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('baseline:saved', handleBaselineSaved);
+    };
+  }, []);
 
   // Auto-open leftmost sport with data, or Run as default
 useEffect(() => {
