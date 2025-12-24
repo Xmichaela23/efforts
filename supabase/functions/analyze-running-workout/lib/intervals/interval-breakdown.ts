@@ -911,6 +911,10 @@ export function generateIntervalBreakdown(
           ? Math.max(0, 100 - (Math.abs(warmupActualDuration - warmupPlannedDuration) / warmupPlannedDuration) * 100)
           : 0;
         
+        // Debug logging for warmup pace calculation
+        console.log(`🔍 [WARMUP DEBUG] Actual pace: ${warmupActualPace}s/mi, Range: ${warmupRangeLower}-${warmupRangeUpper}s/mi, Adherence: ${warmupPaceAdherence}%`);
+        console.log(`🔍 [WARMUP DEBUG] Within range? ${warmupActualPace >= warmupRangeLower && warmupActualPace <= warmupRangeUpper}`);
+        
         // ALWAYS show breakdown when execution < 100% (not just when warmup adherence < 90%)
         if (executionScore < 100) {
           const formatPace = (sec: number) => {
@@ -929,6 +933,18 @@ export function generateIntervalBreakdown(
           const warmupActualFormatted = warmupActualPace > 0 ? formatPace(warmupActualPace) + '/mi' : 'N/A';
           const warmupPlannedFormatted = formatDuration(warmupPlannedDuration);
           const warmupActualFormattedDur = formatDuration(warmupActualDuration);
+          
+          // Determine if warmup is too fast or too slow (or in range)
+          let warmupPaceIssue = '';
+          if (warmupActualPace > 0 && warmupRangeLower > 0 && warmupRangeUpper > 0) {
+            if (warmupActualPace < warmupRangeLower) {
+              warmupPaceIssue = 'too fast';
+            } else if (warmupActualPace > warmupRangeUpper) {
+              warmupPaceIssue = 'too slow';
+            } else {
+              warmupPaceIssue = 'within range';
+            }
+          }
           
           sectionText += '\n';
                    sectionText += `EXECUTION SCORE BREAKDOWN (${executionScore}%):\n`;
@@ -970,8 +986,16 @@ export function generateIntervalBreakdown(
                    const warmupPlannedDistStr = warmupPlannedDistM > 0 ? `${(warmupPlannedDistM / 1609.34).toFixed(warmupPlannedDistM / 1609.34 < 1 ? 2 : 1)} mi` : warmupPlannedFormatted;
                    sectionText += `Planned: ${warmupPlannedDistStr} @ ${warmupPlannedRange}\n`;
                    sectionText += `Actual: ${warmupActualFormattedDur} @ ${warmupActualFormatted}\n`;
-                   sectionText += `\nIssue: Warmup pace was ${warmupActualFormatted} vs ${warmupPlannedRange} target (too fast)\n`;
-                   sectionText += `Duration was perfect (${warmupPlannedFormatted} completed), but running warmup too fast reduces workout quality.\n`;
+                   if (warmupPaceIssue === 'within range') {
+                     sectionText += `\nIssue: Warmup pace was ${warmupActualFormatted} vs ${warmupPlannedRange} target (within range, but other factors reduced execution score).\n`;
+                   } else {
+                     sectionText += `\nIssue: Warmup pace was ${warmupActualFormatted} vs ${warmupPlannedRange} target (${warmupPaceIssue}).\n`;
+                     if (warmupPaceIssue === 'too fast') {
+                       sectionText += `Duration was perfect (${warmupPlannedFormatted} completed), but running warmup too fast reduces workout quality.\n`;
+                     } else {
+                       sectionText += `Duration was perfect (${warmupPlannedFormatted} completed), but running warmup too slow reduces workout quality.\n`;
+                     }
+                   }
                    sectionText += `\nFix: Complete warmup at prescribed easy pace (${warmupPlannedRange}) to maximize workout benefit.\n`;
         } else if (executionScore < 100) {
           // Even if warmup is good, still explain why execution < 100%
