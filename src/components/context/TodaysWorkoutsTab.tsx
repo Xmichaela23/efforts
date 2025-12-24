@@ -831,7 +831,47 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
               )}
             </div>
           ) : (
-            <>
+            <div className="space-y-4">
+              {/* Key Insights - Show FIRST (narrative at top) - MUST BE FIRST IN DOM ORDER */}
+              {analysisMetrics.insights && analysisMetrics.insights.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 order-1">
+                  <div className="text-sm font-medium text-gray-800 mb-3">Analysis</div>
+                  <div className="space-y-2">
+                    {analysisMetrics.insights.map((insight, index) => (
+                      <p key={index} className="text-sm text-gray-700 leading-relaxed">
+                        {insight}
+                      </p>
+                    ))}
+                  </div>
+
+                  {/* Mile-by-Mile Terrain Analysis */}
+                  {analysisMetrics.mile_by_mile_terrain && analysisMetrics.mile_by_mile_terrain.section && (
+                    <div className="mt-4">
+                      <div className="text-sm font-medium text-gray-800 mb-2">
+                        Mile-by-Mile Terrain Breakdown
+                      </div>
+                      <div className="text-xs text-gray-600 whitespace-pre-line bg-blue-50 rounded p-3 font-mono">
+                        {analysisMetrics.mile_by_mile_terrain.section}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Red Flags */}
+                  {analysisMetrics.red_flags.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="text-xs font-medium text-red-600 mb-2">⚠️ Areas for Improvement:</div>
+                      <div className="space-y-1">
+                        {analysisMetrics.red_flags.map((flag, index) => (
+                          <div key={index} className="text-xs text-red-600">
+                            • {flag}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Workout Totals - Show for ANY workout with analysis, regardless of insights */}
               {(() => {
                 console.log('🔍 [WORKOUT TOTALS DEBUG] analysisMetrics:', analysisMetrics);
@@ -956,7 +996,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 );
               })()}
 
-              {/* Interval Breakdown (for interval workouts) - Show BEFORE insights */}
+              {/* Interval Breakdown (for interval workouts) - Show AFTER insights */}
               {(() => {
                 const intervalBreakdown = analysisMetrics.workout?.workout_analysis?.detailed_analysis?.interval_breakdown;
                 
@@ -974,47 +1014,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                 }
                 return null;
               })()}
-
-              {/* Key Insights - Only show if insights exist */}
-              {analysisMetrics.insights && analysisMetrics.insights.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-                  {/* Key Insights */}
-                  <div className="space-y-2">
-                    {analysisMetrics.insights.map((insight, index) => (
-                      <div key={index} className="text-sm text-gray-700 bg-gray-50 rounded p-2">
-                        {insight}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Mile-by-Mile Terrain Analysis */}
-                  {analysisMetrics.mile_by_mile_terrain && analysisMetrics.mile_by_mile_terrain.section && (
-                    <div className="mt-4">
-                      <div className="text-sm font-medium text-gray-800 mb-2">
-                        Mile-by-Mile Terrain Breakdown
-                      </div>
-                      <div className="text-xs text-gray-600 whitespace-pre-line bg-blue-50 rounded p-3 font-mono">
-                        {analysisMetrics.mile_by_mile_terrain.section}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Red Flags */}
-                  {analysisMetrics.red_flags.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <div className="text-xs font-medium text-red-600 mb-2">⚠️ Areas for Improvement:</div>
-                      <div className="space-y-1">
-                        {analysisMetrics.red_flags.map((flag, index) => (
-                          <div key={index} className="text-xs text-red-600">
-                            • {flag}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
+            </div>
           )}
         </div>
       ) : (

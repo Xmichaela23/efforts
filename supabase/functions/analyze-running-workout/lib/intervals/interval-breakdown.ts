@@ -210,7 +210,7 @@ export function generateIntervalBreakdown(
   
   // Analyze warmup, recovery, and cooldown segments for pacing analysis
   let pacingAnalysisText = '';
-  let coachingInsightText = '';
+  // COACHING INSIGHT removed - AI narrative provides this context now
   
   if (allIntervals && allIntervals.length > 0) {
     const warmupInterval = allIntervals.find((i: any) => (i.role === 'warmup' || i.kind === 'warmup') && i.executed);
@@ -298,9 +298,19 @@ export function generateIntervalBreakdown(
     // Get segment adherence from granular analysis - it should always be there
     const segmentAdherence = granularAnalysis?.segment_adherence;
     
-    // Always show breakdown when we have overall pace adherence and work intervals
-    if (overallPaceAdherence !== undefined && workIntervalAdherence > 0) {
-      pacingAnalysisText = `PACE ADHERENCE BREAKDOWN (${overallPaceAdherence}% overall):\n\n`;
+    // Use performance.pace_adherence as single source of truth (matches Summary view)
+    // This is interval-average pace adherence, not time-in-range score
+    // If performance.pace_adherence is not available, use the parameter (which should also be from performance)
+    const paceAdherence = granularAnalysis?.performance?.pace_adherence ?? overallPaceAdherence;
+    
+    // Debug: Log what we're using
+    if (granularAnalysis?.performance?.pace_adherence === undefined && overallPaceAdherence !== undefined) {
+      console.warn(`⚠️ [BREAKDOWN] performance.pace_adherence not found, using parameter: ${overallPaceAdherence}%`);
+    }
+    
+    // Always show breakdown when we have pace adherence and work intervals
+    if (paceAdherence !== undefined && workIntervalAdherence > 0) {
+      pacingAnalysisText = `PACE ADHERENCE BREAKDOWN (${Math.round(paceAdherence)}% overall):\n\n`;
       
       // Use segment adherence data - it should always be calculated and available
       if (segmentAdherence) {
@@ -387,43 +397,8 @@ export function generateIntervalBreakdown(
           }
           
           // Summary explanation - only show if there's a meaningful discrepancy
-          if (overallPaceAdherence < workIntervalAdherence - 10 && breakdown.length > 0) {
-            const avgWorkAdherence = Math.round(breakdown.reduce((sum, i) => sum + i.pace_adherence_percent, 0) / breakdown.length);
-            pacingAnalysisText += `WHY THIS MATTERS:\n\n`;
-            pacingAnalysisText += `Your overall pace adherence is ${overallPaceAdherence}% because `;
-            const issues: string[] = [];
-            if (segmentAdherence.warmup && segmentAdherence.warmup.adherence < 90) {
-              issues.push('warmup was faster than prescribed easy pace');
-            }
-            if (segmentAdherence.cooldown && segmentAdherence.cooldown.adherence < 90) {
-              issues.push('cooldown was faster than prescribed easy pace');
-            }
-            if (recoveryIntervals.length > 0) {
-              const recoveryAdherences = recoveryIntervals.map((rec: any) => {
-                const recPlannedPace = rec.planned?.target_pace_s_per_mi || rec.planned?.pace_range?.lower || 0;
-                const recActualPace = rec.executed?.avg_pace_s_per_mi || 0;
-                if (recPlannedPace > 0 && recActualPace > 0) {
-                  const recDelta = Math.abs(recActualPace - recPlannedPace);
-                  return Math.max(0, 100 - (recDelta / recPlannedPace) * 100);
-                }
-                return 0;
-              }).filter((a: number) => a > 0);
-              const avgRecovery = recoveryAdherences.length > 0
-                ? recoveryAdherences.reduce((sum: number, a: number) => sum + a, 0) / recoveryAdherences.length
-                : 100;
-              if (avgRecovery < 90) {
-                issues.push('recovery jogs were faster than prescribed');
-              }
-            }
-            
-            if (issues.length > 0) {
-              pacingAnalysisText += issues.join(', ');
-              pacingAnalysisText += `, even though your work intervals were excellent (${avgWorkAdherence}%). `;
-            } else {
-              pacingAnalysisText += `of pacing variations across segments, even though your work intervals were excellent (${avgWorkAdherence}%). `;
-            }
-            pacingAnalysisText += `Running easy when prescribed is important for recovery and adaptation.\n\n`;
-          }
+          // "WHY THIS MATTERS" section removed - AI narrative provides this context
+          // (paceAdherence < workIntervalAdherence - 10 check removed since AI handles interpretation)
         } else {
           // Segment data should always be available - log error if missing
           console.error(`❌ [BREAKDOWN] Segment adherence data missing! This should not happen.`);
@@ -436,41 +411,7 @@ export function generateIntervalBreakdown(
         }
     }
     
-    // Generate COACHING INSIGHT section
-    const avgPerformance = breakdown.length > 0 ? Math.round(summary.total / breakdown.length) : 0;
-    if (avgPerformance >= 90) {
-      coachingInsightText = `COACHING INSIGHT:\nOutstanding interval execution with remarkably consistent pacing (${breakdown.map((i: any) => i.pace_adherence_percent).join('-')}% adherence) across all ${breakdown.length} work efforts. This demonstrates excellent pace judgment and control during hard efforts.\n\n`;
-      
-      // Add warmup/recovery guidance if needed - focus on PACE issue
-      if (warmupInterval && allIntervals) {
-        // ✅ USE SAME SOURCE AS SUMMARY SCREEN - executed.avg_pace_s_per_mi (single source of truth)
-        const warmupActualPace = warmupInterval.executed?.avg_pace_s_per_mi || 0;
-        
-        // Get pace range from planned step
-        let warmupPaceRange = warmupInterval.planned?.pace_range || warmupInterval.pace_range;
-        if (!warmupPaceRange && plannedWorkout && warmupInterval.planned_step_id) {
-          const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === warmupInterval.planned_step_id);
-          warmupPaceRange = plannedStep?.pace_range;
-        }
-        
-        if (warmupActualPace > 0 && warmupPaceRange) {
-          const warmupRangeLower = warmupPaceRange.lower || 0;
-          const warmupRangeUpper = warmupPaceRange.upper || 0;
-          const warmupPaceAdh = calculatePaceRangeAdherence(warmupActualPace, warmupRangeLower, warmupRangeUpper);
-          
-          if (warmupPaceAdh < 90) {
-            const warmupActualFormatted = formatPaceFromSeconds(warmupActualPace);
-            const warmupRangeFormatted = formatPaceRange(warmupRangeLower, warmupRangeUpper);
-            coachingInsightText += `Primary opportunity: Warmup pace was ${warmupActualFormatted} vs ${warmupRangeFormatted} target (too fast). Running warmup too fast can:\n`;
-          coachingInsightText += `- Reduce the quality of subsequent intervals\n`;
-          coachingInsightText += `- Limit recovery between hard efforts\n`;
-          coachingInsightText += `- Increase injury risk over time\n`;
-          coachingInsightText += `- Defeat the purpose of structured interval training\n\n`;
-          coachingInsightText += `The prescribed easy pace allows you to arrive at each work interval fully prepared to hit the target pace, rather than starting with accumulated fatigue.\n\n`;
-          }
-        }
-      }
-    }
+    // COACHING INSIGHT removed - AI narrative provides this context now
   }
   
   // Build complete breakdown array with warmup, recovery, and cooldown
@@ -708,6 +649,7 @@ export function generateIntervalBreakdown(
     return `${lowerMin}:${String(lowerSec).padStart(2, '0')}-${upperMin}:${String(upperSec).padStart(2, '0')}`;
   };
   
+  // Start section text with pacing analysis (AI narrative is shown separately at top)
   let sectionText = pacingAnalysisText;
   sectionText += 'INTERVAL-BY-INTERVAL BREAKDOWN:\n\n';
   
@@ -926,8 +868,9 @@ export function generateIntervalBreakdown(
   // Add execution score breakdown if execution < 100% - ALWAYS SHOW WHEN < 100%
   if (granularAnalysis?.performance?.execution_adherence !== undefined) {
     const executionScore = granularAnalysis.performance.execution_adherence;
-    const paceAdherence = granularAnalysis.performance.pace_adherence || overallPaceAdherence || 100;
-    const durationAdherence = granularAnalysis.performance.duration_adherence || 99;
+    // Use performance.pace_adherence as single source of truth (matches Summary view)
+    const paceAdherence = granularAnalysis.performance.pace_adherence ?? overallPaceAdherence ?? 100;
+    const durationAdherence = granularAnalysis.performance.duration_adherence ?? 99;
     
     if (executionScore < 100 && allIntervals && allIntervals.length > 0) {
       const warmupInterval = allIntervals.find((i: any) => (i.role === 'warmup' || i.kind === 'warmup') && i.executed);
@@ -1044,10 +987,7 @@ export function generateIntervalBreakdown(
     }
   }
   
-  // Add coaching insight section
-  if (coachingInsightText) {
-    sectionText += `\n${coachingInsightText}`;
-  }
+  // Coaching insight already added at the top
 
   // Recalculate summary for work intervals only (for performance scoring)
   const workIntervalsOnly = completeBreakdown.filter(i => i.interval_type === 'work');

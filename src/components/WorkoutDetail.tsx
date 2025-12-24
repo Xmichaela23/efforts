@@ -234,6 +234,12 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         <div>
           {activeTab === 'summary' && (
             <div className="space-y-4">
+              {/* AI Analysis - Show at top */}
+              <WorkoutAIDisplay 
+                aiAnalysis={workout.ai_analysis} 
+                workoutAnalysis={workout.workout_analysis}
+              />
+              
               {workout.type === 'strength' ? (
                 <StrengthSummaryView workoutData={{
                   ...workout,
@@ -244,12 +250,6 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               ) : (
                 <WorkoutMetrics workout={workout} />
               )}
-              
-              {/* AI Analysis */}
-              <WorkoutAIDisplay 
-                aiAnalysis={workout.ai_analysis} 
-                workoutAnalysis={workout.workout_analysis}
-              />
               
               <Card>
                 <CardHeader>

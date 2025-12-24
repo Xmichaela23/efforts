@@ -13,6 +13,7 @@ interface WorkoutAIDisplayProps {
     strengths?: string[];
     key_metrics?: any;
     red_flags?: string[];
+    narrative_insights?: string[];
     analysis?: {
       adherence_percentage?: number;
       execution_quality?: {
@@ -25,6 +26,9 @@ interface WorkoutAIDisplayProps {
 }
 
 const WorkoutAIDisplay: React.FC<WorkoutAIDisplayProps> = ({ aiAnalysis, workoutAnalysis }) => {
+  // Show narrative insights at the top if available
+  const narrativeInsights = workoutAnalysis?.narrative_insights;
+  
   // Show new granular analysis if available, otherwise fall back to old AI analysis
   if (workoutAnalysis?.analysis) {
     const analysis = workoutAnalysis.analysis;
@@ -33,6 +37,17 @@ const WorkoutAIDisplay: React.FC<WorkoutAIDisplayProps> = ({ aiAnalysis, workout
     
     return (
       <div className="space-y-3">
+        {/* AI Narrative Insights - Show at top */}
+        {narrativeInsights && Array.isArray(narrativeInsights) && narrativeInsights.length > 0 && (
+          <div className="border-b pb-3 mb-3">
+            <div className="text-sm font-medium mb-2 text-gray-900">Analysis</div>
+            <div className="space-y-2">
+              {narrativeInsights.map((insight, index) => (
+                <p key={index} className="text-sm text-gray-700 leading-relaxed">{insight}</p>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Adherence Score */}
         {granularAnalysis.overall_adherence !== undefined && (
           <div className="flex items-center justify-between">
@@ -192,6 +207,20 @@ const WorkoutAIDisplay: React.FC<WorkoutAIDisplayProps> = ({ aiAnalysis, workout
             </ul>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // Show narrative insights if available (even without analysis structure)
+  if (narrativeInsights && Array.isArray(narrativeInsights) && narrativeInsights.length > 0) {
+    return (
+      <div className="space-y-3">
+        <div className="text-sm font-medium mb-2 text-gray-900">Analysis</div>
+        <div className="space-y-2">
+          {narrativeInsights.map((insight, index) => (
+            <p key={index} className="text-sm text-gray-700 leading-relaxed">{insight}</p>
+          ))}
+        </div>
       </div>
     );
   }
