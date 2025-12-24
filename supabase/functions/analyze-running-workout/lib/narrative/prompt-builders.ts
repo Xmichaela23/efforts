@@ -166,7 +166,7 @@ export function buildAdherenceContext(performance: any, granularAnalysis: any): 
     execution_adherence_pct: Math.round(performance.execution_adherence),
     pace_adherence_pct: Math.round(performance.pace_adherence),
     duration_adherence_pct: Math.round(performance.duration_adherence),
-    hr_drift_bpm: granularAnalysis.heart_rate_analysis?.hr_drift_bpm || 0,
+    hr_drift_bpm: granularAnalysis.heart_rate_analysis?.hr_drift_bpm ?? null, // Preserve null for interval workouts
     pace_variability_pct: granularAnalysis.pacing_variability?.coefficient_of_variation || 0
   };
 }
@@ -433,12 +433,16 @@ function buildPlannedWorkoutPromptSection(
   paceUnit: string,
   workoutContext: any
 ): string {
+  const hrDriftLine = adherenceContext.hr_drift_bpm !== null && adherenceContext.hr_drift_bpm !== undefined
+    ? `- HR Drift: ${adherenceContext.hr_drift_bpm} bpm`
+    : `- HR Drift: Not applicable (interval workout - HR resets during recovery)`;
+  
   let section = `
 Adherence Metrics (vs. Planned Workout):
 - Execution: ${adherenceContext.execution_adherence_pct}%
 - Pace: ${adherenceContext.pace_adherence_pct}%
 - Duration: ${adherenceContext.duration_adherence_pct}%
-- HR Drift: ${adherenceContext.hr_drift_bpm} bpm
+${hrDriftLine}
 - Pace Variability: ${adherenceContext.pace_variability_pct}%
 ${plannedPaceInfo ? `
 Planned Workout Details:
@@ -470,13 +474,16 @@ function buildFreeformRunPromptSection(
   granularAnalysis: any
 ): string {
   const hrAnalysis = granularAnalysis?.heart_rate_analysis;
-  const hrDrift = hrAnalysis?.hr_drift_bpm || 0;
+  const hrDrift = hrAnalysis?.hr_drift_bpm ?? null; // Preserve null for interval workouts
   const earlyHR = hrAnalysis?.early_avg_hr;
   const lateHR = hrAnalysis?.late_avg_hr;
   const interpretation = hrAnalysis?.hr_drift_interpretation;
   
   let hrObservation = '';
-  if (earlyHR && lateHR) {
+  if (hrDrift === null || hrDrift === undefined) {
+    // Interval workout: HR drift not applicable
+    hrObservation = `"Heart rate averaged X bpm, peaking at A bpm."`;
+  } else if (earlyHR && lateHR) {
     hrObservation = `"Heart rate averaged X bpm with ${hrDrift > 0 ? '+' : ''}${hrDrift} bpm drift (${earlyHR} bpm early → ${lateHR} bpm late) over Z minutes, ${interpretation ? interpretation.toLowerCase() : 'indicating normal cardiovascular response'}. Peaked at A bpm."`;
   } else {
     const driftContext = hrDrift === 0 ? 'Indicates remarkably stable cardiovascular response' : 
@@ -487,9 +494,13 @@ function buildFreeformRunPromptSection(
     hrObservation = `"Heart rate averaged X bpm with ${hrDrift > 0 ? '+' : ''}${hrDrift} bpm drift over Z minutes, peaking at A bpm. ${driftContext}."`;
   }
   
+  const hrDriftLine = hrDrift !== null && hrDrift !== undefined 
+    ? `- HR Drift: ${hrDrift} bpm`
+    : `- HR Drift: Not applicable (interval workout)`;
+  
   return `
 Pattern Analysis (Freeform Run):
-- HR Drift: ${adherenceContext.hr_drift_bpm} bpm
+${hrDriftLine}
 - Pace Variability: ${adherenceContext.pace_variability_pct.toFixed(1)}%
 
 Generate 3-4 observations describing patterns and stimulus:
@@ -770,6 +781,10 @@ Pace control varied significantly mile-to-mile, with only ${milesInRange} of ${t
  */
 function buildHRObservation(adherenceContext: any): string {
   // This is a template - actual values filled in by AI
+  // HR drift is null for interval workouts (not applicable)
+  if (adherenceContext.hr_drift_bpm === null || adherenceContext.hr_drift_bpm === undefined) {
+    return `"Heart rate averaged X bpm, peaking at Z bpm."`;
+  }
   return `"Heart rate averaged X bpm with ${adherenceContext.hr_drift_bpm > 0 ? '+' : ''}${adherenceContext.hr_drift_bpm} bpm drift, peaking at Z bpm."`;
 }
 

@@ -129,11 +129,14 @@ const WorkoutAIDisplay: React.FC<WorkoutAIDisplayProps> = ({ aiAnalysis, workout
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">HR Drift</span>
                 <span className={`text-sm font-medium ${
+                  granularAnalysis.heart_rate_analysis.hr_drift_bpm === null || granularAnalysis.heart_rate_analysis.hr_drift_bpm === undefined ? 'text-gray-500' :
                   granularAnalysis.heart_rate_analysis.hr_drift_bpm > 5 ? 'text-orange-600' :
                   granularAnalysis.heart_rate_analysis.hr_drift_bpm < -5 ? 'text-green-600' :
                   'text-gray-600'
                 }`}>
-                  {granularAnalysis.heart_rate_analysis.hr_drift_bpm > 0 ? '+' : ''}{granularAnalysis.heart_rate_analysis.hr_drift_bpm} bpm
+                  {granularAnalysis.heart_rate_analysis.hr_drift_bpm === null || granularAnalysis.heart_rate_analysis.hr_drift_bpm === undefined 
+                    ? 'N/A (intervals)' 
+                    : `${granularAnalysis.heart_rate_analysis.hr_drift_bpm > 0 ? '+' : ''}${granularAnalysis.heart_rate_analysis.hr_drift_bpm} bpm`}
                 </span>
               </div>
               <div className="flex items-center justify-between">

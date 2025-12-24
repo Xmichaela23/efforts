@@ -2059,8 +2059,9 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
   
   console.log(`✅ [SEGMENT BREAKDOWN] Final segment adherence:`, JSON.stringify(segmentAdherence, null, 2));
   
-  // Calculate HR drift for the entire workout (across all work intervals)
-  // Collect all samples from work intervals for HR drift calculation
+  // HR drift calculation: Only valid for continuous/steady-state runs, NOT interval workouts
+  // Interval workouts have recovery periods that reset HR, making drift calculation meaningless
+  // Collect all samples from work intervals for HR metrics (but skip drift for intervals)
   const allWorkSamples: any[] = [];
   for (const interval of workIntervals) {
     if (interval.sample_idx_start !== undefined && interval.sample_idx_end !== undefined) {
@@ -2069,27 +2070,21 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
     }
   }
   
-  // Calculate HR drift using the entire work period
+  // Calculate HR metrics (but skip drift for interval workouts)
   let heartRateAnalysis = null;
   if (allWorkSamples.length > 0) {
-    // Determine work period timestamps
-    const workStartTimestamp = allWorkSamples.length > 0 
-      ? (allWorkSamples[0].timestamp || allWorkSamples[0].elapsed_time_s || 0)
-      : undefined;
-    const workEndTimestamp = allWorkSamples.length > 0
-      ? (allWorkSamples[allWorkSamples.length - 1].timestamp || allWorkSamples[allWorkSamples.length - 1].elapsed_time_s || 0)
-      : undefined;
+    const validHRSamples = allWorkSamples.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
+    const avgHR = validHRSamples.length > 0
+      ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length)
+      : 0;
+    const maxHR = validHRSamples.length > 0 ? Math.max(...validHRSamples.map(s => s.heart_rate)) : 0;
     
-    const hrDriftResult = calculateHeartRateDrift(allWorkSamples, workStartTimestamp, workEndTimestamp);
+    // HR drift is NOT applicable for interval workouts (work/recovery cycles reset HR)
+    // Only calculate drift for continuous steady-state runs
+    const isIntervalWorkout = recoveryIntervals.length > 0;
     
-    if (hrDriftResult.valid) {
-      // Calculate average HR from all work samples
-      const validHRSamples = allWorkSamples.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
-      const avgHR = validHRSamples.length > 0
-        ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length)
-        : 0;
-      const maxHR = validHRSamples.length > 0 ? Math.max(...validHRSamples.map(s => s.heart_rate)) : 0;
-      
+    if (isIntervalWorkout) {
+      // Interval workout: Skip HR drift (not meaningful due to recovery periods)
       heartRateAnalysis = {
         adherence_percentage: 100, // Not applicable for interval workouts
         time_in_zone_s: totalTime,
@@ -2099,11 +2094,37 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
         samples_outside_zone: 0,
         average_heart_rate: avgHR,
         target_zone: null,
-        hr_drift_bpm: hrDriftResult.drift_bpm,
-        early_avg_hr: hrDriftResult.early_avg_hr,
-        late_avg_hr: hrDriftResult.late_avg_hr,
-        hr_drift_interpretation: hrDriftResult.interpretation,
+        hr_drift_bpm: null, // Not applicable for interval workouts
+        early_avg_hr: null,
+        late_avg_hr: null,
+        hr_drift_interpretation: 'Not applicable for interval workouts (HR resets during recovery)',
         hr_consistency: 1 - (pacingVariability.coefficient_of_variation / 100) // Use pace variability as proxy
+      };
+    } else {
+      // Continuous run: Calculate HR drift normally
+      const workStartTimestamp = allWorkSamples.length > 0 
+        ? (allWorkSamples[0].timestamp || allWorkSamples[0].elapsed_time_s || 0)
+        : undefined;
+      const workEndTimestamp = allWorkSamples.length > 0
+        ? (allWorkSamples[allWorkSamples.length - 1].timestamp || allWorkSamples[allWorkSamples.length - 1].elapsed_time_s || 0)
+        : undefined;
+      
+      const hrDriftResult = calculateHeartRateDrift(allWorkSamples, workStartTimestamp, workEndTimestamp);
+      
+      heartRateAnalysis = {
+        adherence_percentage: 100,
+        time_in_zone_s: totalTime,
+        time_outside_zone_s: 0,
+        total_time_s: totalTime,
+        samples_in_zone: validHRSamples.length,
+        samples_outside_zone: 0,
+        average_heart_rate: avgHR,
+        target_zone: null,
+        hr_drift_bpm: hrDriftResult.valid ? hrDriftResult.drift_bpm : null,
+        early_avg_hr: hrDriftResult.valid ? hrDriftResult.early_avg_hr : null,
+        late_avg_hr: hrDriftResult.valid ? hrDriftResult.late_avg_hr : null,
+        hr_drift_interpretation: hrDriftResult.valid ? hrDriftResult.interpretation : 'Insufficient data for drift calculation',
+        hr_consistency: 1 - (pacingVariability.coefficient_of_variation / 100)
       };
     }
   }
