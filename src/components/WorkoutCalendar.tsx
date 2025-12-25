@@ -641,7 +641,7 @@ export default function WorkoutCalendar({
         <div className="flex items-center gap-2">
           <h2 className="text-base font-medium">Week of {rangeLabel}</h2>
           {loadingDebounced && (
-            <span role="status" aria-live="polite" className="text-[11px] text-gray-500">Loading week…</span>
+            <span role="status" aria-live="polite" className="text-[11px] text-muted-foreground">Loading week…</span>
           )}
         </div>
         <button
@@ -666,16 +666,16 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-gray-200 p-2 flex flex-col justify-between items-stretch",
-                "bg-white hover:bg-gray-50",
+                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-border/40 bg-card rounded-lg shadow-md p-2 flex flex-col justify-between items-stretch",
+                "bg-card hover:bg-card/80",
               ].join(" ")}
             >
               {/* Top row: Day + Date inline */}
               <div className="flex items-baseline justify-start">
-                <div className="text-[11px] tracking-wide text-gray-900 font-medium uppercase">
+                <div className="text-[11px] tracking-wide text-foreground font-medium uppercase">
                   {weekdayFmt.format(d)}
                 </div>
-                <div className="ml-2 text-sm text-gray-500">{d.getDate()}</div>
+                <div className="ml-2 text-sm text-muted-foreground">{d.getDate()}</div>
               </div>
 
               {/* Bottom area: Event labels anchored at bottom */}
@@ -695,8 +695,8 @@ export default function WorkoutCalendar({
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
                         className={`cursor-pointer text-xs px-1.5 py-0.5 rounded w-full text-center truncate border ${
                           isCompleted 
-                            ? 'bg-gradient-to-r from-green-100 to-gray-50 border-gray-200 text-gray-600 hover:from-green-200 hover:to-gray-100'
-                            : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                            ? 'bg-gradient-to-r from-green-900/40 to-card/60 border-border/40 text-foreground hover:from-green-800/50 hover:to-card/70'
+                            : 'bg-card/60 border-border/40 text-foreground hover:bg-card/80'
                         }`}
                       >
                         {evt.label}
@@ -708,12 +708,12 @@ export default function WorkoutCalendar({
                 
                 {items.length === 0 && loadingDebounced && (
                   <>
-                    <span className="h-[18px] rounded w-full bg-gray-100" />
-                    <span className="h-[18px] rounded w-3/4 bg-gray-100" />
+                    <span className="h-[18px] rounded w-full bg-card/40" />
+                    <span className="h-[18px] rounded w-3/4 bg-card/40" />
                   </>
                 )}
                 {items.length === 0 && !loadingDebounced && (
-                  <span className="text-xs text-gray-400">&nbsp;</span>
+                  <span className="text-xs text-muted-foreground/50">&nbsp;</span>
                 )}
               </div>
             </button>
@@ -731,7 +731,7 @@ export default function WorkoutCalendar({
           return (
             <div 
               key={`empty-${index}`}
-              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-gray-200 p-2 flex flex-col justify-start items-start ${
+              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-border/40 bg-card rounded-lg shadow-md p-2 flex flex-col justify-start items-start ${
                 isLastCell ? 'col-span-2' : ''
               }`}
             >
@@ -744,7 +744,7 @@ export default function WorkoutCalendar({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button type="button" className="inline-flex items-center">
-                          <Info className="w-3.5 h-3.5 text-gray-500 hover:text-gray-700 cursor-help" />
+                          <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help" />
                         </button>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
@@ -910,8 +910,8 @@ export default function WorkoutCalendar({
                         <div className="space-y-1 pt-1">
                           {metrics.map((metric, index) => (
                             <div key={index} className="flex items-center justify-between text-xs">
-                              <span className="text-gray-600">{metric.label}</span>
-                              <span className="font-medium text-gray-700">{metric.value}</span>
+                              <span className="text-muted-foreground">{metric.label}</span>
+                              <span className="font-medium text-foreground">{metric.value}</span>
                             </div>
                           ))}
                         </div>
@@ -922,10 +922,10 @@ export default function WorkoutCalendar({
                   
                   {/* Training plan context - phase and race countdown */}
                   {trainingPlanContext && (trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
-                    <div className="pt-2 mt-2 border-t border-gray-200 text-xs text-gray-600">
+                    <div className="pt-2 mt-2 border-t border-border text-xs text-muted-foreground">
                       <div className="flex items-center gap-1 flex-wrap">
                         {trainingPlanContext.focus && (
-                          <span className="font-medium text-gray-700">{trainingPlanContext.focus}</span>
+                          <span className="font-medium text-foreground">{trainingPlanContext.focus}</span>
                         )}
                         {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && (
                           <span className="text-gray-400">•</span>

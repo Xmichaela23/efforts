@@ -755,10 +755,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     }
                     onEditEffort && onEditEffort(w);
                   }}
-                  className={`w-full text-left p-1.5 rounded-md transition-colors border ${
+                  className={`w-full text-left p-1.5 rounded-lg transition-all border ${
                     workout.workout_status === 'completed'
-                      ? 'bg-gradient-to-r from-green-100 to-gray-50 border-gray-200 text-gray-600 hover:from-green-200 hover:to-gray-100'
-                      : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                      ? 'bg-gradient-to-r from-green-900/30 to-card border-border/40 text-foreground hover:from-green-800/40 hover:to-card shadow-md'
+                      : 'bg-card border-border/40 text-foreground hover:bg-card/80 shadow-md hover:shadow-lg'
                   }`}
                 >
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
@@ -774,7 +774,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         <div className="flex items-center gap-3 flex-shrink-0">
                           {isEnduranceType(workout.type || workout.workout_type || '') && (
                             <span
-                              className="text-xs text-blue-600 hover:underline cursor-pointer"
+                              className="text-xs text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
                               onClick={(e) => handleSendToGarmin(e, workout)}
                             >
                               {sendingToGarmin === workout.id ? 'Sending...' : 'Send to Garmin'}
@@ -782,7 +782,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           )}
                           {isStrengthOrMobility(workout.type || workout.workout_type || '') && (
                             <span
-                              className="text-xs text-blue-600 hover:underline cursor-pointer"
+                              className="text-xs text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -796,7 +796,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             </span>
                           )}
                           <span
-                            className="text-xs text-gray-500 hover:underline cursor-pointer"
+                            className="text-xs text-muted-foreground hover:underline cursor-pointer"
                             onClick={(e)=>{ 
                               e.preventDefault(); e.stopPropagation(); 
                               const key = String(workout.id);
@@ -849,7 +849,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                               m = s.match(/swim_kick_(\d+)x(\d+)(yd|m)/i); if (m) { add('Kick', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
                               m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m) { add('Aerobic', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
                             });
-                            return lines.length? (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>) : null;
+                            return lines.length? (<ul className="list-disc pl-5 text-xs text-foreground">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>) : null;
                           } catch {}
                         }
                         // Non-swim: avoid duplicate details; PlannedWorkoutSummary already renders content
@@ -860,7 +860,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     <div className="space-y-1">
                       {/* Title and Duration Row */}
                       <div className="flex items-center justify-between">
-                        <div className="font-medium text-base text-gray-900">
+                        <div className="font-medium text-base text-foreground">
                           {(() => {
                             const type = String(workout.type || '').toLowerCase();
                             const desc = String(workout.description || '').toLowerCase();
@@ -944,7 +944,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             return getDisplaySport(workout);
                           })()}
                           {workout.workout_status === 'planned' && (
-                            <span className="text-xs ml-2 text-gray-500">(planned)</span>
+                            <span className="text-xs ml-2 text-muted-foreground">(planned)</span>
                           )}
                           {workout.workout_status === 'completed' && (
                             <span className="ml-2 text-green-600">✓</span>
@@ -955,7 +955,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const sec = resolveMovingSeconds(workout);
                             if (Number.isFinite(sec as any) && (sec as number) > 0) {
                               const mins = Math.round((sec as number) / 60);
-                              return <span className="px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-800">{mins}min</span>;
+                              return <span className="px-2 py-0.5 rounded bg-blue-900/30 border border-blue-700/40 text-blue-300">{mins}min</span>;
                             }
                             return null;
                           })()}
