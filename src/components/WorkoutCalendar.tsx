@@ -666,8 +666,8 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/5 backdrop-blur-sm border border-white/5 rounded-2xl shadow-lg p-3 flex flex-col justify-between items-stretch",
-                "hover:bg-white/8 transition-all",
+                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-2xl shadow-lg p-3 flex flex-col justify-between items-stretch",
+                "hover:bg-white/[0.05] transition-all",
               ].join(" ")}
             >
               {/* Top row: Day + Date inline */}
@@ -693,10 +693,10 @@ export default function WorkoutCalendar({
                         tabIndex={0}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`cursor-pointer text-xs px-2 py-1 rounded-xl w-full text-center truncate border transition-all backdrop-blur-md ${
+                        className={`cursor-pointer text-xs px-2 py-1 rounded-xl w-full text-center truncate border transition-all backdrop-blur-sm ${
                           isCompleted 
-                            ? 'bg-green-900/70 border border-green-700/30 text-white hover:bg-green-900/80 shadow-sm'
-                            : 'bg-zinc-700/60 border border-zinc-600/30 text-gray-300 hover:bg-zinc-700/70 shadow-sm hover:shadow'
+                            ? 'bg-green-500/20 backdrop-blur-sm border border-green-400/30 text-white hover:bg-green-500/25 shadow-sm'
+                            : 'bg-white/[0.08] backdrop-blur-sm border border-white/20 text-gray-300 hover:bg-white/[0.12] shadow-sm hover:shadow'
                         }`}
                       >
                         {evt.label}
@@ -708,8 +708,8 @@ export default function WorkoutCalendar({
                 
                 {items.length === 0 && loadingDebounced && (
                   <>
-                    <span className="h-[18px] rounded w-full bg-black/20" />
-                    <span className="h-[18px] rounded w-3/4 bg-black/20" />
+                    <span className="h-[18px] rounded w-full bg-white/[0.03]" />
+                    <span className="h-[18px] rounded w-3/4 bg-white/[0.03]" />
                   </>
                 )}
                 {items.length === 0 && !loadingDebounced && (
@@ -731,7 +731,7 @@ export default function WorkoutCalendar({
           return (
             <div 
               key={`empty-${index}`}
-              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/5 backdrop-blur-sm border border-white/5 rounded-2xl shadow-lg p-3 flex flex-col justify-start items-start ${
+              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-2xl shadow-lg p-3 flex flex-col justify-start items-start ${
                 isLastCell ? 'col-span-2' : ''
               }`}
             >

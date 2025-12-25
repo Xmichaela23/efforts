@@ -757,8 +757,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   }}
                   className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg ${
                     workout.workout_status === 'completed'
-                      ? 'bg-green-900/70 border border-green-700/30 text-white hover:bg-green-900/80 shadow-lg'
-                      : 'bg-zinc-700/60 border border-zinc-600/30 text-gray-300 hover:bg-zinc-700/70 shadow-lg hover:shadow-xl'
+                      ? 'bg-green-500/20 backdrop-blur-sm border border-green-400/30 text-white hover:bg-green-500/25 shadow-lg'
+                      : 'bg-white/[0.05] backdrop-blur-lg border border-white/15 text-gray-300 hover:bg-white/[0.08] shadow-lg hover:shadow-xl'
                   }`}
                 >
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
@@ -955,7 +955,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const sec = resolveMovingSeconds(workout);
                             if (Number.isFinite(sec as any) && (sec as number) > 0) {
                               const mins = Math.round((sec as number) / 60);
-                              return <span className="px-2 py-0.5 rounded-lg bg-blue-900/30 backdrop-blur-md border border-white/20 text-blue-300">{mins}min</span>;
+                              return <span className="px-2 py-0.5 rounded-lg bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 text-blue-300">{mins}min</span>;
                             }
                             return null;
                           })()}
