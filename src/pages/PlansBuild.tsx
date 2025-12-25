@@ -31,9 +31,9 @@ export default function PlansBuild() {
             <div className="flex items-center space-x-1 pl-4">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="p-0.5">
+                  <button className="text-white/80 hover:text-white transition-colors p-2">
                     <Menu className="h-5 w-5" />
-                  </Button>
+                  </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56">
                   <DropdownMenuItem onClick={() => navigate('/baselines')}>Training Baselines</DropdownMenuItem>
@@ -42,7 +42,7 @@ export default function PlansBuild() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <h1 className="text-2xl font-bold text-primary">efforts</h1>
+              <h1 className="text-2xl font-light tracking-wider text-white">efforts</h1>
               <div className="flex items-center gap-3">
                 <Button onClick={safeBack} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">
                   ← Back

@@ -425,9 +425,9 @@ return (
           <div className="flex items-center gap-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="p-0.5">
+                <button className="text-white/80 hover:text-white transition-colors p-2">
                   <Menu className="h-5 w-5" />
-                </Button>
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
                 <DropdownMenuItem onClick={() => navigate('/')}>
@@ -458,7 +458,7 @@ return (
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <h1 className="text-2xl font-bold text-primary">efforts</h1>
+            <h1 className="text-2xl font-light tracking-wider text-white">efforts</h1>
             <button 
               onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} 
               className="text-sm font-medium text-gray-700 hover:bg-gray-50"
