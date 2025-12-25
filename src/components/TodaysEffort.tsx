@@ -755,10 +755,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     }
                     onEditEffort && onEditEffort(w);
                   }}
-                  className={`w-full text-left p-1.5 rounded-lg transition-all border ${
+                  className={`w-full text-left p-3 rounded-xl transition-all border ${
                     workout.workout_status === 'completed'
-                      ? 'bg-gradient-to-r from-green-900/30 to-card border-border/40 text-foreground hover:from-green-800/40 hover:to-card shadow-md'
-                      : 'bg-card border-border/40 text-foreground hover:bg-card/80 shadow-md hover:shadow-lg'
+                      ? 'bg-gradient-to-r from-green-800/40 to-green-900/30 border-green-700/40 text-white hover:from-green-700/50 hover:to-green-800/40 shadow-lg'
+                      : 'bg-card border-border/50 text-foreground hover:bg-card/90 shadow-lg hover:shadow-xl'
                   }`}
                 >
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
@@ -947,7 +947,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             <span className="text-xs ml-2 text-muted-foreground">(planned)</span>
                           )}
                           {workout.workout_status === 'completed' && (
-                            <span className="ml-2 text-green-600">✓</span>
+                            <span className="ml-2 text-green-400">✓</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs">

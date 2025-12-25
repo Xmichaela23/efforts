@@ -605,22 +605,22 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="flex-1">
-        <div className="font-medium text-base text-gray-900 flex items-center gap-2">
+        <div className="font-medium text-base text-foreground flex items-center gap-2">
           <span>{title}</span>
           <span className="flex items-center gap-1">
             {(typeof minutes === 'number') ? (
-              <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(minutes)}</span>
+              <span className="px-2 py-0.5 text-xs rounded bg-card/60 border border-border/40 text-foreground">{formatDuration(minutes)}</span>
             ) : null}
             {(typeof yards === 'number') ? (
-              <span className="px-2 py-0.5 text-xs rounded bg-blue-50 border border-blue-200 text-blue-800">{yards} yd</span>
+              <span className="px-2 py-0.5 text-xs rounded bg-blue-900/30 border border-blue-700/40 text-blue-300">{yards} yd</span>
             ) : null}
             {(workout as any)?.workload_planned ? (
-              <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-600">{(workout as any).workload_planned}</span>
+              <span className="px-2 py-0.5 text-xs rounded bg-card/60 border border-border/40 text-muted-foreground">{(workout as any).workload_planned}</span>
             ) : null}
           </span>
         </div>
         {!hideLines && !isStrength && (
-          <div className="text-sm text-gray-600 mt-1">
+          <div className="text-sm text-muted-foreground mt-1">
             {stacked.length > 1 ? (
               <span className="whitespace-pre-line">{stacked.join('\n')}</span>
             ) : (
@@ -629,7 +629,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           </div>
         )}
         {!hideLines && !isStrength && enduranceLines.length>0 && (
-          <ul className="list-disc pl-5 mt-1 text-sm text-gray-700">
+          <ul className="list-disc pl-5 mt-1 text-sm text-foreground">
             {enduranceLines.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}

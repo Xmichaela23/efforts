@@ -666,8 +666,8 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-border/40 bg-card rounded-lg shadow-md p-2 flex flex-col justify-between items-stretch",
-                "bg-card hover:bg-card/80",
+                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-border/50 bg-card rounded-xl shadow-lg p-3 flex flex-col justify-between items-stretch",
+                "hover:bg-card/90 transition-colors",
               ].join(" ")}
             >
               {/* Top row: Day + Date inline */}
@@ -693,10 +693,10 @@ export default function WorkoutCalendar({
                         tabIndex={0}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`cursor-pointer text-xs px-1.5 py-0.5 rounded w-full text-center truncate border ${
+                        className={`cursor-pointer text-xs px-2 py-1 rounded-md w-full text-center truncate border transition-all ${
                           isCompleted 
-                            ? 'bg-gradient-to-r from-green-900/40 to-card/60 border-border/40 text-foreground hover:from-green-800/50 hover:to-card/70'
-                            : 'bg-card/60 border-border/40 text-foreground hover:bg-card/80'
+                            ? 'bg-gradient-to-r from-green-800/50 to-green-900/30 border-green-700/40 text-white hover:from-green-700/60 hover:to-green-800/40 shadow-sm'
+                            : 'bg-card/80 border-border/50 text-foreground hover:bg-card shadow-sm hover:shadow'
                         }`}
                       >
                         {evt.label}
@@ -731,7 +731,7 @@ export default function WorkoutCalendar({
           return (
             <div 
               key={`empty-${index}`}
-              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-border/40 bg-card rounded-lg shadow-md p-2 flex flex-col justify-start items-start ${
+              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] border border-border/50 bg-card rounded-xl shadow-lg p-3 flex flex-col justify-start items-start ${
                 isLastCell ? 'col-span-2' : ''
               }`}
             >
