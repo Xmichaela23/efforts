@@ -52,11 +52,16 @@ export function formatStrengthExercise(
   const parts: string[] = [name];
   if (sets > 0 && reps != null) parts.push(`${sets}×${reps}`);
   
-  // Use weight_display if available (includes "each" for per-hand exercises)
+  // Use weight_display if available (includes "each" for per-hand exercises, "+X lb" for dips)
   if (weightDisplay && !isBw && weightDisplay !== 'Bodyweight' && weightDisplay !== 'Band') {
     parts.push(`@ ${weightDisplay}`);
   } else if (wt > 0 && !isBw) {
-    parts.push(`@ ${Math.round(wt)}${unit}`);
+    // Check if this is dips with added weight (starts with "+")
+    if (exercise?.name?.toLowerCase().includes('dip') && wt > 0) {
+      parts.push(`@ +${Math.round(wt)}${unit}`);
+    } else {
+      parts.push(`@ ${Math.round(wt)}${unit}`);
+    }
   }
   
   return parts.join(' ') + notes;

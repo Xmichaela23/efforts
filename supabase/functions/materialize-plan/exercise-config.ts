@@ -17,7 +17,7 @@
 export interface ExerciseConfig {
   primaryRef: 'squat' | 'deadlift' | 'bench' | 'overhead' | 'hipThrust' | null;
   ratio: number;           // 1RM ratio to primary lift
-  displayFormat: 'total' | 'perHand' | 'perLeg' | 'bodyweight' | 'band';
+  displayFormat: 'total' | 'perHand' | 'perLeg' | 'bodyweight' | 'band' | 'dipsAdded';
   isUnilateral: boolean;
   notes?: string;
 }
@@ -211,6 +211,21 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // UPPER PUSH (Bench Reference)
   // ============================================================================
   
+  // Barbell Bench Press: Primary lift, uses bench 1RM directly
+  'bench press': {
+    primaryRef: 'bench',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    notes: 'Barbell bench press. Use bench 1RM baseline directly.'
+  },
+  'bench': {
+    primaryRef: 'bench',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false
+  },
+  
   // Dumbbell Bench Press: Each DB ~37-40% of barbell bench (stability demand)
   'dumbbell bench press': {
     primaryRef: 'bench',
@@ -255,17 +270,19 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false
   },
   
-  // Dips: Bodyweight + added load
+  // Dips: ~90% of bench press 1RM (total = bodyweight + added weight)
+  // Most users won't need added weight, but advanced athletes might
   'dips': {
     primaryRef: 'bench',
-    ratio: 0.0, // Bodyweight
-    displayFormat: 'bodyweight',
-    isUnilateral: false
+    ratio: 0.90, // Dip 1RM = 90% of bench 1RM
+    displayFormat: 'total', // Will calculate total load, then subtract bodyweight
+    isUnilateral: false,
+    notes: 'Total load (bodyweight + added). Shows added weight if ≥10 lb, otherwise "Bodyweight".'
   },
   'dip': {
     primaryRef: 'bench',
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
+    ratio: 0.90,
+    displayFormat: 'total',
     isUnilateral: false
   },
   
@@ -356,6 +373,18 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false
   },
   'lateral raises': {
+    primaryRef: 'overhead',
+    ratio: 0.25,
+    displayFormat: 'perHand',
+    isUnilateral: false
+  },
+  'dumbbell lateral raise': {
+    primaryRef: 'overhead',
+    ratio: 0.25,
+    displayFormat: 'perHand',
+    isUnilateral: false
+  },
+  'dumbbell lateral raises': {
     primaryRef: 'overhead',
     ratio: 0.25,
     displayFormat: 'perHand',
@@ -595,19 +624,27 @@ export function getExerciseConfig(exerciseName: string): ExerciseConfig | null {
 
 /**
  * Get the baseline 1RM value for an exercise
+ * Handles multiple field name variants for compatibility
  */
 export function getBaseline1RM(
   config: ExerciseConfig,
-  baselines: { squat?: number; deadlift?: number; bench?: number; overhead?: number; hipThrust?: number }
+  baselines: any // Accept any to handle various field name formats
 ): number | null {
   if (!config.primaryRef) return null;
   
   switch (config.primaryRef) {
-    case 'squat': return baselines.squat ?? null;
-    case 'deadlift': return baselines.deadlift ?? null;
-    case 'bench': return baselines.bench ?? null;
-    case 'overhead': return baselines.overhead ?? null;
-    case 'hipThrust': return baselines.hipThrust ?? null;
+    case 'squat': 
+      return Number.isFinite(baselines?.squat) ? baselines.squat : null;
+    case 'deadlift': 
+      return Number.isFinite(baselines?.deadlift) ? baselines.deadlift : null;
+    case 'bench': 
+      return Number.isFinite(baselines?.bench) ? baselines.bench : null;
+    case 'overhead': 
+      // Check multiple field name variants (ohp, overheadPress1RM, overhead, overhead_press)
+      const ohp = baselines?.overheadPress1RM ?? baselines?.ohp ?? baselines?.overhead ?? baselines?.overhead_press;
+      return Number.isFinite(ohp) ? ohp : null;
+    case 'hipThrust': 
+      return Number.isFinite(baselines?.hipThrust) ? baselines.hipThrust : null;
     default: return null;
   }
 }
@@ -618,7 +655,7 @@ export function getBaseline1RM(
 export function calculatePrescribedWeight(
   exerciseName: string,
   targetPercent: number, // e.g., 0.70 for 70% 1RM
-  baselines: { squat?: number; deadlift?: number; bench?: number; overhead?: number; hipThrust?: number },
+  baselines: any, // Accept any to handle various field name formats (ohp, overheadPress1RM, etc.)
   reps?: number
 ): { weight: number | null; displayFormat: string; notes?: string } {
   const config = getExerciseConfig(exerciseName);
@@ -638,6 +675,48 @@ export function calculatePrescribedWeight(
     return { weight: null, displayFormat: config.displayFormat, notes: config.notes };
   }
   
+  // Special handling for dips: calculate total load, then subtract bodyweight
+  const exerciseNameLower = exerciseName.toLowerCase();
+  if ((exerciseNameLower === 'dips' || exerciseNameLower === 'dip') && config.primaryRef === 'bench') {
+    // Calculate target total load (bodyweight + added weight)
+    const inferred1RM = base1RM * config.ratio; // Dip 1RM = 90% of bench
+    const repScale = getRepScale(reps);
+    const targetTotalLoad = inferred1RM * targetPercent * repScale;
+    
+    // Get bodyweight from baselines (check multiple field names)
+    const bodyweight = baselines?.weight ?? baselines?.bodyweight ?? baselines?.bodyWeight;
+    
+    if (Number.isFinite(bodyweight) && bodyweight > 0) {
+      // Calculate added weight needed
+      const addedWeight = targetTotalLoad - bodyweight;
+      
+      // 10 lb threshold: only show added weight if >= 10 lb
+      if (addedWeight >= 10) {
+        const roundedAdded = Math.max(10, Math.round(addedWeight / 5) * 5);
+        return {
+          weight: roundedAdded,
+          displayFormat: 'dipsAdded', // Special format for "+X lb"
+          notes: config.notes
+        };
+      } else {
+        // Bodyweight is sufficient (or close enough)
+        return {
+          weight: 0,
+          displayFormat: 'bodyweight',
+          notes: config.notes
+        };
+      }
+    } else {
+      // No bodyweight available - default to bodyweight
+      return {
+        weight: 0,
+        displayFormat: 'bodyweight',
+        notes: config.notes
+      };
+    }
+  }
+  
+  // Standard calculation for other exercises
   // Calculate inferred 1RM for this exercise
   const inferred1RM = base1RM * config.ratio;
   
@@ -679,7 +758,7 @@ function getRepScale(reps?: number): number {
  */
 export function formatWeightDisplay(weight: number | null, displayFormat: string): string {
   if (weight === null) return '';
-  if (weight === 0) return 'Bodyweight';
+  if (weight === 0 && displayFormat !== 'dipsAdded') return 'Bodyweight';
   
   switch (displayFormat) {
     case 'perHand':
@@ -688,6 +767,8 @@ export function formatWeightDisplay(weight: number | null, displayFormat: string
       return `${weight} lb per leg`;
     case 'total':
       return `${weight} lb`;
+    case 'dipsAdded':
+      return `+${weight} lb`; // Added weight for dips
     case 'band':
       return 'Band';
     case 'bodyweight':
