@@ -84,7 +84,7 @@
   }
   
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
     font-family: 'Inter', sans-serif;
     letter-spacing: 0.02em;
     height: 100%;
@@ -93,7 +93,9 @@
     overflow-x: hidden;
     /* Improve mobile scrolling */
     -webkit-overflow-scrolling: touch;
-    /* Enhanced gradient background for glassmorphism blur effect */
+    /* Refined monochromatic gradient for sophisticated depth */
+    background: linear-gradient(to bottom, #18181b, #0a0a0a, #000000);
+    /* Enhanced gradient overlays for glassmorphism blur effect */
     background-image: 
       radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
       radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
@@ -125,7 +127,8 @@
     height: 100vh;
     height: 100dvh;
     width: 100%;
-    background: hsl(var(--background));
+    /* Refined monochromatic gradient for sophisticated depth */
+    background: linear-gradient(to bottom, #18181b, #0a0a0a, #000000);
     overflow: hidden;
   }
   
