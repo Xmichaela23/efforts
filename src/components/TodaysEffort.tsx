@@ -757,8 +757,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   }}
                   className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg ${
                     workout.workout_status === 'completed'
-                      ? 'bg-gradient-to-r from-green-800/40 to-green-900/30 border border-white/20 text-white hover:from-green-700/50 hover:to-green-800/40 shadow-lg'
-                      : 'bg-zinc-700/40 border border-white/10 text-gray-300 hover:bg-zinc-700/50 shadow-lg hover:shadow-xl'
+                      ? 'bg-green-900/70 border border-green-700/30 text-white hover:bg-green-900/80 shadow-lg'
+                      : 'bg-zinc-700/60 border border-zinc-600/30 text-gray-300 hover:bg-zinc-700/70 shadow-lg hover:shadow-xl'
                   }`}
                 >
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
