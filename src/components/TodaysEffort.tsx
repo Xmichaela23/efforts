@@ -755,7 +755,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     }
                     onEditEffort && onEditEffort(w);
                   }}
-                  className={`w-full text-left p-3 rounded-xl transition-all backdrop-blur-lg ${
+                  className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg ${
                     workout.workout_status === 'completed'
                       ? 'bg-gradient-to-r from-green-800/40 to-green-900/30 border border-white/20 text-white hover:from-green-700/50 hover:to-green-800/40 shadow-lg'
                       : 'bg-black/30 border border-white/20 text-foreground hover:bg-black/40 shadow-lg hover:shadow-xl'
@@ -955,7 +955,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const sec = resolveMovingSeconds(workout);
                             if (Number.isFinite(sec as any) && (sec as number) > 0) {
                               const mins = Math.round((sec as number) / 60);
-                              return <span className="px-2 py-0.5 rounded bg-blue-900/30 backdrop-blur-md border border-white/20 text-blue-300">{mins}min</span>;
+                              return <span className="px-2 py-0.5 rounded-lg bg-blue-900/30 backdrop-blur-md border border-white/20 text-blue-300">{mins}min</span>;
                             }
                             return null;
                           })()}

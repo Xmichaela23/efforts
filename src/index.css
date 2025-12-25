@@ -28,7 +28,7 @@
     --border: 0 0% 30%;
     --input: 0 0% 25%;
     --ring: 0 0% 50%;
-    --radius: 0.75rem;
+    --radius: 1rem;
     /* Deterministic layout variables (universal for PWA + browser) */
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
