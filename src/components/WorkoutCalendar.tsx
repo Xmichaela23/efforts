@@ -696,7 +696,7 @@ export default function WorkoutCalendar({
                         className={`cursor-pointer text-xs px-2 py-1 rounded-xl w-full text-center truncate border transition-all backdrop-blur-md ${
                           isCompleted 
                             ? 'bg-gradient-to-r from-green-800/50 to-green-900/30 border border-white/20 text-white hover:from-green-700/60 hover:to-green-800/40 shadow-sm'
-                            : 'bg-black/20 border border-white/10 text-foreground hover:bg-black/30 shadow-sm hover:shadow'
+                            : 'bg-zinc-700/40 border border-white/10 text-gray-300 hover:bg-zinc-700/50 shadow-sm hover:shadow'
                         }`}
                       >
                         {evt.label}
