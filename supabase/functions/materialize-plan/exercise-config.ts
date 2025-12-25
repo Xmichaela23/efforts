@@ -727,9 +727,15 @@ export function calculatePrescribedWeight(
   // Round to nearest 5 lbs
   prescribedTotal = Math.max(5, Math.round(prescribedTotal / 5) * 5);
   
-  // For perHand exercises, divide by 2
+  // For perHand exercises: check if ratio represents total or per-hand
+  // Ratios < 0.50 are typically per-hand (e.g., lateral raises 0.25)
+  // Ratios >= 0.50 are typically total load (e.g., dumbbell bench 0.80)
   if (config.displayFormat === 'perHand') {
-    prescribedTotal = Math.max(5, Math.round(prescribedTotal / 2 / 5) * 5);
+    if (config.ratio >= 0.50) {
+      // Ratio represents total load, divide by 2 to get per-hand
+      prescribedTotal = Math.max(5, Math.round(prescribedTotal / 2 / 5) * 5);
+    }
+    // If ratio < 0.50, it's already per-hand, no division needed
   }
   
   return { 
