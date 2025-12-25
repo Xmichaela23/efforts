@@ -93,11 +93,13 @@
     overflow-x: hidden;
     /* Improve mobile scrolling */
     -webkit-overflow-scrolling: touch;
-    /* Enhanced background texture for translucency visibility */
+    /* Enhanced gradient background for glassmorphism blur effect */
     background-image: 
-      radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 60%),
-      radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 60%),
-      radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.015) 0%, transparent 50%);
+      radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+      radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+      linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
     background-attachment: fixed;
   }
   
@@ -130,9 +132,9 @@
   /* 🚨 MOBILE HEADER - Fixed at top */
   .mobile-header {
     grid-row: 1;
-    border-bottom: 1px solid hsl(var(--border) / 0.3);
-    background: hsl(var(--card) / 0.8);
-    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(16px);
     z-index: 40;
     /* Avoid notch/status bar overlap in PWA */
     padding-top: env(safe-area-inset-top);
@@ -196,10 +198,10 @@
     padding-top: 8px;
     padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px); /* lowered further by ~10px */
     height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px));
-    background: hsl(var(--card) / 0.9);
-    border-top: 0; /* let calendar provide the shared bottom frame */
+    background: rgba(0, 0, 0, 0.3);
+    border-top: 1px solid rgba(255, 255, 255, 0.1); /* let calendar provide the shared bottom frame */
     box-shadow: 0 -2px 16px rgba(0,0,0,0.4);
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(16px);
     display: flex;
     align-items: center;
   }

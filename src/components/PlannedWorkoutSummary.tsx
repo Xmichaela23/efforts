@@ -609,13 +609,13 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           <span>{title}</span>
           <span className="flex items-center gap-1">
             {(typeof minutes === 'number') ? (
-              <span className="px-2 py-0.5 text-xs rounded bg-card/60 border border-border/40 text-foreground">{formatDuration(minutes)}</span>
+              <span className="px-2 py-0.5 text-xs rounded bg-black/30 backdrop-blur-md border border-white/20 text-foreground">{formatDuration(minutes)}</span>
             ) : null}
             {(typeof yards === 'number') ? (
-              <span className="px-2 py-0.5 text-xs rounded bg-blue-900/30 border border-blue-700/40 text-blue-300">{yards} yd</span>
+              <span className="px-2 py-0.5 text-xs rounded bg-blue-900/30 backdrop-blur-md border border-white/20 text-blue-300">{yards} yd</span>
             ) : null}
             {(workout as any)?.workload_planned ? (
-              <span className="px-2 py-0.5 text-xs rounded bg-card/60 border border-border/40 text-muted-foreground">{(workout as any).workload_planned}</span>
+              <span className="px-2 py-0.5 text-xs rounded bg-black/30 backdrop-blur-md border border-white/20 text-muted-foreground">{(workout as any).workload_planned}</span>
             ) : null}
           </span>
         </div>
