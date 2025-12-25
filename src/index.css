@@ -93,10 +93,11 @@
     overflow-x: hidden;
     /* Improve mobile scrolling */
     -webkit-overflow-scrolling: touch;
-    /* Subtle background texture to break up flat dark */
+    /* Enhanced background texture for translucency visibility */
     background-image: 
-      radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+      radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 60%),
+      radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.015) 0%, transparent 50%);
     background-attachment: fixed;
   }
   
