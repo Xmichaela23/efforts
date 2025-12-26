@@ -19,6 +19,7 @@ import LogEffortDropdown from './LogEffortDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
 import ContextTabs from './ContextTabs';
 import LogFAB from './LogFAB';
+import PlansMenu from './PlansMenu';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
@@ -67,6 +68,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showContext, setShowContext] = useState(false);
   const [contextFocusWorkoutId, setContextFocusWorkoutId] = useState<string | null>(null);
   const [activeBottomNav, setActiveBottomNav] = useState<'home' | 'plans' | 'insights'>('home');
+  const [plansMenuOpen, setPlansMenuOpen] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
@@ -1250,13 +1252,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 </div>
               )}
               {activeBottomNav === 'plans' && (
-                <div className="pt-4 h-full">
-                  <AllPlansInterface
-                    onClose={handleBackToDashboard}
-                    onSelectPlan={handleSelectRoutine}
-                    onBuildWorkout={handleAddEffort}
-                    onDeletePlan={deletePlan}
-                  />
+                <div className="pt-4 h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-gray-300 font-light tracking-normal mb-4">Select an option from the Plans menu</p>
+                  </div>
                 </div>
               )}
               {activeBottomNav === 'insights' && (
@@ -1297,23 +1296,37 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 >
                   Home
                 </Button>
-                <Button
-                  onClick={() => setActiveBottomNav('plans')}
-                  className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    activeBottomNav === 'plans' 
-                      ? 'border-white/25 text-white bg-white/[0.08]' 
-                      : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
-                  }`}
-                  style={{
-                    fontFamily: 'Inter, sans-serif',
-                    padding: '12px 16px',
-                    borderRadius: '1rem',
-                    fontSize: '15px',
-                    minHeight: '48px'
+                <PlansMenu
+                  currentPlans={currentPlans}
+                  completedPlans={completedPlans}
+                  onSelectPlan={handleSelectRoutine}
+                  isOpen={plansMenuOpen}
+                  onOpenChange={(open) => {
+                    setPlansMenuOpen(open);
+                    if (open) {
+                      setActiveBottomNav('plans');
+                    }
                   }}
-                >
-                  Plans
-                </Button>
+                  trigger={
+                    <Button
+                      onClick={() => setPlansMenuOpen(true)}
+                      className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                        activeBottomNav === 'plans' || plansMenuOpen
+                          ? 'border-white/25 text-white bg-white/[0.08]' 
+                          : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
+                      }`}
+                      style={{
+                        fontFamily: 'Inter, sans-serif',
+                        padding: '12px 16px',
+                        borderRadius: '1rem',
+                        fontSize: '15px',
+                        minHeight: '48px'
+                      }}
+                    >
+                      Plans
+                    </Button>
+                  }
+                />
                 <Button
                   onClick={() => setActiveBottomNav('insights')}
                   className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
