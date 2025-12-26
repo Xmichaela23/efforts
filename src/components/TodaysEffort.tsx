@@ -734,7 +734,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
       {/* Content area - scrolls vertically (reverted) */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-y-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' as any, minHeight: 0 }}>
-        <div className="px-3 pb-2" style={{ paddingBottom: 48 }}>
+        <div className="px-3 pb-2" style={{ paddingBottom: hasExpandedWorkout ? 80 : 48 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
           <div className="flex items-center justify-center h-full px-4">
@@ -759,7 +759,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       ? 'bg-green-500/20 backdrop-blur-sm border border-green-400/30 text-white'
                       : 'bg-white/[0.05] backdrop-blur-lg border border-white/15 text-gray-300'
                   }`}
-                  style={{ touchAction: 'pan-y' }}
                 >
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
                   {workout.workout_status === 'planned' ? (
