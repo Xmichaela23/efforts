@@ -51,7 +51,7 @@ const PlansMenu: React.FC<PlansMenuProps> = ({
         align="center"
         side="top"
         sideOffset={16}
-        className="bg-white/[0.08] backdrop-blur-lg border border-white/25 shadow-xl mb-2"
+        className="bg-white/[0.08] backdrop-blur-lg border border-white/25 shadow-xl mb-2 z-50"
         style={{ borderRadius: '1rem', padding: '12px', minWidth: '280px', maxWidth: '340px' }}
       >
         {/* Plan generation wizard - top priority */}

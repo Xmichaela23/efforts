@@ -1251,13 +1251,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   </div>
                 </div>
               )}
-              {activeBottomNav === 'plans' && (
-                <div className="pt-4 h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-gray-300 font-light tracking-normal mb-4">Select an option from the Plans menu</p>
-                  </div>
-                </div>
-              )}
               {activeBottomNav === 'insights' && (
                 <div className="pt-4 h-full">
                   <ContextTabs focusWorkoutId={contextFocusWorkoutId} />
@@ -1301,17 +1294,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   completedPlans={completedPlans}
                   onSelectPlan={handleSelectRoutine}
                   isOpen={plansMenuOpen}
-                  onOpenChange={(open) => {
-                    setPlansMenuOpen(open);
-                    if (open) {
-                      setActiveBottomNav('plans');
-                    }
-                  }}
+                  onOpenChange={setPlansMenuOpen}
                   trigger={
                     <Button
                       onClick={() => setPlansMenuOpen(true)}
                       className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                        activeBottomNav === 'plans' || plansMenuOpen
+                        plansMenuOpen
                           ? 'border-white/25 text-white bg-white/[0.08]' 
                           : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
                       }`}
