@@ -1269,34 +1269,36 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             <div className="flex justify-center items-center gap-2 pb-3 pt-1">
                 <Button
                   onClick={() => setActiveBottomNav('home')}
-                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
                     activeBottomNav === 'home' 
-                      ? 'border-white/30 text-white bg-white/[0.12]' 
-                      : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
+                      ? 'border-white/50 text-white bg-white/[0.12]' 
+                      : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
                   }`}
                   style={{
                     fontFamily: 'Inter, sans-serif',
                     padding: '12px 16px',
                     borderRadius: '1rem',
                     fontSize: '15px',
-                    minHeight: '48px'
+                    minHeight: '48px',
+                    boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
                   }}
                 >
                   <Home className="h-5 w-5" />
                 </Button>
                 <Button
                   onClick={() => setActiveBottomNav('insights')}
-                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
                     activeBottomNav === 'insights' 
-                      ? 'border-white/30 text-white bg-white/[0.12]' 
-                      : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
+                      ? 'border-white/50 text-white bg-white/[0.12]' 
+                      : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
                   }`}
                   style={{
                     fontFamily: 'Inter, sans-serif',
                     padding: '12px 16px',
                     borderRadius: '1rem',
                     fontSize: '15px',
-                    minHeight: '48px'
+                    minHeight: '48px',
+                    boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
                   }}
                 >
                   Context
@@ -1308,23 +1310,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   isOpen={plansMenuOpen}
                   onOpenChange={setPlansMenuOpen}
                   trigger={
-                    <Button
-                      onClick={() => setPlansMenuOpen(true)}
-                      className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                        plansMenuOpen
-                          ? 'border-white/30 text-white bg-white/[0.12]' 
-                          : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
-                      }`}
-                      style={{
-                        fontFamily: 'Inter, sans-serif',
-                        padding: '12px 16px',
-                        borderRadius: '1rem',
-                        fontSize: '15px',
-                        minHeight: '48px'
-                      }}
-                    >
-                      Plans
-                    </Button>
+                      <Button
+                        onClick={() => setPlansMenuOpen(true)}
+                        className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                          plansMenuOpen
+                            ? 'border-white/50 text-white bg-white/[0.12]' 
+                            : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
+                        }`}
+                        style={{
+                          fontFamily: 'Inter, sans-serif',
+                          padding: '12px 16px',
+                          borderRadius: '1rem',
+                          fontSize: '15px',
+                          minHeight: '48px',
+                          boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
+                        }}
+                      >
+                        Plans
+                      </Button>
                   }
                 />
                 <LogFAB onSelectType={handleSelectEffortType} />
