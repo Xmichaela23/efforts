@@ -771,18 +771,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         </div>
                         
                         {/* Right: action + details */}
-                        <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           {isEnduranceType(workout.type || workout.workout_type || '') && (
-                            <span
-                              className="text-xs text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
+                            <button
+                              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
                               onClick={(e) => handleSendToGarmin(e, workout)}
                             >
                               {sendingToGarmin === workout.id ? 'Sending...' : 'Send to Garmin'}
-                            </span>
+                            </button>
                           )}
                           {isStrengthOrMobility(workout.type || workout.workout_type || '') && (
-                            <span
-                              className="text-xs text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
+                            <button
+                              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -793,10 +793,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                               }}
                             >
                               Go to workout
-                            </span>
+                            </button>
                           )}
-                          <span
-                            className="text-xs text-muted-foreground hover:underline cursor-pointer"
+                          <button
+                            className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
                             onClick={(e)=>{ 
                               e.preventDefault(); e.stopPropagation(); 
                               const key = String(workout.id);
@@ -817,7 +817,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             }}
                           >
                             {expanded[String(workout.id)] ? 'hide' : 'details'}
-                          </span>
+                          </button>
                         </div>
                       </div>
                       {(() => { 

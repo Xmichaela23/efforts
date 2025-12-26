@@ -618,11 +618,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
               <li key={i} className="text-sm text-gray-200 font-light tracking-normal flex items-start justify-between">
                 <span>{ln}</span>
                 {i===0 && isPlannedRow && (
-                  <div className="ml-3 flex items-center gap-3 text-xs">
+                  <div className="ml-3 flex items-center gap-2">
                     <button
                       type="button"
                       onClick={handleGarminExport}
-                      className="text-gray-400 hover:text-gray-300 hover:underline font-light transition-colors"
+                      className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
                     >Send to Garmin</button>
                   </div>
                 )}
