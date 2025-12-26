@@ -709,7 +709,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       <div className="p-2 border-b">
         {/* Row 1: Title + Attach/Unattach */}
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-lg">
+          <h2 className="font-light tracking-normal text-lg text-white">
             {(() => {
               const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
               if (st) return st;

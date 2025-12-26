@@ -550,7 +550,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     <div className="space-y-3">
       {showHeader && (
         <div className="flex items-center justify-between">
-          <div className="text-base font-semibold">{(() => {
+          <div className="text-base font-light tracking-normal text-white">{(() => {
             // For strength workouts, check workout_structure.title first, then workout.name, then workout.title
             const t = String((workout as any)?.type || '').toLowerCase();
             if (t === 'strength') {
