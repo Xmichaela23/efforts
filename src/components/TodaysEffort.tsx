@@ -148,21 +148,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // Check if any workout is expanded
   const hasExpandedWorkout = Object.values(expanded).some(Boolean);
 
-  // Prevent scroll from going past top boundary
-  useEffect(() => {
-    const root = scrollRef.current;
-    if (!root) return;
-    
-    const handleScroll = () => {
-      if (root.scrollTop < 0) {
-        root.scrollTop = 0;
-      }
-    };
-    
-    root.addEventListener('scroll', handleScroll, { passive: true });
-    return () => root.removeEventListener('scroll', handleScroll);
-  }, []);
-
   // Toggle bottom fade only when not at bottom using IntersectionObserver sentinel
   // Hide fade when any workout is expanded
   useEffect(() => {
@@ -747,18 +732,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       </div>
 
-      {/* Content area - scrolls vertically (reverted) */}
+      {/* Content area - scrolls vertically */}
       <div 
         ref={scrollRef} 
-        className="flex-1 overflow-y-scroll scrollbar-hide" 
+        className="flex-1 overflow-y-auto scrollbar-hide" 
         style={{ 
-          WebkitOverflowScrolling: 'touch', 
-          minHeight: 0,
-          touchAction: 'pan-y',
-          overscrollBehaviorY: 'none'
+          WebkitOverflowScrolling: 'touch',
+          minHeight: 0
         }}
       >
-        <div className="px-3" style={{ paddingTop: 4, paddingBottom: hasExpandedWorkout ? 100 : 48 }}>
+        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 80 : 48 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
           <div className="flex items-center justify-center h-full px-4">
