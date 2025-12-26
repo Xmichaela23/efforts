@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Menu, User, Upload, Settings, Activity, Link, ArrowRight } from 'lucide-react';
+import { Menu, User, Upload, Settings, Activity, Link, ArrowRight, Calendar, BarChart3 } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
@@ -18,6 +18,7 @@ import NewEffortDropdown from './NewEffortDropdown';
 import LogEffortDropdown from './LogEffortDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
 import ContextTabs from './ContextTabs';
+import LogFAB from './LogFAB';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
@@ -65,6 +66,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showTrainingBaselines, setShowTrainingBaselines] = useState(false);
   const [showContext, setShowContext] = useState(false);
   const [contextFocusWorkoutId, setContextFocusWorkoutId] = useState<string | null>(null);
+  const [activeBottomNav, setActiveBottomNav] = useState<'home' | 'plans' | 'insights'>('home');
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
@@ -1095,30 +1097,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
               {(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
-                  <Button
-                    onClick={handleHeaderBack}
-                    className="bg-white/[0.05] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.08] hover:text-white hover:border-white/35 transition-all duration-300 shadow-lg hover:shadow-xl"
-                    style={{
-                      fontFamily: 'Inter, sans-serif',
-                      padding: '8px 12px',
-                      borderRadius: '0.75rem',
-                      fontSize: '14px'
-                    }}
-                  >
-                    ← Back
-                  </Button>
-                  <Button
-                    onClick={handleBackToDashboard}
-                    className="bg-white/[0.05] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.08] hover:text-white hover:border-white/35 transition-all duration-300 shadow-lg hover:shadow-xl"
-                    style={{
-                      fontFamily: 'Inter, sans-serif',
-                      padding: '8px 12px',
-                      borderRadius: '0.75rem',
-                      fontSize: '14px'
-                    }}
-                  >
-                    Dashboard
-                  </Button>
+                  {!selectedWorkout && (
+                    <Button
+                      onClick={handleHeaderBack}
+                      className="bg-white/[0.05] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.08] hover:text-white hover:border-white/35 transition-all duration-300 shadow-lg hover:shadow-xl"
+                      style={{
+                        fontFamily: 'Inter, sans-serif',
+                        padding: '8px 12px',
+                        borderRadius: '0.75rem',
+                        fontSize: '14px'
+                      }}
+                    >
+                      ← Back
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -1229,70 +1221,123 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             </div>
           ) : (
             <div className="w-full h-full flex flex-col">
-              <div className="space-y-1 pt-2 flex-shrink-0">
-                <TodaysEffort
-                  selectedDate={selectedDate}
-                  onAddEffort={handleAddEffort}
-                  onViewCompleted={handleViewCompleted}
-                  onEditEffort={handleEditEffort}
-                />
-                <div className="flex-1 overflow-hidden">
-                  <div className="h-full overflow-hidden">
-                    <WorkoutCalendar
-                      onAddEffort={() => handleAddEffort('run')}
-                      onSelectType={handleSelectEffortType}
-                      onSelectWorkout={handleEditEffort}
-                      onViewCompleted={handleViewCompleted}
-                      onEditEffort={handleEditEffort}
-                      onDateSelect={handleDateSelect}
-                      onSelectRoutine={handleSelectRoutine}
-                      onOpenPlanBuilder={handleOpenPlanBuilder}
-                      currentPlans={currentPlans}
-                      completedPlans={completedPlans}
-                      workouts={workouts}
-                      plannedWorkouts={[]}
-                    />
+              {activeBottomNav === 'home' && (
+                <div className="space-y-1 pt-2 flex-shrink-0">
+                  <TodaysEffort
+                    selectedDate={selectedDate}
+                    onAddEffort={handleAddEffort}
+                    onViewCompleted={handleViewCompleted}
+                    onEditEffort={handleEditEffort}
+                  />
+                  <div className="flex-1 overflow-hidden">
+                    <div className="h-full overflow-hidden">
+                      <WorkoutCalendar
+                        onAddEffort={() => handleAddEffort('run')}
+                        onSelectType={handleSelectEffortType}
+                        onSelectWorkout={handleEditEffort}
+                        onViewCompleted={handleViewCompleted}
+                        onEditEffort={handleEditEffort}
+                        onDateSelect={handleDateSelect}
+                        onSelectRoutine={handleSelectRoutine}
+                        onOpenPlanBuilder={handleOpenPlanBuilder}
+                        currentPlans={currentPlans}
+                        completedPlans={completedPlans}
+                        workouts={workouts}
+                        plannedWorkouts={[]}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+              {activeBottomNav === 'plans' && (
+                <div className="pt-4 h-full">
+                  <AllPlansInterface
+                    onClose={handleBackToDashboard}
+                    onSelectPlan={handleSelectRoutine}
+                    onBuildWorkout={handleAddEffort}
+                    onDeletePlan={deletePlan}
+                  />
+                </div>
+              )}
+              {activeBottomNav === 'insights' && (
+                <div className="pt-4 h-full">
+                  <ContextTabs focusWorkoutId={contextFocusWorkoutId} />
+                </div>
+              )}
             </div>
           )}
         </div>
         </PullToRefresh>
       </main>
 
-      {/* Bottom Navigation Tab Bar - Instagram style */}
+      {/* Bottom Navigation Tab Bar - Standard pattern */}
       {!(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
-        <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center">
-          <div className="w-full">
-            <div className="flex justify-center items-center gap-3">
-              {/* Build hidden for now */}
-              <LogEffortDropdown onSelectType={handleSelectEffortType} />
-              <PlansDropdown 
-                onSelectRoutine={handleSelectRoutine}
-                currentPlans={currentPlans}
-                completedPlans={completedPlans}
-                onOpenPlanBuilder={handleOpenPlanBuilder}
-              />
-              <Button
-                onClick={() => handleOpenContext()}
-                className="flex items-center gap-2 bg-white/[0.05] backdrop-blur-lg border border-white/15 text-gray-300 font-light tracking-wide hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 shadow-lg hover:shadow-xl focus:outline-none focus:ring-0 focus:border-0 active:outline-none active:ring-0 active:border-0"
-                style={{
-                  fontFamily: 'Inter, sans-serif',
-                  padding: '14px 12px',
-                  borderRadius: '1rem',
-                  fontSize: '15px',
-                  minHeight: '48px',
-                  flex: 1,
-                  maxWidth: '140px'
-                }}
-              >
-                Context
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+        <>
+          {/* FAB for Logging */}
+          <LogFAB onSelectType={handleSelectEffortType} />
+          
+          {/* Bottom Navigation Tabs */}
+          <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center">
+            <div className="w-full">
+              <div className="flex justify-center items-center gap-2">
+                <Button
+                  onClick={() => setActiveBottomNav('home')}
+                  className={`flex-1 flex items-center justify-center gap-2 bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                    activeBottomNav === 'home' 
+                      ? 'border-white/25 text-white bg-white/[0.08]' 
+                      : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
+                  }`}
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    padding: '12px 16px',
+                    borderRadius: '1rem',
+                    fontSize: '15px',
+                    minHeight: '48px'
+                  }}
+                >
+                  <Activity className="h-5 w-5" />
+                  Home
+                </Button>
+                <Button
+                  onClick={() => setActiveBottomNav('plans')}
+                  className={`flex-1 flex items-center justify-center gap-2 bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                    activeBottomNav === 'plans' 
+                      ? 'border-white/25 text-white bg-white/[0.08]' 
+                      : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
+                  }`}
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    padding: '12px 16px',
+                    borderRadius: '1rem',
+                    fontSize: '15px',
+                    minHeight: '48px'
+                  }}
+                >
+                  <Calendar className="h-5 w-5" />
+                  Plans
+                </Button>
+                <Button
+                  onClick={() => setActiveBottomNav('insights')}
+                  className={`flex-1 flex items-center justify-center gap-2 bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                    activeBottomNav === 'insights' 
+                      ? 'border-white/25 text-white bg-white/[0.08]' 
+                      : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
+                  }`}
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    padding: '12px 16px',
+                    borderRadius: '1rem',
+                    fontSize: '15px',
+                    minHeight: '48px'
+                  }}
+                >
+                  <BarChart3 className="h-5 w-5" />
+                  Insights
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
