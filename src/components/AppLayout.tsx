@@ -1100,8 +1100,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               {(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
                   {!selectedWorkout && (
-                    <Button
-                      onClick={handleHeaderBack}
+                  <Button
+                    onClick={handleHeaderBack}
                       className="bg-white/[0.05] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.08] hover:text-white hover:border-white/35 transition-all duration-300 shadow-lg hover:shadow-xl"
                       style={{
                         fontFamily: 'Inter, sans-serif',
@@ -1109,9 +1109,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         borderRadius: '0.75rem',
                         fontSize: '14px'
                       }}
-                    >
-                      ← Back
-                    </Button>
+                  >
+                    ← Back
+                  </Button>
                   )}
                 </div>
               )}
@@ -1224,32 +1224,32 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           ) : (
             <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (
-                <div className="space-y-1 pt-2 flex-shrink-0">
-                  <TodaysEffort
-                    selectedDate={selectedDate}
-                    onAddEffort={handleAddEffort}
-                    onViewCompleted={handleViewCompleted}
-                    onEditEffort={handleEditEffort}
-                  />
-                  <div className="flex-1 overflow-hidden">
-                    <div className="h-full overflow-hidden">
-                      <WorkoutCalendar
-                        onAddEffort={() => handleAddEffort('run')}
-                        onSelectType={handleSelectEffortType}
-                        onSelectWorkout={handleEditEffort}
-                        onViewCompleted={handleViewCompleted}
-                        onEditEffort={handleEditEffort}
-                        onDateSelect={handleDateSelect}
-                        onSelectRoutine={handleSelectRoutine}
-                        onOpenPlanBuilder={handleOpenPlanBuilder}
-                        currentPlans={currentPlans}
-                        completedPlans={completedPlans}
-                        workouts={workouts}
-                        plannedWorkouts={[]}
-                      />
-                    </div>
+              <div className="space-y-1 pt-2 flex-shrink-0">
+                <TodaysEffort
+                  selectedDate={selectedDate}
+                  onAddEffort={handleAddEffort}
+                  onViewCompleted={handleViewCompleted}
+                  onEditEffort={handleEditEffort}
+                />
+                <div className="flex-1 overflow-hidden">
+                  <div className="h-full overflow-hidden">
+                    <WorkoutCalendar
+                      onAddEffort={() => handleAddEffort('run')}
+                      onSelectType={handleSelectEffortType}
+                      onSelectWorkout={handleEditEffort}
+                      onViewCompleted={handleViewCompleted}
+                      onEditEffort={handleEditEffort}
+                      onDateSelect={handleDateSelect}
+                      onSelectRoutine={handleSelectRoutine}
+                      onOpenPlanBuilder={handleOpenPlanBuilder}
+                      currentPlans={currentPlans}
+                      completedPlans={completedPlans}
+                      workouts={workouts}
+                      plannedWorkouts={[]}
+                    />
                   </div>
                 </div>
+              </div>
               )}
               {activeBottomNav === 'insights' && (
                 <div className="pt-4 h-full">
@@ -1304,36 +1304,36 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   Context
                 </Button>
                 <PlansMenu
-                  currentPlans={currentPlans}
-                  completedPlans={completedPlans}
+                currentPlans={currentPlans}
+                completedPlans={completedPlans}
                   onSelectPlan={handleSelectRoutine}
                   isOpen={plansMenuOpen}
                   onOpenChange={setPlansMenuOpen}
                   trigger={
-                      <Button
+              <Button
                         onClick={() => setPlansMenuOpen(true)}
                         className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
                           plansMenuOpen
                             ? 'border-white/50 text-white bg-white/[0.12]' 
                             : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
                         }`}
-                        style={{
-                          fontFamily: 'Inter, sans-serif',
+                style={{
+                  fontFamily: 'Inter, sans-serif',
                           padding: '12px 16px',
                           borderRadius: '1rem',
-                          fontSize: '15px',
-                          minHeight: '48px',
+                  fontSize: '15px',
+                  minHeight: '48px',
                           boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
-                        }}
-                      >
+                }}
+              >
                         Plans
-                      </Button>
+              </Button>
                   }
                 />
                 <LogFAB onSelectType={handleSelectEffortType} />
-              </div>
             </div>
           </div>
+        </div>
       )}
     </div>
   );
