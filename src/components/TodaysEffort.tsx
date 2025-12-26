@@ -733,7 +733,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       </div>
 
       {/* Content area - scrolls vertically (reverted) */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-y-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' as any }}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-y-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' as any, minHeight: 0 }}>
         <div className="px-3 pb-2" style={{ paddingBottom: 48 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
@@ -752,22 +752,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           <div className="">
             <div className="space-y-1">
               {displayWorkouts.map((workout) => (
-                <button
+                <div
                   key={workout.id}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const w: any = { ...workout };
-                    if (w.workout_status === 'planned') {
-                      w.__preferredTab = 'planned';
-                    }
-                    onEditEffort && onEditEffort(w);
-                  }}
                   className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg ${
                     workout.workout_status === 'completed'
-                      ? 'bg-green-500/20 backdrop-blur-sm border border-green-400/30 text-white hover:bg-green-500/25 shadow-lg'
-                      : 'bg-white/[0.05] backdrop-blur-lg border border-white/15 text-gray-300 hover:bg-white/[0.08] shadow-lg hover:shadow-xl'
+                      ? 'bg-green-500/20 backdrop-blur-sm border border-green-400/30 text-white'
+                      : 'bg-white/[0.05] backdrop-blur-lg border border-white/15 text-gray-300'
                   }`}
+                  style={{ touchAction: 'pan-y' }}
                 >
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
                   {workout.workout_status === 'planned' ? (
@@ -978,7 +970,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       </div>
                     </div>
                   )}
-                </button>
+                </div>
               ))}
             </div>
           </div>
