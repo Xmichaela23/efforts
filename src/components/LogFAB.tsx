@@ -26,12 +26,7 @@ const LogFAB: React.FC<LogFABProps> = ({ onSelectType }) => {
 
   return (
     <div 
-      className="fixed z-50"
-      style={{
-        // Position above bottom nav: uses CSS variable for tabbar height + safe area + spacing
-        bottom: 'calc(var(--tabbar-h, 56px) + max(env(safe-area-inset-bottom, 0px) - 34px, 0px) + 1.5rem)',
-        right: '1.5rem',
-      }}
+      className="absolute -top-20 right-6 z-50"
     >
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger asChild>
