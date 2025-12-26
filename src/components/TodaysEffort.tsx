@@ -955,7 +955,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const sec = resolveMovingSeconds(workout);
                             if (Number.isFinite(sec as any) && (sec as number) > 0) {
                               const mins = Math.round((sec as number) / 60);
-                              return <span className="px-2 py-0.5 rounded-lg bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 text-blue-300">{mins}:00</span>;
+                              return <span className="text-blue-300 font-light">{mins}:00</span>;
                             }
                             return null;
                           })()}
