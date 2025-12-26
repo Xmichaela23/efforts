@@ -17,10 +17,9 @@ const LogEffortDropdown: React.FC<LogEffortDropdownProps> = ({ onSelectType }) =
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow-md"
+          className="flex items-center gap-2 bg-white/[0.05] backdrop-blur-lg border border-white/15 text-white/90 font-light tracking-wide hover:bg-white/[0.10] hover:text-white hover:border-white/30 transition-all duration-300"
           style={{
             fontFamily: 'Inter, sans-serif',
-            fontWeight: 600,
             padding: '14px 16px',
             borderRadius: '8px',
             fontSize: '15px',
