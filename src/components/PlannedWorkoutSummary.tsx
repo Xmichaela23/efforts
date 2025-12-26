@@ -16,9 +16,10 @@ interface PlannedWorkoutSummaryProps {
 
 const formatDuration = (minutes: number) => {
   if (!minutes && minutes !== 0) return '';
-  const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  return `${hours}h ${mins}`;
+  const totalMins = minutes;
+  // Return MM:00 format (e.g., "52:00")
+  return `${totalMins}:00`;
 };
 
 function getTitle(workout: any): string {

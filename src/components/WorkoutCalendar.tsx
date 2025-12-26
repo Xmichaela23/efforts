@@ -102,7 +102,7 @@ function derivePlannedCellLabel(w: any): string | null {
     // Use single source of truth for duration calculation
     const secs = resolveMovingSeconds(w);
     const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
-    const durStr = mins > 0 ? `${mins}m` : '';
+    const durStr = mins > 0 ? `${mins}:00` : '';
 
     const has = (pat: RegExp) => steps.some(s => pat.test(s)) || pat.test(txt);
 
@@ -453,7 +453,7 @@ export default function WorkoutCalendar({
             // Use single source of truth for duration calculation
             const secs = resolveMovingSeconds(w);
             const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
-            const durStr = mins > 0 ? `${mins}m` : '';
+            const durStr = mins > 0 ? `${mins}:00` : '';
             labelBase = durStr ? `${t} ${durStr}`.trim() : t;
           } else {
             // For completed workouts or other types, use miles if available
@@ -470,7 +470,7 @@ export default function WorkoutCalendar({
               // Use single source of truth for duration calculation
               const secs = resolveMovingSeconds(w);
               const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
-              const durStr = mins > 0 ? `${mins}m` : '';
+              const durStr = mins > 0 ? `${mins}:00` : '';
               if (durStr) {
                 labelBase = `${labelBase} ${durStr}`.trim();
               }
