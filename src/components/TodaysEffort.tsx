@@ -145,8 +145,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     } catch {}
   }, [activeDate, today, dayLoc, locTried]);
 
+  // Check if any workout is expanded
+  const hasExpandedWorkout = Object.values(expanded).some(Boolean);
+
   // Toggle bottom fade only when not at bottom using IntersectionObserver sentinel
+  // Hide fade when any workout is expanded
   useEffect(() => {
+    if (hasExpandedWorkout) {
+      setShowFade(false);
+      return;
+    }
     const root = scrollRef.current;
     const sentinel = sentinelRef.current;
     if (!root || !sentinel) return;
@@ -157,7 +165,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }, { root, threshold: 1.0 });
     io.observe(sentinel);
     return () => { try { io.disconnect(); } catch {} };
-  }, [scrollRef, sentinelRef]);
+  }, [scrollRef, sentinelRef, hasExpandedWorkout]);
 
   const dateWorkoutsMemo = useMemo(() => {
     const items = Array.isArray(unifiedItems) ? unifiedItems : [];
@@ -725,7 +733,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       </div>
 
       {/* Content area - scrolls vertically (reverted) */}
-      <div ref={scrollRef} className="flex-1 overflow-auto overscroll-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' as any }}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-y-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' as any }}>
         <div className="px-3 pb-2" style={{ paddingBottom: 48 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
