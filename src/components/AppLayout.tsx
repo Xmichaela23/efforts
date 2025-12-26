@@ -1282,7 +1282,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               <div className="flex justify-center items-center gap-2">
                 <Button
                   onClick={() => setActiveBottomNav('home')}
-                  className={`flex-1 flex items-center justify-center gap-2 bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                  className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
                     activeBottomNav === 'home' 
                       ? 'border-white/25 text-white bg-white/[0.08]' 
                       : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
@@ -1295,12 +1295,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     minHeight: '48px'
                   }}
                 >
-                  <Activity className="h-5 w-5" />
                   Home
                 </Button>
                 <Button
                   onClick={() => setActiveBottomNav('plans')}
-                  className={`flex-1 flex items-center justify-center gap-2 bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                  className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
                     activeBottomNav === 'plans' 
                       ? 'border-white/25 text-white bg-white/[0.08]' 
                       : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
@@ -1313,12 +1312,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     minHeight: '48px'
                   }}
                 >
-                  <Calendar className="h-5 w-5" />
                   Plans
                 </Button>
                 <Button
                   onClick={() => setActiveBottomNav('insights')}
-                  className={`flex-1 flex items-center justify-center gap-2 bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                  className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
                     activeBottomNav === 'insights' 
                       ? 'border-white/25 text-white bg-white/[0.08]' 
                       : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
@@ -1331,8 +1329,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     minHeight: '48px'
                   }}
                 >
-                  <BarChart3 className="h-5 w-5" />
-                  Insights
+                  Context
                 </Button>
               </div>
             </div>
