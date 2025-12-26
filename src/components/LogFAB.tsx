@@ -29,17 +29,17 @@ const LogFAB: React.FC<LogFABProps> = ({ onSelectType }) => {
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger asChild>
           <Button
-            className="w-14 h-14 rounded-full bg-white/[0.12] backdrop-blur-md border-2 border-white/70 text-white font-light shadow-2xl hover:bg-white/[0.18] hover:border-white/80 transition-all duration-300 flex items-center justify-center flex-shrink-0"
+            className="w-14 h-14 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/30 text-white font-light hover:bg-white/[0.12] hover:border-white/40 transition-all duration-300 flex items-center justify-center flex-shrink-0"
             style={{
               fontFamily: 'Inter, sans-serif',
-              boxShadow: '0 10px 40px rgba(255, 255, 255, 0.25), 0 0 20px rgba(255, 255, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
               minHeight: '56px',
+              marginBottom: 'env(safe-area-inset-bottom, 0px)',
             }}
           >
             {isOpen ? (
-              <X className="h-6 w-6" />
+              <X className="h-7 w-7 stroke-[2.5]" />
             ) : (
-              <Plus className="h-6 w-6" />
+              <Plus className="h-7 w-7 stroke-[2.5]" />
             )}
           </Button>
         </DropdownMenuTrigger>

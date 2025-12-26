@@ -1264,7 +1264,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Bottom Navigation Tab Bar - Standard pattern */}
       {!(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
-        <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center">
+        <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center" style={{ paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}>
           <div className="w-full">
             <div className="flex justify-center items-center gap-2">
               {/* FAB for Logging - now part of bottom nav */}
