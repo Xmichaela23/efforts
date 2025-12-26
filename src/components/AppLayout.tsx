@@ -1092,13 +1092,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <h1 className="text-2xl font-light tracking-wider text-white">efforts</h1>
+              <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
               {(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
                   <Button
                     onClick={handleHeaderBack}
                     variant="ghost"
-                    className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="text-sm font-light tracking-normal text-gray-700 hover:bg-gray-50"
                     style={{fontFamily: 'Inter, sans-serif'}}
                   >
                     ← Back
@@ -1106,7 +1106,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   <Button
                     onClick={handleBackToDashboard}
                     variant="ghost"
-                    className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="text-sm font-light tracking-normal text-gray-700 hover:bg-gray-50"
                     style={{fontFamily: 'Inter, sans-serif'}}
                   >
                     Dashboard

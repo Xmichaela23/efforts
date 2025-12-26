@@ -458,7 +458,7 @@ return (
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <h1 className="text-2xl font-light tracking-wider text-white">efforts</h1>
+            <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
             <button 
               onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} 
               className="text-sm font-medium text-gray-700 hover:bg-gray-50"

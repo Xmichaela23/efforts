@@ -639,7 +639,7 @@ export default function WorkoutCalendar({
           ‹
         </button>
         <div className="flex items-center gap-2">
-          <h2 className="text-base font-medium">Week of {rangeLabel}</h2>
+          <h2 className="text-base font-light tracking-normal">Week of {rangeLabel}</h2>
           {loadingDebounced && (
             <span role="status" aria-live="polite" className="text-[11px] text-muted-foreground">Loading week…</span>
           )}
@@ -672,7 +672,7 @@ export default function WorkoutCalendar({
             >
               {/* Top row: Day + Date inline */}
               <div className="flex items-baseline justify-start">
-                <div className="text-[11px] tracking-wide text-foreground font-medium uppercase">
+                <div className="text-sm font-light tracking-wider text-foreground uppercase">
                   {weekdayFmt.format(d)}
                 </div>
                 <div className="ml-2 text-sm text-muted-foreground">{d.getDate()}</div>
@@ -693,7 +693,7 @@ export default function WorkoutCalendar({
                         tabIndex={0}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`cursor-pointer text-xs px-2 py-1 rounded-xl w-full text-center truncate border transition-all backdrop-blur-sm ${
+                        className={`cursor-pointer text-xs px-2 py-1 rounded-xl w-full text-center truncate border transition-all backdrop-blur-sm font-light tracking-wide ${
                           isCompleted 
                             ? 'bg-green-500/20 backdrop-blur-sm border border-green-400/30 text-white hover:bg-green-500/25 shadow-sm'
                             : 'bg-white/[0.08] backdrop-blur-sm border border-white/20 text-gray-300 hover:bg-white/[0.12] shadow-sm hover:shadow'
@@ -740,7 +740,7 @@ export default function WorkoutCalendar({
                 <div className="space-y-2">
                   {/* Total Workload with counts */}
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">Total Workload</span>
+                    <span className="text-sm font-light tracking-normal">Total Workload</span>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button type="button" className="inline-flex items-center">
@@ -911,7 +911,7 @@ export default function WorkoutCalendar({
                           {metrics.map((metric, index) => (
                             <div key={index} className="flex items-center justify-between text-xs">
                               <span className="text-muted-foreground">{metric.label}</span>
-                              <span className="font-medium text-foreground">{metric.value}</span>
+                              <span className="font-light tracking-normal text-foreground">{metric.value}</span>
                             </div>
                           ))}
                         </div>
@@ -925,7 +925,7 @@ export default function WorkoutCalendar({
                     <div className="pt-2 mt-2 border-t border-border text-xs text-muted-foreground">
                       <div className="flex items-center gap-1 flex-wrap">
                         {trainingPlanContext.focus && (
-                          <span className="font-medium text-foreground">{trainingPlanContext.focus}</span>
+                          <span className="font-light tracking-normal text-foreground">{trainingPlanContext.focus}</span>
                         )}
                         {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && (
                           <span className="text-gray-400">•</span>

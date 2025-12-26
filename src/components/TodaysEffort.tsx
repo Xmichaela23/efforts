@@ -709,7 +709,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-2 px-4 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">
+          <span className="text-sm font-light tracking-normal text-foreground">
             {formatDisplayDate(activeDate)}
           </span>
           {/* Effort count removed for space */}
@@ -860,7 +860,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     <div className="space-y-1">
                       {/* Title and Duration Row */}
                       <div className="flex items-center justify-between">
-                        <div className="font-medium text-base text-foreground">
+                        <div className="font-light tracking-normal text-base text-foreground">
                           {(() => {
                             const type = String(workout.type || '').toLowerCase();
                             const desc = String(workout.description || '').toLowerCase();

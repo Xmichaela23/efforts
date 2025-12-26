@@ -42,7 +42,7 @@ export default function PlansBuild() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <h1 className="text-2xl font-light tracking-wider text-white">efforts</h1>
+              <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
               <div className="flex items-center gap-3">
                 <Button onClick={safeBack} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">
                   ← Back

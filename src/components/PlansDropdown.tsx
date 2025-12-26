@@ -112,12 +112,12 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
                 style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '10px 12px', minHeight: '56px', maxWidth: '296px'}}
               >
                 <span className="text-xs text-gray-500 mb-0.5">Current plan</span>
-                <span className="font-medium leading-snug whitespace-normal break-words" style={{ overflow: 'hidden', maxWidth: '280px' }}>
+                <span className="font-light tracking-normal leading-snug whitespace-normal break-words" style={{ overflow: 'hidden', maxWidth: '280px' }}>
                   {plan.name}
                 </span>
                 <span className="text-xs text-gray-500 mt-0.5">
                   Week {plan.currentWeek || 1}
-                  {plan.status === 'paused' && <span className="ml-2 text-orange-600 font-medium">(Paused)</span>}
+                  {plan.status === 'paused' && <span className="ml-2 text-orange-600 font-light">(Paused)</span>}
                 </span>
               </DropdownMenuItem>
             ))}
