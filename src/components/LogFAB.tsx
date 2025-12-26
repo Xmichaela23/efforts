@@ -37,9 +37,9 @@ const LogFAB: React.FC<LogFABProps> = ({ onSelectType }) => {
             }}
           >
             {isOpen ? (
-              <X className="h-7 w-7 stroke-[3.5] text-white" />
+              <X className="h-7 w-7 stroke-[3.5]" />
             ) : (
-              <CirclePlus className="h-7 w-7 stroke-[3.5] text-white fill-none stroke-white" />
+              <CirclePlus className="h-7 w-7" />
             )}
           </Button>
         </DropdownMenuTrigger>
