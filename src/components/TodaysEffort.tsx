@@ -716,10 +716,30 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // (Reverted) no horizontal scroll state
 
+  // Calculate header height for scroll container positioning
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  useEffect(() => {
+    if (headerRef.current) {
+      const updateHeight = () => {
+        setHeaderHeight(headerRef.current?.offsetHeight || 0);
+      };
+      updateHeight();
+      const resizeObserver = new ResizeObserver(updateHeight);
+      resizeObserver.observe(headerRef.current);
+      return () => resizeObserver.disconnect();
+    }
+  }, [weather]);
+
   return (
-    <div className="w-full flex-shrink-0 flex flex-col overflow-hidden" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)', position:'relative'}}>
+    <div className="w-full flex-shrink-0 overflow-hidden" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)', position:'relative'}}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-2 px-4 flex-shrink-0">
+      <div 
+        ref={headerRef}
+        className="flex items-center justify-between mb-2 px-4 flex-shrink-0" 
+        style={{ position: 'relative', zIndex: 1 }}
+      >
         <div className="flex items-center gap-2">
           <span className="text-sm font-light tracking-normal text-foreground">
             {formatDisplayDate(activeDate)}
@@ -736,16 +756,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       </div>
 
-      {/* Content area - scrolls vertically */}
+      {/* Content area - scrolls vertically with absolute positioning */}
       <div 
         ref={scrollRef} 
-        className="flex-1 overflow-y-auto scrollbar-hide" 
+        className="overflow-y-auto scrollbar-hide" 
         style={{ 
+          position: 'absolute',
+          top: headerHeight + 8, // mb-2 = 8px
+          left: 0,
+          right: 0,
+          bottom: 0,
           WebkitOverflowScrolling: 'touch',
-          minHeight: 0,
-          maxHeight: '100%',
           touchAction: 'pan-y',
-          position: 'relative'
+          overflowX: 'hidden'
         }}
       >
         <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48, paddingTop: 4 }}>
