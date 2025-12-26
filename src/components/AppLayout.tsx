@@ -1268,11 +1268,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
               <Button
                 onClick={() => handleOpenContext()}
-                className="flex items-center gap-2 bg-white/[0.05] backdrop-blur-lg border border-white/15 text-white/90 font-light tracking-wide hover:bg-white/[0.10] hover:text-white hover:border-white/30 transition-all duration-300 focus:outline-none focus:ring-0 focus:border-0 active:outline-none active:ring-0 active:border-0"
+                className="flex items-center gap-2 bg-white/[0.05] backdrop-blur-lg border border-white/15 text-gray-300 font-light tracking-wide hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 shadow-lg hover:shadow-xl focus:outline-none focus:ring-0 focus:border-0 active:outline-none active:ring-0 active:border-0"
                 style={{
                   fontFamily: 'Inter, sans-serif',
                   padding: '14px 12px',
-                  borderRadius: '8px',
+                  borderRadius: '1rem',
                   fontSize: '15px',
                   minHeight: '48px',
                   flex: 1,
