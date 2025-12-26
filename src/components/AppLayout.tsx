@@ -18,7 +18,7 @@ import NewEffortDropdown from './NewEffortDropdown';
 import LogEffortDropdown from './LogEffortDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
 import ContextTabs from './ContextTabs';
-import LogFAB from './LogFAB';
+import LogEffortDropdown from './LogEffortDropdown';
 import PlansMenu from './PlansMenu';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 import PlansDropdown from './PlansDropdown';
@@ -1267,8 +1267,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center" style={{ paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}>
           <div className="w-full">
             <div className="flex justify-center items-center gap-2">
-              {/* FAB for Logging - now part of bottom nav */}
-              <LogFAB onSelectType={handleSelectEffortType} />
+              <LogEffortDropdown onSelectType={handleSelectEffortType} />
                 <Button
                   onClick={() => setActiveBottomNav('home')}
                   className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
