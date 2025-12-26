@@ -734,7 +734,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
       {/* Content area - scrolls vertically (reverted) */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-y-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' as any, minHeight: 0 }}>
-        <div className="px-3 pb-2" style={{ paddingBottom: hasExpandedWorkout ? 80 : 48 }}>
+        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48, paddingRight: hasExpandedWorkout ? 8 : 0 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
           <div className="flex items-center justify-center h-full px-4">
