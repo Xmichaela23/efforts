@@ -718,17 +718,24 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Calculate header height for scroll container positioning
   const headerRef = useRef<HTMLDivElement | null>(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(40); // Start with reasonable default
 
   useEffect(() => {
     if (headerRef.current) {
       const updateHeight = () => {
-        setHeaderHeight(headerRef.current?.offsetHeight || 0);
+        const height = headerRef.current?.offsetHeight || 40;
+        setHeaderHeight(height);
       };
+      // Update immediately
       updateHeight();
+      // Also update after a short delay to catch any layout changes
+      const timeoutId = setTimeout(updateHeight, 100);
       const resizeObserver = new ResizeObserver(updateHeight);
       resizeObserver.observe(headerRef.current);
-      return () => resizeObserver.disconnect();
+      return () => {
+        clearTimeout(timeoutId);
+        resizeObserver.disconnect();
+      };
     }
   }, [weather]);
 
@@ -758,17 +765,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
       {/* Content area - scrolls vertically with absolute positioning */}
       <div 
-        ref={scrollRef} 
-        className="overflow-y-auto scrollbar-hide" 
+        ref={scrollRef}
+        className="scrollbar-hide" 
         style={{ 
           position: 'absolute',
-          top: headerHeight + 8, // mb-2 = 8px
+          top: `${headerHeight + 8}px`,
           left: 0,
           right: 0,
           bottom: 0,
-          WebkitOverflowScrolling: 'touch',
-          touchAction: 'pan-y',
-          overflowX: 'hidden'
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch'
         }}
       >
         <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48, paddingTop: 4 }}>
