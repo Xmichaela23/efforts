@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Menu, User, Upload, Settings, Activity, Link, ArrowRight, Calendar, BarChart3 } from 'lucide-react';
+import { Menu, User, Upload, Settings, Activity, Link, ArrowRight, Calendar, BarChart3, Home } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
@@ -1266,14 +1266,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       {!(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
         <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center" style={{ paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}>
           <div className="w-full">
-            <div className="flex justify-center items-center gap-2">
-              <LogEffortDropdown onSelectType={handleSelectEffortType} />
+            <div className="flex justify-center items-center gap-2 pb-3 pt-1">
                 <Button
                   onClick={() => setActiveBottomNav('home')}
-                  className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
                     activeBottomNav === 'home' 
-                      ? 'border-white/25 text-white bg-white/[0.08]' 
-                      : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
+                      ? 'border-white/30 text-white bg-white/[0.12]' 
+                      : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
                   }`}
                   style={{
                     fontFamily: 'Inter, sans-serif',
@@ -1283,7 +1282,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     minHeight: '48px'
                   }}
                 >
-                  Home
+                  <Home className="h-5 w-5" />
+                </Button>
+                <Button
+                  onClick={() => setActiveBottomNav('insights')}
+                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                    activeBottomNav === 'insights' 
+                      ? 'border-white/30 text-white bg-white/[0.12]' 
+                      : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
+                  }`}
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    padding: '12px 16px',
+                    borderRadius: '1rem',
+                    fontSize: '15px',
+                    minHeight: '48px'
+                  }}
+                >
+                  Context
                 </Button>
                 <PlansMenu
                   currentPlans={currentPlans}
@@ -1294,10 +1310,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   trigger={
                     <Button
                       onClick={() => setPlansMenuOpen(true)}
-                      className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                      className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
                         plansMenuOpen
-                          ? 'border-white/25 text-white bg-white/[0.08]' 
-                          : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
+                          ? 'border-white/30 text-white bg-white/[0.12]' 
+                          : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
                       }`}
                       style={{
                         fontFamily: 'Inter, sans-serif',
@@ -1311,23 +1327,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     </Button>
                   }
                 />
-                <Button
-                  onClick={() => setActiveBottomNav('insights')}
-                  className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    activeBottomNav === 'insights' 
-                      ? 'border-white/25 text-white bg-white/[0.08]' 
-                      : 'border-white/15 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
-                  }`}
-                  style={{
-                    fontFamily: 'Inter, sans-serif',
-                    padding: '12px 16px',
-                    borderRadius: '1rem',
-                    fontSize: '15px',
-                    minHeight: '48px'
-                  }}
-                >
-                  Context
-                </Button>
+              <LogEffortDropdown onSelectType={handleSelectEffortType} />
               </div>
             </div>
           </div>
