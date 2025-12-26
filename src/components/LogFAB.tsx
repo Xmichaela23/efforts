@@ -25,14 +25,21 @@ const LogFAB: React.FC<LogFABProps> = ({ onSelectType }) => {
   ];
 
   return (
-    <div className="fixed bottom-24 right-6 z-50">
+    <div 
+      className="fixed z-50"
+      style={{
+        // Position above bottom nav: uses CSS variable for tabbar height + safe area + spacing
+        bottom: 'calc(var(--tabbar-h, 56px) + max(env(safe-area-inset-bottom, 0px) - 34px, 0px) + 1.5rem)',
+        right: '1.5rem',
+      }}
+    >
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger asChild>
           <Button
-            className="w-16 h-16 rounded-full bg-white/[0.15] backdrop-blur-lg border-2 border-white/40 text-white font-light shadow-2xl hover:bg-white/[0.20] hover:border-white/50 transition-all duration-300 flex items-center justify-center"
+            className="w-16 h-16 rounded-full bg-white/[0.12] backdrop-blur-md border-2 border-white/50 text-white font-light shadow-2xl hover:bg-white/[0.18] hover:border-white/60 transition-all duration-300 flex items-center justify-center"
             style={{
               fontFamily: 'Inter, sans-serif',
-              boxShadow: '0 10px 40px rgba(255, 255, 255, 0.15), 0 0 20px rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 10px 40px rgba(255, 255, 255, 0.2), 0 0 20px rgba(255, 255, 255, 0.15)',
             }}
           >
             {isOpen ? (
