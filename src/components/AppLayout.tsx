@@ -1264,14 +1264,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Bottom Navigation Tab Bar - Standard pattern */}
       {!(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
-        <div className="relative">
-          {/* FAB for Logging - positioned relative to bottom nav container */}
-          <LogFAB onSelectType={handleSelectEffortType} />
-          
-          {/* Bottom Navigation Tabs */}
-          <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center relative">
-            <div className="w-full">
-              <div className="flex justify-center items-center gap-2">
+        <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center">
+          <div className="w-full">
+            <div className="flex justify-center items-center gap-2">
+              {/* FAB for Logging - now part of bottom nav */}
+              <LogFAB onSelectType={handleSelectEffortType} />
                 <Button
                   onClick={() => setActiveBottomNav('home')}
                   className={`flex-1 flex items-center justify-center bg-white/[0.05] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
