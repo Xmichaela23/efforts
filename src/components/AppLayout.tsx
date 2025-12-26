@@ -1097,7 +1097,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <div className="flex items-center gap-3">
                   <Button
                     onClick={handleHeaderBack}
-                    className="bg-white/[0.05] backdrop-blur-lg border border-white/15 text-white/90 font-light tracking-wide hover:bg-white/[0.08] hover:text-white hover:border-white/20 transition-all duration-300 shadow-lg hover:shadow-xl"
+                    className="bg-white/[0.05] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.08] hover:text-white hover:border-white/35 transition-all duration-300 shadow-lg hover:shadow-xl"
                     style={{
                       fontFamily: 'Inter, sans-serif',
                       padding: '8px 12px',
@@ -1109,7 +1109,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   </Button>
                   <Button
                     onClick={handleBackToDashboard}
-                    className="bg-white/[0.05] backdrop-blur-lg border border-white/15 text-white/90 font-light tracking-wide hover:bg-white/[0.08] hover:text-white hover:border-white/20 transition-all duration-300 shadow-lg hover:shadow-xl"
+                    className="bg-white/[0.05] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.08] hover:text-white hover:border-white/35 transition-all duration-300 shadow-lg hover:shadow-xl"
                     style={{
                       fontFamily: 'Inter, sans-serif',
                       padding: '8px 12px',

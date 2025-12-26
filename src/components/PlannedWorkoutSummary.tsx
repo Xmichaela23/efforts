@@ -621,7 +621,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           </span>
         </div>
         {!hideLines && !isStrength && (
-          <div className="text-sm text-gray-300 font-light tracking-normal mt-1">
+          <div className="text-sm text-gray-200 font-light tracking-normal mt-1">
             {stacked.length > 1 ? (
               <span className="whitespace-pre-line">{stacked.join('\n')}</span>
             ) : (
@@ -630,22 +630,22 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           </div>
         )}
         {!hideLines && !isStrength && enduranceLines.length>0 && (
-          <ul className="list-disc pl-5 mt-1 text-sm text-gray-300 font-light tracking-normal">
+          <ul className="list-disc pl-5 mt-1 text-sm text-gray-200 font-light tracking-normal">
             {enduranceLines.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}
         {!hideLines && isStrength && (
-          <div className="text-sm text-gray-300 font-light tracking-normal mt-1">
+          <div className="text-sm text-gray-200 font-light tracking-normal mt-1">
             <span>{lines}</span>
           </div>
         )}
         {!hideLines && isStrength && strengthItems.length>0 && (
-          <ul className="list-disc pl-5 mt-1 text-sm text-gray-300 font-light tracking-normal">
+          <ul className="list-disc pl-5 mt-1 text-sm text-gray-200 font-light tracking-normal">
             {strengthItems.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}
         {!hideLines && isMobility && mobilityLines.length>0 && (
-          <ul className="list-disc pl-5 mt-1 text-sm text-gray-300 font-light tracking-normal">
+          <ul className="list-disc pl-5 mt-1 text-sm text-gray-200 font-light tracking-normal">
             {mobilityLines.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}

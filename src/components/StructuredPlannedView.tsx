@@ -48,16 +48,16 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
             {mobilityList.map((m, i)=> (
               <li key={i} className="text-sm text-gray-800">
                 <span className="font-medium">{m.name}</span>
-                {m.duration ? <span className="text-gray-600"> — {m.duration}</span> : null}
+                {m.duration ? <span className="text-gray-200"> — {m.duration}</span> : null}
                 {(() => {
                   const w: any = (m as any)?.weight;
                   if (w == null) return null;
                   const num = typeof w === 'number' ? w : (typeof w === 'string' ? parseFloat(w) : NaN);
                   if (!Number.isFinite(num) || num <= 0) return null;
                   const unit = String((m as any)?.unit || 'lb');
-                  return <span className="text-gray-600"> — @ {Math.round(num)} {unit}</span>;
+                  return <span className="text-gray-200"> — @ {Math.round(num)} {unit}</span>;
                 })()}
-                {m.description ? <span className="text-gray-600"> — {m.description}</span> : null}
+                {m.description ? <span className="text-gray-200"> — {m.description}</span> : null}
               </li>
             ))}
           </ul>
@@ -601,7 +601,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         </div>
       )}
       {sessionSummary && (
-        <div className="text-sm text-gray-600 leading-snug">
+        <div className="text-sm text-gray-200 font-light tracking-normal leading-snug">
           {sessionSummary}
         </div>
       )}
@@ -615,7 +615,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
             const isStrengthContext = (String((workout as any)?.workout_structure?.type||'').toLowerCase()==='strength_session') || (parentDisc === 'strength');
             const isPlannedRow = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';
             return (
-              <li key={i} className="text-sm text-gray-300 font-light tracking-normal flex items-start justify-between">
+              <li key={i} className="text-sm text-gray-200 font-light tracking-normal flex items-start justify-between">
                 <span>{ln}</span>
                 {i===0 && isPlannedRow && (
                   <div className="ml-3 flex items-center gap-3 text-xs">
