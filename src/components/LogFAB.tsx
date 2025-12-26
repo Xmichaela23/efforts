@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CirclePlus, Waves, Bike, Activity, Dumbbell, Move, CircleDot, X } from 'lucide-react';
+import { Plus, Waves, Bike, Activity, Dumbbell, Move, CircleDot, X } from 'lucide-react';
 
 interface LogFABProps {
   onSelectType: (type: string) => void;
@@ -39,7 +39,7 @@ const LogFAB: React.FC<LogFABProps> = ({ onSelectType }) => {
             {isOpen ? (
               <X className="h-7 w-7 stroke-[3.5]" />
             ) : (
-              <CirclePlus className="h-7 w-7" />
+              <Plus className="h-7 w-7 stroke-[3.5]" />
             )}
           </Button>
         </DropdownMenuTrigger>
