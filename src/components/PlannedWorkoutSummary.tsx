@@ -606,22 +606,22 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="flex-1">
-        <div className="font-light tracking-normal text-base text-foreground flex items-center gap-2">
+        <div className="font-light tracking-normal text-base text-white flex items-center gap-2">
           <span>{title}</span>
           <span className="flex items-center gap-1">
             {(typeof minutes === 'number') ? (
-              <span className="px-2 py-0.5 text-xs rounded-lg bg-white/[0.05] backdrop-blur-sm border border-white/15 text-foreground">{formatDuration(minutes)}</span>
+              <span className="px-2 py-0.5 text-xs rounded-lg bg-white/[0.05] backdrop-blur-sm border border-white/15 text-gray-300">{formatDuration(minutes)}</span>
             ) : null}
             {(typeof yards === 'number') ? (
               <span className="px-2 py-0.5 text-xs rounded-lg bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 text-blue-300">{yards} yd</span>
             ) : null}
             {(workout as any)?.workload_planned ? (
-              <span className="px-2 py-0.5 text-xs rounded-lg bg-white/[0.05] backdrop-blur-sm border border-white/15 text-muted-foreground">{(workout as any).workload_planned}</span>
+              <span className="px-2 py-0.5 text-xs rounded-lg bg-white/[0.05] backdrop-blur-sm border border-white/15 text-gray-300">{(workout as any).workload_planned}</span>
             ) : null}
           </span>
         </div>
         {!hideLines && !isStrength && (
-          <div className="text-sm text-muted-foreground mt-1">
+          <div className="text-sm text-gray-300 font-light tracking-normal mt-1">
             {stacked.length > 1 ? (
               <span className="whitespace-pre-line">{stacked.join('\n')}</span>
             ) : (
@@ -630,22 +630,22 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           </div>
         )}
         {!hideLines && !isStrength && enduranceLines.length>0 && (
-          <ul className="list-disc pl-5 mt-1 text-sm text-foreground">
+          <ul className="list-disc pl-5 mt-1 text-sm text-gray-300 font-light tracking-normal">
             {enduranceLines.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}
         {!hideLines && isStrength && (
-          <div className="text-sm text-gray-600 mt-1">
+          <div className="text-sm text-gray-300 font-light tracking-normal mt-1">
             <span>{lines}</span>
           </div>
         )}
         {!hideLines && isStrength && strengthItems.length>0 && (
-          <ul className="list-disc pl-5 mt-1 text-sm text-gray-700">
+          <ul className="list-disc pl-5 mt-1 text-sm text-gray-300 font-light tracking-normal">
             {strengthItems.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}
         {!hideLines && isMobility && mobilityLines.length>0 && (
-          <ul className="list-disc pl-5 mt-1 text-sm text-gray-700">
+          <ul className="list-disc pl-5 mt-1 text-sm text-gray-300 font-light tracking-normal">
             {mobilityLines.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}

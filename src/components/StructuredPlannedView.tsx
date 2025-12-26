@@ -607,7 +607,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       )}
       <div className="p-1">
         {totalSecsFromSteps>0 && (
-          <div className="text-xs text-gray-600 mb-1">Total duration: {(() => { const m=Math.floor(totalSecsFromSteps/60); const s=totalSecsFromSteps%60; return `${m}:${String(s).padStart(2,'0')}`; })()}</div>
+          <div className="text-xs text-gray-300 font-light tracking-normal mb-1">Total duration: {(() => { const m=Math.floor(totalSecsFromSteps/60); const s=totalSecsFromSteps%60; return `${m}:${String(s).padStart(2,'0')}`; })()}</div>
         )}
         <ul className="list-none space-y-1">
           {(lines.length?lines:["No structured steps found."]).map((ln, i)=>{
@@ -615,14 +615,14 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
             const isStrengthContext = (String((workout as any)?.workout_structure?.type||'').toLowerCase()==='strength_session') || (parentDisc === 'strength');
             const isPlannedRow = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';
             return (
-              <li key={i} className="text-sm text-gray-800 flex items-start justify-between">
+              <li key={i} className="text-sm text-gray-300 font-light tracking-normal flex items-start justify-between">
                 <span>{ln}</span>
                 {i===0 && isPlannedRow && (
                   <div className="ml-3 flex items-center gap-3 text-xs">
                     <button
                       type="button"
                       onClick={handleGarminExport}
-                      className="text-gray-600 hover:underline"
+                      className="text-gray-400 hover:text-gray-300 hover:underline font-light transition-colors"
                     >Send to Garmin</button>
                   </div>
                 )}

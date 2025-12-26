@@ -709,7 +709,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       <div className="p-2 border-b">
         {/* Row 1: Title + Attach/Unattach */}
         <div className="flex items-center justify-between">
-          <h2 className="font-light tracking-normal text-lg text-white">
+          <h2 className="font-light tracking-normal text-xl text-white">
             {(() => {
               const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
               if (st) return st;
@@ -826,7 +826,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         
         {/* Row 3: Date */}
         <div>
-            <p className="text-sm text-muted-foreground leading-snug font-sans [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline">
+            <p className="text-sm text-gray-300 font-light tracking-normal leading-snug font-sans [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline">
               {(() => {
                 try {
                   // For completed workouts, use the date field for date and timestamp for time
@@ -890,15 +890,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <TabsList className="grid w-full grid-cols-3 bg-transparent border-none mb-0 py-0">
-          <TabsTrigger value="planned" className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700">
+          <TabsTrigger value="planned" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
             <Calendar className="h-4 w-4" />
             Planned
           </TabsTrigger>
-          <TabsTrigger value="summary" className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700">
+          <TabsTrigger value="summary" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
             <ListCollapse className="h-4 w-4" />
             Summary
           </TabsTrigger>
-          <TabsTrigger value="completed" className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700">
+          <TabsTrigger value="completed" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
             <List className="h-4 w-4" />
             Details
           </TabsTrigger>
