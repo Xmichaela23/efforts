@@ -18,7 +18,7 @@ import NewEffortDropdown from './NewEffortDropdown';
 import LogEffortDropdown from './LogEffortDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
 import ContextTabs from './ContextTabs';
-import LogEffortDropdown from './LogEffortDropdown';
+import LogFAB from './LogFAB';
 import PlansMenu from './PlansMenu';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 import PlansDropdown from './PlansDropdown';
@@ -1264,73 +1264,77 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Bottom Navigation Tab Bar - Standard pattern */}
       {!(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
-        <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center" style={{ paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}>
-          <div className="w-full">
-            <div className="flex justify-center items-center gap-2 pb-3 pt-1">
-                <Button
-                  onClick={() => setActiveBottomNav('home')}
-                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    activeBottomNav === 'home' 
-                      ? 'border-white/30 text-white bg-white/[0.12]' 
-                      : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
-                  }`}
-                  style={{
-                    fontFamily: 'Inter, sans-serif',
-                    padding: '12px 16px',
-                    borderRadius: '1rem',
-                    fontSize: '15px',
-                    minHeight: '48px'
-                  }}
-                >
-                  <Home className="h-5 w-5" />
-                </Button>
-                <Button
-                  onClick={() => setActiveBottomNav('insights')}
-                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    activeBottomNav === 'insights' 
-                      ? 'border-white/30 text-white bg-white/[0.12]' 
-                      : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
-                  }`}
-                  style={{
-                    fontFamily: 'Inter, sans-serif',
-                    padding: '12px 16px',
-                    borderRadius: '1rem',
-                    fontSize: '15px',
-                    minHeight: '48px'
-                  }}
-                >
-                  Context
-                </Button>
-                <PlansMenu
-                  currentPlans={currentPlans}
-                  completedPlans={completedPlans}
-                  onSelectPlan={handleSelectRoutine}
-                  isOpen={plansMenuOpen}
-                  onOpenChange={setPlansMenuOpen}
-                  trigger={
-                    <Button
-                      onClick={() => setPlansMenuOpen(true)}
-                      className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                        plansMenuOpen
-                          ? 'border-white/30 text-white bg-white/[0.12]' 
-                          : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
-                      }`}
-                      style={{
-                        fontFamily: 'Inter, sans-serif',
-                        padding: '12px 16px',
-                        borderRadius: '1rem',
-                        fontSize: '15px',
-                        minHeight: '48px'
-                      }}
-                    >
-                      Plans
-                    </Button>
-                  }
-                />
-              <LogEffortDropdown onSelectType={handleSelectEffortType} />
+        <div className="relative">
+          <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center" style={{ paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}>
+            <div className="w-full">
+              <div className="flex justify-center items-center gap-2 pb-3 pt-1">
+                  <Button
+                    onClick={() => setActiveBottomNav('home')}
+                    className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                      activeBottomNav === 'home' 
+                        ? 'border-white/30 text-white bg-white/[0.12]' 
+                        : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
+                    }`}
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      padding: '12px 16px',
+                      borderRadius: '1rem',
+                      fontSize: '15px',
+                      minHeight: '48px'
+                    }}
+                  >
+                    <Home className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    onClick={() => setActiveBottomNav('insights')}
+                    className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                      activeBottomNav === 'insights' 
+                        ? 'border-white/30 text-white bg-white/[0.12]' 
+                        : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
+                    }`}
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      padding: '12px 16px',
+                      borderRadius: '1rem',
+                      fontSize: '15px',
+                      minHeight: '48px'
+                    }}
+                  >
+                    Context
+                  </Button>
+                  <PlansMenu
+                    currentPlans={currentPlans}
+                    completedPlans={completedPlans}
+                    onSelectPlan={handleSelectRoutine}
+                    isOpen={plansMenuOpen}
+                    onOpenChange={setPlansMenuOpen}
+                    trigger={
+                      <Button
+                        onClick={() => setPlansMenuOpen(true)}
+                        className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                          plansMenuOpen
+                            ? 'border-white/30 text-white bg-white/[0.12]' 
+                            : 'border-white/20 hover:bg-white/[0.10] hover:text-white hover:border-white/25'
+                        }`}
+                        style={{
+                          fontFamily: 'Inter, sans-serif',
+                          padding: '12px 16px',
+                          borderRadius: '1rem',
+                          fontSize: '15px',
+                          minHeight: '48px'
+                        }}
+                      >
+                        Plans
+                      </Button>
+                    }
+                  />
+                </div>
               </div>
             </div>
+          <div className="absolute -top-20 right-6 z-50">
+            <LogFAB onSelectType={handleSelectEffortType} />
           </div>
+        </div>
       )}
     </div>
   );
