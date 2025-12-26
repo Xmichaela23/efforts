@@ -31,7 +31,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [locTried, setLocTried] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [showFade, setShowFade] = useState(true);
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
@@ -148,30 +147,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // Check if any workout is expanded
   const hasExpandedWorkout = Object.values(expanded).some(Boolean);
 
-  // Ensure scroll container maintains proper scroll bounds when content expands/contracts
-  useEffect(() => {
-    const root = scrollRef.current;
-    if (!root) return;
-    
-    // Use requestAnimationFrame to ensure DOM has updated
-    const rafId = requestAnimationFrame(() => {
-      try {
-        // Ensure scroll position stays within valid bounds
-        const maxScroll = Math.max(0, root.scrollHeight - root.clientHeight);
-        if (root.scrollTop > maxScroll) {
-          root.scrollTop = maxScroll;
-        }
-        // Ensure scrollTop is never negative
-        if (root.scrollTop < 0) {
-          root.scrollTop = 0;
-        }
-      } catch {}
-    });
-    
-    return () => cancelAnimationFrame(rafId);
-  }, [hasExpandedWorkout, expanded, displayWorkouts.length]);
-
-  // Toggle bottom fade only when not at bottom using IntersectionObserver sentinel
+  // Toggle bottom fade only when not at bottom using scroll position
   // Hide fade when any workout is expanded
   useEffect(() => {
     if (hasExpandedWorkout) {
@@ -179,19 +155,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       return;
     }
     const root = scrollRef.current;
-    const sentinel = sentinelRef.current;
-    if (!root || !sentinel) return;
-    const io = new IntersectionObserver((entries) => {
-      const entry = entries[0];
-      // If sentinel is visible within scroll container, we are at/near bottom → hide fade
-      setShowFade(!entry.isIntersecting);
-    }, { 
-      root, 
-      rootMargin: '0px',
-      threshold: 0.1 // Lower threshold for more reliable detection
-    });
-    io.observe(sentinel);
-    return () => { try { io.disconnect(); } catch {} };
+    if (!root) return;
+    
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = root;
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px threshold
+      setShowFade(!isAtBottom);
+    };
+    
+    root.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Check initial state
+    
+    return () => {
+      root.removeEventListener('scroll', handleScroll);
+    };
   }, [hasExpandedWorkout]);
 
   const dateWorkoutsMemo = useMemo(() => {
@@ -765,10 +742,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         className="flex-1 overflow-y-auto scrollbar-hide" 
         style={{ 
           WebkitOverflowScrolling: 'touch',
-          minHeight: 0
+          minHeight: 0,
+          maxHeight: '100%',
+          touchAction: 'pan-y',
+          position: 'relative'
         }}
       >
-        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48 }}>
+        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48, paddingTop: 4 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
           <div className="flex items-center justify-center h-full px-4">
@@ -996,8 +976,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </div>
           </div>
         )}
-          {/* Bottom sentinel to detect end-of-list */}
-          <div ref={sentinelRef} style={{ height: 1, minHeight: 1 }} />
+          {/* Bottom spacing */}
+          <div style={{ height: 1 }} />
         </div>
       </div>
       {/* Bottom fade overlay (shown only when not at bottom) */}
