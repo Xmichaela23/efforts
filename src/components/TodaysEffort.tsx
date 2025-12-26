@@ -148,6 +148,29 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // Check if any workout is expanded
   const hasExpandedWorkout = Object.values(expanded).some(Boolean);
 
+  // Ensure scroll container maintains proper scroll bounds when content expands/contracts
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+    
+    // Use requestAnimationFrame to ensure DOM has updated
+    const rafId = requestAnimationFrame(() => {
+      try {
+        // Ensure scroll position stays within valid bounds
+        const maxScroll = Math.max(0, root.scrollHeight - root.clientHeight);
+        if (root.scrollTop > maxScroll) {
+          root.scrollTop = maxScroll;
+        }
+        // Ensure scrollTop is never negative
+        if (root.scrollTop < 0) {
+          root.scrollTop = 0;
+        }
+      } catch {}
+    });
+    
+    return () => cancelAnimationFrame(rafId);
+  }, [hasExpandedWorkout, expanded, displayWorkouts.length]);
+
   // Toggle bottom fade only when not at bottom using IntersectionObserver sentinel
   // Hide fade when any workout is expanded
   useEffect(() => {
@@ -162,10 +185,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       const entry = entries[0];
       // If sentinel is visible within scroll container, we are at/near bottom → hide fade
       setShowFade(!entry.isIntersecting);
-    }, { root, threshold: 1.0 });
+    }, { 
+      root, 
+      rootMargin: '0px',
+      threshold: 0.1 // Lower threshold for more reliable detection
+    });
     io.observe(sentinel);
     return () => { try { io.disconnect(); } catch {} };
-  }, [scrollRef, sentinelRef, hasExpandedWorkout]);
+  }, [hasExpandedWorkout]);
 
   const dateWorkoutsMemo = useMemo(() => {
     const items = Array.isArray(unifiedItems) ? unifiedItems : [];
@@ -741,7 +768,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           minHeight: 0
         }}
       >
-        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 80 : 48 }}>
+        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
           <div className="flex items-center justify-center h-full px-4">
@@ -804,22 +831,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           <button
                             className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
                             onClick={(e)=>{ 
-                              e.preventDefault(); e.stopPropagation(); 
+                              e.preventDefault(); 
+                              e.stopPropagation(); 
                               const key = String(workout.id);
-                              const willOpen = !expanded[key];
                               toggleExpanded(key);
-                              if (willOpen) {
-                                try {
-                                  const root = scrollRef.current;
-                                  const btn = (e.currentTarget as HTMLElement);
-                                  const card = btn.closest('button');
-                                  if (root && card) {
-                                    const rootTop = root.getBoundingClientRect().top;
-                                    const cardTop = (card as HTMLElement).getBoundingClientRect().top;
-                                    root.scrollTo({ top: root.scrollTop + (cardTop - rootTop) - 12, behavior: 'smooth' });
-                                  }
-                                } catch {}
-                              }
                             }}
                           >
                             {expanded[String(workout.id)] ? 'hide' : 'details'}
@@ -982,7 +997,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         )}
           {/* Bottom sentinel to detect end-of-list */}
-          <div ref={sentinelRef} style={{ height: hasExpandedWorkout ? 40 : 1, minHeight: hasExpandedWorkout ? 40 : 1 }} />
+          <div ref={sentinelRef} style={{ height: 1, minHeight: 1 }} />
         </div>
       </div>
       {/* Bottom fade overlay (shown only when not at bottom) */}
