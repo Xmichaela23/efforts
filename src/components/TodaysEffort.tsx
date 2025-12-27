@@ -834,15 +834,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         style={{ position: 'relative', zIndex: 1 }}
       >
         <div className="space-y-1">
-          {/* Line 1: Date + Week (left) | Event (right) */}
+          {/* Line 1: Date (left) | Event (right) */}
           <div className="flex justify-between items-baseline gap-2">
             <span className="text-lg font-light tracking-wide text-foreground">
               {formatDisplayDate(activeDate)}
-              {trainingPlanContext?.currentWeek && (
-                <span className="text-lg font-light tracking-wide text-foreground">
-                  {' • Week '}{trainingPlanContext.currentWeek}
-                </span>
-              )}
             </span>
             {/* Event countdown - right aligned, amber for future goals */}
             {trainingPlanContext && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
@@ -852,10 +847,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             )}
           </div>
 
-          {/* Line 2: Focus (subtle subtitle, no bullet) */}
-          {trainingPlanContext?.focus && (
+          {/* Line 2: Week + Focus (same line, same size) */}
+          {trainingPlanContext && (trainingPlanContext.currentWeek || trainingPlanContext.focus) && (
             <div className="text-sm text-white/60 font-light tracking-normal">
-              {trainingPlanContext.focus}
+              {trainingPlanContext.currentWeek && (
+                <span>Week {trainingPlanContext.currentWeek}</span>
+              )}
+              {trainingPlanContext.currentWeek && trainingPlanContext.focus && (
+                <span> • </span>
+              )}
+              {trainingPlanContext.focus && (
+                <span>{trainingPlanContext.focus}</span>
+              )}
             </div>
           )}
 
