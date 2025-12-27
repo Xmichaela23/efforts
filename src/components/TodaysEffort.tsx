@@ -164,12 +164,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           }
         );
         const data = await response.json();
-        const city = data.address?.city || 
-                     data.address?.town || 
-                     data.address?.village || 
-                     data.address?.municipality ||
-                     data.address?.county ||
-                     null;
+        let city = data.address?.city || 
+                   data.address?.town || 
+                   data.address?.village || 
+                   data.address?.municipality ||
+                   data.address?.county ||
+                   null;
+        
+        // Make city names clearer for well-known cities
+        if (city) {
+          const cityLower = city.toLowerCase();
+          // New York -> New York City
+          if (cityLower === 'new york' || cityLower.includes('new york') && !cityLower.includes('city')) {
+            city = 'New York City';
+          }
+          // Los Angeles -> Los Angeles (already clear)
+          // San Francisco -> San Francisco (already clear)
+          // Chicago -> Chicago (already clear)
+          // etc.
+        }
+        
         setCityName(city);
       } catch (err) {
         // Silently fail - city name is optional
