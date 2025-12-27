@@ -800,7 +800,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   key={workout.id}
                   className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg ${
                     workout.workout_status === 'completed'
-                      ? 'bg-green-500/20 backdrop-blur-sm border border-green-400/30 text-white'
+                      ? 'bg-cyan-600/20 backdrop-blur-sm border border-cyan-700/30 text-white'
                       : 'bg-white/[0.05] backdrop-blur-lg border border-white/15 text-gray-300'
                   }`}
                 >
@@ -978,7 +978,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             <span className="text-xs ml-2 text-muted-foreground">(planned)</span>
                           )}
                           {workout.workout_status === 'completed' && (
-                            <span className="ml-2 text-green-400">✓</span>
+                            <span className="ml-2 text-cyan-600">✓</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs">

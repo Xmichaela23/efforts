@@ -695,7 +695,7 @@ export default function WorkoutCalendar({
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
                         className={`cursor-pointer text-xs px-2 py-1 rounded-xl w-full text-center truncate border transition-all backdrop-blur-sm font-light tracking-wide ${
                           isCompleted 
-                            ? 'bg-green-500/20 backdrop-blur-sm border border-green-400/30 text-white hover:bg-green-500/25 shadow-sm'
+                            ? 'bg-cyan-600/20 backdrop-blur-sm border border-cyan-700/30 text-white hover:bg-cyan-600/25 shadow-sm'
                             : 'bg-white/[0.08] backdrop-blur-sm border border-white/20 text-gray-300 hover:bg-white/[0.12] shadow-sm hover:shadow'
                         }`}
                       >
