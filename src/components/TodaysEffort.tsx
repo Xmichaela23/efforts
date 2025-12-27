@@ -30,6 +30,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [baselines, setBaselines] = useState<any | null>(null);
   const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [locTried, setLocTried] = useState(false);
+  const [cityName, setCityName] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [showFade, setShowFade] = useState(true);
 
@@ -143,6 +144,41 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       });
     } catch {}
   }, [activeDate, today, dayLoc, locTried]);
+
+  // Reverse geocoding to get city name from coordinates
+  useEffect(() => {
+    if (!dayLoc || activeDate !== today) {
+      setCityName(null);
+      return;
+    }
+
+    // Use OpenStreetMap Nominatim for reverse geocoding (free, no API key needed)
+    const fetchCityName = async () => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${dayLoc.lat}&lon=${dayLoc.lng}&format=json&addressdetails=1`,
+          {
+            headers: {
+              'User-Agent': 'Efforts App' // Required by Nominatim
+            }
+          }
+        );
+        const data = await response.json();
+        const city = data.address?.city || 
+                     data.address?.town || 
+                     data.address?.village || 
+                     data.address?.municipality ||
+                     data.address?.county ||
+                     null;
+        setCityName(city);
+      } catch (err) {
+        // Silently fail - city name is optional
+        setCityName(null);
+      }
+    };
+
+    fetchCityName();
+  }, [dayLoc, activeDate, today]);
 
   // Check if any workout is expanded
   const hasExpandedWorkout = Object.values(expanded).some(Boolean);
@@ -747,17 +783,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         className="flex items-center justify-between mb-2 px-4 flex-shrink-0" 
         style={{ position: 'relative', zIndex: 1 }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-light tracking-normal text-foreground">
-            {formatDisplayDate(activeDate)}
-          </span>
-          {/* Effort count removed for space */}
-          {/* Weather chip (explicit-location only) */}
-          {weather && (
-            <span className="text-xs text-muted-foreground">
-              · {Math.round(weather.temperature)}°F {weather.condition}
-              {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
-              {weather.sunrise && weather.sunset ? (()=>{ try { const fmt=(iso:string)=>{ const d=new Date(iso); return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, m=> m.trim().toLowerCase()); }; return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; } catch { return '';} })() : ''}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-light tracking-normal text-foreground">
+              {formatDisplayDate(activeDate)}
+            </span>
+            {/* Effort count removed for space */}
+            {/* Weather chip (explicit-location only) */}
+            {weather && (
+              <span className="text-xs text-muted-foreground">
+                · {Math.round(weather.temperature)}°F {weather.condition}
+                {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
+                {weather.sunrise && weather.sunset ? (()=>{ try { const fmt=(iso:string)=>{ const d=new Date(iso); return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, m=> m.trim().toLowerCase()); }; return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; } catch { return '';} })() : ''}
+              </span>
+            )}
+          </div>
+          {/* City name from geolocation */}
+          {cityName && (
+            <span className="text-xs text-muted-foreground font-light tracking-normal">
+              {cityName}
             </span>
           )}
         </div>
