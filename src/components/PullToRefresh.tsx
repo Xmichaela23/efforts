@@ -29,6 +29,22 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thre
 
     const onTouchMove = (e: TouchEvent) => {
       if (!pullingRef.current || startYRef.current == null) return;
+      
+      // Check if touch is inside a scrollable container - if so, don't interfere
+      const target = e.target as HTMLElement;
+      if (target) {
+        const scrollableParent = target.closest('[style*="overflow"], [class*="overflow"]');
+        if (scrollableParent) {
+          const computedStyle = window.getComputedStyle(scrollableParent as Element);
+          if (computedStyle.overflowY === 'auto' || computedStyle.overflowY === 'scroll') {
+            // User is scrolling inside a nested container - don't interfere
+            pullingRef.current = false;
+            startYRef.current = null;
+            return;
+          }
+        }
+      }
+      
       const dy = e.touches[0].clientY - startYRef.current;
       if (dy > 0) {
         // Apply easing
