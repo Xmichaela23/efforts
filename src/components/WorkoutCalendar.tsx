@@ -666,7 +666,7 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-2xl shadow-lg p-3 flex flex-col justify-between items-stretch",
+                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/20 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-3 flex flex-col justify-between items-stretch",
                 "hover:bg-white/[0.05] transition-all",
               ].join(" ")}
             >
@@ -695,8 +695,8 @@ export default function WorkoutCalendar({
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
                         className={`cursor-pointer text-xs px-2 py-1 rounded-xl w-full text-center truncate border transition-all backdrop-blur-sm font-light tracking-wide ${
                           isCompleted 
-                            ? 'bg-cyan-600/20 backdrop-blur-sm border border-cyan-700/30 text-white hover:bg-cyan-600/25 shadow-sm'
-                            : 'bg-white/[0.08] backdrop-blur-sm border border-white/20 text-gray-300 hover:bg-white/[0.12] shadow-sm hover:shadow'
+                            ? 'bg-cyan-600/20 backdrop-blur-sm border border-cyan-500/40 text-white hover:bg-cyan-600/25 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(6,182,212,0.15)_inset,0_2px_8px_rgba(0,0,0,0.2)]'
+                            : 'bg-white/[0.08] backdrop-blur-sm border border-white/25 text-gray-300 hover:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'
                         }`}
                       >
                         {evt.label}
@@ -731,7 +731,7 @@ export default function WorkoutCalendar({
           return (
             <div 
               key={`empty-${index}`}
-              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-2xl shadow-lg p-3 flex flex-col justify-start items-start ${
+              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/20 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-3 flex flex-col justify-start items-start ${
                 isLastCell ? 'col-span-2' : ''
               }`}
             >

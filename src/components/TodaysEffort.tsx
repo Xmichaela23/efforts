@@ -800,8 +800,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   key={workout.id}
                   className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg ${
                     workout.workout_status === 'completed'
-                      ? 'bg-cyan-600/20 backdrop-blur-sm border border-cyan-700/30 text-white'
-                      : 'bg-white/[0.05] backdrop-blur-lg border border-white/15 text-gray-300'
+                      ? 'bg-cyan-600/20 backdrop-blur-sm border border-cyan-500/40 text-white shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]'
+                      : 'bg-white/[0.05] backdrop-blur-lg border border-white/25 text-gray-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]'
                   }`}
                 >
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
@@ -817,7 +817,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {isEnduranceType(workout.type || workout.workout_type || '') && (
                             <button
-                              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
+                              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/40 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.12)_inset,0_2px_8px_rgba(0,0,0,0.2)]"
                               onClick={(e) => handleSendToGarmin(e, workout)}
                             >
                               {sendingToGarmin === workout.id ? 'Sending...' : 'Send to Garmin'}
@@ -825,7 +825,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           )}
                           {isStrengthOrMobility(workout.type || workout.workout_type || '') && (
                             <button
-                              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
+                              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/40 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.12)_inset,0_2px_8px_rgba(0,0,0,0.2)]"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
