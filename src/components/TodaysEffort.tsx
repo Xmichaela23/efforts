@@ -1070,50 +1070,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       </div>
       {/* Bottom fade overlay (shown only when not at bottom) */}
       {showFade && (
-        <>
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 40,
-              pointerEvents: 'none',
-              background:
-                'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 55%, rgba(255,255,255,1) 100%)',
-              boxShadow: 'inset 0 -10px 16px rgba(0,0,0,0.04)'
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              bottom: 8,
-              display: 'flex',
-              justifyContent: 'center',
-              pointerEvents: 'none'
-            }}
-          >
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 22,
-                height: 22,
-                borderRadius: 9999,
-                background: 'rgba(255,255,255,0.9)',
-                color: 'rgba(0,0,0,0.38)',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </span>
-          </div>
-        </>
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 40,
+            pointerEvents: 'none',
+            background:
+              'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 55%, rgba(0,0,0,0.8) 100%)',
+            boxShadow: 'inset 0 -10px 16px rgba(0,0,0,0.2)'
+          }}
+        />
       )}
     </div>
   );
