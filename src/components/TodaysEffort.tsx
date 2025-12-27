@@ -833,24 +833,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         className="mb-2 px-4 flex-shrink-0" 
         style={{ position: 'relative', zIndex: 1 }}
       >
-        <div className="flex flex-col gap-2">
-          {/* Primary line: Training context (Date, Week, Focus) + Event countdown */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-lg font-light tracking-wide text-foreground">
-                {formatDisplayDate(activeDate)}
-              </span>
+        <div className="space-y-1">
+          {/* Line 1: Date + Week (left) | Event (right) */}
+          <div className="flex justify-between items-baseline gap-2">
+            <span className="text-lg font-light tracking-wide text-foreground">
+              {formatDisplayDate(activeDate)}
               {trainingPlanContext?.currentWeek && (
                 <span className="text-lg font-light tracking-wide text-foreground">
-                  • Week {trainingPlanContext.currentWeek}
+                  {' • Week '}{trainingPlanContext.currentWeek}
                 </span>
               )}
-              {trainingPlanContext?.focus && (
-                <span className="text-lg font-light tracking-wide text-foreground">
-                  • {trainingPlanContext.focus}
-                </span>
-              )}
-            </div>
+            </span>
             {/* Event countdown - right aligned, amber for future goals */}
             {trainingPlanContext && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
               <span className="text-sm font-light text-amber-400/60 tracking-wide flex-shrink-0">
@@ -859,7 +852,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             )}
           </div>
 
-          {/* Secondary line: Weather + Location */}
+          {/* Line 2: Focus (subtle subtitle, no bullet) */}
+          {trainingPlanContext?.focus && (
+            <div className="text-sm text-white/60 font-light tracking-normal">
+              {trainingPlanContext.focus}
+            </div>
+          )}
+
+          {/* Line 3: Weather + Location */}
           {weather && (
             <div className="flex items-center gap-1 flex-wrap">
               <span className="text-sm font-light text-white/60 tracking-normal">
