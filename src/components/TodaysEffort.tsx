@@ -39,7 +39,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const activeDate = selectedDate || today;
 
   // Unified single-source lookup for the active date
-  const { items: unifiedItems = [], loading: unifiedLoading } = useWeekUnified(activeDate, activeDate);
+  const { items: unifiedItems = [], loading: unifiedLoading, trainingPlanContext } = useWeekUnified(activeDate, activeDate);
 
   // No persistence: we will use ephemeral geolocation below for today's weather
   // Hard fetch of sets for today's completed strength if missing (dev-time only)
@@ -798,22 +798,47 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         style={{ position: 'relative', zIndex: 1 }}
       >
         <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-light tracking-normal text-foreground">
               {formatDisplayDate(activeDate)}
             </span>
-            {/* Effort count removed for space */}
-            {/* Weather chip (explicit-location only) */}
-            {weather && (
+            {/* Week focus and weeks to event */}
+            {trainingPlanContext && (trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
+              <>
+                {trainingPlanContext.focus && (
+                  <span className="text-xs text-muted-foreground">
+                    · {trainingPlanContext.focus}
+                  </span>
+                )}
+                {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && (
+                  <span className="text-gray-400">·</span>
+                )}
+                {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          {/* Weather below date */}
+          {weather && (
+            <div className="flex items-center gap-1 flex-wrap">
               <span className="text-xs text-muted-foreground">
-                · {Math.round(weather.temperature)}°F {weather.condition}
+                {Math.round(weather.temperature)}°F {weather.condition}
                 {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
                 {weather.sunrise && weather.sunset ? (()=>{ try { const fmt=(iso:string)=>{ const d=new Date(iso); return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, m=> m.trim().toLowerCase()); }; return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; } catch { return '';} })() : ''}
               </span>
-            )}
-          </div>
-          {/* City name from geolocation */}
-          {cityName && (
+              {/* City name from geolocation */}
+              {cityName && (
+                <span className="text-xs text-muted-foreground font-light tracking-normal">
+                  · {cityName}
+                </span>
+              )}
+            </div>
+          )}
+          {/* City name only if no weather */}
+          {!weather && cityName && (
             <span className="text-xs text-muted-foreground font-light tracking-normal">
               {cityName}
             </span>
@@ -1077,18 +1102,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       </div>
       {/* Bottom fade overlay (shown only when not at bottom) */}
       {showFade && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 40,
-            pointerEvents: 'none',
-            background:
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 40,
+              pointerEvents: 'none',
+              background:
               'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 55%, rgba(0,0,0,0.8) 100%)',
             boxShadow: 'inset 0 -10px 16px rgba(0,0,0,0.2)'
-          }}
+              }}
         />
       )}
     </div>
