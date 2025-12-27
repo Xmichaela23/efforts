@@ -38,8 +38,44 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const today = new Date().toLocaleDateString('en-CA');
   const activeDate = selectedDate || today;
 
-  // Unified single-source lookup for the active date
-  const { items: unifiedItems = [], loading: unifiedLoading, trainingPlanContext } = useWeekUnified(activeDate, activeDate);
+  // Helper functions for week calculation
+  const startOfWeek = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    d.setHours(0, 0, 0, 0);
+    const diff = (day + 6) % 7;
+    d.setDate(d.getDate() - diff);
+    return d;
+  };
+
+  const addDays = (date: Date, n: number) => {
+    const d = new Date(date);
+    d.setDate(d.getDate() + n);
+    return d;
+  };
+
+  const toDateOnlyString = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
+  // Calculate week range for training plan context (needs week range to work properly)
+  const activeDateObj = new Date(activeDate + 'T12:00:00');
+  const weekStart = startOfWeek(activeDateObj);
+  const weekEnd = addDays(weekStart, 6);
+  const fromISO = toDateOnlyString(weekStart);
+  const toISO = toDateOnlyString(weekEnd);
+
+  // Unified lookup - use week range for training plan context, but filter items to active date
+  const { items: allUnifiedItems = [], loading: unifiedLoading, trainingPlanContext } = useWeekUnified(fromISO, toISO);
+  
+  // Filter to only items for the active date
+  const unifiedItems = allUnifiedItems.filter((item: any) => {
+    const itemDate = String(item?.date || '').slice(0, 10);
+    return itemDate === activeDate;
+  });
 
   // No persistence: we will use ephemeral geolocation below for today's weather
   // Hard fetch of sets for today's completed strength if missing (dev-time only)
