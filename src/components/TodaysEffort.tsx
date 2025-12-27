@@ -946,7 +946,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       })()}
                     </div>
                   ) : (
-                    <div className="space-y-1">
+                    <div 
+                      className="space-y-1 cursor-pointer"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onEditEffort && onEditEffort(workout);
+                      }}
+                    >
                       {/* Title and Duration Row */}
                       <div className="flex items-center justify-between">
                         <div className="font-light tracking-normal text-base text-foreground">
