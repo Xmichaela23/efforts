@@ -838,8 +838,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             <span className="text-sm font-light tracking-normal text-foreground">
               {formatDisplayDate(activeDate)}
             </span>
-            {/* Week focus and weeks to event */}
-            {trainingPlanContext && (trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
+            {/* Week focus */}
+            {trainingPlanContext && trainingPlanContext.focus && (
               <>
                 {trainingPlanContext.currentWeek && (
                   <span className="text-xs text-muted-foreground">
@@ -852,14 +852,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 {trainingPlanContext.focus && (
                   <span className="text-xs text-muted-foreground">
                     {trainingPlanContext.focus}
-                  </span>
-                )}
-                {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && (
-                  <span className="text-gray-400">·</span>
-                )}
-                {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
                   </span>
                 )}
               </>
@@ -886,6 +878,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             <span className="text-xs text-muted-foreground font-light tracking-normal">
               {cityName}
             </span>
+          )}
+          {/* Weeks to event - centered below weather */}
+          {trainingPlanContext && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
+            <div className="flex items-center justify-center mt-1">
+              <span className="text-xs text-muted-foreground">
+                {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
+              </span>
+            </div>
           )}
         </div>
       </div>
