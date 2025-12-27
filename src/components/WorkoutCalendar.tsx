@@ -699,7 +699,20 @@ export default function WorkoutCalendar({
                             : 'bg-white/[0.08] backdrop-blur-sm border border-white/25 text-gray-300 hover:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'
                         }`}
                       >
-                        {evt.label}
+                        {(() => {
+                          const label = String(evt.label || '');
+                          const hasCheckmark = /✓+$/.test(label);
+                          if (hasCheckmark && isCompleted) {
+                            const labelText = label.replace(/✓+$/, '').trim();
+                            return (
+                              <>
+                                {labelText}
+                                <span className="text-cyan-600"> ✓</span>
+                              </>
+                            );
+                          }
+                          return label;
+                        })()}
                       </span>
                     );
                   })
