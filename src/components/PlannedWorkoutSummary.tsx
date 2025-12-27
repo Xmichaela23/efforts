@@ -610,7 +610,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           <span>{title}</span>
           <span className="flex items-center gap-1">
             {(typeof minutes === 'number') ? (
-              <span className="text-xs text-blue-300 font-light">{minutes}:00</span>
+              <span className="text-xs text-white font-light">{minutes}:00</span>
             ) : null}
             {(typeof yards === 'number') ? (
               <span className="px-2 py-0.5 text-xs rounded-lg bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 text-blue-300">{yards} yd</span>
