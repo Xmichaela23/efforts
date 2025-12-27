@@ -841,9 +841,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* Week focus and weeks to event */}
             {trainingPlanContext && (trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
               <>
+                {trainingPlanContext.currentWeek && (
+                  <span className="text-xs text-muted-foreground">
+                    · Week {trainingPlanContext.currentWeek}
+                  </span>
+                )}
+                {trainingPlanContext.currentWeek && trainingPlanContext.focus && (
+                  <span className="text-gray-400">·</span>
+                )}
                 {trainingPlanContext.focus && (
                   <span className="text-xs text-muted-foreground">
-                    · {trainingPlanContext.focus}
+                    {trainingPlanContext.focus}
                   </span>
                 )}
                 {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && (
