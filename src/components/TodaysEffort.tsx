@@ -834,27 +834,32 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         style={{ position: 'relative', zIndex: 1 }}
       >
         <div className="flex flex-col gap-2">
-          {/* Primary line: Date and Week */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          {/* Primary line: Training context (Date, Week, Focus) + Event countdown */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-lg font-light tracking-wide text-foreground">
                 {formatDisplayDate(activeDate)}
-                {trainingPlanContext?.currentWeek && (
-                  <span className="text-lg font-light tracking-wide text-foreground">
-                    {' • Week '}{trainingPlanContext.currentWeek}
-                  </span>
-                )}
               </span>
+              {trainingPlanContext?.currentWeek && (
+                <span className="text-lg font-light tracking-wide text-foreground">
+                  • Week {trainingPlanContext.currentWeek}
+                </span>
+              )}
+              {trainingPlanContext?.focus && (
+                <span className="text-lg font-light tracking-wide text-foreground">
+                  • {trainingPlanContext.focus}
+                </span>
+              )}
             </div>
-            {/* Event countdown - right aligned */}
+            {/* Event countdown - right aligned, amber for future goals */}
             {trainingPlanContext && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-              <span className="text-sm font-light text-cyan-400 tracking-wide">
+              <span className="text-sm font-light text-amber-400/60 tracking-wide flex-shrink-0">
                 {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
               </span>
             )}
           </div>
 
-          {/* Secondary line: Weather details */}
+          {/* Secondary line: Weather + Location */}
           {weather && (
             <div className="flex items-center gap-1 flex-wrap">
               <span className="text-sm font-light text-white/60 tracking-normal">
@@ -865,7 +870,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               {/* City name from geolocation */}
               {cityName && (
                 <span className="text-sm font-light text-white/60 tracking-normal">
-                  · {cityName}
+                  • {cityName}
                 </span>
               )}
             </div>
@@ -875,15 +880,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             <span className="text-sm font-light text-white/60 tracking-normal">
               {cityName}
             </span>
-          )}
-
-          {/* Focus badge - separate, subtle */}
-          {trainingPlanContext && trainingPlanContext.focus && (
-            <div className="flex items-center">
-              <span className="bg-white/[0.08] border border-white/10 rounded-full px-3 py-1 text-xs font-light tracking-normal text-foreground">
-                {trainingPlanContext.focus}
-              </span>
-            </div>
           )}
         </div>
       </div>
