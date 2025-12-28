@@ -237,6 +237,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Toggle bottom fade only when not at bottom using scroll position
   // Hide fade when any workout is expanded
+  // Fade should show when there's scrollable content and not at bottom
   useEffect(() => {
     if (hasExpandedWorkout) {
       setShowFade(false);
@@ -247,8 +248,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = root;
+      const hasScrollableContent = scrollHeight > clientHeight;
       const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px threshold
-      setShowFade(!isAtBottom);
+      // Show fade when there's scrollable content AND not at bottom
+      setShowFade(hasScrollableContent && !isAtBottom);
     };
     
     root.addEventListener('scroll', handleScroll, { passive: true });
