@@ -26,7 +26,7 @@ const App = () => (
 <ThemeProvider defaultTheme="light">
 <QueryClientProvider client={queryClient}>
 <AppProvider>
-<TooltipProvider>
+<TooltipProvider delayDuration={300} disableHoverableContent>
 <Toaster />
 <Sonner />
 <BrowserRouter>

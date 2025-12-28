@@ -259,6 +259,7 @@ export default function WorkoutCalendar({
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
+  const [workloadTooltipOpen, setWorkloadTooltipOpen] = useState(false);
   const { useImperial } = useAppContext();
 
   // Week bounds for planned fetch
@@ -754,13 +755,21 @@ export default function WorkoutCalendar({
                   {/* Total Workload with counts */}
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-light tracking-normal">Total Workload</span>
-                    <Tooltip>
+                    <Tooltip open={workloadTooltipOpen} onOpenChange={setWorkloadTooltipOpen} delayDuration={0}>
                       <TooltipTrigger asChild>
-                        <button type="button" className="inline-flex items-center">
-                          <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help" />
+                        <button 
+                          type="button" 
+                          className="inline-flex items-center touch-manipulation"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setWorkloadTooltipOpen(!workloadTooltipOpen);
+                          }}
+                        >
+                          <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs">
+                      <TooltipContent side="top" className="max-w-xs" sideOffset={8}>
                         <div className="text-xs space-y-2">
                           <div>
                             <strong>Total Workload</strong>
