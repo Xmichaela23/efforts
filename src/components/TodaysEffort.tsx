@@ -846,7 +846,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </span>
           </div>
 
-          {/* Line 2: Week + Focus + Event (all training context together) */}
+          {/* Line 2: Weather + Location (weather only for today) */}
+          {(weather || cityName) && (
+            <div className="flex items-center gap-1 flex-wrap">
+              {weather && isTodayDate && (
+                <span className="text-sm font-light text-white/60 tracking-normal">
+                  {Math.round(weather.temperature)}°F {weather.condition}
+                  {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
+                  {weather.sunrise && weather.sunset ? (()=>{ try { const fmt=(iso:string)=>{ const d=new Date(iso); return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, m=> m.trim().toLowerCase()); }; return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; } catch { return '';} })() : ''}
+                </span>
+              )}
+              {/* City name from geolocation (show for any date if available) */}
+              {cityName && (
+                <span className="text-sm font-light text-white/60 tracking-normal">
+                  {weather && isTodayDate ? ' • ' : ''}{cityName}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Line 3: Week + Focus + Event (all training context together) */}
           {trainingPlanContext && (trainingPlanContext.currentWeek || trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
             <div className="text-sm text-white/60 font-light tracking-normal">
               {trainingPlanContext.currentWeek && (
@@ -864,25 +883,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
                 <span className="text-amber-400/60">
                   {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Line 3: Weather + Location (weather only for today) */}
-          {(weather || cityName) && (
-            <div className="flex items-center gap-1 flex-wrap">
-              {weather && isTodayDate && (
-                <span className="text-sm font-light text-white/60 tracking-normal">
-                  {Math.round(weather.temperature)}°F {weather.condition}
-                  {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
-                  {weather.sunrise && weather.sunset ? (()=>{ try { const fmt=(iso:string)=>{ const d=new Date(iso); return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, m=> m.trim().toLowerCase()); }; return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; } catch { return '';} })() : ''}
-                </span>
-              )}
-              {/* City name from geolocation (show for any date if available) */}
-              {cityName && (
-                <span className="text-sm font-light text-white/60 tracking-normal">
-                  {weather && isTodayDate ? ' • ' : ''}{cityName}
                 </span>
               )}
             </div>
