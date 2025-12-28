@@ -1210,7 +1210,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : selectedWorkout ? (
-            <div className="pt-4 h-full">
+            <div className="pt-4 h-full" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
               <UnifiedWorkoutView
                 workout={selectedWorkout}
                 onUpdateWorkout={handleUpdateWorkout}
@@ -1262,15 +1262,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         </PullToRefresh>
       </main>
 
-      {/* Bottom Navigation Tab Bar - Standard pattern */}
-      {!(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext || workoutBeingEdited) && (
+      {/* Bottom Navigation Tab Bar - Show on all screens (except loggers and builder) */}
+      {!(showStrengthLogger || showPilatesYogaLogger || showBuilder || workoutBeingEdited) && (
         <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center" style={{ paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}>
           <div className="w-full">
             <div className="flex justify-center items-center gap-2 pb-3 pt-1">
                 <Button
-                  onClick={() => setActiveBottomNav('home')}
+                  onClick={() => {
+                    // Close any open views and navigate to home
+                    if (selectedWorkout || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext) {
+                      handleBackToDashboard();
+                    }
+                    setActiveBottomNav('home');
+                  }}
                   className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    activeBottomNav === 'home' 
+                    activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showContext
                       ? 'border-white/50 text-white bg-white/[0.12]' 
                       : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
                   }`}
@@ -1286,9 +1292,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   <Home className="h-5 w-5" />
                 </Button>
                 <Button
-                  onClick={() => setActiveBottomNav('insights')}
+                  onClick={() => {
+                    // Close any open views and navigate to context
+                    if (selectedWorkout || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines) {
+                      handleBackToDashboard();
+                    }
+                    setShowContext(false);
+                    setActiveBottomNav('insights');
+                  }}
                   className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    activeBottomNav === 'insights' 
+                    activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines
                       ? 'border-white/50 text-white bg-white/[0.12]' 
                       : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
                   }`}
@@ -1311,7 +1324,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   onOpenChange={setPlansMenuOpen}
                   trigger={
               <Button
-                        onClick={() => setPlansMenuOpen(true)}
+                        onClick={() => {
+                          // Close workout detail view if open
+                          if (selectedWorkout) {
+                            handleBackToDashboard();
+                          }
+                          setPlansMenuOpen(true);
+                        }}
                         className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
                           plansMenuOpen
                             ? 'border-white/50 text-white bg-white/[0.12]' 
