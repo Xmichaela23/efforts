@@ -81,6 +81,9 @@
     /* Prevent mobile zoom on input focus */
     -webkit-text-size-adjust: 100%;
     -ms-text-size-adjust: 100%;
+    /* Dark background to prevent white showing on overscroll */
+    background: #000000;
+    overscroll-behavior: none;
   }
   
   body {
@@ -93,6 +96,8 @@
     overflow-x: hidden;
     /* Improve mobile scrolling */
     -webkit-overflow-scrolling: touch;
+    /* Prevent white background on overscroll */
+    overscroll-behavior: none;
     /* Refined monochromatic gradient for sophisticated depth - strengthened for visibility */
     background: linear-gradient(to bottom, #27272a, #18181b, #000000);
     /* Enhanced gradient overlays for glassmorphism blur effect */
@@ -107,6 +112,8 @@
   
   #root {
     height: 100%;
+    /* Dark background to prevent white showing through */
+    background: #000000;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -154,6 +161,10 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 0;
+    /* Prevent white background on overscroll */
+    overscroll-behavior: none;
+    /* Ensure dark background */
+    background: transparent;
   }
 
   /* 🆕 NEW: Sliding container for calendar and summary */
