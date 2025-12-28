@@ -628,7 +628,8 @@ function buildSplit(samples: Sample[], s: number, e: number): Split {
 function computeSplits(samples: Sample[], metersPerSplit: number): Split[] {
   if (samples.length < 2) return [];
   const out: Split[] = [];
-  let start = 0, next = samples[0].d_m + metersPerSplit;
+  // Start from distance 0, not samples[0].d_m, to ensure first split (mile 1) is included
+  let start = 0, next = metersPerSplit;
   for (let i = 1; i < samples.length; i++) {
     if (samples[i].d_m >= next) { out.push(buildSplit(samples, start, i)); start = i + 1; next += metersPerSplit; }
   }
