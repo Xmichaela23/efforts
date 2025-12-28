@@ -719,15 +719,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           {/* Attach/Unattach button - moved here */}
           {isCompleted && (
             (!currentPlannedId && !linkedPlanned) ? (
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
                 onClick={()=>setAssocOpen(true)}
-              >Attach</Button>
+                className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                }}
+              >Attach</button>
             ) : (
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
                 onClick={async()=>{
                   try {
                     const pid = String(currentPlannedId || (linkedPlanned as any)?.id || '');
@@ -746,7 +746,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     setActiveTab('completed');
                   } catch {}
                 }}
-              >Unattach</Button>
+                className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                }}
+              >Unattach</button>
             )
           )}
         </div>
