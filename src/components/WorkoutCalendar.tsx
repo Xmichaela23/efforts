@@ -7,7 +7,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle, Info } from 'lucide-react';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -755,8 +755,8 @@ export default function WorkoutCalendar({
                   {/* Total Workload with counts */}
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-light tracking-normal">Total Workload</span>
-                    <Tooltip open={workloadTooltipOpen} onOpenChange={setWorkloadTooltipOpen} delayDuration={0}>
-                      <TooltipTrigger asChild>
+                    <Popover open={workloadTooltipOpen} onOpenChange={setWorkloadTooltipOpen}>
+                      <PopoverTrigger asChild>
                         <button 
                           type="button" 
                           className="inline-flex items-center touch-manipulation"
@@ -768,8 +768,8 @@ export default function WorkoutCalendar({
                         >
                           <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
                         </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs" sideOffset={8}>
+                      </PopoverTrigger>
+                      <PopoverContent side="top" className="max-w-xs p-4" sideOffset={8}>
                         <div className="text-xs space-y-2">
                           <div>
                             <strong>Total Workload</strong>
@@ -795,8 +795,8 @@ export default function WorkoutCalendar({
                             <strong>Why it matters:</strong> Use this to balance hard weeks (high workload) with recovery weeks (lower workload) and track your training progression over time.
                           </div>
                         </div>
-                      </TooltipContent>
-                    </Tooltip>
+                      </PopoverContent>
+                    </Popover>
                     <div className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
                       <span className="text-sm">{weeklyStats.planned}</span>
