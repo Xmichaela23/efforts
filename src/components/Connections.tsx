@@ -16,8 +16,11 @@ import {
   Menu,
   User,
   Upload,
-  Link
+  Link,
+  Home
 } from 'lucide-react';
+import PlansMenu from './PlansMenu';
+import LogFAB from './LogFAB';
 import { useToast } from './ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '../lib/supabase';
@@ -69,6 +72,7 @@ const Connections: React.FC = () => {
   // Placeholder state for dropdown menu (would normally come from context)
   const [currentPlans] = useState<any[]>([]);
   const repairPlan = null;
+  const [plansMenuOpen, setPlansMenuOpen] = useState(false);
 
   useEffect(() => {
     // On desktop, show controls by default; on mobile, keep them collapsed
@@ -875,7 +879,8 @@ const Connections: React.FC = () => {
               <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
               <button 
                 onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} 
-                className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+                style={{ fontFamily: 'Inter, sans-serif' }}
               >
                 ← Back
               </button>
@@ -883,22 +888,23 @@ const Connections: React.FC = () => {
             <div className="flex items-center gap-2">
               <button 
                 onClick={goToDashboard} 
-                className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+                style={{ fontFamily: 'Inter, sans-serif' }}
               >
                 Dashboard
               </button>
             </div>
           </div>
           <div className="px-4 pb-2">
-            <h2 className="text-2xl font-bold">Connections</h2>
+            <h2 className="text-2xl font-bold text-white">Connections</h2>
           </div>
         </div>
       </header>
-      <main className="mobile-main-content overflow-y-auto overflow-x-hidden">
+      <main className="mobile-main-content overflow-y-auto overflow-x-hidden" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
         <div className="max-w-4xl mx-auto p-6 min-h-0">
       
       <div className="text-center space-y-2">
-        <p className="text-gray-600">
+        <p className="text-white/70">
           Connect your fitness services to automatically sync data and enable real-time updates.
         </p>
       </div>
@@ -910,7 +916,7 @@ const Connections: React.FC = () => {
               <div className="flex items-start gap-3">
                 {getProviderIcon(connection.provider)}
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-white/90">
                     {getProviderName(connection.provider)}
                     {connection.connected && (
                       <div className={`w-2 h-2 rounded-full animate-pulse ${
@@ -922,7 +928,7 @@ const Connections: React.FC = () => {
                       }`}></div>
                     )}
                   </CardTitle>
-                  <CardDescription className="mt-1">
+                  <CardDescription className="mt-1 text-white/60">
                     {getProviderDescription(connection.provider)}
                   </CardDescription>
                 </div>
@@ -933,13 +939,7 @@ const Connections: React.FC = () => {
               {connection.connected ? (
                 <div className="space-y-4">
                   {/* Connected Status Indicator */}
-                  <div className={`p-3 rounded-md border ${
-                    connection.provider === 'garmin' 
-                      ? 'bg-blue-50 border-blue-200' 
-                      : connection.provider === 'strava'
-                      ? 'bg-orange-50 border-orange-200'
-                      : 'bg-green-50 border-green-200'
-                  }`}>
+                  <div className="p-3 rounded-md bg-white/[0.08] backdrop-blur-lg border border-white/25">
                     <div className="flex items-center space-x-2">
                       <div className={`w-2 h-2 rounded-full ${
                         connection.provider === 'garmin' 
@@ -948,13 +948,7 @@ const Connections: React.FC = () => {
                           ? 'bg-orange-500'
                           : 'bg-green-500'
                       }`}></div>
-                      <span className={`text-sm font-medium ${
-                        connection.provider === 'garmin' 
-                          ? 'text-blue-800' 
-                          : connection.provider === 'strava'
-                          ? 'text-orange-800'
-                          : 'text-green-800'
-                      }`}>
+                      <span className="text-sm font-medium text-cyan-400">
                         ✓ Connected to {getProviderName(connection.provider)}
                       </span>
                     </div>
@@ -963,8 +957,8 @@ const Connections: React.FC = () => {
                   {/* Last Sync - only show for Strava */}
                   {connection.provider === 'strava' && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Last Import:</span>
-                      <span className="flex items-center space-x-1">
+                      <span className="text-white/60">Last Import:</span>
+                      <span className="flex items-center space-x-1 text-white/80">
                         <Clock className="h-3 w-3" />
                         <span>
                           {connection.lastSync 
@@ -990,7 +984,8 @@ const Connections: React.FC = () => {
                             setStravaStartDate(start.toISOString().split('T')[0]);
                             setStravaEndDate(end.toISOString().split('T')[0]);
                           }}
-                          className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                          className="px-2 py-1 bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/80 rounded-full hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         >
                           Last 7 days
                         </button>
@@ -1002,7 +997,8 @@ const Connections: React.FC = () => {
                             setStravaStartDate(start.toISOString().split('T')[0]);
                             setStravaEndDate(end.toISOString().split('T')[0]);
                           }}
-                          className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                          className="px-2 py-1 bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/80 rounded-full hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         >
                           Last 30 days
                         </button>
@@ -1014,7 +1010,8 @@ const Connections: React.FC = () => {
                             setStravaStartDate(start.toISOString().split('T')[0]);
                             setStravaEndDate(end.toISOString().split('T')[0]);
                           }}
-                          className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                          className="px-2 py-1 bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/80 rounded-full hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         >
                           Last 60 days
                         </button>
@@ -1026,16 +1023,18 @@ const Connections: React.FC = () => {
                           type="date"
                           value={stravaStartDate}
                           onChange={(e) => setStravaStartDate(e.target.value)}
-                          className="px-2 py-1 border rounded text-xs flex-1 min-w-[120px]"
+                          className="px-2 py-1 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-xs flex-1 min-w-[120px]"
                           placeholder="Start Date"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         />
-                        <span className="text-gray-500">to</span>
+                        <span className="text-white/60">to</span>
                         <input
                           type="date"
                           value={stravaEndDate}
                           onChange={(e) => setStravaEndDate(e.target.value)}
-                          className="px-2 py-1 border rounded text-xs flex-1 min-w-[120px]"
+                          className="px-2 py-1 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-xs flex-1 min-w-[120px]"
                           placeholder="End Date"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         />
                       </div>
                     </div>
@@ -1061,6 +1060,7 @@ const Connections: React.FC = () => {
                           return importHistoricalData(connection.provider, start, end);
                         }}
                         disabled={loading}
+                        className="rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 disabled:bg-white/[0.05] disabled:border-white/20 disabled:text-white/40"
                       >
                         <Zap className="h-4 w-4 mr-2" />
                         {(() => {
@@ -1081,6 +1081,7 @@ const Connections: React.FC = () => {
                         size="sm"
                         onClick={() => setShowDateControls((v) => !v)}
                         disabled={loading}
+                        className="rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 disabled:bg-white/[0.05] disabled:border-white/20 disabled:text-white/40"
                       >
                         <Calendar className="h-4 w-4 mr-2" />
                         {showDateControls ? 'Hide' : 'Custom'}
@@ -1099,7 +1100,7 @@ const Connections: React.FC = () => {
                         }
                       }}
                       disabled={loading}
-                      className="text-gray-500 hover:text-red-600 hover:border-red-300"
+                      className="rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-red-400 hover:border-red-400/50 transition-all duration-300 disabled:bg-white/[0.05] disabled:border-white/20 disabled:text-white/40"
                     >
                       <Unlink className="h-4 w-4 mr-1" />
                       Disconnect
@@ -1109,13 +1110,13 @@ const Connections: React.FC = () => {
                   {/* Progress Bar for Import - Strava only */}
                   {importProgress.importing && connection.provider === 'strava' && (
                     <div className="w-full mt-2">
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <div className="flex justify-between text-xs text-white/70 mb-1">
                         <span>Importing activities...</span>
                         <span>{importProgress.progress}/{importProgress.total}</span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-white/[0.08] rounded-full h-2">
                         <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          className="bg-cyan-400 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${importProgress.total > 0 ? (importProgress.progress / importProgress.total) * 100 : 0}%` }}
                         ></div>
                       </div>
@@ -1124,7 +1125,7 @@ const Connections: React.FC = () => {
                     
                   {/* Garmin message display */}
                   {connection.provider === 'garmin' && garminMessage && (
-                    <div className="p-2 bg-blue-50 rounded text-xs text-blue-700 border border-blue-200 mt-2">
+                    <div className="p-2 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-xs text-white/90 mt-2">
                       {garminMessage}
                     </div>
                   )}
@@ -1152,7 +1153,7 @@ const Connections: React.FC = () => {
                         }
                       }}
                       disabled={loading}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                      className="w-full rounded-full bg-blue-600 hover:bg-blue-700 text-white border-none"
                     >
                       <Link2 className="h-4 w-4 mr-2" />
                       Connect {getProviderName(connection.provider)}
@@ -1168,11 +1169,11 @@ const Connections: React.FC = () => {
       {/* Activity Source Preference Section */}
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
+          <CardTitle className="flex items-center space-x-2 text-white/90">
             <Settings className="h-5 w-5" />
             <span>Activity Source Preference</span>
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-white/60">
             Choose where to get your activity data from.
           </CardDescription>
         </CardHeader>
@@ -1187,11 +1188,11 @@ const Connections: React.FC = () => {
                   checked={sourcePreference === 'garmin'}
                   onChange={() => saveSourcePreference('garmin')}
                   disabled={savingPreference}
-                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  className="h-4 w-4 text-blue-500 border-white/30 focus:ring-blue-500"
                 />
                 <div>
-                  <span className="font-medium text-gray-900">Garmin only</span>
-                  <p className="text-sm text-gray-500">Import activities from Garmin. Send planned workouts to your Garmin devices.</p>
+                  <span className="font-medium text-white/90">Garmin only</span>
+                  <p className="text-sm text-white/60">Import activities from Garmin. Send planned workouts to your Garmin devices.</p>
                 </div>
               </label>
               
@@ -1203,11 +1204,11 @@ const Connections: React.FC = () => {
                   checked={sourcePreference === 'strava'}
                   onChange={() => saveSourcePreference('strava')}
                   disabled={savingPreference}
-                  className="h-4 w-4 text-orange-500 border-gray-300 focus:ring-orange-500"
+                  className="h-4 w-4 text-orange-500 border-white/30 focus:ring-orange-500"
                 />
                 <div>
-                  <span className="font-medium text-gray-900">Strava only</span>
-                  <p className="text-sm text-gray-500">Import activities from Strava to see segments and PRs. You can still send planned workouts to Garmin devices when connected to Garmin.</p>
+                  <span className="font-medium text-white/90">Strava only</span>
+                  <p className="text-sm text-white/60">Import activities from Strava to see segments and PRs. You can still send planned workouts to Garmin devices when connected to Garmin.</p>
                 </div>
               </label>
               
@@ -1219,17 +1220,17 @@ const Connections: React.FC = () => {
                   checked={sourcePreference === 'both'}
                   onChange={() => saveSourcePreference('both')}
                   disabled={savingPreference}
-                  className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
+                  className="h-4 w-4 text-green-500 border-white/30 focus:ring-green-500"
                 />
                 <div>
-                  <span className="font-medium text-gray-900">Both sources</span>
-                  <p className="text-sm text-gray-500">Import from both. Duplicates will occur if both are connected.</p>
+                  <span className="font-medium text-white/90">Both sources</span>
+                  <p className="text-sm text-white/60">Import from both. Duplicates will occur if both are connected.</p>
                 </div>
               </label>
             </div>
             
-            <div className="pt-2 border-t">
-              <p className="text-xs text-gray-500">
+            <div className="pt-2 border-t border-white/10">
+              <p className="text-xs text-white/60">
                 💡 <strong>Tip:</strong> Want segments and PRs? Choose "Strava only". Just want clean data without duplicates? Choose "Garmin only".
               </p>
             </div>
@@ -1237,7 +1238,7 @@ const Connections: React.FC = () => {
         </CardContent>
       </Card>
 
-      <div className="text-center text-sm text-gray-500">
+      <div className="text-center text-sm text-white/70">
         <p>
           <strong>New activities will automatically sync</strong> when you complete them.
           <br />
@@ -1245,12 +1246,12 @@ const Connections: React.FC = () => {
         </p>
       </div>
 
-      <div className="text-center text-xs text-gray-400 mt-4">
+      <div className="text-center text-xs text-white/60 mt-4">
         <p>
           If you want to delete your Strava or Garmin data from the app,{' '}
           <a 
             href="mailto:support@efforts.work?subject=Data%20Deletion%20Request&body=Please%20delete%20my%20Strava%2FGarmin%20activity%20data%20from%20efforts."
-            className="underline hover:text-gray-600"
+            className="underline hover:text-white/80 text-cyan-400"
           >
             email support@efforts.work
           </a>
@@ -1259,6 +1260,70 @@ const Connections: React.FC = () => {
       </div>
         </div>
       </main>
+      
+      {/* Bottom Navigation Tab Bar */}
+      <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center" style={{ paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}>
+        <div className="w-full">
+          <div className="flex justify-center items-center gap-2 pb-3 pt-1">
+            <Button
+              onClick={() => navigate('/')}
+              className="flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45"
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                padding: '12px 16px',
+                borderRadius: '1rem',
+                fontSize: '15px',
+                minHeight: '48px',
+                boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
+              }}
+            >
+              <Home className="h-5 w-5" />
+            </Button>
+            <Button
+              onClick={() => navigate('/')}
+              className="flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45"
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                padding: '12px 16px',
+                borderRadius: '1rem',
+                fontSize: '15px',
+                minHeight: '48px',
+                boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
+              }}
+            >
+              Context
+            </Button>
+            <PlansMenu
+              currentPlans={currentPlans}
+              completedPlans={[]}
+              onSelectPlan={() => {}}
+              isOpen={plansMenuOpen}
+              onOpenChange={setPlansMenuOpen}
+              trigger={
+                <Button
+                  onClick={() => setPlansMenuOpen(true)}
+                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
+                    plansMenuOpen
+                      ? 'border-white/50 text-white bg-white/[0.12]' 
+                      : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
+                  }`}
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    padding: '12px 16px',
+                    borderRadius: '1rem',
+                    fontSize: '15px',
+                    minHeight: '48px',
+                    boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
+                  }}
+                >
+                  Plans
+                </Button>
+              }
+            />
+            <LogFAB onSelectType={() => {}} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
