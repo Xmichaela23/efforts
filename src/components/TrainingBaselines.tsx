@@ -58,10 +58,6 @@ export default function TrainingBaselines({ onClose, onOpenBaselineTest }: Train
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
 const navigate = useNavigate();
 
-const goToDashboard = () => {
-  navigate('/dashboard');
-};
-
 const [data, setData] = useState<BaselineData>({
   age: 0,
   disciplines: [],
@@ -459,22 +455,6 @@ return (
               </DropdownMenuContent>
             </DropdownMenu>
             <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
-            <button 
-              onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} 
-              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
-              style={{ fontFamily: 'Inter, sans-serif' }}
-            >
-              ← Back
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={goToDashboard} 
-              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
-              style={{ fontFamily: 'Inter, sans-serif' }}
-            >
-              Dashboard
-            </button>
           </div>
         </div>
         <div className="px-4 pb-2">
