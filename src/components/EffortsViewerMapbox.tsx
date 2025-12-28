@@ -1674,7 +1674,7 @@ function EffortsViewerMapbox({
             );
           })()}
           {memoizedSegments && memoizedSegments.length > 0 && (
-            <span style={{ color: '#94a3b8', fontSize: 11, fontStyle: 'italic' }}>
+            <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 11, fontStyle: 'italic', fontWeight: 400, letterSpacing: '0.01em' }}>
               Tap colored sections to see performance
             </span>
           )}
