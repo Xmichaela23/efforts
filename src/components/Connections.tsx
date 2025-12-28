@@ -1280,7 +1280,10 @@ const Connections: React.FC = () => {
               <Home className="h-5 w-5" />
             </Button>
             <Button
-              onClick={() => navigate('/')}
+              onClick={() => {
+                // Navigate back to main app - context will be accessible from there
+                navigate('/');
+              }}
               className="flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45"
               style={{
                 fontFamily: 'Inter, sans-serif',
