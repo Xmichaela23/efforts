@@ -638,34 +638,47 @@ function computeSplits(samples: Sample[], metersPerSplit: number): Split[] {
 }
 
 /** ---------- Tiny UI atoms ---------- */
-const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick }: { label: string; value: string | number; subValue?: string; active?: boolean; titleAttr?: string; width?: number; onClick?: () => void }) => (
-  <div 
-    title={titleAttr || ''} 
-    onClick={onClick}
-    style={{
-      padding: "2px 0",
-      borderRadius: 0,
-      border: "none",
-      background: "transparent",
-      display: "flex",
-      flexDirection: "column",
-      gap: 1,
-      width: `${width ?? 54}px`,
-      textAlign: "center",
-      overflow: "hidden",
-      cursor: onClick ? "pointer" : "default",
-      transition: "opacity 0.15s ease"
-    }}
-    onMouseEnter={(e) => { if (onClick) e.currentTarget.style.opacity = "0.7"; }}
-    onMouseLeave={(e) => { if (onClick) e.currentTarget.style.opacity = "1"; }}
-  >
-    <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{label}</span>
-    <span style={{ fontSize: 12, fontWeight: 700, color: active ? "#0284c7" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "opacity 150ms ease" }}>{value}</span>
-    {subValue ? (
-      <span style={{ fontSize: 10, color: "#6b7280", fontWeight: 600, whiteSpace: "nowrap", transition: "opacity 150ms ease" }}>{subValue}</span>
-    ) : null}
-  </div>
-);
+const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick, metricType }: { label: string; value: string | number; subValue?: string; active?: boolean; titleAttr?: string; width?: number; onClick?: () => void; metricType?: string }) => {
+  // Match button colors
+  const metricColors: Record<string, string> = {
+    pace: '#3b82f6', spd: '#3b82f6', speed: '#3b82f6',
+    bpm: '#ef4444',
+    elev: '#10b981',
+    pwr: '#f59e0b',
+    cad: '#8b5cf6',
+    vam: '#06b6d4'
+  };
+  const activeColor = metricType && metricColors[metricType] ? metricColors[metricType] : '#60a5fa';
+  
+  return (
+    <div 
+      title={titleAttr || ''} 
+      onClick={onClick}
+      style={{
+        padding: "2px 0",
+        borderRadius: 0,
+        border: "none",
+        background: "transparent",
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+        width: `${width ?? 54}px`,
+        textAlign: "center",
+        overflow: "hidden",
+        cursor: onClick ? "pointer" : "default",
+        transition: "opacity 0.15s ease"
+      }}
+      onMouseEnter={(e) => { if (onClick) e.currentTarget.style.opacity = "0.7"; }}
+      onMouseLeave={(e) => { if (onClick) e.currentTarget.style.opacity = "1"; }}
+    >
+      <span style={{ fontSize: 10, color: "rgba(255, 255, 255, 0.6)", fontWeight: 600 }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: active ? activeColor : "rgba(255, 255, 255, 0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "opacity 150ms ease" }}>{value}</span>
+      {subValue ? (
+        <span style={{ fontSize: 10, color: "rgba(255, 255, 255, 0.5)", fontWeight: 600, whiteSpace: "nowrap", transition: "opacity 150ms ease" }}>{subValue}</span>
+      ) : null}
+    </div>
+  );
+};
 
 
 /** ---------- Main Component ---------- */
@@ -1843,6 +1856,7 @@ function EffortsViewerMapbox({
             active={tab==="pace" || tab==="spd"} 
             width={54}
             onClick={() => setTab(workoutData?.type === 'run' ? "pace" : "spd")}
+            metricType={workoutData?.type === 'ride' ? 'spd' : 'pace'}
           />
           {/* Power - 2nd for cycling only */}
           {workoutData?.type !== 'run' && (
@@ -1856,6 +1870,7 @@ function EffortsViewerMapbox({
               active={tab==="pwr"} 
               width={54}
               onClick={() => setTab("pwr")}
+              metricType="pwr"
             />
           )}
           {/* HR */}
@@ -1876,6 +1891,7 @@ function EffortsViewerMapbox({
             active={tab==="bpm"} 
             width={54}
             onClick={() => setTab("bpm")}
+            metricType="bpm"
           />
           {/* Grade */}
           <Pill
@@ -1901,6 +1917,7 @@ function EffortsViewerMapbox({
             active={tab==="elev"}
             width={54}
             onClick={() => setTab("elev")}
+            metricType="elev"
           />
           {/* Cadence */}
           <Pill 
@@ -1913,6 +1930,7 @@ function EffortsViewerMapbox({
             active={tab==="cad"} 
             width={54}
             onClick={() => setTab("cad")}
+            metricType="cad"
           />
           {/* Power - last for running only */}
           {workoutData?.type === 'run' && (
@@ -1926,6 +1944,7 @@ function EffortsViewerMapbox({
               active={tab==="pwr"} 
               width={54}
               onClick={() => setTab("pwr")}
+              metricType="pwr"
             />
           )}
           {/* VAM - cycling only */}
@@ -1949,6 +1968,7 @@ function EffortsViewerMapbox({
               active={tab==="vam"} 
               width={54}
               onClick={() => setTab("vam")}
+              metricType="vam"
             />
           )}
         </div>
