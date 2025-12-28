@@ -2236,19 +2236,19 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Splits */}
-      <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>
-        <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Splits ({useMiles ? "mi" : "km"})</div>
+      <div style={{ marginTop: 14, borderTop: "1px solid rgba(255, 255, 255, 0.1)", paddingTop: 10 }}>
+        <div style={{ fontWeight: 700, color: "rgba(255, 255, 255, 0.9)", marginBottom: 8 }}>Splits ({useMiles ? "mi" : "km"})</div>
         <div style={{ display: "grid", gridTemplateColumns: "64px 1fr 1fr 1fr 1fr", gap: 8, fontSize: 14 }}>
-          <div style={{ fontWeight: 600, color: "#64748b" }}>#</div>
-          <div style={{ fontWeight: 600, color: "#64748b" }}>Time</div>
-          <div style={{ fontWeight: 600, color: "#64748b" }}>
+          <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>#</div>
+          <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>Time</div>
+          <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>
             {workoutData?.type === 'ride' ? 'Speed' : 'Pace'}
           </div>
-          <div style={{ fontWeight: 600, color: "#64748b" }}>BPM</div>
-          <div style={{ fontWeight: 600, color: "#64748b" }}>Grade</div>
+          <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>BPM</div>
+          <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>Grade</div>
           {splits.map((sp, i) => {
             const active = i === activeSplitIx;
-            const cell = (c: any) => <div style={{ padding: "8px 4px", background: active ? "#f0f9ff" : undefined, borderRadius: 8 }}>{c}</div>;
+            const cell = (c: any) => <div style={{ padding: "8px 4px", background: active ? "rgba(255, 255, 255, 0.1)" : undefined, borderRadius: 8, color: active ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.9)" }}>{c}</div>;
             return (
               <React.Fragment key={i}>
                 {cell(i + 1)}
