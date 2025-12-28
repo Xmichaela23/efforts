@@ -94,11 +94,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     })();
   }, [unifiedItems, activeDate]);
 
+  // Only fetch weather for today (we don't have historical weather data)
+  const isTodayDate = activeDate === today;
   const { weather } = useWeather({
     lat: dayLoc?.lat,
     lng: dayLoc?.lng,
     timestamp: `${activeDate}T12:00:00`,
-    enabled: !!dayLoc,
+    enabled: !!dayLoc && isTodayDate, // Only enable for today
   });
 
   const { toast } = useToast();
@@ -864,20 +866,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </div>
           )}
 
-          {/* Line 3: Weather + Location */}
+          {/* Line 3: Weather + Location (weather only for today) */}
           {(weather || cityName) && (
             <div className="flex items-center gap-1 flex-wrap">
-              {weather && (
+              {weather && isTodayDate && (
                 <span className="text-sm font-light text-white/60 tracking-normal">
                   {Math.round(weather.temperature)}°F {weather.condition}
                   {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
                   {weather.sunrise && weather.sunset ? (()=>{ try { const fmt=(iso:string)=>{ const d=new Date(iso); return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, m=> m.trim().toLowerCase()); }; return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; } catch { return '';} })() : ''}
                 </span>
               )}
-              {/* City name from geolocation */}
+              {/* City name from geolocation (show for any date if available) */}
               {cityName && (
                 <span className="text-sm font-light text-white/60 tracking-normal">
-                  {weather ? ' • ' : ''}{cityName}
+                  {weather && isTodayDate ? ' • ' : ''}{cityName}
                 </span>
               )}
             </div>
