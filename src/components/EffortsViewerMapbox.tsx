@@ -1681,7 +1681,11 @@ function EffortsViewerMapbox({
         </div>
         <button
           onClick={() => setTheme(theme === 'outdoor' ? 'hybrid' : theme === 'hybrid' ? 'topo' : 'outdoor')}
-          style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+          className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+          style={{
+            fontFamily: 'Inter, sans-serif',
+            cursor: 'pointer',
+          }}
           aria-label="Toggle map style"
         >
           {theme === 'outdoor' ? 'Hybrid' : theme === 'hybrid' ? 'Topo' : 'Outdoor'}
