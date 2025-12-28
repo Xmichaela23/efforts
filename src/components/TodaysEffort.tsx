@@ -865,26 +865,22 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           )}
 
           {/* Line 3: Weather + Location */}
-          {weather && (
+          {(weather || cityName) && (
             <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-sm font-light text-white/60 tracking-normal">
-                {Math.round(weather.temperature)}°F {weather.condition}
-                {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
-                {weather.sunrise && weather.sunset ? (()=>{ try { const fmt=(iso:string)=>{ const d=new Date(iso); return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, m=> m.trim().toLowerCase()); }; return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; } catch { return '';} })() : ''}
-              </span>
+              {weather && (
+                <span className="text-sm font-light text-white/60 tracking-normal">
+                  {Math.round(weather.temperature)}°F {weather.condition}
+                  {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
+                  {weather.sunrise && weather.sunset ? (()=>{ try { const fmt=(iso:string)=>{ const d=new Date(iso); return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, m=> m.trim().toLowerCase()); }; return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; } catch { return '';} })() : ''}
+                </span>
+              )}
               {/* City name from geolocation */}
               {cityName && (
                 <span className="text-sm font-light text-white/60 tracking-normal">
-                  • {cityName}
+                  {weather ? ' • ' : ''}{cityName}
                 </span>
               )}
             </div>
-          )}
-          {/* City name only if no weather */}
-          {!weather && cityName && (
-            <span className="text-sm font-light text-white/60 tracking-normal">
-              {cityName}
-            </span>
           )}
         </div>
       </div>
