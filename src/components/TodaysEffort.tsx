@@ -834,21 +834,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         style={{ position: 'relative', zIndex: 1 }}
       >
         <div className="space-y-1">
-          {/* Line 1: Date (left) | Event (right) */}
-          <div className="flex justify-between items-baseline gap-2">
+          {/* Line 1: Date */}
+          <div>
             <span className="text-lg font-light tracking-wide text-foreground">
               {formatDisplayDate(activeDate)}
             </span>
-            {/* Event countdown - right aligned, amber for future goals */}
-            {trainingPlanContext && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-              <span className="text-sm font-light text-amber-400/60 tracking-wide flex-shrink-0">
-                {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
-              </span>
-            )}
           </div>
 
-          {/* Line 2: Week + Focus (same line, same size) */}
-          {trainingPlanContext && (trainingPlanContext.currentWeek || trainingPlanContext.focus) && (
+          {/* Line 2: Week + Focus + Event (all training context together) */}
+          {trainingPlanContext && (trainingPlanContext.currentWeek || trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
             <div className="text-sm text-white/60 font-light tracking-normal">
               {trainingPlanContext.currentWeek && (
                 <span>Week {trainingPlanContext.currentWeek}</span>
@@ -858,6 +852,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               )}
               {trainingPlanContext.focus && (
                 <span>{trainingPlanContext.focus}</span>
+              )}
+              {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
+                <span> • </span>
+              )}
+              {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
+                <span className="text-amber-400/60">
+                  {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
+                </span>
               )}
             </div>
           )}
