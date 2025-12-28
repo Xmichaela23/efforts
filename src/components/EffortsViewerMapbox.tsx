@@ -1982,7 +1982,7 @@ function EffortsViewerMapbox({
           <div style={{ 
             textAlign: 'center', 
             fontSize: 11, 
-            color: '#6b7280', 
+            color: 'rgba(255, 255, 255, 0.7)', 
             marginTop: -4, 
             marginBottom: 4,
             transition: 'opacity 150ms ease',
@@ -1996,11 +1996,11 @@ function EffortsViewerMapbox({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
           {/* Altitude - show total when not scrubbing */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-            <div style={{ fontSize: 13, color: "#475569", fontWeight: 700 }}>
+            <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.9)", fontWeight: 700 }}>
               Alt {fmtAlt(isScrubbing ? altNow_m : (normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].elev_m_sm ?? 0 : 0), useFeet)}
             </div>
             {!isScrubbing && (
-              <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
+              <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
                 (total)
               </div>
             )}
@@ -2012,7 +2012,8 @@ function EffortsViewerMapbox({
               fontSize: 18, 
               textAlign: "center", 
               fontFeatureSettings: '"tnum"', // Use tabular numbers for consistent spacing
-              letterSpacing: "0.5px"
+              letterSpacing: "0.5px",
+              color: "rgba(255, 255, 255, 0.9)"
             }}>
               {isScrubbing 
                 ? `${fmtDist(s?.d_m ?? 0, useMiles)} · ${fmtTime(s?.t_s ?? 0)}`
@@ -2020,14 +2021,14 @@ function EffortsViewerMapbox({
               }
             </div>
             {!isScrubbing && (
-              <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
+              <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
                 (total)
               </div>
             )}
           </div>
           {/* Elevation Gain/Loss - show totals when not scrubbing */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-            <div style={{ fontSize: 13, color: "#475569", fontWeight: 700, whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.9)", fontWeight: 700, whiteSpace: "nowrap" }}>
               {(() => {
                 const gainNow = isScrubbing 
                   ? (atEnd ? (Number.isFinite(totalGain_m) ? totalGain_m : (sigGain_m[sigGain_m.length - 1] ?? 0)) : (sigGain_m[Math.min(idx, sigGain_m.length - 1)] ?? 0))
@@ -2044,7 +2045,7 @@ function EffortsViewerMapbox({
               })()}
             </div>
             {!isScrubbing && (
-              <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
+              <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
                 (total)
               </div>
             )}
@@ -2054,20 +2055,21 @@ function EffortsViewerMapbox({
 
       {/* Chart */}
       <div style={{ marginTop: 0, overflow: 'visible' }} onMouseLeave={onMouseLeave}>
-        <svg
-          ref={svgRef}
-          viewBox={`-10 -30 ${W + 10} ${SVG_HEIGHT + 75}`}   // responsive: all drawn in SVG units, with top/bottom padding for drag hints
-          width="100%"
-          preserveAspectRatio="xMidYMin meet"
-          onMouseMove={onMove}
-          onMouseUp={onMouseUp}
-          onMouseLeave={onMouseLeave}
-          onTouchStart={onTouch}
-          onTouchMove={onTouch}
-          onTouchEnd={onTouchEnd}
-          onDoubleClick={() => setLocked((l) => !l)}
-          style={{ display: "block", borderRadius: 12, background: "#fff", touchAction: "none", cursor: "crosshair" }}
-        >
+        <div className="rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25 p-4" style={{ marginBottom: 8 }}>
+          <svg
+            ref={svgRef}
+            viewBox={`-10 -30 ${W + 10} ${SVG_HEIGHT + 75}`}   // responsive: all drawn in SVG units, with top/bottom padding for drag hints
+            width="100%"
+            preserveAspectRatio="xMidYMin meet"
+            onMouseMove={onMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseLeave}
+            onTouchStart={onTouch}
+            onTouchMove={onTouch}
+            onTouchEnd={onTouchEnd}
+            onDoubleClick={() => setLocked((l) => !l)}
+            style={{ display: "block", borderRadius: 8, background: "transparent", touchAction: "none", cursor: "crosshair" }}
+          >
           {/* Gradient definitions */}
           <defs>
             <linearGradient id="paceGradient" x1="0" y1="0" x2="0" y2="1">
@@ -2109,7 +2111,7 @@ function EffortsViewerMapbox({
             x={W * 0.45} 
             y={-12} 
             textAnchor="middle" 
-            fill="#9ca3af" 
+            fill="rgba(255, 255, 255, 0.6)" 
             fontSize={20}
             fontWeight={500}
           >
@@ -2118,7 +2120,7 @@ function EffortsViewerMapbox({
           {/* vertical grid */}
           {[0, 1, 2, 3, 4].map((i) => {
             const x = pl + i * ((W - pl - pr) / 4);
-            return <line key={i} x1={x} x2={x} y1={P} y2={H - pb} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4 4" />;
+            return <line key={i} x1={x} x2={x} y1={P} y2={H - pb} stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1" strokeDasharray="4 4" />;
           })}
           {/* X-axis labels (time and distance) */}
           {[0, 1, 2, 3, 4].map((i) => {
@@ -2141,10 +2143,10 @@ function EffortsViewerMapbox({
             const xPos = i === 0 ? x + 8 : x; // Offset first label to avoid Y-axis labels
             return (
               <g key={`xaxis-${i}`}>
-                <text x={xPos} y={H - pb + 16} fill="#6b7280" fontSize={14} fontWeight={500} textAnchor={anchor}>
+                <text x={xPos} y={H - pb + 16} fill="rgba(255, 255, 255, 0.8)" fontSize={14} fontWeight={500} textAnchor={anchor}>
                   {distDisplay} {distUnit}
                 </text>
-                <text x={xPos} y={H - pb + 30} fill="#9ca3af" fontSize={12} textAnchor={anchor}>
+                <text x={xPos} y={H - pb + 30} fill="rgba(255, 255, 255, 0.6)" fontSize={12} textAnchor={anchor}>
                   {timeDisplay}
                 </text>
               </g>
@@ -2153,8 +2155,8 @@ function EffortsViewerMapbox({
           {/* horizontal ticks */}
           {yTicks.map((v, i) => (
             <g key={i}>
-              <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#e5e7eb" strokeWidth="1" />
-              <text x={pl - 8} y={yFromValue(v) + 4} fill="#6b7280" fontSize={14} fontWeight={500} textAnchor="end">
+              <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1" />
+              <text x={pl - 8} y={yFromValue(v) + 4} fill="rgba(255, 255, 255, 0.8)" fontSize={14} fontWeight={500} textAnchor="end">
                 {fmtYAxis(v, tab, workoutData?.type || 'run', useMiles, useFeet)}
               </text>
             </g>
@@ -2183,7 +2185,7 @@ function EffortsViewerMapbox({
             {linePath && (
               <>
                 {!metricRaw.some(v => Number.isFinite(v)) && tab === "vam" && (
-                  <text x={(W/2)} y={(H/2)} textAnchor="middle" fill="#94a3b8" fontSize={14} fontWeight={700}>No VAM data</text>
+                  <text x={(W/2)} y={(H/2)} textAnchor="middle" fill="rgba(255, 255, 255, 0.6)" fontSize={14} fontWeight={700}>No VAM data</text>
                 )}
                 {metricRaw.some(v => Number.isFinite(v)) && (
                   <path d={linePath} fill="none" stroke={chartConfig.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
@@ -2193,21 +2195,22 @@ function EffortsViewerMapbox({
           </g>
 
           {/* cursor */}
-          <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#0ea5e9" strokeWidth={1.5} />
-          <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
+          <line x1={cx} x2={cx} y1={P} y2={H - pb} stroke="#60a5fa" strokeWidth={1.5} />
+          <circle cx={cx} cy={cy} r={5} fill="#60a5fa" stroke="rgba(255, 255, 255, 0.9)" strokeWidth={2} />
           
           {/* Drag hint - in bottom padding of scrubbable SVG area, aligned with top drag hint */}
           <text 
             x={W * 0.45} 
             y={dragHintY} 
             textAnchor="middle" 
-            fill="#9ca3af" 
+            fill="rgba(255, 255, 255, 0.6)" 
             fontSize={20}
             fontWeight={500}
           >
             ← drag for details →
           </text>
         </svg>
+        </div>
       </div>
 
       {/* Metric buttons */}
