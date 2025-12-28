@@ -461,7 +461,8 @@ return (
             <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
             <button 
               onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} 
-              className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+              style={{ fontFamily: 'Inter, sans-serif' }}
             >
               ← Back
             </button>
@@ -469,14 +470,15 @@ return (
           <div className="flex items-center gap-2">
             <button 
               onClick={goToDashboard} 
-              className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+              style={{ fontFamily: 'Inter, sans-serif' }}
             >
               Dashboard
             </button>
           </div>
         </div>
         <div className="px-4 pb-2">
-          <h2 className="text-2xl font-bold">Training Baselines</h2>
+          <h2 className="text-2xl font-bold text-white">Training Baselines</h2>
         </div>
       </div>
     </header>
@@ -485,14 +487,14 @@ return (
         <div className="max-w-2xl mx-auto px-4 py-6">
         {loading ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">Loading your baselines...</p>
+            <p className="text-white/60">Loading your baselines...</p>
           </div>
         ) : (
           <>
               <div className="text-center mb-6">
-                <p className="text-gray-600">Your performance data for personalized training plans</p>
+                <p className="text-white/70">Your performance data for personalized training plans</p>
               {lastUpdated && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-white/60 mt-1">
                   Last updated: {new Date(lastUpdated).toLocaleDateString()}
                 </p>
               )}
@@ -526,63 +528,68 @@ return (
                 <div className="space-y-6">
                   {/* Basic Information */}
                       <div className="space-y-2">
-                    <h2 className="text-sm font-medium text-gray-700">Basic Information</h2>
+                    <h2 className="text-sm font-medium text-white/90">Basic Information</h2>
                     
                     <div className="flex flex-wrap gap-3">
                       <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-500 whitespace-nowrap">Birthday</label>
+                        <label className="text-xs text-white/60 whitespace-nowrap">Birthday</label>
                         <input
                           type="date"
                           value={data.birthday || ''}
                           onChange={(e) => setData(prev => ({ ...prev, birthday: e.target.value }))}
-                          className="h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                          className="h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         />
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-500">Gender</label>
+                        <label className="text-xs text-white/60">Gender</label>
                         <select
                           value={data.gender || ''}
                           onChange={(e) => setData(prev => ({ ...prev, gender: e.target.value as any }))}
-                          className="h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                          className="h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 focus:outline-none focus:border-white/40"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         >
-                          <option value="">-</option>
-                          <option value="male">M</option>
-                          <option value="female">F</option>
-                          <option value="prefer_not_to_say">-</option>
+                          <option value="" className="bg-[#1a1a1a]">-</option>
+                          <option value="male" className="bg-[#1a1a1a]">M</option>
+                          <option value="female" className="bg-[#1a1a1a]">F</option>
+                          <option value="prefer_not_to_say" className="bg-[#1a1a1a]">-</option>
                         </select>
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-500">Units</label>
+                        <label className="text-xs text-white/60">Units</label>
                         <select
                           value={data.units || 'imperial'}
                           onChange={(e) => setData(prev => ({ ...prev, units: e.target.value as any }))}
-                          className="h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                          className="h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 focus:outline-none focus:border-white/40"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         >
-                          <option value="imperial">lbs</option>
-                          <option value="metric">kg</option>
+                          <option value="imperial" className="bg-[#1a1a1a]">lbs</option>
+                          <option value="metric" className="bg-[#1a1a1a]">kg</option>
                         </select>
                         </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-500">Ht</label>
+                        <label className="text-xs text-white/60">Ht</label>
                         <input
                           type="number"
                           value={data.height || ''}
                           onChange={(e) => setData(prev => ({ ...prev, height: parseInt(e.target.value) || undefined }))}
                           placeholder="70"
-                          className="w-12 h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                          className="w-12 h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         />
-                        <span className="text-xs text-gray-400">{data.units === 'metric' ? 'cm' : 'in'}</span>
+                        <span className="text-xs text-white/60">{data.units === 'metric' ? 'cm' : 'in'}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-500">Wt</label>
+                        <label className="text-xs text-white/60">Wt</label>
                         <input
                           type="number"
                           value={data.weight || ''}
                           onChange={(e) => setData(prev => ({ ...prev, weight: parseInt(e.target.value) || undefined }))}
                           placeholder="160"
-                          className="w-14 h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                          className="w-14 h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         />
-                        <span className="text-xs text-gray-400">{data.units === 'metric' ? 'kg' : 'lb'}</span>
+                        <span className="text-xs text-white/60">{data.units === 'metric' ? 'kg' : 'lb'}</span>
                       </div>
                     </div>
                   </div>
@@ -590,8 +597,8 @@ return (
                   {/* Disciplines */}
                   <div className="space-y-2">
                     <div>
-                      <h2 className="text-sm font-medium text-gray-700">Your Sports</h2>
-                      <p className="text-xs text-gray-500">Add baselines for personalized plans</p>
+                      <h2 className="text-sm font-medium text-white/90">Your Sports</h2>
+                      <p className="text-xs text-white/60">Add baselines for personalized plans</p>
                     </div>
                     
                     <div className="grid grid-cols-4 gap-2">
@@ -603,21 +610,22 @@ return (
                           <button
                             key={discipline.id}
                             onClick={() => toggleDiscipline(discipline.id)}
-                            className={`relative flex items-center justify-center gap-1.5 py-2 rounded border text-center transition-colors ${
+                            className={`relative flex items-center justify-center gap-1.5 py-2 rounded-full border text-center transition-all duration-300 ${
                               isActive
-                                ? 'border-gray-400 bg-gray-100'
+                                ? 'border-white/50 bg-white/[0.12] text-white'
                                 : hasData
-                                  ? 'border-gray-300 bg-gray-50'
-                                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                  ? 'border-white/30 bg-white/[0.08] text-white/80'
+                                  : 'border-white/25 bg-white/[0.05] text-white/60 hover:border-white/35 hover:bg-white/[0.08] hover:text-white/80'
                             }`}
+                            style={{ fontFamily: 'Inter, sans-serif' }}
                           >
                             {!isActive && (
-                              <span className="absolute -top-1 -right-1 text-[10px] text-gray-500">
+                              <span className="absolute -top-1 -right-1 text-[10px] text-white/60">
                                 {hasData ? '✓' : '+'}
                                       </span>
                             )}
-                            <Icon className={`h-4 w-4 ${isActive ? 'text-gray-700' : hasData ? 'text-gray-600' : 'text-gray-400'}`} />
-                            <span className={`text-xs font-medium ${isActive ? 'text-gray-700' : hasData ? 'text-gray-600' : 'text-gray-500'}`}>
+                            <Icon className={`h-4 w-4 ${isActive ? 'text-white' : hasData ? 'text-white/80' : 'text-white/60'}`} />
+                            <span className={`text-xs font-medium ${isActive ? 'text-white' : hasData ? 'text-white/80' : 'text-white/60'}`}>
                               {discipline.name}
                                       </span>
                                       </button>
@@ -629,18 +637,18 @@ return (
                   {/* Per-discipline performance numbers */}
                   {activeSport && (
                     <div className="space-y-4">
-                      <h2 className="text-sm font-medium text-gray-700">Performance Numbers</h2>
+                      <h2 className="text-sm font-medium text-white/90">Performance Numbers</h2>
 
                       {/* Running */}
                       {activeSport === 'running' && (
-                        <div className="space-y-3 pb-4 border-b border-gray-200">
+                        <div className="space-y-3 pb-4 border-b border-white/10">
                           <div className="flex items-center gap-2">
-                            <Activity className="h-4 w-4 text-gray-600" />
-                            <h3 className="text-sm font-medium">Running</h3>
+                            <Activity className="h-4 w-4 text-white/80" />
+                            <h3 className="text-sm font-medium text-white/90">Running</h3>
                                     </div>
                           <div className="flex flex-wrap gap-4">
                             <div className="flex items-center gap-2">
-                              <label className="text-xs text-gray-500">5K Time</label>
+                              <label className="text-xs text-white/60">5K Time</label>
                                       <input
                                         type="text"
                                         value={data.performanceNumbers?.fiveK || ''}
@@ -652,11 +660,12 @@ return (
                                           }
                                         }))}
                                 placeholder="25:00"
-                                className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
                                     </div>
                             <div className="flex items-center gap-2">
-                              <label className="text-xs text-gray-500">Easy Pace</label>
+                              <label className="text-xs text-white/60">Easy Pace</label>
                                       <input
                                         type="text"
                                         value={data.performanceNumbers?.easyPace || ''}
@@ -668,9 +677,10 @@ return (
                                           }
                                         }))}
                                 placeholder="9:30"
-                                className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
-                              <span className="text-xs text-gray-400">/mi</span>
+                              <span className="text-xs text-white/60">/mi</span>
                                     </div>
                                     </div>
                         </div>
@@ -678,13 +688,13 @@ return (
 
                       {/* Cycling */}
                       {activeSport === 'cycling' && (
-                        <div className="space-y-3 pb-4 border-b border-gray-200">
+                        <div className="space-y-3 pb-4 border-b border-white/10">
                           <div className="flex items-center gap-2">
-                            <Bike className="h-4 w-4 text-gray-600" />
-                            <h3 className="text-sm font-medium">Cycling</h3>
+                            <Bike className="h-4 w-4 text-white/80" />
+                            <h3 className="text-sm font-medium text-white/90">Cycling</h3>
                           </div>
                           <div className="flex items-center gap-2">
-                            <label className="text-xs text-gray-500">FTP</label>
+                            <label className="text-xs text-white/60">FTP</label>
                                       <input
                               type="number"
                               value={data.performanceNumbers?.ftp || ''}
@@ -696,22 +706,23 @@ return (
                                           }
                                         }))}
                               placeholder="250"
-                              className="w-20 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                              className="w-20 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                              style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
-                            <span className="text-xs text-gray-400">watts</span>
+                            <span className="text-xs text-white/60">watts</span>
                                     </div>
                                   </div>
                                 )}
 
                       {/* Swimming */}
                       {activeSport === 'swimming' && (
-                        <div className="space-y-3 pb-4 border-b border-gray-200">
+                        <div className="space-y-3 pb-4 border-b border-white/10">
                           <div className="flex items-center gap-2">
-                            <Waves className="h-4 w-4 text-gray-600" />
-                            <h3 className="text-sm font-medium">Swimming</h3>
+                            <Waves className="h-4 w-4 text-white/80" />
+                            <h3 className="text-sm font-medium text-white/90">Swimming</h3>
                           </div>
                           <div className="flex items-center gap-2">
-                            <label className="text-xs text-gray-500">100yd Pace</label>
+                            <label className="text-xs text-white/60">100yd Pace</label>
                                       <input
                                         type="text"
                                         value={data.performanceNumbers?.swimPace100 || ''}
@@ -723,12 +734,13 @@ return (
                                           }
                                         }))}
                               placeholder="1:45"
-                              className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                              className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                              style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
-                            <span className="text-xs text-gray-400">mm:ss</span>
+                            <span className="text-xs text-white/60">mm:ss</span>
                                     </div>
                           <div className="space-y-2">
-                            <label className="text-xs text-gray-500">Equipment</label>
+                            <label className="text-xs text-white/60">Equipment</label>
                             <div className="flex flex-wrap gap-2">
                               {swimmingEquipmentOptions.map((option) => {
                                 const isSelected = (data.equipment.swimming || []).includes(option);
@@ -736,11 +748,12 @@ return (
                                   <button
                                     key={option}
                                     onClick={() => toggleEquipment('swimming', option)}
-                                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                                    className={`px-2 py-1 text-xs rounded-full transition-all duration-300 ${
                                       isSelected
-                                        ? 'bg-gray-300 text-gray-800'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        ? 'bg-white/[0.12] border border-white/50 text-white'
+                                        : 'bg-white/[0.08] border border-white/25 text-white/80 hover:bg-white/[0.12] hover:border-white/35 hover:text-white'
                                     }`}
+                                    style={{ fontFamily: 'Inter, sans-serif' }}
                                   >
                                     {option}
                                   </button>
@@ -755,17 +768,17 @@ return (
                       {activeSport === 'strength' && (
                         <div className="space-y-3 pb-4">
                           <div className="flex items-center gap-2">
-                            <Dumbbell className="h-4 w-4 text-gray-600" />
-                            <h3 className="text-sm font-medium">Strength</h3>
-                            <span className="text-xs text-gray-400">1 rep max ({data.units === 'metric' ? 'kg' : 'lbs'})</span>
+                            <Dumbbell className="h-4 w-4 text-white/80" />
+                            <h3 className="text-sm font-medium text-white/90">Strength</h3>
+                            <span className="text-xs text-white/60">1 rep max ({data.units === 'metric' ? 'kg' : 'lbs'})</span>
                           </div>
                           
                           {/* Baseline Test Note */}
-                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                            <p className="text-xs text-gray-700 mb-2">
+                          <div className="p-3 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-md">
+                            <p className="text-xs text-white/90 mb-2">
                               Don't know your numbers? Or want to retest?
                             </p>
-                            <p className="text-xs text-gray-600 mb-2">
+                            <p className="text-xs text-white/70 mb-2">
                               Log a{' '}
                               <button
                                 onClick={() => {
@@ -773,7 +786,7 @@ return (
                                     onOpenBaselineTest('Baseline Test: Lower Body');
                                   }
                                 }}
-                                className="text-blue-600 hover:text-blue-800 underline font-medium"
+                                className="text-cyan-400 hover:text-cyan-300 underline font-medium"
                               >
                                 Baseline Test: Lower Body
                               </button>
@@ -784,20 +797,20 @@ return (
                                     onOpenBaselineTest('Baseline Test: Upper Body');
                                   }
                                 }}
-                                className="text-blue-600 hover:text-blue-800 underline font-medium"
+                                className="text-cyan-400 hover:text-cyan-300 underline font-medium"
                               >
                                 Upper Body
                               </button>
                               {' '}workout. We'll guide you through warmups and calculate your 1RM automatically.
                             </p>
-                            <p className="text-xs text-gray-500 italic">
+                            <p className="text-xs text-white/60 italic">
                               Tip: Retest every 8-12 weeks to track progress.
                             </p>
                           </div>
                           
                           <div className="flex flex-wrap gap-3">
                             <div className="flex items-center gap-1">
-                              <label className="text-xs text-gray-500">Squat</label>
+                              <label className="text-xs text-white/60">Squat</label>
                                       <input
                                         type="number"
                                         value={data.performanceNumbers?.squat || ''}
@@ -809,11 +822,12 @@ return (
                                           }
                                         }))}
                                 placeholder="225"
-                                className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
                                     </div>
                             <div className="flex items-center gap-1">
-                              <label className="text-xs text-gray-500">DL</label>
+                              <label className="text-xs text-white/60">DL</label>
                                       <input
                                         type="number"
                                         value={data.performanceNumbers?.deadlift || ''}
@@ -825,11 +839,12 @@ return (
                                           }
                                         }))}
                                 placeholder="315"
-                                className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
                                     </div>
                             <div className="flex items-center gap-1">
-                              <label className="text-xs text-gray-500">Bench</label>
+                              <label className="text-xs text-white/60">Bench</label>
                                       <input
                                         type="number"
                                         value={data.performanceNumbers?.bench || ''}
@@ -841,11 +856,12 @@ return (
                                           }
                                         }))}
                                 placeholder="185"
-                                className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
                                     </div>
                             <div className="flex items-center gap-1">
-                              <label className="text-xs text-gray-500">OHP</label>
+                              <label className="text-xs text-white/60">OHP</label>
                                       <input
                                         type="number"
                                         value={data.performanceNumbers?.overheadPress1RM || ''}
@@ -857,12 +873,13 @@ return (
                                           }
                                         }))}
                                 placeholder="135"
-                                className="w-16 h-8 px-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
                                     </div>
                                   </div>
                           <div className="space-y-3">
-                            <label className="text-xs text-gray-500">Equipment Access</label>
+                            <label className="text-xs text-white/60">Equipment Access</label>
                             
                             {/* Commercial vs Home gym toggle */}
                             <div className="flex gap-4">
@@ -874,13 +891,14 @@ return (
                                     equipment: { ...prev.equipment, strength: ['Commercial gym'] }
                                   }));
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded border transition-colors ${
+                                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-full border transition-all duration-300 ${
                                   hasCommercialGym
-                                    ? 'border-gray-400 bg-gray-100 text-gray-800'
-                                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                    ? 'border-white/50 bg-white/[0.12] text-white'
+                                    : 'border-white/25 bg-white/[0.08] text-white/80 hover:border-white/35 hover:bg-white/[0.10]'
                                 }`}
+                                style={{ fontFamily: 'Inter, sans-serif' }}
                               >
-                                <span className={`w-3 h-3 rounded-full border-2 ${hasCommercialGym ? 'border-gray-600 bg-gray-600' : 'border-gray-400'}`} />
+                                <span className={`w-3 h-3 rounded-full border-2 ${hasCommercialGym ? 'border-white/80 bg-white/80' : 'border-white/40'}`} />
                                 Commercial gym
                           </button>
                               <button
@@ -894,13 +912,14 @@ return (
                                   }
                                   // If already home gym, do nothing - keep existing equipment
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded border transition-colors ${
+                                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-full border transition-all duration-300 ${
                                   !hasCommercialGym
-                                    ? 'border-gray-400 bg-gray-100 text-gray-800'
-                                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                    ? 'border-white/50 bg-white/[0.12] text-white'
+                                    : 'border-white/25 bg-white/[0.08] text-white/80 hover:border-white/35 hover:bg-white/[0.10]'
                                 }`}
+                                style={{ fontFamily: 'Inter, sans-serif' }}
                               >
-                                <span className={`w-3 h-3 rounded-full border-2 ${!hasCommercialGym ? 'border-gray-600 bg-gray-600' : 'border-gray-400'}`} />
+                                <span className={`w-3 h-3 rounded-full border-2 ${!hasCommercialGym ? 'border-white/80 bg-white/80' : 'border-white/40'}`} />
                                 Home gym
                               </button>
                   </div>
@@ -908,7 +927,7 @@ return (
                             {/* Home gym equipment details - only show if not commercial */}
                             {!hasCommercialGym && (
                               <div className="space-y-2 pl-1">
-                                <p className="text-xs text-gray-400">Select your equipment:</p>
+                                <p className="text-xs text-white/60">Select your equipment:</p>
                                 <div className="flex flex-wrap gap-2">
                                   {homeGymEquipmentOptions.map((option) => {
                                     const isSelected = (data.equipment.strength || []).includes(option);
@@ -916,11 +935,12 @@ return (
                         <button
                                         key={option}
                                         onClick={() => toggleEquipment('strength', option)}
-                                        className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                                        className={`px-2 py-1 text-xs rounded-full transition-all duration-300 ${
                                           isSelected
-                                            ? 'bg-gray-300 text-gray-800'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            ? 'bg-white/[0.12] border border-white/50 text-white'
+                                            : 'bg-white/[0.08] border border-white/25 text-white/80 hover:bg-white/[0.12] hover:border-white/35 hover:text-white'
                                         }`}
+                                        style={{ fontFamily: 'Inter, sans-serif' }}
                                       >
                           {option}
                         </button>
@@ -939,32 +959,34 @@ return (
                 /* Data Import Tab */
                 <div className="space-y-6">
                   <div className="text-center">
-                    <h3 className="text-lg font-medium mb-2">Import Training Data</h3>
-                    <p className="text-sm text-gray-600">Connect your fitness accounts to auto-populate baseline data</p>
+                    <h3 className="text-lg font-medium mb-2 text-white/90">Import Training Data</h3>
+                    <p className="text-sm text-white/70">Connect your fitness accounts to auto-populate baseline data</p>
                   </div>
                   
                   {/* Strava Connection */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Activity className="h-5 w-5 text-orange-500" />
-                      <h4 className="font-medium">Strava Integration</h4>
+                      <h4 className="font-medium text-white/90">Strava Integration</h4>
                     </div>
 
                     {!stravaConnected ? (
                       <button
                         onClick={connectStrava}
-                        className="w-full px-4 py-3 text-white bg-orange-500 hover:bg-orange-600 transition-colors font-medium rounded-md"
+                        className="w-full px-4 py-3 text-white bg-orange-500 hover:bg-orange-600 transition-colors font-medium rounded-full"
+                        style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         Connect with Strava
                       </button>
                     ) : (
                       <div className="space-y-3">
-                        <div className="p-3 bg-green-50 rounded-md">
-                          <p className="text-sm text-green-800">✓ Connected to Strava</p>
+                        <div className="p-3 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-md">
+                          <p className="text-sm text-cyan-400">✓ Connected to Strava</p>
                         </div>
                           <button
                             onClick={disconnectStrava}
-                            className="px-4 py-2 text-red-600 hover:text-red-700 transition-colors text-sm"
+                            className="px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 hover:bg-white/[0.12]"
+                            style={{ fontFamily: 'Inter, sans-serif' }}
                           >
                             Disconnect
                           </button>
@@ -972,8 +994,8 @@ return (
                     )}
 
                     {stravaMessage && (
-                      <div className="p-3 bg-gray-50 rounded-md">
-                        <p className="text-sm text-gray-700">{stravaMessage}</p>
+                      <div className="p-3 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-md">
+                        <p className="text-sm text-white/90">{stravaMessage}</p>
                       </div>
                     )}
                   </div>
@@ -993,24 +1015,26 @@ return (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Watch className="h-5 w-5 text-blue-500" />
-                      <h4 className="font-medium">Garmin Integration</h4>
+                      <h4 className="font-medium text-white/90">Garmin Integration</h4>
                     </div>
 
                     {!garminConnected ? (
                       <button
                         onClick={connectGarmin}
-                        className="w-full px-4 py-3 text-white bg-blue-500 hover:bg-blue-600 transition-colors font-medium rounded-md"
+                        className="w-full px-4 py-3 text-white bg-blue-500 hover:bg-blue-600 transition-colors font-medium rounded-full"
+                        style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         Connect with Garmin
                       </button>
                     ) : (
                       <div className="space-y-3">
-                        <div className="p-3 bg-green-50 rounded-md">
-                          <p className="text-sm text-green-800">✓ Connected to Garmin</p>
+                        <div className="p-3 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-md">
+                          <p className="text-sm text-cyan-400">✓ Connected to Garmin</p>
                         </div>
                           <button
                             onClick={disconnectGarmin}
-                            className="px-4 py-2 text-red-600 hover:text-red-700 transition-colors text-sm"
+                            className="px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 hover:bg-white/[0.12]"
+                            style={{ fontFamily: 'Inter, sans-serif' }}
                           >
                             Disconnect
                           </button>
@@ -1018,8 +1042,8 @@ return (
                     )}
 
                     {garminMessage && (
-                      <div className="p-3 bg-gray-50 rounded-md">
-                        <p className="text-sm text-gray-700">{garminMessage}</p>
+                      <div className="p-3 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-md">
+                        <p className="text-sm text-white/90">{garminMessage}</p>
                       </div>
                     )}
                   </div>
@@ -1041,7 +1065,7 @@ return (
               <div className="pt-8 pb-8">
                 {saveMessage && (
                   <div className={`text-center mb-4 text-sm ${
-                    saveMessage.includes('Error') ? 'text-red-600' : 'text-green-600'
+                    saveMessage.includes('Error') ? 'text-red-400' : 'text-cyan-400'
                   }`}>
                     {saveMessage}
                   </div>
@@ -1050,7 +1074,8 @@ return (
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                    className="w-full py-3 text-gray-700 hover:text-gray-900 transition-colors font-medium disabled:text-gray-400"
+                    className="w-full py-3 px-4 rounded-full bg-white/[0.12] border border-white/50 text-white hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 font-medium disabled:bg-white/[0.05] disabled:border-white/20 disabled:text-white/40"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                     {saving ? 'Saving...' : 'Save Baselines'}
                 </button>

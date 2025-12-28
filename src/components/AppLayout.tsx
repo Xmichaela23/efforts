@@ -982,26 +982,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     );
   }
 
-  // Show training baselines
-  if (showTrainingBaselines) {
-    return (
-      <TrainingBaselines
-        onClose={handleBackToDashboard}
-        onOpenBaselineTest={(testName: string) => {
-          const today = new Date().toISOString().split('T')[0];
-          setShowTrainingBaselines(false);
-          setLoggerScheduledWorkout({
-            name: testName,
-            type: 'strength',
-            date: today,
-            workout_status: 'planned'
-          });
-          setSelectedDate(today);
-          setShowStrengthLogger(true);
-        }}
-      />
-    );
-  }
+  // Training baselines is now included in main layout flow below
 
 
   if (loading) {
@@ -1195,6 +1176,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               <ContextTabs
                 onClose={handleCloseContext}
                 focusWorkoutId={contextFocusWorkoutId}
+              />
+            </div>
+          ) : showTrainingBaselines ? (
+            <div className="pt-4 h-full" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
+              <TrainingBaselines
+                onClose={handleBackToDashboard}
+                onOpenBaselineTest={(testName: string) => {
+                  const today = new Date().toISOString().split('T')[0];
+                  setShowTrainingBaselines(false);
+                  setLoggerScheduledWorkout({
+                    name: testName,
+                    type: 'strength',
+                    date: today,
+                    workout_status: 'planned'
+                  });
+                  setSelectedDate(today);
+                  setShowStrengthLogger(true);
+                }}
               />
             </div>
           ) : showBuilder ? (
