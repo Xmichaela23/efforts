@@ -2865,7 +2865,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       
                       {/* Rest timer - only show when rest is actually needed */}
                       {showRestTimer && (
-                        <div className="flex items-center gap-2 mt-4 mb-0.5 ml-8 relative">
+                        <div className="flex items-center gap-2 mt-6 mb-0.5 ml-8 relative">
                           <span className="text-xs text-white/60">Rest</span>
                           <button
                             onClick={() => {
@@ -3169,7 +3169,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       // Only show Plates/Barbell UI for barbell exercises
                       if (exerciseType === 'barbell') {
                         return (
-                          <div className="flex items-center justify-between mt-0.5">
+                          <div className="flex items-center justify-between mt-0.5 mb-2">
                             <button
                               onClick={() => togglePlateCalc(exercise.id, setIndex)}
                               className="text-xs text-white/70 flex items-center gap-1 hover:text-white/90 transition-colors"
@@ -3218,11 +3218,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       // Only show PlateMath for barbell exercises
                       if (exerciseType === 'barbell' && expandedPlates[`${exercise.id}-${setIndex}`]) {
                         return (
-                          <PlateMath
-                            weight={set.weight}
-                            barType={set.barType || 'standard'}
-                            useImperial={true}
-                          />
+                          <div className="mb-2">
+                            <PlateMath
+                              weight={set.weight}
+                              barType={set.barType || 'standard'}
+                              useImperial={true}
+                            />
+                          </div>
                         );
                       }
                       return null;
