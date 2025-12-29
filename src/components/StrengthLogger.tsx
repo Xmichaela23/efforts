@@ -2462,21 +2462,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Don't render until properly initialized
   if (!isInitialized) {
     return (
-      <div 
-        className="min-h-screen pb-20"
-        style={{
-          background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
-          backgroundImage: `
-            radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
-            radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
-            radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
-            linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
-            linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
-            linear-gradient(to bottom, #27272a, #18181b, #000000)
-          `,
-          backgroundAttachment: 'fixed'
-        }}
-      >
+      <div className="min-h-screen pb-20">
         <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 pb-4 mb-4 rounded-xl">
           <div className="flex items-center w-full px-4">
             <h1 className="text-xl font-medium text-white/90">Loading...</h1>
@@ -2487,21 +2473,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   }
 
   return (
-    <div 
-      className="min-h-screen pb-24"
-      style={{
-        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
-        backgroundImage: `
-          radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
-          radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
-          radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
-          linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
-          linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
-          linear-gradient(to bottom, #27272a, #18181b, #000000)
-        `,
-        backgroundAttachment: 'fixed'
-      }}
-    >
+    <div className="min-h-screen pb-24">
       {/* Header */}
       <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 pb-2 mb-2 rounded-xl">
         <div className="flex items-center justify-between w-full px-4">
@@ -2710,7 +2682,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </div>
         )}
         {exercises.map((exercise, exerciseIndex) => (
-          <div key={exercise.id} className="bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-xl">
+          <div 
+            key={exercise.id} 
+            className="backdrop-blur-lg border border-white/25 rounded-xl mx-3 mb-2"
+            style={{
+              background: 'linear-gradient(to bottom, rgba(39, 39, 42, 0.95), rgba(24, 24, 27, 0.95), rgba(0, 0, 0, 0.95))',
+              backgroundImage: `
+                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 60%),
+                radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 60%)
+              `
+            }}
+          >
             {/* Core Work exercises use the CoreTimer component */}
             {isCoreWorkExercise(exercise.name) ? (
               <div className="p-2">
