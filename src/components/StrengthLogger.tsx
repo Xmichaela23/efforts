@@ -2540,8 +2540,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               )}
             </div>
             <div className="relative">
-              <button onClick={()=>{ setShowAddonsMenu(v=>!v); setShowPlannedMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Warm‑up • Core</button>
-              {showAddonsMenu && (
+              {/* Temporarily hidden */}
+              {/* Temporarily hidden */}
+              {false && (
+                <>
+                  <button onClick={()=>{ setShowAddonsMenu(v=>!v); setShowPlannedMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Warm‑up • Core</button>
+                  {showAddonsMenu && (
               <div className="absolute right-0 mt-1.5 w-72 bg-white/[0.12] backdrop-blur-lg border border-white/25 rounded-xl shadow-xl z-50 p-2">
                 <div className="space-y-1">
                   <div>
@@ -2580,7 +2584,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   {/* Mobility category removed per request */}
                 </div>
               </div>
-            )}
+                  )}
+                </>
+              )}
           </div>
         </div>
         </div>
