@@ -185,11 +185,11 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
   const progress = ((duration - timeRemaining) / duration) * 100;
   
   return (
-    <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border border-orange-200">
+    <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-xl p-4 shadow-lg">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-orange-800">Core Timer</h3>
-        <span className="text-sm text-orange-600">{Math.floor(duration / 60)} min - your choice</span>
+        <h3 className="text-lg font-semibold text-white/90">Core Timer</h3>
+        <span className="text-sm text-white/60">{Math.floor(duration / 60)} min - your choice</span>
       </div>
       
       {/* Timer Display */}
@@ -205,7 +205,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
               cx="48"
               cy="48"
               r="44"
-              stroke="#fed7aa"
+              stroke="rgba(255, 255, 255, 0.15)"
               strokeWidth="6"
               fill="none"
             />
@@ -213,7 +213,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
               cx="48"
               cy="48"
               r="44"
-              stroke="#f97316"
+              stroke="#f59e0b"
               strokeWidth="6"
               fill="none"
               strokeDasharray={`${2 * Math.PI * 44}`}
@@ -231,11 +231,12 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                 onBlur={handleDurationSubmit}
                 onKeyDown={(e) => e.key === 'Enter' && handleDurationSubmit()}
                 autoFocus
-                className="w-16 text-center text-xl font-mono font-bold bg-white border border-orange-300 rounded px-1"
+                className="w-16 text-center text-xl font-mono font-bold bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-lg px-1 text-white/90 placeholder:text-white/30 focus:outline-none focus:border-white/40"
                 placeholder="5:00"
+                style={{ fontFamily: 'Inter, sans-serif' }}
               />
             ) : (
-              <span className={`text-2xl font-mono font-bold ${timeRemaining <= 30 ? 'text-red-600' : 'text-orange-700'}`}>
+              <span className={`text-2xl font-mono font-bold ${timeRemaining <= 30 ? 'text-red-400' : 'text-white/90'}`}>
                 {formatTime(timeRemaining)}
               </span>
             )}
@@ -246,18 +247,20 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
         <div className="flex flex-col gap-2">
           <button
             onClick={handleStartPause}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-full font-light tracking-wide transition-all duration-300 ${
               isRunning 
-                ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' 
-                : 'bg-orange-500 text-white hover:bg-orange-600'
+                ? 'bg-white/[0.12] border border-white/35 text-white/90 hover:bg-white/[0.15] hover:border-white/45' 
+                : 'bg-amber-500/80 text-white hover:bg-amber-500 border border-amber-400/50'
             }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
           >
             {isRunning ? <Pause size={18} /> : <Play size={18} />}
             {isRunning ? 'Pause' : 'Start'}
           </button>
           <button
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-full font-light tracking-wide bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300"
+            style={{ fontFamily: 'Inter, sans-serif' }}
           >
             <RotateCcw size={18} />
             Reset
@@ -267,7 +270,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
       
       {/* Exercise List */}
       <div className="space-y-2">
-        <div className="text-sm font-medium text-orange-700 mb-2">Log your exercises:</div>
+        <div className="text-sm font-medium text-white/80 mb-2">Log your exercises:</div>
         
         {exercises.map((ex, index) => (
           <div key={ex.id} className="relative">
@@ -277,8 +280,8 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                 onClick={() => toggleCompleted(ex.id)}
                 className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
                   ex.completed 
-                    ? 'bg-green-500 border-green-500 text-white' 
-                    : 'border-gray-300 hover:border-orange-400'
+                    ? 'bg-cyan-400/20 border-cyan-400/50 text-cyan-400' 
+                    : 'border-white/25 bg-white/[0.05] hover:border-white/40'
                 }`}
               >
                 {ex.completed && <Check size={14} />}
@@ -293,19 +296,23 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                   onFocus={() => setFocusedExerciseId(ex.id)}
                   onBlur={handleBlur}
                   placeholder="Exercise name..."
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 ${
-                    ex.completed ? 'bg-green-50 line-through text-gray-500' : 'bg-white'
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-0 ${
+                    ex.completed 
+                      ? 'bg-white/[0.03] line-through text-white/40 border-white/10' 
+                      : 'bg-white/[0.05] backdrop-blur-lg border-white/15 text-white/80 placeholder:text-white/30 focus:border-white/30 focus:bg-white/[0.08]'
                   }`}
+                  style={{ fontFamily: 'Inter, sans-serif' }}
                 />
                 
                 {/* Autocomplete dropdown */}
                 {focusedExerciseId === ex.id && suggestions.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <div className="absolute z-10 w-full mt-1 bg-white/[0.12] backdrop-blur-lg border border-white/25 rounded-lg shadow-xl max-h-48 overflow-y-auto">
                     {suggestions.map((suggestion, i) => (
                       <button
                         key={i}
                         onClick={() => selectSuggestion(ex.id, suggestion)}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-orange-50 first:rounded-t-lg last:rounded-b-lg"
+                        className="w-full px-3 py-2 text-left text-sm text-white/90 hover:bg-white/[0.15] first:rounded-t-lg last:rounded-b-lg transition-colors"
+                        style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         {suggestion}
                       </button>
@@ -320,18 +327,22 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                 value={ex.amount}
                 onChange={(e) => updateExercise(ex.id, 'amount', e.target.value)}
                 placeholder="Amount"
-                className={`w-20 px-2 py-2 border rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-orange-400 ${
-                  ex.completed ? 'bg-green-50 line-through text-gray-500' : 'bg-white'
+                className={`w-20 px-2 py-2 border rounded-lg text-sm text-center focus:outline-none focus:ring-0 ${
+                  ex.completed 
+                    ? 'bg-white/[0.03] line-through text-white/40 border-white/10' 
+                    : 'bg-white/[0.05] backdrop-blur-lg border-white/15 text-white/80 placeholder:text-white/30 focus:border-white/30 focus:bg-white/[0.08]'
                 }`}
+                style={{ fontFamily: 'Inter, sans-serif' }}
               />
               
               {/* Remove button */}
               {exercises.length > 1 && (
                 <button
                   onClick={() => removeExercise(ex.id)}
-                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                  className="p-2 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/60 hover:text-red-400 hover:border-red-400 transition-all duration-300 h-8 w-8 flex items-center justify-center flex-shrink-0"
+                  aria-label="Remove exercise"
                 >
-                  <X size={18} />
+                  <X size={16} />
                 </button>
               )}
             </div>
@@ -341,7 +352,8 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
         {/* Add exercise button */}
         <button
           onClick={addExercise}
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-orange-600 hover:bg-orange-100 rounded-lg transition-colors"
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-white/70 hover:text-white/90 hover:bg-white/[0.05] rounded-lg transition-colors"
+          style={{ fontFamily: 'Inter, sans-serif' }}
         >
           <Plus size={16} />
           Add exercise
@@ -350,7 +362,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
       
       {/* Elapsed time note */}
       {totalElapsed > 0 && (
-        <div className="mt-4 text-center text-sm text-gray-500">
+        <div className="mt-4 text-center text-sm text-white/60">
           Total time: {formatTime(totalElapsed)}
         </div>
       )}
