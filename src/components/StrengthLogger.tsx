@@ -2491,7 +2491,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <div className="relative">
               <button onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Pick planned</button>
               {showPlannedMenu && (
-                <div className="absolute right-0 mt-1.5 w-72 bg-zinc-900/98 border border-white/30 rounded-xl shadow-2xl z-[100] p-2">
+                <div className="absolute right-0 mt-1.5 w-72 bg-black border border-white/30 rounded-xl shadow-2xl z-[100] p-2">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="text-xs font-semibold text-white/60">Strength (Next 14 days)</div>
                     <button 
