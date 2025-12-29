@@ -3073,14 +3073,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               value={set.resistance_level || 'Light'}
                               onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
                             >
-                              <SelectTrigger className="h-9 text-center text-sm border-gray-300 flex-1">
+                              <SelectTrigger className="h-9 text-center text-sm border-white/15 bg-white/[0.05] backdrop-blur-lg rounded-lg text-white/80 placeholder:text-white/30 flex-1 focus:ring-0 focus:border-white/30 focus:bg-white/[0.08]">
                                 <SelectValue placeholder="Resistance" />
                               </SelectTrigger>
-                              <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
-                                <SelectItem value="Light">Light</SelectItem>
-                                <SelectItem value="Medium">Medium</SelectItem>
-                                <SelectItem value="Heavy">Heavy</SelectItem>
-                                <SelectItem value="Extra Heavy">Extra Heavy</SelectItem>
+                              <SelectContent className="bg-white/[0.08] backdrop-blur-lg border border-white/25 shadow-xl z-50 text-white/90">
+                                <SelectItem value="Light" className="hover:bg-white/[0.12]">Light</SelectItem>
+                                <SelectItem value="Medium" className="hover:bg-white/[0.12]">Medium</SelectItem>
+                                <SelectItem value="Heavy" className="hover:bg-white/[0.12]">Heavy</SelectItem>
+                                <SelectItem value="Extra Heavy" className="hover:bg-white/[0.12]">Extra Heavy</SelectItem>
                               </SelectContent>
                             </Select>
                           );
