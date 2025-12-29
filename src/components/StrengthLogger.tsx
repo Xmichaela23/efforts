@@ -150,7 +150,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
   };
 
   return (
-    <div className="bg-gray-50">
+    <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-xl mx-3 mb-2">
       {/* Collapsed state */}
       {!isExpanded ? (
         <button
@@ -158,10 +158,10 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
           className="w-full px-4 py-3 flex items-center justify-between"
         >
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">▶</span>
-            <span className="text-sm font-medium">Quick check-in (optional)</span>
+            <span className="text-sm text-white/60">▶</span>
+            <span className="text-sm font-medium text-white/90">Quick check-in (optional)</span>
           </div>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-white/60">
             Energy • Soreness • Sleep
           </span>
         </button>
@@ -172,58 +172,58 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
             onClick={onToggle}
             className="w-full flex items-center gap-2 mb-4"
           >
-            <span className="text-sm text-gray-600">▼</span>
-            <span className="text-sm font-medium">Quick check-in</span>
+            <span className="text-sm text-white/60">▼</span>
+            <span className="text-sm font-medium text-white/90">Quick check-in</span>
           </button>
           
           {/* Energy slider */}
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium">Energy level</label>
-              <span className="text-lg">{energy}</span>
+              <label className="text-sm font-medium text-white/90">Energy level</label>
+              <span className="text-lg text-white/90">{energy}</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">Low</span>
+              <span className="text-sm text-white/60">Low</span>
               <input
                 type="range"
                 min="1"
                 max="10"
                 value={energy}
                 onChange={(e) => setEnergy(Number(e.target.value))}
-                className="flex-1 h-2 bg-gray-200 rounded-lg"
+                className="flex-1 h-2 bg-white/[0.15] rounded-lg"
               />
-              <span className="text-sm text-gray-500">High</span>
+              <span className="text-sm text-white/60">High</span>
             </div>
           </div>
           
           {/* Soreness slider */}
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium">Muscle soreness</label>
-              <span className="text-lg">{soreness}</span>
+              <label className="text-sm font-medium text-white/90">Muscle soreness</label>
+              <span className="text-lg text-white/90">{soreness}</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">None</span>
+              <span className="text-sm text-white/60">None</span>
               <input
                 type="range"
                 min="0"
                 max="10"
                 value={soreness}
                 onChange={(e) => setSoreness(Number(e.target.value))}
-                className="flex-1 h-2 bg-gray-200 rounded-lg"
+                className="flex-1 h-2 bg-white/[0.15] rounded-lg"
               />
-              <span className="text-sm text-gray-500">Severe</span>
+              <span className="text-sm text-white/60">Severe</span>
             </div>
           </div>
           
           {/* Sleep input */}
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium">Sleep last night</label>
-              <span className="text-lg">{sleep}h</span>
+              <label className="text-sm font-medium text-white/90">Sleep last night</label>
+              <span className="text-lg text-white/90">{sleep}h</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">0h</span>
+              <span className="text-sm text-white/60">0h</span>
               <input
                 type="range"
                 min="0"
@@ -231,15 +231,16 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
                 step="0.5"
                 value={sleep}
                 onChange={(e) => setSleep(Number(e.target.value))}
-                className="flex-1 h-2 bg-gray-200 rounded-lg"
+                className="flex-1 h-2 bg-white/[0.15] rounded-lg"
               />
-              <span className="text-sm text-gray-500">12h</span>
+              <span className="text-sm text-white/60">12h</span>
             </div>
           </div>
           
           <button
             onClick={handleSubmit}
-            className="w-full py-2 text-gray-700 hover:text-gray-900 text-sm font-medium"
+            className="w-full py-2 rounded-full bg-white/[0.12] border border-white/50 text-white hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 text-sm font-medium"
+            style={{ fontFamily: 'Inter, sans-serif' }}
           >
             Save
           </button>
@@ -2462,9 +2463,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   if (!isInitialized) {
     return (
       <div className="min-h-screen pb-20">
-        <div className="bg-white pb-4 mb-4">
-          <div className="flex items-center w-full">
-            <h1 className="text-xl font-medium text-gray-700">Loading...</h1>
+        <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 pb-4 mb-4 rounded-xl">
+          <div className="flex items-center w-full px-4">
+            <h1 className="text-xl font-medium text-white/90">Loading...</h1>
           </div>
         </div>
       </div>
@@ -2474,9 +2475,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   return (
     <div className="min-h-screen pb-24">
       {/* Header */}
-      <div className="bg-white pb-2 mb-2">
-        <div className="flex items-center justify-between w-full">
-          <h1 className="text-xl font-medium text-gray-700">
+      <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 pb-2 mb-2 rounded-xl">
+        <div className="flex items-center justify-between w-full px-4">
+          <h1 className="text-xl font-medium text-white/90">
             {(() => {
               const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
               if (mode === 'mobility') return 'Log Mobility';
@@ -2485,11 +2486,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </h1>
           <div className="flex items-center gap-2">
             <div className="relative">
-              <button onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 rounded-md text-gray-700 hover:text-gray-900 border border-transparent hover:bg-gray-50">Pick planned</button>
+              <button onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Pick planned</button>
               {showPlannedMenu && (
-                <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
+                <div className="absolute right-0 mt-1.5 w-72 bg-white/[0.12] backdrop-blur-lg border border-white/25 rounded-xl shadow-xl z-50 p-2">
                   <div className="flex items-center justify-between mb-1.5">
-                    <div className="text-xs font-semibold text-gray-500">Strength (Next 14 days)</div>
+                    <div className="text-xs font-semibold text-white/60">Strength (Next 14 days)</div>
                     <button 
                       onClick={() => {
                         clearSessionProgress();
@@ -2503,7 +2504,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         setLockManualPrefill(false);
                         setShowPlannedMenu(false);
                       }}
-                      className="text-xs text-blue-600 hover:text-blue-800"
+                      className="text-xs text-cyan-400 hover:text-cyan-300"
                     >
                       Start Fresh
                     </button>
@@ -2526,9 +2527,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           setSourcePlannedId(w.id); 
                           setSourcePlannedDate(w.date); 
                           setShowPlannedMenu(false); 
-                        }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between" type="button">
+                        }} className="w-full text-left px-2 py-1.5 rounded hover:bg-white/[0.08] text-sm flex items-center justify-between text-white/90" type="button">
                           <span>{weekdayShortFromYmd(w.date)} — {w.name||'Strength'}</span>
-                          <span className="text-2xs px-1.5 py-0.5 rounded border border-gray-200 text-gray-600">{String(w.workout_status||'planned')}</span>
+                          <span className="text-2xs px-1.5 py-0.5 rounded border border-white/25 text-white/60 bg-white/[0.05]">{String(w.workout_status||'planned')}</span>
                         </button>
                       ))}
                   </div>
@@ -2536,41 +2537,41 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               )}
             </div>
             <div className="relative">
-              <button onClick={()=>{ setShowAddonsMenu(v=>!v); setShowPlannedMenu(false); }} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Warm‑up • Core</button>
+              <button onClick={()=>{ setShowAddonsMenu(v=>!v); setShowPlannedMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Warm‑up • Core</button>
               {showAddonsMenu && (
-              <div className="absolute right-0 mt-1.5 w-72 bg-white rounded-md shadow-xl z-50 p-2">
+              <div className="absolute right-0 mt-1.5 w-72 bg-white/[0.12] backdrop-blur-lg border border-white/25 rounded-xl shadow-xl z-50 p-2">
                 <div className="space-y-1">
                   <div>
-                    <div className="text-xs text-gray-600 px-1 mb-1">Warm‑Up</div>
+                    <div className="text-xs text-white/60 px-1 mb-1">Warm‑Up</div>
                     {!showWarmupChooser ? (
                       <div className="grid grid-cols-2 gap-2">
-                        <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
+                        <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>5 min</button>
                       </div>
                     ) : (
-                      <div className="p-2 border rounded">
-                        <div className="text-xs text-gray-600 mb-1">Category</div>
+                      <div className="p-2 border border-white/25 rounded-xl bg-white/[0.05]">
+                        <div className="text-xs text-white/60 mb-1">Category</div>
                         <div className="flex flex-wrap gap-1.5 mb-2">
                           {['push','squat','hinge','pull','general','power'].map(cat => (
-                            <button key={cat} onClick={()=>setSelectedWarmupCategory(cat)} className={`px-2 py-0.5 rounded border text-xs ${selectedWarmupCategory===cat? 'bg-gray-100 border-gray-400 text-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>{cat}</button>
+                            <button key={cat} onClick={()=>setSelectedWarmupCategory(cat)} className={`px-2 py-0.5 rounded-full border text-xs transition-all duration-300 ${selectedWarmupCategory===cat? 'bg-white/[0.12] border-white/50 text-white' : 'border-white/25 bg-white/[0.08] text-white/80 hover:bg-white/[0.10] hover:border-white/35'}`} style={{ fontFamily: 'Inter, sans-serif' }}>{cat}</button>
                           ))}
                         </div>
-                        <div className="text-xs text-gray-600 mb-1">Variant</div>
+                        <div className="text-xs text-white/60 mb-1">Variant</div>
                         <div className="flex flex-wrap gap-1.5 mb-2">
                           {['A','B','C','D','E','F'].map(v => (
-                            <button key={v} onClick={()=>setSelectedWarmupVariant(v)} className={`px-2 py-0.5 rounded border text-xs ${selectedWarmupVariant===v? 'bg-gray-100 border-gray-400 text-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>{v}</button>
+                            <button key={v} onClick={()=>setSelectedWarmupVariant(v)} className={`px-2 py-0.5 rounded-full border text-xs transition-all duration-300 ${selectedWarmupVariant===v? 'bg-white/[0.12] border-white/50 text-white' : 'border-white/25 bg-white/[0.08] text-white/80 hover:bg-white/[0.10] hover:border-white/35'}`} style={{ fontFamily: 'Inter, sans-serif' }}>{v}</button>
                           ))}
                         </div>
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={()=>setShowWarmupChooser(false)} className="text-xs text-gray-700 hover:text-gray-900">Cancel</button>
-                          <button onClick={attachChosenWarmup} className="text-xs px-2 py-1 rounded bg-gray-900 text-white">Attach</button>
+                          <button onClick={()=>setShowWarmupChooser(false)} className="text-xs text-white/70 hover:text-white/90">Cancel</button>
+                          <button onClick={attachChosenWarmup} className="text-xs px-2 py-1 rounded-full bg-white/[0.12] border border-white/50 text-white hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Attach</button>
                         </div>
                       </div>
                     )}
                   </div>
                   <div>
-                    <div className="text-xs text-gray-600 px-1 mb-1">Core</div>
+                    <div className="text-xs text-white/60 px-1 mb-1">Core</div>
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
+                      <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>5 min</button>
                     </div>
                   </div>
                   {/* Mobility category removed per request */}
@@ -2581,7 +2582,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         </div>
         </div>
         {sourcePlannedName && (
-          <div className="mt-2 text-sm text-gray-600">Source: {sourcePlannedName}</div>
+          <div className="mt-2 text-sm text-white/60 px-4">Source: {sourcePlannedName}</div>
         )}
       </div>
 
@@ -2598,11 +2599,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         {attachedAddons.length>0 && (
           <div className="px-3 space-y-2">
             {attachedAddons.map((a,idx)=> (
-              <div key={idx} className="rounded border border-gray-200">
+              <div key={idx} className="rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25">
                 <div className="flex items-center justify-between p-2">
-                  <div className="text-sm text-gray-800">{a.name}</div>
+                  <div className="text-sm text-white/90">{a.name}</div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">{formatSeconds(a.seconds)}</span>
+                    <span className="text-xs text-white/60">{formatSeconds(a.seconds)}</span>
                     {!a.completed ? (
                       <button onClick={()=>{
                         const updatedAddons = attachedAddons.map((x,i)=> i===idx?{...x, running: !x.running }:x);
@@ -2610,11 +2611,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (isInitialized && exercises.length > 0) {
                           saveSessionProgress(exercises, updatedAddons, notesText, notesRpe);
                         }
-                      }} className="px-2 py-1 text-xs border rounded">
+                      }} className="px-2 py-1 text-xs rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>
                         {a.running? 'Pause' : 'Start'}
                       </button>
                     ) : (
-                      <span className="text-green-600 text-xs">✓ Done</span>
+                      <span className="text-cyan-400 text-xs">✓ Done</span>
                     )}
                     {/* Remove addon */}
                     <button
@@ -2627,7 +2628,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           saveSessionProgress(exercises, updated, notesText, notesRpe);
                         }
                       }}
-                      className="text-gray-400 hover:text-red-600 h-7 w-7 flex items-center justify-center"
+                      className="text-white/60 hover:text-red-400 h-7 w-7 flex items-center justify-center transition-colors"
                       aria-label="Remove addon"
                     >
                       <X className="h-4 w-4" />
@@ -2636,12 +2637,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 </div>
                 {a.sequence && a.sequence.length>0 && (
                   <div className="px-2 pb-1.5">
-                    <div className="text-xs text-gray-500 mb-0.5">Sequence</div>
-                    <div className="divide-y divide-gray-100 border border-gray-100 rounded">
+                    <div className="text-xs text-white/60 mb-0.5">Sequence</div>
+                    <div className="divide-y divide-white/10 border border-white/10 rounded-xl bg-white/[0.05]">
                       {a.sequence.map((step, sIdx)=> (
-                        <div key={sIdx} className="flex items-center justify-between px-2 py-1.5 bg-white">
-                          <div className="text-sm text-gray-700">{step.move}</div>
-                          <div className="text-xs text-gray-500">{Math.round(step.time_sec/60)}m{String(step.time_sec%60).padStart(2,'0')}s</div>
+                        <div key={sIdx} className="flex items-center justify-between px-2 py-1.5">
+                          <div className="text-sm text-white/90">{step.move}</div>
+                          <div className="text-xs text-white/60">{Math.round(step.time_sec/60)}m{String(step.time_sec%60).padStart(2,'0')}s</div>
                         </div>
                       ))}
                     </div>
@@ -2654,11 +2655,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         {pendingOrOptions && pendingOrOptions.length > 1 && (
           <div className="px-3">
             <div className="flex items-center flex-wrap gap-2 text-sm">
-              <span className="text-gray-600">Choose one:</span>
+              <span className="text-white/70">Choose one:</span>
               {pendingOrOptions.map((opt, idx) => (
                 <button
                   key={idx}
-                  className="px-2 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  className="px-2 py-1 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
                   onClick={() => {
                     // Replace/add the chosen OR as simple prefilled sets (lower rep bound)
                     setExercises(prev => {
@@ -2680,7 +2682,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </div>
         )}
         {exercises.map((exercise, exerciseIndex) => (
-          <div key={exercise.id} className="bg-white">
+          <div key={exercise.id} className="bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-xl">
             {/* Core Work exercises use the CoreTimer component */}
             {isCoreWorkExercise(exercise.name) ? (
               <div className="p-2">
@@ -2717,8 +2719,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <div className="p-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 relative">
-                  <div className="flex items-center border border-gray-200 bg-white">
-                    <div className="pl-3 text-gray-400">
+                  <div className="flex items-center border border-white/25 bg-white/[0.08] backdrop-blur-lg rounded-lg">
+                    <div className="pl-3 text-white/60">
                       <Search className="h-4 w-4" />
                     </div>
                     <Input
@@ -2736,12 +2738,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       onBlur={() => {
                         setTimeout(() => setActiveDropdown(null), 150);
                       }}
-                      className="h-10 text-base font-medium border-gray-300"
-                      style={{ fontSize: '16px' }}
+                      className="h-10 text-base font-medium border-none bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0"
+                      style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                     />
                   </div>
                   {activeDropdown === exercise.id && exercise.name.length > 0 && (
-                    <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 shadow-lg z-50 max-h-32 overflow-y-auto">
+                    <div className="absolute top-11 left-0 right-0 bg-white/[0.12] backdrop-blur-lg border border-white/25 rounded-xl shadow-xl z-50 max-h-32 overflow-y-auto">
                       {getFilteredExercises(exercise.name).map((suggestion, index) => (
                         <button
                           key={index}
@@ -2750,7 +2752,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             updateExerciseName(exercise.id, suggestion, true);
                             setActiveDropdown(null);
                           }}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm min-h-[36px] flex items-center"
+                          className="w-full text-left px-3 py-2 hover:bg-white/[0.08] text-sm min-h-[36px] flex items-center text-white/90"
                         >
                           {suggestion}
                         </button>
@@ -2760,7 +2762,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 </div>
                 <button
                   onClick={() => toggleExerciseExpanded(exercise.id)}
-                  className="p-2 text-gray-500 hover:text-gray-700"
+                  className="p-2 text-white/60 hover:text-white/90 transition-colors"
                 >
                   {expandedExercises[exercise.id] ? 
                     <ChevronUp className="h-4 w-4" /> : 
@@ -2772,7 +2774,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     onClick={() => deleteExercise(exercise.id)} 
                     variant="ghost" 
                     size="sm"
-                    className="text-gray-600 hover:text-gray-800 h-8 w-8 p-0 flex-shrink-0"
+                    className="text-white/60 hover:text-red-400 h-8 w-8 p-0 flex-shrink-0"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -3280,9 +3282,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         ))}
 
         {/* Add new exercise input */}
-        <div className="relative bg-white px-3 pt-0 pb-0">
-          <div className="relative flex items-center border border-gray-200 bg-white rounded-md">
-            <div className="pl-2 text-gray-400">
+        <div className="relative bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-xl px-3 pt-0 pb-0">
+          <div className="relative flex items-center border border-white/25 bg-white/[0.08] backdrop-blur-lg rounded-lg">
+            <div className="pl-2 text-white/60">
               <Search className="h-4 w-4" />
             </div>
             <Input
@@ -3290,8 +3292,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               value={currentExercise}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="h-8 text-sm border-gray-300 pr-9"
-              style={{ fontSize: '16px' }}
+              className="h-8 text-sm border-none bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0 pr-9"
+              style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
             />
             {currentExercise && (
               <button
@@ -3323,10 +3325,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       </div>
 
       {/* Fixed bottom save action (text-only per design) */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-gray-200 z-[100]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/[0.12] backdrop-blur-lg border-t border-white/25 z-[100]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
         <button 
           onClick={saveWorkout}
-          className="w-full h-12 text-base font-medium text-black hover:text-blue-600"
+          className="w-full h-12 text-base font-medium text-white hover:text-cyan-400 transition-colors rounded-full bg-white/[0.08] border border-white/25 hover:bg-white/[0.12] hover:border-white/35"
+          style={{ fontFamily: 'Inter, sans-serif' }}
         >
           Save
         </button>
@@ -3336,51 +3339,51 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       {showNotesModal && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={isSaving || isSaved ? undefined : ()=>setShowNotesModal(false)} />
-          <div className="relative w-full sm:w-[520px] bg-white rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
-            <h3 className="text-lg font-semibold mb-3">How did it feel?</h3>
+          <div className="relative w-full sm:w-[520px] bg-white/[0.12] backdrop-blur-lg border border-white/25 rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+            <h3 className="text-lg font-semibold mb-3 text-white/90">How did it feel?</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-sm text-gray-600">Notes</label>
+                <label className="text-sm text-white/70">Notes</label>
                 <textarea value={notesText} onChange={(e)=>{
                   setNotesText(e.target.value);
                   if (isInitialized && exercises.length > 0) {
                     saveSessionProgress(exercises, attachedAddons, e.target.value, notesRpe);
                   }
-                }} rows={4} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="" />
+                }} rows={4} className="mt-1 w-full bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-lg p-2 text-sm text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40" placeholder="" style={{ fontFamily: 'Inter, sans-serif' }} />
               </div>
               <div>
-                <label className="text-sm text-gray-600">RPE (1–10)</label>
+                <label className="text-sm text-white/70">RPE (1–10)</label>
                 <input type="number" min={1} max={10} value={notesRpe} onChange={(e)=>{
                   const newRpe = e.target.value?Math.max(1, Math.min(10, parseInt(e.target.value)||0)): '';
                   setNotesRpe(newRpe);
                   if (isInitialized && exercises.length > 0) {
                     saveSessionProgress(exercises, attachedAddons, notesText, newRpe);
                   }
-                }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm text-center bg-white" placeholder="—" />
+                }} className="mt-1 w-full bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-lg p-2 text-sm text-center text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40" placeholder="—" style={{ fontFamily: 'Inter, sans-serif' }} />
               </div>
             </div>
-            <div className="mt-4 sticky bottom-0 bg-white pt-3">
+            <div className="mt-4 sticky bottom-0 bg-white/[0.12] backdrop-blur-lg pt-3 rounded-lg">
               <div className="flex items-center gap-4">
                 {isSaving || isSaved ? (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 flex-1 justify-center">
+                  <div className="flex items-center gap-2 text-sm text-white/70 flex-1 justify-center">
                     {isSaving && (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
                         <span>Saving workout... (you don't need to stay here)</span>
                       </>
                     )}
                     {isSaved && (
                       <>
-                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <CheckCircle className="h-4 w-4 text-cyan-400" />
                         <span>Saved!</span>
                       </>
                     )}
                   </div>
                 ) : (
                   <>
-                    <button onClick={()=>setShowNotesModal(false)} className="text-sm text-gray-700 hover:text-gray-900">Cancel</button>
-                    <button onClick={()=>{ finalizeSave(); }} className="text-sm text-gray-700 hover:text-gray-900">Skip</button>
-                    <button onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="text-sm text-black hover:text-blue-600">Save</button>
+                    <button onClick={()=>setShowNotesModal(false)} className="text-sm text-white/70 hover:text-white/90">Cancel</button>
+                    <button onClick={()=>{ finalizeSave(); }} className="text-sm text-white/70 hover:text-white/90">Skip</button>
+                    <button onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="text-sm text-white hover:text-cyan-400 rounded-full px-3 py-1.5 bg-white/[0.12] border border-white/50 hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Save</button>
                   </>
                 )}
               </div>
@@ -3437,33 +3440,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       {showSessionRPE && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={isSaving || isSaved ? undefined : handleSessionRPESkip} />
-          <div className="relative w-full max-w-md mx-4 bg-white rounded-lg shadow-xl p-6 z-10">
+          <div className="relative w-full max-w-md mx-4 bg-white/[0.12] backdrop-blur-lg border border-white/25 rounded-xl shadow-xl p-6 z-10">
             {isSaving ? (
               <div className="flex flex-col items-center justify-center py-8">
-                <Loader2 className="h-12 w-12 text-blue-600 animate-spin mb-4" />
-                <p className="text-lg font-medium text-gray-900">Saving workout...</p>
-                <p className="text-sm text-gray-500 mt-2">(you don't need to stay here while loading)</p>
+                <Loader2 className="h-12 w-12 text-cyan-400 animate-spin mb-4" />
+                <p className="text-lg font-medium text-white/90">Saving workout...</p>
+                <p className="text-sm text-white/60 mt-2">(you don't need to stay here while loading)</p>
               </div>
             ) : isSaved ? (
               <div className="flex flex-col items-center justify-center py-8">
-                <CheckCircle className="h-12 w-12 text-green-600 mb-4" />
-                <p className="text-lg font-medium text-gray-900">Saved!</p>
+                <CheckCircle className="h-12 w-12 text-cyan-400 mb-4" />
+                <p className="text-lg font-medium text-white/90">Saved!</p>
               </div>
             ) : (
               <>
-                <h2 className="text-2xl font-bold mb-2 text-center">
+                <h2 className="text-2xl font-bold mb-2 text-center text-white/90">
                   Workout Complete!
                 </h2>
                 
-                <p className="text-gray-600 mb-8 text-center">
+                <p className="text-white/70 mb-8 text-center">
                   How hard was that session?
                 </p>
                 
                 {/* RPE slider */}
                 <div className="mb-6">
                   <div className="flex justify-between mb-2">
-                    <span className="text-sm text-gray-500">Easy</span>
-                    <span className="text-sm text-gray-500">Maximal</span>
+                    <span className="text-sm text-white/60">Easy</span>
+                    <span className="text-sm text-white/60">Maximal</span>
                   </div>
                   
                   <input
@@ -3472,12 +3475,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     max="10"
                     value={sessionRPE}
                     onChange={(e) => setSessionRPE(Number(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 bg-white/[0.15] rounded-lg appearance-none cursor-pointer"
                   />
                   
                   <div className="text-center mt-3">
-                    <div className="text-4xl font-bold text-gray-900">{sessionRPE}</div>
-                    <div className="text-sm text-gray-600 mt-1">
+                    <div className="text-4xl font-bold text-white/90">{sessionRPE}</div>
+                    <div className="text-sm text-white/70 mt-1">
                       {getRPELabel(sessionRPE)}
                     </div>
                   </div>
@@ -3486,13 +3489,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 <div className="flex gap-3">
                   <button
                     onClick={handleSessionRPESkip}
-                    className="flex-1 py-4 text-gray-600 hover:text-gray-900"
+                    className="flex-1 py-4 rounded-full bg-white/[0.08] border border-white/25 text-white/80 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
                   >
                     Skip
                   </button>
                   <button
                     onClick={() => handleSessionRPESubmit(sessionRPE)}
-                    className="flex-1 py-4 text-gray-700 hover:text-gray-900 font-medium"
+                    className="flex-1 py-4 rounded-full bg-white/[0.12] border border-white/50 text-white hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 font-medium"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
                   >
                     Submit & Finish
                   </button>
