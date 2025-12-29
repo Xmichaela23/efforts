@@ -3274,7 +3274,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // Show notes section for mobility mode, or if notes exist
                   if (isMobilityMode || exercise.notes) {
                     return (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="mt-3 pt-3 border-t border-white/10">
                         <Textarea
                           id={`notes-${exercise.id}`}
                           value={exercise.notes || ''}
@@ -3289,7 +3289,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           }}
                           placeholder="How did it feel? Any modifications?"
                           rows={3}
-                          className="text-sm"
+                          className="text-sm border-white/15 bg-white/[0.05] backdrop-blur-lg rounded-lg text-white/80 placeholder:text-white/30 focus-visible:ring-0 focus-visible:border-white/30 focus:bg-white/[0.08]"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
                         />
                       </div>
                     );
