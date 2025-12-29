@@ -2462,7 +2462,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Don't render until properly initialized
   if (!isInitialized) {
     return (
-      <div className="min-h-screen pb-20">
+      <div 
+        className="min-h-screen pb-20"
+        style={{
+          background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+          backgroundImage: `
+            radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+            radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+            radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            linear-gradient(to bottom, #27272a, #18181b, #000000)
+          `,
+          backgroundAttachment: 'fixed'
+        }}
+      >
         <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 pb-4 mb-4 rounded-xl">
           <div className="flex items-center w-full px-4">
             <h1 className="text-xl font-medium text-white/90">Loading...</h1>
@@ -2473,7 +2487,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   }
 
   return (
-    <div className="min-h-screen pb-24">
+    <div 
+      className="min-h-screen pb-24"
+      style={{
+        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+        backgroundImage: `
+          radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+          radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+          radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+          linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+          linear-gradient(to bottom, #27272a, #18181b, #000000)
+        `,
+        backgroundAttachment: 'fixed'
+      }}
+    >
       {/* Header */}
       <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 pb-2 mb-2 rounded-xl">
         <div className="flex items-center justify-between w-full px-4">
@@ -3029,7 +3057,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             pattern="[0-9]*"
                             value={set.reps === 0 ? '' : set.reps.toString()}
                             onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                            className="h-9 text-center text-sm border-white/10 bg-white/[0.03] backdrop-blur-md text-white/70 placeholder:text-white/30 flex-1 focus-visible:ring-0 focus-visible:border-white/20"
+                            className="h-9 text-center text-sm border-white/15 bg-white/[0.05] backdrop-blur-lg rounded-lg text-white/80 placeholder:text-white/35 flex-1 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.08]"
                             style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             placeholder="Reps"
                           />
@@ -3079,7 +3107,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 pattern="[0-9]*"
                                 value={set.weight === 0 ? '' : set.weight.toString()}
                                 onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                                className="h-9 text-center text-sm border-white/10 bg-white/[0.03] backdrop-blur-md text-white/70 placeholder:text-white/30 focus-visible:ring-0 focus-visible:border-white/20"
+                                className="h-9 text-center text-sm border-white/15 bg-white/[0.05] backdrop-blur-lg rounded-lg text-white/80 placeholder:text-white/35 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.08]"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                                 placeholder="Weight"
                               />
@@ -3096,7 +3124,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             pattern="[0-9]*"
                             value={set.weight === 0 ? '' : set.weight.toString()}
                             onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                            className="h-9 text-center text-sm border-white/10 bg-white/[0.03] backdrop-blur-md text-white/70 placeholder:text-white/30 flex-1 focus-visible:ring-0 focus-visible:border-white/20"
+                            className="h-9 text-center text-sm border-white/15 bg-white/[0.05] backdrop-blur-lg rounded-lg text-white/80 placeholder:text-white/35 flex-1 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.08]"
                             style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             placeholder="Weight"
                           />
@@ -3116,7 +3144,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             pattern="[0-9]*"
                             value={set.rir || ''}
                             onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                            className="h-9 text-center text-sm border-white/10 bg-white/[0.03] backdrop-blur-md text-white/70 placeholder:text-white/30 w-16 focus-visible:ring-0 focus-visible:border-white/20"
+                            className="h-9 text-center text-sm border-white/15 bg-white/[0.05] backdrop-blur-lg rounded-lg text-white/80 placeholder:text-white/35 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.08]"
                             min="0"
                             max="5"
                             style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
