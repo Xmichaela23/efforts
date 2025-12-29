@@ -317,13 +317,13 @@ const PlateMath: React.FC<{
 
   return (
     <div className="mt-1 p-2 bg-white/[0.05] backdrop-blur-lg border border-white/10 rounded-lg text-xs">
-      <div className="text-white/70 mb-1">{barWeight}{unit} bar + per side:</div>
+      <div className="text-white/70 mb-1">{barWeight}{unit} bar +</div>
       {plateCalc.plates.length > 0 ? (
         <div className="space-y-1">
           {plateCalc.plates.map((plate, index) => (
             <div key={index} className="flex items-center gap-2 text-white/80">
               <span className="text-white/60">{plate.count}x</span>
-              <span>{plate.weight}{unit}</span>
+              <span>{plate.weight}{unit} per side</span>
             </div>
           ))}
         </div>
