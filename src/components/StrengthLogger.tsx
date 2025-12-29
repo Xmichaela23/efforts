@@ -316,24 +316,24 @@ const PlateMath: React.FC<{
   const plateCalc = calculatePlates();
 
   return (
-    <div className="mt-1 p-2 bg-gray-50 text-xs">
-      <div className="text-gray-600 mb-1">{barWeight}{unit} bar + per side:</div>
+    <div className="mt-1 p-2 bg-white/[0.05] backdrop-blur-lg border border-white/10 rounded-lg text-xs">
+      <div className="text-white/70 mb-1">{barWeight}{unit} bar + per side:</div>
       {plateCalc.plates.length > 0 ? (
         <div className="space-y-1">
           {plateCalc.plates.map((plate, index) => (
-            <div key={index} className="flex items-center justify-between text-gray-600">
+            <div key={index} className="flex items-center gap-2 text-white/80">
+              <span className="text-white/60">{plate.count}x</span>
               <span>{plate.weight}{unit}</span>
-              <span>{plate.count}x</span>
             </div>
           ))}
         </div>
         
       ) : (
-        <span className="text-gray-500">Empty bar only</span>
+        <span className="text-white/60">Empty bar only</span>
       )}
       
       {!plateCalc.possible && weight > barWeight && (
-        <div className="mt-1 text-red-600">
+        <div className="mt-1 text-red-400">
           Can't make exactly {weight}{unit} with standard plates
         </div>
       )}
@@ -3144,7 +3144,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </button>
                       <button
                         onClick={() => deleteSet(exercise.id, setIndex)}
-                        className="text-gray-400 hover:text-red-600 h-8 w-8 flex items-center justify-center"
+                        className="p-2 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/60 hover:text-red-400 hover:border-red-400 transition-all duration-300 h-8 w-8 flex items-center justify-center flex-shrink-0"
                         aria-label="Delete set"
                       >
                         <X className="h-4 w-4" />
@@ -3166,7 +3166,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           <div className="flex items-center justify-between mt-0.5">
                             <button
                               onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                              className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700"
+                              className="text-xs text-white/70 flex items-center gap-1 hover:text-white/90 transition-colors"
                             >
                               Plates
                               {expandedPlates[`${exercise.id}-${setIndex}`] ? (
@@ -3179,18 +3179,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               value={set.barType || 'standard'}
                               onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
                             >
-                              <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
+                              <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-white/70 hover:text-white/90 gap-1 w-auto border-none">
                                 <SelectValue />
                               </SelectTrigger>
-                              <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
-                                <SelectItem value="standard">Barbell (45lb)</SelectItem>
-                                <SelectItem value="womens">Women's (33lb)</SelectItem>
-                                <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
-                                <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
-                                <SelectItem value="trap">Trap/Hex (60lb)</SelectItem>
-                                <SelectItem value="cambered">Cambered (55lb)</SelectItem>
-                                <SelectItem value="swiss">Swiss/Football (35lb)</SelectItem>
-                                <SelectItem value="technique">Technique (15lb)</SelectItem>
+                              <SelectContent className="bg-white/[0.08] backdrop-blur-lg border border-white/25 shadow-xl z-50 text-white/90">
+                                <SelectItem value="standard" className="hover:bg-white/[0.12]">Barbell (45lb)</SelectItem>
+                                <SelectItem value="womens" className="hover:bg-white/[0.12]">Women's (33lb)</SelectItem>
+                                <SelectItem value="safety" className="hover:bg-white/[0.12]">Safety Squat (45lb)</SelectItem>
+                                <SelectItem value="ez" className="hover:bg-white/[0.12]">EZ Curl (25lb)</SelectItem>
+                                <SelectItem value="trap" className="hover:bg-white/[0.12]">Trap/Hex (60lb)</SelectItem>
+                                <SelectItem value="cambered" className="hover:bg-white/[0.12]">Cambered (55lb)</SelectItem>
+                                <SelectItem value="swiss" className="hover:bg-white/[0.12]">Swiss/Football (35lb)</SelectItem>
+                                <SelectItem value="technique" className="hover:bg-white/[0.12]">Technique (15lb)</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
