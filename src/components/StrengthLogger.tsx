@@ -2865,7 +2865,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       
                       {/* Rest timer - only show when rest is actually needed */}
                       {showRestTimer && (
-                        <div className="flex items-center gap-2 mt-3 mb-0.5 ml-8 relative">
+                        <div className="flex items-center gap-2 mt-4 mb-0.5 ml-8 relative">
                           <span className="text-xs text-white/60">Rest</span>
                           <button
                             onClick={() => {
