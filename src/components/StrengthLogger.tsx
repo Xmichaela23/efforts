@@ -1989,13 +1989,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const deleteExercise = (exerciseId: string) => {
-    const remaining = exercises.filter(exercise => exercise.id !== exerciseId);
-    setExercises(remaining);
-    // If no exercises left, clear persisted draft
-    if (remaining.length === 0) {
-      clearSessionProgress();
-    } else {
-      saveSessionProgress(remaining, attachedAddons, notesText, notesRpe);
+    const exercise = exercises.find(ex => ex.id === exerciseId);
+    if (exercise && window.confirm(`Delete "${exercise.name}"? This will remove all sets for this exercise.`)) {
+      const remaining = exercises.filter(ex => ex.id !== exerciseId);
+      setExercises(remaining);
+      // If no exercises left, clear persisted draft
+      if (remaining.length === 0) {
+        clearSessionProgress();
+      } else {
+        saveSessionProgress(remaining, attachedAddons, notesText, notesRpe);
+      }
     }
   };
 
@@ -2713,14 +2716,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 />
                 {exercises.length > 1 && (
                   <div className="flex justify-end mt-2">
-                    <Button 
+                    <button 
                       onClick={() => deleteExercise(exercise.id)} 
-                      variant="ghost" 
-                      size="sm"
-                      className="text-gray-600 hover:text-gray-800"
+                      className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/70 hover:text-red-400 hover:bg-white/[0.12] hover:border-red-400/50 transition-all duration-300 text-sm flex items-center gap-1"
+                      style={{ fontFamily: 'Inter, sans-serif' }}
                     >
-                      <X className="h-4 w-4 mr-1" /> Remove
-                    </Button>
+                      <X className="h-4 w-4" /> Remove
+                    </button>
                   </div>
                 )}
               </div>
@@ -2780,14 +2782,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   }
                 </button>
                 {exercises.length > 1 && (
-                  <Button 
+                  <button 
                     onClick={() => deleteExercise(exercise.id)} 
-                    variant="ghost" 
-                    size="sm"
-                    className="text-white/60 hover:text-red-400 h-8 w-8 p-0 flex-shrink-0"
+                    className="h-8 w-8 p-0 flex items-center justify-center text-white/60 hover:text-red-400 transition-colors flex-shrink-0 rounded-md hover:bg-white/[0.05]"
+                    aria-label="Delete exercise"
                   >
                     <X className="h-4 w-4" />
-                  </Button>
+                  </button>
                 )}
               </div>
             </div>
