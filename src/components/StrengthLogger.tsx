@@ -2859,7 +2859,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       
                       {/* Rest timer - only show when rest is actually needed */}
                       {showRestTimer && (
-                        <div className="flex items-center gap-2 mb-0.5 ml-8 relative">
+                        <div className="flex items-center gap-2 mt-3 mb-0.5 ml-8 relative">
                           <span className="text-xs text-white/60">Rest</span>
                           <button
                             onClick={() => {
@@ -3247,19 +3247,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   </div>
                 )}
                 
-                <Button 
+                <button 
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     addSet(exercise.id);
                   }}
-                  variant="ghost"
-                  className="w-full h-8 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-50 mt-0"
+                  className="w-full h-8 text-xs px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 flex items-center justify-center gap-2 mt-0"
                   type="button"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
                 >
-                  <Plus className="h-3.5 w-3.5 mr-2" />
+                  <Plus className="h-3.5 w-3.5" />
                   Add Set
-                </Button>
+                </button>
                 
                 {/* Notes section - collapsible, shown when exercise is expanded */}
                 {(() => {
