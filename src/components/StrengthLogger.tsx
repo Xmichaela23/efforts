@@ -2827,7 +2827,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const result = baselineTestResults[exercise.id];
                   
                   return (
-                    <div key={setIndex} className="mb-1 last:mb-0">
+                    <div key={setIndex} className={showRestTimer ? "mb-4" : "mb-1 last:mb-0"}>
                       {/* Baseline test set type label and hint */}
                       {isBaselineTest && (
                         <div className="mb-1 ml-8">
@@ -3144,9 +3144,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </div>
                     )}
                     
-                    {/* Rest timer - only show when rest is actually needed */}
+                    {/* Rest timer - only show when rest is actually needed, positioned after all set content */}
                     {showRestTimer && (
-                      <div className="flex items-center gap-2 mt-6 mb-0.5 ml-8 relative">
+                      <div className="flex items-center gap-2 mt-4 mb-2 ml-8 relative">
                         <span className="text-xs text-white/60">Rest</span>
                         <button
                           onClick={() => {
