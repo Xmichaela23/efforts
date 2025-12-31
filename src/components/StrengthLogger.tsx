@@ -2863,101 +2863,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         </div>
                       )}
                       
-                      {/* Rest timer - only show when rest is actually needed */}
-                      {showRestTimer && (
-                        <div className="flex items-center gap-2 mt-6 mb-0.5 ml-8 relative">
-                          <span className="text-xs text-white/60">Rest</span>
-                          <button
-                            onClick={() => {
-                              const key = restTimerKey;
-                              // Calculate rest time based on previous set's reps
-                              const prevSet = exercise.sets[setIndex - 1];
-                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, prevSet.reps)
-                                : 90;
-                              const cur = restTimer?.seconds ?? calculatedRest;
-                              const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
-                              setEditingTimerKey(key);
-                              setEditingTimerValue(prefill);
-                            }}
-                            onContextMenu={(e) => { 
-                              e.preventDefault(); 
-                              const prevSet = exercise.sets[setIndex - 1];
-                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, prevSet.reps)
-                                : 90;
-                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: calculatedRest, running: false } })); 
-                            }}
-                            className="h-7 px-2 text-xs rounded-md border border-white/25 bg-white/[0.08] backdrop-blur-lg text-white/90 hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300"
-                            style={{ fontFamily: 'Inter, sans-serif' }}
-                            aria-label="Rest timer"
-                          >
-                            {formatSeconds(restTimer?.seconds ?? (() => {
-                              const prevSet = exercise.sets[setIndex - 1];
-                              return prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, prevSet.reps)
-                                : 90;
-                            })())}
-                          </button>
-                          <button
-                            onClick={() => {
-                              const prevSet = exercise.sets[setIndex - 1];
-                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, prevSet.reps)
-                                : 90;
-                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: (prev[restTimerKey]?.seconds ?? calculatedRest) || calculatedRest, running: true } }));
-                            }}
-                            className="h-7 px-2 text-xs rounded-md border border-white/25 bg-white/[0.08] backdrop-blur-lg text-white/90 hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300"
-                            style={{ fontFamily: 'Inter, sans-serif' }}
-                            aria-label="Start rest timer"
-                          >
-                            Start
-                          </button>
-
-                          {editingTimerKey === restTimerKey && (
-                            <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
-                              <input
-                                type="tel"
-                                value={editingTimerValue}
-                                onChange={(e)=>setEditingTimerValue(e.target.value)}
-                                placeholder="mm:ss or 90"
-                                className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
-                              />
-                              <div className="flex items-center justify-between mt-3 gap-3">
-                                <button
-                                  onClick={() => {
-                                    const parsed = parseTimerInput(editingTimerValue);
-                                    if (parsed !== null) {
-                                      setTimers(prev => ({ ...prev, [editingTimerKey!]: { seconds: parsed, running: false } }));
-                                      setEditingTimerKey(null);
-                                    }
-                                  }}
-                                  className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (!editingTimerKey) return;
-                                    setTimers(prev => ({ ...prev, [editingTimerKey]: { seconds: 0, running: false } }));
-                                    setEditingTimerKey(null);
-                                  }}
-                                  className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                                >
-                                  Clear
-                                </button>
-                                <button
-                                  onClick={() => setEditingTimerKey(null)}
-                                  className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                                >
-                                  Close
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
                       <div className="flex items-center gap-2">
                         <div className="w-6 text-xs text-white/60 text-right">{setIndex + 1}</div>
                         
@@ -3236,6 +3141,99 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         <div className="text-sm font-medium text-gray-900 mb-1">
                           Estimated 1RM: {result.estimated1RM} lbs → We'll use {result.rounded1RM} lbs (rounded down)
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Rest timer - only show when rest is actually needed */}
+                    {showRestTimer && (
+                      <div className="flex items-center gap-2 mt-6 mb-0.5 ml-8 relative">
+                        <span className="text-xs text-white/60">Rest</span>
+                        <button
+                          onClick={() => {
+                            const key = restTimerKey;
+                            // Calculate rest time based on previous set's reps
+                            const prevSet = exercise.sets[setIndex - 1];
+                            const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                              ? calculateRestTime(exercise.name, prevSet.reps)
+                              : 90;
+                            const cur = restTimer?.seconds ?? calculatedRest;
+                            const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
+                            setEditingTimerKey(key);
+                            setEditingTimerValue(prefill);
+                          }}
+                          onContextMenu={(e) => { 
+                            e.preventDefault(); 
+                            const prevSet = exercise.sets[setIndex - 1];
+                            const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                              ? calculateRestTime(exercise.name, prevSet.reps)
+                              : 90;
+                            setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: calculatedRest, running: false } })); 
+                          }}
+                          className="h-7 px-2 text-xs rounded-md border border-white/25 bg-white/[0.08] backdrop-blur-lg text-white/90 hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
+                          aria-label="Rest timer"
+                        >
+                          {formatSeconds(restTimer?.seconds ?? (() => {
+                            const prevSet = exercise.sets[setIndex - 1];
+                            return prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                              ? calculateRestTime(exercise.name, prevSet.reps)
+                              : 90;
+                          })())}
+                        </button>
+                        <button
+                          onClick={() => {
+                            const prevSet = exercise.sets[setIndex - 1];
+                            const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                              ? calculateRestTime(exercise.name, prevSet.reps)
+                              : 90;
+                            setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: (prev[restTimerKey]?.seconds ?? calculatedRest) || calculatedRest, running: true } }));
+                          }}
+                          className="h-7 px-2 text-xs rounded-md border border-white/25 bg-white/[0.08] backdrop-blur-lg text-white/90 hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
+                          aria-label="Start rest timer"
+                        >
+                          Start
+                        </button>
+
+                        {editingTimerKey === restTimerKey && (
+                          <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
+                            <input
+                              type="tel"
+                              value={editingTimerValue}
+                              onChange={(e)=>setEditingTimerValue(e.target.value)}
+                              placeholder="mm:ss or 90"
+                              className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
+                            />
+                            <div className="flex justify-end gap-2 mt-2">
+                              <button
+                                onClick={() => {
+                                  const input = editingTimerValue.trim();
+                                  let newSeconds = 0;
+                                  if (input.includes(':')) {
+                                    const [mins, secs] = input.split(':');
+                                    newSeconds = (parseInt(mins, 10) || 0) * 60 + (parseInt(secs, 10) || 0);
+                                  } else {
+                                    const num = parseInt(input, 10) || 0;
+                                    newSeconds = num <= 20 ? num * 60 : num;
+                                  }
+                                  if (newSeconds > 0) {
+                                    setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: newSeconds, running: false } }));
+                                  }
+                                  setEditingTimerKey(null);
+                                }}
+                                className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingTimerKey(null)}
+                                className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                              >
+                                Close
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
