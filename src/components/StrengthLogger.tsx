@@ -150,7 +150,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
   };
 
   return (
-    <div className="bg-white/[0.20] backdrop-blur-md border border-white/40 rounded-2xl mx-3 mb-2">
+    <div className="bg-zinc-800/40 backdrop-blur-sm border border-white/8 rounded-2xl mx-3 mb-2">
       {/* Collapsed state */}
       {!isExpanded ? (
         <button
@@ -2479,7 +2479,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           backgroundAttachment: 'fixed'
         }}
       >
-        <div className="bg-white/[0.20] backdrop-blur-md border border-white/40 pb-4 mb-4 rounded-2xl">
+        <div className="bg-zinc-800/40 backdrop-blur-sm border border-white/8 pb-4 mb-4 rounded-2xl">
           <div className="flex items-center w-full px-4">
             <h1 className="text-xl font-medium text-white/90">Loading...</h1>
           </div>
@@ -2504,7 +2504,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }}
     >
       {/* Header */}
-      <div className="bg-white/[0.20] backdrop-blur-md border border-white/40 pb-2 mb-2 rounded-2xl relative" style={{ zIndex: 1 }}>
+      <div className="bg-zinc-800/40 backdrop-blur-sm border border-white/8 pb-2 mb-2 rounded-2xl relative" style={{ zIndex: 1 }}>
         <div className="flex items-center justify-between w-full px-4">
           <h1 className="text-xl font-medium text-white/90">
             {(() => {
@@ -2719,7 +2719,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         {exercises.map((exercise, exerciseIndex) => (
           <div 
             key={exercise.id} 
-            className="bg-white/[0.20] backdrop-blur-md border border-white/40 rounded-2xl mx-3 mb-2"
+            className="bg-zinc-800/40 backdrop-blur-sm border border-white/8 rounded-2xl mx-3 mb-2"
           >
             {/* Core Work exercises use the CoreTimer component */}
             {isCoreWorkExercise(exercise.name) ? (
@@ -2842,7 +2842,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const result = baselineTestResults[exercise.id];
                   
                   return (
-                    <div key={setIndex} className={`bg-white/[0.25] backdrop-blur-md border border-white/45 rounded-xl p-2 ${showRestTimer ? "mb-4" : "mb-1"}`}>
+                    <div key={setIndex} className={`bg-zinc-700/50 backdrop-blur-md border border-white/12 rounded-xl p-2 ${showRestTimer ? "mb-4" : "mb-1"}`}>
                       {/* Baseline test set type label and hint */}
                       {isBaselineTest && (
                         <div className="mb-1 ml-8">
@@ -2892,7 +2892,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 setEditingTimerKey(durationTimerKey);
                                 setEditingTimerValue(prefill);
                               }}
-                              className={`h-9 px-2 text-sm rounded-md border flex-1 text-center transition-all duration-300 ${isDurationRunning ? 'text-cyan-400 border-cyan-400/50 bg-white/[0.40]' : 'text-white/90 border-white/60 bg-white/[0.35] backdrop-blur-md'}`}
+                              className={`h-9 px-2 text-sm rounded-md border flex-1 text-center transition-all duration-300 ${isDurationRunning ? 'text-cyan-400 border-cyan-400/50 bg-zinc-600/70' : 'text-white border-white/20 bg-zinc-600/60 backdrop-blur-md'}`}
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             >
                               {currentDurationSeconds >= 60 
@@ -2905,7 +2905,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   const currentDuration = set.duration_seconds || 60;
                                   setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds: currentDuration, running: true } }));
                                 }}
-                                className="h-9 px-2 text-xs rounded-md border border-white/60 bg-white/[0.35] backdrop-blur-md text-white/90 hover:bg-white/[0.40] transition-all duration-300"
+                                className="h-9 px-2 text-xs rounded-md border border-white/25 bg-zinc-500/60 backdrop-blur-md text-white hover:bg-zinc-500/70 transition-all duration-300"
                                 style={{ fontFamily: 'Inter, sans-serif' }}
                               >
                                 Start
@@ -2915,7 +2915,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 onClick={() => {
                                   setTimers(prev => ({ ...prev, [durationTimerKey]: { ...prev[durationTimerKey], running: false } }));
                                 }}
-                                className="h-9 px-2 text-xs rounded-md border border-white/60 bg-white/[0.35] backdrop-blur-md text-white/90 hover:bg-white/[0.40] transition-all duration-300"
+                                className="h-9 px-2 text-xs rounded-md border border-white/25 bg-zinc-500/60 backdrop-blur-md text-white hover:bg-zinc-500/70 transition-all duration-300"
                                 style={{ fontFamily: 'Inter, sans-serif' }}
                               >
                                 Pause
@@ -2966,7 +2966,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             pattern="[0-9]*"
                             value={set.reps === 0 ? '' : set.reps.toString()}
                             onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                            className="h-9 text-center text-sm border-white/60 bg-white/[0.35] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 flex-1 focus-visible:ring-0 focus-visible:border-white/70 focus-visible:bg-white/[0.40]"
+                            className="h-9 text-center text-sm border-white/20 bg-zinc-600/60 backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-zinc-600/70"
                             style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             placeholder="Reps"
                           />
@@ -2993,7 +2993,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               value={set.resistance_level || 'Light'}
                               onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
                             >
-                              <SelectTrigger className="h-9 text-center text-sm border-white/60 bg-white/[0.35] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 flex-1 focus:ring-0 focus:border-white/70 focus:bg-white/[0.40]">
+                              <SelectTrigger className="h-9 text-center text-sm border-white/20 bg-zinc-600/60 backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus:ring-0 focus:border-white/30 focus:bg-zinc-600/70">
                                 <SelectValue placeholder="Resistance" />
                               </SelectTrigger>
                               <SelectContent className="bg-white/[0.12] backdrop-blur-md border border-white/20 shadow-xl z-50 text-white/90">
@@ -3033,7 +3033,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             pattern="[0-9]*"
                             value={set.weight === 0 ? '' : set.weight.toString()}
                             onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                            className="h-9 text-center text-sm border-white/60 bg-white/[0.35] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 flex-1 focus-visible:ring-0 focus-visible:border-white/70 focus-visible:bg-white/[0.40]"
+                            className="h-9 text-center text-sm border-white/20 bg-zinc-600/60 backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-zinc-600/70"
                             style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             placeholder="Weight"
                           />
@@ -3053,7 +3053,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             pattern="[0-9]*"
                             value={set.rir || ''}
                             onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                            className="h-9 text-center text-sm border-white/60 bg-white/[0.35] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/70 focus-visible:bg-white/[0.40]"
+                            className="h-9 text-center text-sm border-white/20 bg-zinc-600/60 backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-zinc-600/70"
                             min="0"
                             max="5"
                             style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
@@ -3063,14 +3063,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       })()}
                       <button
                         onClick={() => handleSetComplete(exercise.id, setIndex)}
-                        className={`text-xs px-2 py-1 rounded-full min-h-[28px] transition-all duration-300 ${set.completed ? 'bg-cyan-400/20 border border-cyan-400/50 text-cyan-400' : 'bg-white/[0.35] backdrop-blur-md border border-white/60 text-white/90 hover:bg-white/[0.40]'}`}
+                        className={`text-xs px-2 py-1 rounded-full min-h-[28px] transition-all duration-300 ${set.completed ? 'bg-cyan-400/20 border border-cyan-400/50 text-cyan-400' : 'bg-zinc-500/60 backdrop-blur-md border border-white/25 text-white hover:bg-zinc-500/70'}`}
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         {set.completed ? '✓ Done' : 'Done'}
                       </button>
                       <button
                         onClick={() => deleteSet(exercise.id, setIndex)}
-                        className="p-2 rounded-full bg-white/[0.35] backdrop-blur-md border border-white/60 text-white/60 hover:text-red-400 hover:bg-white/[0.40] hover:border-red-400 transition-all duration-300 h-8 w-8 flex items-center justify-center flex-shrink-0"
+                        className="p-2 rounded-full bg-zinc-500/60 backdrop-blur-md border border-white/25 text-white/60 hover:text-red-400 hover:bg-zinc-500/70 hover:border-red-400 transition-all duration-300 h-8 w-8 flex items-center justify-center flex-shrink-0"
                         aria-label="Delete set"
                       >
                         <X className="h-4 w-4" />
@@ -3184,7 +3184,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               : 90;
                             setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: calculatedRest, running: false } })); 
                           }}
-                          className="h-7 px-2 text-xs rounded-md border border-white/60 bg-white/[0.35] backdrop-blur-md text-white/90 hover:bg-white/[0.40] transition-all duration-300"
+                          className="h-7 px-2 text-xs rounded-md border border-white/25 bg-zinc-500/60 backdrop-blur-md text-white hover:bg-zinc-500/70 transition-all duration-300"
                           style={{ fontFamily: 'Inter, sans-serif' }}
                           aria-label="Rest timer"
                         >
@@ -3203,7 +3203,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               : 90;
                             setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: (prev[restTimerKey]?.seconds ?? calculatedRest) || calculatedRest, running: true } }));
                           }}
-                          className="h-7 px-2 text-xs rounded-md border border-white/60 bg-white/[0.35] backdrop-blur-md text-white/90 hover:bg-white/[0.40] transition-all duration-300"
+                          className="h-7 px-2 text-xs rounded-md border border-white/25 bg-zinc-500/60 backdrop-blur-md text-white hover:bg-zinc-500/70 transition-all duration-300"
                           style={{ fontFamily: 'Inter, sans-serif' }}
                           aria-label="Start rest timer"
                         >
@@ -3274,7 +3274,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     e.stopPropagation();
                     addSet(exercise.id);
                   }}
-                  className="w-full h-8 text-xs px-3 py-1.5 rounded-full bg-white/[0.12] backdrop-blur-md border border-white/20 text-white/90 hover:bg-white/[0.16] transition-all duration-300 flex items-center justify-center gap-2 mt-0"
+                  className="w-full h-8 text-xs px-3 py-1.5 rounded-full bg-zinc-600/60 backdrop-blur-md border border-white/20 text-white hover:bg-zinc-600/70 transition-all duration-300 flex items-center justify-center gap-2 mt-0"
                   type="button"
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
@@ -3366,7 +3366,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/[0.08] backdrop-blur-md border-t border-white/20 z-[100]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
         <button 
           onClick={saveWorkout}
-          className="w-full h-12 text-base font-medium text-white transition-colors rounded-full bg-cyan-700/70 backdrop-blur-md border border-cyan-500/40 hover:bg-cyan-700/80"
+          className="w-full h-12 text-base font-medium text-white transition-colors rounded-full bg-cyan-700/80 backdrop-blur-md border border-cyan-500/40 hover:bg-cyan-700/90"
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
           Save
