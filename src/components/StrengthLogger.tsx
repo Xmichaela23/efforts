@@ -150,7 +150,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
   };
 
   return (
-    <div className="bg-zinc-900/70 backdrop-blur-md border-2 border-white/30 rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.3)]">
+    <div className="bg-zinc-900/70 backdrop-blur-md border border-white/20 rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
       {/* Collapsed state */}
       {!isExpanded ? (
         <button
@@ -239,7 +239,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
           
           <button
             onClick={handleSubmit}
-            className="w-full py-2 rounded-full bg-zinc-900/90 border border-white/50 text-white hover:bg-zinc-900/95 hover:border-white/60 transition-all duration-300 text-sm font-medium"
+            className="w-full py-2 rounded-full bg-zinc-900/90 border border-white/35 text-white hover:bg-zinc-900/95 hover:border-white/45 transition-all duration-300 text-sm font-medium"
             style={{ fontFamily: 'Inter, sans-serif' }}
           >
             Save
@@ -316,7 +316,7 @@ const PlateMath: React.FC<{
   const plateCalc = calculatePlates();
 
   return (
-    <div className="mt-1 p-2 bg-zinc-900/80 backdrop-blur-md border-2 border-white/30 rounded-lg text-xs shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+    <div className="mt-1 p-2 bg-zinc-900/80 backdrop-blur-md border border-white/20 rounded-lg text-xs shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
       <div className="text-white/70 mb-1">{barWeight}{unit} bar +</div>
       {plateCalc.plates.length > 0 ? (
         <div className="space-y-1">
@@ -2479,7 +2479,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           backgroundAttachment: 'fixed'
         }}
       >
-        <div className="bg-zinc-900/70 backdrop-blur-md border-2 border-white/30 pb-4 mb-4 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.3)]">
+        <div className="bg-zinc-900/70 backdrop-blur-md border border-white/20 pb-4 mb-4 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
           <div className="flex items-center w-full px-4">
             <h1 className="text-xl font-medium text-white/90">Loading...</h1>
           </div>
@@ -2504,7 +2504,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }}
     >
       {/* Header */}
-      <div className="bg-zinc-900/60 backdrop-blur-md border-2 border-white/30 pb-2 mb-2 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.3)]" style={{ zIndex: 1 }}>
+      <div className="bg-zinc-900/60 backdrop-blur-md border border-white/20 pb-2 mb-2 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]" style={{ zIndex: 1 }}>
         <div className="flex items-center justify-between w-full px-4">
           <h1 className="text-xl font-medium text-white/90">
             {(() => {
@@ -2515,9 +2515,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </h1>
           <div className="flex items-center gap-2">
             <div className="relative">
-              <button onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border-2 border-white/30 text-white/90 hover:bg-zinc-900/90 hover:border-white/40 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>Pick planned</button>
+              <button onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/20 text-white/90 hover:bg-zinc-900/90 hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>Pick planned</button>
               {showPlannedMenu && (
-                <div className="absolute right-0 mt-1.5 w-72 bg-zinc-900/90 backdrop-blur-md border-2 border-white/35 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_8px_24px_rgba(0,0,0,0.4)] z-[100] p-2">
+                <div className="absolute right-0 mt-1.5 w-72 bg-zinc-900/90 backdrop-blur-md border border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-[100] p-2">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="text-xs font-semibold text-white/60">Strength (Next 14 days)</div>
                     <button 
@@ -2570,33 +2570,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {/* Temporarily hidden */}
               {false && (
                 <>
-                  <button onClick={()=>{ setShowAddonsMenu(v=>!v); setShowPlannedMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border-2 border-white/30 text-white/90 hover:bg-zinc-900/90 hover:border-white/40 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>Warm‑up • Core</button>
+                  <button onClick={()=>{ setShowAddonsMenu(v=>!v); setShowPlannedMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/20 text-white/90 hover:bg-zinc-900/90 hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>Warm‑up • Core</button>
                   {showAddonsMenu && (
-              <div className="absolute right-0 mt-1.5 w-72 bg-zinc-900/90 backdrop-blur-md border-2 border-white/35 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_8px_24px_rgba(0,0,0,0.4)] z-50 p-2">
+              <div className="absolute right-0 mt-1.5 w-72 bg-zinc-900/90 backdrop-blur-md border border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 p-2">
                 <div className="space-y-1">
                   <div>
                     <div className="text-xs text-white/60 px-1 mb-1">Warm‑Up</div>
                     {!showWarmupChooser ? (
                       <div className="grid grid-cols-2 gap-2">
-                        <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border-2 border-white/30 text-white/90 hover:bg-zinc-900/90 hover:border-white/40 transition-all duration-300 text-sm shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>5 min</button>
+                        <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/20 text-white/90 hover:bg-zinc-900/90 hover:border-white/30 transition-all duration-300 text-sm shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>5 min</button>
                       </div>
                     ) : (
                       <div className="p-2 border border-white/30 rounded-xl bg-zinc-900/80">
                         <div className="text-xs text-white/60 mb-1">Category</div>
                         <div className="flex flex-wrap gap-1.5 mb-2">
                           {['push','squat','hinge','pull','general','power'].map(cat => (
-                            <button key={cat} onClick={()=>setSelectedWarmupCategory(cat)} className={`px-2 py-0.5 rounded-full border text-xs transition-all duration-300 ${selectedWarmupCategory===cat? 'bg-zinc-900/90 border-white/50 text-white' : 'border-white/25 bg-zinc-900/80 text-white/80 hover:bg-zinc-900/85 hover:border-white/35'}`} style={{ fontFamily: 'Inter, sans-serif' }}>{cat}</button>
+                            <button key={cat} onClick={()=>setSelectedWarmupCategory(cat)} className={`px-2 py-0.5 rounded-full border text-xs transition-all duration-300 ${selectedWarmupCategory===cat? 'bg-zinc-900/90 border-white/40 text-white' : 'border-white/25 bg-zinc-900/80 text-white/80 hover:bg-zinc-900/85 hover:border-white/35'}`} style={{ fontFamily: 'Inter, sans-serif' }}>{cat}</button>
                           ))}
                         </div>
                         <div className="text-xs text-white/60 mb-1">Variant</div>
                         <div className="flex flex-wrap gap-1.5 mb-2">
                           {['A','B','C','D','E','F'].map(v => (
-                            <button key={v} onClick={()=>setSelectedWarmupVariant(v)} className={`px-2 py-0.5 rounded-full border text-xs transition-all duration-300 ${selectedWarmupVariant===v? 'bg-zinc-900/90 border-white/50 text-white' : 'border-white/25 bg-zinc-900/80 text-white/80 hover:bg-zinc-900/85 hover:border-white/35'}`} style={{ fontFamily: 'Inter, sans-serif' }}>{v}</button>
+                            <button key={v} onClick={()=>setSelectedWarmupVariant(v)} className={`px-2 py-0.5 rounded-full border text-xs transition-all duration-300 ${selectedWarmupVariant===v? 'bg-zinc-900/90 border-white/40 text-white' : 'border-white/25 bg-zinc-900/80 text-white/80 hover:bg-zinc-900/85 hover:border-white/35'}`} style={{ fontFamily: 'Inter, sans-serif' }}>{v}</button>
                           ))}
                         </div>
                         <div className="flex items-center justify-end gap-2">
                           <button onClick={()=>setShowWarmupChooser(false)} className="text-xs text-white/70 hover:text-white/90">Cancel</button>
-                          <button onClick={attachChosenWarmup} className="text-xs px-2 py-1 rounded-full bg-zinc-900/90 border border-white/50 text-white hover:bg-zinc-900/95 hover:border-white/60 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Attach</button>
+                          <button onClick={attachChosenWarmup} className="text-xs px-2 py-1 rounded-full bg-zinc-900/90 border border-white/35 text-white hover:bg-zinc-900/95 hover:border-white/45 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Attach</button>
                         </div>
                       </div>
                     )}
@@ -2604,7 +2604,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <div>
                     <div className="text-xs text-white/60 px-1 mb-1">Core</div>
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border-2 border-white/30 text-white/90 hover:bg-zinc-900/90 hover:border-white/40 transition-all duration-300 text-sm shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>5 min</button>
+                      <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/20 text-white/90 hover:bg-zinc-900/90 hover:border-white/30 transition-all duration-300 text-sm shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>5 min</button>
                     </div>
                   </div>
                   {/* Mobility category removed per request */}
@@ -2634,7 +2634,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         {attachedAddons.length>0 && (
           <div className="px-3 space-y-2">
             {attachedAddons.map((a,idx)=> (
-              <div key={idx} className="rounded-xl bg-zinc-900/70 backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+              <div key={idx} className="rounded-xl bg-zinc-900/70 backdrop-blur-md border border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
                 <div className="flex items-center justify-between p-2">
                   <div className="text-sm text-white/90">{a.name}</div>
                   <div className="flex items-center gap-2">
@@ -2646,7 +2646,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (isInitialized && exercises.length > 0) {
                           saveSessionProgress(exercises, updatedAddons, notesText, notesRpe);
                         }
-                      }} className="px-2 py-1 text-xs rounded-full bg-zinc-900/80 backdrop-blur-md border-2 border-white/30 text-white/90 hover:bg-zinc-900/90 hover:border-white/40 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      }} className="px-2 py-1 text-xs rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/20 text-white/90 hover:bg-zinc-900/90 hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>
                         {a.running? 'Pause' : 'Start'}
                       </button>
                     ) : (
@@ -2673,7 +2673,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {a.sequence && a.sequence.length>0 && (
                   <div className="px-2 pb-1.5">
                     <div className="text-xs text-white/60 mb-0.5">Sequence</div>
-                    <div className="divide-y divide-white/15 border-2 border-white/30 rounded-xl bg-zinc-900/80 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+                    <div className="divide-y divide-white/15 border border-white/20 rounded-xl bg-zinc-900/80 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
                       {a.sequence.map((step, sIdx)=> (
                         <div key={sIdx} className="flex items-center justify-between px-2 py-1.5">
                           <div className="text-sm text-white/90">{step.move}</div>
@@ -2694,7 +2694,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {pendingOrOptions.map((opt, idx) => (
                 <button
                   key={idx}
-                  className="px-2 py-1 rounded-full bg-zinc-900/80 backdrop-blur-md border-2 border-white/30 text-white/90 hover:bg-zinc-900/90 hover:border-white/40 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                  className="px-2 py-1 rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/20 text-white/90 hover:bg-zinc-900/90 hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                   style={{ fontFamily: 'Inter, sans-serif' }}
                   onClick={() => {
                     // Replace/add the chosen OR as simple prefilled sets (lower rep bound)
@@ -2719,7 +2719,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         {exercises.map((exercise, exerciseIndex) => (
           <div 
             key={exercise.id} 
-            className="bg-zinc-900/70 backdrop-blur-md border-2 border-white/30 rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.3)]"
+            className="bg-zinc-900/70 backdrop-blur-md border border-white/20 rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
           >
             {/* Core Work exercises use the CoreTimer component */}
             {isCoreWorkExercise(exercise.name) ? (
@@ -2743,7 +2743,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <div className="flex justify-end mt-2">
                     <button 
                       onClick={() => deleteExercise(exercise.id)} 
-                      className="px-3 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border-2 border-white/30 text-white/70 hover:text-red-400 hover:bg-zinc-900/90 hover:border-red-400/60 transition-all duration-300 text-sm flex items-center gap-1 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                      className="px-3 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/20 text-white/70 hover:text-red-400 hover:bg-zinc-900/90 hover:border-red-400/60 transition-all duration-300 text-sm flex items-center gap-1 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                       style={{ fontFamily: 'Inter, sans-serif' }}
                     >
                       <X className="h-4 w-4" /> Remove
@@ -2756,7 +2756,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <div className="p-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 relative">
-                  <div className="flex items-center border-2 border-white/25 bg-zinc-900/80 backdrop-blur-sm rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+                  <div className="flex items-center border border-white/20 bg-zinc-900/80 backdrop-blur-sm rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
                     <div className="pl-3 text-white/60">
                       <Search className="h-4 w-4" />
                     </div>
@@ -2780,7 +2780,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     />
                   </div>
                   {activeDropdown === exercise.id && exercise.name.length > 0 && (
-                    <div className="absolute top-11 left-0 right-0 bg-zinc-900/90 backdrop-blur-md border-2 border-white/35 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_8px_24px_rgba(0,0,0,0.4)] z-50 max-h-32 overflow-y-auto">
+                    <div className="absolute top-11 left-0 right-0 bg-zinc-900/90 backdrop-blur-md border border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 max-h-32 overflow-y-auto">
                       {getFilteredExercises(exercise.name).map((suggestion, index) => (
                         <button
                           key={index}
@@ -2842,7 +2842,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const result = baselineTestResults[exercise.id];
                   
                   return (
-                    <div key={setIndex} className={`bg-zinc-900/60 backdrop-blur-md border-2 border-white/25 rounded-xl p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.3)] ${showRestTimer ? "mb-4" : "mb-1"}`}>
+                    <div key={setIndex} className={`bg-zinc-900/60 backdrop-blur-md border border-white/20 rounded-xl p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] ${showRestTimer ? "mb-4" : "mb-1"}`}>
                       {/* Baseline test set type label and hint */}
                       {isBaselineTest && (
                         <div className="mb-1 ml-8">
@@ -2966,7 +2966,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             pattern="[0-9]*"
                             value={set.reps === 0 ? '' : set.reps.toString()}
                             onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                            className="h-9 text-center text-sm border-2 border-white/30 bg-zinc-900/80 backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus-visible:ring-0 focus-visible:border-white/45 focus-visible:bg-zinc-900/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                            className="h-9 text-center text-sm border border-white/20 bg-zinc-900/80 backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus-visible:ring-0 focus-visible:border-white/35 focus-visible:bg-zinc-900/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                             style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             placeholder="Reps"
                           />
@@ -2993,10 +2993,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               value={set.resistance_level || 'Light'}
                               onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
                             >
-                              <SelectTrigger className="h-9 text-center text-sm border-2 border-white/30 bg-zinc-900/80 backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus:ring-0 focus:border-white/45 focus:bg-zinc-900/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+                              <SelectTrigger className="h-9 text-center text-sm border border-white/20 bg-zinc-900/80 backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus:ring-0 focus:border-white/35 focus:bg-zinc-900/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
                                 <SelectValue placeholder="Resistance" />
                               </SelectTrigger>
-                              <SelectContent className="bg-zinc-900/90 backdrop-blur-md border-2 border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_8px_24px_rgba(0,0,0,0.4)] z-50 text-white/90">
+                              <SelectContent className="bg-zinc-900/90 backdrop-blur-md border border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
                                 <SelectItem value="Light" className="hover:bg-zinc-900/95">Light</SelectItem>
                                 <SelectItem value="Medium" className="hover:bg-zinc-900/95">Medium</SelectItem>
                                 <SelectItem value="Heavy" className="hover:bg-zinc-900/95">Heavy</SelectItem>
@@ -3033,7 +3033,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             pattern="[0-9]*"
                             value={set.weight === 0 ? '' : set.weight.toString()}
                             onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                            className="h-9 text-center text-sm border-2 border-white/30 bg-zinc-900/80 backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus-visible:ring-0 focus-visible:border-white/45 focus-visible:bg-zinc-900/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                            className="h-9 text-center text-sm border border-white/20 bg-zinc-900/80 backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus-visible:ring-0 focus-visible:border-white/35 focus-visible:bg-zinc-900/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                             style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             placeholder="Weight"
                           />
@@ -3063,14 +3063,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       })()}
                       <button
                         onClick={() => handleSetComplete(exercise.id, setIndex)}
-                        className={`text-xs px-2 py-1 rounded-full min-h-[28px] transition-all duration-300 ${set.completed ? 'bg-cyan-400/20 border-2 border-cyan-400/50 text-cyan-400' : 'bg-zinc-900/80 backdrop-blur-sm border-2 border-white/35 text-gray-300 hover:bg-zinc-900/90 hover:border-white/45 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.12)_inset,0_2px_8px_rgba(0,0,0,0.25)]'}`}
+                        className={`text-xs px-2 py-1 rounded-full min-h-[28px] transition-all duration-300 ${set.completed ? 'bg-cyan-400/20 border border-cyan-400/50 text-cyan-400' : 'bg-zinc-900/80 backdrop-blur-sm border border-white/25 text-gray-300 hover:bg-zinc-900/90 hover:border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         {set.completed ? '✓ Done' : 'Done'}
                       </button>
                       <button
                         onClick={() => deleteSet(exercise.id, setIndex)}
-                        className="p-2 rounded-full bg-zinc-900/80 backdrop-blur-sm border-2 border-white/30 text-white/60 hover:text-red-400 hover:bg-zinc-900/90 hover:border-red-400/60 transition-all duration-300 h-8 w-8 flex items-center justify-center flex-shrink-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                        className="p-2 rounded-full bg-zinc-900/80 backdrop-blur-sm border border-white/20 text-white/60 hover:text-red-400 hover:bg-zinc-900/90 hover:border-red-400/60 transition-all duration-300 h-8 w-8 flex items-center justify-center flex-shrink-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                         aria-label="Delete set"
                       >
                         <X className="h-4 w-4" />
@@ -3108,7 +3108,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-white/70 hover:text-white/90 gap-1 w-auto border-none">
                                 <SelectValue />
                               </SelectTrigger>
-                              <SelectContent className="bg-zinc-900/90 backdrop-blur-md border-2 border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_8px_24px_rgba(0,0,0,0.4)] z-50 text-white/90">
+                              <SelectContent className="bg-zinc-900/90 backdrop-blur-md border border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
                                 <SelectItem value="standard" className="hover:bg-zinc-900/95">Barbell (45lb)</SelectItem>
                                 <SelectItem value="womens" className="hover:bg-zinc-900/95">Women's (33lb)</SelectItem>
                                 <SelectItem value="safety" className="hover:bg-zinc-900/95">Safety Squat (45lb)</SelectItem>
@@ -3184,7 +3184,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               : 90;
                             setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: calculatedRest, running: false } })); 
                           }}
-                          className="h-7 px-2 text-xs rounded-md border-2 border-white/30 bg-zinc-900/80 backdrop-blur-sm text-white hover:bg-zinc-900/90 hover:border-white/40 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                          className="h-7 px-2 text-xs rounded-md border border-white/20 bg-zinc-900/80 backdrop-blur-sm text-white hover:bg-zinc-900/90 hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                           style={{ fontFamily: 'Inter, sans-serif' }}
                           aria-label="Rest timer"
                         >
@@ -3203,7 +3203,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               : 90;
                             setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: (prev[restTimerKey]?.seconds ?? calculatedRest) || calculatedRest, running: true } }));
                           }}
-                          className="h-7 px-2 text-xs rounded-md border-2 border-white/30 bg-zinc-900/80 backdrop-blur-sm text-white hover:bg-zinc-900/90 hover:border-white/40 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                          className="h-7 px-2 text-xs rounded-md border border-white/20 bg-zinc-900/80 backdrop-blur-sm text-white hover:bg-zinc-900/90 hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                           style={{ fontFamily: 'Inter, sans-serif' }}
                           aria-label="Start rest timer"
                         >
@@ -3274,7 +3274,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     e.stopPropagation();
                     addSet(exercise.id);
                   }}
-                  className="w-full h-8 text-xs px-3 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border-2 border-white/35 text-white hover:bg-zinc-900/90 hover:border-white/45 transition-all duration-300 flex items-center justify-center gap-2 mt-0 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]"
+                  className="w-full h-8 text-xs px-3 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/25 text-white hover:bg-zinc-900/90 hover:border-white/35 transition-all duration-300 flex items-center justify-center gap-2 mt-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)]"
                   type="button"
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
@@ -3320,8 +3320,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         ))}
 
         {/* Add new exercise input */}
-        <div className="relative bg-zinc-900/70 backdrop-blur-md border-2 border-white/25 rounded-2xl px-3 pt-0 pb-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-          <div className="relative flex items-center border-2 border-white/30 bg-zinc-900/80 backdrop-blur-lg rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+        <div className="relative bg-zinc-900/70 backdrop-blur-md border border-white/20 rounded-2xl px-3 pt-0 pb-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+          <div className="relative flex items-center border border-white/20 bg-zinc-900/80 backdrop-blur-lg rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
             <div className="pl-2 text-white/60">
               <Search className="h-4 w-4" />
             </div>
@@ -3363,10 +3363,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       </div>
 
       {/* Fixed bottom save action (text-only per design) */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-zinc-900/80 backdrop-blur-md border-t-2 border-white/30 z-[100] shadow-[0_-4px_12px_rgba(0,0,0,0.3)]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-zinc-900/80 backdrop-blur-md border-t border-white/20 z-[100] shadow-[0_-4px_12px_rgba(0,0,0,0.3)]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
         <button 
           onClick={saveWorkout}
-          className="w-full h-12 text-base font-medium text-white transition-colors rounded-full bg-cyan-700/80 backdrop-blur-md border-2 border-cyan-500/50 hover:bg-cyan-700/90 hover:border-cyan-500/60 shadow-[0_0_0_1px_rgba(6,182,212,0.2)_inset,0_4px_12px_rgba(0,0,0,0.3)]"
+          className="w-full h-12 text-base font-medium text-white transition-colors rounded-full bg-cyan-700/80 backdrop-blur-md border border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/60 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
           Save
@@ -3377,7 +3377,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       {showNotesModal && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={isSaving || isSaved ? undefined : ()=>setShowNotesModal(false)} />
-          <div className="relative w-full sm:w-[520px] bg-zinc-900/90 backdrop-blur-md border-2 border-white/35 rounded-t-2xl sm:rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_8px_24px_rgba(0,0,0,0.4)] p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+          <div className="relative w-full sm:w-[520px] bg-zinc-900/90 backdrop-blur-md border border-white/25 rounded-t-2xl sm:rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
             <h3 className="text-lg font-semibold mb-3 text-white/90">How did it feel?</h3>
             <div className="space-y-3">
               <div>
@@ -3387,7 +3387,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   if (isInitialized && exercises.length > 0) {
                     saveSessionProgress(exercises, attachedAddons, e.target.value, notesRpe);
                   }
-                }} rows={4} className="mt-1 w-full bg-zinc-900/80 backdrop-blur-sm border-2 border-white/25 rounded-lg p-2 text-sm text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" placeholder="" style={{ fontFamily: 'Inter, sans-serif' }} />
+                }} rows={4} className="mt-1 w-full bg-zinc-900/80 backdrop-blur-sm border border-white/20 rounded-lg p-2 text-sm text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" placeholder="" style={{ fontFamily: 'Inter, sans-serif' }} />
               </div>
               <div>
                 <label className="text-sm text-white/70">RPE (1–10)</label>
@@ -3397,10 +3397,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   if (isInitialized && exercises.length > 0) {
                     saveSessionProgress(exercises, attachedAddons, notesText, newRpe);
                   }
-                }} className="mt-1 w-full bg-zinc-900/80 backdrop-blur-sm border-2 border-white/25 rounded-lg p-2 text-sm text-center text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" placeholder="—" style={{ fontFamily: 'Inter, sans-serif' }} />
+                }} className="mt-1 w-full bg-zinc-900/80 backdrop-blur-sm border border-white/20 rounded-lg p-2 text-sm text-center text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" placeholder="—" style={{ fontFamily: 'Inter, sans-serif' }} />
               </div>
             </div>
-            <div className="mt-4 sticky bottom-0 bg-zinc-900/80 backdrop-blur-md border-2 border-white/30 pt-3 rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+            <div className="mt-4 sticky bottom-0 bg-zinc-900/80 backdrop-blur-md border border-white/20 pt-3 rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
               <div className="flex items-center gap-4">
                 {isSaving || isSaved ? (
                   <div className="flex items-center gap-2 text-sm text-white/70 flex-1 justify-center">
@@ -3421,7 +3421,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <>
                     <button onClick={()=>setShowNotesModal(false)} className="text-sm text-white/70 hover:text-white/90">Cancel</button>
                     <button onClick={()=>{ finalizeSave(); }} className="text-sm text-white/70 hover:text-white/90">Skip</button>
-                    <button onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="text-sm text-white hover:text-cyan-400 rounded-full px-3 py-1.5 bg-zinc-900/90 border border-white/50 hover:bg-zinc-900/95 hover:border-white/60 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Save</button>
+                    <button onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="text-sm text-white hover:text-cyan-400 rounded-full px-3 py-1.5 bg-zinc-900/90 border border-white/35 hover:bg-zinc-900/95 hover:border-white/45 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Save</button>
                   </>
                 )}
               </div>
@@ -3478,7 +3478,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       {showSessionRPE && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={isSaving || isSaved ? undefined : handleSessionRPESkip} />
-          <div className="relative w-full max-w-md mx-4 bg-zinc-900/90 backdrop-blur-md border-2 border-white/35 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_8px_24px_rgba(0,0,0,0.4)] p-6 z-10">
+          <div className="relative w-full max-w-md mx-4 bg-zinc-900/90 backdrop-blur-md border border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-6 z-10">
             {isSaving ? (
               <div className="flex flex-col items-center justify-center py-8">
                 <Loader2 className="h-12 w-12 text-cyan-400 animate-spin mb-4" />
@@ -3527,14 +3527,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 <div className="flex gap-3">
                   <button
                     onClick={handleSessionRPESkip}
-                    className="flex-1 py-4 rounded-full bg-zinc-900/80 border-2 border-white/30 text-white/80 hover:bg-zinc-900/90 hover:text-white hover:border-white/40 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                    className="flex-1 py-4 rounded-full bg-zinc-900/80 border border-white/20 text-white/80 hover:bg-zinc-900/90 hover:text-white hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                     style={{ fontFamily: 'Inter, sans-serif' }}
                   >
                     Skip
                   </button>
                   <button
                     onClick={() => handleSessionRPESubmit(sessionRPE)}
-                    className="flex-1 py-4 rounded-full bg-zinc-900/90 border border-white/50 text-white hover:bg-zinc-900/95 hover:border-white/60 transition-all duration-300 font-medium"
+                    className="flex-1 py-4 rounded-full bg-zinc-900/90 border border-white/35 text-white hover:bg-zinc-900/95 hover:border-white/45 transition-all duration-300 font-medium"
                     style={{ fontFamily: 'Inter, sans-serif' }}
                   >
                     Submit & Finish
