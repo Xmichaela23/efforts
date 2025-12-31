@@ -2810,14 +2810,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const isDurationRunning = durationTimer?.running || false;
                   const currentDurationSeconds = durationTimer?.seconds ?? (set.duration_seconds || 60);
                   
-                  // Rest timer should only show when:
+                  // Rest timer should show for all sets (except duration-based):
                   // 1. Not duration-based exercise
-                  // 2. Not the first set (rest happens between sets)
-                  // 3. There are multiple sets (no rest needed if only one set)
-                  // Note: Rest timer shows between sets to help guide rest periods
-                  const showRestTimer = !isDurationBased && 
-                    setIndex > 0 && 
-                    exercise.sets.length > 1;
+                  // 2. Show for all sets to allow rest after each set
+                  const showRestTimer = !isDurationBased && exercise.sets.length > 0;
                   
                   const isBaselineTest = isBaselineTestWorkout(scheduledWorkout || {});
                   const isWarmup = set.setType === 'warmup';
@@ -2827,7 +2823,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const result = baselineTestResults[exercise.id];
                   
                   return (
-                    <div key={setIndex} className={showRestTimer ? "mb-4" : "mb-1 last:mb-0"}>
+                    <div key={setIndex} className={showRestTimer ? "mb-4" : "mb-1"}>
                       {/* Baseline test set type label and hint */}
                       {isBaselineTest && (
                         <div className="mb-1 ml-8">
