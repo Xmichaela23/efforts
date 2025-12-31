@@ -2465,7 +2465,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Don't render until properly initialized
   if (!isInitialized) {
     return (
-      <div className="min-h-screen pb-20">
+      <div 
+        className="min-h-screen pb-20"
+        style={{
+          background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+          backgroundImage: `
+            radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+            radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+            radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%)
+          `,
+          backgroundAttachment: 'fixed'
+        }}
+      >
         <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 pb-4 mb-4 rounded-xl">
           <div className="flex items-center w-full px-4">
             <h1 className="text-xl font-medium text-white/90">Loading...</h1>
@@ -2476,7 +2489,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   }
 
   return (
-    <div className="min-h-screen pb-24">
+    <div 
+      className="min-h-screen pb-24"
+      style={{
+        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+        backgroundImage: `
+          radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+          radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+          radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+          linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%)
+        `,
+        backgroundAttachment: 'fixed'
+      }}
+    >
       {/* Header */}
       <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 pb-2 mb-2 rounded-xl relative" style={{ zIndex: 1 }}>
         <div className="flex items-center justify-between w-full px-4">
