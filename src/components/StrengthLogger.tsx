@@ -3359,7 +3359,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       </div>
 
       {/* Fixed bottom save action (text-only per design) */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 z-[100] shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+      <div 
+        className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 z-[100] shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" 
+        style={{ 
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+          minHeight: 'calc(48px + env(safe-area-inset-bottom, 0px) + 12px)',
+          transform: 'translateZ(0)',
+          willChange: 'transform'
+        }}
+      >
         <button 
           onClick={saveWorkout}
           className="w-full h-12 text-base font-medium text-white transition-all duration-200 rounded-full bg-cyan-700/80 backdrop-blur-lg border-2 border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
