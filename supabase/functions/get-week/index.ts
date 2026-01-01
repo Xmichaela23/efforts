@@ -1050,17 +1050,17 @@ Deno.serve(async (req)=>{
           const config = planData.config;
           const weeklySummaries = config.weekly_summaries || {};
           
-          // Calculate current week dynamically from plan start date
+          // Calculate week number based on viewed date range (fromISO), not today
           const durationWeeks = planData.duration_weeks || config.duration_weeks || 0;
           let currentWeek = planData.current_week || 1;
           const startDateStr = config.user_selected_start_date || config.start_date;
-          if (startDateStr) {
+          if (startDateStr && fromISO) {
             const startDate = new Date(startDateStr);
-            const today = new Date();
+            const viewedDate = new Date(fromISO);
             // Reset to start of day for accurate calculation
             startDate.setHours(0, 0, 0, 0);
-            today.setHours(0, 0, 0, 0);
-            const diffMs = today.getTime() - startDate.getTime();
+            viewedDate.setHours(0, 0, 0, 0);
+            const diffMs = viewedDate.getTime() - startDate.getTime();
             const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
             // Week 1 starts at day 0, week 2 at day 7, etc.
             currentWeek = Math.max(1, Math.floor(diffDays / 7) + 1);
