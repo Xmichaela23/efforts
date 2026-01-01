@@ -2763,6 +2763,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         updateExerciseName(exercise.id, e.target.value);
                         setActiveDropdown(e.target.value.length > 0 ? exercise.id : null);
                       }}
+                      className="h-10 text-base font-medium !border-0 bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:!border-0"
                       onFocus={() => {
                         if (exercise.name.length > 0) {
                           setActiveDropdown(exercise.id);
@@ -2771,7 +2772,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       onBlur={() => {
                         setTimeout(() => setActiveDropdown(null), 150);
                       }}
-                      className="h-10 text-base font-medium border-none bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0"
                       style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                     />
                   </div>
@@ -3326,7 +3326,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               value={currentExercise}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="h-8 text-sm border-none bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0 pr-9"
+              className="h-8 text-sm !border-0 bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:!border-0 pr-9"
               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
             />
             {currentExercise && (
@@ -3362,7 +3362,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 z-[100] shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
         <button 
           onClick={saveWorkout}
-          className="w-full h-12 text-base font-medium text-white transition-colors rounded-full bg-cyan-700/80 backdrop-blur-lg border-2 border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+          className="w-full h-12 text-base font-medium text-white transition-all duration-200 rounded-full bg-cyan-700/80 backdrop-blur-lg border-2 border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
           Save
