@@ -2467,7 +2467,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   if (!isInitialized) {
     return (
       <div 
-        className="min-h-screen pb-20"
+        className="min-h-screen"
         style={{
           background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
           backgroundImage: `
@@ -2491,7 +2491,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   return (
     <div 
-      className="min-h-screen pb-20"
+      className="min-h-screen"
       style={{
         background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
         backgroundAttachment: 'fixed'
@@ -3391,6 +3391,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         document.body
       )}
 
+      {/* Extra bottom padding to ensure scroll works properly */}
+      <div style={{ height: '100px', width: '100%' }} />
 
       {/* Notes Modal */}
       {showNotesModal && (
