@@ -1078,7 +1078,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               </DropdownMenu>
 
               <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
-              {(selectedWorkout || showStrengthLogger || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage || showContext) && !showSummary && (
+              {(selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
                   {!selectedWorkout && (
                   <Button
@@ -1261,8 +1261,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         </PullToRefresh>
       </main>
 
-      {/* Bottom Navigation Tab Bar - Show on all screens (except loggers and builder) */}
-      {!(showStrengthLogger || showPilatesYogaLogger || showBuilder || workoutBeingEdited) && (
+      {/* Bottom Navigation Tab Bar - Show on all screens (except some loggers and builder) */}
+      {!(showPilatesYogaLogger || showBuilder || workoutBeingEdited) && (
         <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center" style={{ paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}>
           <div className="w-full">
             <div className="flex justify-center items-center gap-2 pb-3 pt-1">
