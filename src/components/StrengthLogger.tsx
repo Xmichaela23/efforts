@@ -2496,8 +2496,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
         backgroundAttachment: 'fixed',
         overscrollBehavior: 'none',
+        overscrollBehaviorY: 'none',
         WebkitOverflowScrolling: 'touch',
-        paddingBottom: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))',
         position: 'relative',
         isolation: 'isolate'
       }}
@@ -3395,6 +3395,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         </div>,
         document.body
       )}
+
+      {/* Spacer to prevent scroll bounce at bottom - matches save button height */}
+      <div style={{ height: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))', flexShrink: 0 }} />
 
       {/* Notes Modal */}
       {showNotesModal && (
