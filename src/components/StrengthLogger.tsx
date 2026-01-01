@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -2607,6 +2606,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   )}
                 </>
               )}
+            </div>
           </div>
         </div>
         {sourcePlannedName && (
@@ -3359,36 +3359,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       </div>
 
       {/* Fixed bottom save action */}
-      {createPortal(
-        <div 
-          className="px-4 py-3 bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" 
-          style={{ 
-            position: 'fixed',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            width: '100%',
-            paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
-            height: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))',
-            zIndex: 9999,
-            transform: 'translate3d(0, 0, 0)',
-            WebkitTransform: 'translate3d(0, 0, 0)',
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            willChange: 'transform',
-            pointerEvents: 'auto'
-          }}
+      <div 
+        className="px-4 py-3 fixed bottom-0 left-0 right-0 w-full bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" 
+        style={{ 
+          paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
+          height: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))',
+          zIndex: 9999
+        }}
+      >
+        <button 
+          onClick={saveWorkout}
+          className="w-full h-12 text-base font-medium text-white transition-all duration-200 rounded-full bg-cyan-700/80 backdrop-blur-lg border-2 border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+          style={{ fontFamily: 'Inter, sans-serif' }}
         >
-          <button 
-            onClick={saveWorkout}
-            className="w-full h-12 text-base font-medium text-white transition-all duration-200 rounded-full bg-cyan-700/80 backdrop-blur-lg border-2 border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            Save
-          </button>
-        </div>,
-        typeof document !== 'undefined' ? document.body : null as any
-      )}
+          Save
+        </button>
+      </div>
 
       {/* Extra bottom padding to ensure scroll works properly - extra large to prevent snap back */}
       {/* Bottom spacer for fixed save button */}
