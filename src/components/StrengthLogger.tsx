@@ -3534,22 +3534,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </div>
         </div>
       )}
-    </div>
 
-    {/* Bottom save action - flex item, not fixed */}
-    <div 
-      className="flex-shrink-0 px-4 py-3 bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" 
-      style={{ 
-        paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px))'
-      }}
-    >
-      <button 
-        onClick={saveWorkout}
-        className="w-full h-12 text-base font-medium text-white transition-all duration-200 rounded-full bg-cyan-700/80 backdrop-blur-lg border-2 border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
-        style={{ fontFamily: 'Inter, sans-serif' }}
+      {/* Save button at bottom of content */}
+      <div 
+        className="px-4 py-6 mt-4"
+        style={{ 
+          paddingBottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 24px))'
+        }}
       >
-        Save
-      </button>
+        <button 
+          onClick={saveWorkout}
+          className="w-full h-14 text-base font-medium text-white transition-all duration-200 rounded-full bg-cyan-700/80 backdrop-blur-lg border-2 border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+          style={{ fontFamily: 'Inter, sans-serif' }}
+        >
+          Save Workout
+        </button>
+      </div>
     </div>
     </div>
   );
