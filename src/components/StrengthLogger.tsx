@@ -2489,13 +2489,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   }
 
   return (
-    <>
     <div 
-      className="min-h-screen pb-20"
+      className="fixed inset-0 flex flex-col"
       style={{
-        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
-        backgroundAttachment: 'fixed'
+        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)'
       }}
+    >
+    <div 
+      className="flex-1 overflow-y-auto pb-4 overscroll-contain"
+      style={{ WebkitOverflowScrolling: 'touch' }}
     >
       {/* Header */}
       <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pb-2 mb-2 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]" style={{ zIndex: 1 }}>
@@ -3534,13 +3536,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       )}
     </div>
 
-    {/* Fixed bottom save action - outside scrollable container */}
+    {/* Bottom save action - flex item, not fixed */}
     <div 
-      className="px-4 py-3 fixed bottom-0 left-0 right-0 w-full bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" 
+      className="flex-shrink-0 px-4 py-3 bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" 
       style={{ 
-        paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
-        height: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))',
-        zIndex: 9999
+        paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px))'
       }}
     >
       <button 
@@ -3551,6 +3551,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         Save
       </button>
     </div>
-    </>
+    </div>
   );
 }
