@@ -2155,7 +2155,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
     
-    // If set is not completed, show RIR prompt (for strength workouts)
+    // If RIR was already entered inline, just mark complete (don't prompt again)
+    if (set.rir !== undefined && set.rir !== null) {
+      updateSet(exerciseId, setIndex, { completed: true });
+      return;
+    }
+    
+    // If set is not completed and no RIR entered, show RIR prompt
     setCurrentRIRExercise(exerciseId);
     setCurrentRIRSet(setIndex);
     setSelectedRIR(null);
