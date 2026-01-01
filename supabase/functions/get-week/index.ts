@@ -1049,12 +1049,30 @@ Deno.serve(async (req)=>{
         if (planData?.config) {
           const config = planData.config;
           const weeklySummaries = config.weekly_summaries || {};
-          // Use current_week from database instead of calculating
-          const currentWeek = planData.current_week || 1;
+          
+          // Calculate current week dynamically from plan start date
+          const durationWeeks = planData.duration_weeks || config.duration_weeks || 0;
+          let currentWeek = planData.current_week || 1;
+          const startDateStr = config.user_selected_start_date || config.start_date;
+          if (startDateStr) {
+            const startDate = new Date(startDateStr);
+            const today = new Date();
+            // Reset to start of day for accurate calculation
+            startDate.setHours(0, 0, 0, 0);
+            today.setHours(0, 0, 0, 0);
+            const diffMs = today.getTime() - startDate.getTime();
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            // Week 1 starts at day 0, week 2 at day 7, etc.
+            currentWeek = Math.max(1, Math.floor(diffDays / 7) + 1);
+            // Cap at duration weeks if defined
+            if (durationWeeks > 0) {
+              currentWeek = Math.min(currentWeek, durationWeeks);
+            }
+          }
+          
           const weekSummary = weeklySummaries[String(currentWeek)] || {};
           
           // Calculate weeks till race
-          const durationWeeks = planData.duration_weeks || config.duration_weeks || 0;
           const weeksToRace = durationWeeks > 0 ? Math.max(0, durationWeeks - currentWeek + 1) : null;
           
           trainingPlanContext = {
