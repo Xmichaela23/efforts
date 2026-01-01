@@ -3028,7 +3028,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                                 placeholder="Weight"
                               />
-                              <div className="absolute left-0 right-0 top-full text-[10px] text-white/50 text-center mt-0.5">(each hand)</div>
+                              <div className="absolute left-0 right-0 top-full text-[11px] text-amber-400/80 text-center mt-0.5 font-medium">(each hand)</div>
                             </div>
                           );
                         }
