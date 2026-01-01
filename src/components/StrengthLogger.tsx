@@ -73,7 +73,10 @@ const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' 
     'bicep curl', 'biceps curl', 'hammer curl', 'concentration curl',
     'lateral raise', 'front raise', 'chest fly', 'chest flye',
     'arnold press', 'goblet squat', 'bulgarian split squat',
-    'farmer walk', 'farmer walks'
+    'farmer walk', 'farmer walks',
+    'walking lunge', 'reverse lunge', 'forward lunge', 'lunge',
+    'single leg rdl', 'single-leg rdl', 'romanian deadlift', 'rdl',
+    'step up', 'step-up'
   ];
   if (dbPatterns.some(p => name.includes(p))) return 'dumbbell';
   
