@@ -2490,10 +2490,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   return (
     <div 
-      className="min-h-screen pb-24"
+      className="min-h-screen"
       style={{
         background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
-        backgroundAttachment: 'fixed'
+        backgroundAttachment: 'fixed',
+        overscrollBehavior: 'none',
+        WebkitOverflowScrolling: 'touch',
+        paddingBottom: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))'
       }}
     >
       {/* Header */}
@@ -3362,10 +3365,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       <div 
         className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 z-[100] shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" 
         style={{ 
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
-          minHeight: 'calc(48px + env(safe-area-inset-bottom, 0px) + 12px)',
+          paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
+          height: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))',
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
           transform: 'translateZ(0)',
-          willChange: 'transform'
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          willChange: 'transform',
+          overscrollBehavior: 'none'
         }}
       >
         <button 
