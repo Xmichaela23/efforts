@@ -3014,21 +3014,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           );
                         }
                         
-                        // Dumbbell exercises: Show weight input with persistent label
+                        // Dumbbell exercises: Show weight input with inline label
                         if (exerciseType === 'dumbbell') {
                           return (
-                            <div className="flex-1 relative">
+                            <div className="flex items-center gap-1 flex-1">
                               <Input
                                 type="number"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
                                 value={set.weight === 0 ? '' : set.weight.toString()}
                                 onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                                className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                                className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                                placeholder="Weight"
+                                placeholder="lbs"
                               />
-                              <div className="absolute left-0 right-0 top-full text-[11px] text-amber-400/80 text-center mt-0.5 font-medium">(each hand)</div>
+                              <span className="text-[10px] text-amber-400/90 font-medium whitespace-nowrap">/hand</span>
                             </div>
                           );
                         }
