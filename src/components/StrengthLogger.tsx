@@ -2712,7 +2712,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         {exercises.map((exercise, exerciseIndex) => (
           <div 
             key={exercise.id} 
-            className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+            className="backdrop-blur-xl border-2 border-white/20 rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+            style={{
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0.08), rgba(255,255,255,0.03))'
+            }}
           >
             {/* Core Work exercises use the CoreTimer component */}
             {isCoreWorkExercise(exercise.name) ? (
