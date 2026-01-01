@@ -32,7 +32,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [locTried, setLocTried] = useState(false);
   const [cityName, setCityName] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [showFade, setShowFade] = useState(true);
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
   const today = new Date().toLocaleDateString('en-CA');
@@ -235,32 +234,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // Check if any workout is expanded
   const hasExpandedWorkout = Object.values(expanded).some(Boolean);
 
-  // Toggle bottom fade only when not at bottom using scroll position
-  // Hide fade when any workout is expanded
-  // Fade should show when there's scrollable content and not at bottom
-  useEffect(() => {
-    if (hasExpandedWorkout) {
-      setShowFade(false);
-      return;
-    }
-    const root = scrollRef.current;
-    if (!root) return;
-    
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = root;
-      const hasScrollableContent = scrollHeight > clientHeight;
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px threshold
-      // Show fade when there's scrollable content AND not at bottom
-      setShowFade(hasScrollableContent && !isAtBottom);
-    };
-    
-    root.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); // Check initial state
-    
-    return () => {
-      root.removeEventListener('scroll', handleScroll);
-    };
-  }, [hasExpandedWorkout]);
 
   const dateWorkoutsMemo = useMemo(() => {
     const items = Array.isArray(unifiedItems) ? unifiedItems : [];
@@ -1144,22 +1117,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           <div style={{ height: 1 }} />
         </div>
       </div>
-      {/* Bottom fade overlay (shown only when not at bottom) */}
-      {showFade && (
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 40,
-              pointerEvents: 'none',
-              background:
-              'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 55%, rgba(0,0,0,0.8) 100%)',
-            boxShadow: 'inset 0 -10px 16px rgba(0,0,0,0.2)'
-              }}
-        />
-      )}
     </div>
   );
 };
