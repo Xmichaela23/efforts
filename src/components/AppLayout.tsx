@@ -1269,7 +1269,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to home
-                    if (selectedWorkout || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext) {
                       handleBackToDashboard();
                     }
                     setActiveBottomNav('home');
@@ -1293,7 +1293,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to context
-                    if (selectedWorkout || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines) {
                       handleBackToDashboard();
                     }
                     setShowContext(false);
@@ -1324,8 +1324,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   trigger={
               <Button
                         onClick={() => {
-                          // Close workout detail view if open
-                          if (selectedWorkout) {
+                          // Close workout detail view or logger if open
+                          if (selectedWorkout || showStrengthLogger) {
                             handleBackToDashboard();
                           }
                           setPlansMenuOpen(true);
