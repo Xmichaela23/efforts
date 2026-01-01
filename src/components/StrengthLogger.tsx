@@ -2492,11 +2492,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     <div 
       className="min-h-screen pb-24"
       style={{
-        background: `
-          radial-gradient(circle at 20% 30%, rgba(100,116,139,0.15) 0%, transparent 50%),
-          radial-gradient(circle at 80% 70%, rgba(71,85,105,0.1) 0%, transparent 50%),
-          linear-gradient(to bottom, #3f3f46, #18181b, #000000)
-        `,
+        background: 'linear-gradient(to bottom, #52525b, #27272a, #000000)',
         backgroundAttachment: 'fixed'
       }}
     >
