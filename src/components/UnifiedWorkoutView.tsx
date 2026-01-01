@@ -704,9 +704,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const isLinked = Boolean((sourceWorkout as any)?.planned_id) || Boolean(currentPlannedId) || Boolean(linkedPlanned?.id);
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div 
+      className="w-full h-full flex flex-col"
+      style={{
+        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+      }}
+    >
       {/* Header */}
-      <div className="p-2 border-b">
+      <div className="p-2 border-b border-white/10 bg-white/[0.03] backdrop-blur-md">
         {/* Row 1: Title + Attach/Unattach */}
         <div className="flex items-center justify-between">
           <h2 className="font-light tracking-normal text-xl text-white">
@@ -893,7 +898,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-3 bg-transparent border-none mb-0 py-0">
+        <TabsList className="grid w-full grid-cols-3 bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-0 py-0">
           <TabsTrigger value="planned" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
             <Calendar className="h-4 w-4" />
             Planned
@@ -908,7 +913,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsTrigger>
         </TabsList>
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto bg-white/[0.02] backdrop-blur-sm">
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-1">
             <StructuredPlannedView 
@@ -957,7 +962,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Summary Tab */}
-          <TabsContent value="summary" className="flex-1 p-0">
+          <TabsContent value="summary" className="flex-1 p-0 bg-transparent">
             {/* Attach/Unattach moved to header to reduce padding */}
             {/* Header metrics now rendered by MobileSummary to keep stable Pace/Duration adherence */}
             {/* Inline Strength Logger editor */}
