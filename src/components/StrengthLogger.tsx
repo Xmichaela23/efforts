@@ -2489,8 +2489,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   }
 
   return (
+    <>
     <div 
-      className="min-h-screen"
+      className="min-h-screen pb-20"
       style={{
         background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
         backgroundAttachment: 'fixed'
@@ -3358,27 +3359,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         </div>
       </div>
 
-      {/* Fixed bottom save action */}
-      <div 
-        className="px-4 py-3 fixed bottom-0 left-0 right-0 w-full bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" 
-        style={{ 
-          paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
-          height: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))',
-          zIndex: 9999
-        }}
-      >
-        <button 
-          onClick={saveWorkout}
-          className="w-full h-12 text-base font-medium text-white transition-all duration-200 rounded-full bg-cyan-700/80 backdrop-blur-lg border-2 border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
-          style={{ fontFamily: 'Inter, sans-serif' }}
-        >
-          Save
-        </button>
-      </div>
-
-      {/* Extra bottom padding to ensure scroll works properly - extra large to prevent snap back */}
-      {/* Bottom spacer for fixed save button */}
-      <div style={{ height: '80px' }} />
 
       {/* Notes Modal */}
       {showNotesModal && (
@@ -3553,5 +3533,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         </div>
       )}
     </div>
+
+    {/* Fixed bottom save action - outside scrollable container */}
+    <div 
+      className="px-4 py-3 fixed bottom-0 left-0 right-0 w-full bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" 
+      style={{ 
+        paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
+        height: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))',
+        zIndex: 9999
+      }}
+    >
+      <button 
+        onClick={saveWorkout}
+        className="w-full h-12 text-base font-medium text-white transition-all duration-200 rounded-full bg-cyan-700/80 backdrop-blur-lg border-2 border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+        style={{ fontFamily: 'Inter, sans-serif' }}
+      >
+        Save
+      </button>
+    </div>
+    </>
   );
 }
