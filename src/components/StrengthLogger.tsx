@@ -3391,8 +3391,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         document.body
       )}
 
-      {/* Extra bottom padding to ensure scroll works properly */}
-      <div style={{ height: '100px', width: '100%' }} />
+      {/* Extra bottom padding to ensure scroll works properly - extra large to prevent snap back */}
+      <div style={{ height: '150px', width: '100%', minHeight: '150px', display: 'block', flexShrink: 0, content: '""' }} aria-hidden="true" />
 
       {/* Notes Modal */}
       {showNotesModal && (
