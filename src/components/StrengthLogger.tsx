@@ -3317,39 +3317,38 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         ))}
 
         {/* Add new exercise input */}
-        <div className="relative bg-white/[0.05] backdrop-blur-md border-2 border-white/20 rounded-2xl px-3 pt-0 pb-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-          <div className="relative flex items-center border-2 border-white/25 bg-white/[0.08] backdrop-blur-lg rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-            <div className="pl-2 text-white/60">
-              <Search className="h-4 w-4" />
-            </div>
-            <Input
-              placeholder="Add exercise..."
-              value={currentExercise}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="h-8 text-sm !border-0 bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:!border-0 pr-9"
-              style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-            />
-            {currentExercise && (
-              <button
-                type="button"
-                onClick={handleAddClick}
-                className="absolute right-2 h-5 w-5 flex items-center justify-center text-gray-700 hover:text-gray-900"
-                aria-label="Add exercise"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            )}
+        <div className="relative flex items-center border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] px-3 py-2 mx-3 mb-2">
+          <div className="pl-2 text-white/60">
+            <Search className="h-4 w-4" />
           </div>
+          <Input
+            placeholder="Add exercise..."
+            value={currentExercise}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="h-8 text-sm !border-0 bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:!border-0 pr-9 flex-1"
+            style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+          />
+          {currentExercise && (
+            <button
+              type="button"
+              onClick={handleAddClick}
+              className="absolute right-3 h-6 w-6 flex items-center justify-center text-white/70 hover:text-white rounded-full hover:bg-white/[0.10] transition-colors"
+              aria-label="Add exercise"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
+        </div>
           
           {showSuggestions && filteredExercises.length > 0 && (
-            <div className="absolute top-10 left-3 right-3 bg-white border border-gray-200 shadow-lg z-50 max-h-64 overflow-y-auto">
+            <div className="absolute top-12 left-0 right-0 mx-3 bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 max-h-64 overflow-y-auto">
               {filteredExercises.map((exercise, index) => (
                 <button
                   key={index}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSuggestionClick(exercise)}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm min-h-[40px]"
+                  className="w-full text-left px-3 py-2 hover:bg-white/[0.10] text-white/90 text-sm min-h-[40px] transition-colors"
                 >
                   {exercise}
                 </button>
@@ -3392,7 +3391,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       )}
 
       {/* Extra bottom padding to ensure scroll works properly - extra large to prevent snap back */}
-      <div style={{ height: '150px', width: '100%', minHeight: '150px', display: 'block', flexShrink: 0, content: '""' }} aria-hidden="true" />
+      {/* Bottom spacer for fixed save button */}
+      <div style={{ height: '80px' }} />
 
       {/* Notes Modal */}
       {showNotesModal && (
