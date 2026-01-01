@@ -2609,7 +2609,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               )}
           </div>
         </div>
-        </div>
         {sourcePlannedName && (
           <div className="mt-2 text-sm text-white/60 px-4">Source: {sourcePlannedName}</div>
         )}
@@ -3317,32 +3316,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         ))}
 
         {/* Add new exercise input */}
-        <div className="relative flex items-center border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] px-3 py-2 mx-3 mb-2">
-          <div className="pl-2 text-white/60">
-            <Search className="h-4 w-4" />
+        <div className="relative mx-3 mb-2">
+          <div className="relative flex items-center border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] px-3 py-2">
+            <div className="pl-2 text-white/60">
+              <Search className="h-4 w-4" />
+            </div>
+            <Input
+              placeholder="Add exercise..."
+              value={currentExercise}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="h-8 text-sm !border-0 bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:!border-0 pr-9 flex-1"
+              style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+            />
+            {currentExercise && (
+              <button
+                type="button"
+                onClick={handleAddClick}
+                className="absolute right-3 h-6 w-6 flex items-center justify-center text-white/70 hover:text-white rounded-full hover:bg-white/[0.10] transition-colors"
+                aria-label="Add exercise"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
           </div>
-          <Input
-            placeholder="Add exercise..."
-            value={currentExercise}
-            onChange={(e) => handleInputChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="h-8 text-sm !border-0 bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:!border-0 pr-9 flex-1"
-            style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-          />
-          {currentExercise && (
-            <button
-              type="button"
-              onClick={handleAddClick}
-              className="absolute right-3 h-6 w-6 flex items-center justify-center text-white/70 hover:text-white rounded-full hover:bg-white/[0.10] transition-colors"
-              aria-label="Add exercise"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          )}
-        </div>
           
           {showSuggestions && filteredExercises.length > 0 && (
-            <div className="absolute top-12 left-0 right-0 mx-3 bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 max-h-64 overflow-y-auto">
+            <div className="absolute top-12 left-0 right-0 bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 max-h-64 overflow-y-auto">
               {filteredExercises.map((exercise, index) => (
                 <button
                   key={index}
@@ -3358,7 +3358,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         </div>
       </div>
 
-      {/* Fixed bottom save action - rendered via portal to document.body to avoid scroll container issues */}
+      {/* Fixed bottom save action */}
       {createPortal(
         <div 
           className="px-4 py-3 bg-white/[0.08] backdrop-blur-md border-t-2 border-white/20 shadow-[0_-4px_12px_rgba(0,0,0,0.2)]" 
@@ -3387,7 +3387,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             Save
           </button>
         </div>,
-        document.body
+        typeof document !== 'undefined' ? document.body : null as any
       )}
 
       {/* Extra bottom padding to ensure scroll works properly - extra large to prevent snap back */}
