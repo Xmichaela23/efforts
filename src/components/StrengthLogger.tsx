@@ -2491,13 +2491,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   return (
     <div 
-      className="min-h-screen"
+      className="min-h-screen pb-20"
       style={{
         background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
-        backgroundAttachment: 'fixed',
-        WebkitOverflowScrolling: 'touch',
-        position: 'relative',
-        isolation: 'isolate'
+        backgroundAttachment: 'fixed'
       }}
     >
       {/* Header */}
@@ -3394,15 +3391,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         document.body
       )}
 
-      {/* Spacer to prevent scroll bounce at bottom - matches save button height */}
-      <div 
-        style={{ 
-          height: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))', 
-          minHeight: 'calc(60px + max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)))',
-          flexShrink: 0,
-          pointerEvents: 'none'
-        }} 
-      />
 
       {/* Notes Modal */}
       {showNotesModal && (
