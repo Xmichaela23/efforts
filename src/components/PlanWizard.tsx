@@ -1686,43 +1686,43 @@ export default function PlanWizard() {
               {state.hasRaceDate ? (
                 // Race date mode - show summary
                 <div className="space-y-4">
-                  <div className="p-4 bg-gray-50 rounded-lg border">
+                  <div className="p-4 bg-white/[0.05] backdrop-blur-lg rounded-xl border-2 border-white/15">
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Race day:</span>
-                        <span className="font-medium">{new Date(state.raceDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                        <span className="text-white/60">Race day:</span>
+                        <span className="font-medium text-white">{state.raceDate ? new Date(state.raceDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '—'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Plan starts:</span>
-                        <span className="font-medium">{new Date(state.startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+                        <span className="text-white/60">Plan starts:</span>
+                        <span className="font-medium text-white">{state.startDate ? new Date(state.startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '—'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Duration:</span>
-                        <span className="font-medium">{state.duration} weeks</span>
+                        <span className="text-white/60">Duration:</span>
+                        <span className="font-medium text-white">{state.duration ? `${state.duration} weeks` : '—'}</span>
                       </div>
                     </div>
                   </div>
                   
                   {/* Show Effort Score and projected finish time for Speed goal */}
                   {state.effortScore && projectedFinishTime && (
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="p-4 bg-blue-500/10 backdrop-blur-lg rounded-xl border-2 border-blue-400/30">
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-blue-700">Effort Score:</span>
-                          <span className="font-semibold text-blue-900">{state.effortScore}</span>
+                          <span className="text-blue-300">Effort Score:</span>
+                          <span className="font-semibold text-blue-100">{state.effortScore}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-blue-700">Projected finish:</span>
-                          <span className="font-semibold text-blue-900">{formatFinishTime(projectedFinishTime)}</span>
+                          <span className="text-blue-300">Projected finish:</span>
+                          <span className="font-semibold text-blue-100">{formatFinishTime(projectedFinishTime)}</span>
                         </div>
                         {state.effortPaces && (
                           <div className="flex justify-between">
-                            <span className="text-blue-700">Goal pace:</span>
-                            <span className="font-semibold text-blue-900">{formatPace(state.effortPaces.race)}/mi</span>
+                            <span className="text-blue-300">Goal pace:</span>
+                            <span className="font-semibold text-blue-100">{formatPace(state.effortPaces.race)}/mi</span>
                           </div>
                         )}
                       </div>
-                      <p className="text-xs text-blue-600 mt-2">
+                      <p className="text-xs text-blue-300/80 mt-2">
                         Based on your fitness level. All workouts will use these paces.
                       </p>
                     </div>
@@ -1731,7 +1731,7 @@ export default function PlanWizard() {
                   <button
                     type="button"
                     onClick={() => setState(prev => ({ ...prev, hasRaceDate: null, raceDate: '' }))}
-                    className="text-sm text-gray-500 hover:text-black underline"
+                    className="text-sm text-white/50 hover:text-white/80 underline"
                   >
                     Change race date
                   </button>
@@ -1746,7 +1746,7 @@ export default function PlanWizard() {
                     className="w-full p-3 bg-white/[0.08] border border-white/20 rounded-lg text-base text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
                   />
                   {planEndDate && (
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-white/50">
                       Plan ends: {planEndDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                     </p>
                   )}
