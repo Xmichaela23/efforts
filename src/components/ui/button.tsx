@@ -16,7 +16,7 @@ const buttonVariants = cva(
           "border border-gray-300 bg-white text-black hover:bg-gray-50 hover:text-black",
         secondary:
           "bg-white text-black border border-gray-300 hover:bg-gray-50 hover:text-black",
-        ghost: "bg-white text-black hover:bg-gray-50 hover:text-black",
+        ghost: "bg-transparent text-inherit hover:bg-white/10",
         link: "text-black underline-offset-4 hover:underline",
         toggle: "bg-white text-black border border-gray-300 hover:bg-gray-50 hover:text-black",
         "toggle-active": "bg-black text-white border border-black",
