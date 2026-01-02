@@ -704,16 +704,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const isLinked = Boolean((sourceWorkout as any)?.planned_id) || Boolean(currentPlannedId) || Boolean(linkedPlanned?.id);
 
   return (
-    <div 
-      className="fixed inset-0 overflow-y-auto overscroll-contain"
-      style={{
-        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
-        WebkitOverflowScrolling: 'touch'
-      }}
-    >
-      {/* Spacer for header */}
-      <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
-      
+    <div className="h-full overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
       {/* Header */}
       <div className="p-3">
         {/* Row 1: Title + Attach/Unattach */}
@@ -1078,9 +1069,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
         </div>
       </Tabs>
-      
-      {/* Spacer for bottom nav */}
-      <div style={{ height: 'calc(var(--tabbar-h, 80px) + env(safe-area-inset-bottom, 0px) + 16px)' }} />
     </div>
   );
 };

@@ -1209,6 +1209,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : selectedWorkout ? (
+            <div className="h-full">
               <UnifiedWorkoutView
                 workout={selectedWorkout}
                 onUpdateWorkout={handleUpdateWorkout}
@@ -1218,6 +1219,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 origin="today"
                 initialTab={activeTab as any}
               />
+            </div>
           ) : (
             <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (
