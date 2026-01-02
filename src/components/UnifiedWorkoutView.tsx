@@ -707,12 +707,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     <div 
       className="fixed inset-0 flex flex-col z-40"
       style={{ 
-        background: 'linear-gradient(to bottom, #ff0000, #00ff00, #0000ff)'
+        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)'
       }}
     >
       <div 
         className="flex-1 overflow-y-auto overscroll-contain min-h-0"
-        style={{ WebkitOverflowScrolling: 'touch', background: 'linear-gradient(to bottom, #ff00ff, #00ffff)' }}
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
       {/* Spacer for app header */}
       <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
@@ -1019,9 +1019,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent value="completed" className="flex-1 p-2" style={{ background: 'orange' }}>
+          <TabsContent value="completed" className="flex-1 p-2">
             {isCompleted ? (
-              <div style={{ background: 'lime' }}>
+              <div>
                   {/* Delete control removed per product decision */}
                   {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
                     <div>

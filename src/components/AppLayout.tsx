@@ -1121,7 +1121,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         />
       )}
       
-      <main className="mobile-main-content" style={{ background: 'red' }}>
+      <main className="mobile-main-content">
         <PullToRefresh onRefresh={handleGlobalRefresh}>
         <div className="w-full px-2" style={{ paddingBottom: 'calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px)' }}>
           {showPlanBuilder ? (
