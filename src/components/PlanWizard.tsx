@@ -880,13 +880,13 @@ export default function PlanWizard() {
               className="space-y-4"
             >
               {/* Complete Goal → Simple Completion */}
-              <div className="p-3 border rounded-lg hover:bg-gray-50">
+              <div className={`p-4 rounded-xl transition-all ${state.goal === 'complete' ? 'bg-white/[0.12] border-2 border-white/30' : 'bg-white/[0.05] border border-white/15 hover:bg-white/[0.08]'}`}>
                 <div className="flex items-start space-x-3">
                   <RadioGroupItem value="complete" id="complete" className="mt-1" />
                   <Label htmlFor="complete" className="flex-1 cursor-pointer">
-                    <span className="block font-medium">Complete</span>
-                    <span className="block text-xs text-gray-500 mt-0.5 italic">For those focused on the experience, returning to running, or first-timers who want to complete</span>
-                    <span className="block text-sm text-gray-600 mt-2">
+                    <span className="block font-medium text-white">Complete</span>
+                    <span className="block text-xs text-white/50 mt-0.5 italic">For those focused on the experience, returning to running, or first-timers who want to complete</span>
+                    <span className="block text-sm text-white/60 mt-2">
                       Build the endurance to finish strong. Training is effort-based (easy, moderate, hard) so you can run by feel.
                     </span>
                   </Label>
@@ -897,7 +897,7 @@ export default function PlanWizard() {
               {(() => {
                 const isSpeedLocked = state.fitness === 'beginner' && state.distance === 'marathon';
                 return (
-              <div className={`p-3 border rounded-lg ${isSpeedLocked ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}`}>
+              <div className={`p-4 rounded-xl transition-all ${isSpeedLocked ? 'bg-white/[0.03] border border-white/10 opacity-60' : state.goal === 'speed' ? 'bg-white/[0.12] border-2 border-white/30' : 'bg-white/[0.05] border border-white/15 hover:bg-white/[0.08]'}`}>
                 <div className="flex items-start space-x-3">
                   <RadioGroupItem 
                     value="speed" 
@@ -906,16 +906,16 @@ export default function PlanWizard() {
                     disabled={isSpeedLocked}
                   />
                   <Label htmlFor="speed" className={`flex-1 ${isSpeedLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                    <span className="block font-medium">
+                    <span className="block font-medium text-white">
                       {isSpeedLocked ? 'Speed (Locked)' : 'Speed'}
                     </span>
-                    <span className="block text-xs text-gray-500 mt-0.5 italic">For experienced runners looking to improve their time</span>
+                    <span className="block text-xs text-white/50 mt-0.5 italic">For experienced runners looking to improve their time</span>
                     {isSpeedLocked ? (
-                      <span className="block text-xs text-amber-600 mt-2">
+                      <span className="block text-xs text-amber-400 mt-2">
                         Speed-focused marathon training requires Intermediate+ fitness (25+ mpw).
                       </span>
                     ) : (
-                      <span className="block text-sm text-gray-600 mt-2">
+                      <span className="block text-sm text-white/60 mt-2">
                         Train with a focus on improving speed. Includes structured intervals and tempo runs with paces calculated from your 5K.
                       </span>
                     )}
@@ -928,7 +928,7 @@ export default function PlanWizard() {
             
             {/* Disclaimer */}
             {state.goal && (
-              <p className="text-xs text-gray-400 mt-4">
+              <p className="text-xs text-white/40 mt-4">
                 {state.goal === 'complete' 
                   ? 'Plan based on progressive training principles.'
                   : 'Plan based on established running science.'}
