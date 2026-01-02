@@ -705,19 +705,17 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 flex flex-col"
+      className="fixed inset-0 overflow-y-auto overscroll-contain"
       style={{
         background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
-        paddingTop: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))',
-        paddingBottom: 'calc(var(--tabbar-h, 80px) + env(safe-area-inset-bottom, 0px))'
+        WebkitOverflowScrolling: 'touch'
       }}
     >
-    <div 
-      className="flex-1 overflow-y-auto overscroll-contain"
-      style={{ WebkitOverflowScrolling: 'touch' }}
-    >
+      {/* Spacer for header */}
+      <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
+      
       {/* Header */}
-      <div className="p-3 bg-white/[0.03] backdrop-blur-md border-b border-white/10">
+      <div className="p-3">
         {/* Row 1: Title + Attach/Unattach */}
         <div className="flex items-center justify-between">
           <h2 className="font-light tracking-normal text-xl text-white">
@@ -1080,7 +1078,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
         </div>
       </Tabs>
-      </div>
+      
+      {/* Spacer for bottom nav */}
+      <div style={{ height: 'calc(var(--tabbar-h, 80px) + env(safe-area-inset-bottom, 0px) + 16px)' }} />
     </div>
   );
 };
