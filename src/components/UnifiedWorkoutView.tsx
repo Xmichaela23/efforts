@@ -705,7 +705,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 flex flex-col"
+      className="fixed inset-0 flex flex-col z-10"
       style={{ 
         background: 'linear-gradient(to bottom, #ff0000, #00ff00, #0000ff)'
       }}
