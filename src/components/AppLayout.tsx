@@ -1109,7 +1109,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       </header>
 
       {/* Render UnifiedWorkoutView OUTSIDE mobile-main-content to avoid z-index issues */}
-      {selectedWorkout && !showPlanBuilder && !showStrengthPlans && !showAllPlans && !showStrengthLogger && !showContextMenu && (
+      {selectedWorkout && !showPlanBuilder && !showStrengthPlans && !showAllPlans && !showStrengthLogger && (
         <UnifiedWorkoutView
           workout={selectedWorkout}
           onUpdateWorkout={handleUpdateWorkout}
