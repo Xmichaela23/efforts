@@ -1108,6 +1108,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         </div>
       </header>
 
+      {/* Render UnifiedWorkoutView OUTSIDE mobile-main-content to avoid z-index issues */}
+      {selectedWorkout && !showPlanBuilder && !showStrengthPlans && !showAllPlans && !showStrengthLogger && !showContextMenu && (
+        <UnifiedWorkoutView
+          workout={selectedWorkout}
+          onUpdateWorkout={handleUpdateWorkout}
+          onClose={handleBackToDashboard}
+          onDelete={handleDeleteWorkout}
+          onNavigateToContext={handleNavigateToContext}
+          origin="today"
+          initialTab={activeTab as any}
+        />
+      )}
+      
       <main className="mobile-main-content" style={{ background: 'red' }}>
         <PullToRefresh onRefresh={handleGlobalRefresh}>
         <div className="w-full px-2" style={{ paddingBottom: 'calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px)' }}>
@@ -1209,17 +1222,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : selectedWorkout ? (
-            <div className="h-full" style={{ background: 'cyan' }}>
-              <UnifiedWorkoutView
-                workout={selectedWorkout}
-                onUpdateWorkout={handleUpdateWorkout}
-                onClose={handleBackToDashboard}
-                onDelete={handleDeleteWorkout}
-                onNavigateToContext={handleNavigateToContext}
-                origin="today"
-                initialTab={activeTab as any}
-              />
-            </div>
+            /* UnifiedWorkoutView now rendered outside mobile-main-content */
+            null
           ) : (
             <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (

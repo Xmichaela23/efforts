@@ -705,13 +705,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 flex flex-col z-10"
+      className="fixed inset-0 flex flex-col z-40"
       style={{ 
         background: 'linear-gradient(to bottom, #ff0000, #00ff00, #0000ff)'
       }}
     >
       <div 
-        className="flex-1 overflow-y-auto overscroll-contain"
+        className="flex-1 overflow-y-auto overscroll-contain min-h-0"
         style={{ WebkitOverflowScrolling: 'touch', background: 'linear-gradient(to bottom, #ff00ff, #00ffff)' }}
       >
       {/* Spacer for app header */}
