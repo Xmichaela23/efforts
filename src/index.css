@@ -164,13 +164,17 @@
     bottom: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    /* Padding so content starts below header and ends above tabbar */
+    /* Padding so content starts below header - NO bottom padding so content scrolls behind nav */
     padding-top: calc(var(--header-h) + env(safe-area-inset-top));
-    padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     /* Prevent white background on overscroll */
     overscroll-behavior: none;
     /* Transparent so gradient shows through */
     background: transparent;
+  }
+  
+  /* Add bottom spacing to last content element so it can scroll above nav */
+  .mobile-main-content > *:last-child {
+    margin-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px);
   }
 
   /* 🆕 NEW: Sliding container for calendar and summary */
