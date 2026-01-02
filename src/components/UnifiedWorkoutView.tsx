@@ -708,10 +708,17 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       className="w-full h-full flex flex-col"
       style={{
         background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+        backgroundImage: `
+          radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+          radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+          radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+          linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%)
+        `,
       }}
     >
       {/* Header */}
-      <div className="p-2 border-b border-white/10 bg-white/[0.03] backdrop-blur-md">
+      <div className="p-2 border-b border-white/10 bg-white/[0.05] backdrop-blur-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
         {/* Row 1: Title + Attach/Unattach */}
         <div className="flex items-center justify-between">
           <h2 className="font-light tracking-normal text-xl text-white">
@@ -913,13 +920,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsTrigger>
         </TabsList>
 
-        <div className="flex-1 overflow-auto bg-white/[0.02] backdrop-blur-sm">
+        <div 
+          className="flex-1 overflow-y-auto overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           {/* Planned Tab */}
-          <TabsContent value="planned" className="flex-1 p-1">
-            <StructuredPlannedView 
-              workout={getUnifiedPlannedWorkout(unifiedWorkout, isCompleted, hydratedPlanned, linkedPlanned)}
-              showHeader={true}
-            />
+          <TabsContent value="planned" className="flex-1 p-2">
+            <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 rounded-2xl p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
+              <StructuredPlannedView 
+                workout={getUnifiedPlannedWorkout(unifiedWorkout, isCompleted, hydratedPlanned, linkedPlanned)}
+                showHeader={true}
+              />
+            </div>
             {(() => {
               // Show inline launcher for planned sessions (strength, mobility, and pilates_yoga)
               const row = isCompleted ? (linkedPlanned || null) : unifiedWorkout;
@@ -955,6 +967,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     variant="ghost"
                     size="sm"
                     onClick={handleClick}
+                    className="bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/90 hover:bg-white/[0.12]"
                   >Go to workout</Button>
                 </div>
               );
@@ -962,37 +975,39 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Summary Tab */}
-          <TabsContent value="summary" className="flex-1 p-0 bg-transparent">
-            {/* Attach/Unattach moved to header to reduce padding */}
-            {/* Header metrics now rendered by MobileSummary to keep stable Pace/Duration adherence */}
-            {/* Inline Strength Logger editor */}
-            {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
-              <div className="mb-4 border border-gray-200 rounded-md">
-                <StrengthLogger
-                  onClose={()=> setEditingInline(false)}
-                  scheduledWorkout={(isCompleted ? workout : (linkedPlanned || workout))}
-                  onWorkoutSaved={(saved)=>{
-                    setEditingInline(false);
-                    setActiveTab('summary');
-                    try { (workout as any).id = (saved as any)?.id || (workout as any).id; } catch {}
-                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                  }}
-                  targetDate={(workout as any)?.date}
-                />
-              </div>
-            )}
-            {(() => {
-              return isCompleted && !isLinked ? (
-                <div className="px-3 py-2 text-sm text-gray-600">Attach this workout to a planned session to see planned vs actual.</div>
-              ) : (
-                <MobileSummary 
-                  planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
-                  completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
-                  onNavigateToContext={onNavigateToContext}
-                />
-              );
-            })()}
+          <TabsContent value="summary" className="flex-1 p-2">
+            <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 rounded-2xl p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
+              {/* Attach/Unattach moved to header to reduce padding */}
+              {/* Header metrics now rendered by MobileSummary to keep stable Pace/Duration adherence */}
+              {/* Inline Strength Logger editor */}
+              {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
+                <div className="mb-4 border border-white/20 rounded-md">
+                  <StrengthLogger
+                    onClose={()=> setEditingInline(false)}
+                    scheduledWorkout={(isCompleted ? workout : (linkedPlanned || workout))}
+                    onWorkoutSaved={(saved)=>{
+                      setEditingInline(false);
+                      setActiveTab('summary');
+                      try { (workout as any).id = (saved as any)?.id || (workout as any).id; } catch {}
+                      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                    }}
+                    targetDate={(workout as any)?.date}
+                  />
+                </div>
+              )}
+              {(() => {
+                return isCompleted && !isLinked ? (
+                  <div className="px-3 py-2 text-sm text-white/60">Attach this workout to a planned session to see planned vs actual.</div>
+                ) : (
+                  <MobileSummary 
+                    planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
+                    completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
+                    onNavigateToContext={onNavigateToContext}
+                  />
+                );
+              })()}
+            </div>
             {onDelete && workout?.id && (
               <Button
                 variant="ghost"
@@ -1009,61 +1024,60 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent value="completed" className="flex-1 p-1">
-            {isCompleted ? (
-              <div className="h-full">
-                {/* Delete control removed per product decision */}
-                {/* Delete control removed per product decision */}
-                {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
-                  <div className="p-4">
-                    <CompletedTab 
-                      workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
-                      workoutData={completedData}
-                    />
-                  </div>
-                ) : (workout.type === 'strength' || workout.type === 'mobility' || workout.type === 'pilates_yoga') ? (
-                  <div className="p-4">
-                    <h3 className="font-semibold mb-4">
-                      {workout.type === 'mobility' ? 'Mobility' : 
-                       workout.type === 'pilates_yoga' ? 'Pilates/Yoga' : 
-                       'Strength'} Workout Completed</h3>
-                    {/* Use StrengthCompletedView for both strength and mobility workouts */}
-                    <StrengthCompletedView 
-                      workoutData={completedData}
-                      plannedWorkout={linkedPlanned}
-                    />
-                    {assocOpen && (
-                      <AssociatePlannedDialog
-                        workout={workout}
-                        open={assocOpen}
-                        onClose={()=>setAssocOpen(false)}
-                        onAssociated={async(pid)=>{ 
-                          setAssocOpen(false);
-                          // Just dispatch invalidation - AppLayout and useEffects will handle the rest
-                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                          try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-                        }}
+          <TabsContent value="completed" className="flex-1 p-2">
+            <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 rounded-2xl p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
+              {isCompleted ? (
+                <div className="h-full">
+                  {/* Delete control removed per product decision */}
+                  {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
+                    <div>
+                      <CompletedTab 
+                        workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
+                        workoutData={completedData}
                       />
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-4">
-                    <h3 className="font-semibold mb-4">Workout Completed</h3>
-                    <p className="text-muted-foreground">Workout type not yet supported in completed view.</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-4">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-yellow-900 mb-2">Not Yet Completed</h3>
-                  <p className="text-sm text-yellow-800">
+                    </div>
+                  ) : (workout.type === 'strength' || workout.type === 'mobility' || workout.type === 'pilates_yoga') ? (
+                    <div>
+                      <h3 className="font-semibold mb-4 text-white/90">
+                        {workout.type === 'mobility' ? 'Mobility' : 
+                         workout.type === 'pilates_yoga' ? 'Pilates/Yoga' : 
+                         'Strength'} Workout Completed</h3>
+                      {/* Use StrengthCompletedView for both strength and mobility workouts */}
+                      <StrengthCompletedView 
+                        workoutData={completedData}
+                        plannedWorkout={linkedPlanned}
+                      />
+                      {assocOpen && (
+                        <AssociatePlannedDialog
+                          workout={workout}
+                          open={assocOpen}
+                          onClose={()=>setAssocOpen(false)}
+                          onAssociated={async(pid)=>{ 
+                            setAssocOpen(false);
+                            // Just dispatch invalidation - AppLayout and useEffects will handle the rest
+                            try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                            try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                            try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+                          }}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <h3 className="font-semibold mb-4 text-white/90">Workout Completed</h3>
+                      <p className="text-white/60">Workout type not yet supported in completed view.</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                  <h3 className="font-semibold text-amber-400 mb-2">Not Yet Completed</h3>
+                  <p className="text-sm text-amber-300/80">
                     This workout hasn't been completed yet. Complete it to see detailed analytics.
                   </p>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </TabsContent>
         </div>
       </Tabs>
