@@ -914,12 +914,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         >
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-2">
-            <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 rounded-2xl p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
-              <StructuredPlannedView 
-                workout={getUnifiedPlannedWorkout(unifiedWorkout, isCompleted, hydratedPlanned, linkedPlanned)}
-                showHeader={true}
-              />
-            </div>
+            <StructuredPlannedView 
+              workout={getUnifiedPlannedWorkout(unifiedWorkout, isCompleted, hydratedPlanned, linkedPlanned)}
+              showHeader={true}
+            />
             {(() => {
               // Show inline launcher for planned sessions (strength, mobility, and pilates_yoga)
               const row = isCompleted ? (linkedPlanned || null) : unifiedWorkout;
@@ -964,38 +962,36 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Summary Tab */}
           <TabsContent value="summary" className="flex-1 p-2">
-            <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 rounded-2xl p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
-              {/* Attach/Unattach moved to header to reduce padding */}
-              {/* Header metrics now rendered by MobileSummary to keep stable Pace/Duration adherence */}
-              {/* Inline Strength Logger editor */}
-              {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
-                <div className="mb-4 border border-white/20 rounded-md">
-                  <StrengthLogger
-                    onClose={()=> setEditingInline(false)}
-                    scheduledWorkout={(isCompleted ? workout : (linkedPlanned || workout))}
-                    onWorkoutSaved={(saved)=>{
-                      setEditingInline(false);
-                      setActiveTab('summary');
-                      try { (workout as any).id = (saved as any)?.id || (workout as any).id; } catch {}
-                      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                    }}
-                    targetDate={(workout as any)?.date}
-                  />
-                </div>
-              )}
-              {(() => {
-                return isCompleted && !isLinked ? (
-                  <div className="px-3 py-2 text-sm text-white/60">Attach this workout to a planned session to see planned vs actual.</div>
-                ) : (
-                  <MobileSummary 
-                    planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
-                    completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
-                    onNavigateToContext={onNavigateToContext}
-                  />
-                );
-              })()}
-            </div>
+            {/* Attach/Unattach moved to header to reduce padding */}
+            {/* Header metrics now rendered by MobileSummary to keep stable Pace/Duration adherence */}
+            {/* Inline Strength Logger editor */}
+            {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
+              <div className="mb-4 border border-white/20 rounded-md">
+                <StrengthLogger
+                  onClose={()=> setEditingInline(false)}
+                  scheduledWorkout={(isCompleted ? workout : (linkedPlanned || workout))}
+                  onWorkoutSaved={(saved)=>{
+                    setEditingInline(false);
+                    setActiveTab('summary');
+                    try { (workout as any).id = (saved as any)?.id || (workout as any).id; } catch {}
+                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                  }}
+                  targetDate={(workout as any)?.date}
+                />
+              </div>
+            )}
+            {(() => {
+              return isCompleted && !isLinked ? (
+                <div className="px-3 py-2 text-sm text-white/60">Attach this workout to a planned session to see planned vs actual.</div>
+              ) : (
+                <MobileSummary 
+                  planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
+                  completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
+                  onNavigateToContext={onNavigateToContext}
+                />
+              );
+            })()}
             {onDelete && workout?.id && (
               <Button
                 variant="ghost"
@@ -1013,9 +1009,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Completed Tab */}
           <TabsContent value="completed" className="flex-1 p-2">
-            <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 rounded-2xl p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
-              {isCompleted ? (
-                <div className="h-full">
+            {isCompleted ? (
+              <div>
                   {/* Delete control removed per product decision */}
                   {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
                     <div>
@@ -1056,16 +1051,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       <p className="text-white/60">Workout type not yet supported in completed view.</p>
                     </div>
                   )}
-                </div>
-              ) : (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-                  <h3 className="font-semibold text-amber-400 mb-2">Not Yet Completed</h3>
-                  <p className="text-sm text-amber-300/80">
-                    This workout hasn't been completed yet. Complete it to see detailed analytics.
-                  </p>
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-amber-400 mb-2">Not Yet Completed</h3>
+                <p className="text-sm text-amber-300/80">
+                  This workout hasn't been completed yet. Complete it to see detailed analytics.
+                </p>
+              </div>
+            )}
           </TabsContent>
         </div>
       </Tabs>
