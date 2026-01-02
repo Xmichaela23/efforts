@@ -2508,6 +2508,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       className="flex-1 overflow-y-auto pb-4 overscroll-contain"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
+      {/* Spacer for app header */}
+      <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
       {/* Header */}
       <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pb-2 mb-2 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]" style={{ zIndex: 1 }}>
         <div className="flex items-center justify-between w-full px-4">
