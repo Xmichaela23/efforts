@@ -1019,9 +1019,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent value="completed" className="flex-1 p-2">
+          <TabsContent value="completed" className="flex-1 p-2" style={{ background: 'orange' }}>
             {isCompleted ? (
-              <div>
+              <div style={{ background: 'lime' }}>
                   {/* Delete control removed per product decision */}
                   {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
                     <div>
