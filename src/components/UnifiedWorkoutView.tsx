@@ -917,7 +917,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         </TabsList>
 
         <div 
-          className="flex-1 overflow-y-auto overscroll-contain"
+          className="flex-1 overflow-y-auto overscroll-contain pt-3"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {/* Planned Tab */}
