@@ -1263,9 +1263,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Bottom Navigation Tab Bar - Show on all screens (except some loggers and builder) */}
       {!(showPilatesYogaLogger || showBuilder || workoutBeingEdited) && (
-        <div className="mobile-tabbar px-4 pt-3 flex items-center">
+        <div className="mobile-tabbar px-4 flex items-center">
           <div className="w-full">
-            <div className="flex justify-center items-center gap-2 pb-3 pt-1">
+            <div className="flex justify-center items-center gap-2">
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to home
