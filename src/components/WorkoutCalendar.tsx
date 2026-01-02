@@ -630,24 +630,24 @@ export default function WorkoutCalendar({
         }
       }}
     >
-      {/* Header with week range and navigation */}
-      <div className="flex items-center justify-between mb-0">
+      {/* Header with week range and navigation - sticky with blur */}
+      <div className="flex items-center justify-between mb-0 sticky top-0 z-10 py-2 -mx-2 px-2 bg-black/40 backdrop-blur-lg border-b border-white/10">
         <button
           aria-label="Previous week"
-          className="px-3 py-2 min-w-10 rounded hover:bg-zinc-100 active:bg-zinc-200"
+          className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
           onClick={() => handlePrevWeek(addDays(weekStart, -1))}
         >
           ‹
         </button>
         <div className="flex items-center gap-2">
-          <h2 className="text-base font-light tracking-normal">Week of {rangeLabel}</h2>
+          <h2 className="text-base font-light tracking-normal text-white">Week of {rangeLabel}</h2>
           {loadingDebounced && (
-            <span role="status" aria-live="polite" className="text-[11px] text-muted-foreground">Loading week…</span>
+            <span role="status" aria-live="polite" className="text-[11px] text-white/50">Loading week…</span>
           )}
         </div>
         <button
           aria-label="Next week"
-          className="px-3 py-2 min-w-10 rounded hover:bg-zinc-100 active:bg-zinc-200"
+          className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
           onClick={() => handleNextWeek(addDays(weekEnd, 1))}
         >
           ›
