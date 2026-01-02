@@ -852,6 +852,7 @@ function EffortsViewerMapbox({
   }, [normalizedSamples]);
   const [tab, setTab] = useState<MetricTab>(defaultTab);
   const [showVam, setShowVam] = useState(false);
+  const [showMapInfo, setShowMapInfo] = useState(false);
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
   const [scrubDistance, setScrubDistance] = useState<number | null>(null);
@@ -1674,9 +1675,24 @@ function EffortsViewerMapbox({
             );
           })()}
           {memoizedSegments && memoizedSegments.length > 0 && (
-            <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 11, fontStyle: 'italic', fontWeight: 400, letterSpacing: '0.01em' }}>
-              Tap colored sections to see performance
-            </span>
+            <div className="relative">
+              <button
+                onClick={() => setShowMapInfo(!showMapInfo)}
+                className="flex items-center justify-center w-5 h-5 rounded-full bg-white/[0.08] border border-white/20 text-white/60 hover:bg-white/[0.12] hover:text-white/80 transition-all"
+                aria-label="Map info"
+                style={{ fontSize: 11, fontWeight: 600 }}
+              >
+                i
+              </button>
+              {showMapInfo && (
+                <div 
+                  className="absolute top-7 left-1/2 -translate-x-1/2 z-50 px-3 py-2 rounded-lg bg-black/90 backdrop-blur-md border border-white/20 text-white/90 text-xs whitespace-nowrap shadow-lg"
+                  onClick={() => setShowMapInfo(false)}
+                >
+                  Tap colored sections to see performance
+                </div>
+              )}
+            </div>
           )}
         </div>
         <button
