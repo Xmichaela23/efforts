@@ -1127,7 +1127,7 @@ export default function PlanWizard() {
                         placeholder={state.effortRaceDistance === 'marathon' || state.effortRaceDistance === 'half' ? 'H:MM:SS' : 'MM:SS'}
                         value={state.effortRaceTime}
                         onChange={(e) => handleRaceTimeChange(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg text-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-3 bg-white/[0.08] border border-white/20 rounded-lg text-lg font-mono text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30"
                       />
                     </>
                   )}
@@ -1247,9 +1247,9 @@ export default function PlanWizard() {
                         placeholder="10:30"
                         value={state.knownEasyPace}
                         onChange={(e) => handleKnownPacesChange(e.target.value, state.knownFiveKPace)}
-                        className="w-24 p-3 border border-gray-300 rounded-lg text-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-24 p-3 bg-white/[0.08] border border-white/20 rounded-lg text-lg font-mono text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
                       />
-                      <span className="text-gray-600">/mi</span>
+                      <span className="text-white/60">/mi</span>
                     </div>
                   </div>
                   
@@ -1265,9 +1265,9 @@ export default function PlanWizard() {
                         placeholder="25:00"
                         value={state.knownFiveKPace}
                         onChange={(e) => handleKnownPacesChange(state.knownEasyPace, e.target.value)}
-                        className="w-24 p-3 border border-gray-300 rounded-lg text-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-24 p-3 bg-white/[0.08] border border-white/20 rounded-lg text-lg font-mono text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
                       />
-                      <span className="text-gray-600">MM:SS</span>
+                      <span className="text-white/60">MM:SS</span>
                     </div>
                   </div>
                   
@@ -1518,7 +1518,7 @@ export default function PlanWizard() {
                     value={state.raceDate}
                     min={getMinRaceDate()}
                     onChange={(e) => handleRaceDateChange(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-3 bg-white/[0.08] border border-white/20 rounded-lg text-base text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
                   />
                   <div className="space-y-1">
                     <input
@@ -1526,7 +1526,7 @@ export default function PlanWizard() {
                       value={state.raceName}
                       onChange={(e) => setState(prev => ({ ...prev, raceName: e.target.value }))}
                       placeholder="Race name (optional)"
-                      className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full p-3 bg-white/[0.08] border border-white/20 rounded-lg text-base text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
                     />
                     {state.distance === 'marathon' && state.raceDate && findMatchingMarathon(state.raceDate) && state.raceName === findMatchingMarathon(state.raceDate)?.name && (
                       <p className="text-xs text-green-600">Auto-detected major marathon</p>
@@ -1565,7 +1565,7 @@ export default function PlanWizard() {
                           const weeks = Math.max(4, Math.min(24, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))));
                           setState(prev => ({ ...prev, startDate: newStart, duration: weeks }));
                         }}
-                        className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full p-3 bg-white/[0.08] border border-white/20 rounded-lg text-base text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
                       />
                       <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <p className="text-sm text-blue-800 font-medium">{state.duration} week plan</p>
@@ -1743,7 +1743,7 @@ export default function PlanWizard() {
                     type="date"
                     value={state.startDate}
                     onChange={(e) => updateState('startDate', e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-3 bg-white/[0.08] border border-white/20 rounded-lg text-base text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
                   />
                   {planEndDate && (
                     <p className="text-sm text-gray-500">
