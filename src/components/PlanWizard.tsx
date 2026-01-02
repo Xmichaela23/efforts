@@ -2055,24 +2055,24 @@ export default function PlanWizard() {
   // Show generating overlay
   if (isGenerating) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)' }}>
         <div className="w-full max-w-xs space-y-6">
           <div className="text-center">
-            <h2 className="text-xl font-semibold mb-2">Building your plan</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-xl font-semibold mb-2 text-white">Building your plan</h2>
+            <p className="text-sm text-white/60">
               Creating {state.duration} weeks of personalized training...
             </p>
           </div>
           
           {/* Progress bar */}
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-white/10 rounded-full h-2">
             <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-white h-2 rounded-full transition-all duration-300"
               style={{ width: `${Math.min(generateProgress, 100)}%` }}
             />
           </div>
           
-          <p className="text-center text-sm text-gray-400">
+          <p className="text-center text-sm text-white/40">
             {generateProgress < 30 ? 'Analyzing parameters...' :
              generateProgress < 60 ? 'Generating sessions...' :
              generateProgress < 90 ? 'Optimizing schedule...' :
@@ -2091,19 +2091,19 @@ export default function PlanWizard() {
     );
 
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)' }}>
         {/* Header */}
-        <div className="border-b px-4 py-3">
-          <h1 className="text-lg font-semibold text-center">Your Plan</h1>
+        <div className="border-b border-white/10 px-4 py-3">
+          <h1 className="text-lg font-semibold text-center text-white/80">Your Plan</h1>
         </div>
 
         {/* Content */}
         <div className="p-4 pb-32 max-w-lg mx-auto">
           {/* Plan summary */}
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold mb-2">{generatedPlan.name}</h2>
-            <p className="text-sm text-gray-600 mb-3">{generatedPlan.description}</p>
-            <div className="flex gap-4 text-sm text-gray-500">
+          <div className="mb-6 bg-white/[0.05] backdrop-blur-xl border border-white/15 rounded-2xl p-4">
+            <h2 className="text-xl font-semibold mb-2 text-orange-400">{generatedPlan.name}</h2>
+            <p className="text-sm text-white/70 mb-3">{generatedPlan.description}</p>
+            <div className="flex gap-4 text-sm text-white/50">
               <span>{generatedPlan.duration_weeks} weeks</span>
               <span>Starts {new Date(state.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
             </div>
@@ -2111,7 +2111,7 @@ export default function PlanWizard() {
 
           {/* Week 1 preview */}
           <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-500 mb-3">WEEK 1 PREVIEW</h3>
+            <h3 className="text-sm font-medium text-white/50 mb-3">WEEK 1 PREVIEW</h3>
             <div className="space-y-2">
               {(() => {
                 // Group sessions by day
@@ -2127,24 +2127,24 @@ export default function PlanWizard() {
                   const isRest = daySessions.length === 0;
                   
                   return (
-                    <div key={day} className={`p-3 rounded-lg ${isRest ? 'bg-gray-100' : 'bg-gray-50'}`}>
+                    <div key={day} className={`p-3 rounded-xl ${isRest ? 'bg-white/[0.03] border border-white/10' : 'bg-white/[0.08] backdrop-blur-md border border-white/15'}`}>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-gray-400 w-12">
+                        <span className="text-xs font-medium text-white/40 w-12">
                           {day.slice(0, 3)}
                         </span>
                         {isRest ? (
-                          <span className="text-sm text-gray-400 italic">Rest</span>
+                          <span className="text-sm text-white/30 italic">Rest</span>
                         ) : (
                           <div className="flex-1 space-y-2">
                             {daySessions.map((session: any, idx: number) => (
                               <div key={idx} className="flex items-center justify-between">
                                 <div className="flex-1">
-                                  <span className="font-medium text-sm">{session.name}</span>
+                                  <span className="font-medium text-sm text-white">{session.name}</span>
                                   {session.description && (
-                                    <p className="text-xs text-gray-500 mt-0.5">{session.description}</p>
+                                    <p className="text-xs text-white/50 mt-0.5">{session.description}</p>
                                   )}
                                 </div>
-                                <span className="text-xs text-gray-400 ml-2">{session.duration}m</span>
+                                <span className="text-xs text-white/40 ml-2">{session.duration}m</span>
                               </div>
                             ))}
                           </div>
@@ -2158,26 +2158,35 @@ export default function PlanWizard() {
           </div>
 
           {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <div className="mt-4 p-3 bg-red-500/20 border border-red-500/40 rounded-lg text-sm text-red-300">
               {error}
             </div>
           )}
         </div>
 
         {/* Actions */}
-        <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-4">
+        <div 
+          className="fixed bottom-0 left-0 right-0 px-4 py-3"
+          style={{ 
+            background: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)'
+          }}
+        >
           <div className="max-w-lg mx-auto flex justify-between items-center">
             <button
               type="button"
               onClick={handleReject}
-              className="text-gray-500 hover:text-black"
+              className="px-4 py-2 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors"
             >
               Start Over
             </button>
             <button
               type="button"
               onClick={handleAccept}
-              className="font-medium hover:underline"
+              className="px-5 py-2 rounded-full bg-white/[0.12] backdrop-blur-md border border-white/25 text-white font-medium hover:bg-white/[0.16] transition-colors"
             >
               Accept Plan
             </button>
