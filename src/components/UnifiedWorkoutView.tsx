@@ -712,7 +712,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     >
       <div 
         className="flex-1 overflow-y-auto overscroll-contain"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        style={{ WebkitOverflowScrolling: 'touch', background: 'linear-gradient(to bottom, #ff00ff, #00ffff)' }}
       >
       {/* Spacer for app header */}
       <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
