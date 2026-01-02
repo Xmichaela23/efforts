@@ -2020,7 +2020,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const totalWeeks = selectedPlanDetail.duration || selectedPlanDetail.duration_weeks || (selectedPlanDetail.weeks ? selectedPlanDetail.weeks.length : 0);
               const nums = Array.from({ length: Math.max(0, Number(totalWeeks) || 0) }, (_, i) => i + 1);
               return nums.length > 0 ? (
-                <div className="flex items-center gap-2 overflow-x-auto py-1">
+                <div className="flex items-center gap-2 overflow-x-auto py-2 -mx-1 px-1">
                   {nums.map((wn: number) => {
                     const isSelected = selectedWeek === wn;
                     const isCurrent = wn === (selectedPlanDetail.currentWeek || 0);
@@ -2028,19 +2028,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                       <button
                         key={wn}
                         onClick={() => setSelectedWeek(wn)}
-                        className={`whitespace-nowrap px-2 py-1 rounded flex items-center gap-1 ${
+                        className={`whitespace-nowrap px-3 py-1.5 rounded-full text-sm transition-all ${
                           isSelected 
-                            ? 'bg-gray-100 text-black' 
+                            ? 'bg-white/[0.15] border-2 border-white/30 text-white font-medium' 
                             : isCurrent 
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                              : 'text-gray-700 hover:text-black'
+                              ? 'bg-orange-500/20 border border-orange-400/40 text-orange-300' 
+                              : 'bg-white/[0.05] border border-white/15 text-white/60 hover:bg-white/[0.08] hover:text-white/80'
                         }`}
                       >
-                        <span className="text-sm">Week {wn}</span>
-                        {isCurrent && (
-                          <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
-                            Current
-                          </span>
+                        {wn}
+                        {isCurrent && !isSelected && (
+                          <span className="ml-1 text-[10px] text-orange-400">•</span>
                         )}
                       </button>
                     );
@@ -2050,7 +2048,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             })()}
 
             {currentWeekData && (
-              <div className="text-sm text-gray-700 px-1 pb-1">
+              <div className="text-sm text-white/70 px-1 py-2">
                 {(() => {
                   const focusText = String(currentWeekData.focus || '').toLowerCase();
                   const stage = /taper/.test(focusText)
@@ -2061,7 +2059,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                     ? 'Peak'
                     : 'Build';
                   const count = (currentWeekData?.workouts || []).filter((w:any)=>w.type!=='rest').length;
-                  const isCur = selectedWeek === (selectedPlanDetail.currentWeek || 0);
                   
                   // Get total miles from weekly summary or calculate from workouts
                   const weeklySummariesObj: any = (selectedPlanDetail as any)?.config?.weekly_summaries || 
@@ -2069,35 +2066,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   const wsKey = String(selectedWeek);
                   const ws: any = weeklySummariesObj?.[wsKey] || {};
                   const totalMiles = typeof ws?.total_miles === 'number' ? ws.total_miles : null;
-
-                  // Calculate weeks till race for this week
-                  const raceDate = (selectedPlanDetail as any)?.config?.race_date;
-                  const weeksToRace = raceDate ? (() => {
-                    const totalWeeks = selectedPlanDetail.duration || selectedPlanDetail.duration_weeks || 0;
-                    return Math.max(0, totalWeeks - selectedWeek + 1);
-                  })() : null;
                   
                   return (
-                    <span>
-                      <span className="font-medium">{stage}</span>
-                      <span className="text-gray-400"> • </span>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-white font-medium">{stage}</span>
                       {totalMiles !== null && (
-                        <>
-                          <span className="font-medium">{totalMiles} mi</span>
-                          <span className="text-gray-400"> • </span>
-                        </>
+                        <span className="text-white/60">{totalMiles} mi</span>
                       )}
-                      <span className="font-medium">{formatDuration(getWeeklyVolume(currentWeekData))}</span>
-                      <span className="text-gray-400"> • </span>
-                      <span>{count} workouts</span>
-                      {weeksToRace !== null && weeksToRace > 0 && (
-                        <>
-                          <span className="text-gray-400"> • </span>
-                          <span>{weeksToRace} {weeksToRace === 1 ? 'week' : 'weeks'} till race</span>
-                        </>
-                      )}
-                      {isCur ? <span className="ml-2 text-blue-600">Current</span> : null}
-                    </span>
+                      <span className="text-white/60">{formatDuration(getWeeklyVolume(currentWeekData))}</span>
+                      <span className="text-white/60">{count} workouts</span>
+                    </div>
                   );
                 })()}
               </div>
@@ -2109,18 +2087,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const ws: any = weeklySummariesObj?.[wsKey] || {};
               const focus: string | undefined = (typeof ws?.focus === 'string' && ws.focus.trim().length>0) ? ws.focus.trim() : undefined;
               const notes: string | undefined = (typeof ws?.notes === 'string' && ws.notes.trim().length>0) ? ws.notes.trim() : undefined;
-              const hours = typeof ws?.estimated_hours === 'number' ? ws.estimated_hours : undefined;
-              const hard = typeof ws?.hard_sessions === 'number' ? ws.hard_sessions : undefined;
-              const keys: string[] = Array.isArray(ws?.key_workouts) ? ws.key_workouts.slice(0, 3) : [];
-              const hasHeader = !!(focus || notes);
-              if (!hasHeader && !(hours != null || hard != null || (keys.length > 0))) return null;
+              if (!focus && !notes) return null;
               return (
-                <div className="px-1 pb-3 text-sm text-gray-700">
-                  {focus && (<div className="mb-1">{focus}</div>)}
-                  {notes && (<div className="mb-1 text-gray-600">{notes}</div>)}
-                  {false && (
-                    <div />
-                  )}
+                <div className="px-1 pb-3">
+                  {focus && (<div className="text-sm text-orange-400/80 italic">{focus}</div>)}
+                  {notes && (<div className="text-xs text-white/50 mt-1">{notes}</div>)}
                 </div>
               );
             })()}
