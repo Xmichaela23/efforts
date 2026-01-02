@@ -127,10 +127,9 @@
     font-variant-numeric: tabular-nums;
   }
   
-  /* 🚨 MOBILE APP CONTAINER - CSS Grid Layout */
+  /* 🚨 MOBILE APP CONTAINER - Fixed layout with blur-through header/nav */
   .mobile-app-container {
-    display: grid;
-    grid-template-rows: auto 1fr;
+    position: relative;
     height: 100vh;
     height: 100dvh;
     width: 100%;
@@ -139,31 +138,38 @@
     overflow: hidden;
   }
   
-  /* 🚨 MOBILE HEADER - Fixed at top */
+  /* 🚨 MOBILE HEADER - Fixed at top for blur-through effect */
   .mobile-header {
-    grid-row: 1;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(12px);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-h);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     z-index: 50;
     /* Avoid notch/status bar overlap in PWA */
     padding-top: env(safe-area-inset-top);
     box-shadow: 0 1px 8px rgba(0,0,0,0.3);
   }
   
-  /* 🚨 MOBILE MAIN CONTENT - Scrollable area */
+  /* 🚨 MOBILE MAIN CONTENT - Full viewport, scrolls behind fixed header/nav */
   .mobile-main-content {
-    grid-row: 2;
-    /* Use the exact same tabbar expression to align calendar bottom frame universally */
-    height: calc(100vh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); /* fallback */
-    height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); /* Safari stable */
-    height: calc(100dvh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); /* Modern browsers */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 0;
+    /* Padding so content starts below header and ends above tabbar */
+    padding-top: calc(var(--header-h) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     /* Prevent white background on overscroll */
     overscroll-behavior: none;
-    /* Ensure dark background */
+    /* Transparent so gradient shows through */
     background: transparent;
   }
 
@@ -202,7 +208,7 @@
     padding-left: 1rem; /* Add some spacing between panels */
   }
 
-  /* 🚨 MOBILE TAB BAR - fixed, includes safe area */
+  /* 🚨 MOBILE TAB BAR - fixed with blur-through effect */
   .mobile-tabbar {
     position: fixed;
     left: 0;
@@ -212,10 +218,11 @@
     padding-top: 8px;
     padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px); /* lowered further by ~10px */
     height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px));
-    background: rgba(0, 0, 0, 0.3);
-    border-top: 1px solid rgba(255, 255, 255, 0.1); /* let calendar provide the shared bottom frame */
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 -2px 16px rgba(0,0,0,0.4);
-    backdrop-filter: blur(16px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     display: flex;
     align-items: center;
     z-index: 50;
@@ -302,7 +309,6 @@
 @media (display-mode: standalone) {
   .mobile-tabbar { padding-top: 8px; padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px); height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)); }
   :root { --todays-h: 13rem; --cal-cell-h: 150px; }
-  .mobile-main-content { height: calc(100vh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); height: calc(100dvh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); }
 }
 
 @media not all and (display-mode: standalone) {
