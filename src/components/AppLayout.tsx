@@ -1263,7 +1263,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Bottom Navigation Tab Bar - Show on all screens (except some loggers and builder) */}
       {!(showPilatesYogaLogger || showBuilder || workoutBeingEdited) && (
-        <div className="mobile-tabbar px-4 pb-8 pt-3 flex items-center" style={{ paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}>
+        <div className="mobile-tabbar px-4 pt-3 flex items-center">
           <div className="w-full">
             <div className="flex justify-center items-center gap-2 pb-3 pt-1">
                 <Button
