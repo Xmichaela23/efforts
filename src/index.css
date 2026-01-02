@@ -218,10 +218,10 @@
     left: 0;
     right: 0;
     bottom: 0;
-    /* universal bar + safe-area cushion and label lift */
+    /* Extend fully into safe-area to eliminate black matte */
     padding-top: 8px;
-    padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px); /* lowered further by ~10px */
-    height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px));
+    padding-bottom: env(safe-area-inset-bottom);
+    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     background: rgba(0, 0, 0, 0.4);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 -2px 16px rgba(0,0,0,0.4);
@@ -311,7 +311,7 @@
 
 /* Make PWA and browser blocks match the universal values to avoid divergence */
 @media (display-mode: standalone) {
-  .mobile-tabbar { padding-top: 8px; padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px); height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)); }
+  .mobile-tabbar { padding-top: 8px; padding-bottom: env(safe-area-inset-bottom); height: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); }
   :root { --todays-h: 13rem; --cal-cell-h: 150px; }
 }
 
