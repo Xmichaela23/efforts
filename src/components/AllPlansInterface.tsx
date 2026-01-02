@@ -1696,7 +1696,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   // Day View via unified modal (Planned tab)
   if (currentView === 'day' && selectedWorkout) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)' }}>
         <UnifiedWorkoutView
           workout={selectedWorkout}
           initialTab="planned"
@@ -1710,7 +1710,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   // Fast-path: when focusing a plan, render a lightweight loading state instead of the list
   if (currentView === 'detail' && !selectedPlanDetail) {
     return (
-      <div className="p-4 text-sm text-gray-600">
+      <div className="p-4 text-sm text-white/60">
         Loading plan…
       </div>
     );
@@ -1726,7 +1726,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     return (
       <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-          <button onClick={handleBack} className="flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm">
+          <button onClick={handleBack} className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm">
             <ArrowLeft className="h-3.5 w-3.5" />
             Plans
           </button>
@@ -1736,13 +1736,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               console.log('[Button Render] planStatus:', planStatus, 'selectedPlanDetail.status:', selectedPlanDetail?.status);
               if (planStatus === 'active') {
                 return (
-                  <button onClick={handlePausePlan} className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm">
+                  <button onClick={handlePausePlan} className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm">
                     Pause
                   </button>
                 );
               } else if (planStatus === 'paused') {
                 return (
-                  <button onClick={handleResumePlan} className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm">
+                  <button onClick={handleResumePlan} className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm">
                     Resume
                   </button>
                 );
@@ -1750,21 +1750,21 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               return null;
             })()}
 
-            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="hidden sm:block px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm">
+            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="hidden sm:block px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm">
               Download
             </button>
-            <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm sm:hidden">
+            <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm sm:hidden">
               Info
             </button>
             
-            <button className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors text-sm">
+            <button className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm">
               Modify
             </button>
             
             {(planStatus === 'active' || planStatus === 'paused') && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <button className="px-2 py-1 rounded-md border border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 transition-colors text-sm">
+                  <button className="px-3 py-1.5 rounded-full bg-orange-500/20 backdrop-blur-md border border-orange-500/40 text-orange-400 hover:bg-orange-500/30 hover:text-orange-300 transition-colors text-sm">
                     End
                   </button>
                 </AlertDialogTrigger>
@@ -1787,7 +1787,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <button className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors text-sm">
+                <button className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-400 transition-colors text-sm">
                   Delete
                 </button>
               </AlertDialogTrigger>
@@ -1809,20 +1809,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           </div>
         </div>
 
-        <div className="border border-gray-200 rounded-lg">
-          <div className="p-3 border-b border-gray-200">
+        <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
+          <div className="p-3 border-b border-white/10">
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-1">
                   <h1
-                    className="font-semibold leading-tight text-base sm:text-xl"
+                    className="font-semibold leading-tight text-base sm:text-xl text-white"
                     style={{ display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
                   >
                     {selectedPlanDetail.name}
                   </h1>
                 </div>
                 {showPlanDesc && (
-                  <p className="text-gray-600 mt-1 text-sm leading-relaxed">{selectedPlanDetail.description}</p>
+                  <p className="text-white/60 mt-1 text-sm leading-relaxed">{selectedPlanDetail.description}</p>
                 )}
               </div>
             </div>
@@ -1866,34 +1866,34 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               if (!raceDate && !effortScore) return null;
 
               return (
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600 mb-3 pb-3 border-b border-gray-200">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/60 mb-3 pb-3 border-b border-white/10">
                   {raceDate && (
                     <>
                       <span>
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-semibold text-orange-400">
                           {raceName || new Date(raceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
                         {raceName && (
-                          <span className="text-gray-500 ml-1">
+                          <span className="text-white/50 ml-1">
                             ({new Date(raceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
                           </span>
                         )}
                       </span>
                       {weeksToRace !== null && weeksToRace > 0 && (
                         <span>
-                          <span className="font-semibold text-gray-900">{weeksToRace}</span> weeks to go
+                          <span className="font-semibold text-orange-400">{weeksToRace}</span> weeks to go
                         </span>
                       )}
                     </>
                   )}
                   {effortScore && (
                     <span>
-                      Effort Score <span className="font-semibold text-gray-900">{effortScore}</span>
+                      Effort Score <span className="font-semibold text-orange-400">{effortScore}</span>
                     </span>
                   )}
                   {targetTime && distanceLabel && (
                     <span>
-                      Goal <span className="font-semibold text-gray-900">{formatTime(targetTime)}</span> {distanceLabel}
+                      Goal <span className="font-semibold text-orange-400">{formatTime(targetTime)}</span> {distanceLabel}
                     </span>
                   )}
                 </div>
@@ -1901,28 +1901,28 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             })()}
             
             {/* Compact, single-line stats */}
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600 mb-3">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/60 mb-3">
               <span>
-                <span className="font-semibold text-gray-900">{selectedPlanDetail.duration || 0}</span> wk
+                <span className="font-semibold text-orange-400">{selectedPlanDetail.duration || 0}</span> wk
               </span>
               <span>
-                <span className="font-semibold text-gray-900">{selectedPlanDetail.totalWorkouts || 0}</span> workouts
+                <span className="font-semibold text-orange-400">{selectedPlanDetail.totalWorkouts || 0}</span> workouts
               </span>
               <span>
-                <span className="font-semibold text-gray-900">{formatDuration(totalVolume)}</span> total
+                <span className="font-semibold text-orange-400">{formatDuration(totalVolume)}</span> total
               </span>
               <span>
-                <span className="font-semibold text-gray-900">{formatDuration(averageWeeklyVolume)}</span> avg/wk
+                <span className="font-semibold text-orange-400">{formatDuration(averageWeeklyVolume)}</span> avg/wk
               </span>
             </div>
 
             {/* Slim progress row */}
-            <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+            <div className="flex items-center justify-between text-xs text-white/60 mb-1">
               <span>Progress</span>
               <span>Week {selectedPlanDetail.currentWeek || 1} of {selectedPlanDetail.duration || 0}</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-1.5">
-              <div className="bg-black rounded-full h-1.5 transition-all duration-300" style={{ width: `${progress}%` }}></div>
+            <div className="w-full bg-white/10 rounded-full h-1.5">
+              <div className="bg-white rounded-full h-1.5 transition-all duration-300" style={{ width: `${progress}%` }}></div>
             </div>
           </div>
         </div>
@@ -1931,8 +1931,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
         {viewMode === 'adjustments' ? (
           <div className="space-y-6">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="text-sm text-gray-600">
+            <div className="flex items-center justify-between p-4 bg-white/[0.05] backdrop-blur-md border border-white/10 rounded-lg">
+              <div className="text-sm text-white/60">
                 Plan adjustments: {adjustmentsUsed} of {adjustmentLimit} used
               </div>
               {adjustmentsUsed >= adjustmentLimit && (
@@ -2138,14 +2138,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                       });
                       const keys = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
                       return keys.map(day => (
-                        <div key={day} className="border border-gray-200 rounded">
-                          <div className="px-3 py-2 text-sm font-medium">{day}</div>
+                        <div key={day} className="bg-white/[0.05] backdrop-blur-md border border-white/15 rounded-xl overflow-hidden">
+                          <div className="px-3 py-2 text-sm font-medium text-white">{day}</div>
                           <div className="px-3 pb-3 space-y-3">
                             {groups[day].map((workout: any, index: number) => (
                               <div
                                 key={workout.id || `workout-${day}-${index}`}
                                 onClick={() => handleWorkoutClick(workout)}
-                                className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                                className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-white/[0.03] border-white/10' : 'bg-white/[0.08] border-white/15 hover:bg-white/[0.12] hover:border-white/25'}`}
                               >
                                 {false ? (
                                   <></>
@@ -2173,13 +2173,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               </div>
             )}
             {weekLoading && (
-              <div className="p-3 text-sm text-gray-500">Loading…</div>
+              <div className="p-3 text-sm text-white/50">Loading…</div>
             )}
 
             {(!selectedPlanDetail.weeks || selectedPlanDetail.weeks.length === 0) && (
               <div className="text-center py-8">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Plan Details Loading</h3>
-                <p className="text-gray-600 mb-4">Detailed workout information is being prepared...</p>
+                <h3 className="text-lg font-medium text-white mb-2">Plan Details Loading</h3>
+                <p className="text-white/60 mb-4">Detailed workout information is being prepared...</p>
               </div>
             )}
           </>
@@ -2192,7 +2192,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   return (
     <div className="space-y-6 overflow-x-hidden" style={{fontFamily: 'Inter, sans-serif', touchAction: 'pan-y', overscrollBehaviorX: 'contain'}}>
       <div className="flex items-center justify-between">
-        <button onClick={onClose} className="flex items-center gap-2 p-0 h-auto text-gray-600 hover:text-black transition-colors">
+        <button onClick={onClose} className="flex items-center gap-2 p-0 h-auto text-white/60 hover:text-white transition-colors">
           <ArrowLeft className="h-4 w-4" />
           Dashboard
         </button>
@@ -2224,15 +2224,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
       {!showCompleted && currentPlans.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-medium text-gray-900">Current Plans</h2>
+          <h2 className="text-lg font-medium text-white">Current Plans</h2>
           {currentPlans.map((plan) => (
             <div
               key={plan.id}
               onClick={() => handlePlanClick(plan.id)}
-              className="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg border border-gray-200"
+              className="p-4 cursor-pointer bg-white/[0.05] hover:bg-white/[0.10] transition-colors rounded-xl border border-white/15"
             >
-              <div className="font-medium">{plan.name} - Wk {plan.currentWeek}</div>
-              <div className="text-sm text-gray-600 mt-1">{plan.description}</div>
+              <div className="font-medium text-white">{plan.name} - Wk {plan.currentWeek}</div>
+              <div className="text-sm text-white/60 mt-1">{plan.description}</div>
             </div>
           ))}
         </div>
@@ -2240,16 +2240,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
       {completedPlans.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-medium text-gray-900">Completed Plans</h2>
+          <h2 className="text-lg font-medium text-white">Completed Plans</h2>
           {completedPlans.map((plan) => (
             <div
               key={plan.id}
               onClick={() => handlePlanClick(plan.id)}
-              className="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg border border-gray-200"
+              className="p-4 cursor-pointer bg-white/[0.05] hover:bg-white/[0.10] transition-colors rounded-xl border border-white/15"
             >
-              <div className="font-medium">{plan.name}</div>
-              <div className="text-sm text-gray-600 mt-1">{plan.description}</div>
-              <div className="text-xs text-green-600 mt-1">✓ Completed</div>
+              <div className="font-medium text-white">{plan.name}</div>
+              <div className="text-sm text-white/60 mt-1">{plan.description}</div>
+              <div className="text-xs text-green-400 mt-1">✓ Completed</div>
             </div>
           ))}
         </div>
@@ -2259,8 +2259,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
       {currentPlans.length === 0 && completedPlans.length === 0 && plannedWorkouts.length === 0 && (
         <div className="text-center py-8">
-          <h2 className="text-lg font-medium text-gray-900 mb-2">No Plans Yet</h2>
-          <p className="text-gray-600 mb-4">Use "Build me a plan" in the Builder tab to create your first training plan, or create individual workouts in the Builder tab</p>
+          <h2 className="text-lg font-medium text-white mb-2">No Plans Yet</h2>
+          <p className="text-white/60 mb-4">Use "Build me a plan" in the Builder tab to create your first training plan, or create individual workouts in the Builder tab</p>
         </div>
       )}
     </div>
