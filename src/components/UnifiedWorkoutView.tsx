@@ -717,7 +717,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
       {/* Header */}
-      <div className="p-3 border-b border-white/10">
+      <div className="p-3 bg-white/[0.03] backdrop-blur-md border-b border-white/10">
         {/* Row 1: Title + Attach/Unattach */}
         <div className="flex items-center justify-between">
           <h2 className="font-light tracking-normal text-xl text-white">
