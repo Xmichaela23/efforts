@@ -1108,7 +1108,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         </div>
       </header>
 
-      <main className="mobile-main-content">
+      <main className="mobile-main-content" style={{ background: 'red' }}>
         <PullToRefresh onRefresh={handleGlobalRefresh}>
         <div className="w-full px-2" style={{ paddingBottom: 'calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px)' }}>
           {showPlanBuilder ? (
@@ -1209,7 +1209,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : selectedWorkout ? (
-            <div className="h-full">
+            <div className="h-full" style={{ background: 'cyan' }}>
               <UnifiedWorkoutView
                 workout={selectedWorkout}
                 onUpdateWorkout={handleUpdateWorkout}
