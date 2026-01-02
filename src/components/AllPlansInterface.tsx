@@ -2108,9 +2108,23 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         groups[d] = groups[d] ? [...groups[d], w] : [w];
                       });
                       const keys = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
-                      return keys.map(day => (
+                      return keys.map(day => {
+                        // Get date from first workout of the day
+                        const firstWorkout = groups[day]?.[0];
+                        const dateStr = firstWorkout?.date;
+                        const formattedDate = dateStr ? (() => {
+                          try {
+                            const d = new Date(dateStr + 'T00:00:00');
+                            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          } catch { return ''; }
+                        })() : '';
+                        
+                        return (
                         <div key={day} className="bg-white/[0.05] backdrop-blur-md border border-white/15 rounded-xl overflow-hidden">
-                          <div className="px-3 py-2 text-sm font-medium text-white">{day}</div>
+                          <div className="px-3 py-2 text-sm font-medium text-white flex items-center gap-2">
+                            <span>{day}</span>
+                            {formattedDate && <span className="text-white/50 font-normal">{formattedDate}</span>}
+                          </div>
                           <div className="px-3 pb-3 space-y-3">
                             {groups[day].map((workout: any, index: number) => (
                               <div
@@ -2137,7 +2151,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                             
                           </div>
                         </div>
-                      ));
+                      );})
                     })()}
                   </div>
                 </div>
