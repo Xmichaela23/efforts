@@ -705,20 +705,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   return (
     <div 
-      className="w-full h-full flex flex-col"
+      className="fixed inset-0 flex flex-col z-40"
       style={{
         background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
-        backgroundImage: `
-          radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
-          radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
-          radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
-          linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
-          linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%)
-        `,
       }}
     >
+      {/* Scrollable content area */}
+      <div 
+        className="flex-1 overflow-y-auto overscroll-contain"
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          paddingBottom: 'calc(var(--tabbar-h, 80px) + env(safe-area-inset-bottom, 0px) + 16px)'
+        }}
+      >
       {/* Header */}
-      <div className="p-2 border-b border-white/10 bg-white/[0.05] backdrop-blur-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
+      <div className="p-2 border-b border-white/10 bg-white/[0.05] backdrop-blur-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] sticky top-0 z-10">
         {/* Row 1: Title + Attach/Unattach */}
         <div className="flex items-center justify-between">
           <h2 className="font-light tracking-normal text-xl text-white">
@@ -1081,6 +1082,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
         </div>
       </Tabs>
+      </div>
     </div>
   );
 };
