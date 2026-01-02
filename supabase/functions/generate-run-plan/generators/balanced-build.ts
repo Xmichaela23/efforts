@@ -64,6 +64,9 @@ const WEEKLY_MILEAGE: Record<string, Record<string, { start: number; peak: numbe
 };
 
 export class BalancedBuildGenerator extends BaseGenerator {
+  // Cache for dynamically calculated long run progression
+  private longRunProgressionCache?: number[];
+
   generatePlan(): TrainingPlan {
     const phaseStructure = this.determinePhaseStructure();
     const sessions_by_week: Record<string, Session[]> = {};
@@ -150,12 +153,9 @@ export class BalancedBuildGenerator extends BaseGenerator {
                      (this.params.distance === 'marathon' || this.params.distance === 'half');
       const mpMiles = withMP ? this.getMPSegmentMiles(weekNumber, phase) : 0;
       
-      // Reduce long run if in reduced_quality zone (8-14 days out)
-      const adjustedLongRunMiles = sundayProximity === 'reduced_quality' 
-        ? Math.min(longRunMiles, 12) 
-        : longRunMiles;
-      
-      sessions.push(this.createVDOTLongRun(adjustedLongRunMiles, mpMiles));
+      // Long run uses dynamic progression which already handles tapering
+      // No need for race proximity caps - progression positions peak correctly
+      sessions.push(this.createVDOTLongRun(longRunMiles, mpMiles));
     }
 
     let usedMiles = sessions.length > 0 ? longRunMiles : 0;
@@ -276,8 +276,8 @@ export class BalancedBuildGenerator extends BaseGenerator {
               ['easy_run']
             ));
           } else if (day === 'Sunday') {
-            // Reduced long run (10-12 miles max)
-            sessions.push(this.createVDOTLongRun(Math.min(12, this.getLongRunMiles(weekNumber, false)), 0));
+            // Long run uses dynamic progression - already handles taper
+            sessions.push(this.createVDOTLongRun(this.getLongRunMiles(weekNumber, false), 0));
           } else if (sessions.length < runningDays && day !== 'Saturday') {
             sessions.push(this.createSession(
               day,
@@ -496,12 +496,112 @@ export class BalancedBuildGenerator extends BaseGenerator {
     return Math.round(targetMiles);
   }
 
-  private getLongRunMiles(weekNumber: number, isRecovery: boolean): number {
-    const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
-    if (!progression) return 14;
+  /**
+   * Get long run miles for a given week using dynamic progression
+   * Calculates progression once and caches it for the plan duration
+   */
+  private getLongRunMiles(weekNumber: number, _isRecovery: boolean): number {
+    // For non-marathon distances, use the static progression
+    if (this.params.distance !== 'marathon') {
+      const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
+      if (!progression) return 10;
+      const index = Math.min(weekNumber - 1, progression.length - 1);
+      return progression[index] || 10;
+    }
+
+    // Calculate progression once and cache it
+    if (!this.longRunProgressionCache) {
+      this.longRunProgressionCache = this.calculateLongRunProgression();
+    }
     
-    const index = Math.min(weekNumber - 1, progression.length - 1);
-    return progression[index] || 14;
+    const index = weekNumber - 1;
+    return this.longRunProgressionCache[index] || 14;
+  }
+
+  /**
+   * Calculate dynamic long run progression based on plan duration
+   * Ensures peak long run is always 3 weeks before race (Daniels methodology)
+   * Uses 3-up, 1-down pattern for build phase
+   * 
+   * Note on weeksFromRace:
+   *   weeksFromRace = planWeeks - week + 1
+   *   - weeksFromRace === 1: race week (0 weeks before race Sunday)
+   *   - weeksFromRace === 2: 1 week before race
+   *   - weeksFromRace === 3: 2 weeks before race  
+   *   - weeksFromRace === 4: 3 weeks before race (PEAK per Daniels)
+   */
+  private calculateLongRunProgression(): number[] {
+    const planWeeks = this.params.duration_weeks;
+    const peakWeek = planWeeks - 3;  // Peak is 3 weeks before race week
+    const maxLongRun = this.getMaxLongRunMiles();
+    
+    const progression: number[] = [];
+    
+    for (let week = 1; week <= planWeeks; week++) {
+      const weeksFromRace = planWeeks - week + 1;
+      
+      // Taper phase (final 4 weeks including peak)
+      if (weeksFromRace === 1) {
+        // Race week - minimal long run (may be skipped by race proximity logic)
+        progression.push(8);
+      } else if (weeksFromRace === 2) {
+        // 1 week before race - final taper
+        progression.push(10);
+      } else if (weeksFromRace === 3) {
+        // 2 weeks before race - step down from peak
+        progression.push(12);
+      } else if (weeksFromRace === 4) {
+        // 3 weeks before race - PEAK long run
+        progression.push(maxLongRun);
+      }
+      // Build phase with 3-up, 1-down pattern
+      else if (week % 4 === 0 && week < peakWeek) {
+        // Recovery every 4th week during build phase
+        // Recovery weeks scale with progress: 10 → 10 → 12
+        progression.push(10 + Math.floor(week / 8) * 2);
+      } else {
+        // Progressive build toward peak
+        progression.push(this.calculateBuildUpMiles(week, peakWeek, maxLongRun));
+      }
+    }
+    
+    return progression;
+  }
+
+  /**
+   * Get maximum long run distance by fitness level
+   * Per Daniels' Running Formula: 20 miles max for all levels
+   */
+  private getMaxLongRunMiles(): number {
+    const maxByLevel: Record<string, number> = {
+      'beginner': 18,
+      'intermediate': 20,  // Daniels maximum
+      'advanced': 20       // Still 20, NOT 22 (diminishing returns beyond 20)
+    };
+    return maxByLevel[this.params.fitness] || 20;
+  }
+
+  /**
+   * Calculate progressive build-up miles for a given week
+   * Gradual progression: 10 → 12 → 14 → 16 → 18 (caps at maxMiles - 2 to reserve peak)
+   */
+  private calculateBuildUpMiles(
+    currentWeek: number,
+    peakWeek: number,
+    maxMiles: number
+  ): number {
+    // Calculate progress as percentage of build phase completed
+    const buildPhaseWeeks = peakWeek - 1;  // Weeks available to build
+    const progress = Math.min(1, (currentWeek - 1) / Math.max(1, buildPhaseWeeks - 1));
+    
+    // Starting point is 10 miles
+    // Cap build phase at maxMiles - 2 so peak week is distinct
+    const startMiles = 10;
+    const buildMaxMiles = maxMiles - 2;  // e.g., 18 for intermediate (peak is 20)
+    const targetMiles = startMiles + (buildMaxMiles - startMiles) * progress;
+    
+    // Round to even numbers for cleaner progressions
+    return Math.round(targetMiles / 2) * 2;
   }
 
   private getMPSegmentMiles(weekNumber: number, phase: Phase): number {

@@ -2198,29 +2198,21 @@ export default function PlanWizard() {
             <div className="flex items-center space-x-1 pl-4">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="p-0.5">
+                  <Button variant="ghost" size="icon" className="p-0.5 text-white/80 hover:text-white hover:bg-white/10">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem onClick={() => navigate('/baselines')}>Training Baselines</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/connections')}>Connections</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/')}>Dashboard</DropdownMenuItem>
+                <DropdownMenuContent align="start" className="w-56 bg-white/[0.12] backdrop-blur-xl border border-white/25">
+                  <DropdownMenuItem onClick={() => navigate('/baselines')} className="text-white/80 hover:text-white hover:bg-white/10">Training Baselines</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/connections')} className="text-white/80 hover:text-white hover:bg-white/10">Connections</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/')} className="text-white/80 hover:text-white hover:bg-white/10">Dashboard</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <h1 className="text-2xl font-bold text-primary">efforts</h1>
-              <div className="flex items-center gap-3">
-                <Button onClick={safeBack} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">
-                  ← Back
-                </Button>
-                <Button onClick={() => navigate('/')} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">
-                  Dashboard
-                </Button>
-              </div>
+              <h1 className="text-2xl font-bold text-white">efforts</h1>
             </div>
             <div className="pr-4">
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-white/60">
                 {step + 1} of {getStepCount()}
               </span>
             </div>
@@ -2229,9 +2221,9 @@ export default function PlanWizard() {
       </header>
 
       {/* Progress bar */}
-      <div className="h-1 bg-gray-100">
+      <div className="h-1 bg-white/10">
         <div 
-          className="h-full bg-blue-600 transition-all duration-300"
+          className="h-full bg-white transition-all duration-300"
           style={{ width: `${((step + 1) / getStepCount()) * 100}%` }}
         />
       </div>
@@ -2250,26 +2242,42 @@ export default function PlanWizard() {
       </main>
 
       {/* Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-4 z-50">
+      <div 
+        className="fixed bottom-0 left-0 right-0 z-50 px-4 py-3"
+        style={{ 
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)'
+        }}
+      >
         <div className="max-w-md mx-auto flex justify-between items-center">
           {step > 0 ? (
             <button
               type="button"
               onClick={handleBack}
               disabled={isGenerating}
-              className="text-gray-500 hover:text-black disabled:opacity-50 flex items-center"
+              className="px-4 py-2 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white disabled:opacity-50 flex items-center transition-colors"
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back
             </button>
           ) : (
-            <div />
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="px-4 py-2 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white flex items-center transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Cancel
+            </button>
           )}
           <button
             type="button"
             onClick={handleNext}
             disabled={!canProceed() || isGenerating || (step === 0 && state.discipline !== 'run')}
-            className="font-medium hover:underline disabled:opacity-50 disabled:no-underline flex items-center"
+            className="px-5 py-2 rounded-full bg-white/[0.12] backdrop-blur-md border border-white/25 text-white font-medium hover:bg-white/[0.16] disabled:opacity-50 flex items-center transition-colors"
           >
             {isGenerating ? (
               <>
