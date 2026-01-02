@@ -1229,7 +1229,7 @@ const formatMovingTime = () => {
         // If no series at all, show loading (shouldn't happen for valid workouts)
         if (!series) {
           return (
-            <div className="mt-6 mb-6 mx-[-16px] flex items-center justify-center" style={{ minHeight: 700 }}>
+            <div className="mt-6 mb-6 mx-[-16px] flex items-center justify-center" style={{ minHeight: 700, background: 'purple' }}>
               <div className="text-center text-muted-foreground">
                 <div className="text-lg font-semibold mb-2">Processing workout data...</div>
                 <div className="text-sm">Charts will appear automatically when ready</div>
@@ -1294,7 +1294,7 @@ const formatMovingTime = () => {
            .filter(Boolean) as [number,number][];
         // No client-side series transformation; use server-provided series as-is
         return (
-          <div className="mt-6 mb-6 mx-[-16px]">
+          <div className="mt-6 mb-6 mx-[-16px]" style={{ background: 'hotpink' }}>
               <EffortsViewerMapbox
               samples={(memo?.series || series) as any}
               trackLngLat={(memo?.track || track) as any}
