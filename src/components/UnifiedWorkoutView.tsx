@@ -705,22 +705,17 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   return (
     <div 
-      className="fixed left-0 right-0 flex flex-col z-40"
+      className="fixed inset-0 flex flex-col"
       style={{
-        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
-        top: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))',
-        bottom: 'calc(var(--tabbar-h, 80px) + env(safe-area-inset-bottom, 0px))',
+        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)'
       }}
     >
-      {/* Scrollable content area */}
-      <div 
-        className="flex-1 overflow-y-auto overscroll-contain"
-        style={{ 
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
+    <div 
+      className="flex-1 overflow-y-auto pb-4 overscroll-contain"
+      style={{ WebkitOverflowScrolling: 'touch' }}
+    >
       {/* Header */}
-      <div className="p-2 border-b border-white/10 bg-white/[0.05] backdrop-blur-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] sticky top-0 z-10">
+      <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pb-2 mb-2 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]" style={{ zIndex: 1 }}>
         {/* Row 1: Title + Attach/Unattach */}
         <div className="flex items-center justify-between">
           <h2 className="font-light tracking-normal text-xl text-white">
