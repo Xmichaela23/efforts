@@ -1649,7 +1649,7 @@ function EffortsViewerMapbox({
   return (
     <div style={{ maxWidth: 780, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
       {/* Map header with weather, source, and theme toggle */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 6px 6px 6px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 6px 6px 6px", paddingLeft: 8, paddingRight: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <WeatherDisplay 
             weather={weather}
