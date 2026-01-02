@@ -707,15 +707,17 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     <div 
       className="fixed inset-0 flex flex-col"
       style={{
-        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)'
+        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+        paddingTop: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))',
+        paddingBottom: 'calc(var(--tabbar-h, 80px) + env(safe-area-inset-bottom, 0px))'
       }}
     >
     <div 
-      className="flex-1 overflow-y-auto pb-4 overscroll-contain"
+      className="flex-1 overflow-y-auto overscroll-contain"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
       {/* Header */}
-      <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pb-2 mb-2 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]" style={{ zIndex: 1 }}>
+      <div className="p-3 border-b border-white/10">
         {/* Row 1: Title + Attach/Unattach */}
         <div className="flex items-center justify-between">
           <h2 className="font-light tracking-normal text-xl text-white">
