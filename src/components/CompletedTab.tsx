@@ -1294,7 +1294,7 @@ const formatMovingTime = () => {
            .filter(Boolean) as [number,number][];
         // No client-side series transformation; use server-provided series as-is
         return (
-          <div className="mt-6 mb-6 mx-[-16px]" style={{ minHeight: 700 }}>
+          <div className="mt-6 mb-6 mx-[-16px]">
               <EffortsViewerMapbox
               samples={(memo?.series || series) as any}
               trackLngLat={(memo?.track || track) as any}
