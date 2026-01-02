@@ -705,9 +705,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 flex flex-col z-40"
+      className="fixed left-0 right-0 flex flex-col z-40"
       style={{
         background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+        top: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))',
+        bottom: 'calc(var(--tabbar-h, 80px) + env(safe-area-inset-bottom, 0px))',
       }}
     >
       {/* Scrollable content area */}
@@ -715,7 +717,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         className="flex-1 overflow-y-auto overscroll-contain"
         style={{ 
           WebkitOverflowScrolling: 'touch',
-          paddingBottom: 'calc(var(--tabbar-h, 80px) + env(safe-area-inset-bottom, 0px) + 16px)'
         }}
       >
       {/* Header */}
