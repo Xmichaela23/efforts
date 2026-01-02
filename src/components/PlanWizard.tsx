@@ -911,7 +911,7 @@ export default function PlanWizard() {
                     </span>
                     <span className="block text-xs text-white/50 mt-0.5 italic">For experienced runners looking to improve their time</span>
                     {isSpeedLocked ? (
-                      <span className="block text-xs text-amber-400 mt-2">
+                      <span className="block text-xs text-orange-400 mt-2">
                         Speed-focused marathon training requires Intermediate+ fitness (25+ mpw).
                       </span>
                     ) : (
