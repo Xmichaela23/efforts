@@ -405,6 +405,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     return () => window.removeEventListener('plans:goToDashboard', handler);
   }, []);
 
+  // Handle week navigation from TodaysEffort
+  useEffect(() => {
+    const handler = (ev: any) => {
+      try {
+        const date = ev?.detail?.date;
+        if (date) {
+          setSelectedDate(date);
+        }
+      } catch {}
+    };
+    window.addEventListener('week:navigate', handler as any);
+    return () => window.removeEventListener('week:navigate', handler as any);
+  }, []);
+
   // NEW: Training Baselines handler
   const handleTrainingBaselinesClick = () => {
     setShowTrainingBaselines(true);
@@ -1233,7 +1247,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   onAddEffort={handleAddEffort}
                   onViewCompleted={handleViewCompleted}
                   onEditEffort={handleEditEffort}
-                  onDateSelect={handleDateSelect}
                 />
                 <div className="flex-1">
                   <WorkoutCalendar

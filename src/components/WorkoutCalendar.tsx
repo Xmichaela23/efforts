@@ -630,7 +630,7 @@ export default function WorkoutCalendar({
         }
       }}
     >
-      {/* Week header moved to TodaysEffort for blur effect - calendar grid starts directly */}
+      {/* Week header is now in TodaysEffort for blur effect */}
 
       {/* 3-column week grid filling remaining height with min cell size */}
       <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full flex-1 relative" style={{ rowGap: 0, columnGap: 0, alignContent: 'stretch', alignItems: 'stretch' }}>

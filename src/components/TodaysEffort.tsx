@@ -17,15 +17,13 @@ interface TodaysEffortProps {
   onAddEffort: (type: string, date?: string) => void;
   onViewCompleted: () => void;
   onEditEffort?: (workout: any) => void;
-  onDateSelect?: (date: string) => void;
 }
 
 const TodaysEffort: React.FC<TodaysEffortProps> = ({ 
   selectedDate, 
   onAddEffort, 
   onViewCompleted, 
-  onEditEffort,
-  onDateSelect 
+  onEditEffort 
 }) => {
   const { useImperial, workouts, loading, loadUserBaselines, detailedPlans } = useAppContext();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
@@ -805,27 +803,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
   }, [weather]);
 
-  // Week navigation handlers
-  const handlePrevWeek = () => {
-    const newDate = new Date(activeDate + 'T12:00:00');
-    newDate.setDate(newDate.getDate() - 7);
-    const newDateStr = newDate.toLocaleDateString('en-CA');
-    onDateSelect && onDateSelect(newDateStr);
-  };
-  
-  const handleNextWeek = () => {
-    const newDate = new Date(activeDate + 'T12:00:00');
-    newDate.setDate(newDate.getDate() + 7);
-    const newDateStr = newDate.toLocaleDateString('en-CA');
-    onDateSelect && onDateSelect(newDateStr);
-  };
-
-  // Format week range label
-  const formatWeekRange = () => {
-    const monthFmt = new Intl.DateTimeFormat('en-US', { month: 'short' });
-    return `${monthFmt.format(weekStart)} ${weekStart.getDate()} – ${monthFmt.format(weekEnd)} ${weekEnd.getDate()}`;
-  };
-
   return (
     <div className="w-full flex-shrink-0" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)', position:'relative', overflow: 'visible', zIndex: 0}}>
       {/* Header - with backdrop blur for scroll-behind effect */}
@@ -914,34 +891,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           paddingTop: `${headerHeight + 8}px`,
         }}
       >
-        {/* Sticky Week Of header with backdrop blur */}
-        <div 
-          className="sticky top-0 z-20 flex items-center justify-between py-2 px-2 mx-1 mb-2 rounded-xl border border-white/20"
-          style={{
-            background: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)'
-          }}
-        >
-          <button
-            aria-label="Previous week"
-            className="px-2 py-1 rounded hover:bg-white/10 active:bg-white/20 text-white/80 text-sm"
-            onClick={handlePrevWeek}
-          >
-            ‹
-          </button>
-          <span className="text-sm font-light tracking-normal text-white">
-            Week of {formatWeekRange()}
-          </span>
-          <button
-            aria-label="Next week"
-            className="px-2 py-1 rounded hover:bg-white/10 active:bg-white/20 text-white/80 text-sm"
-            onClick={handleNextWeek}
-          >
-            ›
-          </button>
-        </div>
-
         <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
@@ -1173,6 +1122,46 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </div>
           </div>
         )}
+        </div>
+        
+        {/* Sticky Week Of header at bottom - workout cards scroll behind with blur */}
+        <div 
+          className="sticky bottom-0 z-20 flex items-center justify-between py-2 px-2 mx-1 mt-2 rounded-xl border border-white/20"
+          style={{
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)'
+          }}
+        >
+          <button
+            aria-label="Previous week"
+            className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
+            onClick={() => {
+              const newDate = new Date(activeDate + 'T12:00:00');
+              newDate.setDate(newDate.getDate() - 7);
+              // Dispatch event for parent to handle
+              window.dispatchEvent(new CustomEvent('week:navigate', { detail: { date: newDate.toLocaleDateString('en-CA') } }));
+            }}
+          >
+            ‹
+          </button>
+          <span className="text-sm font-light tracking-normal text-white">
+            Week of {(() => {
+              const monthFmt = new Intl.DateTimeFormat('en-US', { month: 'short' });
+              return `${monthFmt.format(weekStart)} ${weekStart.getDate()} – ${monthFmt.format(weekEnd)} ${weekEnd.getDate()}`;
+            })()}
+          </span>
+          <button
+            aria-label="Next week"
+            className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
+            onClick={() => {
+              const newDate = new Date(activeDate + 'T12:00:00');
+              newDate.setDate(newDate.getDate() + 7);
+              window.dispatchEvent(new CustomEvent('week:navigate', { detail: { date: newDate.toLocaleDateString('en-CA') } }));
+            }}
+          >
+            ›
+          </button>
         </div>
       </div>
     </div>
