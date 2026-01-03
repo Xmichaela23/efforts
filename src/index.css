@@ -161,14 +161,15 @@
     top: 0;
     left: 0;
     right: 0;
-    bottom: 0;
+    /* End exactly at tabbar top - tabbar has its own fixed position at bottom */
+    bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    /* Padding so content starts below header - NO bottom padding so content scrolls behind nav */
+    /* Padding so content starts below header */
     padding-top: calc(var(--header-h) + env(safe-area-inset-top));
     /* Prevent white background on overscroll */
     overscroll-behavior: none;
-    /* Solid black background to eliminate visible gradient in any content gaps */
+    /* Solid black background */
     background: #000000;
   }
   

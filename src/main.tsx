@@ -18,11 +18,6 @@ function applyRuntimeLayoutOverrides() {
         padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px) !important;
         height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) !important;
       }
-      .mobile-main-content {
-        height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)) !important;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-      }
       `;
       document.head.appendChild(style);
     }
@@ -31,18 +26,19 @@ function applyRuntimeLayoutOverrides() {
 
 function fitLayout() {
   try {
-    const header = document.querySelector('.mobile-header') as HTMLElement | null;
     const tabbar = document.querySelector('.mobile-tabbar') as HTMLElement | null;
     const main = document.querySelector('.mobile-main-content') as HTMLElement | null;
     const grid = document.querySelector('.mobile-calendar') as HTMLElement | null;
-    if (!main || !header || !tabbar || !grid) return;
+    if (!main || !tabbar || !grid) return;
 
-    const vh = window.innerHeight;
-    const headerH = header.offsetHeight || 64;
+    // Don't override main content height - let CSS position: fixed with top: 0; bottom: 0 handle it
+    // Just clear any previously set inline height
+    main.style.height = '';
+    
+    const mainRect = main.getBoundingClientRect();
     const tabbarH = tabbar.offsetHeight || 56;
-
-    const mainH = Math.max(0, vh - headerH - tabbarH);
-    main.style.height = `${mainH}px`;
+    // Main content should extend from its top to the tabbar top
+    const mainH = mainRect.height;
 
     const mainRect = main.getBoundingClientRect();
     const gridRect = grid.getBoundingClientRect();
