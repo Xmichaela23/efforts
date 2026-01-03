@@ -863,7 +863,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       </div>
 
-      {/* Content area - scrolls vertically with absolute positioning */}
+      {/* Content area - overflow visible so content extends behind Week of bar for blur effect */}
       <div 
         ref={scrollRef}
         className="scrollbar-hide" 
@@ -873,9 +873,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          WebkitOverflowScrolling: 'touch'
+          overflowY: 'visible',
+          overflowX: 'visible'
         }}
       >
         <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48, paddingTop: 4 }}>
