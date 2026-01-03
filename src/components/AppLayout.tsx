@@ -1234,7 +1234,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   onViewCompleted={handleViewCompleted}
                   onEditEffort={handleEditEffort}
                 />
-                <div className="flex-1 -mt-8 relative z-10">
+                <div className="flex-1">
                   <WorkoutCalendar
                     onAddEffort={() => handleAddEffort('run')}
                     onSelectType={handleSelectEffortType}
