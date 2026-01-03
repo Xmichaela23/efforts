@@ -78,11 +78,11 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
       ? 'bg-sky-600/60 border-sky-400/30 text-white hover:bg-sky-600/70'
       : 'bg-transparent border-2 border-sky-400/50 text-sky-300 hover:bg-sky-400/10';
   }
-  // Strength: orange
+  // Strength: yellow (distinct from goal orange)
   if (t === 'strength' || t === 'weight' || t === 'weights') {
     return isCompleted
-      ? 'bg-orange-600/60 border-orange-400/30 text-white hover:bg-orange-600/70'
-      : 'bg-transparent border-2 border-orange-400/50 text-orange-300 hover:bg-orange-400/10';
+      ? 'bg-yellow-600/60 border-yellow-400/30 text-white hover:bg-yellow-600/70'
+      : 'bg-transparent border-2 border-yellow-400/50 text-yellow-300 hover:bg-yellow-400/10';
   }
   // Mobility/Pilates/Yoga: indigo
   if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') {
@@ -102,7 +102,7 @@ export function getDisciplineCheckmarkColor(type: string): string {
   if (t === 'run' || t === 'running') return 'text-fuchsia-400';
   if (t === 'ride' || t === 'cycling' || t === 'bike') return 'text-green-400';
   if (t === 'swim' || t === 'swimming') return 'text-sky-400';
-  if (t === 'strength' || t === 'weight' || t === 'weights') return 'text-orange-400';
+  if (t === 'strength' || t === 'weight' || t === 'weights') return 'text-yellow-400';
   if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') return 'text-indigo-400';
   return 'text-white';
 }
