@@ -40,7 +40,6 @@ function fitLayout() {
     // Main content should extend from its top to the tabbar top
     const mainH = mainRect.height;
 
-    const mainRect = main.getBoundingClientRect();
     const gridRect = grid.getBoundingClientRect();
     const topOffset = Math.max(0, gridRect.top - mainRect.top);
     let remaining = Math.max(0, mainH - topOffset);
