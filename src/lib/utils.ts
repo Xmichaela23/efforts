@@ -60,11 +60,11 @@ export function getDisciplineBorder(type: string): string {
 export function getDisciplinePillClasses(type: string, isCompleted: boolean = false): string {
   const t = (type || '').toLowerCase();
   
-  // Run: fuchsia
+  // Run: rose (soft red)
   if (t === 'run' || t === 'running') {
     return isCompleted
-      ? 'bg-fuchsia-600/60 border-fuchsia-400/30 text-white hover:bg-fuchsia-600/70'
-      : 'bg-transparent border-2 border-fuchsia-400/50 text-fuchsia-300 hover:bg-fuchsia-400/10';
+      ? 'bg-rose-600/60 border-rose-400/30 text-white hover:bg-rose-600/70'
+      : 'bg-transparent border-2 border-rose-400/50 text-rose-300 hover:bg-rose-400/10';
   }
   // Ride/Cycling: green
   if (t === 'ride' || t === 'cycling' || t === 'bike') {
@@ -99,7 +99,7 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
 // Get checkmark color based on discipline
 export function getDisciplineCheckmarkColor(type: string): string {
   const t = (type || '').toLowerCase();
-  if (t === 'run' || t === 'running') return 'text-fuchsia-400';
+  if (t === 'run' || t === 'running') return 'text-rose-400';
   if (t === 'ride' || t === 'cycling' || t === 'bike') return 'text-green-400';
   if (t === 'swim' || t === 'swimming') return 'text-sky-400';
   if (t === 'strength' || t === 'weight' || t === 'weights') return 'text-yellow-400';
