@@ -1234,23 +1234,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   onViewCompleted={handleViewCompleted}
                   onEditEffort={handleEditEffort}
                 />
-                <div className="flex-1 overflow-hidden">
-                  <div className="h-full overflow-hidden">
-                    <WorkoutCalendar
-                      onAddEffort={() => handleAddEffort('run')}
-                      onSelectType={handleSelectEffortType}
-                      onSelectWorkout={handleEditEffort}
-                      onViewCompleted={handleViewCompleted}
-                      onEditEffort={handleEditEffort}
-                      onDateSelect={handleDateSelect}
-                      onSelectRoutine={handleSelectRoutine}
-                      onOpenPlanBuilder={handleOpenPlanBuilder}
-                      currentPlans={currentPlans}
-                      completedPlans={completedPlans}
-                      workouts={workouts}
-                      plannedWorkouts={[]}
-                    />
-                  </div>
+                <div className="flex-1">
+                  <WorkoutCalendar
+                    onAddEffort={() => handleAddEffort('run')}
+                    onSelectType={handleSelectEffortType}
+                    onSelectWorkout={handleEditEffort}
+                    onViewCompleted={handleViewCompleted}
+                    onEditEffort={handleEditEffort}
+                    onDateSelect={handleDateSelect}
+                    onSelectRoutine={handleSelectRoutine}
+                    onOpenPlanBuilder={handleOpenPlanBuilder}
+                    currentPlans={currentPlans}
+                    completedPlans={completedPlans}
+                    workouts={workouts}
+                    plannedWorkouts={[]}
+                  />
                 </div>
               </div>
               )}
