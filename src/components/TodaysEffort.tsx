@@ -919,13 +919,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       >
         <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48 }}>
         {displayWorkouts.length === 0 ? (
-          // Empty state
+          // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
           <div className="flex items-center justify-center h-full px-4">
             <p className="text-muted-foreground text-xs text-center">
               {isPastDate 
                 ? 'No effort logged' 
-                : isToday 
-                  ? 'No effort scheduled'
+                : trainingPlanContext?.currentWeek
+                  ? 'Rest'
                   : 'No effort scheduled'
               }
             </p>
