@@ -825,11 +825,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   return (
     <div className="w-full flex-shrink-0" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)', position:'relative', overflow: 'visible', zIndex: 0}}>
-      {/* Header */}
+      {/* Header - with backdrop blur for scroll-behind effect */}
       <div 
         ref={headerRef}
         className="mb-2 px-4 flex-shrink-0" 
-        style={{ position: 'relative', zIndex: 1 }}
+        style={{ 
+          position: 'relative', 
+          zIndex: 10,
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          marginLeft: '-1rem',
+          marginRight: '-1rem',
+          paddingLeft: '1.25rem',
+          paddingRight: '1.25rem',
+          paddingTop: '0.25rem',
+          paddingBottom: '0.5rem',
+        }}
       >
         <div className="space-y-1">
           {/* Line 1: Date */}
@@ -883,19 +895,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       </div>
 
-      {/* Content area - scrolls vertically with sticky Week Of header */}
+      {/* Content area - scrolls vertically, starts from top so content can scroll behind header */}
       <div 
         ref={scrollRef}
         className="scrollbar-hide" 
         style={{ 
           position: 'absolute',
-          top: `${headerHeight + 8}px`,
+          top: 0,
           left: 0,
           right: 0,
           bottom: 0,
           overflowY: 'auto',
           overflowX: 'hidden',
-          WebkitOverflowScrolling: 'touch'
+          WebkitOverflowScrolling: 'touch',
+          paddingTop: `${headerHeight + 8}px`,
         }}
       >
         {/* Sticky Week Of header with backdrop blur */}
