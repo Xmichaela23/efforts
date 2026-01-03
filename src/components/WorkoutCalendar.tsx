@@ -590,7 +590,7 @@ export default function WorkoutCalendar({
 
   return (
     <div
-      className="w-full max-w-md mx-auto flex flex-col h-full touch-pan-y"
+      className="w-full max-w-md mx-auto flex flex-col h-full touch-pan-y bg-transparent"
       onTouchStart={(e) => {
         const t = e.changedTouches[0];
         setTouchStartX(t.clientX);
@@ -632,11 +632,11 @@ export default function WorkoutCalendar({
     >
       {/* Header with week range and navigation - sticky with blur */}
       <div 
-        className="flex items-center justify-between mb-0 sticky top-0 z-10 py-3 -mx-2 px-2 border-b border-white/15"
+        className="flex items-center justify-between mb-0 sticky top-0 z-30 py-3 -mx-2 px-2 border-b border-white/20"
         style={{ 
-          background: 'rgba(0, 0, 0, 0.4)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)'
+          background: 'rgba(24, 24, 27, 0.5)',
+          backdropFilter: 'saturate(180%) blur(20px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)'
         }}
       >
         <button
