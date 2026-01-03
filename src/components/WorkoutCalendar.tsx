@@ -630,36 +630,7 @@ export default function WorkoutCalendar({
         }
       }}
     >
-      {/* Header with week range and navigation - glassy with blur-through */}
-      <div 
-        className="flex items-center justify-between mb-0 sticky top-0 z-30 py-3 -mx-2 px-2 rounded-xl border border-white/20"
-        style={{
-          background: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(40px)',
-          WebkitBackdropFilter: 'blur(40px)'
-        }}
-      >
-        <button
-          aria-label="Previous week"
-          className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
-          onClick={() => handlePrevWeek(addDays(weekStart, -1))}
-        >
-          ‹
-        </button>
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-light tracking-normal text-white">Week of {rangeLabel}</h2>
-          {loadingDebounced && (
-            <span role="status" aria-live="polite" className="text-[11px] text-white/50">Loading week…</span>
-          )}
-        </div>
-        <button
-          aria-label="Next week"
-          className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
-          onClick={() => handleNextWeek(addDays(weekEnd, 1))}
-        >
-          ›
-        </button>
-      </div>
+      {/* Week header moved to TodaysEffort for blur effect - calendar grid starts directly */}
 
       {/* 3-column week grid filling remaining height with min cell size */}
       <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full flex-1 relative" style={{ rowGap: 0, columnGap: 0, alignContent: 'stretch', alignItems: 'stretch' }}>

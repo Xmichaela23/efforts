@@ -17,13 +17,15 @@ interface TodaysEffortProps {
   onAddEffort: (type: string, date?: string) => void;
   onViewCompleted: () => void;
   onEditEffort?: (workout: any) => void;
+  onDateSelect?: (date: string) => void;
 }
 
 const TodaysEffort: React.FC<TodaysEffortProps> = ({ 
   selectedDate, 
   onAddEffort, 
   onViewCompleted, 
-  onEditEffort 
+  onEditEffort,
+  onDateSelect 
 }) => {
   const { useImperial, workouts, loading, loadUserBaselines, detailedPlans } = useAppContext();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
@@ -807,14 +809,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const handlePrevWeek = () => {
     const newDate = new Date(activeDate + 'T12:00:00');
     newDate.setDate(newDate.getDate() - 7);
-    // This would need to be passed up to parent - for now just log
-    console.log('Navigate to prev week:', newDate.toLocaleDateString('en-CA'));
+    const newDateStr = newDate.toLocaleDateString('en-CA');
+    onDateSelect && onDateSelect(newDateStr);
   };
   
   const handleNextWeek = () => {
     const newDate = new Date(activeDate + 'T12:00:00');
     newDate.setDate(newDate.getDate() + 7);
-    console.log('Navigate to next week:', newDate.toLocaleDateString('en-CA'));
+    const newDateStr = newDate.toLocaleDateString('en-CA');
+    onDateSelect && onDateSelect(newDateStr);
   };
 
   // Format week range label

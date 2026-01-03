@@ -1233,6 +1233,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   onAddEffort={handleAddEffort}
                   onViewCompleted={handleViewCompleted}
                   onEditEffort={handleEditEffort}
+                  onDateSelect={handleDateSelect}
                 />
                 <div className="flex-1">
                   <WorkoutCalendar
