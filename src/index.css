@@ -172,10 +172,7 @@
     background: transparent;
   }
   
-  /* Add bottom spacing to last content element so it can scroll above nav */
-  .mobile-main-content > *:last-child {
-    margin-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px);
-  }
+  /* Bottom spacing removed - content fits without needing scroll buffer */
 
   /* 🆕 NEW: Sliding container for calendar and summary */
   .sliding-container {
