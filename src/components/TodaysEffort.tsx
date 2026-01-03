@@ -11,6 +11,7 @@ import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
 import { mapUnifiedItemToPlanned, mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
 import { useToast } from '@/components/ui/use-toast';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -32,6 +33,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [locTried, setLocTried] = useState(false);
   const [cityName, setCityName] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [selectedPlannedWorkout, setSelectedPlannedWorkout] = useState<any | null>(null);
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
   const today = new Date().toLocaleDateString('en-CA');
@@ -935,90 +937,24 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               {displayWorkouts.map((workout) => (
                 <div
                   key={workout.id}
-                  className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg border ${getDisciplinePillClasses(workout.type || workout.workout_type || '', workout.workout_status === 'completed')}`}
+                  className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg border cursor-pointer ${getDisciplinePillClasses(workout.type || workout.workout_type || '', workout.workout_status === 'completed')}`}
+                  onClick={() => {
+                    if (workout.workout_status === 'planned') {
+                      setSelectedPlannedWorkout(workout);
+                    }
+                  }}
                 >
-                  {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
+                  {/* Planned: grouped like weekly - tap to open bottom sheet */}
                   {workout.workout_status === 'planned' ? (
                     <div className="space-y-1">
                       <div className="flex items-center justify-between gap-2">
-                        {/* Left: workout summary */}
+                        {/* Left: workout summary - tap card to open bottom sheet */}
                         <div className="flex-1 min-w-0">
-                          <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={!expanded[String(workout.id)]} />
+                          <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={true} />
                         </div>
-                        
-                        {/* Right: action + details */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {isEnduranceType(workout.type || workout.workout_type || '') && (
-                            <button
-                              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/40 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.12)_inset,0_2px_8px_rgba(0,0,0,0.2)]"
-                              onClick={(e) => handleSendToGarmin(e, workout)}
-                            >
-                              {sendingToGarmin === workout.id ? 'Sending...' : 'Send to Garmin'}
-                            </button>
-                          )}
-                          {isStrengthOrMobility(workout.type || workout.workout_type || '') && (
-                            <button
-                              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/40 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.12)_inset,0_2px_8px_rgba(0,0,0,0.2)]"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                // Open the logger with this workout pre-filled
-                                const w: any = { ...workout };
-                                w.__openLogger = true;
-                                onEditEffort && onEditEffort(w);
-                              }}
-                            >
-                              Go to workout
-                            </button>
-                          )}
-                          <button
-                            className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
-                            onClick={(e)=>{ 
-                              e.preventDefault(); 
-                              e.stopPropagation(); 
-                              const key = String(workout.id);
-                              toggleExpanded(key);
-                            }}
-                          >
-                            {expanded[String(workout.id)] ? 'hide' : 'details'}
-                          </button>
-                        </div>
+                        {/* Chevron indicator */}
+                        <div className="text-white/40 text-sm">›</div>
                       </div>
-                      {(() => { 
-                        if (!expanded[String(workout.id)]) return null;
-                        const type = String((workout as any)?.type||'').toLowerCase();
-                        // Swim: use lightweight token summary to avoid heavy step expansion
-                        if (type==='swim') {
-                          try {
-                            const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
-                            if (!toks.length) return null;
-                            const preferYards = true; // authored units default to yards for this plan
-                            const yd = (n:number, unit:string)=> unit.toLowerCase()==='yd'? n : Math.round(n/0.9144);
-                            const lines: string[] = [];
-                            const pushWUCD = (m:RegExpMatchArray, warm:boolean)=>{
-                              const n = parseInt(m[1],10); const unit = String(m[2]||'yd'); const dist = preferYards? `${yd(n,unit)} yd` : `${n} ${unit}`;
-                              lines.push(`${warm?'Warm‑up':'Cool‑down'} ${dist}`);
-                            };
-                            const add = (label:string, reps:number, dist:number, unit:string)=>{
-                              const distance = preferYards? `${yd(dist,unit)} yd` : `${dist} ${unit}`;
-                              lines.push(`${label} ${reps}×${distance}`);
-                            };
-                            toks.forEach((t)=>{
-                              const s = String(t).toLowerCase();
-                              let m = s.match(/swim_warmup_(\d+)(yd|m)/i); if (m) { pushWUCD(m, true); return; }
-                              m = s.match(/swim_cooldown_(\d+)(yd|m)/i); if (m) { pushWUCD(m, false); return; }
-                              m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)/i); if (m) { add(m[1].replace(/_/g,' '), parseInt(m[2],10), parseInt(m[3],10), m[4]); return; }
-                              m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i); if (m) { add(m[4].replace(/_/g,' '), parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
-                              m = s.match(/swim_pull_(\d+)x(\d+)(yd|m)/i); if (m) { add('Pull', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
-                              m = s.match(/swim_kick_(\d+)x(\d+)(yd|m)/i); if (m) { add('Kick', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
-                              m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m) { add('Aerobic', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
-                            });
-                            return lines.length? (<ul className="list-disc pl-5 text-xs text-foreground">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>) : null;
-                          } catch {}
-                        }
-                        // Non-swim: avoid duplicate details; PlannedWorkoutSummary already renders content
-                        return null;
-                      })()}
                     </div>
                   ) : (
                     <div 
@@ -1178,6 +1114,74 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Planned Workout Bottom Sheet */}
+      <Drawer open={!!selectedPlannedWorkout} onOpenChange={(open) => !open && setSelectedPlannedWorkout(null)}>
+        <DrawerContent 
+          className="bg-black/90 backdrop-blur-xl border-white/20"
+          style={{ maxHeight: '85vh' }}
+        >
+          <DrawerHeader className="text-left">
+            <DrawerTitle className="text-white font-light tracking-wide text-lg">
+              {(() => {
+                const w = selectedPlannedWorkout;
+                if (!w) return 'Planned Workout';
+                const type = String(w.type || w.workout_type || '').toLowerCase();
+                const name = w.name || w.title || '';
+                if (name && name.toLowerCase() !== type) return name;
+                return type.charAt(0).toUpperCase() + type.slice(1);
+              })()}
+            </DrawerTitle>
+            <DrawerDescription className="text-white/60 font-light">
+              {selectedPlannedWorkout?.rendered_description || selectedPlannedWorkout?.description || 'No description available'}
+            </DrawerDescription>
+          </DrawerHeader>
+          
+          <div className="px-4 pb-4 overflow-y-auto" style={{ maxHeight: '50vh' }}>
+            {selectedPlannedWorkout && (
+              <PlannedWorkoutSummary 
+                workout={selectedPlannedWorkout} 
+                baselines={baselines as any} 
+                hideLines={false} 
+              />
+            )}
+          </div>
+
+          <DrawerFooter className="border-t border-white/10 pt-4">
+            <div className="flex gap-2 w-full">
+              {selectedPlannedWorkout && isEnduranceType(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
+                <button
+                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-sm font-light tracking-wide hover:bg-white/[0.12] transition-all"
+                  onClick={(e) => {
+                    handleSendToGarmin(e, selectedPlannedWorkout);
+                  }}
+                >
+                  {sendingToGarmin === selectedPlannedWorkout?.id ? 'Sending...' : 'Send to Garmin'}
+                </button>
+              )}
+              {selectedPlannedWorkout && isStrengthOrMobility(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
+                <button
+                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-sm font-light tracking-wide hover:bg-white/[0.12] transition-all"
+                  onClick={() => {
+                    const w: any = { ...selectedPlannedWorkout };
+                    w.__openLogger = true;
+                    onEditEffort && onEditEffort(w);
+                    setSelectedPlannedWorkout(null);
+                  }}
+                >
+                  Go to workout
+                </button>
+              )}
+              <button
+                className="flex-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/20 text-white/70 text-sm font-light tracking-wide hover:bg-white/[0.08] transition-all"
+                onClick={() => setSelectedPlannedWorkout(null)}
+              >
+                Close
+              </button>
+            </div>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 };
