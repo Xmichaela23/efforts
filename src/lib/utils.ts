@@ -63,37 +63,37 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
   // Run: rose (soft pink-red)
   if (t === 'run' || t === 'running') {
     return isCompleted
-      ? 'bg-rose-500/30 border border-rose-400/40 text-rose-100 backdrop-blur-md hover:bg-rose-500/40'
-      : 'bg-transparent border border-rose-400/50 text-rose-300 hover:bg-rose-400/10';
+      ? 'bg-rose-500/20 border border-rose-400/30 text-rose-300 backdrop-blur-md hover:bg-rose-500/30'
+      : 'bg-transparent border border-rose-400/50 text-white/90 hover:bg-rose-400/10';
   }
   // Ride/Cycling: green
   if (t === 'ride' || t === 'cycling' || t === 'bike') {
     return isCompleted
-      ? 'bg-green-500/30 border border-green-400/40 text-green-100 backdrop-blur-md hover:bg-green-500/40'
-      : 'bg-transparent border border-green-400/50 text-green-300 hover:bg-green-400/10';
+      ? 'bg-green-500/20 border border-green-400/30 text-green-300 backdrop-blur-md hover:bg-green-500/30'
+      : 'bg-transparent border border-green-400/50 text-white/90 hover:bg-green-400/10';
   }
   // Swim: sky blue
   if (t === 'swim' || t === 'swimming') {
     return isCompleted
-      ? 'bg-sky-500/30 border border-sky-400/40 text-sky-100 backdrop-blur-md hover:bg-sky-500/40'
-      : 'bg-transparent border border-sky-400/50 text-sky-300 hover:bg-sky-400/10';
+      ? 'bg-sky-500/20 border border-sky-400/30 text-sky-300 backdrop-blur-md hover:bg-sky-500/30'
+      : 'bg-transparent border border-sky-400/50 text-white/90 hover:bg-sky-400/10';
   }
   // Strength: yellow (distinct from goal orange)
   if (t === 'strength' || t === 'weight' || t === 'weights') {
     return isCompleted
-      ? 'bg-yellow-500/30 border border-yellow-400/40 text-yellow-100 backdrop-blur-md hover:bg-yellow-500/40'
-      : 'bg-transparent border border-yellow-400/50 text-yellow-300 hover:bg-yellow-400/10';
+      ? 'bg-yellow-500/20 border border-yellow-400/30 text-yellow-300 backdrop-blur-md hover:bg-yellow-500/30'
+      : 'bg-transparent border border-yellow-400/50 text-white/90 hover:bg-yellow-400/10';
   }
   // Mobility/Pilates/Yoga: indigo
   if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') {
     return isCompleted
-      ? 'bg-indigo-500/30 border border-indigo-400/40 text-indigo-100 backdrop-blur-md hover:bg-indigo-500/40'
-      : 'bg-transparent border border-indigo-400/50 text-indigo-300 hover:bg-indigo-400/10';
+      ? 'bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 backdrop-blur-md hover:bg-indigo-500/30'
+      : 'bg-transparent border border-indigo-400/50 text-white/90 hover:bg-indigo-400/10';
   }
   // Default fallback: neutral
   return isCompleted
-    ? 'bg-zinc-500/30 border border-zinc-400/40 text-white backdrop-blur-md hover:bg-zinc-500/40'
-    : 'bg-transparent border border-white/40 text-white/70 hover:bg-white/10';
+    ? 'bg-zinc-500/20 border border-zinc-400/30 text-white/80 backdrop-blur-md hover:bg-zinc-500/30'
+    : 'bg-transparent border border-white/40 text-white/90 hover:bg-white/10';
 }
 
 // Get checkmark color based on discipline
