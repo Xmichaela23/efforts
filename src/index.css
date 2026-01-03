@@ -161,12 +161,14 @@
     top: 0;
     left: 0;
     right: 0;
-    /* End exactly at tabbar top - tabbar has its own fixed position at bottom */
-    bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+    /* Extend to bottom so content can scroll behind glassmorphic tabbar */
+    bottom: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     /* Padding so content starts below header */
     padding-top: calc(var(--header-h) + env(safe-area-inset-top));
+    /* Bottom padding so content isn't hidden behind tabbar */
+    padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     /* Prevent white background on overscroll */
     overscroll-behavior: none;
     /* Solid black background */
@@ -210,7 +212,7 @@
     padding-left: 1rem; /* Add some spacing between panels */
   }
 
-  /* 🚨 MOBILE TAB BAR - fixed with blur-through effect */
+  /* 🚨 MOBILE TAB BAR - fixed with glassmorphism blur effect */
   .mobile-tabbar {
     position: fixed;
     left: 0;
@@ -220,8 +222,11 @@
     padding-top: 8px;
     padding-bottom: env(safe-area-inset-bottom);
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
-    background: rgba(0, 0, 0, 0.4);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    /* Glassmorphism: translucent background with blur */
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
     box-shadow: 0 -2px 16px rgba(0,0,0,0.4);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
