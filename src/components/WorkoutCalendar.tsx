@@ -262,6 +262,20 @@ export default function WorkoutCalendar({
   const [workloadTooltipOpen, setWorkloadTooltipOpen] = useState(false);
   const { useImperial } = useAppContext();
 
+  // Sync referenceDate when week:navigate event is dispatched (from TodaysEffort)
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      try {
+        const date = e.detail?.date;
+        if (date) {
+          setReferenceDate(new Date(date + 'T12:00:00'));
+        }
+      } catch {}
+    };
+    window.addEventListener('week:navigate', handler as any);
+    return () => window.removeEventListener('week:navigate', handler as any);
+  }, []);
+
   // Week bounds for planned fetch
   const weekStart = startOfWeek(referenceDate);
   const weekEnd = addDays(weekStart, 6);
