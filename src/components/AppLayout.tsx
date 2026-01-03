@@ -1241,7 +1241,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           ) : (
             <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (
-              <div className="space-y-1 pt-2 flex-shrink-0">
+              <div className="space-y-1 pt-2 flex-1 flex flex-col">
                 <TodaysEffort
                   selectedDate={selectedDate}
                   onAddEffort={handleAddEffort}
