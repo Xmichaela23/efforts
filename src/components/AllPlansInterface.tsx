@@ -1764,7 +1764,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             {(planStatus === 'active' || planStatus === 'paused') && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <button className="px-3 py-1.5 rounded-full bg-orange-500/20 backdrop-blur-md border border-orange-500/40 text-orange-400 hover:bg-orange-500/30 hover:text-orange-300 transition-colors text-sm">
+                  <button className="px-3 py-1.5 rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/40 text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-colors text-sm">
                     End
                   </button>
                 </AlertDialogTrigger>
@@ -1777,7 +1777,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleEndPlan} className="bg-orange-600 hover:bg-orange-700">
+                    <AlertDialogAction onClick={handleEndPlan} className="bg-red-600 hover:bg-red-700">
                       End Plan
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -1870,7 +1870,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   {raceDate && (
                     <>
                       <span>
-                        <span className="font-semibold text-orange-400">
+                        <span className="font-semibold text-yellow-500">
                           {raceName || new Date(raceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
                         {raceName && (
@@ -1881,19 +1881,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                       </span>
                       {weeksToRace !== null && weeksToRace > 0 && (
                         <span>
-                          <span className="font-semibold text-orange-400">{weeksToRace}</span> weeks to go
+                          <span className="font-semibold text-yellow-500">{weeksToRace}</span> weeks to go
                         </span>
                       )}
                     </>
                   )}
                   {effortScore && (
                     <span>
-                      Effort Score <span className="font-semibold text-orange-400">{effortScore}</span>
+                      Effort Score <span className="font-semibold text-yellow-500">{effortScore}</span>
                     </span>
                   )}
                   {targetTime && distanceLabel && (
                     <span>
-                      Goal <span className="font-semibold text-orange-400">{formatTime(targetTime)}</span> {distanceLabel}
+                      Goal <span className="font-semibold text-yellow-500">{formatTime(targetTime)}</span> {distanceLabel}
                     </span>
                   )}
                 </div>
@@ -1903,16 +1903,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             {/* Compact, single-line stats */}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/60 mb-3">
               <span>
-                <span className="font-semibold text-orange-400">{selectedPlanDetail.duration || 0}</span> wk
+                <span className="font-semibold text-yellow-500">{selectedPlanDetail.duration || 0}</span> wk
               </span>
               <span>
-                <span className="font-semibold text-orange-400">{selectedPlanDetail.totalWorkouts || 0}</span> workouts
+                <span className="font-semibold text-yellow-500">{selectedPlanDetail.totalWorkouts || 0}</span> workouts
               </span>
               <span>
-                <span className="font-semibold text-orange-400">{formatDuration(totalVolume)}</span> total
+                <span className="font-semibold text-yellow-500">{formatDuration(totalVolume)}</span> total
               </span>
               <span>
-                <span className="font-semibold text-orange-400">{formatDuration(averageWeeklyVolume)}</span> avg/wk
+                <span className="font-semibold text-yellow-500">{formatDuration(averageWeeklyVolume)}</span> avg/wk
               </span>
             </div>
 
@@ -2032,13 +2032,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                           isSelected 
                             ? 'bg-white/[0.15] border-2 border-white/30 text-white font-medium' 
                             : isCurrent 
-                              ? 'bg-orange-500/20 border border-orange-400/40 text-orange-300' 
+                              ? 'bg-yellow-500/20 border border-yellow-400/40 text-yellow-300' 
                               : 'bg-white/[0.05] border border-white/15 text-white/60 hover:bg-white/[0.08] hover:text-white/80'
                         }`}
                       >
                         {wn}
                         {isCurrent && !isSelected && (
-                          <span className="ml-1 text-[10px] text-orange-400">•</span>
+                          <span className="ml-1 text-[10px] text-yellow-500">•</span>
                         )}
                       </button>
                     );
@@ -2090,7 +2090,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               if (!focus && !notes) return null;
               return (
                 <div className="px-1 pb-3">
-                  {focus && (<div className="text-sm text-orange-400/80 italic">{focus}</div>)}
+                  {focus && (<div className="text-sm text-yellow-500/80 italic">{focus}</div>)}
                   {notes && (<div className="text-xs text-white/50 mt-1">{notes}</div>)}
                 </div>
               );
