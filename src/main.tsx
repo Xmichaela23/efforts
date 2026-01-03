@@ -73,29 +73,26 @@ function alignFrameLine() {
   try {
     const cells = document.querySelectorAll('.mobile-calendar-cell') as NodeListOf<HTMLElement>;
     const tabbar = document.querySelector('.mobile-tabbar') as HTMLElement | null;
-    if (!cells || cells.length === 0 || !tabbar) return false;
+    const grid = document.querySelector('.mobile-calendar') as HTMLElement | null;
+    if (!cells || cells.length === 0 || !tabbar || !grid) return false;
 
-    const last = cells[cells.length - 1];
-    const bottom = last.getBoundingClientRect().bottom;
+    // Calculate exact available height from grid top to tabbar top
+    const gridRect = grid.getBoundingClientRect();
     const tabTop = tabbar.getBoundingClientRect().top;
+    const availableHeight = tabTop - gridRect.top - 4; // 4px cushion
+    
+    // 3 rows in the grid
+    const cellHeight = Math.floor(availableHeight / 3);
+    // No min/max constraints - fill the space exactly
+    const finalHeight = Math.max(100, cellHeight);
+    
+    document.documentElement.style.setProperty('--cal-cell-h', `${finalHeight}px`);
+    cells.forEach((el) => { 
+      el.style.height = `${finalHeight}px`; 
+      el.style.minHeight = `${finalHeight}px`; 
+    });
 
-    const desiredCushion = 2; // px
-    const gap = (tabTop - bottom) - desiredCushion; // positive means space remaining
-
-    if (Math.abs(gap) <= 1) return true; // aligned
-
-    const raw = getComputedStyle(document.documentElement).getPropertyValue('--cal-cell-h').trim();
-    const current = raw.endsWith('px') ? parseFloat(raw) : raw.endsWith('rem') ? parseFloat(raw) * 16 : parseFloat(raw);
-    if (!isFinite(current)) return false;
-
-    // Light correction only: cap delta to ±6px to avoid visible jumps
-    const delta = Math.max(-6, Math.min(gap, 6));
-    const next = Math.max(118, Math.min(current + delta, 150));
-    document.documentElement.style.setProperty('--cal-cell-h', `${next}px`);
-    const els = document.querySelectorAll('.mobile-calendar-cell') as NodeListOf<HTMLElement>;
-    els.forEach((el) => { el.style.height = `${next}px`; el.style.minHeight = `${next}px`; });
-
-    return Math.abs(gap) <= 1;
+    return true;
   } catch { return false; }
 }
 
