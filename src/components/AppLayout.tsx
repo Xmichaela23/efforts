@@ -1137,7 +1137,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       
       <main className="mobile-main-content">
         <PullToRefresh onRefresh={handleGlobalRefresh}>
-        <div className="w-full px-2">
+        <div className="w-full h-full px-2">
           {showPlanBuilder ? (
             <div className="pt-1">
               <PlanBuilder
