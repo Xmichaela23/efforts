@@ -12,7 +12,7 @@ function applyRuntimeLayoutOverrides() {
       style.id = styleId;
       style.textContent = `
       /* Pre-seed final targets to avoid first-paint jump */
-      :root { --todays-h: 13rem; --cal-cell-h: 150px; }
+      :root { --todays-h: 17rem; --cal-cell-h: 130px; }
       .mobile-tabbar {
         padding-top: 8px !important;
         padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px) !important;
@@ -59,7 +59,7 @@ function fitLayout() {
     remaining -= (padTop + padBottom + borderTop + borderBottom + gap + 2);
 
     // Apply directly to cells to bypass any CSS fallback
-    const desiredCell = Math.max(118, Math.min(remaining, 150));
+    const desiredCell = Math.max(90, Math.min(remaining, 140));
     document.documentElement.style.setProperty('--cal-cell-h', `${desiredCell}px`);
     const cells = document.querySelectorAll('.mobile-calendar-cell') as NodeListOf<HTMLElement>;
     cells.forEach((el) => {
@@ -90,7 +90,7 @@ function alignFrameLine() {
 
     // Light correction only: cap delta to ±6px to avoid visible jumps
     const delta = Math.max(-6, Math.min(gap, 6));
-    const next = Math.max(118, Math.min(current + delta, 150));
+    const next = Math.max(90, Math.min(current + delta, 140));
     document.documentElement.style.setProperty('--cal-cell-h', `${next}px`);
     const els = document.querySelectorAll('.mobile-calendar-cell') as NodeListOf<HTMLElement>;
     els.forEach((el) => { el.style.height = `${next}px`; el.style.minHeight = `${next}px`; });
