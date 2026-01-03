@@ -6,6 +6,7 @@ import MapEffort, { SegmentEffort } from "./MapEffort";
 import WeatherDisplay from "./WeatherDisplay";
 import { useWeather } from "../hooks/useWeather";
 import { formatSpeed } from "../utils/workoutFormatting";
+import { isVirtualActivity, getVirtualWorkoutLabel } from "../utils/workoutNames";
 
 /** ---------- Route Simplification (Douglas-Peucker Algorithm) ---------- */
 
@@ -1708,66 +1709,139 @@ function EffortsViewerMapbox({
         </button>
       </div>
 
-      {/* Map (MapLibre) */}
-      <MapEffort
-        trackLngLat={useMemo(() => {
-          try {
-            const raw = Array.isArray(trackLngLat) ? trackLngLat : [];
-            // Use Douglas-Peucker algorithm for intelligent route simplification
-            const simplified = simplifyRouteForMap(raw);
-            return simplified;
-          } catch (error) {
-            return Array.isArray(trackLngLat) ? trackLngLat : [];
-          }
-        }, [trackLngLat, theme]) as any}
-        cursorDist_m={distNow}
-        totalDist_m={dTotal}
-        theme={theme}
-        height={200}
-        
-        // Enhancement 4: Pass current metric data for overlay
-        currentMetric={{
-          value: formatMetricValue(
-            metricRaw[Math.min(idx, metricRaw.length - 1)] as number | null,
-            tab,
-            useMiles,
-            useFeet
-          ),
-          label: getMetricLabel(tab, workoutData?.type)
-        }}
-        currentTime={fmtTime(s?.t_s ?? 0)}
-        
-        // Enhancement 6: Click-to-jump callback
-        onRouteClick={(distance_m) => {
-          // Find index in normalizedSamples that matches this distance
-          const distances = normalizedSamples.map(sample => sample.d_m);
-          const newIdx = findNearestIndex(distances, distance_m);
-          setIdx(newIdx);
-        }}
-        
-        // Pass active tab for future enhancements (color-coded routes)
-        activeMetricTab={tab}
-        
-        // Pass imperial/metric preference
-        useMiles={useMiles}
-        
-        // Thumb scrubbing props
-        discipline={isRide ? 'bike' : 'run'}
-        currentSpeed={currentSpeed}
-        currentPower={currentPower}
-        currentHR={currentHR}
-        currentGrade={currentGrade}
-        currentDistance={currentDistanceFormatted}
-        onScrub={handleScrub}
-        
-        // Strava segments (memoized to prevent re-renders from clearing)
-        segments={memoizedSegments}
-        onSegmentClick={(segment) => {
-          setSelectedSegment(segment);
-        }}
-        // Pass raw (unsimplified) track for segment index lookups (memoized)
-        rawTrackLngLat={memoizedRawTrack}
-      />
+      {/* Map (MapLibre) or Virtual Ride Placeholder */}
+      {isVirtualActivity(workoutData) ? (
+        // Virtual ride placeholder - Zwift/indoor activities don't have real-world maps
+        <div 
+          style={{ 
+            height: 200, 
+            background: 'linear-gradient(135deg, #0f1f0f 0%, #1a2e1a 50%, #0f1f0f 100%)',
+            borderRadius: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            overflow: 'hidden',
+            border: '1px solid rgba(34,197,94,0.2)',
+          }}
+        >
+          {/* Gradient background with green tones */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(circle at 30% 40%, rgba(22,163,74,0.12) 0%, transparent 50%), radial-gradient(circle at 70% 60%, rgba(34,197,94,0.08) 0%, transparent 50%)',
+          }} />
+          
+          {/* Grid pattern overlay */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'linear-gradient(rgba(34,197,94,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,0.05) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }} />
+          
+          {/* Content */}
+          <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+            {/* Icon */}
+            <div style={{
+              width: 48,
+              height: 48,
+              margin: '0 auto 12px',
+              background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
+              borderRadius: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(22,163,74,0.3)',
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+            </div>
+            
+            {/* Label */}
+            <div style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'rgba(34,197,94,0.9)',
+              marginBottom: 4,
+              letterSpacing: '0.5px',
+            }}>
+              {getVirtualWorkoutLabel(workoutData)}
+            </div>
+            <div style={{
+              fontSize: 12,
+              color: 'rgba(255,255,255,0.5)',
+              fontWeight: 400,
+            }}>
+              Virtual world map not available
+            </div>
+          </div>
+        </div>
+      ) : (
+        <MapEffort
+          trackLngLat={useMemo(() => {
+            try {
+              const raw = Array.isArray(trackLngLat) ? trackLngLat : [];
+              // Use Douglas-Peucker algorithm for intelligent route simplification
+              const simplified = simplifyRouteForMap(raw);
+              return simplified;
+            } catch (error) {
+              return Array.isArray(trackLngLat) ? trackLngLat : [];
+            }
+          }, [trackLngLat, theme]) as any}
+          cursorDist_m={distNow}
+          totalDist_m={dTotal}
+          theme={theme}
+          height={200}
+          
+          // Enhancement 4: Pass current metric data for overlay
+          currentMetric={{
+            value: formatMetricValue(
+              metricRaw[Math.min(idx, metricRaw.length - 1)] as number | null,
+              tab,
+              useMiles,
+              useFeet
+            ),
+            label: getMetricLabel(tab, workoutData?.type)
+          }}
+          currentTime={fmtTime(s?.t_s ?? 0)}
+          
+          // Enhancement 6: Click-to-jump callback
+          onRouteClick={(distance_m) => {
+            // Find index in normalizedSamples that matches this distance
+            const distances = normalizedSamples.map(sample => sample.d_m);
+            const newIdx = findNearestIndex(distances, distance_m);
+            setIdx(newIdx);
+          }}
+          
+          // Pass active tab for future enhancements (color-coded routes)
+          activeMetricTab={tab}
+          
+          // Pass imperial/metric preference
+          useMiles={useMiles}
+          
+          // Thumb scrubbing props
+          discipline={isRide ? 'bike' : 'run'}
+          currentSpeed={currentSpeed}
+          currentPower={currentPower}
+          currentHR={currentHR}
+          currentGrade={currentGrade}
+          currentDistance={currentDistanceFormatted}
+          onScrub={handleScrub}
+          
+          // Strava segments (memoized to prevent re-renders from clearing)
+          segments={memoizedSegments}
+          onSegmentClick={(segment) => {
+            setSelectedSegment(segment);
+          }}
+          // Pass raw (unsimplified) track for segment index lookups (memoized)
+          rawTrackLngLat={memoizedRawTrack}
+        />
+      )}
       
       {/* Segment info popup */}
       {selectedSegment && (

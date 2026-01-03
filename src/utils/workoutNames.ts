@@ -3,6 +3,55 @@
  * Examples: "Los Angeles Run", "Los Angeles Ride", "Lap Swim", "Open Water Swim"
  */
 
+/**
+ * Check if a workout is a virtual/indoor activity (Zwift, treadmill, indoor trainer)
+ * These activities have GPS data that maps to fictional locations (e.g., Watopia in the Pacific Ocean)
+ */
+export function isVirtualActivity(workout: any): boolean {
+  const providerSport = (workout?.provider_sport || '').toLowerCase();
+  const activityType = (workout?.activity_type || '').toLowerCase();
+  const name = (workout?.name || '').toLowerCase();
+  
+  // Check provider sport type for virtual indicators
+  const isVirtualSport = (
+    providerSport.includes('virtual') ||
+    providerSport === 'indoorcycling' ||
+    providerSport.includes('treadmill') ||
+    activityType.includes('virtual') ||
+    activityType === 'indoorcycling' ||
+    activityType.includes('treadmill')
+  );
+  
+  // Check workout name for Zwift indicators
+  const isZwiftWorkout = (
+    name.includes('zwift') ||
+    name.includes('watopia') ||
+    name.includes('makuri') ||
+    name.includes('innsbruck') && name.includes('zwift')
+  );
+  
+  return isVirtualSport || isZwiftWorkout;
+}
+
+/**
+ * Get a friendly label for virtual workout source
+ */
+export function getVirtualWorkoutLabel(workout: any): string {
+  const providerSport = (workout?.provider_sport || '').toLowerCase();
+  const name = (workout?.name || '').toLowerCase();
+  
+  if (name.includes('zwift') || providerSport.includes('virtual')) {
+    return 'Zwift';
+  }
+  if (providerSport === 'indoorcycling' || providerSport.includes('trainer')) {
+    return 'Indoor Trainer';
+  }
+  if (providerSport.includes('treadmill')) {
+    return 'Treadmill';
+  }
+  return 'Virtual Ride';
+}
+
 export interface WorkoutNameOptions {
   type: string; // normalized type: 'run', 'ride', 'swim', 'strength', 'walk'
   activityType?: string; // raw provider type: 'ROAD_BIKING', 'RUNNING', 'LAP_SWIMMING', etc.
