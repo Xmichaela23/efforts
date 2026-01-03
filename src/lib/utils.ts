@@ -60,35 +60,35 @@ export function getDisciplineBorder(type: string): string {
 export function getDisciplinePillClasses(type: string, isCompleted: boolean = false): string {
   const t = (type || '').toLowerCase();
   
-  // Run: amber (warm gold, ties to marathon goal)
+  // Run: Yellow-500 (#eab308)
   if (t === 'run' || t === 'running') {
     return isCompleted
-      ? 'bg-amber-600/20 border border-amber-500/30 text-amber-400 backdrop-blur-md hover:bg-amber-600/30'
-      : 'bg-transparent border border-amber-500/50 text-white/90 hover:bg-amber-500/10';
+      ? 'bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 backdrop-blur-md hover:bg-yellow-500/30'
+      : 'bg-transparent border border-yellow-500/50 text-white/90 hover:bg-yellow-500/10';
   }
-  // Ride/Cycling: green
+  // Ride/Cycling: Green-600 (#16a34a)
   if (t === 'ride' || t === 'cycling' || t === 'bike') {
     return isCompleted
-      ? 'bg-green-500/20 border border-green-400/30 text-green-300 backdrop-blur-md hover:bg-green-500/30'
-      : 'bg-transparent border border-green-400/50 text-white/90 hover:bg-green-400/10';
+      ? 'bg-green-600/20 border border-green-500/30 text-green-400 backdrop-blur-md hover:bg-green-600/30'
+      : 'bg-transparent border border-green-500/50 text-white/90 hover:bg-green-500/10';
   }
-  // Swim: sky blue
+  // Swim: Cyan-600 (#0891b2)
   if (t === 'swim' || t === 'swimming') {
     return isCompleted
-      ? 'bg-sky-500/20 border border-sky-400/30 text-sky-300 backdrop-blur-md hover:bg-sky-500/30'
-      : 'bg-transparent border border-sky-400/50 text-white/90 hover:bg-sky-400/10';
+      ? 'bg-cyan-600/20 border border-cyan-500/30 text-cyan-400 backdrop-blur-md hover:bg-cyan-600/30'
+      : 'bg-transparent border border-cyan-500/50 text-white/90 hover:bg-cyan-500/10';
   }
-  // Strength: yellow (distinct from goal orange)
+  // Strength: Orange-600 (#ea580c)
   if (t === 'strength' || t === 'weight' || t === 'weights') {
     return isCompleted
-      ? 'bg-yellow-500/20 border border-yellow-400/30 text-yellow-300 backdrop-blur-md hover:bg-yellow-500/30'
-      : 'bg-transparent border border-yellow-400/50 text-white/90 hover:bg-yellow-400/10';
+      ? 'bg-orange-600/20 border border-orange-500/30 text-orange-400 backdrop-blur-md hover:bg-orange-600/30'
+      : 'bg-transparent border border-orange-500/50 text-white/90 hover:bg-orange-500/10';
   }
-  // Mobility/Pilates/Yoga: indigo
+  // Mobility/Pilates/Yoga: Purple-600 (#9333ea)
   if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') {
     return isCompleted
-      ? 'bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 backdrop-blur-md hover:bg-indigo-500/30'
-      : 'bg-transparent border border-indigo-400/50 text-white/90 hover:bg-indigo-400/10';
+      ? 'bg-purple-600/20 border border-purple-500/30 text-purple-400 backdrop-blur-md hover:bg-purple-600/30'
+      : 'bg-transparent border border-purple-500/50 text-white/90 hover:bg-purple-500/10';
   }
   // Default fallback: neutral
   return isCompleted
@@ -99,11 +99,11 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
 // Get checkmark color based on discipline
 export function getDisciplineCheckmarkColor(type: string): string {
   const t = (type || '').toLowerCase();
-  if (t === 'run' || t === 'running') return 'text-amber-500';
-  if (t === 'ride' || t === 'cycling' || t === 'bike') return 'text-green-400';
-  if (t === 'swim' || t === 'swimming') return 'text-sky-400';
-  if (t === 'strength' || t === 'weight' || t === 'weights') return 'text-yellow-400';
-  if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') return 'text-indigo-400';
+  if (t === 'run' || t === 'running') return 'text-yellow-500';
+  if (t === 'ride' || t === 'cycling' || t === 'bike') return 'text-green-500';
+  if (t === 'swim' || t === 'swimming') return 'text-cyan-500';
+  if (t === 'strength' || t === 'weight' || t === 'weights') return 'text-orange-500';
+  if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') return 'text-purple-500';
   return 'text-white';
 }
 
