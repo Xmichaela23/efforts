@@ -803,6 +803,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
   }, [weather]);
 
+  // Week navigation handlers
+  const handlePrevWeek = () => {
+    const newDate = new Date(activeDate + 'T12:00:00');
+    newDate.setDate(newDate.getDate() - 7);
+    // This would need to be passed up to parent - for now just log
+    console.log('Navigate to prev week:', newDate.toLocaleDateString('en-CA'));
+  };
+  
+  const handleNextWeek = () => {
+    const newDate = new Date(activeDate + 'T12:00:00');
+    newDate.setDate(newDate.getDate() + 7);
+    console.log('Navigate to next week:', newDate.toLocaleDateString('en-CA'));
+  };
+
+  // Format week range label
+  const formatWeekRange = () => {
+    const monthFmt = new Intl.DateTimeFormat('en-US', { month: 'short' });
+    return `${monthFmt.format(weekStart)} ${weekStart.getDate()} – ${monthFmt.format(weekEnd)} ${weekEnd.getDate()}`;
+  };
+
   return (
     <div className="w-full flex-shrink-0" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)', position:'relative', overflow: 'visible', zIndex: 0}}>
       {/* Header */}
@@ -863,7 +883,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       </div>
 
-      {/* Content area - scrolls vertically */}
+      {/* Content area - scrolls vertically with sticky Week Of header */}
       <div 
         ref={scrollRef}
         className="scrollbar-hide" 
@@ -878,7 +898,35 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           WebkitOverflowScrolling: 'touch'
         }}
       >
-        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48, paddingTop: 4 }}>
+        {/* Sticky Week Of header with backdrop blur */}
+        <div 
+          className="sticky top-0 z-20 flex items-center justify-between py-2 px-2 mx-1 mb-2 rounded-xl border border-white/20"
+          style={{
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)'
+          }}
+        >
+          <button
+            aria-label="Previous week"
+            className="px-2 py-1 rounded hover:bg-white/10 active:bg-white/20 text-white/80 text-sm"
+            onClick={handlePrevWeek}
+          >
+            ‹
+          </button>
+          <span className="text-sm font-light tracking-normal text-white">
+            Week of {formatWeekRange()}
+          </span>
+          <button
+            aria-label="Next week"
+            className="px-2 py-1 rounded hover:bg-white/10 active:bg-white/20 text-white/80 text-sm"
+            onClick={handleNextWeek}
+          >
+            ›
+          </button>
+        </div>
+
+        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
           <div className="flex items-center justify-center h-full px-4">
@@ -1109,8 +1157,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </div>
           </div>
         )}
-          {/* Bottom spacing */}
-          <div style={{ height: 1 }} />
         </div>
       </div>
     </div>
