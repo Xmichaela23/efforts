@@ -168,8 +168,8 @@
     padding-top: calc(var(--header-h) + env(safe-area-inset-top));
     /* Prevent white background on overscroll */
     overscroll-behavior: none;
-    /* Transparent so gradient shows through */
-    background: transparent;
+    /* Solid black background to eliminate visible gradient in any content gaps */
+    background: #000000;
   }
   
   /* Bottom spacing removed - content fits without needing scroll buffer */
