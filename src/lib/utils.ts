@@ -60,40 +60,43 @@ export function getDisciplineBorder(type: string): string {
 export function getDisciplinePillClasses(type: string, isCompleted: boolean = false): string {
   const t = (type || '').toLowerCase();
   
-  // Run: rose (soft red)
+  // Glassmorphic base styles
+  const glassBase = 'backdrop-blur-md';
+  
+  // Run: rose-400 (lighter soft pink-red)
   if (t === 'run' || t === 'running') {
     return isCompleted
-      ? 'bg-rose-600/60 border-rose-400/30 text-white hover:bg-rose-600/70'
-      : 'bg-transparent border-2 border-rose-400/50 text-rose-300 hover:bg-rose-400/10';
+      ? `${glassBase} bg-rose-400/40 border border-rose-300/40 text-white hover:bg-rose-400/50`
+      : `${glassBase} bg-rose-400/10 border border-rose-400/40 text-rose-300 hover:bg-rose-400/20`;
   }
   // Ride/Cycling: green
   if (t === 'ride' || t === 'cycling' || t === 'bike') {
     return isCompleted
-      ? 'bg-green-600/60 border-green-400/30 text-white hover:bg-green-600/70'
-      : 'bg-transparent border-2 border-green-400/50 text-green-300 hover:bg-green-400/10';
+      ? `${glassBase} bg-green-500/40 border border-green-400/40 text-white hover:bg-green-500/50`
+      : `${glassBase} bg-green-400/10 border border-green-400/40 text-green-300 hover:bg-green-400/20`;
   }
   // Swim: sky blue
   if (t === 'swim' || t === 'swimming') {
     return isCompleted
-      ? 'bg-sky-600/60 border-sky-400/30 text-white hover:bg-sky-600/70'
-      : 'bg-transparent border-2 border-sky-400/50 text-sky-300 hover:bg-sky-400/10';
+      ? `${glassBase} bg-sky-500/40 border border-sky-400/40 text-white hover:bg-sky-500/50`
+      : `${glassBase} bg-sky-400/10 border border-sky-400/40 text-sky-300 hover:bg-sky-400/20`;
   }
   // Strength: yellow (distinct from goal orange)
   if (t === 'strength' || t === 'weight' || t === 'weights') {
     return isCompleted
-      ? 'bg-yellow-600/60 border-yellow-400/30 text-white hover:bg-yellow-600/70'
-      : 'bg-transparent border-2 border-yellow-400/50 text-yellow-300 hover:bg-yellow-400/10';
+      ? `${glassBase} bg-yellow-500/40 border border-yellow-400/40 text-white hover:bg-yellow-500/50`
+      : `${glassBase} bg-yellow-400/10 border border-yellow-400/40 text-yellow-300 hover:bg-yellow-400/20`;
   }
   // Mobility/Pilates/Yoga: indigo
   if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') {
     return isCompleted
-      ? 'bg-indigo-600/60 border-indigo-400/30 text-white hover:bg-indigo-600/70'
-      : 'bg-transparent border-2 border-indigo-400/50 text-indigo-300 hover:bg-indigo-400/10';
+      ? `${glassBase} bg-indigo-500/40 border border-indigo-400/40 text-white hover:bg-indigo-500/50`
+      : `${glassBase} bg-indigo-400/10 border border-indigo-400/40 text-indigo-300 hover:bg-indigo-400/20`;
   }
   // Default fallback: neutral
   return isCompleted
-    ? 'bg-zinc-600/60 border-zinc-400/30 text-white hover:bg-zinc-600/70'
-    : 'bg-transparent border-2 border-white/30 text-white/70 hover:bg-white/10';
+    ? `${glassBase} bg-zinc-500/40 border border-zinc-400/40 text-white hover:bg-zinc-500/50`
+    : `${glassBase} bg-white/5 border border-white/25 text-white/70 hover:bg-white/10`;
 }
 
 // Get checkmark color based on discipline
