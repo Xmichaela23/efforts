@@ -892,7 +892,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 <span> • </span>
               )}
               {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                <span className="text-yellow-500">
+                <span className="text-teal-500">
                   {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
                 </span>
               )}

@@ -60,11 +60,11 @@ export function getDisciplineBorder(type: string): string {
 export function getDisciplinePillClasses(type: string, isCompleted: boolean = false): string {
   const t = (type || '').toLowerCase();
   
-  // Run: Yellow-500 (#eab308)
+  // Run: Teal-500 (#14b8a6) - aqua-green
   if (t === 'run' || t === 'running') {
     return isCompleted
-      ? 'bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 backdrop-blur-md hover:bg-yellow-500/30'
-      : 'bg-transparent border border-yellow-500/50 text-white/90 hover:bg-yellow-500/10';
+      ? 'bg-teal-500/20 border border-teal-500/30 text-teal-400 backdrop-blur-md hover:bg-teal-500/30'
+      : 'bg-transparent border border-teal-500/50 text-white/90 hover:bg-teal-500/10';
   }
   // Ride/Cycling: Green-600 (#16a34a)
   if (t === 'ride' || t === 'cycling' || t === 'bike') {
@@ -72,11 +72,11 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
       ? 'bg-green-600/20 border border-green-500/30 text-green-400 backdrop-blur-md hover:bg-green-600/30'
       : 'bg-transparent border border-green-500/50 text-white/90 hover:bg-green-500/10';
   }
-  // Swim: Cyan-600 (#0891b2)
+  // Swim: Blue-600 (#2563eb) - true blue
   if (t === 'swim' || t === 'swimming') {
     return isCompleted
-      ? 'bg-cyan-600/20 border border-cyan-500/30 text-cyan-400 backdrop-blur-md hover:bg-cyan-600/30'
-      : 'bg-transparent border border-cyan-500/50 text-white/90 hover:bg-cyan-500/10';
+      ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 backdrop-blur-md hover:bg-blue-600/30'
+      : 'bg-transparent border border-blue-500/50 text-white/90 hover:bg-blue-500/10';
   }
   // Strength: Orange-600 (#ea580c)
   if (t === 'strength' || t === 'weight' || t === 'weights') {
@@ -99,9 +99,9 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
 // Get checkmark color based on discipline
 export function getDisciplineCheckmarkColor(type: string): string {
   const t = (type || '').toLowerCase();
-  if (t === 'run' || t === 'running') return 'text-yellow-500';
+  if (t === 'run' || t === 'running') return 'text-teal-500';
   if (t === 'ride' || t === 'cycling' || t === 'bike') return 'text-green-500';
-  if (t === 'swim' || t === 'swimming') return 'text-cyan-500';
+  if (t === 'swim' || t === 'swimming') return 'text-blue-500';
   if (t === 'strength' || t === 'weight' || t === 'weights') return 'text-orange-500';
   if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') return 'text-purple-500';
   return 'text-white';
