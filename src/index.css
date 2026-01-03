@@ -32,7 +32,7 @@
     /* Deterministic layout variables (universal for PWA + browser) */
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
-    --todays-h: 17rem; /* extended for more workout cards */
+    --todays-h: 14rem; /* balanced height */
     --cal-cell-h: 150px; /* original size */
     /* Analytics tokens (mobile, minimal) */
     --series-pace: #3b82f6;
@@ -259,21 +259,21 @@
   /* Responsive height tuning so everything fits without manual tweaks */
   @media (max-height: 740px) {
     :root {
-      --todays-h: 12rem;
+      --todays-h: 10rem;
       --cal-cell-h: 10.25rem;
     }
   }
 
   @media (max-height: 670px) {
     :root {
-      --todays-h: 10rem;
+      --todays-h: 8rem;
       --cal-cell-h: 9.75rem;
     }
   }
 
   @media (min-height: 900px) {
     :root {
-      --todays-h: 20rem;
+      --todays-h: 16rem;
       --cal-cell-h: 12rem;
     }
   }
@@ -312,9 +312,9 @@
 /* Make PWA and browser blocks match the universal values to avoid divergence */
 @media (display-mode: standalone) {
   .mobile-tabbar { padding-top: 8px; padding-bottom: env(safe-area-inset-bottom); height: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); }
-  :root { --todays-h: 17rem; --cal-cell-h: 150px; }
+  :root { --todays-h: 14rem; --cal-cell-h: 150px; }
 }
 
 @media not all and (display-mode: standalone) {
-  :root { --todays-h: 17rem; --cal-cell-h: 150px; }
+  :root { --todays-h: 14rem; --cal-cell-h: 150px; }
 }
