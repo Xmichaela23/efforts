@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
-import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
+import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle, Info } from 'lucide-react';
@@ -686,7 +686,9 @@ export default function WorkoutCalendar({
                     // Check actual workout_status from _src
                     const workoutStatus = String((evt?._src?.workout_status || '')).toLowerCase();
                     const isCompleted = workoutStatus === 'completed';
-                    const isPlanned = workoutStatus === 'planned';
+                    const workoutType = String(evt?._src?.type || evt?._src?.workout_type || '').toLowerCase();
+                    const disciplineColors = getDisciplinePillClasses(workoutType, isCompleted);
+                    
                     return (
                       <span
                         key={`${key}-${i}`}
@@ -694,11 +696,7 @@ export default function WorkoutCalendar({
                         tabIndex={0}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`cursor-pointer text-xs px-2 py-1 rounded-xl w-full text-center truncate border transition-all backdrop-blur-sm font-light tracking-wide ${
-                          isCompleted 
-                            ? 'bg-cyan-600/20 backdrop-blur-sm border border-cyan-500/40 text-white hover:bg-cyan-600/25 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(6,182,212,0.15)_inset,0_2px_8px_rgba(0,0,0,0.2)]'
-                            : 'bg-white/[0.08] backdrop-blur-sm border border-white/25 text-gray-300 hover:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'
-                        }`}
+                        className={`cursor-pointer text-xs px-2 py-1 rounded-xl w-full text-center truncate transition-all backdrop-blur-sm font-light tracking-wide ${disciplineColors}`}
                       >
                         {(() => {
                           const label = String(evt.label || '');
@@ -708,7 +706,7 @@ export default function WorkoutCalendar({
                             return (
                               <>
                                 {labelText}
-                                <span className="text-cyan-600"> ✓</span>
+                                <span className={getDisciplineCheckmarkColor(workoutType)}> ✓</span>
                               </>
                             );
                           }

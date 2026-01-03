@@ -56,17 +56,55 @@ export function getDisciplineBorder(type: string): string {
   return disciplineBorder[key] || '#D1D5DB'; // gray-300 fallback
 }
 
-// Get Tailwind classes for discipline-colored pills
+// Get Tailwind classes for discipline-colored pills (dark theme glassmorphism)
 export function getDisciplinePillClasses(type: string, isCompleted: boolean = false): string {
-  const key = (type || '').toLowerCase();
+  const t = (type || '').toLowerCase();
   
-  // Completed workouts: gradient fade from green to gray
-  if (isCompleted) {
-    return 'bg-gradient-to-r from-green-100 to-gray-50 border border-gray-200 text-gray-600 hover:from-green-200 hover:to-gray-100';
+  // Run: fuchsia
+  if (t === 'run' || t === 'running') {
+    return isCompleted
+      ? 'bg-fuchsia-600/60 border-fuchsia-400/30 text-white hover:bg-fuchsia-600/70'
+      : 'bg-transparent border-2 border-fuchsia-400/50 text-fuchsia-300 hover:bg-fuchsia-400/10';
   }
-  
-  // Minimal: neutral pills (dot will be added separately in component)
-  return 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100';
+  // Ride/Cycling: green
+  if (t === 'ride' || t === 'cycling' || t === 'bike') {
+    return isCompleted
+      ? 'bg-green-600/60 border-green-400/30 text-white hover:bg-green-600/70'
+      : 'bg-transparent border-2 border-green-400/50 text-green-300 hover:bg-green-400/10';
+  }
+  // Swim: sky blue
+  if (t === 'swim' || t === 'swimming') {
+    return isCompleted
+      ? 'bg-sky-600/60 border-sky-400/30 text-white hover:bg-sky-600/70'
+      : 'bg-transparent border-2 border-sky-400/50 text-sky-300 hover:bg-sky-400/10';
+  }
+  // Strength: orange
+  if (t === 'strength' || t === 'weight' || t === 'weights') {
+    return isCompleted
+      ? 'bg-orange-600/60 border-orange-400/30 text-white hover:bg-orange-600/70'
+      : 'bg-transparent border-2 border-orange-400/50 text-orange-300 hover:bg-orange-400/10';
+  }
+  // Mobility/Pilates/Yoga: indigo
+  if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') {
+    return isCompleted
+      ? 'bg-indigo-600/60 border-indigo-400/30 text-white hover:bg-indigo-600/70'
+      : 'bg-transparent border-2 border-indigo-400/50 text-indigo-300 hover:bg-indigo-400/10';
+  }
+  // Default fallback: neutral
+  return isCompleted
+    ? 'bg-zinc-600/60 border-zinc-400/30 text-white hover:bg-zinc-600/70'
+    : 'bg-transparent border-2 border-white/30 text-white/70 hover:bg-white/10';
+}
+
+// Get checkmark color based on discipline
+export function getDisciplineCheckmarkColor(type: string): string {
+  const t = (type || '').toLowerCase();
+  if (t === 'run' || t === 'running') return 'text-fuchsia-400';
+  if (t === 'ride' || t === 'cycling' || t === 'bike') return 'text-green-400';
+  if (t === 'swim' || t === 'swimming') return 'text-sky-400';
+  if (t === 'strength' || t === 'weight' || t === 'weights') return 'text-orange-400';
+  if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') return 'text-indigo-400';
+  return 'text-white';
 }
 
 // Time and pace formatting utilities

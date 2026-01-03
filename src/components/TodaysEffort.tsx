@@ -4,7 +4,7 @@ import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity } from 'lucide-react';
-import { getDisciplineColor } from '@/lib/utils';
+import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
@@ -898,11 +898,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               {displayWorkouts.map((workout) => (
                 <div
                   key={workout.id}
-                  className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg ${
-                    workout.workout_status === 'completed'
-                      ? 'bg-cyan-600/20 backdrop-blur-sm border border-cyan-500/40 text-white shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]'
-                      : 'bg-white/[0.05] backdrop-blur-lg border border-white/25 text-gray-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]'
-                  }`}
+                  className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg border ${getDisciplinePillClasses(workout.type || workout.workout_type || '', workout.workout_status === 'completed')}`}
                 >
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
                   {workout.workout_status === 'planned' ? (
@@ -1085,7 +1081,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             <span className="text-xs ml-2 text-muted-foreground">(planned)</span>
                           )}
                           {workout.workout_status === 'completed' && (
-                            <span className="ml-2 text-cyan-600">✓</span>
+                            <span className={`ml-2 ${getDisciplineCheckmarkColor(workout.type || workout.workout_type || '')}`}>✓</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs">
