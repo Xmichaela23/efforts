@@ -630,7 +630,36 @@ export default function WorkoutCalendar({
         }
       }}
     >
-      {/* Week header is now in TodaysEffort for blur effect */}
+      {/* Week header - fixed position above calendar */}
+      <div 
+        className="flex items-center justify-between py-2 px-2 mb-1 rounded-xl border border-white/20"
+        style={{
+          background: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)'
+        }}
+      >
+        <button
+          aria-label="Previous week"
+          className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
+          onClick={() => handlePrevWeek(addDays(weekStart, -1))}
+        >
+          ‹
+        </button>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-light tracking-normal text-white">Week of {rangeLabel}</h2>
+          {loadingDebounced && (
+            <span role="status" aria-live="polite" className="text-[11px] text-white/50">Loading…</span>
+          )}
+        </div>
+        <button
+          aria-label="Next week"
+          className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
+          onClick={() => handleNextWeek(addDays(weekEnd, 1))}
+        >
+          ›
+        </button>
+      </div>
 
       {/* 3-column week grid filling remaining height with min cell size */}
       <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full flex-1 relative" style={{ rowGap: 0, columnGap: 0, alignContent: 'stretch', alignItems: 'stretch' }}>

@@ -1123,46 +1123,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         )}
         </div>
-        
-        {/* Sticky Week Of header at bottom - workout cards scroll behind with blur */}
-        <div 
-          className="sticky bottom-0 z-20 flex items-center justify-between py-2 px-2 mx-1 mt-2 rounded-xl border border-white/20"
-          style={{
-            background: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)'
-          }}
-        >
-          <button
-            aria-label="Previous week"
-            className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
-            onClick={() => {
-              const newDate = new Date(activeDate + 'T12:00:00');
-              newDate.setDate(newDate.getDate() - 7);
-              // Dispatch event for parent to handle
-              window.dispatchEvent(new CustomEvent('week:navigate', { detail: { date: newDate.toLocaleDateString('en-CA') } }));
-            }}
-          >
-            ‹
-          </button>
-          <span className="text-sm font-light tracking-normal text-white">
-            Week of {(() => {
-              const monthFmt = new Intl.DateTimeFormat('en-US', { month: 'short' });
-              return `${monthFmt.format(weekStart)} ${weekStart.getDate()} – ${monthFmt.format(weekEnd)} ${weekEnd.getDate()}`;
-            })()}
-          </span>
-          <button
-            aria-label="Next week"
-            className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
-            onClick={() => {
-              const newDate = new Date(activeDate + 'T12:00:00');
-              newDate.setDate(newDate.getDate() + 7);
-              window.dispatchEvent(new CustomEvent('week:navigate', { detail: { date: newDate.toLocaleDateString('en-CA') } }));
-            }}
-          >
-            ›
-          </button>
-        </div>
       </div>
     </div>
   );
