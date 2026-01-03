@@ -631,7 +631,14 @@ export default function WorkoutCalendar({
       }}
     >
       {/* Header with week range and navigation - sticky with blur */}
-      <div className="flex items-center justify-between mb-0 sticky top-0 z-10 py-3 -mx-2 px-2 bg-zinc-900/70 backdrop-blur-2xl border-b border-white/15">
+      <div 
+        className="flex items-center justify-between mb-0 sticky top-0 z-10 py-3 -mx-2 px-2 border-b border-white/15"
+        style={{ 
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)'
+        }}
+      >
         <button
           aria-label="Previous week"
           className="px-3 py-2 min-w-10 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
