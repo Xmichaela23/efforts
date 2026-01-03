@@ -630,37 +630,6 @@ export default function WorkoutCalendar({
         }
       }}
     >
-      {/* Week header - fixed position above calendar */}
-      <div 
-        className="flex items-center justify-between py-1.5 px-2 mb-1 rounded-lg border border-white/20"
-        style={{
-          background: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)'
-        }}
-      >
-        <button
-          aria-label="Previous week"
-          className="px-2 py-1 min-w-8 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
-          onClick={() => handlePrevWeek(addDays(weekStart, -1))}
-        >
-          ‹
-        </button>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-light tracking-normal text-white">Week of {rangeLabel}</span>
-          {loadingDebounced && (
-            <span role="status" aria-live="polite" className="text-[10px] text-white/50">Loading…</span>
-          )}
-        </div>
-        <button
-          aria-label="Next week"
-          className="px-2 py-1 min-w-8 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
-          onClick={() => handleNextWeek(addDays(weekEnd, 1))}
-        >
-          ›
-        </button>
-      </div>
-
       {/* 3-column week grid filling remaining height with min cell size */}
       <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full flex-1 relative" style={{ rowGap: 0, columnGap: 0, alignContent: 'stretch', alignItems: 'stretch' }}>
         {weekDays.map((d) => {

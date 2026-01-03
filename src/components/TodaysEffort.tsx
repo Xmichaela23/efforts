@@ -67,6 +67,30 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
 
+  // Format week range for "Week of" header
+  const formatWeekRange = (start: Date, end: Date) => {
+    const sameMonth = start.getMonth() === end.getMonth();
+    const sameYear = start.getFullYear() === end.getFullYear();
+    const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+    const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+    
+    if (sameMonth && sameYear) {
+      return `${startMonth} ${start.getDate()} – ${end.getDate()}`;
+    } else if (sameYear) {
+      return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}`;
+    } else {
+      return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}`;
+    }
+  };
+
+  const handleWeekNav = (direction: 'prev' | 'next') => {
+    const newDate = direction === 'prev' 
+      ? addDays(weekStart, -7) 
+      : addDays(weekEnd, 1);
+    // Dispatch event for AppLayout to update selectedDate
+    window.dispatchEvent(new CustomEvent('week:navigate', { detail: { date: toDateOnlyString(newDate) } }));
+  };
+
   // Unified lookup - use week range for training plan context, but filter items to active date
   const { items: allUnifiedItems = [], loading: unifiedLoading, trainingPlanContext } = useWeekUnified(fromISO, toISO);
   
@@ -1122,6 +1146,36 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </div>
           </div>
         )}
+        </div>
+        
+        {/* Week of header - sticky at bottom with glassmorphism */}
+        <div 
+          className="sticky bottom-0 left-0 right-0 flex items-center justify-between py-2 px-3 rounded-t-xl border border-white/20 border-b-0 mt-2"
+          style={{
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(24px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+            marginLeft: '-0.75rem',
+            marginRight: '-0.75rem',
+          }}
+        >
+          <button
+            aria-label="Previous week"
+            className="px-2 py-1 min-w-8 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
+            onClick={() => handleWeekNav('prev')}
+          >
+            ‹
+          </button>
+          <span className="text-sm font-light tracking-normal text-white">
+            Week of {formatWeekRange(weekStart, weekEnd)}
+          </span>
+          <button
+            aria-label="Next week"
+            className="px-2 py-1 min-w-8 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
+            onClick={() => handleWeekNav('next')}
+          >
+            ›
+          </button>
         </div>
       </div>
     </div>
