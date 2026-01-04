@@ -293,30 +293,28 @@ Deno.serve(async (req) => {
     console.log(`📊 Data sufficiency: ${trainingWorkouts.length} training workouts (need ${MIN_TRAINING_WORKOUTS}+) = ${hasEnoughData ? 'SUFFICIENT' : 'INSUFFICIENT'}`);
 
     // ==========================================================================
-    // EXTRACT PEAK PERFORMANCE FROM POWER CURVES
+    // CALCULATE DURATION-BASED BUCKET TRENDS
     // ==========================================================================
-    // This uses the computed.power_curve and computed.best_efforts fields
-    // that were calculated by compute-workout-analysis
+    // Compare performance within similar workout durations
+    // This is more accurate than peak efforts or filtering "casual vs training"
     
-    const peakPerformance = extractPeakPerformance(completedWorkouts, weeks_back);
-    console.log('📈 Peak performance extracted:', JSON.stringify(peakPerformance, null, 2));
-
-    let analysis: any;
-    
-    // ==========================================================================
-    // CHECK FOR DATA QUALITY ISSUES TO SURFACE IN UI
-    // ==========================================================================
     const bikeWorkouts = completedWorkouts.filter(w => 
       w.type === 'ride' || w.type === 'cycling' || w.type === 'bike'
     );
-    const bikesWithPowerCurve = bikeWorkouts.filter(w => w.computed?.power_curve);
-    const hasBikesButNoPowerCurve = bikeWorkouts.length > 0 && bikesWithPowerCurve.length === 0;
-    const bikePeakAvailable = peakPerformance && (peakPerformance.bike_20min || peakPerformance.bike_5min || peakPerformance.bike_1min);
+    const runWorkouts = completedWorkouts.filter(w => 
+      w.type === 'run' || w.type === 'running'
+    );
+    const strengthWorkouts = completedWorkouts.filter(w => w.type === 'strength');
     
-    console.log(`🚴 Bike data quality: ${bikeWorkouts.length} rides, ${bikesWithPowerCurve.length} with power curves, peak available: ${!!bikePeakAvailable}`);
+    const bikeTrends = calculateBucketTrends(bikeWorkouts, 'bike', weeks_back);
+    const runTrends = calculateBucketTrends(runWorkouts, 'run', weeks_back);
+    
+    console.log(`📊 Bucket trends: ${bikeTrends.length} bike buckets, ${runTrends.length} run buckets`);
+
+    let analysis: any;
 
     if (hasEnoughData) {
-      // Generate full GPT-4 analysis with peak performance data
+      // Generate full GPT-4 analysis with bucket trends
       analysis = await generateOverallAnalysis(
         weeklyAggregates, 
         trends, 
@@ -325,51 +323,40 @@ Deno.serve(async (req) => {
         missed,
         userBaselines,
         recoveryWeeks,
-        peakPerformance  // NEW: Pass peak performance data
+        { bikeTrends, runTrends }  // NEW: Pass bucket trends instead of peak performance
       );
       
       // ==========================================================================
       // DATA QUALITY FLAGS PER DISCIPLINE
       // ==========================================================================
-      const bikePeakComparable = bikePeakAvailable && 
-        ((peakPerformance.bike_20min?.current && peakPerformance.bike_20min?.previous) ||
-         (peakPerformance.bike_5min?.current && peakPerformance.bike_5min?.previous) ||
-         (peakPerformance.bike_1min?.current && peakPerformance.bike_1min?.previous));
+      // Based on whether we have enough data in duration buckets
       
-      // Run data quality
-      const runWorkouts = completedWorkouts.filter(w => w.type === 'run' || w.type === 'running');
-      const runsWithBestEfforts = runWorkouts.filter(w => w.computed?.best_efforts);
-      const runPeakComparable = peakPerformance && 
-        ((peakPerformance.run_5k?.current && peakPerformance.run_5k?.previous) ||
-         (peakPerformance.run_1mi?.current && peakPerformance.run_1mi?.previous));
-      
-      // Strength data quality
-      const strengthWorkouts = completedWorkouts.filter(w => w.type === 'strength');
-      const strengthHasLifts = trends.strength_lifts && Object.keys(trends.strength_lifts).length > 0;
-      const strengthHasProgression = strengthHasLifts && 
-        Object.values(trends.strength_lifts).some((weights: any) => 
-          Array.isArray(weights) && weights.length > 1
-        );
+      const strengthHasBaselines = userBaselines && (
+        userBaselines.bench > 0 || 
+        userBaselines.squat > 0 || 
+        userBaselines.deadlift > 0 ||
+        userBaselines.overheadPress1RM > 0
+      );
       
       analysis.data_quality = {
-        // Bike
+        // Bike - show note if rides exist but no bucket trends
         bike_count: bikeWorkouts.length,
-        bike_power_curves_count: bikesWithPowerCurve.length,
-        bike_peak_comparable: !!bikePeakComparable,
-        show_bike_note: bikeWorkouts.length > 0 && !bikePeakComparable,
+        bike_trends_count: bikeTrends.length,
+        show_bike_note: bikeWorkouts.length > 0 && bikeTrends.length === 0,
         
-        // Run
+        // Run - show note if runs exist but no bucket trends  
         run_count: runWorkouts.length,
-        run_best_efforts_count: runsWithBestEfforts.length,
-        run_peak_comparable: !!runPeakComparable,
-        show_run_note: runWorkouts.length > 0 && !runPeakComparable,
+        run_trends_count: runTrends.length,
+        show_run_note: runWorkouts.length > 0 && runTrends.length === 0,
         
-        // Strength
+        // Strength - show note if workouts exist but no baselines set
         strength_count: strengthWorkouts.length,
-        strength_has_lifts: strengthHasLifts,
-        strength_has_progression: strengthHasProgression,
-        show_strength_note: strengthWorkouts.length > 0 && !strengthHasProgression
+        strength_has_baselines: !!strengthHasBaselines,
+        show_strength_note: strengthWorkouts.length > 0 && !strengthHasBaselines
       };
+      
+      // Also attach the raw trends for potential UI use
+      analysis.bucket_trends = { bike: bikeTrends, run: runTrends };
       
       console.log('📊 Data quality:', JSON.stringify(analysis.data_quality, null, 2));
     } else {
@@ -1244,10 +1231,24 @@ function generatePerformanceSummary(weeks: any[], trends: any, peakPerformance?:
     }
     
     // Run: Best 5K pace - ONLY if we have data in BOTH periods
+    // Add sample size so GPT knows the quality of comparison
     if (peakPerformance.run_5k) {
-      const { current, previous } = peakPerformance.run_5k;
+      const { current, previous, current_count, previous_count } = peakPerformance.run_5k;
+      const countNote = current_count && previous_count 
+        ? ` (from ${previous_count} runs → ${current_count} runs)` 
+        : '';
       if (current && previous) {
-        lines.push(`🏃 RUN: Peak 5K pace ${previous} → ${current}`);
+        // Check if this is a meaningful comparison (large pace difference might just be different effort types)
+        const currentSecs = peakPerformance.run_5k.current_raw;
+        const previousSecs = peakPerformance.run_5k.previous_raw;
+        const pctDiff = Math.abs(currentSecs - previousSecs) / previousSecs * 100;
+        
+        if (pctDiff > 15) {
+          // >15% difference likely means comparing easy vs hard runs, not fitness change
+          lines.push(`🏃 RUN: Peak 5K pace ${previous} → ${current}${countNote}. NOTE: Large variance suggests different effort types, not fitness change.`);
+        } else {
+          lines.push(`🏃 RUN: Peak 5K pace ${previous} → ${current}${countNote}`);
+        }
       } else if (current) {
         lines.push(`🏃 RUN: Peak 5K pace ${current}. Need 2+ months of data for trend comparison.`);
       }
@@ -1429,10 +1430,12 @@ function extractPeakPerformance(workouts: any[], weeksBack: number): any {
       current: currentBest ? formatPace(currentBest) : null,
       previous: previousBest ? formatPace(previousBest) : null,
       current_raw: currentBest,
-      previous_raw: previousBest
+      previous_raw: previousBest,
+      current_count: current5Ks.length,
+      previous_count: previous5Ks.length
     };
     
-    console.log(`🏃 Peak 5K pace: current=${peakData.run_5k.current}, previous=${peakData.run_5k.previous}`);
+    console.log(`🏃 Peak 5K pace: current=${peakData.run_5k.current} (${current5Ks.length} runs), previous=${peakData.run_5k.previous} (${previous5Ks.length} runs)`);
   }
   
   // Best 1mi
@@ -1480,6 +1483,221 @@ function formatMissedByDiscipline(missed: any[]): string {
     .join(', ') || 'none';
 }
 
+// =============================================================================
+// DURATION-BASED PERFORMANCE COMPARISON
+// =============================================================================
+// Compare performance within similar workout durations instead of trying to 
+// filter "training vs casual" or calculate power curves.
+
+const DURATION_BUCKETS: Record<string, Record<string, { min: number; max: number; label: string }>> = {
+  bike: {
+    'short': { min: 1800, max: 2700, label: '30-45min' },
+    'medium': { min: 2700, max: 4500, label: '45-75min' },
+    'long': { min: 5400, max: 7200, label: '90-120min' },
+    'very_long': { min: 7200, max: Infinity, label: '120min+' }
+  },
+  run: {
+    'short': { min: 1200, max: 2100, label: '20-35min' },
+    'medium': { min: 2100, max: 3600, label: '35-60min' },
+    'long': { min: 3600, max: 5400, label: '60-90min' },
+    'very_long': { min: 5400, max: Infinity, label: '90min+' }
+  }
+};
+
+interface BucketTrend {
+  bucket: string;
+  label: string;
+  current: number;
+  previous: number;
+  change: string;
+  current_count: number;
+  previous_count: number;
+  metric_label: string;
+}
+
+/**
+ * Calculate performance trends within duration buckets
+ * Compares best performance in similar-duration workouts between periods
+ */
+function calculateBucketTrends(
+  workouts: any[], 
+  sport: 'bike' | 'run',
+  weeksBack: number
+): BucketTrend[] {
+  const now = new Date();
+  const midpoint = new Date(now);
+  midpoint.setDate(midpoint.getDate() - (weeksBack * 7) / 2);
+  const periodStart = new Date(now);
+  periodStart.setDate(periodStart.getDate() - (weeksBack * 7));
+  
+  // Split into current and previous periods
+  const currentPeriod = workouts.filter(w => new Date(w.date) >= midpoint);
+  const previousPeriod = workouts.filter(w => 
+    new Date(w.date) >= periodStart && new Date(w.date) < midpoint
+  );
+  
+  const buckets = DURATION_BUCKETS[sport];
+  const trends: BucketTrend[] = [];
+  
+  for (const [bucketKey, range] of Object.entries(buckets)) {
+    // Filter workouts in this duration bucket
+    const currentBucket = currentPeriod.filter(w => {
+      const duration = w.duration || w.moving_time || 0;
+      return duration >= range.min && duration < range.max;
+    });
+    const previousBucket = previousPeriod.filter(w => {
+      const duration = w.duration || w.moving_time || 0;
+      return duration >= range.min && duration < range.max;
+    });
+    
+    // Need at least 2 workouts in each period for comparison (relaxed from 3)
+    if (currentBucket.length < 2 || previousBucket.length < 2) continue;
+    
+    let currentBest: number;
+    let previousBest: number;
+    let metricLabel: string;
+    
+    if (sport === 'bike') {
+      // For bikes: use normalized_power or avg_power
+      currentBest = Math.max(...currentBucket.map(w => 
+        w.normalized_power || w.avg_power || 0
+      ));
+      previousBest = Math.max(...previousBucket.map(w => 
+        w.normalized_power || w.avg_power || 0
+      ));
+      metricLabel = 'W';
+    } else {
+      // For runs: use avg_pace (lower is better, so use Math.min)
+      // But we want to show improvement as positive, so we'll handle this in display
+      const currentPaces = currentBucket
+        .map(w => w.avg_pace_s || parsePaceToSeconds(w.avg_pace))
+        .filter(p => p && p > 0);
+      const previousPaces = previousBucket
+        .map(w => w.avg_pace_s || parsePaceToSeconds(w.avg_pace))
+        .filter(p => p && p > 0);
+      
+      if (currentPaces.length === 0 || previousPaces.length === 0) continue;
+      
+      // Best pace = fastest = lowest seconds
+      currentBest = Math.min(...currentPaces);
+      previousBest = Math.min(...previousPaces);
+      metricLabel = '/mi';
+    }
+    
+    // Skip if no valid data
+    if (!currentBest || !previousBest || currentBest <= 0 || previousBest <= 0) continue;
+    
+    // Calculate change
+    let changePercent: number;
+    if (sport === 'run') {
+      // For pace: negative change = improvement (faster)
+      changePercent = ((previousBest - currentBest) / previousBest) * 100;
+    } else {
+      // For power: positive change = improvement (higher)
+      changePercent = ((currentBest - previousBest) / previousBest) * 100;
+    }
+    
+    trends.push({
+      bucket: bucketKey,
+      label: range.label,
+      current: Math.round(currentBest),
+      previous: Math.round(previousBest),
+      change: changePercent > 0 ? `+${changePercent.toFixed(1)}%` : `${changePercent.toFixed(1)}%`,
+      current_count: currentBucket.length,
+      previous_count: previousBucket.length,
+      metric_label: metricLabel
+    });
+  }
+  
+  console.log(`📊 ${sport} bucket trends:`, JSON.stringify(trends, null, 2));
+  return trends;
+}
+
+/**
+ * Parse pace string to seconds (e.g., "8:30/mi" -> 510)
+ */
+function parsePaceToSeconds(pace: string | number | null): number | null {
+  if (!pace) return null;
+  if (typeof pace === 'number') return pace;
+  
+  // Remove "/mi" or "/km" suffix
+  const cleanPace = pace.replace(/\/mi|\/km/gi, '').trim();
+  const parts = cleanPace.split(':');
+  
+  if (parts.length === 2) {
+    const mins = parseInt(parts[0], 10);
+    const secs = parseInt(parts[1], 10);
+    if (!isNaN(mins) && !isNaN(secs)) {
+      return mins * 60 + secs;
+    }
+  }
+  return null;
+}
+
+/**
+ * Format bucket trends for GPT prompt
+ */
+function formatBucketTrendsForPrompt(
+  bikeTrends: BucketTrend[],
+  runTrends: BucketTrend[],
+  userBaselines: any
+): string {
+  const lines: string[] = [];
+  
+  // Bike trends
+  if (bikeTrends.length > 0) {
+    lines.push('🚴 BIKE TRENDS (by duration):');
+    bikeTrends.forEach(t => {
+      lines.push(`  ${t.label}: ${t.previous}W → ${t.current}W (${t.change}) [${t.previous_count} → ${t.current_count} rides]`);
+    });
+  } else {
+    lines.push('🚴 BIKE: Insufficient comparable rides. Need 2+ rides of similar duration in each 2-week period.');
+  }
+  
+  lines.push('');
+  
+  // Run trends  
+  if (runTrends.length > 0) {
+    lines.push('🏃 RUN TRENDS (by duration):');
+    runTrends.forEach(t => {
+      const prevPace = formatPace(t.previous);
+      const currPace = formatPace(t.current);
+      lines.push(`  ${t.label}: ${prevPace} → ${currPace} (${t.change}) [${t.previous_count} → ${t.current_count} runs]`);
+    });
+  } else {
+    lines.push('🏃 RUN: Insufficient comparable runs. Need 2+ runs of similar duration in each 2-week period.');
+  }
+  
+  lines.push('');
+  
+  // Strength (use baselines, not working weights)
+  const strengthBaselineMap: Record<string, string> = {
+    'bench': 'Bench Press',
+    'squat': 'Back Squat', 
+    'deadlift': 'Deadlift',
+    'overheadPress1RM': 'Overhead Press'
+  };
+  
+  const strengthBaselines: string[] = [];
+  if (userBaselines) {
+    Object.entries(strengthBaselineMap).forEach(([key, name]) => {
+      const val = userBaselines[key];
+      if (val && val > 0) {
+        strengthBaselines.push(`${name}: ${val}lb 1RM`);
+      }
+    });
+  }
+  
+  if (strengthBaselines.length > 0) {
+    lines.push('💪 STRENGTH BASELINES: ' + strengthBaselines.join(', '));
+    lines.push('   (Retest 1RMs to track progression. Working weights from plans are not shown.)');
+  } else {
+    lines.push('💪 STRENGTH: No 1RM baselines set. Add baselines in settings to track progression.');
+  }
+  
+  return lines.join('\n');
+}
+
 /**
  * Generate overall analysis using GPT-4
  */
@@ -1491,7 +1709,7 @@ async function generateOverallAnalysis(
   missed: any[],
   userBaselines: any,
   recoveryWeeks: Set<number>,
-  peakPerformance?: any  // NEW: Peak performance from power curves
+  bucketTrends?: { bikeTrends: BucketTrend[], runTrends: BucketTrend[] }  // NEW: Duration bucket trends
 ) {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
@@ -1513,8 +1731,10 @@ async function generateOverallAnalysis(
       return missedDate >= weekStart && missedDate <= weekEnd;
     });
 
-    // Generate baseline insights
-    const baselineInsights = generateBaselineInsights(trends, userBaselines);
+    // Format bucket trends for prompt
+    const bikeTrends = bucketTrends?.bikeTrends || [];
+    const runTrends = bucketTrends?.runTrends || [];
+    const performanceData = formatBucketTrendsForPrompt(bikeTrends, runTrends, userBaselines);
 
     const prompt = `Analyze ${weeklyAggregates.length} weeks of training.
 
@@ -1531,10 +1751,8 @@ ${generateDisciplineBreakdown(weeklyAggregates)}
 Most recent week: ${mostRecentWeek.completed_count}/${mostRecentWeek.planned_count} completed
 Missed in recent week: ${formatMissedByDiscipline(recentWeekMissed)}
 
-PERFORMANCE DATA (chronological order, week 1 = OLDEST, week ${weeklyAggregates.length} = NEWEST):
-${generatePerformanceSummary(weeklyAggregates, trends, peakPerformance, userBaselines)}
-
-${baselineInsights.length > 0 ? `\nSTRENGTH BASELINE ALERTS:\n${baselineInsights.join('\n')}` : ''}
+PERFORMANCE DATA (duration-based comparison, comparing similar-length workouts):
+${performanceData}
 
 IMPORTANT: Performance trends exclude recovery/deload weeks. Compare loading weeks only.
 Week ${weeklyAggregates.length} ${recoveryWeeks.has(weeklyAggregates.length - 1) ? 'was a planned recovery week with intentionally reduced loads' : 'was a loading week'}.
@@ -1542,16 +1760,15 @@ Week ${weeklyAggregates.length} ${recoveryWeeks.has(weeklyAggregates.length - 1)
 Generate analysis with these DISTINCT sections. Only report on disciplines the athlete actually trains:
 
 1. Performance Trends (4-week progression):
-   - PRIORITIZE PEAK data (lines starting with 🚴 PEAK or 🏃 PEAK) - these are best efforts, not averages
-   - If PEAK data exists, report those numbers first (e.g., "Best 20min power: 132W, stable vs previous month")
-   - Weekly averages are for context only, not the main story
+   - Report on BIKE TRENDS and RUN TRENDS if provided (by duration bucket)
+   - Format: "Medium rides (45-75min): 185W → 192W (+4%)"
+   - If "Insufficient comparable" appears, say so honestly - don't make up trends
+   - For strength: mention baselines if set, or suggest setting them
    - Report ONLY on disciplines with data
-   - For strength: mention lift progression if meaningful change occurred
-   - If no previous period data, say "establishing baseline" not "improved"
    - DO NOT mention current week specifics
    - 2-3 sentences maximum
 
-   Example: "Best 20min power: 235W (+5W vs previous month). Best 5K pace: 7:45/mi (stable). Deadlift: 225lb → 235lb."
+   Example: "Medium runs (35-60min): 8:45/mi → 8:32/mi (+2%). Bike trends unavailable - need more comparable rides. Strength baselines: Deadlift 225lb, Bench 185lb."
 
 2. Plan Adherence (overall pattern):
    - Overall completion rate for all ${weeklyAggregates.length} weeks
@@ -1573,13 +1790,12 @@ Generate analysis with these DISTINCT sections. Only report on disciplines the a
 
 CRITICAL RULES:
 - Each section serves different purpose - NO overlap
-- Performance Trends = progression over time
+- Performance Trends = progression over time (duration-based comparison)
 - Plan Adherence = completion patterns
 - This Week = what happened this week
-- Only report on disciplines with actual data
+- Only report on disciplines with actual comparable data
 - Exclude mobility from analysis
-- Use athlete's actual disciplines, don't assume triathlon
-- Treat strength lifts like any other performance metric
+- Be honest about insufficient data - don't fabricate trends
 
 Return ONLY valid JSON:
 {
