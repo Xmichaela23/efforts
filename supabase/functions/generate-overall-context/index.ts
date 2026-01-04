@@ -303,6 +303,18 @@ Deno.serve(async (req) => {
 
     let analysis: any;
     
+    // ==========================================================================
+    // CHECK FOR DATA QUALITY ISSUES TO SURFACE IN UI
+    // ==========================================================================
+    const bikeWorkouts = completedWorkouts.filter(w => 
+      w.type === 'ride' || w.type === 'cycling' || w.type === 'bike'
+    );
+    const bikesWithPowerCurve = bikeWorkouts.filter(w => w.computed?.power_curve);
+    const hasBikesButNoPowerCurve = bikeWorkouts.length > 0 && bikesWithPowerCurve.length === 0;
+    const bikePeakAvailable = peakPerformance && (peakPerformance.bike_20min || peakPerformance.bike_5min || peakPerformance.bike_1min);
+    
+    console.log(`🚴 Bike data quality: ${bikeWorkouts.length} rides, ${bikesWithPowerCurve.length} with power curves, peak available: ${!!bikePeakAvailable}`);
+
     if (hasEnoughData) {
       // Generate full GPT-4 analysis with peak performance data
       analysis = await generateOverallAnalysis(
@@ -315,6 +327,14 @@ Deno.serve(async (req) => {
         recoveryWeeks,
         peakPerformance  // NEW: Pass peak performance data
       );
+      
+      // Add data quality flags for UI
+      analysis.data_quality = {
+        has_bikes_without_power_curves: hasBikesButNoPowerCurve,
+        bike_rides_count: bikeWorkouts.length,
+        bike_power_curves_count: bikesWithPowerCurve.length,
+        bike_peak_available: !!bikePeakAvailable
+      };
     } else {
       // Return limited analysis without performance trends
       const totalPlanned = weeklyAggregates.reduce((sum, week) => sum + week.planned_count, 0);

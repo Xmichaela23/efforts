@@ -12,7 +12,7 @@
  */
 
 import React, { useState } from 'react';
-import { RefreshCw, TrendingUp, CheckCircle, Calendar, Loader2 } from 'lucide-react';
+import { RefreshCw, TrendingUp, CheckCircle, Calendar, Loader2, Bike, AlertCircle } from 'lucide-react';
 import { useOverallContext } from '@/hooks/useOverallContext';
 
 interface BlockSummaryTabProps {}
@@ -108,6 +108,20 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
           <p className="text-sm text-white/80 leading-relaxed whitespace-pre-line">
             {data.performance_trends}
           </p>
+          
+          {/* Bike power data quality note */}
+          {data.data_quality?.has_bikes_without_power_curves && !data.data_quality?.bike_peak_available && (
+            <div className="mt-3 pt-3 border-t border-white/10">
+              <div className="flex items-start gap-2 text-amber-400/80">
+                <Bike className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <p className="text-xs">
+                  <span className="font-medium">Bike power trends unavailable.</span>{' '}
+                  You have {data.data_quality.bike_rides_count} ride{data.data_quality.bike_rides_count !== 1 ? 's' : ''} but no power curve data. 
+                  Complete 30min+ structured rides with a power meter to track cycling fitness.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       ) : data.insufficient_data ? (
         <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
