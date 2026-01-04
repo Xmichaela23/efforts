@@ -456,6 +456,9 @@ Deno.serve(async (req)=>{
       'workout_status',
       'planned_id',
       'computed',
+      // workload data (single source of truth from calculate-workload)
+      'workload_actual',
+      'intensity_factor',
       // fallbacks to enrich executed.overall
       'distance',
       'avg_heart_rate',
@@ -494,7 +497,7 @@ Deno.serve(async (req)=>{
     let plannedRows = null;
     let pErr = null;
     try {
-      const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+      const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,workload_planned,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
         ascending: true
       }).order('created_at', {
         ascending: true
@@ -813,7 +816,10 @@ Deno.serve(async (req)=>{
         status,
         planned,
         executed,
-        planned_id: w.planned_id || null
+        planned_id: w.planned_id || null,
+        // Workload data from database (single source of truth)
+        workload_actual: w.workload_actual ?? null,
+        intensity_factor: w.intensity_factor ?? null
       };
     };
     const items = workouts.map(unify);
@@ -938,7 +944,11 @@ Deno.serve(async (req)=>{
           type: String(p.type).toLowerCase(),
           status: 'planned',
           planned,
-          executed: null
+          executed: null,
+          // Workload data from database (single source of truth)
+          workload_planned: p.workload_planned ?? null,
+          workload_actual: null,
+          intensity_factor: null
         };
         items.push(it);
         byKey.set(key, it);
@@ -1001,7 +1011,11 @@ Deno.serve(async (req)=>{
           type: String(p.type).toLowerCase(),
           status: 'planned',
           planned,
-          executed: null
+          executed: null,
+          // Workload data from database (single source of truth)
+          workload_planned: p.workload_planned ?? null,
+          workload_actual: null,
+          intensity_factor: null
         };
         items.push(it);
       // Don't update byKey - keep the completed workout as the primary item for this date+type
@@ -1092,38 +1106,53 @@ Deno.serve(async (req)=>{
         console.error('Failed to fetch training plan context:', error);
       }
     }
-    // Calculate workload totals INLINE from unified items (self-healing)
-    // This calculates workload on-the-fly for every item, ensuring it's always correct
+    // Calculate workload totals from database values (single source of truth)
+    // Falls back to on-the-fly calculation only if DB value is null (self-healing)
     let workloadPlanned = 0;
     let workloadCompleted = 0;
     const workloadBackfillUpdates = []; // Track items needing database backfill
     
     try {
       for (const item of itemsWithAI) {
-        const calculatedWorkload = calculateWorkloadForItem(item);
         const status = String(item?.status || '').toLowerCase();
         const isCompleted = status === 'completed';
         const isPlanned = status === 'planned';
         
         if (isCompleted) {
-          workloadCompleted += calculatedWorkload;
-          // Queue backfill if missing from database
-          if (item?.id && calculatedWorkload > 0) {
-            workloadBackfillUpdates.push({ 
-              table: 'workouts', 
-              id: item.id, 
-              workload_actual: calculatedWorkload 
-            });
+          // PRIORITY 1: Use database value (calculated by calculate-workload edge function)
+          const dbWorkload = item?.workload_actual;
+          if (typeof dbWorkload === 'number' && dbWorkload > 0) {
+            workloadCompleted += dbWorkload;
+          } else {
+            // PRIORITY 2: Calculate on-the-fly if DB value missing (self-healing)
+            const calculatedWorkload = calculateWorkloadForItem(item);
+            workloadCompleted += calculatedWorkload;
+            // Queue backfill to DB
+            if (item?.id && calculatedWorkload > 0) {
+              workloadBackfillUpdates.push({ 
+                table: 'workouts', 
+                id: item.id, 
+                workload_actual: calculatedWorkload 
+              });
+            }
           }
         } else if (isPlanned) {
-          workloadPlanned += calculatedWorkload;
-          // Queue backfill for planned workouts
-          if (item?.planned?.id && calculatedWorkload > 0) {
-            workloadBackfillUpdates.push({ 
-              table: 'planned_workouts', 
-              id: item.planned.id, 
-              workload_planned: calculatedWorkload 
-            });
+          // PRIORITY 1: Use database value
+          const dbWorkload = item?.workload_planned;
+          if (typeof dbWorkload === 'number' && dbWorkload > 0) {
+            workloadPlanned += dbWorkload;
+          } else {
+            // PRIORITY 2: Calculate on-the-fly if DB value missing (self-healing)
+            const calculatedWorkload = calculateWorkloadForItem(item);
+            workloadPlanned += calculatedWorkload;
+            // Queue backfill for planned workouts
+            if (item?.planned?.id && calculatedWorkload > 0) {
+              workloadBackfillUpdates.push({ 
+                table: 'planned_workouts', 
+                id: item.planned.id, 
+                workload_planned: calculatedWorkload 
+              });
+            }
           }
         }
       }
@@ -1152,7 +1181,7 @@ Deno.serve(async (req)=>{
         })();
       }
       
-      console.log(`[get-week] Calculated workload: planned=${workloadPlanned}, completed=${workloadCompleted} from ${itemsWithAI.length} items`);
+      console.log(`[get-week] Workload totals: planned=${workloadPlanned}, completed=${workloadCompleted} (${workloadBackfillUpdates.length} backfills queued)`);
     } catch (error) {
       console.error('Failed to calculate workload totals:', error);
       // Fallback: try database query as last resort
