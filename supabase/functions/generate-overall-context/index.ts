@@ -1617,11 +1617,18 @@ function calculateBucketTrends(
     } else {
       // For runs: use computed.overall.avg_pace_s_per_mi (seconds per mile)
       // Lower is better (faster), so use Math.min
+      // NOTE: computed may be a JSON string, need to parse it
       const currentPaces = currentBucket
-        .map(w => w.computed?.overall?.avg_pace_s_per_mi)
+        .map(w => {
+          const computed = typeof w.computed === 'string' ? JSON.parse(w.computed) : w.computed;
+          return computed?.overall?.avg_pace_s_per_mi;
+        })
         .filter((p): p is number => typeof p === 'number' && p > 0);
       const previousPaces = previousBucket
-        .map(w => w.computed?.overall?.avg_pace_s_per_mi)
+        .map(w => {
+          const computed = typeof w.computed === 'string' ? JSON.parse(w.computed) : w.computed;
+          return computed?.overall?.avg_pace_s_per_mi;
+        })
         .filter((p): p is number => typeof p === 'number' && p > 0);
       
       console.log(`📊 ${sport} bucket ${bucketKey} paces: current=${currentPaces.length} paces, previous=${previousPaces.length} paces`);
