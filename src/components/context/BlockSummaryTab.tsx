@@ -1,32 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+/**
+ * =============================================================================
+ * BLOCK SUMMARY TAB
+ * =============================================================================
+ * 
+ * Displays 4-week training block summary with GPT-4 generated analysis
+ * 
+ * Data from generate-overall-context edge function:
+ * - performance_trends: GPT analysis of pace/power progression
+ * - plan_adherence: GPT analysis of completion rates
+ * - weekly_summary: GPT analysis of most recent week
+ */
+
+import React, { useState } from 'react';
+import { RefreshCw, TrendingUp, CheckCircle, Calendar, Loader2 } from 'lucide-react';
 import { useOverallContext } from '@/hooks/useOverallContext';
 
 interface BlockSummaryTabProps {}
-
-interface OverallContextData {
-  performance_trends: {
-    run_pace: string[];
-    bike_power: number[];
-    swim_pace: string[];
-    strength_lifts: any[];
-  };
-  plan_adherence: {
-    overall: number;
-    runs: number;
-    bikes: number;
-    swims: number;
-    strength: number;
-  };
-  weekly_breakdown: any[];
-  analysis: string;
-  baseline_alerts?: string[];
-  phase_assessment?: {
-    current_phase: string;
-    status: string;
-    recommendation: string;
-  };
-}
 
 const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
   const { data, loading, error, refresh } = useOverallContext(4); // 4-week block
@@ -41,38 +30,28 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
     }
   };
 
-  const getAdherenceText = (rate: number) => {
-    if (rate >= 90) return 'Excellent';
-    if (rate >= 80) return 'Good';
-    if (rate >= 70) return 'Fair';
-    return 'Needs Work';
-  };
-
+  // Loading state
   if (loading && !data) {
     return (
-      <div className="px-4 py-2 space-y-3">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-        </div>
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-        </div>
+      <div className="flex flex-col items-center justify-center py-12 text-white/60">
+        <Loader2 className="w-8 h-8 animate-spin mb-3" />
+        <div className="text-sm">Generating block analysis...</div>
+        <div className="text-xs text-white/40 mt-1">This may take a moment</div>
       </div>
     );
   }
 
+  // Error state
   if (error) {
     return (
-      <div className="px-4 py-2">
+      <div className="px-4 py-8">
         <div className="text-center">
-          <h3 className="text-base font-semibold text-black mb-2">Error Loading Analysis</h3>
-          <p className="text-sm text-[#666666] mb-4">{error}</p>
+          <h3 className="text-base font-semibold text-white mb-2">Error Loading Analysis</h3>
+          <p className="text-sm text-white/60 mb-4">{error}</p>
           <button 
             onClick={handleRefresh} 
             disabled={isRefreshing}
-            className="text-sm text-black hover:text-gray-600"
+            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white transition-colors"
           >
             Try Again
           </button>
@@ -81,13 +60,15 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
     );
   }
 
+  // No data state
   if (!data) {
     return (
-      <div className="px-4 py-2 text-center">
-        <p className="text-sm text-[#666666]">No analysis data available</p>
+      <div className="px-4 py-8 text-center">
+        <p className="text-sm text-white/60">No analysis data available</p>
+        <p className="text-xs text-white/40 mt-2">Complete some workouts to see your block summary</p>
         <button 
           onClick={handleRefresh} 
-          className="text-sm text-black hover:text-gray-600 mt-2"
+          className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white transition-colors"
         >
           Generate Analysis
         </button>
@@ -96,138 +77,76 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
   }
 
   return (
-    <div className="px-4 py-2 space-y-4">
-      {/* Header */}
+    <div className="space-y-4 pb-6">
+      {/* Header with refresh button */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-base font-semibold text-black">4-Week Training Block Summary</h3>
-          <p className="text-xs text-[#666666] font-normal">Performance trends and fitness progression</p>
+          <h2 className="text-lg font-medium text-white">4-Week Block</h2>
+          <p className="text-xs text-white/50">Performance trends and fitness progression</p>
         </div>
-        <button 
-          onClick={handleRefresh} 
-          disabled={isRefreshing}
-          className="text-sm text-black hover:text-gray-600"
+        <button
+          onClick={handleRefresh}
+          disabled={loading || isRefreshing}
+          className={`p-2 rounded-lg transition-colors ${
+            loading || isRefreshing
+              ? 'text-white/30 cursor-not-allowed' 
+              : 'text-white/50 hover:text-white hover:bg-white/10'
+          }`}
+          title="Refresh analysis"
         >
-          Refresh
+          <RefreshCw className={`w-4 h-4 ${loading || isRefreshing ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
       {/* Performance Trends */}
-      <div>
-        <h4 className="text-sm text-black mb-2">Performance Trends</h4>
-        <div className="space-y-2">
-          {/* Run Performance */}
-          {data.performance_trends?.run_pace && data.performance_trends.run_pace.length > 0 && (
-            <div className="grid grid-cols-3 gap-1 px-2">
-              <div className="text-base font-semibold text-black">Running</div>
-              <div className="text-xs text-[#666666] font-normal">
-                {data.performance_trends.run_pace[0]} → {data.performance_trends.run_pace[data.performance_trends.run_pace.length - 1]}
-              </div>
-              <div className="text-sm text-black">Improving</div>
-            </div>
-          )}
-
-          {/* Bike Performance */}
-          {data.performance_trends?.bike_power && data.performance_trends.bike_power.length > 0 && (
-            <div className="grid grid-cols-3 gap-1 px-2">
-              <div className="text-base font-semibold text-black">Cycling</div>
-              <div className="text-xs text-[#666666] font-normal">
-                {data.performance_trends.bike_power[0]}W → {data.performance_trends.bike_power[data.performance_trends.bike_power.length - 1]}W
-              </div>
-              <div className="text-sm text-black">Stronger</div>
-            </div>
-          )}
-
-          {/* Swim Performance */}
-          {data.performance_trends?.swim_pace && data.performance_trends.swim_pace.length > 0 && (
-            <div className="grid grid-cols-3 gap-1 px-2">
-              <div className="text-base font-semibold text-black">Swimming</div>
-              <div className="text-xs text-[#666666] font-normal">
-                {data.performance_trends.swim_pace[0]} → {data.performance_trends.swim_pace[data.performance_trends.swim_pace.length - 1]}
-              </div>
-              <div className="text-sm text-black">Faster</div>
-            </div>
-          )}
-
-          {/* Strength Performance */}
-          {data.performance_trends?.strength_lifts && data.performance_trends.strength_lifts.length > 0 && (
-            <div className="grid grid-cols-3 gap-1 px-2">
-              <div className="text-base font-semibold text-black">Strength</div>
-              <div className="text-xs text-[#666666] font-normal">Lifts progressing across all movements</div>
-              <div className="text-sm text-black">Consistent</div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Plan Adherence */}
-      <div>
-        <h4 className="text-sm text-black mb-2">Plan Adherence</h4>
-        <div className="space-y-2">
-          {/* Overall Adherence */}
-          <div className="grid grid-cols-3 gap-1 px-2">
-            <div className="text-base font-semibold text-black">Overall</div>
-            <div className="text-xs text-[#666666] font-normal">All disciplines combined</div>
-            <div className="text-sm text-black">{data.plan_adherence?.overall || 0}%</div>
+      {data.performance_trends && (
+        <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-4 h-4 text-teal-500" />
+            <h3 className="text-sm font-medium text-white">Performance Trends</h3>
           </div>
-
-          {/* Individual Disciplines */}
-          <div className="grid grid-cols-3 gap-1 px-2">
-            <div className="text-base font-semibold text-black">Runs</div>
-            <div className="text-xs text-[#666666] font-normal">Running workouts</div>
-            <div className="text-sm text-black">{data.plan_adherence?.runs || 0}%</div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-1 px-2">
-            <div className="text-base font-semibold text-black">Bikes</div>
-            <div className="text-xs text-[#666666] font-normal">Cycling workouts</div>
-            <div className="text-sm text-black">{data.plan_adherence?.bikes || 0}%</div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-1 px-2">
-            <div className="text-base font-semibold text-black">Swims</div>
-            <div className="text-xs text-[#666666] font-normal">Swimming workouts</div>
-            <div className="text-sm text-black">{data.plan_adherence?.swims || 0}%</div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-1 px-2">
-            <div className="text-base font-semibold text-black">Strength</div>
-            <div className="text-xs text-[#666666] font-normal">Strength workouts</div>
-            <div className="text-sm text-black">{data.plan_adherence?.strength || 0}%</div>
-          </div>
-        </div>
-      </div>
-
-      {/* AI Analysis */}
-      {data.analysis && (
-        <div>
-          <h4 className="text-sm text-black mb-2">Training Analysis</h4>
-          <div className="px-2">
-            <p className="text-sm text-black leading-relaxed whitespace-pre-line">
-              {data.analysis}
-            </p>
-          </div>
+          <p className="text-sm text-white/80 leading-relaxed whitespace-pre-line">
+            {data.performance_trends}
+          </p>
         </div>
       )}
 
-      {/* Weekly Breakdown */}
-      {data.weekly_breakdown && data.weekly_breakdown.length > 0 && (
-        <div>
-          <h4 className="text-sm text-black mb-2">Weekly Breakdown</h4>
-          <div className="space-y-2">
-            {data.weekly_breakdown.map((week, index) => (
-              <div key={index} className="grid grid-cols-3 gap-1 px-2">
-                <div className="text-base font-semibold text-black">{week.week_label}</div>
-                <div className="text-xs text-[#666666] font-normal">
-                  Runs: {week.runs?.count || 0}, Bikes: {week.bikes?.count || 0}, Swims: {week.swims?.count || 0}
-                </div>
-                <div className="text-sm text-black">
-                  {week.runs?.avg_pace && `Run: ${week.runs.avg_pace}`}
-                  {week.bikes?.avg_power && ` Bike: ${week.bikes.avg_power}W`}
-                </div>
-              </div>
-            ))}
+      {/* Plan Adherence */}
+      {data.plan_adherence && (
+        <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <CheckCircle className="w-4 h-4 text-green-500" />
+            <h3 className="text-sm font-medium text-white">Plan Adherence</h3>
           </div>
+          <p className="text-sm text-white/80 leading-relaxed whitespace-pre-line">
+            {data.plan_adherence}
+          </p>
+        </div>
+      )}
+
+      {/* Weekly Summary (Most Recent Week) */}
+      {data.weekly_summary && (
+        <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-medium text-white">This Week</h3>
+          </div>
+          <p className="text-sm text-white/80 leading-relaxed whitespace-pre-line">
+            {data.weekly_summary}
+          </p>
+        </div>
+      )}
+
+      {/* No content fallback */}
+      {!data.performance_trends && !data.plan_adherence && !data.weekly_summary && (
+        <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4 text-center">
+          <p className="text-sm text-white/60">Analysis generated but no content available</p>
+          <button 
+            onClick={handleRefresh} 
+            className="mt-2 text-sm text-white/80 hover:text-white underline"
+          >
+            Regenerate
+          </button>
         </div>
       )}
     </div>
