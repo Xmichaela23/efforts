@@ -328,21 +328,50 @@ Deno.serve(async (req) => {
         peakPerformance  // NEW: Pass peak performance data
       );
       
-      // Add data quality flags for UI
-      // Show bike note if: rides exist AND no comparable peak data (either no curves OR only one period has data)
+      // ==========================================================================
+      // DATA QUALITY FLAGS PER DISCIPLINE
+      // ==========================================================================
       const bikePeakComparable = bikePeakAvailable && 
         ((peakPerformance.bike_20min?.current && peakPerformance.bike_20min?.previous) ||
          (peakPerformance.bike_5min?.current && peakPerformance.bike_5min?.previous) ||
          (peakPerformance.bike_1min?.current && peakPerformance.bike_1min?.previous));
       
+      // Run data quality
+      const runWorkouts = completedWorkouts.filter(w => w.type === 'run' || w.type === 'running');
+      const runsWithBestEfforts = runWorkouts.filter(w => w.computed?.best_efforts);
+      const runPeakComparable = peakPerformance && 
+        ((peakPerformance.run_5k?.current && peakPerformance.run_5k?.previous) ||
+         (peakPerformance.run_1mi?.current && peakPerformance.run_1mi?.previous));
+      
+      // Strength data quality
+      const strengthWorkouts = completedWorkouts.filter(w => w.type === 'strength');
+      const strengthHasLifts = trends.strength_lifts && Object.keys(trends.strength_lifts).length > 0;
+      const strengthHasProgression = strengthHasLifts && 
+        Object.values(trends.strength_lifts).some((weights: any) => 
+          Array.isArray(weights) && weights.length > 1
+        );
+      
       analysis.data_quality = {
-        has_bikes_without_power_curves: hasBikesButNoPowerCurve,
-        bike_rides_count: bikeWorkouts.length,
+        // Bike
+        bike_count: bikeWorkouts.length,
         bike_power_curves_count: bikesWithPowerCurve.length,
-        bike_peak_available: !!bikePeakAvailable,
         bike_peak_comparable: !!bikePeakComparable,
-        show_bike_note: bikeWorkouts.length > 0 && !bikePeakComparable
+        show_bike_note: bikeWorkouts.length > 0 && !bikePeakComparable,
+        
+        // Run
+        run_count: runWorkouts.length,
+        run_best_efforts_count: runsWithBestEfforts.length,
+        run_peak_comparable: !!runPeakComparable,
+        show_run_note: runWorkouts.length > 0 && !runPeakComparable,
+        
+        // Strength
+        strength_count: strengthWorkouts.length,
+        strength_has_lifts: strengthHasLifts,
+        strength_has_progression: strengthHasProgression,
+        show_strength_note: strengthWorkouts.length > 0 && !strengthHasProgression
       };
+      
+      console.log('📊 Data quality:', JSON.stringify(analysis.data_quality, null, 2));
     } else {
       // Return limited analysis without performance trends
       const totalPlanned = weeklyAggregates.reduce((sum, week) => sum + week.planned_count, 0);
@@ -1179,10 +1208,11 @@ function generateDisciplineBreakdown(weeks: any[]): string {
 /**
  * Generate performance summary for disciplines with data
  */
-function generatePerformanceSummary(weeks: any[], trends: any, peakPerformance?: any): string {
+function generatePerformanceSummary(weeks: any[], trends: any, peakPerformance?: any, userBaselines?: any): string {
   console.log('🏃 Run HARD pace array for GPT:', trends.run_hard_pace);
   console.log('🚴 Bike HARD power array for GPT:', trends.bike_hard_power);
   console.log('📈 Peak performance data:', peakPerformance);
+  console.log('💪 User baselines:', userBaselines);
   
   const lines: string[] = [];
   
@@ -1260,38 +1290,48 @@ function generatePerformanceSummary(weeks: any[], trends: any, peakPerformance?:
     lines.push(`Swim pace avg: ${trends.swim_pace[0]} → ${trends.swim_pace[trends.swim_pace.length - 1]} per 100yd`);
   }
   
-  // Strength lift progression - only show meaningful data
-  const strengthLiftsWithData = trends.strength_lifts 
-    ? Object.entries(trends.strength_lifts).filter(([_, weights]: [string, any]) => 
-        Array.isArray(weights) && weights.length > 0 && weights.some((w: number) => w > 0)
-      )
-    : [];
+  // ==========================================================================
+  // STRENGTH: Use actual 1RM baselines, NOT working weights from workouts
+  // Working weights from workouts are just prescribed percentages (e.g., 70% of 1RM)
+  // ==========================================================================
+  const strengthBaselineMap: Record<string, { key: string, name: string }> = {
+    'bench': { key: 'bench', name: 'Bench Press' },
+    'squat': { key: 'squat', name: 'Back Squat' },
+    'deadlift': { key: 'deadlift', name: 'Deadlift' },
+    'overheadPress1RM': { key: 'overheadPress1RM', name: 'Overhead Press' }
+  };
   
-  if (strengthLiftsWithData.length > 0) {
-    strengthLiftsWithData.forEach(([lift, weights]: [string, any]) => {
-      const first = weights[0];
-      const last = weights[weights.length - 1];
-      
-      const liftName = lift
-        .split('_')
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-      
-      if (weights.length > 1 && first > 0 && last > 0) {
-        const change = last - first;
-        if (change > 0) {
-          lines.push(`💪 ${liftName}: ${first}lb → ${last}lb (+${change}lb)`);
-        } else if (change < 0) {
-          lines.push(`💪 ${liftName}: ${first}lb → ${last}lb (${change}lb)`);
-        } else {
-          lines.push(`💪 ${liftName}: Stable at ${last}lb`);
-        }
-      } else if (weights.length === 1 && first > 0) {
-        lines.push(`💪 ${liftName}: ${first}lb (baseline - need more data for trends)`);
+  const strengthBaselines: string[] = [];
+  let hasStrengthBaselines = false;
+  
+  if (userBaselines) {
+    Object.entries(strengthBaselineMap).forEach(([key, config]) => {
+      const baseline1RM = userBaselines[key];
+      if (baseline1RM && baseline1RM > 0) {
+        hasStrengthBaselines = true;
+        strengthBaselines.push(`${config.name}: ${baseline1RM}lb 1RM`);
       }
     });
+  }
+  
+  // Check if user has been doing strength workouts
+  const hasStrengthWorkouts = trends.strength_lifts && 
+    Object.values(trends.strength_lifts).some((weights: any) => 
+      Array.isArray(weights) && weights.length > 0
+    );
+  
+  if (hasStrengthBaselines) {
+    // User has baselines set - show them
+    lines.push(`💪 STRENGTH BASELINES: ${strengthBaselines.join(', ')}`);
+    if (hasStrengthWorkouts) {
+      lines.push(`   Following prescribed program. Retest 1RMs to track progression.`);
+    }
+  } else if (hasStrengthWorkouts) {
+    // User is doing strength but no baselines set
+    lines.push(`💪 STRENGTH: Completing workouts but no 1RM baselines set. Add baselines in settings to track progression.`);
   } else {
-    lines.push(`💪 STRENGTH: No primary lifts tracked. Log bench/squat/deadlift with weights for progression tracking.`);
+    // No strength at all
+    lines.push(`💪 STRENGTH: No strength workouts in this period.`);
   }
   
   return lines.length > 0 ? lines.join('\n') : 'No performance data available';
@@ -1492,7 +1532,7 @@ Most recent week: ${mostRecentWeek.completed_count}/${mostRecentWeek.planned_cou
 Missed in recent week: ${formatMissedByDiscipline(recentWeekMissed)}
 
 PERFORMANCE DATA (chronological order, week 1 = OLDEST, week ${weeklyAggregates.length} = NEWEST):
-${generatePerformanceSummary(weeklyAggregates, trends, peakPerformance)}
+${generatePerformanceSummary(weeklyAggregates, trends, peakPerformance, userBaselines)}
 
 ${baselineInsights.length > 0 ? `\nSTRENGTH BASELINE ALERTS:\n${baselineInsights.join('\n')}` : ''}
 

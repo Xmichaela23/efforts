@@ -12,8 +12,40 @@
  */
 
 import React, { useState } from 'react';
-import { RefreshCw, TrendingUp, CheckCircle, Calendar, Loader2, Bike, AlertCircle } from 'lucide-react';
+import { RefreshCw, TrendingUp, CheckCircle, Calendar, Loader2, Bike, Activity, Dumbbell, Waves, AlertCircle } from 'lucide-react';
 import { useOverallContext } from '@/hooks/useOverallContext';
+
+// Discipline colors matching the rest of the app
+const DISCIPLINE_NOTES = {
+  bike: {
+    icon: Bike,
+    color: 'text-green-400',
+    borderColor: 'border-green-400/30',
+    bgColor: 'bg-green-400/10',
+    label: 'Bike'
+  },
+  run: {
+    icon: Activity,
+    color: 'text-teal-400',
+    borderColor: 'border-teal-400/30', 
+    bgColor: 'bg-teal-400/10',
+    label: 'Run'
+  },
+  strength: {
+    icon: Dumbbell,
+    color: 'text-orange-400',
+    borderColor: 'border-orange-400/30',
+    bgColor: 'bg-orange-400/10',
+    label: 'Strength'
+  },
+  swim: {
+    icon: Waves,
+    color: 'text-blue-400',
+    borderColor: 'border-blue-400/30',
+    bgColor: 'bg-blue-400/10',
+    label: 'Swim'
+  }
+};
 
 interface BlockSummaryTabProps {}
 
@@ -109,20 +141,53 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
             {data.performance_trends}
           </p>
           
-          {/* Bike power data quality note - show when rides exist but no comparable power trends */}
-          {data.data_quality?.show_bike_note && (
-            <div className="mt-3 pt-3 border-t border-white/10">
-              <div className="flex items-start gap-2 text-amber-400/80">
-                <Bike className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <p className="text-xs">
-                  <span className="font-medium">Bike power trends unavailable.</span>{' '}
-                  {data.data_quality.bike_power_curves_count === 0 ? (
-                    <>You have {data.data_quality.bike_rides_count} ride{data.data_quality.bike_rides_count !== 1 ? 's' : ''} but no power data. Complete 30min+ rides with a power meter.</>
-                  ) : (
-                    <>Need power data in both the current and previous 2-week periods to show trends.</>
-                  )}
-                </p>
-              </div>
+          {/* Discipline-specific data quality notes */}
+          {(data.data_quality?.show_run_note || data.data_quality?.show_bike_note || data.data_quality?.show_strength_note) && (
+            <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
+              {/* Run note */}
+              {data.data_quality?.show_run_note && (
+                <div className={`flex items-start gap-2 p-2 rounded ${DISCIPLINE_NOTES.run.bgColor} ${DISCIPLINE_NOTES.run.borderColor} border`}>
+                  <Activity className={`w-4 h-4 mt-0.5 flex-shrink-0 ${DISCIPLINE_NOTES.run.color}`} />
+                  <p className={`text-xs ${DISCIPLINE_NOTES.run.color}`}>
+                    <span className="font-medium">Run pace trends unavailable.</span>{' '}
+                    {data.data_quality.run_best_efforts_count === 0 ? (
+                      <>Need runs with GPS data to calculate best efforts.</>
+                    ) : (
+                      <>Need comparable efforts in both current and previous periods.</>
+                    )}
+                  </p>
+                </div>
+              )}
+              
+              {/* Bike note */}
+              {data.data_quality?.show_bike_note && (
+                <div className={`flex items-start gap-2 p-2 rounded ${DISCIPLINE_NOTES.bike.bgColor} ${DISCIPLINE_NOTES.bike.borderColor} border`}>
+                  <Bike className={`w-4 h-4 mt-0.5 flex-shrink-0 ${DISCIPLINE_NOTES.bike.color}`} />
+                  <p className={`text-xs ${DISCIPLINE_NOTES.bike.color}`}>
+                    <span className="font-medium">Bike power trends unavailable.</span>{' '}
+                    {data.data_quality.bike_power_curves_count === 0 ? (
+                      <>Complete 30min+ rides with a power meter to track cycling fitness.</>
+                    ) : (
+                      <>Need power data in both current and previous periods.</>
+                    )}
+                  </p>
+                </div>
+              )}
+              
+              {/* Strength note */}
+              {data.data_quality?.show_strength_note && (
+                <div className={`flex items-start gap-2 p-2 rounded ${DISCIPLINE_NOTES.strength.bgColor} ${DISCIPLINE_NOTES.strength.borderColor} border`}>
+                  <Dumbbell className={`w-4 h-4 mt-0.5 flex-shrink-0 ${DISCIPLINE_NOTES.strength.color}`} />
+                  <p className={`text-xs ${DISCIPLINE_NOTES.strength.color}`}>
+                    <span className="font-medium">Strength progression unavailable.</span>{' '}
+                    {!data.data_quality.strength_has_lifts ? (
+                      <>Log primary lifts (squat, deadlift, bench, etc.) with weights to track progress.</>
+                    ) : (
+                      <>Complete more sessions to show weight progression over time.</>
+                    )}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
