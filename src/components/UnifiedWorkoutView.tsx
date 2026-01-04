@@ -903,21 +903,35 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - conditionally show based on link status */}
+      {/* Planned workout (not completed): Planned tab only */}
+      {/* Completed + linked: Planned, Adherence, Details */}
+      {/* Completed + not linked: Details only */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-3 bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-0 py-0">
-          <TabsTrigger value="planned" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
-            <Calendar className="h-4 w-4" />
-            Planned
-          </TabsTrigger>
-          <TabsTrigger value="summary" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
-            <ListCollapse className="h-4 w-4" />
-            Summary
-          </TabsTrigger>
-          <TabsTrigger value="completed" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
-            <List className="h-4 w-4" />
-            Details
-          </TabsTrigger>
+        <TabsList className={`grid w-full bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-0 py-0 ${
+          !isCompleted ? 'grid-cols-1' : (isLinked ? 'grid-cols-3' : 'grid-cols-1')
+        }`}>
+          {/* Planned tab: show for planned workouts OR completed+linked */}
+          {(!isCompleted || isLinked) && (
+            <TabsTrigger value="planned" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
+              <Calendar className="h-4 w-4" />
+              Planned
+            </TabsTrigger>
+          )}
+          {/* Adherence tab: only show for completed+linked */}
+          {isCompleted && isLinked && (
+            <TabsTrigger value="summary" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
+              <ListCollapse className="h-4 w-4" />
+              Adherence
+            </TabsTrigger>
+          )}
+          {/* Details tab: only show for completed workouts */}
+          {isCompleted && (
+            <TabsTrigger value="completed" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
+              <List className="h-4 w-4" />
+              Details
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <div 
@@ -972,10 +986,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             })()}
           </TabsContent>
 
-          {/* Summary Tab */}
+          {/* Adherence Tab - only rendered when linked, so no need for unlinked state */}
           <TabsContent value="summary" className="flex-1 p-2">
-            {/* Attach/Unattach moved to header to reduce padding */}
-            {/* Header metrics now rendered by MobileSummary to keep stable Pace/Duration adherence */}
             {/* Inline Strength Logger editor */}
             {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
               <div className="mb-4 border border-white/20 rounded-md">
@@ -993,17 +1005,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 />
               </div>
             )}
-            {(() => {
-              return isCompleted && !isLinked ? (
-                <div className="px-3 py-2 text-sm text-white/60">Attach this workout to a planned session to see planned vs actual.</div>
-              ) : (
-                <MobileSummary 
-                  planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
-                  completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
-                  onNavigateToContext={onNavigateToContext}
-                />
-              );
-            })()}
+            <MobileSummary 
+              planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
+              completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
+              onNavigateToContext={onNavigateToContext}
+            />
             {onDelete && workout?.id && (
               <Button
                 variant="ghost"
