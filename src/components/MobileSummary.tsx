@@ -1629,7 +1629,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               
               {/* Score reasoning explanation for interval workouts */}
               {scoreReasoning && (
-                <div className="mb-3 text-xs text-gray-500 text-center px-4 italic">
+                <div className="mb-4 text-sm text-gray-300 text-center px-3 leading-relaxed">
                   {scoreReasoning}
                 </div>
               )}
