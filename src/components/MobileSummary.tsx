@@ -1572,8 +1572,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             return (
               <div className="flex flex-col items-center px-2">
                 <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
-                <div className="text-[11px] text-gray-700">{label}</div>
-                <div className="text-[11px] text-gray-600">{text}</div>
+                <div className="text-[12px] text-gray-300">{label}</div>
+                <div className="text-[12px] text-gray-400">{text}</div>
               </div>
             );
           };
@@ -1605,7 +1605,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             <div className="w-full pt-1 pb-2">
               {/* Descriptive blurb first */}
               {message && (
-                <div className="mb-3 text-xs text-gray-600 text-center">
+                <div className="mb-3 text-sm text-gray-300 text-center">
                   {message.icon} {message.text}
                 </div>
               )}
@@ -1639,17 +1639,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 <div className="text-center">
                   <button
                     onClick={() => onNavigateToContext(completed.id)}
-                    className="text-sm text-black hover:text-gray-600 transition-colors"
-                    style={{
-                      fontFamily: 'Inter, sans-serif',
-                      fontWeight: 400,
-                      fontSize: '15px',
-                      textDecoration: 'none',
-                      cursor: 'pointer',
-                      background: 'none',
-                      border: 'none',
-                      padding: 0
-                    }}
+                    className="text-sm text-gray-200 hover:text-white transition-colors underline underline-offset-2"
                   >
                     View context
                   </button>
