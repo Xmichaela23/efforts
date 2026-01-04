@@ -324,6 +324,174 @@ function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
 }
 
 // =============================================================================
+// POWER CURVE CALCULATION (Peak Performance Tracking)
+// =============================================================================
+// Calculates best average power for various durations (5s, 1min, 5min, 20min, 60min)
+// Used for tracking fitness improvements and comparing peak efforts over time
+
+interface PowerCurve {
+  '5s'?: number;
+  '1min'?: number;
+  '5min'?: number;
+  '20min'?: number;
+  '60min'?: number;
+}
+
+interface BestEfforts {
+  '1mi'?: { pace_s_per_mi: number; duration_s: number; avg_hr?: number };
+  '5k'?: { pace_s_per_mi: number; duration_s: number; avg_hr?: number };
+  '10k'?: { pace_s_per_mi: number; duration_s: number; avg_hr?: number };
+}
+
+/**
+ * Calculate rolling max average power for a given window size
+ * Returns the best average power over any contiguous window of that duration
+ */
+function rollingMaxAverage(data: (number | null)[], windowSize: number): number | null {
+  // Filter to valid power values with their indices
+  const validPower: { idx: number; val: number }[] = [];
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i];
+    if (v !== null && Number.isFinite(v) && v > 0) {
+      validPower.push({ idx: i, val: v });
+    }
+  }
+  
+  if (validPower.length < windowSize) return null;
+  
+  // Simple approach: slide window through valid samples
+  // Note: This assumes ~1 sample per second (typical for power meters)
+  let maxAvg = 0;
+  let windowSum = 0;
+  
+  // Initialize window
+  for (let i = 0; i < windowSize; i++) {
+    windowSum += validPower[i].val;
+  }
+  maxAvg = windowSum / windowSize;
+  
+  // Slide window
+  for (let i = windowSize; i < validPower.length; i++) {
+    windowSum += validPower[i].val - validPower[i - windowSize].val;
+    const avg = windowSum / windowSize;
+    if (avg > maxAvg) maxAvg = avg;
+  }
+  
+  return Math.round(maxAvg);
+}
+
+/**
+ * Calculate power curve for a cycling workout
+ * Returns best power at key durations for fitness tracking
+ */
+function calculatePowerCurve(powerData: (number | null)[]): PowerCurve | null {
+  const validCount = powerData.filter(p => p !== null && Number.isFinite(p) && p > 0).length;
+  
+  // Need at least 60 seconds of power data
+  if (validCount < 60) {
+    console.log(`⚡ Power curve: insufficient data (${validCount} samples, need 60+)`);
+    return null;
+  }
+  
+  const curve: PowerCurve = {};
+  const durations: { label: keyof PowerCurve; seconds: number }[] = [
+    { label: '5s', seconds: 5 },
+    { label: '1min', seconds: 60 },
+    { label: '5min', seconds: 300 },
+    { label: '20min', seconds: 1200 },
+    { label: '60min', seconds: 3600 }
+  ];
+  
+  for (const { label, seconds } of durations) {
+    if (validCount >= seconds) {
+      const best = rollingMaxAverage(powerData, seconds);
+      if (best !== null && best > 0) {
+        curve[label] = best;
+      }
+    }
+  }
+  
+  const curveLabels = Object.keys(curve).join(', ');
+  console.log(`⚡ Power curve calculated: ${curveLabels || 'none'}`);
+  if (Object.keys(curve).length > 0) {
+    console.log(`⚡ Power curve values:`, curve);
+  }
+  
+  return Object.keys(curve).length > 0 ? curve : null;
+}
+
+/**
+ * Calculate best running efforts at standard distances
+ * Finds fastest segment for each target distance
+ */
+function calculateBestRunEfforts(
+  distanceM: number[],
+  timeS: number[],
+  hrBpm: (number | null)[]
+): BestEfforts | null {
+  if (distanceM.length < 10 || timeS.length < 10) return null;
+  
+  const efforts: BestEfforts = {};
+  const targets: { label: keyof BestEfforts; meters: number }[] = [
+    { label: '1mi', meters: 1609.34 },
+    { label: '5k', meters: 5000 },
+    { label: '10k', meters: 10000 }
+  ];
+  
+  const totalDistance = distanceM[distanceM.length - 1] - distanceM[0];
+  
+  for (const { label, meters } of targets) {
+    // Only calculate if workout covers this distance
+    if (totalDistance < meters * 0.95) continue;
+    
+    let bestPace = Infinity;
+    let bestDuration = 0;
+    let bestAvgHr: number | undefined;
+    
+    // Slide window to find fastest segment of this distance
+    let startIdx = 0;
+    for (let endIdx = 1; endIdx < distanceM.length; endIdx++) {
+      const segmentDist = distanceM[endIdx] - distanceM[startIdx];
+      
+      // Move start forward until segment is close to target
+      while (segmentDist > meters * 1.02 && startIdx < endIdx - 1) {
+        startIdx++;
+      }
+      
+      // Check if we have a valid segment
+      if (segmentDist >= meters * 0.98 && segmentDist <= meters * 1.02) {
+        const segmentTime = timeS[endIdx] - timeS[startIdx];
+        const pacePerMile = (segmentTime / segmentDist) * 1609.34;
+        
+        if (pacePerMile < bestPace && pacePerMile > 180) { // Sanity: faster than 3:00/mi
+          bestPace = pacePerMile;
+          bestDuration = segmentTime;
+          
+          // Calculate avg HR for this segment
+          const hrSegment = hrBpm.slice(startIdx, endIdx + 1).filter((h): h is number => h !== null && Number.isFinite(h));
+          if (hrSegment.length > 0) {
+            bestAvgHr = Math.round(hrSegment.reduce((a, b) => a + b, 0) / hrSegment.length);
+          }
+        }
+      }
+    }
+    
+    if (bestPace < Infinity) {
+      efforts[label] = {
+        pace_s_per_mi: Math.round(bestPace),
+        duration_s: Math.round(bestDuration),
+        avg_hr: bestAvgHr
+      };
+    }
+  }
+  
+  const effortLabels = Object.keys(efforts).join(', ');
+  console.log(`🏃 Best efforts calculated: ${effortLabels || 'none'}`);
+  
+  return Object.keys(efforts).length > 0 ? efforts : null;
+}
+
+// =============================================================================
 // GRANULAR ADHERENCE ANALYSIS FUNCTIONS
 // =============================================================================
 
@@ -1541,10 +1709,42 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Write under workouts.computed with updated overall and analysis
+    // ==========================================================================
+    // CALCULATE PEAK PERFORMANCE METRICS
+    // ==========================================================================
+    // Power curve for cycling, best efforts for running
+    // Used by generate-overall-context for honest performance trend analysis
+    
+    let powerCurve: PowerCurve | null = null;
+    let bestEfforts: BestEfforts | null = null;
+    
+    if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
+      // Calculate power curve for bikes
+      powerCurve = calculatePowerCurve(power_watts);
+      if (powerCurve) {
+        console.log(`⚡ Power curve saved for bike workout`);
+      }
+    }
+    
+    if (w.type === 'run' || w.type === 'running') {
+      // Calculate best efforts for runs
+      bestEfforts = calculateBestRunEfforts(distance_m, time_s, hr_bpm);
+      if (bestEfforts) {
+        console.log(`🏃 Best efforts saved for run workout`);
+      }
+    }
+
+    // Write under workouts.computed with updated overall, analysis, and peak performance
     const computed = (() => {
       const c = parseJson(w.computed) || {};
-      return { ...c, overall, analysis };
+      return { 
+        ...c, 
+        overall, 
+        analysis,
+        // Peak performance metrics (null if not calculated/applicable)
+        power_curve: powerCurve,
+        best_efforts: bestEfforts
+      };
     })();
 
     console.log('📝 About to UPDATE:', {
@@ -1554,7 +1754,9 @@ Deno.serve(async (req) => {
       has_analysis: !!computed.analysis,
       analysis_version: computed.analysis?.version,
       swim_in_analysis: !!computed.analysis?.swim,
-      power_in_analysis: !!computed.analysis?.power
+      power_in_analysis: !!computed.analysis?.power,
+      power_curve: computed.power_curve ? Object.keys(computed.power_curve).join(',') : null,
+      best_efforts: computed.best_efforts ? Object.keys(computed.best_efforts).join(',') : null
     });
 
     // Trigger granular analysis for running workouts
