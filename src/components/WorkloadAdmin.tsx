@@ -219,14 +219,62 @@ export default function WorkloadAdmin() {
 
       {/* Results */}
       {results && (
-        <Card>
+        <Card className="max-w-2xl">
           <CardHeader>
-            <CardTitle>Results</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              <span>Results</span>
+              {results.dry_run !== undefined && (
+                <span className={`text-xs px-2 py-1 rounded ${results.dry_run ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}`}>
+                  {results.dry_run ? 'DRY RUN' : 'EXECUTED'}
+                </span>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="bg-gray-100 p-4 rounded-md overflow-auto text-sm">
-              {JSON.stringify(results, null, 2)}
-            </pre>
+            {/* Summary stats */}
+            {results.total_workouts !== undefined && (
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="bg-white/5 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-white">{results.total_workouts}</div>
+                  <div className="text-xs text-white/60">Total Found</div>
+                </div>
+                <div className="bg-white/5 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-teal-400">{results.needs_backfill}</div>
+                  <div className="text-xs text-white/60">Need Backfill</div>
+                </div>
+                {results.success !== undefined && (
+                  <div className="bg-white/5 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-green-400">{results.success}</div>
+                    <div className="text-xs text-white/60">Completed</div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Workout list (collapsed by default for long lists) */}
+            {results.workouts && results.workouts.length > 0 && (
+              <details className="mt-4">
+                <summary className="cursor-pointer text-sm text-white/70 hover:text-white">
+                  View {results.workouts.length} workouts
+                </summary>
+                <div className="mt-2 max-h-64 overflow-y-auto bg-black/30 rounded-lg p-3">
+                  {results.workouts.map((w: any) => (
+                    <div key={w.id} className="flex items-center gap-2 py-1 text-sm border-b border-white/10 last:border-0">
+                      <span className={`w-2 h-2 rounded-full ${w.type === 'run' ? 'bg-teal-400' : 'bg-green-400'}`} />
+                      <span className="text-white/80 truncate flex-1">{w.name}</span>
+                      <span className="text-white/40 text-xs">{w.date}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            {/* Error display */}
+            {results.error && (
+              <div className="bg-red-500/20 text-red-400 p-3 rounded-lg text-sm">
+                {results.error}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
