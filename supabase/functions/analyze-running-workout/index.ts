@@ -1580,6 +1580,10 @@ Deno.serve(async (req) => {
     console.log('  - detailedAnalysis keys:', detailedAnalysis ? Object.keys(detailedAnalysis) : 'N/A');
     console.log('  - detailedAnalysis value:', JSON.stringify(detailedAnalysis, null, 2));
     
+    // Generate deterministic score explanation (explains WHY scores are what they are)
+    const scoreExplanation = generateScoreExplanation(performance, detailedAnalysis);
+    console.log('📝 [SCORE EXPLANATION] Generated:', scoreExplanation);
+    
     const updatePayload = {
       computed: minimalComputed,  // Lightweight update (no sensor data)
       workout_analysis: {
@@ -1588,6 +1592,7 @@ Deno.serve(async (req) => {
         performance: performance,
         detailed_analysis: detailedAnalysis,
         narrative_insights: narrativeInsights,  // AI-generated human-readable insights
+        score_explanation: scoreExplanation,  // Deterministic explanation of adherence scores
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null  // Include terrain breakdown
       },
       analysis_status: 'complete',
@@ -3556,4 +3561,131 @@ function generateMileByMileTerrainBreakdown(
 
 // AI Narrative generation moved to lib/narrative/ai-generator.ts
 // Function removed - now imported from module
+
+/**
+ * Generate a human-readable explanation of the adherence scores
+ * Explains WHY the scores are what they are, making it clear that
+ * going faster OR slower than prescribed range affects the score.
+ * 
+ * This runs server-side to ensure the explanation is always in sync
+ * with the scoring logic (smart server, dumb client).
+ */
+function generateScoreExplanation(
+  performance: { execution_adherence: number; pace_adherence: number; duration_adherence: number },
+  detailedAnalysis: any
+): string | null {
+  const intervalBreakdown = detailedAnalysis?.interval_breakdown;
+  
+  // Only generate for interval workouts with breakdown data
+  if (!intervalBreakdown?.available || !intervalBreakdown?.intervals?.length) {
+    return null;
+  }
+
+  const intervals = intervalBreakdown.intervals;
+  const workIntervals = intervals.filter((i: any) => i.interval_type === 'work');
+  
+  if (workIntervals.length === 0) {
+    return null;
+  }
+
+  // Format pace from seconds to MM:SS
+  const fmtPace = (secPerMi: number): string => {
+    if (!secPerMi || secPerMi <= 0) return 'N/A';
+    const mins = Math.floor(secPerMi / 60);
+    const secs = Math.round(secPerMi % 60);
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+  };
+
+  // Format delta as readable string
+  const fmtDelta = (deltaSeconds: number): string => {
+    const mins = Math.floor(deltaSeconds / 60);
+    const secs = Math.round(deltaSeconds % 60);
+    return mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
+  };
+
+  // Analyze pace deviations for each work interval
+  interface Deviation {
+    interval: number;
+    actual: string;
+    target: string;
+    delta: number;
+    direction: 'fast' | 'slow' | 'ok';
+  }
+  
+  const deviations: Deviation[] = [];
+  
+  for (const interval of workIntervals) {
+    const actualPaceSecPerMi = (interval.actual_pace_min_per_mi || 0) * 60;
+    const targetLower = interval.planned_pace_range_lower || 0;
+    const targetUpper = interval.planned_pace_range_upper || 0;
+    
+    if (actualPaceSecPerMi > 0 && targetLower > 0 && targetUpper > 0) {
+      let direction: 'fast' | 'slow' | 'ok' = 'ok';
+      let delta = 0;
+      
+      if (actualPaceSecPerMi < targetLower) {
+        direction = 'fast';
+        delta = targetLower - actualPaceSecPerMi;
+      } else if (actualPaceSecPerMi > targetUpper) {
+        direction = 'slow';
+        delta = actualPaceSecPerMi - targetUpper;
+      }
+      
+      deviations.push({
+        interval: interval.interval_number || deviations.length + 1,
+        actual: fmtPace(actualPaceSecPerMi),
+        target: `${fmtPace(targetLower)}-${fmtPace(targetUpper)}`,
+        delta,
+        direction
+      });
+    }
+  }
+
+  if (deviations.length === 0) {
+    return null;
+  }
+
+  // Summarize deviations by direction
+  const fastIntervals = deviations.filter(d => d.direction === 'fast');
+  const slowIntervals = deviations.filter(d => d.direction === 'slow');
+  const okIntervals = deviations.filter(d => d.direction === 'ok');
+  
+  // Build explanation text - be explicit about the scoring philosophy
+  const parts: string[] = [];
+  
+  // Get the target range for display (use first interval's range as representative)
+  const targetRange = deviations[0]?.target || '';
+  const paceAdherencePct = Math.round(performance.pace_adherence);
+  
+  if (paceAdherencePct < 70) {
+    // Low/moderate adherence - explain the scoring philosophy
+    if (fastIntervals.length > 0 && slowIntervals.length === 0) {
+      // All deviations are "too fast"
+      const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
+      parts.push(`Pace score measures time at prescribed pace (${targetRange}/mi)`);
+      parts.push(`${fastIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgFastDelta)}/mi faster than range — going faster still counts as off-target`);
+    } else if (slowIntervals.length > 0 && fastIntervals.length === 0) {
+      // All deviations are "too slow"
+      const avgSlowDelta = Math.round(slowIntervals.reduce((sum, d) => sum + d.delta, 0) / slowIntervals.length);
+      parts.push(`Pace score measures time at prescribed pace (${targetRange}/mi)`);
+      parts.push(`${slowIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgSlowDelta)}/mi slower than range`);
+    } else if (fastIntervals.length > 0 && slowIntervals.length > 0) {
+      // Mixed deviations
+      parts.push(`Pace score measures time at prescribed pace (${targetRange}/mi)`);
+      parts.push(`${fastIntervals.length} intervals too fast, ${slowIntervals.length} too slow — both directions count as off-target`);
+    }
+  } else if (paceAdherencePct < 90) {
+    // Good but not perfect - brief note
+    if (fastIntervals.length > 0) {
+      parts.push(`${fastIntervals.length} of ${deviations.length} intervals faster than ${targetRange}/mi target`);
+    } else if (slowIntervals.length > 0) {
+      parts.push(`${slowIntervals.length} of ${deviations.length} intervals slower than target range`);
+    }
+  } else if (okIntervals.length === deviations.length) {
+    // Perfect adherence
+    parts.push(`All ${deviations.length} work intervals within prescribed ${targetRange}/mi range`);
+  }
+
+  return parts.length > 0 ? parts.join('. ') + '.' : null;
+}
 

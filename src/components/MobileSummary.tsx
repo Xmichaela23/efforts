@@ -1597,6 +1597,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
           // Get contextual message (pass planned and executedSecPerMi for range validation)
           const message = getContextualMessage(workoutIntent, finalDurationPct, finalDistPct, finalPacePct, 'run', planned, executedSecPerMi);
+          
+          // Read server-generated score explanation (smart server, dumb client)
+          const scoreReasoning = (completed as any)?.workout_analysis?.score_explanation || null;
 
           return (
             <div className="w-full pt-1 pb-2">
@@ -1623,6 +1626,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                        'Interval adherence', 'pace')}
                 </div>
               </div>
+              
+              {/* Score reasoning explanation for interval workouts */}
+              {scoreReasoning && (
+                <div className="mb-3 text-xs text-gray-500 text-center px-4 italic">
+                  {scoreReasoning}
+                </div>
+              )}
               
               {/* View in Context link */}
               {onNavigateToContext && completed?.id && (
