@@ -516,6 +516,8 @@ function mapStravaToWorkout(activity, userId) {
     computed: computedJsonObj ? JSON.stringify(computedJsonObj) : null,
     // Strava achievements (PRs, segment efforts, best efforts)
     achievements: achievements ? JSON.stringify(achievements) : null,
+    // Device info for display (e.g., "Garmin Forerunner 265", "Wahoo ELEMNT", "Zwift")
+    device_info: activity.device_name ? JSON.stringify({ device_name: activity.device_name }) : null,
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString()
   };

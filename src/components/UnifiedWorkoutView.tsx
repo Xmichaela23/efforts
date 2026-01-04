@@ -786,12 +786,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
             
             return (
-              <div className="flex items-center gap-2 mt-0.5">
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <img 
                   src="/icons/strava-powered-by.svg" 
                   alt="Powered by Strava" 
                   className="h-3"
                 />
+                {deviceName && <span className="text-gray-400 text-xs">via {deviceName}</span>}
                 {stravaUrl && (
                   <>
                     <span className="text-gray-300">•</span>
