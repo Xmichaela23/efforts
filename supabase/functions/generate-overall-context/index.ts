@@ -1158,15 +1158,17 @@ function generatePerformanceSummary(weeks: any[], trends: any, peakPerformance?:
   // This is the most accurate measure of fitness - comparing best efforts
   
   if (peakPerformance) {
-    // Bike: Best 20min power
-    if (peakPerformance.bike_20min) {
-      const { current, previous, change } = peakPerformance.bike_20min;
+    // Bike: Best power (check 20min, 5min, 1min in order of preference)
+    const bikePeak = peakPerformance.bike_20min || peakPerformance.bike_5min || peakPerformance.bike_1min;
+    if (bikePeak) {
+      const { current, previous, change, duration } = bikePeak;
+      const durationLabel = duration || '20min';
       if (current && previous) {
         const diff = current - previous;
         const trend = diff > 0 ? `+${diff}W` : diff < 0 ? `${diff}W` : 'no change';
-        lines.push(`🚴 PEAK 20min power: ${previous}W → ${current}W (${trend})`);
+        lines.push(`🚴 PEAK ${durationLabel} power: ${previous}W → ${current}W (${trend})`);
       } else if (current) {
-        lines.push(`🚴 PEAK 20min power: ${current}W (no previous data for comparison)`);
+        lines.push(`🚴 PEAK ${durationLabel} power: ${current}W (establishing baseline)`);
       }
     }
     
@@ -1209,8 +1211,9 @@ function generatePerformanceSummary(weeks: any[], trends: any, peakPerformance?:
     lines.push(`Run HR avg: ${trends.run_heart_rate[0]} → ${trends.run_heart_rate[trends.run_heart_rate.length - 1]} bpm`);
   }
   
-  // Bike metrics
-  if (trends.bike_hard_power && trends.bike_hard_power.length > 1) {
+  // Bike metrics - ONLY show averages if we don't have peak power data
+  const hasBikePeakData = peakPerformance && (peakPerformance.bike_20min || peakPerformance.bike_5min || peakPerformance.bike_1min);
+  if (!hasBikePeakData && trends.bike_hard_power && trends.bike_hard_power.length > 1) {
     lines.push(`Bike intervals avg: ${trends.bike_hard_power[0]}W → ${trends.bike_hard_power[trends.bike_hard_power.length - 1]}W`);
   }
   if (trends.bike_heart_rate && trends.bike_heart_rate.length > 1) {
@@ -1266,32 +1269,50 @@ function extractPeakPerformance(workouts: any[], weeksBack: number): any {
   const peakData: any = {};
   
   // ==========================================================================
-  // BIKE: Extract best 20min power from power_curve
+  // BIKE: Extract best power from power_curve
+  // Try 20min first, then 5min, then 1min (use best available)
   // ==========================================================================
-  const currentBikes = currentPeriod.filter(w => 
+  const allCurrentBikes = currentPeriod.filter(w => 
     (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') && 
-    w.computed?.power_curve?.['20min']
+    w.computed?.power_curve
   );
-  const previousBikes = previousPeriod.filter(w => 
+  const allPreviousBikes = previousPeriod.filter(w => 
     (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') && 
-    w.computed?.power_curve?.['20min']
+    w.computed?.power_curve
   );
   
-  if (currentBikes.length > 0 || previousBikes.length > 0) {
-    const currentBest = currentBikes.length > 0 
-      ? Math.max(...currentBikes.map(w => w.computed.power_curve['20min']))
-      : null;
-    const previousBest = previousBikes.length > 0
-      ? Math.max(...previousBikes.map(w => w.computed.power_curve['20min']))
-      : null;
+  // Find the best duration that has data in both periods (or at least current)
+  const powerDurations = ['20min', '5min', '1min'] as const;
+  
+  for (const duration of powerDurations) {
+    const currentBikes = allCurrentBikes.filter(w => w.computed.power_curve[duration]);
+    const previousBikes = allPreviousBikes.filter(w => w.computed.power_curve[duration]);
     
-    peakData.bike_20min = {
-      current: currentBest,
-      previous: previousBest,
-      change: currentBest && previousBest ? currentBest - previousBest : null
-    };
-    
-    console.log(`🚴 Peak 20min power: current=${currentBest}W (from ${currentBikes.length} rides), previous=${previousBest}W (from ${previousBikes.length} rides)`);
+    // Need at least current period data to report
+    if (currentBikes.length > 0) {
+      const currentBest = Math.max(...currentBikes.map(w => w.computed.power_curve[duration]));
+      const previousBest = previousBikes.length > 0
+        ? Math.max(...previousBikes.map(w => w.computed.power_curve[duration]))
+        : null;
+      
+      peakData[`bike_${duration}`] = {
+        current: currentBest,
+        previous: previousBest,
+        change: currentBest && previousBest ? currentBest - previousBest : null,
+        duration: duration
+      };
+      
+      console.log(`🚴 Peak ${duration} power: current=${currentBest}W (from ${currentBikes.length} rides), previous=${previousBest}W (from ${previousBikes.length} rides)`);
+      break; // Use the longest duration available
+    }
+  }
+  
+  // Log if no power curve data at all
+  if (!peakData.bike_20min && !peakData.bike_5min && !peakData.bike_1min) {
+    console.log(`⚠️ No power curve data found for bikes. Current: ${allCurrentBikes.length} rides with power_curve, Previous: ${allPreviousBikes.length}`);
+    if (allCurrentBikes.length > 0) {
+      console.log('Available durations:', allCurrentBikes.map(w => Object.keys(w.computed.power_curve)));
+    }
   }
   
   // ==========================================================================
