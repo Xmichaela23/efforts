@@ -444,12 +444,13 @@ function extractPrimaryLiftWeights(strengthWorkout: any): Record<string, number>
   const exercises = parseStrengthExercises(strengthWorkout.strength_exercises);
   const liftWeights: Record<string, number> = {};
   
-  // Primary lift patterns
-  const liftPatterns: Record<string, string[]> = {
-    'bench_press': ['bench press', 'bench', 'bp'],
-    'back_squat': ['back squat', 'squat', 'bs'],
-    'deadlift': ['deadlift', 'dl'],
-    'overhead_press': ['overhead press', 'ohp', 'press']
+  // Primary lift patterns with MINIMUM realistic weights
+  // Anything below these is likely a warmup, data error, or accessory work
+  const liftPatterns: Record<string, { patterns: string[], minWeight: number }> = {
+    'bench_press': { patterns: ['bench press', 'bench', 'bp'], minWeight: 45 },
+    'back_squat': { patterns: ['back squat', 'squat', 'bs'], minWeight: 45 },
+    'deadlift': { patterns: ['deadlift', 'dl'], minWeight: 65 },  // Deadlifts under 65lb are not real work sets
+    'overhead_press': { patterns: ['overhead press', 'ohp', 'press'], minWeight: 35 }
   };
   
   exercises.forEach((ex: any) => {
@@ -457,9 +458,11 @@ function extractPrimaryLiftWeights(strengthWorkout: any): Record<string, number>
     
     // Match to primary lift
     let primaryLift: string | null = null;
-    for (const [lift, patterns] of Object.entries(liftPatterns)) {
-      if (patterns.some(pattern => nameLower.includes(pattern))) {
+    let minWeight = 0;
+    for (const [lift, config] of Object.entries(liftPatterns)) {
+      if (config.patterns.some(pattern => nameLower.includes(pattern))) {
         primaryLift = lift;
+        minWeight = config.minWeight;
         break;
       }
     }
@@ -469,8 +472,11 @@ function extractPrimaryLiftWeights(strengthWorkout: any): Record<string, number>
       const completedSets = ex.sets.filter((s: any) => s.completed);
       if (completedSets.length > 0) {
         const maxWeight = Math.max(...completedSets.map((s: any) => s.weight || 0));
-        if (maxWeight > 0) {
+        // Only include if above minimum realistic weight
+        if (maxWeight >= minWeight) {
           liftWeights[primaryLift] = Math.max(liftWeights[primaryLift] || 0, maxWeight);
+        } else if (maxWeight > 0) {
+          console.log(`⚠️ Skipping ${primaryLift} at ${maxWeight}lb (below minimum ${minWeight}lb)`);
         }
       }
     }
@@ -1225,27 +1231,38 @@ function generatePerformanceSummary(weeks: any[], trends: any, peakPerformance?:
     lines.push(`Swim pace avg: ${trends.swim_pace[0]} → ${trends.swim_pace[trends.swim_pace.length - 1]} per 100yd`);
   }
   
-  // Strength lift progression
-  if (trends.strength_lifts) {
-    Object.entries(trends.strength_lifts).forEach(([lift, weights]: [string, any]) => {
-      if (Array.isArray(weights) && weights.length > 0) {
-        const first = weights[0];
-        const last = weights[weights.length - 1];
-        
-        if (first > 0 && last > 0) {
-          const liftName = lift
-            .split('_')
-            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(' ');
-          
-          if (weights.length > 1) {
-            lines.push(`${liftName}: ${first} lb → ${last} lb`);
-          } else {
-            lines.push(`${liftName}: ${first} lb`);
-          }
+  // Strength lift progression - only show meaningful data
+  const strengthLiftsWithData = trends.strength_lifts 
+    ? Object.entries(trends.strength_lifts).filter(([_, weights]: [string, any]) => 
+        Array.isArray(weights) && weights.length > 0 && weights.some((w: number) => w > 0)
+      )
+    : [];
+  
+  if (strengthLiftsWithData.length > 0) {
+    strengthLiftsWithData.forEach(([lift, weights]: [string, any]) => {
+      const first = weights[0];
+      const last = weights[weights.length - 1];
+      
+      const liftName = lift
+        .split('_')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+      
+      if (weights.length > 1 && first > 0 && last > 0) {
+        const change = last - first;
+        if (change > 0) {
+          lines.push(`💪 ${liftName}: ${first}lb → ${last}lb (+${change}lb)`);
+        } else if (change < 0) {
+          lines.push(`💪 ${liftName}: ${first}lb → ${last}lb (${change}lb)`);
+        } else {
+          lines.push(`💪 ${liftName}: Stable at ${last}lb`);
         }
+      } else if (weights.length === 1 && first > 0) {
+        lines.push(`💪 ${liftName}: ${first}lb (baseline - need more data for trends)`);
       }
     });
+  } else {
+    lines.push(`💪 STRENGTH: No primary lifts tracked. Log bench/squat/deadlift with weights for progression tracking.`);
   }
   
   return lines.length > 0 ? lines.join('\n') : 'No performance data available';
