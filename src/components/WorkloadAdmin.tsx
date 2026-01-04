@@ -38,29 +38,19 @@ export default function WorkloadAdmin() {
     
     setPowerCurveLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('No active session');
+      const { data, error } = await supabase.functions.invoke('backfill-power-curves', {
+        body: {
+          days_back: powerCurveDaysBack,
+          dry_run: powerCurveDryRun,
+          limit: 100
+        }
+      });
+
+      if (error) {
+        throw error;
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/backfill-power-curves`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            days_back: powerCurveDaysBack,
-            dry_run: powerCurveDryRun,
-            limit: 100
-          })
-        }
-      );
-
-      const result = await response.json();
-      setResults(result);
+      setResults(data);
     } catch (error: any) {
       console.error('Power curve backfill failed:', error);
       setResults({ error: error.message });
