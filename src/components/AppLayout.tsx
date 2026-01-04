@@ -1202,7 +1202,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             <div className="pt-4">
               <ContextTabs
                 onClose={handleCloseContext}
-                focusWorkoutId={contextFocusWorkoutId}
               />
             </div>
           ) : showTrainingBaselines ? (
@@ -1268,7 +1267,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               )}
               {activeBottomNav === 'insights' && (
                 <div className="pt-4 h-full">
-                  <ContextTabs focusWorkoutId={contextFocusWorkoutId} />
+                  <ContextTabs />
                 </div>
               )}
             </div>

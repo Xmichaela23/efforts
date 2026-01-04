@@ -1,25 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, TrendingUp, CalendarDays } from 'lucide-react';
-import TodaysWorkoutsTab from './context/TodaysWorkoutsTab';
+import { TrendingUp, CalendarDays } from 'lucide-react';
 import TrainingContextTab from './context/TrainingContextTab';
 import BlockSummaryTab from './context/BlockSummaryTab';
 
 interface ContextTabsProps {
   onClose?: () => void;
-  focusWorkoutId?: string | null;
 }
 
-const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, focusWorkoutId }) => {
-  const [activeTab, setActiveTab] = useState('today');
-
-  // Auto-select Daily tab when focusWorkoutId is provided
-  useEffect(() => {
-    if (focusWorkoutId) {
-      setActiveTab('today');
-    }
-  }, [focusWorkoutId]);
+const ContextTabs: React.FC<ContextTabsProps> = ({ onClose }) => {
+  const [activeTab, setActiveTab] = useState('context');
 
   return (
     <div className="w-full h-full">
@@ -49,14 +40,7 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, focusWorkoutId }) =>
 
       {/* Tabs - Exact Same Design as Completed Tab */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-3 bg-transparent border-none mb-0 py-0">
-          <TabsTrigger 
-            value="today" 
-            className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
-          >
-            <Calendar className="h-4 w-4" />
-            Daily
-          </TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 bg-transparent border-none mb-0 py-0">
           <TabsTrigger 
             value="context" 
             className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
@@ -74,10 +58,6 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, focusWorkoutId }) =>
         </TabsList>
 
         <div className="flex-1 overflow-auto">
-          <TabsContent value="today" className="flex-1 p-1">
-            <TodaysWorkoutsTab focusWorkoutId={focusWorkoutId} />
-          </TabsContent>
-          
           <TabsContent value="context" className="flex-1 p-1">
             <TrainingContextTab />
           </TabsContent>
