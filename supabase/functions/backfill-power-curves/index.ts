@@ -51,9 +51,10 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const daysBack = body.days_back || 60;
     const dryRun = body.dry_run === true;
-    const limit = body.limit || 50; // Safety limit
+    const limit = body.limit || 10; // Smaller batches to avoid timeout
+    const offset = body.offset || 0; // For pagination
 
-    console.log(`🔄 Backfill request: ${daysBack} days, dry_run=${dryRun}, limit=${limit}`);
+    console.log(`🔄 Backfill request: ${daysBack} days, dry_run=${dryRun}, limit=${limit}, offset=${offset}`);
 
     // Calculate date range
     const startDate = new Date();
@@ -64,15 +65,15 @@ Deno.serve(async (req) => {
     // - Has sensor_data (so we can calculate power curve)
     // - Is a bike or run
     // - Doesn't already have power_curve or best_efforts
-    const { data: workouts, error: queryError } = await supabase
+    const { data: workouts, error: queryError, count } = await supabase
       .from('workouts')
-      .select('id, name, date, type, computed')
+      .select('id, name, date, type, computed', { count: 'exact' })
       .eq('user_id', user.id)
       .gte('date', startDateStr)
       .in('type', ['ride', 'run', 'cycling', 'running', 'bike'])
       .not('sensor_data', 'is', null)
       .order('date', { ascending: false })
-      .limit(limit);
+      .range(offset, offset + limit - 1);
 
     if (queryError) {
       throw new Error(`Query failed: ${queryError.message}`);
@@ -92,13 +93,20 @@ Deno.serve(async (req) => {
       return false;
     });
 
-    console.log(`📊 Found ${workouts?.length || 0} workouts, ${needsBackfill.length} need backfill`);
+    console.log(`📊 Found ${workouts?.length || 0} workouts in batch, ${needsBackfill.length} need backfill, ${count} total`);
+
+    const hasMore = (offset + limit) < (count || 0);
+    const nextOffset = offset + limit;
 
     if (dryRun) {
       return new Response(JSON.stringify({
         dry_run: true,
-        total_workouts: workouts?.length || 0,
+        total_in_range: count || 0,
+        batch_size: workouts?.length || 0,
         needs_backfill: needsBackfill.length,
+        offset,
+        has_more: hasMore,
+        next_offset: hasMore ? nextOffset : null,
         workouts: needsBackfill.map(w => ({
           id: w.id,
           name: w.name,
@@ -152,13 +160,19 @@ Deno.serve(async (req) => {
     const successCount = results.filter(r => r.status === 'success').length;
     const errorCount = results.filter(r => r.status === 'error').length;
 
-    console.log(`✅ Backfill complete: ${successCount} success, ${errorCount} errors`);
+    console.log(`✅ Backfill batch complete: ${successCount} success, ${errorCount} errors`);
 
     return new Response(JSON.stringify({
       dry_run: false,
       processed: results.length,
       success: successCount,
       errors: errorCount,
+      offset,
+      has_more: hasMore,
+      next_offset: hasMore ? nextOffset : null,
+      message: hasMore 
+        ? `Batch complete. Run again with offset=${nextOffset} to continue.`
+        : 'All workouts processed!',
       results
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -24,6 +24,7 @@ export default function WorkloadAdmin() {
   const [powerCurveLoading, setPowerCurveLoading] = useState(false);
   const [powerCurveDaysBack, setPowerCurveDaysBack] = useState(60);
   const [powerCurveDryRun, setPowerCurveDryRun] = useState(true);
+  const [powerCurveOffset, setPowerCurveOffset] = useState(0);
 
   useEffect(() => {
     const getUser = async () => {
@@ -33,7 +34,7 @@ export default function WorkloadAdmin() {
     getUser();
   }, []);
 
-  const handlePowerCurveBackfill = async () => {
+  const handlePowerCurveBackfill = async (offset = 0) => {
     if (!user?.id) return;
     
     setPowerCurveLoading(true);
@@ -42,7 +43,8 @@ export default function WorkloadAdmin() {
         body: {
           days_back: powerCurveDaysBack,
           dry_run: powerCurveDryRun,
-          limit: 100
+          limit: 10, // Process 10 at a time to avoid timeout
+          offset
         }
       });
 
@@ -51,6 +53,13 @@ export default function WorkloadAdmin() {
       }
 
       setResults(data);
+      
+      // Update offset for next batch
+      if (data?.next_offset) {
+        setPowerCurveOffset(data.next_offset);
+      } else {
+        setPowerCurveOffset(0); // Reset when done
+      }
     } catch (error: any) {
       console.error('Power curve backfill failed:', error);
       setResults({ error: error.message });
@@ -201,7 +210,7 @@ export default function WorkloadAdmin() {
             </div>
 
             <Button 
-              onClick={handlePowerCurveBackfill} 
+              onClick={() => handlePowerCurveBackfill(0)} 
               disabled={powerCurveLoading}
               className="w-full"
             >
@@ -210,7 +219,7 @@ export default function WorkloadAdmin() {
               ) : (
                 <Zap className="h-4 w-4 mr-2" />
               )}
-              {powerCurveDryRun ? 'Preview Backfill' : 'Run Backfill'}
+              {powerCurveDryRun ? 'Preview Backfill' : 'Run Backfill (Batch of 10)'}
             </Button>
           </CardContent>
         </Card>
@@ -267,6 +276,35 @@ export default function WorkloadAdmin() {
                   ))}
                 </div>
               </details>
+            )}
+
+            {/* Continue button for pagination */}
+            {results.has_more && !results.dry_run && (
+              <div className="mt-4">
+                <Button 
+                  onClick={() => handlePowerCurveBackfill(results.next_offset)}
+                  disabled={powerCurveLoading}
+                  className="w-full"
+                  variant="outline"
+                >
+                  {powerCurveLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Zap className="h-4 w-4 mr-2" />
+                  )}
+                  Continue (Next Batch from offset {results.next_offset})
+                </Button>
+                <p className="text-xs text-white/50 text-center mt-2">
+                  {results.message}
+                </p>
+              </div>
+            )}
+            
+            {/* Success message */}
+            {results.message && !results.has_more && !results.dry_run && (
+              <div className="mt-4 bg-green-500/20 text-green-400 p-3 rounded-lg text-sm text-center">
+                ✓ {results.message}
+              </div>
             )}
 
             {/* Error display */}
