@@ -149,12 +149,8 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
                 <div className={`flex items-start gap-2 p-2 rounded ${DISCIPLINE_NOTES.run.bgColor} ${DISCIPLINE_NOTES.run.borderColor} border`}>
                   <Activity className={`w-4 h-4 mt-0.5 flex-shrink-0 ${DISCIPLINE_NOTES.run.color}`} />
                   <p className={`text-xs ${DISCIPLINE_NOTES.run.color}`}>
-                    <span className="font-medium">Run pace trends unavailable.</span>{' '}
-                    {data.data_quality.run_best_efforts_count === 0 ? (
-                      <>Need runs with GPS data to calculate best efforts.</>
-                    ) : (
-                      <>Need comparable efforts in both current and previous periods.</>
-                    )}
+                    <span className="font-medium">Run trends unavailable.</span>{' '}
+                    Need 2+ runs of similar duration in each 2-week period. Complete more consistent-length runs.
                   </p>
                 </div>
               )}
@@ -164,12 +160,8 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
                 <div className={`flex items-start gap-2 p-2 rounded ${DISCIPLINE_NOTES.bike.bgColor} ${DISCIPLINE_NOTES.bike.borderColor} border`}>
                   <Bike className={`w-4 h-4 mt-0.5 flex-shrink-0 ${DISCIPLINE_NOTES.bike.color}`} />
                   <p className={`text-xs ${DISCIPLINE_NOTES.bike.color}`}>
-                    <span className="font-medium">Bike power trends unavailable.</span>{' '}
-                    {data.data_quality.bike_power_curves_count === 0 ? (
-                      <>Complete 30min+ rides with a power meter to track cycling fitness.</>
-                    ) : (
-                      <>Need power data in both current and previous periods.</>
-                    )}
+                    <span className="font-medium">Bike trends unavailable.</span>{' '}
+                    Need 2+ rides of similar duration in each 2-week period. Complete more consistent-length rides with power data.
                   </p>
                 </div>
               )}
@@ -180,10 +172,10 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
                   <Dumbbell className={`w-4 h-4 mt-0.5 flex-shrink-0 ${DISCIPLINE_NOTES.strength.color}`} />
                   <p className={`text-xs ${DISCIPLINE_NOTES.strength.color}`}>
                     <span className="font-medium">Strength progression unavailable.</span>{' '}
-                    {!data.data_quality.strength_has_lifts ? (
-                      <>Log primary lifts (squat, deadlift, bench, etc.) with weights to track progress.</>
+                    {!data.data_quality.strength_has_baselines ? (
+                      <>Set 1RM baselines in settings for Squat, Deadlift, Bench Press to track progression.</>
                     ) : (
-                      <>Complete more sessions to show weight progression over time.</>
+                      <>Retest your 1RMs periodically to track strength gains over time.</>
                     )}
                   </p>
                 </div>
