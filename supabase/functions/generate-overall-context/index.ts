@@ -299,6 +299,14 @@ Deno.serve(async (req) => {
     // Compare performance within similar workout durations
     // This is more accurate than peak efforts or filtering "casual vs training"
     
+    // DEBUG: Log all workout types to see what we have
+    const workoutTypes = completedWorkouts.reduce((acc: Record<string, number>, w) => {
+      acc[w.type] = (acc[w.type] || 0) + 1;
+      return acc;
+    }, {});
+    console.log(`📊 Completed workouts by type:`, JSON.stringify(workoutTypes));
+    console.log(`📊 Total completed workouts: ${completedWorkouts.length}`);
+    
     const bikeWorkouts = completedWorkouts.filter(w => 
       w.type === 'ride' || w.type === 'cycling' || w.type === 'bike'
     );
@@ -306,6 +314,25 @@ Deno.serve(async (req) => {
       w.type === 'run' || w.type === 'running'
     );
     const strengthWorkouts = completedWorkouts.filter(w => w.type === 'strength');
+    
+    console.log(`📊 Filtered: ${bikeWorkouts.length} bikes, ${runWorkouts.length} runs, ${strengthWorkouts.length} strength`);
+    
+    // DEBUG: Log sample run workout to see all fields
+    if (runWorkouts.length > 0) {
+      const sample = runWorkouts[0];
+      console.log(`📊 Sample RUN workout:`, JSON.stringify({
+        id: sample.id,
+        name: sample.name,
+        date: sample.date,
+        type: sample.type,
+        duration: sample.duration,
+        moving_time: sample.moving_time,
+        elapsed_time: sample.elapsed_time,
+        avg_pace: sample.avg_pace,
+        avg_pace_s: sample.avg_pace_s,
+        computed: sample.computed ? Object.keys(sample.computed) : null
+      }));
+    }
     
     const bikeTrends = calculateBucketTrends(bikeWorkouts, 'bike', weeks_back);
     const runTrends = calculateBucketTrends(runWorkouts, 'run', weeks_back);
@@ -1558,13 +1585,14 @@ function calculateBucketTrends(
   }
   
   for (const [bucketKey, range] of Object.entries(buckets)) {
-    // Filter workouts in this duration bucket - try multiple field names
+    // Filter workouts in this duration bucket
+    // Duration is in: moving_time, elapsed_time (seconds)
     const currentBucket = currentPeriod.filter(w => {
-      const duration = w.duration || w.moving_time || w.elapsed_time || w.moving_time_seconds || 0;
+      const duration = w.moving_time || w.elapsed_time || 0;
       return duration >= range.min && duration < range.max;
     });
     const previousBucket = previousPeriod.filter(w => {
-      const duration = w.duration || w.moving_time || w.elapsed_time || w.moving_time_seconds || 0;
+      const duration = w.moving_time || w.elapsed_time || 0;
       return duration >= range.min && duration < range.max;
     });
     
@@ -1587,14 +1615,16 @@ function calculateBucketTrends(
       ));
       metricLabel = 'W';
     } else {
-      // For runs: use avg_pace (lower is better, so use Math.min)
-      // But we want to show improvement as positive, so we'll handle this in display
+      // For runs: use computed.overall.avg_pace_s_per_mi (seconds per mile)
+      // Lower is better (faster), so use Math.min
       const currentPaces = currentBucket
-        .map(w => w.avg_pace_s || parsePaceToSeconds(w.avg_pace))
-        .filter(p => p && p > 0);
+        .map(w => w.computed?.overall?.avg_pace_s_per_mi)
+        .filter((p): p is number => typeof p === 'number' && p > 0);
       const previousPaces = previousBucket
-        .map(w => w.avg_pace_s || parsePaceToSeconds(w.avg_pace))
-        .filter(p => p && p > 0);
+        .map(w => w.computed?.overall?.avg_pace_s_per_mi)
+        .filter((p): p is number => typeof p === 'number' && p > 0);
+      
+      console.log(`📊 ${sport} bucket ${bucketKey} paces: current=${currentPaces.length} paces, previous=${previousPaces.length} paces`);
       
       if (currentPaces.length === 0 || previousPaces.length === 0) continue;
       
