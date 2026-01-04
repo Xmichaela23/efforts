@@ -6,9 +6,10 @@ import BlockSummaryTab from './context/BlockSummaryTab';
 
 interface ContextTabsProps {
   onClose?: () => void;
+  onSelectWorkout?: (workout: any) => void;
 }
 
-const ContextTabs: React.FC<ContextTabsProps> = ({ onClose }) => {
+const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, onSelectWorkout }) => {
   const [activeTab, setActiveTab] = useState('context');
 
   return (
@@ -50,7 +51,7 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose }) => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
         <div className="flex-1 overflow-y-auto min-h-0 px-4">
           <TabsContent value="context" className="mt-0">
-            <TrainingContextTab />
+            <TrainingContextTab onSelectWorkout={onSelectWorkout} />
           </TabsContent>
           
           <TabsContent value="block" className="mt-0">

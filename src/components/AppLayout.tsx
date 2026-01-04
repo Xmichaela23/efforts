@@ -1202,6 +1202,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             <div className="pt-4">
               <ContextTabs
                 onClose={handleCloseContext}
+                onSelectWorkout={handleEditEffort}
               />
             </div>
           ) : showTrainingBaselines ? (
@@ -1267,7 +1268,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               )}
               {activeBottomNav === 'insights' && (
                 <div className="pt-4 h-full">
-                  <ContextTabs />
+                  <ContextTabs onSelectWorkout={handleEditEffort} />
                 </div>
               )}
             </div>

@@ -25,9 +25,10 @@ import { ActivityTimeline } from './ActivityTimeline';
 
 interface TrainingContextTabProps {
   date?: string; // Defaults to today
+  onSelectWorkout?: (workout: any) => void;
 }
 
-export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date }) => {
+export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, onSelectWorkout }) => {
   // Default to today if no date provided
   const focusDate = date || new Date().toLocaleDateString('en-CA');
   
@@ -131,7 +132,11 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date }) 
       <SportBreakdown breakdown={data.sport_breakdown} />
 
       {/* Activity Timeline */}
-      <ActivityTimeline timeline={data.timeline} focusDate={focusDate} />
+      <ActivityTimeline 
+        timeline={data.timeline} 
+        focusDate={focusDate} 
+        onSelectWorkout={onSelectWorkout}
+      />
     </div>
   );
 };

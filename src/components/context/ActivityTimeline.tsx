@@ -8,21 +8,37 @@
  * - Rest days shown as empty
  * - Planned workouts shown differently
  * - Acute window highlighted
+ * - Click to view workout details
  */
 
 import React from 'react';
+import { ChevronRight } from 'lucide-react';
 import { getDisciplineColor, formatWorkload, formatTimelineDate } from '@/lib/context-utils';
 import type { TimelineDay } from '@/hooks/useTrainingContext';
 
 interface ActivityTimelineProps {
   timeline: TimelineDay[];
   focusDate: string;
+  onSelectWorkout?: (workout: any) => void;
 }
 
 export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ 
   timeline, 
-  focusDate 
+  focusDate,
+  onSelectWorkout
 }) => {
+  const handleWorkoutClick = (workout: any) => {
+    if (onSelectWorkout && workout.status === 'completed') {
+      // Pass workout object with required fields for handleEditEffort
+      onSelectWorkout({
+        id: workout.id,
+        type: workout.type,
+        name: workout.name,
+        workout_status: 'completed'
+      });
+    }
+  };
+
   return (
     <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
       {/* Header */}
@@ -40,13 +56,13 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
               className={`flex items-start gap-3 py-2 rounded-lg px-2 transition-colors ${
                 isToday 
                   ? 'bg-white/[0.05]' 
-                  : 'hover:bg-white/[0.03]'
+                  : ''
               } ${
                 isAcuteWindow ? 'opacity-100' : 'opacity-60'
               }`}
             >
               {/* Date column */}
-              <div className="w-20 flex-shrink-0">
+              <div className="w-16 flex-shrink-0">
                 <div className={`text-xs ${isToday ? 'text-white font-medium' : 'text-white/60'}`}>
                   {formatTimelineDate(day.date)}
                 </div>
@@ -61,42 +77,60 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                   <div className="text-sm text-white/30 italic">Rest day</div>
                 ) : (
                   <div className="space-y-1">
-                    {day.workouts.map((workout) => (
-                      <div key={workout.id} className="flex items-center gap-2">
-                        {/* Sport indicator dot */}
-                        <div 
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ 
-                            backgroundColor: getDisciplineColor(workout.type),
-                            opacity: workout.status === 'planned' ? 0.5 : 1
-                          }}
-                        />
-                        
-                        {/* Workout name */}
-                        <span className={`text-sm truncate ${
-                          workout.status === 'planned' 
-                            ? 'text-white/50 italic' 
-                            : 'text-white/80'
-                        }`}>
-                          {workout.status === 'planned' && 'Planned: '}
-                          {workout.name}
-                        </span>
-                        
-                        {/* Workload badge */}
-                        {workout.workload_actual > 0 && (
-                          <span className="text-xs text-white/40 flex-shrink-0 bg-white/5 px-1.5 py-0.5 rounded">
-                            {formatWorkload(workout.workload_actual)}
+                    {day.workouts.map((workout) => {
+                      const isClickable = onSelectWorkout && workout.status === 'completed';
+                      
+                      return (
+                        <button
+                          key={workout.id}
+                          onClick={() => handleWorkoutClick(workout)}
+                          disabled={!isClickable}
+                          className={`w-full flex items-center gap-2 text-left rounded-md py-1 px-1 -ml-1 transition-colors ${
+                            isClickable 
+                              ? 'hover:bg-white/[0.08] active:bg-white/[0.12] cursor-pointer' 
+                              : 'cursor-default'
+                          }`}
+                        >
+                          {/* Sport indicator dot */}
+                          <div 
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ 
+                              backgroundColor: getDisciplineColor(workout.type),
+                              opacity: workout.status === 'planned' ? 0.5 : 1
+                            }}
+                          />
+                          
+                          {/* Workout name */}
+                          <span className={`text-sm truncate flex-1 ${
+                            workout.status === 'planned' 
+                              ? 'text-white/50 italic' 
+                              : 'text-white/80'
+                          }`}>
+                            {workout.status === 'planned' && 'Planned: '}
+                            {workout.name}
                           </span>
-                        )}
-                      </div>
-                    ))}
+                          
+                          {/* Workload badge */}
+                          {workout.workload_actual > 0 && (
+                            <span className="text-xs text-white/40 flex-shrink-0 bg-white/5 px-1.5 py-0.5 rounded">
+                              {formatWorkload(workout.workload_actual)}
+                            </span>
+                          )}
+                          
+                          {/* Chevron for clickable items */}
+                          {isClickable && (
+                            <ChevronRight className="w-3 h-3 text-white/30 flex-shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
               
               {/* Daily total (for days with completed workouts) */}
               {day.daily_total > 0 && (
-                <div className="w-14 text-right text-xs text-white/40 flex-shrink-0">
+                <div className="w-12 text-right text-xs text-white/40 flex-shrink-0">
                   {formatWorkload(day.daily_total)} wl
                 </div>
               )}
@@ -108,7 +142,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
       {/* Footer note */}
       <div className="mt-3 pt-3 border-t border-white/10">
         <div className="text-xs text-white/30 text-center">
-          Showing last 14 days • Acute window (last 7 days) highlighted
+          Showing last 14 days • Tap workout for details
         </div>
       </div>
     </div>
@@ -116,4 +150,3 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 };
 
 export default ActivityTimeline;
-
