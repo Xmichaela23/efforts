@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, CalendarCheck, CalendarDays } from 'lucide-react';
+import { Calendar, TrendingUp, CalendarDays } from 'lucide-react';
 import TodaysWorkoutsTab from './context/TodaysWorkoutsTab';
-import WeeklyAnalysisTab from './context/WeeklyAnalysisTab';
+import TrainingContextTab from './context/TrainingContextTab';
 import BlockSummaryTab from './context/BlockSummaryTab';
 
 interface ContextTabsProps {
@@ -58,11 +58,11 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, focusWorkoutId }) =>
             Daily
           </TabsTrigger>
           <TabsTrigger 
-            value="weekly" 
+            value="context" 
             className="flex items-center gap-2 py-1 data-[state=active]:bg-transparent data-[state=active]:text-black data-[state=active]:underline data-[state=inactive]:text-gray-500 hover:text-gray-700"
           >
-            <CalendarCheck className="h-4 w-4" />
-            Weekly
+            <TrendingUp className="h-4 w-4" />
+            Context
           </TabsTrigger>
           <TabsTrigger 
             value="block" 
@@ -78,8 +78,8 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, focusWorkoutId }) =>
             <TodaysWorkoutsTab focusWorkoutId={focusWorkoutId} />
           </TabsContent>
           
-          <TabsContent value="weekly" className="flex-1 p-1">
-            <WeeklyAnalysisTab />
+          <TabsContent value="context" className="flex-1 p-1">
+            <TrainingContextTab />
           </TabsContent>
           
           <TabsContent value="block" className="flex-1 p-1">

@@ -1,0 +1,7 @@
+# generate-training-context edge function configuration
+# Calculates ACWR, sport breakdown, timeline, and smart insights
+
+[function]
+# Allow unauthenticated requests (auth handled via service role key)
+verify_jwt = false
+
