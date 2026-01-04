@@ -2070,12 +2070,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             <col className="w-[12%]" />
           </colgroup>
           <thead>
-            <tr className="border-b border-gray-200">
-              <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Planned</th>
-              <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">{isRideSport ? 'Watts' : (isSwimSport ? '/100 (pref)' : 'Pace')}</th>
-              <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Dist</th>
-              <th className="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Time</th>
-              <th className="px-1 py-2 text-left font-medium text-gray-600 whitespace-nowrap">BPM</th>
+            <tr className="border-b border-white/10">
+              <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">Planned</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">{isRideSport ? 'Watts' : (isSwimSport ? '/100 (pref)' : 'Pace')}</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">Dist</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">Time</th>
+              <th className="px-1 py-2 text-left font-medium text-gray-400 whitespace-nowrap">BPM</th>
             </tr>
           </thead>
           <tbody>
@@ -2322,7 +2322,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             })();
 
             return (
-              <tr key={idx} className="border-b border-gray-100">
+              <tr key={idx} className="border-b border-white/10">
                 <td className="px-2 py-1.5">
                   <div className="flex flex-col">
                     <div className="flex items-center justify-between w-full min-h-[2.1rem]">
@@ -2354,7 +2354,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                       )}
                     </div>
                     {shouldShowRangeSubtitle && rangeSubtitle && (
-                      <div className="text-[9px] text-gray-500 mt-0.5">
+                      <div className="text-[10px] text-gray-400 mt-0.5">
                         {rangeSubtitle}
                       </div>
                     )}
@@ -2364,14 +2364,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 <td className="px-2 py-1.5">{distCell}</td>
                 <td className="px-2 py-1.5">
                   <div className="font-medium">{timeCell}</div>
-                  {showMovingTimeLabel && <div className="text-[9px] text-gray-500">Moving Time</div>}
                 </td>
                 <td className="px-1 py-1.5 text-[13px]">
                   <div className="text-right">
                     {hrVal != null ? (
                       <>
                         <div className="font-medium">{hrVal}</div>
-                        <div className="text-[10px] text-gray-500">bpm</div>
+                        <div className="text-[10px] text-gray-400">bpm</div>
                       </>
                     ) : '—'}
                   </div>
