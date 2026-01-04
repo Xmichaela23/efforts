@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Calculator, History, BarChart3 } from 'lucide-react';
+import { Loader2, Calculator, History, BarChart3, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { 
   calculateWorkloadForWorkout, 
@@ -19,6 +19,11 @@ export default function WorkloadAdmin() {
   const [batchSize, setBatchSize] = useState(100);
   const [dryRun, setDryRun] = useState(true);
   const [user, setUser] = useState<any>(null);
+  
+  // Power curve backfill state
+  const [powerCurveLoading, setPowerCurveLoading] = useState(false);
+  const [powerCurveDaysBack, setPowerCurveDaysBack] = useState(60);
+  const [powerCurveDryRun, setPowerCurveDryRun] = useState(true);
 
   useEffect(() => {
     const getUser = async () => {
@@ -27,6 +32,42 @@ export default function WorkloadAdmin() {
     };
     getUser();
   }, []);
+
+  const handlePowerCurveBackfill = async () => {
+    if (!user?.id) return;
+    
+    setPowerCurveLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No active session');
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/backfill-power-curves`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            days_back: powerCurveDaysBack,
+            dry_run: powerCurveDryRun,
+            limit: 100
+          })
+        }
+      );
+
+      const result = await response.json();
+      setResults(result);
+    } catch (error: any) {
+      console.error('Power curve backfill failed:', error);
+      setResults({ error: error.message });
+    } finally {
+      setPowerCurveLoading(false);
+    }
+  };
 
   const handleSweepHistory = async () => {
     if (!user?.id) return;
@@ -130,6 +171,56 @@ export default function WorkloadAdmin() {
                 <History className="h-4 w-4 mr-2" />
               )}
               Sweep User History
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Power Curve Backfill */}
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Power Curve Backfill
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Recalculate power curves (bikes) and best efforts (runs) for existing workouts.
+              Required for accurate Block tab performance trends.
+            </p>
+            
+            <div className="space-y-2">
+              <Label htmlFor="powerCurveDaysBack">Days Back</Label>
+              <Input
+                id="powerCurveDaysBack"
+                type="number"
+                value={powerCurveDaysBack}
+                onChange={(e) => setPowerCurveDaysBack(parseInt(e.target.value) || 60)}
+                min="7"
+                max="365"
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="powerCurveDryRun"
+                checked={powerCurveDryRun}
+                onCheckedChange={(checked) => setPowerCurveDryRun(checked as boolean)}
+              />
+              <Label htmlFor="powerCurveDryRun">Dry Run (preview only)</Label>
+            </div>
+
+            <Button 
+              onClick={handlePowerCurveBackfill} 
+              disabled={powerCurveLoading}
+              className="w-full"
+            >
+              {powerCurveLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Zap className="h-4 w-4 mr-2" />
+              )}
+              {powerCurveDryRun ? 'Preview Backfill' : 'Run Backfill'}
             </Button>
           </CardContent>
         </Card>
