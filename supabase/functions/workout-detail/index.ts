@@ -115,7 +115,9 @@ Deno.serve(async (req) => {
       // Source tracking for display
       'source','is_strava_imported','strava_activity_id','garmin_activity_id','device_info',
       // Achievements (PRs, segments)
-      'achievements'
+      'achievements',
+      // Workload data (single source of truth from calculate-workload)
+      'workload_actual','workload_planned','intensity_factor'
     ].join(',');
     const gpsSel = opts.include_gps ? ',gps_track' : '';
     const sensSel = opts.include_sensors ? ',sensor_data' : '';
