@@ -144,13 +144,50 @@ Deno.serve(async (req) => {
     const planned = plannedResult.data || [];
     let completedWorkouts = workoutsResult.data || [];
 
-    // Analysis will be triggered by UnifiedWorkoutView when user opens Summary tab
-    // No need for auto-triggering here to avoid race conditions
-
-    // ADD THIS ONE LINE:
-    console.log('📊 ALL bikes from DB:', completedWorkouts
+    // ==========================================================================
+    // FILTER TRAINING WORKOUTS (for performance trends only)
+    // ==========================================================================
+    // Casual rides/commutes/recovery spins shouldn't be used for trend analysis
+    // but ARE included in adherence calculations
+    
+    const trainingWorkouts = completedWorkouts.filter(w => {
+      const type = (w.type || '').toLowerCase();
+      const avgPower = w.avg_power || 0;
+      const duration = w.duration || 0; // in minutes
+      const workload = w.workload_actual || 0;
+      
+      // Sport-specific minimums for "real training"
+      if (type === 'ride' || type === 'cycling' || type === 'bike') {
+        // Bike: need 60W+, 30min+, 40 workload+
+        const isTraining = avgPower >= 60 && duration >= 30 && workload >= 40;
+        if (!isTraining) {
+          console.log(`🚴 Filtered casual bike: ${w.name} (${avgPower}W, ${duration}min, ${workload} wl)`);
+        }
+        return isTraining;
+      }
+      
+      if (type === 'run' || type === 'running') {
+        // Run: need 20min+, 30 workload+
+        return duration >= 20 && workload >= 30;
+      }
+      
+      if (type === 'swim' || type === 'swimming') {
+        // Swim: need 20min+, 25 workload+
+        return duration >= 20 && workload >= 25;
+      }
+      
+      if (type === 'strength') {
+        // Strength: need 30 workload+
+        return workload >= 30;
+      }
+      
+      return true; // Include other types
+    });
+    
+    console.log(`📊 Training filter: ${completedWorkouts.length} total → ${trainingWorkouts.length} training workouts`);
+    console.log('📊 Training bikes:', trainingWorkouts
       .filter(w => w.type === 'ride' || w.type === 'bike' || w.type === 'cycling')
-      .map(w => ({ date: w.date, power: w.avg_power, id: w.id }))
+      .map(w => ({ date: w.date, power: w.avg_power, name: w.name }))
     );
     const userBaselines = baselinesResult.data?.baselines || {};
     const planConfig = trainingPhaseResult.data?.config;
@@ -210,7 +247,14 @@ Deno.serve(async (req) => {
     console.log(`Found ${plannedWithCompletions.length} planned workouts: ${completed.length} completed, ${missed.length} missed`);
 
     // Aggregate by week and discipline
-    const weeklyAggregates = aggregateByWeekWithAttachments(plannedWithCompletions, weeks_back, userBaselines, completedWorkouts);
+    // Use trainingWorkouts for performance metrics, completedWorkouts for adherence
+    const weeklyAggregates = aggregateByWeekWithAttachments(
+      plannedWithCompletions, 
+      weeks_back, 
+      userBaselines, 
+      completedWorkouts,     // All workouts for adherence
+      trainingWorkouts       // Filtered for performance trends
+    );
 
     // Calculate trend metrics (excluding recovery weeks)
     const trends = extractTrends(weeklyAggregates, recoveryWeeks);
@@ -744,9 +788,17 @@ function analyzeSwimIntensity(workout: any, computed: any, userBaselines: any): 
 /**
  * Aggregate planned workouts with their completions by week and discipline
  */
-function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack: number, userBaselines: any, allCompletedWorkouts: any[]) {
-  // allCompletedWorkouts is now passed in from the database query
-  // This includes ALL workouts, not just ones matching planned workouts
+function aggregateByWeekWithAttachments(
+  plannedWithCompletions: any[], 
+  weeksBack: number, 
+  userBaselines: any, 
+  allCompletedWorkouts: any[],
+  trainingWorkouts?: any[]  // Filtered workouts for performance metrics
+) {
+  // allCompletedWorkouts = ALL workouts (for adherence counts)
+  // trainingWorkouts = filtered workouts (for performance metrics like power/pace)
+  // If trainingWorkouts not provided, use allCompletedWorkouts
+  const performanceWorkouts = trainingWorkouts || allCompletedWorkouts;
   const weeklyData: any[] = [];
   
   // Generate week ranges
@@ -769,27 +821,40 @@ function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack
     const completed = weekPlanned.filter(p => p.completed && p.completed.length > 0);
     const missed = weekPlanned.filter(p => !p.completed || p.completed.length === 0);
     
-    // Get ALL workouts in this week's date range (including orphaned workouts)
+    // Get ALL workouts in this week's date range (for adherence counts)
     const completedWorkoutsThisWeek = allCompletedWorkouts.filter(w => {
       const workoutDate = new Date(w.date);
       return workoutDate >= weekStart && workoutDate <= weekEnd;
     });
     
-    // Group completed workouts by discipline AND analyze intensity
-    const runs = completedWorkoutsThisWeek.filter(w => w.type === 'run' || w.type === 'running');
-    const runAnalyses = runs.map(r => analyzeWorkoutIntensity(r, userBaselines, allCompletedWorkouts));
-    const hardRuns = runs.filter((r, i) => runAnalyses[i]?.intensity === 'high');
-    const easyRuns = runs.filter((r, i) => runAnalyses[i]?.intensity === 'low');
-
-    const bikes = completedWorkoutsThisWeek.filter(w => w.type === 'ride' || w.type === 'cycling' || w.type === 'bike');
-    console.log(`🚴 Found ${bikes.length} bike workouts:`, bikes.map(b => ({ type: b.type, power: b.avg_power, id: b.id })));
-    const bikeAnalyses = bikes.map(b => analyzeWorkoutIntensity(b, userBaselines, allCompletedWorkouts));
-    const hardBikes = bikes.filter((b, i) => bikeAnalyses[i]?.intensity === 'high');
-    const easyBikes = bikes.filter((b, i) => bikeAnalyses[i]?.intensity === 'low');
-
-    const swims = completedWorkoutsThisWeek.filter(w => w.type === 'swim' || w.type === 'swimming');
+    // Get TRAINING workouts in this week's date range (for performance metrics)
+    const trainingWorkoutsThisWeek = performanceWorkouts.filter(w => {
+      const workoutDate = new Date(w.date);
+      return workoutDate >= weekStart && workoutDate <= weekEnd;
+    });
+    
+    // Group ALL completed workouts by discipline (for counts/adherence)
+    const allRuns = completedWorkoutsThisWeek.filter(w => w.type === 'run' || w.type === 'running');
+    const allBikes = completedWorkoutsThisWeek.filter(w => w.type === 'ride' || w.type === 'cycling' || w.type === 'bike');
+    const allSwims = completedWorkoutsThisWeek.filter(w => w.type === 'swim' || w.type === 'swimming');
     const strength = completedWorkoutsThisWeek.filter(w => w.type === 'strength');
     const mobility = completedWorkoutsThisWeek.filter(w => w.type === 'mobility');
+    
+    // Group TRAINING workouts by discipline (for performance metrics)
+    const trainingRuns = trainingWorkoutsThisWeek.filter(w => w.type === 'run' || w.type === 'running');
+    const trainingBikes = trainingWorkoutsThisWeek.filter(w => w.type === 'ride' || w.type === 'cycling' || w.type === 'bike');
+    const trainingSwims = trainingWorkoutsThisWeek.filter(w => w.type === 'swim' || w.type === 'swimming');
+    
+    console.log(`🚴 Week bikes: ${allBikes.length} total, ${trainingBikes.length} training`);
+    
+    // Analyze intensity for training workouts
+    const runAnalyses = trainingRuns.map(r => analyzeWorkoutIntensity(r, userBaselines, allCompletedWorkouts));
+    const hardRuns = trainingRuns.filter((r, i) => runAnalyses[i]?.intensity === 'high');
+    const easyRuns = trainingRuns.filter((r, i) => runAnalyses[i]?.intensity === 'low');
+
+    const bikeAnalyses = trainingBikes.map(b => analyzeWorkoutIntensity(b, userBaselines, allCompletedWorkouts));
+    const hardBikes = trainingBikes.filter((b, i) => bikeAnalyses[i]?.intensity === 'high');
+    const easyBikes = trainingBikes.filter((b, i) => bikeAnalyses[i]?.intensity === 'low');
     
     // Group planned by discipline for adherence analysis
     const plannedRuns = weekPlanned.filter(p => p.type === 'run' || p.type === 'running');
@@ -798,37 +863,43 @@ function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack
     const plannedStrength = weekPlanned.filter(p => p.type === 'strength');
     const plannedMobility = weekPlanned.filter(p => p.type === 'mobility');
     
-    // Calculate averages and totals for HARD sessions only (key workouts)
+    // Calculate averages and totals
+    // Counts use ALL workouts, performance metrics use TRAINING workouts only
     const weekData = {
       week_label: `Week ${weeksBack - i} (${weekStartISO} to ${weekEndISO})`,
       runs: {
-        count: runs.length,
+        count: allRuns.length,                      // All runs for adherence
+        training_count: trainingRuns.length,         // Training runs for trends
         hard_count: hardRuns.length,
         easy_count: easyRuns.length,
-        avg_pace: runs.length > 0 ? calculateAveragePaceFromSamples(runs) : null,
+        // Performance metrics from TRAINING runs only
+        avg_pace: trainingRuns.length > 0 ? calculateAveragePaceFromSamples(trainingRuns) : null,
         hard_avg_pace: hardRuns.length > 0 ? calculateAveragePaceFromComputed(hardRuns) : null,
-        best_pace: runs.length > 0 ? calculateBestPaceFromComputed(runs) : null,
-        avg_speed: runs.length > 0 ? calculateAverageSpeed(runs) : null,
-        avg_heart_rate: runs.length > 0 ? calculateAverageHeartRate(runs) : null,
-        total_distance: runs.reduce((sum, r) => sum + (r.distance || 0), 0)
+        best_pace: trainingRuns.length > 0 ? calculateBestPaceFromComputed(trainingRuns) : null,
+        avg_speed: trainingRuns.length > 0 ? calculateAverageSpeed(trainingRuns) : null,
+        avg_heart_rate: trainingRuns.length > 0 ? calculateAverageHeartRate(trainingRuns) : null,
+        total_distance: allRuns.reduce((sum, r) => sum + (r.distance || 0), 0)
       },
       bikes: {
-        count: bikes.length,
+        count: allBikes.length,                      // All bikes for adherence
+        training_count: trainingBikes.length,        // Training bikes for trends
         hard_count: hardBikes.length,
         easy_count: easyBikes.length,
-        avg_power: bikes.length > 0 ? calculateAveragePowerFromSamples(bikes) : null,
+        // Performance metrics from TRAINING bikes only
+        avg_power: trainingBikes.length > 0 ? calculateAveragePowerFromSamples(trainingBikes) : null,
         hard_avg_power: hardBikes.length > 0 ? calculateAveragePower(hardBikes) : null,
-        best_power: bikes.length > 0 ? calculateBestPower(bikes) : null,
-        avg_speed: bikes.length > 0 ? calculateAverageSpeed(bikes) : null,
-        avg_heart_rate: bikes.length > 0 ? calculateAverageHeartRate(bikes) : null,
-        total_duration: bikes.reduce((sum, b) => sum + (b.duration || 0), 0)
+        best_power: trainingBikes.length > 0 ? calculateBestPower(trainingBikes) : null,
+        avg_speed: trainingBikes.length > 0 ? calculateAverageSpeed(trainingBikes) : null,
+        avg_heart_rate: trainingBikes.length > 0 ? calculateAverageHeartRate(trainingBikes) : null,
+        total_duration: allBikes.reduce((sum, b) => sum + (b.duration || 0), 0)
       },
       swims: {
-        count: swims.length,
-        avg_pace: swims.length > 0 ? calculateAverageSwimPaceFromComputed(swims) : null,
-        avg_speed: swims.length > 0 ? calculateAverageSpeed(swims) : null,
-        avg_heart_rate: swims.length > 0 ? calculateAverageHeartRate(swims) : null,
-        total_distance: swims.reduce((sum, s) => sum + (s.distance || 0), 0)
+        count: allSwims.length,                      // All swims for adherence
+        training_count: trainingSwims.length,        // Training swims for trends
+        avg_pace: trainingSwims.length > 0 ? calculateAverageSwimPaceFromComputed(trainingSwims) : null,
+        avg_speed: trainingSwims.length > 0 ? calculateAverageSpeed(trainingSwims) : null,
+        avg_heart_rate: trainingSwims.length > 0 ? calculateAverageHeartRate(trainingSwims) : null,
+        total_distance: allSwims.reduce((sum, s) => sum + (s.distance || 0), 0)
       },
       strength: {
         count: strength.length,
@@ -864,9 +935,9 @@ function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack
         mobility: plannedMobility.length
       },
       completed_by_type: {
-        runs: runs.length,
-        bikes: bikes.length,
-        swims: swims.length,
+        runs: allRuns.length,
+        bikes: allBikes.length,
+        swims: allSwims.length,
         strength: strength.length,
         mobility: mobility.length
       },
@@ -879,7 +950,7 @@ function aggregateByWeekWithAttachments(plannedWithCompletions: any[], weeksBack
       }
     };
     
-    console.log(`✅ Week ${weeksBack - i}: runs=${runs.length} (${hardRuns.length} hard), hard_pace=${weekData.runs.hard_avg_pace}, bikes=${bikes.length} (${hardBikes.length} hard), hard_power=${weekData.bikes.hard_avg_power}`);
+    console.log(`✅ Week ${weeksBack - i}: runs=${allRuns.length} (${trainingRuns.length} training), bikes=${allBikes.length} (${trainingBikes.length} training), training bike power=${weekData.bikes.avg_power}`);
     
     weeklyData.push(weekData);
   }
