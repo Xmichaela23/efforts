@@ -65,6 +65,10 @@ function normalizeBasic(w: any) {
     achievements: w?.achievements ?? null,
     // Computed snapshot passthrough
     computed: w?.computed || null,
+    // Workload data
+    workload_actual: w?.workload_actual ?? null,
+    workload_planned: w?.workload_planned ?? null,
+    intensity_factor: w?.intensity_factor ?? null,
   };
 }
 
