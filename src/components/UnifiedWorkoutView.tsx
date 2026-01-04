@@ -619,6 +619,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     const activityType = getWorkoutType();
     const rawProvider = String((workout as any)?.provider_sport || (workout as any)?.activity_type || '').toLowerCase();
     const humanize = (s: string) => s.replace(/_/g,' ').replace(/\s+/g,' ').trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    
+    // Check for indoor/treadmill indicators
+    const isTrainer = (workout as any)?.strava_data?.original_activity?.trainer === true;
+    const hasGps = Array.isArray((workout as any)?.gps_track) && (workout as any).gps_track.length > 0;
+    const isIndoorRun = (activityType === 'run' || activityType === 'walk') && (isTrainer || !hasGps);
+    
     const friendlySport = () => {
       if (activityType === 'swim') {
         if (/open\s*water|ocean|ow\b/.test(rawProvider)) return 'Open Water Swim';
@@ -627,6 +633,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       }
       if (activityType === 'run') {
         if (/trail/.test(rawProvider)) return 'Trail Run';
+        // Indoor/treadmill detection
+        if (isIndoorRun) return isTrainer ? 'Treadmill' : 'Indoor Run';
         return 'Run';
       }
       if (activityType === 'ride') {
@@ -635,7 +643,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (/road/.test(rawProvider)) return 'Road Ride';
         return 'Ride';
       }
-      if (activityType === 'walk') return 'Walk';
+      if (activityType === 'walk') {
+        if (isIndoorRun) return 'Indoor Walk';
+        return 'Walk';
+      }
       if (activityType === 'strength') return 'Strength Training';
       return humanize(rawProvider || activityType);
     };

@@ -1218,6 +1218,10 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                       const numberOfLengths = workout.number_of_active_lengths || null;
                       const hasGps = Array.isArray(workout.gps_track) && workout.gps_track.length > 0;
                       
+                      // Check for indoor/treadmill indicators
+                      const isTrainer = (workout as any)?.strava_data?.original_activity?.trainer === true;
+                      const isIndoorRun = (type === 'run' || type === 'walk') && (isTrainer || !hasGps);
+                      
                       // Check if name is already nice (not a raw activity_type or single lowercase word)
                       const existingName = workout.name;
                       
@@ -1232,6 +1236,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                         }
                         if (type === 'run') {
                           if (/trail/.test(rawType)) return 'Trail Run';
+                          if (isIndoorRun) return isTrainer ? 'Treadmill' : 'Indoor Run';
                           return 'Run';
                         }
                         if (type === 'ride') {
@@ -1240,7 +1245,10 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                           if (/road/.test(rawType)) return 'Road Ride';
                           return 'Ride';
                         }
-                        if (type === 'walk') return 'Walk';
+                        if (type === 'walk') {
+                          if (isIndoorRun) return 'Indoor Walk';
+                          return 'Walk';
+                        }
                         if (type === 'strength') {
                           // Check workout_structure.title first (from plans), then workout.name
                           const stTitle = String((workout as any)?.workout_structure?.title || '').trim();

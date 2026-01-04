@@ -1709,78 +1709,98 @@ function EffortsViewerMapbox({
         </button>
       </div>
 
-      {/* Map (MapLibre) or Virtual Ride Placeholder */}
+      {/* Map (MapLibre) or Indoor/Virtual Activity Placeholder */}
       {isVirtualActivity(workoutData) ? (
-        // Virtual ride placeholder - Zwift/indoor activities don't have real-world maps
-        <div 
-          style={{ 
-            height: 200, 
-            background: 'linear-gradient(135deg, #0f1f0f 0%, #1a2e1a 50%, #0f1f0f 100%)',
-            borderRadius: 12,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            overflow: 'hidden',
-            border: '1px solid rgba(34,197,94,0.2)',
-          }}
-        >
-          {/* Gradient background with green tones */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'radial-gradient(circle at 30% 40%, rgba(22,163,74,0.12) 0%, transparent 50%), radial-gradient(circle at 70% 60%, rgba(34,197,94,0.08) 0%, transparent 50%)',
-          }} />
+        // Indoor/virtual activity placeholder - no real-world map available
+        (() => {
+          const workoutType = String((workoutData as any)?.type || '').toLowerCase();
+          const label = getVirtualWorkoutLabel(workoutData);
+          const isRun = workoutType === 'run';
+          const isWalk = workoutType === 'walk';
+          const isRunOrWalk = isRun || isWalk;
           
-          {/* Grid pattern overlay */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: 'linear-gradient(rgba(34,197,94,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,0.05) 1px, transparent 1px)',
-            backgroundSize: '20px 20px',
-          }} />
+          // Color scheme: teal for runs/walks (matches app discipline color), green for cycling
+          // Run color: #14b8a6 (teal-500) = rgb(20,184,166)
+          const primaryColorRgb = isRunOrWalk ? '20,184,166' : '34,197,94';
+          const darkBg = isRunOrWalk 
+            ? 'linear-gradient(135deg, #0f1f1f 0%, #1a2e2e 50%, #0f1f1f 100%)'
+            : 'linear-gradient(135deg, #0f1f0f 0%, #1a2e1a 50%, #0f1f0f 100%)';
+          const subtitle = isRunOrWalk ? 'No GPS data recorded' : 'Virtual world map not available';
           
-          {/* Content */}
-          <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
-            {/* Icon */}
-            <div style={{
-              width: 48,
-              height: 48,
-              margin: '0 auto 12px',
-              background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
-              borderRadius: 12,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(22,163,74,0.3)',
-            }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                <line x1="8" y1="21" x2="16" y2="21" />
-                <line x1="12" y1="17" x2="12" y2="21" />
-              </svg>
+          return (
+            <div 
+              style={{ 
+                height: 200, 
+                background: darkBg,
+                borderRadius: 12,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                overflow: 'hidden',
+                border: `1px solid rgba(${primaryColorRgb},0.2)`,
+              }}
+            >
+              {/* Gradient background */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: `radial-gradient(circle at 30% 40%, rgba(${primaryColorRgb},0.12) 0%, transparent 50%), radial-gradient(circle at 70% 60%, rgba(${primaryColorRgb},0.08) 0%, transparent 50%)`,
+              }} />
+              
+              {/* Grid pattern overlay */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `linear-gradient(rgba(${primaryColorRgb},0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(${primaryColorRgb},0.05) 1px, transparent 1px)`,
+                backgroundSize: '20px 20px',
+              }} />
+              
+              {/* Content */}
+              <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+                {/* Icon - monitor/screen for all indoor activities */}
+                <div style={{
+                  width: 48,
+                  height: 48,
+                  margin: '0 auto 12px',
+                  background: isRunOrWalk 
+                    ? 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)'  // teal-600 to teal-500
+                    : 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
+                  borderRadius: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: `0 4px 12px rgba(${primaryColorRgb},0.3)`,
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                    <line x1="8" y1="21" x2="16" y2="21" />
+                    <line x1="12" y1="17" x2="12" y2="21" />
+                  </svg>
+                </div>
+                
+                {/* Label */}
+                <div style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: `rgba(${primaryColorRgb},0.9)`,
+                  marginBottom: 4,
+                  letterSpacing: '0.5px',
+                }}>
+                  {label}
+                </div>
+                <div style={{
+                  fontSize: 12,
+                  color: 'rgba(255,255,255,0.5)',
+                  fontWeight: 400,
+                }}>
+                  {subtitle}
+                </div>
+              </div>
             </div>
-            
-            {/* Label */}
-            <div style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: 'rgba(34,197,94,0.9)',
-              marginBottom: 4,
-              letterSpacing: '0.5px',
-            }}>
-              {getVirtualWorkoutLabel(workoutData)}
-            </div>
-            <div style={{
-              fontSize: 12,
-              color: 'rgba(255,255,255,0.5)',
-              fontWeight: 400,
-            }}>
-              Virtual world map not available
-            </div>
-          </div>
-        </div>
+          );
+        })()
       ) : (
         <MapEffort
           trackLngLat={useMemo(() => {

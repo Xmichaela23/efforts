@@ -4,13 +4,14 @@
  */
 
 /**
- * Check if a workout is a virtual/indoor activity (Zwift, treadmill, indoor trainer)
- * These activities have GPS data that maps to fictional locations (e.g., Watopia in the Pacific Ocean)
+ * Check if a workout is a virtual/indoor activity (Zwift, treadmill, indoor trainer, indoor run)
+ * These activities either have fictional GPS data (Zwift) or no GPS data (treadmill/indoor)
  */
 export function isVirtualActivity(workout: any): boolean {
   const providerSport = (workout?.provider_sport || '').toLowerCase();
   const activityType = (workout?.activity_type || '').toLowerCase();
   const name = (workout?.name || '').toLowerCase();
+  const type = (workout?.type || '').toLowerCase();
   
   // Check provider sport type for virtual indicators
   const isVirtualSport = (
@@ -30,7 +31,12 @@ export function isVirtualActivity(workout: any): boolean {
     name.includes('innsbruck') && name.includes('zwift')
   );
   
-  return isVirtualSport || isZwiftWorkout;
+  // Check for indoor run/walk: trainer flag OR no GPS for run/walk types
+  const isTrainer = workout?.strava_data?.original_activity?.trainer === true;
+  const hasGps = Array.isArray(workout?.gps_track) && workout.gps_track.length > 0;
+  const isIndoorRun = (type === 'run' || type === 'walk') && (isTrainer || !hasGps);
+  
+  return isVirtualSport || isZwiftWorkout || isIndoorRun;
 }
 
 /**
@@ -39,16 +45,35 @@ export function isVirtualActivity(workout: any): boolean {
 export function getVirtualWorkoutLabel(workout: any): string {
   const providerSport = (workout?.provider_sport || '').toLowerCase();
   const name = (workout?.name || '').toLowerCase();
+  const type = (workout?.type || '').toLowerCase();
   
+  // Zwift detection
   if (name.includes('zwift') || providerSport.includes('virtual')) {
     return 'Zwift';
   }
+  
+  // Indoor cycling
   if (providerSport === 'indoorcycling' || providerSport.includes('trainer')) {
     return 'Indoor Trainer';
   }
-  if (providerSport.includes('treadmill')) {
+  
+  // Treadmill (explicit flag or provider sport)
+  const isTrainer = workout?.strava_data?.original_activity?.trainer === true;
+  if (providerSport.includes('treadmill') || (type === 'run' && isTrainer)) {
     return 'Treadmill';
   }
+  
+  // Indoor run (no GPS, no explicit trainer flag)
+  const hasGps = Array.isArray(workout?.gps_track) && workout.gps_track.length > 0;
+  if (type === 'run' && !hasGps) {
+    return 'Indoor Run';
+  }
+  
+  // Indoor walk
+  if (type === 'walk' && !hasGps) {
+    return 'Indoor Walk';
+  }
+  
   return 'Virtual Ride';
 }
 

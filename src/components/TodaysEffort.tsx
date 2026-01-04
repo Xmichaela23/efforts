@@ -672,10 +672,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Get discipline name
   // Display label: prefer provider sport when present (e.g., Hike, Gravel Ride)
+  // Also detect indoor/treadmill runs from trainer flag or missing GPS
   const getDisplaySport = (workout: any): string => {
+    const type = String(workout?.type || '').toLowerCase();
     const provider = workout?.strava_data?.original_activity?.sport_type
       || workout?.provider_sport
       || '';
+    
+    // Check for indoor/treadmill indicators
+    const isTrainer = workout?.strava_data?.original_activity?.trainer === true;
+    const hasGps = Array.isArray(workout?.gps_track) && workout.gps_track.length > 0;
+    const isIndoorRun = (type === 'run' || type === 'walk') && (isTrainer || !hasGps);
+
+    // For indoor runs, return "Indoor Run" or "Treadmill"
+    if (isIndoorRun && type === 'run') {
+      return isTrainer ? 'Treadmill' : 'Indoor Run';
+    }
+    if (isIndoorRun && type === 'walk') {
+      return 'Indoor Walk';
+    }
 
     if (typeof provider === 'string' && provider.trim().length > 0) {
       // Title case

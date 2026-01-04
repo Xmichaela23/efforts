@@ -518,6 +518,18 @@ function mapStravaToWorkout(activity, userId) {
     achievements: achievements ? JSON.stringify(achievements) : null,
     // Device info for display (e.g., "Garmin Forerunner 265", "Wahoo ELEMNT", "Zwift")
     device_info: activity.device_name ? JSON.stringify({ device_name: activity.device_name }) : null,
+    // Store original Strava activity for reference (includes trainer flag, sport_type, etc.)
+    strava_data: JSON.stringify({
+      original_activity: {
+        id: activity.id,
+        sport_type: activity.sport_type || activity.type,
+        trainer: activity.trainer ?? null,
+        workout_type: activity.workout_type ?? null,
+        gear_id: activity.gear_id ?? null,
+        device_name: activity.device_name ?? null,
+      },
+      import_date: new Date().toISOString(),
+    }),
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString()
   };
