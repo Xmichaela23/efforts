@@ -329,11 +329,19 @@ Deno.serve(async (req) => {
       );
       
       // Add data quality flags for UI
+      // Show bike note if: rides exist AND no comparable peak data (either no curves OR only one period has data)
+      const bikePeakComparable = bikePeakAvailable && 
+        ((peakPerformance.bike_20min?.current && peakPerformance.bike_20min?.previous) ||
+         (peakPerformance.bike_5min?.current && peakPerformance.bike_5min?.previous) ||
+         (peakPerformance.bike_1min?.current && peakPerformance.bike_1min?.previous));
+      
       analysis.data_quality = {
         has_bikes_without_power_curves: hasBikesButNoPowerCurve,
         bike_rides_count: bikeWorkouts.length,
         bike_power_curves_count: bikesWithPowerCurve.length,
-        bike_peak_available: !!bikePeakAvailable
+        bike_peak_available: !!bikePeakAvailable,
+        bike_peak_comparable: !!bikePeakComparable,
+        show_bike_note: bikeWorkouts.length > 0 && !bikePeakComparable
       };
     } else {
       // Return limited analysis without performance trends

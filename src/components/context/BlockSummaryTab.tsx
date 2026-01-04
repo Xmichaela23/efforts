@@ -109,15 +109,18 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
             {data.performance_trends}
           </p>
           
-          {/* Bike power data quality note */}
-          {data.data_quality?.has_bikes_without_power_curves && !data.data_quality?.bike_peak_available && (
+          {/* Bike power data quality note - show when rides exist but no comparable power trends */}
+          {data.data_quality?.show_bike_note && (
             <div className="mt-3 pt-3 border-t border-white/10">
               <div className="flex items-start gap-2 text-amber-400/80">
                 <Bike className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <p className="text-xs">
                   <span className="font-medium">Bike power trends unavailable.</span>{' '}
-                  You have {data.data_quality.bike_rides_count} ride{data.data_quality.bike_rides_count !== 1 ? 's' : ''} but no power curve data. 
-                  Complete 30min+ structured rides with a power meter to track cycling fitness.
+                  {data.data_quality.bike_power_curves_count === 0 ? (
+                    <>You have {data.data_quality.bike_rides_count} ride{data.data_quality.bike_rides_count !== 1 ? 's' : ''} but no power data. Complete 30min+ rides with a power meter.</>
+                  ) : (
+                    <>Need power data in both the current and previous 2-week periods to show trends.</>
+                  )}
                 </p>
               </div>
             </div>
