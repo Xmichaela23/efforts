@@ -2037,6 +2037,23 @@ function calculateBestPaceFromComputed(runs: any[]): string | null {
 }
 
 /**
+ * Calculate average pace from runs using computed.overall.avg_pace_s_per_mi
+ */
+function calculateAveragePaceFromComputed(runs: any[]): string | null {
+  const paces = runs
+    .map(r => {
+      const computed = typeof r.computed === 'string' ? JSON.parse(r.computed) : r.computed;
+      return computed?.overall?.avg_pace_s_per_mi || null;
+    })
+    .filter((p): p is number => p !== null && p > 0);
+  
+  if (paces.length === 0) return null;
+  
+  const avgPaceSeconds = paces.reduce((sum, p) => sum + p, 0) / paces.length;
+  return secondsToPace(avgPaceSeconds);
+}
+
+/**
  * Calculate best (highest) power from bikes
  */
 function calculateBestPower(bikes: any[]): number | null {
