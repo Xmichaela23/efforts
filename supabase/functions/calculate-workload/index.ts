@@ -599,28 +599,60 @@ serve(async (req) => {
     let workoutStatus = workout_data?.workout_status;
     let workoutMetadata: any = null;
     
-    // Always fetch workout_metadata from database (even if workout_data is provided)
-    // This ensures we get Session RPE for strength workouts
+    // Always fetch workout_metadata and user_id from database (even if workout_data is provided)
+    // This ensures we get Session RPE for strength workouts and can fetch user's FTP
+    let userId: string | null = null;
     const { data: dbWorkout, error: dbError } = await supabaseClient
       .from('workouts')
-      .select('workout_status, workout_metadata')
+      .select('workout_status, workout_metadata, user_id')
       .eq('id', workout_id)
       .single()
     
     if (!dbError && dbWorkout) {
       workoutStatus = workoutStatus || dbWorkout.workout_status || 'completed';
       workoutMetadata = dbWorkout.workout_metadata;
+      userId = dbWorkout.user_id;
     } else {
       // Try planned_workouts table
       const { data: plannedWorkout, error: plannedError } = await supabaseClient
         .from('planned_workouts')
-        .select('workout_status, workout_metadata')
+        .select('workout_status, workout_metadata, user_id')
         .eq('id', workout_id)
         .single()
       
       if (!plannedError && plannedWorkout) {
         workoutStatus = workoutStatus || plannedWorkout.workout_status || 'planned';
         workoutMetadata = plannedWorkout.workout_metadata;
+        userId = plannedWorkout.user_id;
+      }
+    }
+    
+    // Fetch user's FTP and threshold HR from user_baselines
+    let userFtp: number | null = null;
+    let userThresholdHr: number | null = null;
+    if (userId) {
+      try {
+        const { data: baseline } = await supabaseClient
+          .from('user_baselines')
+          .select('performance_numbers')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (baseline?.performance_numbers) {
+          const perfNumbers = typeof baseline.performance_numbers === 'string' 
+            ? JSON.parse(baseline.performance_numbers) 
+            : baseline.performance_numbers;
+          if (perfNumbers?.ftp) {
+            userFtp = Number(perfNumbers.ftp);
+            console.log('[calculate-workload] User FTP from baselines:', userFtp);
+          }
+          if (perfNumbers?.thresholdHeartRate || perfNumbers?.threshold_heart_rate) {
+            userThresholdHr = Number(perfNumbers.thresholdHeartRate || perfNumbers.threshold_heart_rate);
+            console.log('[calculate-workload] User THR from baselines:', userThresholdHr);
+          }
+        }
+      } catch (e) {
+        console.error('[calculate-workload] Error fetching user baselines:', e);
       }
     }
     
@@ -655,6 +687,17 @@ serve(async (req) => {
       }
     } else {
       workoutStatus = workoutStatus || workout_data.workout_status || 'completed';
+    }
+    
+    // Inject user's FTP and threshold HR into workout data if not already present
+    // This allows power/HR-based intensity calculation for Strava/Garmin imports
+    if (userFtp && !finalWorkoutData.functional_threshold_power) {
+      finalWorkoutData.functional_threshold_power = userFtp;
+      console.log('[calculate-workload] Injected user FTP:', userFtp);
+    }
+    if (userThresholdHr && !finalWorkoutData.threshold_heart_rate) {
+      finalWorkoutData.threshold_heart_rate = userThresholdHr;
+      console.log('[calculate-workload] Injected user THR:', userThresholdHr);
     }
     
     // Parse workout_metadata if it's a string (JSONB from database)
@@ -742,7 +785,11 @@ serve(async (req) => {
         workload_actual: workoutStatus === 'completed' ? workload : null,
         intensity_factor: intensity,
         planned_workload: plannedWorkload, // For comparison when attached
-        workload_difference: plannedWorkload !== null ? workload - plannedWorkload : null
+        workload_difference: plannedWorkload !== null ? workload - plannedWorkload : null,
+        // Debug info for power-based calculation
+        user_ftp: userFtp,
+        avg_power: finalWorkoutData?.avg_power,
+        intensity_method: userFtp && finalWorkoutData?.avg_power ? 'power_based' : 'default'
       }),
       { 
         status: 200, 
