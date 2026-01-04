@@ -1157,67 +1157,67 @@ function generatePerformanceSummary(weeks: any[], trends: any, peakPerformance?:
   // ==========================================================================
   // This is the most accurate measure of fitness - comparing best efforts
   
+  // ==========================================================================
+  // PEAK PERFORMANCE - Only show if we have REAL comparable data
+  // ==========================================================================
+  
   if (peakPerformance) {
-    // Bike: Best power (check 20min, 5min, 1min in order of preference)
+    // Bike: Best power - ONLY if we have data in BOTH periods for comparison
     const bikePeak = peakPerformance.bike_20min || peakPerformance.bike_5min || peakPerformance.bike_1min;
     if (bikePeak) {
-      const { current, previous, change, duration } = bikePeak;
+      const { current, previous, duration } = bikePeak;
       const durationLabel = duration || '20min';
       if (current && previous) {
         const diff = current - previous;
-        const trend = diff > 0 ? `+${diff}W` : diff < 0 ? `${diff}W` : 'no change';
-        lines.push(`🚴 PEAK ${durationLabel} power: ${previous}W → ${current}W (${trend})`);
+        const trend = diff > 0 ? `+${diff}W` : diff < 0 ? `${diff}W` : 'stable';
+        lines.push(`🚴 BIKE: Peak ${durationLabel} power ${previous}W → ${current}W (${trend})`);
       } else if (current) {
-        lines.push(`🚴 PEAK ${durationLabel} power: ${current}W (establishing baseline)`);
+        lines.push(`🚴 BIKE: Peak ${durationLabel} power ${current}W. Need 2+ months of data for trend comparison.`);
       }
+    } else {
+      // No power curve data at all - be explicit
+      lines.push(`🚴 BIKE: No structured training rides with power data. Complete 30min+ rides to track power trends.`);
     }
     
-    // Run: Best 5K pace
+    // Run: Best 5K pace - ONLY if we have data in BOTH periods
     if (peakPerformance.run_5k) {
       const { current, previous } = peakPerformance.run_5k;
       if (current && previous) {
-        lines.push(`🏃 PEAK 5K pace: ${previous} → ${current}`);
+        lines.push(`🏃 RUN: Peak 5K pace ${previous} → ${current}`);
       } else if (current) {
-        lines.push(`🏃 PEAK 5K pace: ${current} (no previous data for comparison)`);
+        lines.push(`🏃 RUN: Peak 5K pace ${current}. Need 2+ months of data for trend comparison.`);
       }
-    }
-    
-    // Run: Best mile pace
-    if (peakPerformance.run_1mi) {
+    } else if (peakPerformance.run_1mi) {
+      // Fall back to mile if no 5K
       const { current, previous } = peakPerformance.run_1mi;
       if (current && previous) {
-        lines.push(`🏃 PEAK 1mi pace: ${previous} → ${current}`);
+        lines.push(`🏃 RUN: Peak mile pace ${previous} → ${current}`);
       } else if (current) {
-        lines.push(`🏃 PEAK 1mi pace: ${current}`);
+        lines.push(`🏃 RUN: Peak mile pace ${current}. Need 2+ months of data for trend comparison.`);
       }
+    } else {
+      // No run peak data
+      lines.push(`🏃 RUN: No runs long enough for peak effort analysis. Complete 5K+ runs to track pace trends.`);
     }
+  } else {
+    // No peak performance data at all
+    lines.push(`No peak performance data available. Workouts need computed power curves/best efforts.`);
   }
   
-  // If we have peak data, add a separator before the weekly trends
-  if (lines.length > 0) {
-    lines.push('');
-    lines.push('Weekly averages (for context):');
-  }
+  lines.push('');  // Separator
   
   // ==========================================================================
   // WEEKLY TRENDS (existing logic, kept for context)
   // ==========================================================================
   
-  // Run metrics - prioritize hard workout progression
-  if (trends.run_hard_pace && trends.run_hard_pace.length > 1) {
-    lines.push(`Run intervals avg: ${trends.run_hard_pace[0]} → ${trends.run_hard_pace[trends.run_hard_pace.length - 1]}`);
-  }
+  // Run HR only (no pace averages - peak data is more meaningful)
   if (trends.run_heart_rate && trends.run_heart_rate.length > 1) {
-    lines.push(`Run HR avg: ${trends.run_heart_rate[0]} → ${trends.run_heart_rate[trends.run_heart_rate.length - 1]} bpm`);
+    lines.push(`Run HR: ${trends.run_heart_rate[0]} → ${trends.run_heart_rate[trends.run_heart_rate.length - 1]} bpm`);
   }
   
-  // Bike metrics - ONLY show averages if we don't have peak power data
-  const hasBikePeakData = peakPerformance && (peakPerformance.bike_20min || peakPerformance.bike_5min || peakPerformance.bike_1min);
-  if (!hasBikePeakData && trends.bike_hard_power && trends.bike_hard_power.length > 1) {
-    lines.push(`Bike intervals avg: ${trends.bike_hard_power[0]}W → ${trends.bike_hard_power[trends.bike_hard_power.length - 1]}W`);
-  }
+  // Bike HR only (no power averages - they're misleading without peak data)
   if (trends.bike_heart_rate && trends.bike_heart_rate.length > 1) {
-    lines.push(`Bike HR avg: ${trends.bike_heart_rate[0]} → ${trends.bike_heart_rate[trends.bike_heart_rate.length - 1]} bpm`);
+    lines.push(`Bike HR: ${trends.bike_heart_rate[0]} → ${trends.bike_heart_rate[trends.bike_heart_rate.length - 1]} bpm`);
   }
   
   // Swim metrics
