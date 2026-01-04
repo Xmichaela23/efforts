@@ -143,12 +143,22 @@ Deno.serve(async (req) => {
 
     const planned = plannedResult.data || [];
     let completedWorkouts = workoutsResult.data || [];
+    const userBaselines = baselinesResult.data?.baselines || {};
 
     // ==========================================================================
     // FILTER TRAINING WORKOUTS (for performance trends only)
     // ==========================================================================
     // Casual rides/commutes/recovery spins shouldn't be used for trend analysis
     // but ARE included in adherence calculations
+    // 
+    // Key insight: Use FTP-relative filtering, not absolute wattage.
+    // An 83W ride for someone with 200W FTP (41% IF) is clearly casual.
+    
+    const userFTP = userBaselines.ftp || 200; // Default FTP if not set
+    const MIN_INTENSITY_FACTOR = 0.50; // Must be at least 50% of FTP to count as training
+    const minBikePower = userFTP * MIN_INTENSITY_FACTOR;
+    
+    console.log(`🎯 FTP-based filter: FTP=${userFTP}W, min training power=${minBikePower}W (${MIN_INTENSITY_FACTOR * 100}% of FTP)`);
     
     const trainingWorkouts = completedWorkouts.filter(w => {
       const type = (w.type || '').toLowerCase();
@@ -158,10 +168,11 @@ Deno.serve(async (req) => {
       
       // Sport-specific minimums for "real training"
       if (type === 'ride' || type === 'cycling' || type === 'bike') {
-        // Bike: need 60W+, 30min+, 40 workload+
-        const isTraining = avgPower >= 60 && duration >= 30 && workload >= 40;
+        // Bike: need 50%+ of FTP, 30min+, 40 workload+
+        const intensityFactor = avgPower / userFTP;
+        const isTraining = avgPower >= minBikePower && duration >= 30 && workload >= 40;
         if (!isTraining) {
-          console.log(`🚴 Filtered casual bike: ${w.name} (${avgPower}W, ${duration}min, ${workload} wl)`);
+          console.log(`🚴 Filtered casual bike: ${w.name} (${avgPower}W = ${Math.round(intensityFactor * 100)}% IF, ${duration}min, ${workload} wl)`);
         }
         return isTraining;
       }
@@ -189,7 +200,6 @@ Deno.serve(async (req) => {
       .filter(w => w.type === 'ride' || w.type === 'bike' || w.type === 'cycling')
       .map(w => ({ date: w.date, power: w.avg_power, name: w.name }))
     );
-    const userBaselines = baselinesResult.data?.baselines || {};
     const planConfig = trainingPhaseResult.data?.config;
     const currentWeek = trainingPhaseResult.data?.current_week || 1;
     
