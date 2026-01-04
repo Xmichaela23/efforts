@@ -1241,8 +1241,9 @@ function generatePerformanceSummary(weeks: any[], trends: any, peakPerformance?:
     lines.push(`Run HR: ${trends.run_heart_rate[0]} → ${trends.run_heart_rate[trends.run_heart_rate.length - 1]} bpm`);
   }
   
-  // Bike HR only (no power averages - they're misleading without peak data)
-  if (trends.bike_heart_rate && trends.bike_heart_rate.length > 1) {
+  // Bike HR only if we ALSO have bike power data (otherwise HR is meaningless)
+  const hasBikePower = peakPerformance && (peakPerformance.bike_20min || peakPerformance.bike_5min || peakPerformance.bike_1min);
+  if (hasBikePower && trends.bike_heart_rate && trends.bike_heart_rate.length > 1) {
     lines.push(`Bike HR: ${trends.bike_heart_rate[0]} → ${trends.bike_heart_rate[trends.bike_heart_rate.length - 1]} bpm`);
   }
   
