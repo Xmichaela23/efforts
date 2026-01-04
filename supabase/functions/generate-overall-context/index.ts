@@ -154,11 +154,15 @@ Deno.serve(async (req) => {
     // Key insight: Use FTP-relative filtering, not absolute wattage.
     // An 83W ride for someone with 200W FTP (41% IF) is clearly casual.
     
-    const userFTP = userBaselines.ftp || 200; // Default FTP if not set
+    const userFTP = userBaselines.ftp; // No fallback - must be set
     const MIN_INTENSITY_FACTOR = 0.50; // Must be at least 50% of FTP to count as training
-    const minBikePower = userFTP * MIN_INTENSITY_FACTOR;
+    const minBikePower = userFTP ? userFTP * MIN_INTENSITY_FACTOR : null;
     
-    console.log(`🎯 FTP-based filter: FTP=${userFTP}W, min training power=${minBikePower}W (${MIN_INTENSITY_FACTOR * 100}% of FTP)`);
+    if (userFTP) {
+      console.log(`🎯 FTP-based filter: FTP=${userFTP}W, min training power=${minBikePower}W (${MIN_INTENSITY_FACTOR * 100}% of FTP)`);
+    } else {
+      console.log(`⚠️ No FTP set - bike power filtering disabled`);
+    }
     
     const trainingWorkouts = completedWorkouts.filter(w => {
       const type = (w.type || '').toLowerCase();
@@ -168,13 +172,23 @@ Deno.serve(async (req) => {
       
       // Sport-specific minimums for "real training"
       if (type === 'ride' || type === 'cycling' || type === 'bike') {
-        // Bike: need 50%+ of FTP, 30min+, 40 workload+
-        const intensityFactor = avgPower / userFTP;
-        const isTraining = avgPower >= minBikePower && duration >= 30 && workload >= 40;
-        if (!isTraining) {
-          console.log(`🚴 Filtered casual bike: ${w.name} (${avgPower}W = ${Math.round(intensityFactor * 100)}% IF, ${duration}min, ${workload} wl)`);
+        // Bike: need 50%+ of FTP (if set), 30min+, 40 workload+
+        // If no FTP set, skip power filter but still require duration/workload
+        if (minBikePower && userFTP) {
+          const intensityFactor = avgPower / userFTP;
+          const isTraining = avgPower >= minBikePower && duration >= 30 && workload >= 40;
+          if (!isTraining) {
+            console.log(`🚴 Filtered casual bike: ${w.name} (${avgPower}W = ${Math.round(intensityFactor * 100)}% IF, ${duration}min, ${workload} wl)`);
+          }
+          return isTraining;
+        } else {
+          // No FTP - just use duration and workload filters
+          const isTraining = duration >= 30 && workload >= 40;
+          if (!isTraining) {
+            console.log(`🚴 Filtered short/easy bike (no FTP): ${w.name} (${duration}min, ${workload} wl)`);
+          }
+          return isTraining;
         }
-        return isTraining;
       }
       
       if (type === 'run' || type === 'running') {
