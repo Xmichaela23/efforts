@@ -123,10 +123,10 @@ Deno.serve(async (req) => {
         .limit(1)
         .single(),
       
-      // Get user's 1RM baselines
+      // Get user's 1RM baselines (stored in performance_numbers column)
       supabase
         .from('user_baselines')
-        .select('baselines')
+        .select('performance_numbers')
         .eq('user_id', user_id)
         .single()
     ]);
@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
 
     const planned = plannedResult.data || [];
     let completedWorkouts = workoutsResult.data || [];
-    const userBaselines = baselinesResult.data?.baselines || {};
+    const userBaselines = baselinesResult.data?.performance_numbers || {};
 
     // ==========================================================================
     // FILTER TRAINING WORKOUTS (for performance trends only)
@@ -221,7 +221,8 @@ Deno.serve(async (req) => {
     console.log('Plan config:', JSON.stringify(planConfig, null, 2));
     
     console.log(`📊 Planned workouts: ${planned.length} total`);
-    console.log(`📊 User baselines:`, userBaselines);
+    console.log(`📊 User baselines:`, JSON.stringify(userBaselines, null, 2));
+    console.log(`📊 Strength baseline check: bench=${userBaselines.bench}, squat=${userBaselines.squat}, deadlift=${userBaselines.deadlift}, ohp=${userBaselines.overheadPress1RM}`);
     console.log(`📊 Current week: ${currentWeek}`);
     
     // Manually join planned workouts with their completions
@@ -1539,16 +1540,35 @@ function calculateBucketTrends(
   const buckets = DURATION_BUCKETS[sport];
   const trends: BucketTrend[] = [];
   
+  // DEBUG: Log sample workout to see field names
+  if (workouts.length > 0) {
+    const sample = workouts[0];
+    console.log(`📊 Sample ${sport} workout fields:`, {
+      date: sample.date,
+      name: sample.name,
+      duration: sample.duration,
+      moving_time: sample.moving_time,
+      elapsed_time: sample.elapsed_time,
+      moving_time_seconds: sample.moving_time_seconds,
+      avg_pace: sample.avg_pace,
+      avg_pace_s: sample.avg_pace_s,
+      avg_power: sample.avg_power,
+      normalized_power: sample.normalized_power
+    });
+  }
+  
   for (const [bucketKey, range] of Object.entries(buckets)) {
-    // Filter workouts in this duration bucket
+    // Filter workouts in this duration bucket - try multiple field names
     const currentBucket = currentPeriod.filter(w => {
-      const duration = w.duration || w.moving_time || 0;
+      const duration = w.duration || w.moving_time || w.elapsed_time || w.moving_time_seconds || 0;
       return duration >= range.min && duration < range.max;
     });
     const previousBucket = previousPeriod.filter(w => {
-      const duration = w.duration || w.moving_time || 0;
+      const duration = w.duration || w.moving_time || w.elapsed_time || w.moving_time_seconds || 0;
       return duration >= range.min && duration < range.max;
     });
+    
+    console.log(`📊 ${sport} bucket ${bucketKey} (${range.label}): current=${currentBucket.length}, previous=${previousBucket.length}`);
     
     // Need at least 2 workouts in each period for comparison (relaxed from 3)
     if (currentBucket.length < 2 || previousBucket.length < 2) continue;
