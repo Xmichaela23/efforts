@@ -259,16 +259,43 @@ Deno.serve(async (req) => {
     // Calculate trend metrics (excluding recovery weeks)
     const trends = extractTrends(weeklyAggregates, recoveryWeeks);
 
-    // Generate GPT-4 analysis
-    const analysis = await generateOverallAnalysis(
-      weeklyAggregates, 
-      trends, 
-      trainingPhase, 
-      completed, 
-      missed,
-      userBaselines,
-      recoveryWeeks
-    );
+    // ==========================================================================
+    // CHECK FOR SUFFICIENT DATA
+    // ==========================================================================
+    // Need 8+ training workouts in 4 weeks for meaningful performance trends
+    const MIN_TRAINING_WORKOUTS = 8;
+    const hasEnoughData = trainingWorkouts.length >= MIN_TRAINING_WORKOUTS;
+    
+    console.log(`📊 Data sufficiency: ${trainingWorkouts.length} training workouts (need ${MIN_TRAINING_WORKOUTS}+) = ${hasEnoughData ? 'SUFFICIENT' : 'INSUFFICIENT'}`);
+
+    let analysis: any;
+    
+    if (hasEnoughData) {
+      // Generate full GPT-4 analysis
+      analysis = await generateOverallAnalysis(
+        weeklyAggregates, 
+        trends, 
+        trainingPhase, 
+        completed, 
+        missed,
+        userBaselines,
+        recoveryWeeks
+      );
+    } else {
+      // Return limited analysis without performance trends
+      const totalPlanned = weeklyAggregates.reduce((sum, week) => sum + week.planned_count, 0);
+      const totalCompleted = weeklyAggregates.reduce((sum, week) => sum + week.completed_count, 0);
+      const overallCompletionRate = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 0;
+      
+      analysis = {
+        performance_trends: null, // Explicitly null - not enough data
+        plan_adherence: `${totalCompleted} of ${totalPlanned} planned sessions completed (${overallCompletionRate}%).`,
+        weekly_summary: `${trainingWorkouts.length} training workouts logged in the last 4 weeks. Complete ${MIN_TRAINING_WORKOUTS - trainingWorkouts.length} more structured workouts to unlock performance trend analysis.`,
+        insufficient_data: true,
+        training_workout_count: trainingWorkouts.length,
+        min_required: MIN_TRAINING_WORKOUTS
+      };
+    }
 
     return new Response(JSON.stringify(analysis), {
       headers: {

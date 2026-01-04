@@ -98,8 +98,8 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
         </button>
       </div>
 
-      {/* Performance Trends */}
-      {data.performance_trends && (
+      {/* Performance Trends - or Insufficient Data Message */}
+      {data.performance_trends ? (
         <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="w-4 h-4 text-teal-500" />
@@ -109,7 +109,22 @@ const BlockSummaryTab: React.FC<BlockSummaryTabProps> = () => {
             {data.performance_trends}
           </p>
         </div>
-      )}
+      ) : data.insufficient_data ? (
+        <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-4 h-4 text-white/40" />
+            <h3 className="text-sm font-medium text-white/60">Performance Trends</h3>
+          </div>
+          <div className="text-center py-2">
+            <p className="text-sm text-white/50">
+              Not enough structured workouts
+            </p>
+            <p className="text-xs text-white/40 mt-2">
+              Complete {(data.min_required || 8) - (data.training_workout_count || 0)} more training sessions to unlock trends
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {/* Plan Adherence */}
       {data.plan_adherence && (
