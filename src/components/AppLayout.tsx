@@ -1086,7 +1086,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               </DropdownMenu>
 
               <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
-              {(selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showGear || showImportPage || showContext) && !showSummary && (
+              {(selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
                   {!selectedWorkout && (
                   <Button
