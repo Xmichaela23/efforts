@@ -1101,15 +1101,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         
         {/* Week of header - sticky at bottom with strong glassmorphism */}
         <div 
-          className="sticky bottom-0 flex items-center justify-between py-2 px-3 rounded-t-xl border border-white/20 border-b-0 mt-2"
+          className="sticky bottom-0 flex items-center justify-between py-1 rounded-t-lg border border-white/15 border-b-0"
           style={{
-            background: 'rgba(255, 255, 255, 0.08)',
-            backdropFilter: 'blur(40px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(48px) saturate(150%)',
+            WebkitBackdropFilter: 'blur(48px) saturate(150%)',
             marginLeft: '-0.75rem',
             marginRight: '-0.75rem',
-            paddingLeft: '0.75rem',
-            paddingRight: '0.75rem',
+            paddingLeft: '0.5rem',
+            paddingRight: '0.5rem',
           }}
         >
           <button
