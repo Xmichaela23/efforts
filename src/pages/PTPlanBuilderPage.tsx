@@ -318,6 +318,31 @@ function parseLine(line: string): ParsedItem | null {
     .replace(/\s{2,}/g, ' ') // Collapse multiple spaces
     .trim();
   
+  // Step 4b: For prose-style input, extract just the exercise name (first meaningful phrase)
+  // If name is too long (>60 chars), it's likely prose - truncate to first phrase
+  if (name.length > 60) {
+    const originalName = name;
+    // Try to extract exercise name - look for common patterns
+    // Pattern: first words before "using", "with", "on", "off", "for", "go", "hold", "focus", "ensure"
+    const proseMatch = name.match(/^(.+?)\s+(?:using|with|on\s+(?:your|the|a)|off\s+(?:a|the)|for\s+\d|go\s+\d|hold\s+\d|focus\s+on|ensure\s+the|foot\s+stays|get\s+tall)/i);
+    if (proseMatch && proseMatch[1].length >= 3) {
+      name = proseMatch[1].trim();
+      // Capture the rest as notes if we don't have notes yet
+      if (!notesPart) {
+        notesPart = originalName.substring(proseMatch[1].length).trim();
+      }
+    } else {
+      // Fallback: take first 4-5 words or up to first major break
+      const words = name.split(/\s+/);
+      const maxWords = Math.min(5, words.length);
+      name = words.slice(0, maxWords).join(' ');
+      // Capture remaining words as notes
+      if (!notesPart && words.length > maxWords) {
+        notesPart = words.slice(maxWords).join(' ');
+      }
+    }
+  }
+  
   // Also remove any notes text that might have leaked into the name
   // This handles cases where notes weren't properly extracted
   if (notesPart) {
