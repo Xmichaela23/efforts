@@ -1544,8 +1544,8 @@ interface BucketTrend {
 }
 
 /**
- * Calculate performance trends within duration buckets
- * Compares best performance in similar-duration workouts between periods
+ * Calculate simple performance trends - compare ALL workouts between two periods
+ * No duration bucketing - just average performance comparison
  */
 function calculateBucketTrends(
   workouts: any[], 
@@ -1558,115 +1558,101 @@ function calculateBucketTrends(
   const periodStart = new Date(now);
   periodStart.setDate(periodStart.getDate() - (weeksBack * 7));
   
-  // Split into current and previous periods
+  // Split into current and previous periods (2 weeks each for 4-week block)
   const currentPeriod = workouts.filter(w => new Date(w.date) >= midpoint);
   const previousPeriod = workouts.filter(w => 
     new Date(w.date) >= periodStart && new Date(w.date) < midpoint
   );
   
-  const buckets = DURATION_BUCKETS[sport];
+  console.log(`📊 ${sport}: ${currentPeriod.length} current, ${previousPeriod.length} previous`);
+  
+  // DEBUG: Log first workout to see structure
+  if (currentPeriod.length > 0) {
+    const sample = currentPeriod[0];
+    const computed = typeof sample.computed === 'string' ? JSON.parse(sample.computed) : sample.computed;
+    console.log(`📊 Sample ${sport} workout:`, {
+      name: sample.name,
+      date: sample.date,
+      avg_power: sample.avg_power,
+      normalized_power: sample.normalized_power,
+      computed_overall: computed?.overall
+    });
+  }
+  
+  // Need at least 1 workout in each period
+  if (currentPeriod.length === 0 || previousPeriod.length === 0) {
+    console.log(`📊 ${sport}: Not enough workouts in both periods`);
+    return [];
+  }
+  
   const trends: BucketTrend[] = [];
   
-  // DEBUG: Log sample workout to see field names
-  if (workouts.length > 0) {
-    const sample = workouts[0];
-    console.log(`📊 Sample ${sport} workout fields:`, {
-      date: sample.date,
-      name: sample.name,
-      duration: sample.duration,
-      moving_time: sample.moving_time,
-      elapsed_time: sample.elapsed_time,
-      moving_time_seconds: sample.moving_time_seconds,
-      avg_pace: sample.avg_pace,
-      avg_pace_s: sample.avg_pace_s,
-      avg_power: sample.avg_power,
-      normalized_power: sample.normalized_power
-    });
+  if (sport === 'bike') {
+    // For bikes: compare average power
+    const currentPowers = currentPeriod
+      .map(w => w.normalized_power || w.avg_power)
+      .filter((p): p is number => typeof p === 'number' && p > 0);
+    const previousPowers = previousPeriod
+      .map(w => w.normalized_power || w.avg_power)
+      .filter((p): p is number => typeof p === 'number' && p > 0);
+    
+    console.log(`📊 Bike powers: ${currentPowers.length} current, ${previousPowers.length} previous`);
+    
+    if (currentPowers.length > 0 && previousPowers.length > 0) {
+      const currentAvg = currentPowers.reduce((a, b) => a + b, 0) / currentPowers.length;
+      const previousAvg = previousPowers.reduce((a, b) => a + b, 0) / previousPowers.length;
+      const changePercent = ((currentAvg - previousAvg) / previousAvg) * 100;
+      
+      trends.push({
+        bucket: 'all',
+        label: 'Avg Power',
+        current: Math.round(currentAvg),
+        previous: Math.round(previousAvg),
+        change: changePercent > 0 ? `+${changePercent.toFixed(1)}%` : `${changePercent.toFixed(1)}%`,
+        current_count: currentPowers.length,
+        previous_count: previousPowers.length,
+        metric_label: 'W'
+      });
+    }
+  } else {
+    // For runs: compare average pace
+    const currentPaces = currentPeriod
+      .map(w => {
+        const computed = typeof w.computed === 'string' ? JSON.parse(w.computed) : w.computed;
+        return computed?.overall?.avg_pace_s_per_mi;
+      })
+      .filter((p): p is number => typeof p === 'number' && p > 0);
+    const previousPaces = previousPeriod
+      .map(w => {
+        const computed = typeof w.computed === 'string' ? JSON.parse(w.computed) : w.computed;
+        return computed?.overall?.avg_pace_s_per_mi;
+      })
+      .filter((p): p is number => typeof p === 'number' && p > 0);
+    
+    console.log(`📊 Run paces: ${currentPaces.length} current, ${previousPaces.length} previous`);
+    if (currentPaces.length > 0) console.log(`📊 Sample current paces:`, currentPaces.slice(0, 3));
+    if (previousPaces.length > 0) console.log(`📊 Sample previous paces:`, previousPaces.slice(0, 3));
+    
+    if (currentPaces.length > 0 && previousPaces.length > 0) {
+      const currentAvg = currentPaces.reduce((a, b) => a + b, 0) / currentPaces.length;
+      const previousAvg = previousPaces.reduce((a, b) => a + b, 0) / previousPaces.length;
+      // For pace: lower is better, so flip the change calculation
+      const changePercent = ((previousAvg - currentAvg) / previousAvg) * 100;
+      
+      trends.push({
+        bucket: 'all',
+        label: 'Avg Pace',
+        current: Math.round(currentAvg),
+        previous: Math.round(previousAvg),
+        change: changePercent > 0 ? `+${changePercent.toFixed(1)}%` : `${changePercent.toFixed(1)}%`,
+        current_count: currentPaces.length,
+        previous_count: previousPaces.length,
+        metric_label: '/mi'
+      });
+    }
   }
   
-  for (const [bucketKey, range] of Object.entries(buckets)) {
-    // Filter workouts in this duration bucket
-    // Duration is in: moving_time, elapsed_time (seconds)
-    const currentBucket = currentPeriod.filter(w => {
-      const duration = w.moving_time || w.elapsed_time || 0;
-      return duration >= range.min && duration < range.max;
-    });
-    const previousBucket = previousPeriod.filter(w => {
-      const duration = w.moving_time || w.elapsed_time || 0;
-      return duration >= range.min && duration < range.max;
-    });
-    
-    console.log(`📊 ${sport} bucket ${bucketKey} (${range.label}): current=${currentBucket.length}, previous=${previousBucket.length}`);
-    
-    // Need at least 2 workouts in each period for comparison (relaxed from 3)
-    if (currentBucket.length < 2 || previousBucket.length < 2) continue;
-    
-    let currentBest: number;
-    let previousBest: number;
-    let metricLabel: string;
-    
-    if (sport === 'bike') {
-      // For bikes: use normalized_power or avg_power
-      currentBest = Math.max(...currentBucket.map(w => 
-        w.normalized_power || w.avg_power || 0
-      ));
-      previousBest = Math.max(...previousBucket.map(w => 
-        w.normalized_power || w.avg_power || 0
-      ));
-      metricLabel = 'W';
-    } else {
-      // For runs: use computed.overall.avg_pace_s_per_mi (seconds per mile)
-      // Lower is better (faster), so use Math.min
-      // NOTE: computed may be a JSON string, need to parse it
-      const currentPaces = currentBucket
-        .map(w => {
-          const computed = typeof w.computed === 'string' ? JSON.parse(w.computed) : w.computed;
-          return computed?.overall?.avg_pace_s_per_mi;
-        })
-        .filter((p): p is number => typeof p === 'number' && p > 0);
-      const previousPaces = previousBucket
-        .map(w => {
-          const computed = typeof w.computed === 'string' ? JSON.parse(w.computed) : w.computed;
-          return computed?.overall?.avg_pace_s_per_mi;
-        })
-        .filter((p): p is number => typeof p === 'number' && p > 0);
-      
-      console.log(`📊 ${sport} bucket ${bucketKey} paces: current=${currentPaces.length} paces, previous=${previousPaces.length} paces`);
-      
-      if (currentPaces.length === 0 || previousPaces.length === 0) continue;
-      
-      // Best pace = fastest = lowest seconds
-      currentBest = Math.min(...currentPaces);
-      previousBest = Math.min(...previousPaces);
-      metricLabel = '/mi';
-    }
-    
-    // Skip if no valid data
-    if (!currentBest || !previousBest || currentBest <= 0 || previousBest <= 0) continue;
-    
-    // Calculate change
-    let changePercent: number;
-    if (sport === 'run') {
-      // For pace: negative change = improvement (faster)
-      changePercent = ((previousBest - currentBest) / previousBest) * 100;
-    } else {
-      // For power: positive change = improvement (higher)
-      changePercent = ((currentBest - previousBest) / previousBest) * 100;
-    }
-    
-    trends.push({
-      bucket: bucketKey,
-      label: range.label,
-      current: Math.round(currentBest),
-      previous: Math.round(previousBest),
-      change: changePercent > 0 ? `+${changePercent.toFixed(1)}%` : `${changePercent.toFixed(1)}%`,
-      current_count: currentBucket.length,
-      previous_count: previousBucket.length,
-      metric_label: metricLabel
-    });
-  }
-  
-  console.log(`📊 ${sport} bucket trends:`, JSON.stringify(trends, null, 2));
+  console.log(`📊 ${sport} trends:`, JSON.stringify(trends, null, 2));
   return trends;
 }
 
@@ -1692,7 +1678,7 @@ function parsePaceToSeconds(pace: string | number | null): number | null {
 }
 
 /**
- * Format bucket trends for GPT prompt
+ * Format trends for GPT prompt
  */
 function formatBucketTrendsForPrompt(
   bikeTrends: BucketTrend[],
@@ -1703,26 +1689,20 @@ function formatBucketTrendsForPrompt(
   
   // Bike trends
   if (bikeTrends.length > 0) {
-    lines.push('🚴 BIKE TRENDS (by duration):');
-    bikeTrends.forEach(t => {
-      lines.push(`  ${t.label}: ${t.previous}W → ${t.current}W (${t.change}) [${t.previous_count} → ${t.current_count} rides]`);
-    });
+    const t = bikeTrends[0];
+    lines.push(`🚴 BIKE: ${t.previous}W → ${t.current}W avg power (${t.change}) from ${t.previous_count} → ${t.current_count} rides`);
   } else {
-    lines.push('🚴 BIKE: Insufficient comparable rides. Need 2+ rides of similar duration in each 2-week period.');
+    lines.push('🚴 BIKE: No power data available for comparison.');
   }
-  
-  lines.push('');
   
   // Run trends  
   if (runTrends.length > 0) {
-    lines.push('🏃 RUN TRENDS (by duration):');
-    runTrends.forEach(t => {
-      const prevPace = formatPace(t.previous);
-      const currPace = formatPace(t.current);
-      lines.push(`  ${t.label}: ${prevPace} → ${currPace} (${t.change}) [${t.previous_count} → ${t.current_count} runs]`);
-    });
+    const t = runTrends[0];
+    const prevPace = formatPace(t.previous);
+    const currPace = formatPace(t.current);
+    lines.push(`🏃 RUN: ${prevPace} → ${currPace} avg pace (${t.change}) from ${t.previous_count} → ${t.current_count} runs`);
   } else {
-    lines.push('🏃 RUN: Insufficient comparable runs. Need 2+ runs of similar duration in each 2-week period.');
+    lines.push('🏃 RUN: No pace data available for comparison.');
   }
   
   lines.push('');
@@ -1817,15 +1797,15 @@ Week ${weeklyAggregates.length} ${recoveryWeeks.has(weeklyAggregates.length - 1)
 Generate analysis with these DISTINCT sections. Only report on disciplines the athlete actually trains:
 
 1. Performance Trends (4-week progression):
-   - Report on BIKE TRENDS and RUN TRENDS if provided (by duration bucket)
-   - Format: "Medium rides (45-75min): 185W → 192W (+4%)"
-   - If "Insufficient comparable" appears, say so honestly - don't make up trends
-   - For strength: mention baselines if set, or suggest setting them
+   - Report on BIKE and RUN data if provided
+   - Format: "Run pace: 8:45/mi → 8:32/mi (+2%)"
+   - If "No data available" appears, briefly mention it
+   - For strength: mention baselines if set
    - Report ONLY on disciplines with data
    - DO NOT mention current week specifics
    - 2-3 sentences maximum
 
-   Example: "Medium runs (35-60min): 8:45/mi → 8:32/mi (+2%). Bike trends unavailable - need more comparable rides. Strength baselines: Deadlift 225lb, Bench 185lb."
+   Example: "Run pace improved 8:45/mi → 8:32/mi (+2%). Bike power stable at 185W. Strength: Deadlift 225lb, Bench 185lb."
 
 2. Plan Adherence (overall pattern):
    - Overall completion rate for all ${weeklyAggregates.length} weeks
