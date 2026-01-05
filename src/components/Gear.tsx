@@ -75,7 +75,7 @@ const BIKE_MODELS: Record<string, string[]> = {
   'Specialized': ['Tarmac', 'Roubaix', 'Diverge', 'Allez', 'Venge', 'Aethos', 'Crux'],
   'Giant': ['Defy', 'TCR', 'Propel', 'Revolt', 'Contend', 'Escape'],
   'Cannondale': ['Synapse', 'SuperSix', 'CAAD', 'Topstone', 'SystemSix'],
-  'Canyon': ['Endurance', 'Ultimate', 'Aeroad', 'Grail', 'Endurace'],
+  'Canyon': ['Endurance', 'Ultimate', 'Aeroad', 'Grail', 'Endurace', 'Speedmax', 'Inflite', 'Grizl'],
   'Cervélo': ['R5', 'S5', 'Caledonia', 'Áspero', 'Soloist'],
   'Scott': ['Addict', 'Foil', 'Speedster', 'Contessa'],
   'BMC': ['Roadmachine', 'Teammachine', 'Timemachine'],
