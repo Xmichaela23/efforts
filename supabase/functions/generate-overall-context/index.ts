@@ -1717,32 +1717,8 @@ function formatBucketTrendsForPrompt(
     lines.push('🏃 RUN: No pace data available for comparison.');
   }
   
-  lines.push('');
-  
-  // Strength (use baselines, not working weights)
-  const strengthBaselineMap: Record<string, string> = {
-    'bench': 'Bench Press',
-    'squat': 'Back Squat', 
-    'deadlift': 'Deadlift',
-    'overheadPress1RM': 'Overhead Press'
-  };
-  
-  const strengthBaselines: string[] = [];
-  if (userBaselines) {
-    Object.entries(strengthBaselineMap).forEach(([key, name]) => {
-      const val = userBaselines[key];
-      if (val && val > 0) {
-        strengthBaselines.push(`${name}: ${val}lb 1RM`);
-      }
-    });
-  }
-  
-  if (strengthBaselines.length > 0) {
-    lines.push('💪 STRENGTH BASELINES: ' + strengthBaselines.join(', '));
-    lines.push('   (Retest 1RMs to track progression. Working weights from plans are not shown.)');
-  } else {
-    lines.push('💪 STRENGTH: No 1RM baselines set. Add baselines in settings to track progression.');
-  }
+  // Don't include strength baselines - user already knows what they set
+  // Only mention strength if there's something actionable to say
   
   return lines.join('\n');
 }
@@ -1810,14 +1786,14 @@ Generate analysis with these DISTINCT sections. Only report on disciplines the a
 
 1. Performance Trends (4-week progression):
    - Report on BIKE and RUN data if provided
-   - Format: "Run pace: 8:45/mi → 8:32/mi (+2%)"
-   - If "No data available" appears, briefly mention it
-   - For strength: mention baselines if set
-   - Report ONLY on disciplines with data
+   - Format: "Run pace improved from 8:45/mi to 8:32/mi (+2%)"
+   - If "No data available" appears, just skip that discipline
+   - DO NOT mention strength baselines (user already knows them)
+   - Report ONLY on disciplines with actual trend data
    - DO NOT mention current week specifics
-   - 2-3 sentences maximum
+   - 1-2 sentences maximum
 
-   Example: "Run pace improved 8:45/mi → 8:32/mi (+2%). Bike power stable at 185W. Strength: Deadlift 225lb, Bench 185lb."
+   Example: "Run pace improved from 8:45/mi to 8:32/mi (+2%). Bike data insufficient for comparison."
 
 2. Plan Adherence (overall pattern):
    - Overall completion rate for all ${weeklyAggregates.length} weeks
