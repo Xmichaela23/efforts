@@ -37,3 +37,9 @@ export {
   formatDataQualityForDisplay 
 } from './data-quality.ts';
 
+export { 
+  calculateWorkoutQuality,
+  formatWorkoutQualityLabel
+} from './calculate-workout-quality.ts';
+export type { WorkoutQuality, WorkoutQualityItem } from './calculate-workout-quality.ts';
+

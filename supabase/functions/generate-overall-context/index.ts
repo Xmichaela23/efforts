@@ -21,7 +21,8 @@ import {
   calculatePlanAdherence,
   calculateWeekSummary,
   generateFocusAreas,
-  assessDataQuality
+  assessDataQuality,
+  calculateWorkoutQuality
 } from '../_shared/block-analysis/index.ts';
 
 const corsHeaders = {
@@ -187,6 +188,11 @@ Deno.serve(async (req) => {
       weeks_back
     );
 
+    const workoutQuality = calculateWorkoutQuality(
+      completedWorkouts,
+      weeks_back
+    );
+
     // ==========================================================================
     // BUILD STRUCTURED RESPONSE (No GPT - structured data speaks for itself)
     // ==========================================================================
@@ -200,6 +206,7 @@ Deno.serve(async (req) => {
       // New structured data (for new frontend)
       performance_trends_structured: performanceTrends,
       plan_adherence_structured: relevantAdherence,
+      workout_quality: workoutQuality,
       this_week: thisWeek,
       focus_areas: focusAreas,
       data_quality: dataQuality,

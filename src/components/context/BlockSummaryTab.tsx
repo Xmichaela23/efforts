@@ -26,7 +26,8 @@ import {
   Target,
   AlertTriangle,
   Info,
-  CheckCircle2
+  CheckCircle2,
+  Target
 } from 'lucide-react';
 import { useOverallContext } from '@/hooks/useOverallContext';
 
@@ -166,6 +167,9 @@ const BlockSummaryTab: React.FC = () => {
           
           {/* Plan Adherence - Structured */}
           <PlanAdherenceSection adherence={data.plan_adherence_structured} />
+          
+          {/* Workout Quality - Structured */}
+          <WorkoutQualitySection quality={data.workout_quality} />
           
           {/* This Week - Structured */}
           <ThisWeekSection week={data.this_week} />
@@ -388,6 +392,63 @@ const PlanAdherenceSection: React.FC<{ adherence: any }> = ({ adherence }) => {
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+// Workout Quality Section - Shows execution quality patterns with trends
+const WorkoutQualitySection: React.FC<{ quality: any }> = ({ quality }) => {
+  if (!quality || !quality.items || quality.items.length === 0) return null;
+  
+  const WORKOUT_TYPE_LABELS: Record<string, string> = {
+    intervals: 'Intervals',
+    long_runs: 'Long runs',
+    tempo: 'Tempo',
+    easy: 'Easy runs'
+  };
+  
+  const STATUS_COLORS = {
+    good: 'text-emerald-400',
+    warning: 'text-amber-400',
+    info: 'text-white/60'
+  };
+  
+  const TREND_LABELS: Record<string, string> = {
+    improving: 'improving',
+    stable: 'stable',
+    worsening: 'worsening'
+  };
+  
+  return (
+    <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Target className="w-4 h-4 text-teal-500" />
+        <h3 className="text-sm font-medium text-white">Workout Quality</h3>
+      </div>
+      
+      <div className="space-y-2">
+        {quality.items.map((item: any, i: number) => (
+          <div key={i} className="flex items-start gap-2 text-sm">
+            <span>{item.icon}</span>
+            <div className="flex-1">
+              <span className="text-white/80">
+                {WORKOUT_TYPE_LABELS[item.workout_type] || item.workout_type}:
+              </span>{' '}
+              <span className={STATUS_COLORS[item.status as keyof typeof STATUS_COLORS] || 'text-white/60'}>
+                {item.message}
+              </span>
+              <span className="text-white/40 ml-1">
+                ({item.count} workouts)
+              </span>
+              {item.trend && item.trend !== 'stable' && (
+                <span className={`ml-1 ${item.trend === 'improving' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {item.trend_icon} {TREND_LABELS[item.trend]}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
