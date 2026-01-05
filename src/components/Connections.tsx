@@ -16,8 +16,10 @@ import {
   Menu,
   User,
   Upload,
+  Download,
   Link,
-  Home
+  Home,
+  Package
 } from 'lucide-react';
 import PlansMenu from './PlansMenu';
 import LogFAB from './LogFAB';
@@ -838,8 +840,12 @@ const Connections: React.FC = () => {
                     <Link className="mr-2 h-4 w-4" />
                     Connections
                   </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Package className="mr-2 h-4 w-4" />
+                    Gear
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/')}>
-                    <Upload className="mr-2 h-4 w-4" />
+                    <Download className="mr-2 h-4 w-4" />
                     Import
                   </DropdownMenuItem>
                   <DropdownMenuItem>
@@ -851,6 +857,10 @@ const Connections: React.FC = () => {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/')}>
                     Sign Out
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/plans/admin')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Admin – Add template (JSON)
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

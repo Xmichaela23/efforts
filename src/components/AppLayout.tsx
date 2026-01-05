@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Menu, User, Upload, Settings, Activity, Link, ArrowRight, Calendar, BarChart3, Home } from 'lucide-react';
+import { Menu, User, Upload, Download, Settings, Activity, Link, ArrowRight, Calendar, BarChart3, Home, Package } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
@@ -1052,8 +1052,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     <Link className="mr-2 h-4 w-4" />
                     Connections
                   </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Package className="mr-2 h-4 w-4" />
+                    Gear
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleImportClick}>
-                    <Upload className="mr-2 h-4 w-4" />
+                    <Download className="mr-2 h-4 w-4" />
                     Import
                   </DropdownMenuItem>
                   <DropdownMenuItem>

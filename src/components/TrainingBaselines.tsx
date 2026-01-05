@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Link } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Download, Link, Package, Settings } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
@@ -438,8 +438,12 @@ return (
                   <Link className="mr-2 h-4 w-4" />
                   Connections
                 </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Package className="mr-2 h-4 w-4" />
+                  Gear
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/')}>
-                  <Upload className="mr-2 h-4 w-4" />
+                  <Download className="mr-2 h-4 w-4" />
                   Import
                 </DropdownMenuItem>
                 <DropdownMenuItem>
@@ -451,6 +455,10 @@ return (
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/')}>
                   Sign Out
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/plans/admin')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Admin – Add template (JSON)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
