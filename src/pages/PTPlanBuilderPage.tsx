@@ -437,7 +437,9 @@ export default function MobilityPlanBuilderPage() {
             description: ii.cues || '',
             // Preserve parsed load for downstream prefilling
             weight: typeof (ii as any).weight === 'number' ? (ii as any).weight : undefined,
-            unit: (ii as any).unit || undefined
+            unit: (ii as any).unit || undefined,
+            // Store per_side flag for logger expansion
+            per_side: ii.perSide || false
           };
           // For duration-based exercises, store duration_seconds and sets
           if (ii.duration_seconds !== undefined) {

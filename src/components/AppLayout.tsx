@@ -157,9 +157,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           if (typeof val === 'string') { try { const p = JSON.parse(val); if (Array.isArray(p)) return p as any[]; } catch {} }
           return [] as any[];
         })();
-        const parsed = raw.map((m: any) => {
-          const name = String(m?.name || '').trim() || 'Mobility';
+        const parsed = raw.flatMap((m: any) => {
+          const baseName = String(m?.name || '').trim() || 'Mobility';
           const notes = String(m?.description || m?.notes || '').trim();
+          const perSide = m?.per_side === true;
           
           // Check if this is a duration-based exercise (has duration_seconds explicitly stored)
           if (typeof m?.duration_seconds === 'number' && m.duration_seconds > 0) {
@@ -171,7 +172,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               const pw = parseFloat(m.weight);
               if (Number.isFinite(pw)) w = pw;
             }
-            return { name, sets, duration_seconds: m.duration_seconds, weight: w, notes };
+            // If per_side, expand into separate L/R entries for each set
+            if (perSide) {
+              const entries: any[] = [];
+              for (let s = 0; s < sets; s++) {
+                entries.push({ name: `${baseName} (Left)`, sets: 1, duration_seconds: m.duration_seconds, weight: w, notes });
+                entries.push({ name: `${baseName} (Right)`, sets: 1, duration_seconds: m.duration_seconds, weight: w, notes });
+              }
+              return entries;
+            }
+            return [{ name: baseName, sets, duration_seconds: m.duration_seconds, weight: w, notes }];
           }
           
           // Otherwise, parse as rep-based exercise
@@ -209,7 +219,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             const mw = blob.match(/(\d+(?:\.\d+)?)\s*(lb|lbs|kg)\b/i);
             if (mw) { const pw = parseFloat(mw[1]); if (Number.isFinite(pw)) w = pw; }
           }
-          return { name, sets, reps: reps !== undefined ? reps : undefined, weight: w, notes };
+          // If per_side, expand into separate L/R entries for each set
+          if (perSide) {
+            const entries: any[] = [];
+            for (let s = 0; s < sets; s++) {
+              entries.push({ name: `${baseName} (Left)`, sets: 1, reps, weight: w, notes });
+              entries.push({ name: `${baseName} (Right)`, sets: 1, reps, weight: w, notes });
+            }
+            return entries;
+          }
+          return [{ name: baseName, sets, reps: reps !== undefined ? reps : undefined, weight: w, notes }];
         });
         const plannedForStrength = { ...planned, type: 'strength', strength_exercises: parsed, logger_mode: 'mobility' } as any;
         setLoggerScheduledWorkout(plannedForStrength);
