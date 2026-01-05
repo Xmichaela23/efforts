@@ -867,7 +867,7 @@ const Connections: React.FC = () => {
               <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
             </div>
           </div>
-          <div className="px-4 pb-4">
+          <div className="px-4 pb-6">
             <h2 className="text-2xl font-bold text-white">Connections</h2>
           </div>
         </div>
@@ -875,8 +875,8 @@ const Connections: React.FC = () => {
       <main className="mobile-main-content overflow-y-auto overflow-x-hidden" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
         <div className="max-w-4xl mx-auto p-6 min-h-0">
       
-      <div className="text-center mb-6">
-        <p className="text-white/60 text-sm">
+      <div className="text-center mb-8">
+        <p className="text-white/50 text-sm">
           Connect your fitness services to automatically sync data and enable real-time updates.
         </p>
       </div>
