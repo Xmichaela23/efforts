@@ -932,7 +932,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           paddingTop: `${headerHeight + 8}px`,
         }}
       >
-        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 48 }}>
+        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
           <div className="flex items-center justify-center h-full px-4">
@@ -1098,38 +1098,41 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         )}
         </div>
-        
-        {/* Week of header - sticky at bottom with strong glassmorphism */}
-        <div 
-          className="sticky bottom-0 flex items-center justify-between py-1 rounded-t-lg border border-white/15 border-b-0"
-          style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            backdropFilter: 'blur(48px) saturate(150%)',
-            WebkitBackdropFilter: 'blur(48px) saturate(150%)',
-            marginLeft: '-0.75rem',
-            marginRight: '-0.75rem',
-            paddingLeft: '0.5rem',
-            paddingRight: '0.5rem',
-          }}
+      </div>
+
+      {/* Week of header - fixed at absolute bottom of TodaysEffort with glassmorphism */}
+      <div 
+        className="flex items-center justify-between py-1 rounded-t-lg border border-white/15 border-b-0"
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: '0.5rem',
+          right: '0.5rem',
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(48px) saturate(150%)',
+          WebkitBackdropFilter: 'blur(48px) saturate(150%)',
+          paddingLeft: '0.5rem',
+          paddingRight: '0.5rem',
+          zIndex: 20,
+        }}
+      >
+        <button
+          aria-label="Previous week"
+          className="px-2 py-1 min-w-8 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
+          onClick={() => handleWeekNav('prev')}
         >
-          <button
-            aria-label="Previous week"
-            className="px-2 py-1 min-w-8 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
-            onClick={() => handleWeekNav('prev')}
-          >
-            ‹
-          </button>
-          <span className="text-sm font-light tracking-normal text-white">
-            Week of {formatWeekRange(weekStart, weekEnd)}
-          </span>
-          <button
-            aria-label="Next week"
-            className="px-2 py-1 min-w-8 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
-            onClick={() => handleWeekNav('next')}
-          >
-            ›
-          </button>
-        </div>
+          ‹
+        </button>
+        <span className="text-sm font-light tracking-normal text-white">
+          Week of {formatWeekRange(weekStart, weekEnd)}
+        </span>
+        <button
+          aria-label="Next week"
+          className="px-2 py-1 min-w-8 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
+          onClick={() => handleWeekNav('next')}
+        >
+          ›
+        </button>
       </div>
 
       {/* Planned Workout Bottom Sheet */}
