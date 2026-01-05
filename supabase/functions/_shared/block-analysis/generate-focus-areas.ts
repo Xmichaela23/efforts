@@ -24,14 +24,13 @@ export function generateFocusAreas(
 ): FocusAreasResult {
   const areas: FocusArea[] = [];
   
-  // 1. Check for critical adherence gaps
+  // 1. Check for critical adherence gaps - just state the fact
   for (const item of adherence.by_discipline) {
     if (item.status === 'critical') {
       areas.push({
         action: getCriticalAction(item.discipline, goal),
-        reason: item.note,
-        priority: 1,
-        impact: getCriticalImpact(item.discipline, goal)
+        reason: `${item.completed}/${item.planned} completed`,
+        priority: 1
       });
     }
   }
@@ -41,29 +40,18 @@ export function generateFocusAreas(
     if (item.status === 'warning' && areas.length < 3) {
       areas.push({
         action: getWarningAction(item.discipline, goal),
-        reason: item.note,
-        priority: 2,
-        impact: getWarningImpact(item.discipline, goal)
+        reason: `${item.completed}/${item.planned} completed`,
+        priority: 2
       });
     }
   }
   
-  // 3. Check for stagnating trends (has workouts but no reliable trend)
+  // 3. Check for data gaps (has workouts but can't track progress)
   if (trends.bike && !trends.bike.reliable && trends.bike.reason === 'no_power_data') {
     if (areas.length < 3) {
       areas.push({
-        action: 'Add power meter to bike rides',
-        reason: 'cannot track cycling fitness without power data',
-        priority: 3
-      });
-    }
-  }
-  
-  if (trends.run && !trends.run.reliable && trends.run.reason === 'variance_too_high') {
-    if (areas.length < 3) {
-      areas.push({
-        action: 'Include more consistent-effort runs',
-        reason: 'high variance between easy and hard runs',
+        action: 'Use power meter on bike rides',
+        reason: 'needed for fitness tracking',
         priority: 3
       });
     }
@@ -73,8 +61,8 @@ export function generateFocusAreas(
   for (const item of adherence.by_discipline) {
     if (item.status === 'good' && areas.length < 3) {
       areas.push({
-        action: `Maintain ${item.discipline} consistency`,
-        reason: "you're on track",
+        action: `Keep up ${item.discipline} consistency`,
+        reason: `${item.completed}/${item.planned} completed`,
         priority: 3
       });
       break; // Only add one positive
@@ -88,8 +76,7 @@ export function generateFocusAreas(
   // Generate goal context
   let goalContext: string | undefined;
   if (goal && goal.weeks_remaining) {
-    const phase = goal.current_phase || 'training';
-    goalContext = `${goal.name} ${phase} phase - ${goal.weeks_remaining} weeks remaining`;
+    goalContext = `${goal.name} - ${goal.weeks_remaining} weeks to go`;
   }
   
   return {
@@ -103,103 +90,38 @@ export function generateFocusAreas(
 // =============================================================================
 
 function getCriticalAction(discipline: string, goal?: Goal): string {
-  const goalType = goal?.type || 'general';
-  
-  const actions: Record<string, Record<string, string>> = {
-    run: {
-      marathon: 'Prioritize long run and one quality run per week minimum',
-      triathlon: 'Complete at least 3 runs per week',
-      general: 'Resume run training - significant deficit'
-    },
-    bike: {
-      triathlon: 'Add 2-3 bike sessions per week',
-      cycling: 'Critical: resume structured bike training',
-      general: 'Add bike sessions back to training'
-    },
-    swim: {
-      triathlon: 'Resume swim training immediately',
-      general: 'Add swim sessions'
-    },
-    strength: {
-      marathon: 'Add 2x15min strength sessions minimum',
-      triathlon: 'Prioritize strength 2x/week',
-      general: 'Resume strength training - injury risk elevated'
-    }
+  // Specific, actionable - not scary or editorial
+  const actions: Record<string, string> = {
+    run: 'Add runs back to schedule',
+    bike: 'Add bike sessions to schedule',
+    swim: 'Add swim sessions to schedule',
+    strength: 'Add 2 strength sessions per week'
   };
   
-  return actions[discipline]?.[goalType] || actions[discipline]?.general || `Resume ${discipline} training`;
+  return actions[discipline] || `Add ${discipline} to schedule`;
 }
 
 function getWarningAction(discipline: string, goal?: Goal): string {
-  const goalType = goal?.type || 'general';
-  
-  const actions: Record<string, Record<string, string>> = {
-    run: {
-      marathon: 'Complete all scheduled runs this week',
-      general: 'Increase run consistency'
-    },
-    bike: {
-      triathlon: 'Complete scheduled bike sessions',
-      cycling: 'Hit planned volume this week',
-      general: 'Add 1 more structured ride/week'
-    },
-    swim: {
-      triathlon: 'Complete scheduled swims',
-      general: 'Maintain swim frequency'
-    },
-    strength: {
-      marathon: 'Prioritize strength 2x/week minimum',
-      triathlon: 'Complete 2 strength sessions/week',
-      general: 'Increase strength consistency'
-    }
+  // Specific, actionable - not scary
+  const actions: Record<string, string> = {
+    run: 'Complete scheduled runs this week',
+    bike: 'Complete scheduled rides this week',
+    swim: 'Complete scheduled swims this week',
+    strength: 'Complete 2 strength sessions this week'
   };
   
-  return actions[discipline]?.[goalType] || actions[discipline]?.general || `Increase ${discipline} consistency`;
+  return actions[discipline] || `Complete scheduled ${discipline}`;
 }
 
 function getCriticalImpact(discipline: string, goal?: Goal): string {
-  const goalType = goal?.type || 'general';
-  
-  const impacts: Record<string, Record<string, string>> = {
-    run: {
-      marathon: 'race-day readiness at risk',
-      triathlon: 'T2 performance compromised',
-      general: 'aerobic fitness declining'
-    },
-    bike: {
-      triathlon: 'bike leg will struggle',
-      cycling: 'target power unreachable',
-      general: 'cycling fitness declining'
-    },
-    strength: {
-      marathon: 'injury risk in later miles',
-      triathlon: 'durability compromised',
-      general: 'injury prevention weakened'
-    }
-  };
-  
-  return impacts[discipline]?.[goalType] || impacts[discipline]?.general || 'training effect compromised';
+  // Don't claim impacts we can't prove
+  // Just note the gap exists
+  return undefined as any; // Don't show impact - let data speak
 }
 
 function getWarningImpact(discipline: string, goal?: Goal): string {
-  const goalType = goal?.type || 'general';
-  
-  const impacts: Record<string, Record<string, string>> = {
-    run: {
-      marathon: 'missing adaptation opportunities',
-      general: 'progress slowing'
-    },
-    bike: {
-      cycling: 'volume below target',
-      general: 'maintenance, not building'
-    },
-    strength: {
-      marathon: 'durability may suffer in race',
-      general: 'injury prevention reduced'
-    }
-  };
-  
-  return impacts[discipline]?.[goalType] || impacts[discipline]?.general || 'slower progress';
+  // Don't claim impacts we can't prove
+  return undefined as any; // Don't show impact - let data speak
 }
 
 // =============================================================================

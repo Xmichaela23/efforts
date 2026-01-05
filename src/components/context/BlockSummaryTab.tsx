@@ -171,12 +171,7 @@ const BlockSummaryTab: React.FC = () => {
           <ThisWeekSection week={data.this_week} />
           
           {/* Focus Areas - Structured */}
-          <FocusAreasSection focusAreas={data.focus_areas} />
-          
-          {/* Coaching Insight */}
-          {data.coaching_insight && (
-            <CoachingInsightSection insight={data.coaching_insight} />
-          )}
+          <FocusAreasSection focusAreas={data.focus_areas} goal={data.goal} />
         </>
       ) : (
         <>
@@ -441,14 +436,19 @@ const ThisWeekSection: React.FC<{ week: any }> = ({ week }) => {
   );
 };
 
-const FocusAreasSection: React.FC<{ focusAreas: any }> = ({ focusAreas }) => {
+const FocusAreasSection: React.FC<{ focusAreas: any; goal?: any }> = ({ focusAreas, goal }) => {
   if (!focusAreas?.areas?.length) return null;
   
   return (
     <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Target className="w-4 h-4 text-purple-500" />
-        <h3 className="text-sm font-medium text-white">Focus Areas</h3>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Target className="w-4 h-4 text-purple-500" />
+          <h3 className="text-sm font-medium text-white">Focus Areas</h3>
+        </div>
+        {goal?.name && (
+          <span className="text-xs text-teal-400">{goal.name}</span>
+        )}
       </div>
       
       <div className="space-y-2">
@@ -465,25 +465,11 @@ const FocusAreasSection: React.FC<{ focusAreas: any }> = ({ focusAreas }) => {
         ))}
       </div>
       
-      {focusAreas.goal_context && (
+      {goal?.weeks_remaining && (
         <div className="mt-3 pt-3 border-t border-white/10 text-xs text-white/50">
-          {focusAreas.goal_context}
+          {goal.weeks_remaining} weeks to go
         </div>
       )}
-    </div>
-  );
-};
-
-const CoachingInsightSection: React.FC<{ insight: string }> = ({ insight }) => {
-  return (
-    <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/10 backdrop-blur-md border border-purple-500/20 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Info className="w-4 h-4 text-purple-400" />
-        <h3 className="text-sm font-medium text-purple-300">Coach's Take</h3>
-      </div>
-      <p className="text-sm text-white/80 leading-relaxed">
-        {insight}
-      </p>
     </div>
   );
 };

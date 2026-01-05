@@ -4,16 +4,15 @@
  * Smart Server, Dumb Client Architecture
  * 
  * - All calculations done in TypeScript (no AI interpretation)
- * - GPT only writes a brief coaching insight at the end
+ * - NO GPT - structured data speaks for itself
  * - Returns structured JSON for frontend to render
  * 
  * Input: { user_id: string, weeks_back?: number (default 4) }
- * Output: BlockAnalysis (structured data)
+ * Output: Structured block analysis data
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
-  BlockAnalysis,
   Workout,
   PlannedWorkout,
   UserBaselines,
@@ -22,11 +21,7 @@ import {
   calculatePlanAdherence,
   calculateWeekSummary,
   generateFocusAreas,
-  assessDataQuality,
-  formatTrendForDisplay,
-  formatAdherenceForDisplay,
-  formatWeekSummaryForDisplay,
-  formatFocusAreasForDisplay
+  assessDataQuality
 } from '../_shared/block-analysis/index.ts';
 
 const corsHeaders = {
@@ -130,6 +125,23 @@ Deno.serve(async (req) => {
     const activePlan = plansResult.data;
 
     console.log(`📊 Data: ${planned.length} planned, ${completedWorkouts.length} completed`);
+    console.log(`📊 Date range: ${startDateISO} to ${endDateISO} (planned up to ${yesterdayISO})`);
+    
+    // Debug: Show this week's planned workouts
+    const thisWeekStart = new Date();
+    thisWeekStart.setDate(thisWeekStart.getDate() - 6);
+    const thisWeekPlanned = planned.filter(p => new Date(p.date) >= thisWeekStart);
+    console.log(`📊 This week planned (${thisWeekStart.toLocaleDateString('en-CA')} to today):`);
+    thisWeekPlanned.forEach(p => {
+      console.log(`   - ${p.date}: ${p.type} "${p.name}"`);
+    });
+    
+    // Debug: Show this week's completed workouts
+    const thisWeekCompleted = completedWorkouts.filter(w => new Date(w.date) >= thisWeekStart);
+    console.log(`📊 This week completed:`);
+    thisWeekCompleted.forEach(w => {
+      console.log(`   - ${w.date}: ${w.type} "${w.name}" (planned_id: ${w.planned_id || 'none'})`);
+    });
 
     // Attach completions to planned workouts
     const plannedWithCompletions = attachCompletions(planned, completedWorkouts);
@@ -172,46 +184,27 @@ Deno.serve(async (req) => {
     );
 
     // ==========================================================================
-    // GPT WRITES COACHING INSIGHT ONLY
+    // BUILD STRUCTURED RESPONSE (No GPT - structured data speaks for itself)
     // ==========================================================================
 
-    const coachingInsight = await generateCoachingInsight({
-      performanceTrends,
-      planAdherence,
-      thisWeek,
-      focusAreas,
-      goal
-    });
-
-    // ==========================================================================
-    // BUILD STRUCTURED RESPONSE
-    // ==========================================================================
-
-    const analysis: BlockAnalysis = {
-      performance_trends: performanceTrends,
-      plan_adherence: planAdherence,
-      this_week: thisWeek,
-      focus_areas: focusAreas,
-      data_quality: dataQuality,
-      coaching_insight: coachingInsight,
-      generated_at: new Date().toISOString()
-    };
-
+    // Filter adherence to only show relevant disciplines for the goal
+    const relevantAdherence = filterRelevantDisciplines(planAdherence, goal);
+    
     // Return BOTH structured data AND legacy text fields
     // Legacy fields use the same keys so old frontend still works
     const response = {
       // New structured data (for new frontend)
       performance_trends_structured: performanceTrends,
-      plan_adherence_structured: planAdherence,
+      plan_adherence_structured: relevantAdherence,
       this_week: thisWeek,
       focus_areas: focusAreas,
       data_quality: dataQuality,
-      coaching_insight: coachingInsight,
+      goal: goal, // Include goal so frontend knows context
       generated_at: new Date().toISOString(),
       
       // Legacy text fields (for old frontend - same keys it expects)
       performance_trends: formatPerformanceTrendsText(performanceTrends),
-      plan_adherence: formatPlanAdherenceText(planAdherence),
+      plan_adherence: formatPlanAdherenceText(relevantAdherence),
       weekly_summary: formatWeekSummaryText(thisWeek)
     };
 
@@ -280,9 +273,12 @@ function extractGoalContext(plan: any): Goal | undefined {
   // Try to determine goal type from name
   let type = 'general';
   const nameLower = planName.toLowerCase();
-  if (nameLower.includes('marathon')) type = 'marathon';
-  else if (nameLower.includes('triathlon') || nameLower.includes('tri')) type = 'triathlon';
-  else if (nameLower.includes('cycling') || nameLower.includes('bike')) type = 'cycling';
+  if (nameLower.includes('marathon') || nameLower.includes('half marathon')) type = 'marathon';
+  else if (nameLower.includes('triathlon') || nameLower.includes('ironman') || nameLower.includes('70.3')) type = 'triathlon';
+  else if (nameLower.includes('cycling') || nameLower.includes('bike') || nameLower.includes('gran fondo')) type = 'cycling';
+  else if (nameLower.includes('5k') || nameLower.includes('10k') || nameLower.includes('run')) type = 'running';
+  
+  console.log(`📊 Goal extraction: "${planName}" → type: ${type}`);
   
   // Try to get current phase from config
   const weekSummary = config?.weekly_summaries?.[currentWeek];
@@ -311,125 +307,6 @@ function extractGoalContext(plan: any): Goal | undefined {
 }
 
 // =============================================================================
-// GPT: Generate coaching insight ONLY
-// =============================================================================
-
-async function generateCoachingInsight(context: {
-  performanceTrends: any;
-  planAdherence: any;
-  thisWeek: any;
-  focusAreas: any;
-  goal?: Goal;
-}): Promise<string> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  
-  if (!openaiKey) {
-    console.log('⚠️ OpenAI key not configured, using fallback');
-    return generateFallbackInsight(context);
-  }
-  
-  try {
-    // Summarize the key facts for GPT
-    const facts = buildFactsSummary(context);
-    
-    const prompt = `You are a coach giving brief, direct feedback. Based on these FACTS (already calculated):
-
-${facts}
-
-Write 2-3 sentences of coaching insight. Be:
-- Direct, not generic ("your strength gap is hurting durability" not "keep it up")
-- Specific about what matters most
-- Honest about problems
-- Brief
-
-Do NOT repeat the numbers - just give the insight. No emoji.`;
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 150,
-        temperature: 0.4
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content.trim();
-
-  } catch (error) {
-    console.error('GPT error:', error);
-    return generateFallbackInsight(context);
-  }
-}
-
-function buildFactsSummary(context: any): string {
-  const lines: string[] = [];
-  
-  // Adherence
-  const adh = context.planAdherence;
-  lines.push(`Adherence: ${adh.overall.percent}% (${adh.overall.status})`);
-  
-  for (const item of adh.by_discipline) {
-    if (item.status === 'critical' || item.status === 'warning') {
-      lines.push(`- ${item.discipline}: ${item.percent}% (${item.note})`);
-    }
-  }
-  
-  // Patterns
-  if (adh.patterns.length > 0) {
-    lines.push(`Patterns: ${adh.patterns.join('; ')}`);
-  }
-  
-  // Trends
-  const trends = context.performanceTrends;
-  if (trends.run?.reliable) {
-    lines.push(`Run: ${formatTrendForDisplay(trends.run)}`);
-  }
-  if (trends.bike?.reliable) {
-    lines.push(`Bike: ${formatTrendForDisplay(trends.bike)}`);
-  }
-  
-  // Focus areas
-  if (context.focusAreas.areas.length > 0) {
-    lines.push(`Top priorities: ${context.focusAreas.areas.map(a => a.action).join('; ')}`);
-  }
-  
-  // Goal
-  if (context.goal) {
-    lines.push(`Goal: ${context.goal.name} (${context.goal.current_phase}, ${context.goal.weeks_remaining || '?'} weeks)`);
-  }
-  
-  return lines.join('\n');
-}
-
-function generateFallbackInsight(context: any): string {
-  const adh = context.planAdherence;
-  const focus = context.focusAreas.areas[0];
-  
-  if (adh.overall.status === 'falling_behind') {
-    return `Training consistency needs attention. ${focus?.action || 'Focus on completing key workouts.'} Adherence has dropped to ${adh.overall.percent}%.`;
-  }
-  
-  if (adh.overall.status === 'needs_attention') {
-    const warning = adh.by_discipline.find(d => d.status === 'warning' || d.status === 'critical');
-    if (warning) {
-      return `Overall adherence is ${adh.overall.percent}%, but ${warning.discipline} is a gap (${warning.note}). ${focus?.action || 'Address this to avoid setbacks.'}`;
-    }
-    return `Training is mostly on track at ${adh.overall.percent}% adherence. ${focus?.action || 'Stay consistent.'}`;
-  }
-  
-  return `Training is on track at ${adh.overall.percent}% adherence. ${focus?.action || 'Keep the momentum going.'}`;
-}
-
 // =============================================================================
 // LEGACY FORMATTERS (for backward compatibility)
 // =============================================================================
@@ -452,6 +329,48 @@ function formatPerformanceTrendsText(trends: any): string {
   }
   
   return parts.join('. ') || 'Insufficient data for performance trends.';
+}
+
+// =============================================================================
+// HELPER: Filter disciplines relevant to goal
+// =============================================================================
+
+function filterRelevantDisciplines(adherence: any, goal?: Goal): any {
+  if (!goal) return adherence;
+  
+  // Define which disciplines matter for each goal type
+  const relevantDisciplines: Record<string, string[]> = {
+    marathon: ['run', 'strength'],
+    running: ['run', 'strength'],
+    triathlon: ['run', 'bike', 'swim', 'strength'],
+    cycling: ['bike', 'strength'],
+    general: ['run', 'bike', 'swim', 'strength']
+  };
+  
+  const relevant = relevantDisciplines[goal.type || 'general'] || relevantDisciplines.general;
+  
+  console.log(`📊 Filtering disciplines for ${goal.type}: keeping ${relevant.join(', ')}`);
+  
+  // Filter by_discipline to only include relevant ones
+  const filteredDisciplines = adherence.by_discipline.filter((d: any) => 
+    relevant.includes(d.discipline)
+  );
+  
+  // Recalculate overall from filtered disciplines
+  const totalPlanned = filteredDisciplines.reduce((sum: number, d: any) => sum + d.planned, 0);
+  const totalCompleted = filteredDisciplines.reduce((sum: number, d: any) => sum + d.completed, 0);
+  const overallPercent = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 0;
+  
+  return {
+    ...adherence,
+    overall: {
+      ...adherence.overall,
+      completed: totalCompleted,
+      planned: totalPlanned,
+      percent: overallPercent
+    },
+    by_discipline: filteredDisciplines
+  };
 }
 
 function formatPlanAdherenceText(adherence: any): string {

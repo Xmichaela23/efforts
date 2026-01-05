@@ -158,53 +158,15 @@ function calculateDisciplineAdherence(
 }
 
 function getDisciplineWarningNote(discipline: string, goal?: Goal): string {
-  const goalType = goal?.type || 'general';
-  
-  const warningNotes: Record<string, Record<string, string>> = {
-    run: {
-      marathon: 'missing runs risks injury on race day',
-      triathlon: 'run consistency critical for T2',
-      general: 'some runs missed'
-    },
-    bike: {
-      triathlon: 'bike fitness plateau likely',
-      cycling: 'volume too low for target',
-      general: 'some rides missed'
-    },
-    swim: {
-      triathlon: 'swim efficiency declining',
-      general: 'some swims missed'
-    },
-    strength: {
-      marathon: 'impacts durability in later miles',
-      triathlon: 'injury risk increasing',
-      cycling: 'power ceiling limited',
-      general: 'chronic skipping impacts durability'
-    }
-  };
-  
-  return warningNotes[discipline]?.[goalType] || warningNotes[discipline]?.general || 'some sessions missed';
+  // Keep notes FACTUAL, not editorial
+  // Don't claim injury risk or make scary statements without evidence
+  return 'below target';
 }
 
 function getDisciplineCriticalNote(discipline: string, goal?: Goal): string {
-  const goalType = goal?.type || 'general';
-  
-  const criticalNotes: Record<string, Record<string, string>> = {
-    run: {
-      marathon: 'serious risk to marathon goal',
-      general: 'significant deficit'
-    },
-    bike: {
-      cycling: 'goal at risk',
-      general: 'significant deficit'
-    },
-    strength: {
-      marathon: 'injury risk elevated',
-      general: 'chronic gap - impacts durability'
-    }
-  };
-  
-  return criticalNotes[discipline]?.[goalType] || criticalNotes[discipline]?.general || 'significant deficit';
+  // Keep notes FACTUAL, not editorial
+  // Just describe what happened, not what MIGHT happen
+  return 'well below target';
 }
 
 // =============================================================================
