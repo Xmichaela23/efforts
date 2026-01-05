@@ -472,20 +472,24 @@ return (
             <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
           </div>
         </div>
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-2">
           <h2 className="text-2xl font-bold text-white">Training Baselines</h2>
-          <p className="text-white/50 text-sm mt-3">Your performance data for personalized training plans</p>
-          {lastUpdated && (
-            <p className="text-xs text-white/40 mt-1">
-              Last updated: {new Date(lastUpdated).toLocaleDateString()}
-            </p>
-          )}
         </div>
       </div>
     </header>
 
       <main className="mobile-main-content">
-        <div className="max-w-2xl mx-auto px-4 py-6">
+        <div className="max-w-2xl mx-auto px-4 pt-4 pb-6">
+          {/* Description with proper spacing */}
+          <div className="text-center mb-6">
+            <p className="text-white/50 text-sm">Your performance data for personalized training plans</p>
+            {lastUpdated && (
+              <p className="text-xs text-white/40 mt-2">
+                Last updated: {new Date(lastUpdated).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+
         {loading ? (
           <div className="text-center py-8">
             <p className="text-white/60">Loading your baselines...</p>

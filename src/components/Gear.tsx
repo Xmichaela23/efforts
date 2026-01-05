@@ -296,21 +296,24 @@ export default function Gear({ onClose }: GearProps) {
               <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
             </div>
           </div>
-          <div className="px-4 pb-4">
+          <div className="px-4 pb-2">
             <h2 className="text-2xl font-bold text-white">Gear</h2>
-            <p className="text-white/50 text-sm mt-3">Track mileage on your running shoes and bikes</p>
           </div>
         </div>
       </header>
 
       <main className="mobile-main-content">
-        <div className="max-w-2xl mx-auto px-4 py-6">
+        <div className="max-w-2xl mx-auto px-4 pt-4 pb-6">
           {loading ? (
             <div className="text-center py-8">
               <p className="text-white/60">Loading your gear...</p>
             </div>
           ) : (
             <div className="space-y-5">
+              {/* Description */}
+              <div className="text-center mb-4">
+                <p className="text-white/50 text-sm">Track mileage on your running shoes and bikes</p>
+              </div>
 
               {/* Tabs: Shoes / Bikes */}
               <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
