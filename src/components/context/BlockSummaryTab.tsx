@@ -258,13 +258,14 @@ const TrendItem: React.FC<{ discipline: string; trend: any; quality: any }> = ({
   // Reliable trend
   const isPositive = trend.change_percent > 0;
   const TrendIcon = isPositive ? TrendingUp : trend.change_percent < 0 ? TrendingDown : Minus;
-  const changeColor = isPositive ? 'text-green-400' : trend.change_percent < 0 ? 'text-red-400' : 'text-white/60';
+  // Use emerald for trends to distinguish from discipline colors (green=bike, teal=run)
+  const changeColor = isPositive ? 'text-emerald-400' : trend.change_percent < 0 ? 'text-rose-400' : 'text-white/60';
   const sign = isPositive ? '+' : '';
   
   // Efficiency signal
   const eff = trend.efficiency;
   const effSignal = eff?.signal;
-  const effColor = effSignal === 'improving' ? 'text-green-400' : 
+  const effColor = effSignal === 'improving' ? 'text-emerald-400' : 
                    effSignal === 'fatigued' ? 'text-amber-400' : 'text-white/50';
   const effIcon = effSignal === 'improving' ? '↓' : effSignal === 'fatigued' ? '↑' : '';
   
