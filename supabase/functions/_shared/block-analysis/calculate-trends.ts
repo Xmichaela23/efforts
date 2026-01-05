@@ -18,6 +18,10 @@ const MAX_RUN_CHANGE_PERCENT = 15;
 // Minimum workouts needed per period for reliable comparison
 const MIN_WORKOUTS_PER_PERIOD = 2;
 
+// HR change thresholds for efficiency signal
+const HR_IMPROVING_THRESHOLD = -3;  // 3+ bpm lower = improving
+const HR_FATIGUED_THRESHOLD = 5;    // 5+ bpm higher = potential fatigue
+
 // =============================================================================
 // MAIN FUNCTION
 // =============================================================================
@@ -127,12 +131,16 @@ function calculateBikeTrend(
     };
   }
   
+  // Calculate cardiac efficiency if HR data available
+  const efficiency = calculateEfficiency(currentPeriod, previousPeriod);
+  
   return {
     current: `${Math.round(currentAvg)}W`,
     previous: `${Math.round(previousAvg)}W`,
     change_percent: Math.round(changePercent * 10) / 10,
     reliable: true,
-    sample_sizes: { current: currentPowers.length, previous: previousPowers.length }
+    sample_sizes: { current: currentPowers.length, previous: previousPowers.length },
+    efficiency
   };
 }
 
@@ -202,12 +210,55 @@ function calculateRunTrend(
     };
   }
   
+  // Calculate cardiac efficiency if HR data available
+  const efficiency = calculateEfficiency(currentPeriod, previousPeriod);
+  
   return {
     current: secondsToPace(currentAvg),
     previous: secondsToPace(previousAvg),
     change_percent: Math.round(changePercent * 10) / 10,
     reliable: true,
-    sample_sizes: { current: currentPaces.length, previous: previousPaces.length }
+    sample_sizes: { current: currentPaces.length, previous: previousPaces.length },
+    efficiency
+  };
+}
+
+// =============================================================================
+// CARDIAC EFFICIENCY
+// =============================================================================
+
+function calculateEfficiency(
+  currentPeriod: Workout[],
+  previousPeriod: Workout[]
+): TrendResult['efficiency'] {
+  // Get workouts with HR data
+  const currentWithHR = currentPeriod.filter(w => w.avg_heart_rate && w.avg_heart_rate > 0);
+  const previousWithHR = previousPeriod.filter(w => w.avg_heart_rate && w.avg_heart_rate > 0);
+  
+  // Need at least 2 workouts with HR in each period
+  if (currentWithHR.length < 2 || previousWithHR.length < 2) {
+    return undefined;
+  }
+  
+  const currentAvgHR = avg(currentWithHR.map(w => w.avg_heart_rate!));
+  const previousAvgHR = avg(previousWithHR.map(w => w.avg_heart_rate!));
+  const hrChange = currentAvgHR - previousAvgHR;
+  
+  // Determine signal
+  let signal: 'improving' | 'stable' | 'fatigued' | null = null;
+  if (hrChange <= HR_IMPROVING_THRESHOLD) {
+    signal = 'improving';  // Lower HR for similar work = more efficient
+  } else if (hrChange >= HR_FATIGUED_THRESHOLD) {
+    signal = 'fatigued';   // Higher HR for similar work = strain
+  } else {
+    signal = 'stable';
+  }
+  
+  return {
+    current_hr: Math.round(currentAvgHR),
+    previous_hr: Math.round(previousAvgHR),
+    hr_change: Math.round(hrChange),
+    signal
   };
 }
 

@@ -17,6 +17,14 @@ export interface TrendResult {
   reason?: 'insufficient_data' | 'no_power_data' | 'variance_too_high';
   message?: string;
   sample_sizes?: { current: number; previous: number };
+  
+  // Cardiac efficiency (if HR data available)
+  efficiency?: {
+    current_hr: number;      // Avg HR in current period
+    previous_hr: number;     // Avg HR in previous period
+    hr_change: number;       // Negative = improving (lower HR for same output)
+    signal: 'improving' | 'stable' | 'fatigued' | null;
+  };
 }
 
 export interface PerformanceTrends {

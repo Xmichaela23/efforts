@@ -261,19 +261,36 @@ const TrendItem: React.FC<{ discipline: string; trend: any; quality: any }> = ({
   const changeColor = isPositive ? 'text-green-400' : trend.change_percent < 0 ? 'text-red-400' : 'text-white/60';
   const sign = isPositive ? '+' : '';
   
+  // Efficiency signal
+  const eff = trend.efficiency;
+  const effSignal = eff?.signal;
+  const effColor = effSignal === 'improving' ? 'text-green-400' : 
+                   effSignal === 'fatigued' ? 'text-amber-400' : 'text-white/50';
+  const effIcon = effSignal === 'improving' ? '↓' : effSignal === 'fatigued' ? '↑' : '';
+  
   return (
-    <div className="flex items-center gap-3">
-      <Icon className={`w-4 h-4 ${config.color}`} />
-      <span className={`text-sm capitalize ${config.color}`}>{discipline}</span>
-      <div className="flex items-center gap-2 text-sm text-white/80">
-        <span>{trend.previous}</span>
-        <span className="text-white/40">→</span>
-        <span>{trend.current}</span>
-        <span className={`${changeColor} flex items-center gap-1`}>
-          <TrendIcon className="w-3 h-3" />
-          {sign}{trend.change_percent}%
-        </span>
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-3">
+        <Icon className={`w-4 h-4 ${config.color}`} />
+        <span className={`text-sm capitalize ${config.color}`}>{discipline}</span>
+        <div className="flex items-center gap-2 text-sm text-white/80">
+          <span>{trend.previous}</span>
+          <span className="text-white/40">→</span>
+          <span>{trend.current}</span>
+          <span className={`${changeColor} flex items-center gap-1`}>
+            <TrendIcon className="w-3 h-3" />
+            {sign}{trend.change_percent}%
+          </span>
+        </div>
       </div>
+      {/* Cardiac efficiency if available */}
+      {eff && eff.signal && (
+        <div className={`ml-8 text-xs ${effColor}`}>
+          HR: {eff.previous_hr} → {eff.current_hr} bpm ({effIcon}{Math.abs(eff.hr_change)} bpm)
+          {effSignal === 'improving' && ' • more efficient'}
+          {effSignal === 'fatigued' && ' • possible fatigue'}
+        </div>
+      )}
     </div>
   );
 };
