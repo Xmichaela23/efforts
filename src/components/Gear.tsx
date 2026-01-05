@@ -46,6 +46,41 @@ interface GearProps {
   onClose: () => void;
 }
 
+// Common brands and models for autocomplete
+const SHOE_BRANDS = [
+  'Nike', 'Hoka', 'Brooks', 'Asics', 'New Balance', 'Saucony', 'Adidas', 
+  'On', 'Altra', 'Mizuno', 'Puma', 'Reebok', 'Under Armour', 'Salomon'
+];
+
+const SHOE_MODELS: Record<string, string[]> = {
+  'Nike': ['Pegasus', 'Vaporfly', 'Alphafly', 'Invincible', 'Zoom Fly', 'Structure', 'Vomero', 'React Infinity'],
+  'Hoka': ['Clifton', 'Bondi', 'Mach', 'Rincon', 'Speedgoat', 'Arahi', 'Gaviota', 'Carbon X'],
+  'Brooks': ['Ghost', 'Glycerin', 'Adrenaline', 'Launch', 'Hyperion', 'Levitate', 'Cascadia'],
+  'Asics': ['Gel-Nimbus', 'Gel-Kayano', 'Novablast', 'Metaspeed', 'GT-2000', 'Cumulus', 'Superblast'],
+  'New Balance': ['Fresh Foam 1080', 'FuelCell', 'Fresh Foam 880', 'Fresh Foam More', 'Rebel', 'SuperComp'],
+  'Saucony': ['Kinvara', 'Endorphin', 'Triumph', 'Guide', 'Ride', 'Peregrine', 'Hurricane'],
+  'Adidas': ['Ultraboost', 'Adizero', 'Supernova', 'Solar Glide', 'Adistar', 'Boston'],
+  'On': ['Cloudmonster', 'Cloudsurfer', 'Cloudflow', 'Cloudstratus', 'Cloudrunner', 'Cloudboom'],
+  'Altra': ['Torin', 'Rivera', 'Escalante', 'Lone Peak', 'Olympus', 'Provision'],
+  'Mizuno': ['Wave Rider', 'Wave Inspire', 'Wave Sky', 'Wave Rebellion', 'Wave Neo'],
+};
+
+const BIKE_BRANDS = [
+  'Trek', 'Specialized', 'Giant', 'Cannondale', 'Canyon', 'Cervélo', 'Pinarello',
+  'Scott', 'BMC', 'Bianchi', 'Factor', 'Colnago', 'Felt', 'Orbea', 'Wilier'
+];
+
+const BIKE_MODELS: Record<string, string[]> = {
+  'Trek': ['Domane', 'Émonda', 'Madone', 'Checkpoint', 'FX', 'Fuel EX'],
+  'Specialized': ['Tarmac', 'Roubaix', 'Diverge', 'Allez', 'Venge', 'Aethos', 'Crux'],
+  'Giant': ['Defy', 'TCR', 'Propel', 'Revolt', 'Contend', 'Escape'],
+  'Cannondale': ['Synapse', 'SuperSix', 'CAAD', 'Topstone', 'SystemSix'],
+  'Canyon': ['Endurance', 'Ultimate', 'Aeroad', 'Grail', 'Endurace'],
+  'Cervélo': ['R5', 'S5', 'Caledonia', 'Áspero', 'Soloist'],
+  'Scott': ['Addict', 'Foil', 'Speedster', 'Contessa'],
+  'BMC': ['Roadmachine', 'Teammachine', 'Timemachine'],
+};
+
 export default function Gear({ onClose }: GearProps) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -472,21 +507,40 @@ export default function Gear({ onClose }: GearProps) {
                           <label className="text-xs text-white/50 font-medium mb-1.5 block">Brand</label>
                           <input
                             type="text"
+                            list={activeTab === 'shoes' ? 'shoe-brands' : 'bike-brands'}
                             value={newGear.brand}
-                            onChange={(e) => setNewGear({ ...newGear, brand: e.target.value })}
+                            onChange={(e) => setNewGear({ ...newGear, brand: e.target.value, model: '' })}
                             placeholder={activeTab === 'shoes' ? 'Nike, Hoka...' : 'Trek, Specialized...'}
                             className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
                           />
+                          <datalist id="shoe-brands">
+                            {SHOE_BRANDS.map(brand => <option key={brand} value={brand} />)}
+                          </datalist>
+                          <datalist id="bike-brands">
+                            {BIKE_BRANDS.map(brand => <option key={brand} value={brand} />)}
+                          </datalist>
                         </div>
                         <div>
                           <label className="text-xs text-white/50 font-medium mb-1.5 block">Model</label>
                           <input
                             type="text"
+                            list={`${newGear.brand.toLowerCase().replace(/\s+/g, '-')}-models`}
                             value={newGear.model}
                             onChange={(e) => setNewGear({ ...newGear, model: e.target.value })}
                             placeholder={activeTab === 'shoes' ? 'Pegasus 40' : 'Domane SL5'}
                             className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
                           />
+                          {/* Dynamic model datalists based on selected brand */}
+                          {activeTab === 'shoes' && Object.entries(SHOE_MODELS).map(([brand, models]) => (
+                            <datalist key={brand} id={`${brand.toLowerCase().replace(/\s+/g, '-')}-models`}>
+                              {models.map(model => <option key={model} value={model} />)}
+                            </datalist>
+                          ))}
+                          {activeTab === 'bikes' && Object.entries(BIKE_MODELS).map(([brand, models]) => (
+                            <datalist key={brand} id={`${brand.toLowerCase().replace(/\s+/g, '-')}-models`}>
+                              {models.map(model => <option key={model} value={model} />)}
+                            </datalist>
+                          ))}
                         </div>
                       </div>
 
