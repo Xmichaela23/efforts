@@ -90,27 +90,27 @@ export function generateFocusAreas(
 // =============================================================================
 
 function getCriticalAction(discipline: string, goal?: Goal): string {
-  // Specific, actionable - not scary or editorial
+  // Focus on the pattern, not specific numbers
   const actions: Record<string, string> = {
-    run: 'Add runs back to schedule',
-    bike: 'Add bike sessions to schedule',
-    swim: 'Add swim sessions to schedule',
-    strength: 'Add 2 strength sessions per week'
+    run: 'Prioritize run sessions',
+    bike: 'Prioritize bike sessions',
+    swim: 'Prioritize swim sessions',
+    strength: 'Prioritize strength sessions'
   };
   
-  return actions[discipline] || `Add ${discipline} to schedule`;
+  return actions[discipline] || `Prioritize ${discipline}`;
 }
 
 function getWarningAction(discipline: string, goal?: Goal): string {
-  // Specific, actionable - not scary
+  // Focus on the pattern, not specific numbers
   const actions: Record<string, string> = {
-    run: 'Complete scheduled runs this week',
-    bike: 'Complete scheduled rides this week',
-    swim: 'Complete scheduled swims this week',
-    strength: 'Complete 2 strength sessions this week'
+    run: 'Stay consistent with runs',
+    bike: 'Stay consistent with rides',
+    swim: 'Stay consistent with swims',
+    strength: 'Stay consistent with strength'
   };
   
-  return actions[discipline] || `Complete scheduled ${discipline}`;
+  return actions[discipline] || `Stay consistent with ${discipline}`;
 }
 
 function getCriticalImpact(discipline: string, goal?: Goal): string {
