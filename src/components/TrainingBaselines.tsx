@@ -472,7 +472,7 @@ return (
             <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
           </div>
         </div>
-        <div className="px-4 pb-2">
+        <div className="px-4 pb-4">
           <h2 className="text-2xl font-bold text-white">Training Baselines</h2>
         </div>
       </div>
@@ -486,8 +486,8 @@ return (
           </div>
         ) : (
           <>
-              <div className="text-center mb-6">
-                <p className="text-white/70">Your performance data for personalized training plans</p>
+              <div className="text-center mb-6 mt-2">
+                <p className="text-white/60 text-sm">Your performance data for personalized training plans</p>
               {lastUpdated && (
                 <p className="text-xs text-white/60 mt-1">
                   Last updated: {new Date(lastUpdated).toLocaleDateString()}
