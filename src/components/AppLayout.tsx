@@ -25,6 +25,7 @@ import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
 import FitFileImporter from './FitFileImporter';
 import TrainingBaselines from './TrainingBaselines';
+import Gear from './Gear';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import PullToRefresh from './PullToRefresh';
 import { supabase } from '@/lib/supabase';
@@ -64,6 +65,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
   const [showImportPage, setShowImportPage] = useState(false);
   const [showTrainingBaselines, setShowTrainingBaselines] = useState(false);
+  const [showGear, setShowGear] = useState(false);
   const [showContext, setShowContext] = useState(false);
   const [contextFocusWorkoutId, setContextFocusWorkoutId] = useState<string | null>(null);
   const [activeBottomNav, setActiveBottomNav] = useState<'home' | 'plans' | 'insights'>('home');
@@ -386,7 +388,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       return;
     }
     // Handle other views - return to dashboard
-    if (showTrainingBaselines || showImportPage || showContext || showBuilder || showStrengthLogger || showPilatesYogaLogger) {
+    if (showTrainingBaselines || showGear || showImportPage || showContext || showBuilder || showStrengthLogger || showPilatesYogaLogger) {
       handleBackToDashboard();
       return;
     }
@@ -421,6 +423,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // NEW: Training Baselines handler
   const handleTrainingBaselinesClick = () => {
     setShowTrainingBaselines(true);
+  };
+
+  // Gear handler
+  const handleGearClick = () => {
+    setShowGear(true);
   };
 
   // NEW: Connections handler
@@ -613,6 +620,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowPlanBuilder(false);
     setShowImportPage(false);
     setShowTrainingBaselines(false); // NEW: Reset training baselines
+    setShowGear(false); // Reset gear view
     setShowContext(false); // NEW: Reset context view
     setBuilderType('');
     setBuilderSourceContext('');
@@ -1052,7 +1060,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     <Link className="mr-2 h-4 w-4" />
                     Connections
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleGearClick}>
                     <Package className="mr-2 h-4 w-4" />
                     Gear
                   </DropdownMenuItem>
@@ -1078,7 +1086,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               </DropdownMenu>
 
               <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
-              {(selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showImportPage || showContext) && !showSummary && (
+              {(selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showTrainingBaselines || showGear || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
                   {!selectedWorkout && (
                   <Button
@@ -1209,6 +1217,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 }}
               />
             </div>
+          ) : showGear ? (
+            <div className="pt-4 h-full" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
+              <Gear onClose={handleBackToDashboard} />
+            </div>
           ) : showBuilder ? (
             <div className="pt-4">
               <WorkoutBuilder
@@ -1271,13 +1283,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to home
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showContext) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showGear || showContext) {
                       handleBackToDashboard();
                     }
                     setActiveBottomNav('home');
                   }}
                   className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showContext
+                    activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear && !showContext
                       ? 'border-white/50 text-white bg-white/[0.12]' 
                       : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
                   }`}
@@ -1302,7 +1314,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     setActiveBottomNav('insights');
                   }}
                   className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines
+                    activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear
                       ? 'border-white/50 text-white bg-white/[0.12]' 
                       : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
                   }`}
