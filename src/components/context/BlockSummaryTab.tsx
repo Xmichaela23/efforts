@@ -134,7 +134,8 @@ const BlockSummaryTab: React.FC = () => {
   }
 
   // Determine which data format we're using (structured vs legacy)
-  const hasStructuredData = data.performance_trends && typeof data.performance_trends === 'object';
+  // Structured data uses `_structured` suffix to avoid conflicts with legacy string fields
+  const hasStructuredData = data.performance_trends_structured && typeof data.performance_trends_structured === 'object';
 
   return (
     <div className="space-y-4 pb-6">
@@ -161,10 +162,10 @@ const BlockSummaryTab: React.FC = () => {
       {hasStructuredData ? (
         <>
           {/* Performance Trends - Structured */}
-          <PerformanceTrendsSection trends={data.performance_trends} quality={data.data_quality} />
+          <PerformanceTrendsSection trends={data.performance_trends_structured} quality={data.data_quality} />
           
           {/* Plan Adherence - Structured */}
-          <PlanAdherenceSection adherence={data.plan_adherence} />
+          <PlanAdherenceSection adherence={data.plan_adherence_structured} />
           
           {/* This Week - Structured */}
           <ThisWeekSection week={data.this_week} />
@@ -492,7 +493,8 @@ const CoachingInsightSection: React.FC<{ insight: string }> = ({ insight }) => {
 // =============================================================================
 
 const LegacyPerformanceTrends: React.FC<{ data: any }> = ({ data }) => {
-  const text = data.performance_trends_text || data.performance_trends;
+  // Only use string values, never objects
+  const text = typeof data.performance_trends === 'string' ? data.performance_trends : null;
   if (!text) return null;
   
   return (
@@ -509,7 +511,8 @@ const LegacyPerformanceTrends: React.FC<{ data: any }> = ({ data }) => {
 };
 
 const LegacyPlanAdherence: React.FC<{ data: any }> = ({ data }) => {
-  const text = data.plan_adherence_text || data.plan_adherence;
+  // Only use string values, never objects
+  const text = typeof data.plan_adherence === 'string' ? data.plan_adherence : null;
   if (!text) return null;
   
   return (

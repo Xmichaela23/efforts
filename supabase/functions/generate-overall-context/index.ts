@@ -197,16 +197,25 @@ Deno.serve(async (req) => {
       generated_at: new Date().toISOString()
     };
 
-    // Also include legacy fields for backward compatibility during migration
-    const legacyResponse = {
-      ...analysis,
-      // Legacy text fields (will be removed after frontend migration)
-      performance_trends_text: formatPerformanceTrendsText(performanceTrends),
-      plan_adherence_text: formatPlanAdherenceText(planAdherence),
+    // Return BOTH structured data AND legacy text fields
+    // Legacy fields use the same keys so old frontend still works
+    const response = {
+      // New structured data (for new frontend)
+      performance_trends_structured: performanceTrends,
+      plan_adherence_structured: planAdherence,
+      this_week: thisWeek,
+      focus_areas: focusAreas,
+      data_quality: dataQuality,
+      coaching_insight: coachingInsight,
+      generated_at: new Date().toISOString(),
+      
+      // Legacy text fields (for old frontend - same keys it expects)
+      performance_trends: formatPerformanceTrendsText(performanceTrends),
+      plan_adherence: formatPlanAdherenceText(planAdherence),
       weekly_summary: formatWeekSummaryText(thisWeek)
     };
 
-    return new Response(JSON.stringify(legacyResponse), {
+    return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
