@@ -6,6 +6,7 @@ import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { SPORT_COLORS } from '@/lib/context-utils';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -341,13 +342,19 @@ const disconnectGarmin = () => {
   setGarminMessage('Disconnected from Garmin');
 };
 
-  // Discipline options
+  // Discipline options with colors
 const disciplineOptions = [
-    { id: 'running', name: 'Run', icon: Activity },
-    { id: 'cycling', name: 'Cycle', icon: Bike },
-    { id: 'swimming', name: 'Swim', icon: Waves },
-    { id: 'strength', name: 'Strength', icon: Dumbbell }
+    { id: 'running', name: 'Run', icon: Activity, color: SPORT_COLORS.run },
+    { id: 'cycling', name: 'Cycle', icon: Bike, color: SPORT_COLORS.cycling },
+    { id: 'swimming', name: 'Swim', icon: Waves, color: SPORT_COLORS.swim },
+    { id: 'strength', name: 'Strength', icon: Dumbbell, color: SPORT_COLORS.strength }
   ];
+  
+  // Get active sport color
+  const getActiveSportColor = () => {
+    const active = disciplineOptions.find(d => d.id === activeSport);
+    return active?.color || '#ffffff';
+  };
 
   const toggleDiscipline = (disciplineId: string) => {
     // If clicking the already active sport, close it
@@ -513,10 +520,10 @@ return (
               </div> */}
 
               {activeTab === 'baselines' ? (
-                <div className="space-y-6">
+                <div className="space-y-5">
                   {/* Basic Information */}
-                      <div className="space-y-2">
-                    <h2 className="text-sm font-medium text-white/90">Basic Information</h2>
+                  <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
+                    <h2 className="text-sm font-semibold text-white/90 mb-3 tracking-wide">Basic Information</h2>
                     
                     <div className="flex flex-wrap gap-3">
                       <div className="flex items-center gap-2">
@@ -583,10 +590,10 @@ return (
                   </div>
 
                   {/* Disciplines */}
-                  <div className="space-y-2">
-                    <div>
-                      <h2 className="text-sm font-medium text-white/90">Your Sports</h2>
-                      <p className="text-xs text-white/60">Add baselines for personalized plans</p>
+                  <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
+                    <div className="mb-3">
+                      <h2 className="text-sm font-semibold text-white/90 tracking-wide">Your Sports</h2>
+                      <p className="text-xs text-white/50 mt-0.5">Tap to add performance baselines</p>
                     </div>
                     
                     <div className="grid grid-cols-4 gap-2">
@@ -598,42 +605,71 @@ return (
                           <button
                             key={discipline.id}
                             onClick={() => toggleDiscipline(discipline.id)}
-                            className={`relative flex items-center justify-center gap-1.5 py-2 rounded-full border text-center transition-all duration-300 ${
+                            className={`relative flex items-center justify-center gap-1.5 py-2.5 rounded-full border text-center transition-all duration-300 backdrop-blur-lg ${
                               isActive
-                                ? 'border-white/50 bg-white/[0.12] text-white'
+                                ? 'border-transparent'
                                 : hasData
-                                  ? 'border-white/30 bg-white/[0.08] text-white/80'
-                                  : 'border-white/25 bg-white/[0.05] text-white/60 hover:border-white/35 hover:bg-white/[0.08] hover:text-white/80'
+                                  ? 'border-white/20 bg-white/[0.06] hover:bg-white/[0.10]'
+                                  : 'border-white/15 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.08]'
                             }`}
-                            style={{ fontFamily: 'Inter, sans-serif' }}
+                            style={{ 
+                              fontFamily: 'Inter, sans-serif',
+                              ...(isActive ? {
+                                backgroundColor: `${discipline.color}20`,
+                                borderColor: discipline.color,
+                                borderWidth: '1.5px',
+                                boxShadow: `0 0 20px ${discipline.color}30, inset 0 0 20px ${discipline.color}10`
+                              } : {})
+                            }}
                           >
-                            {!isActive && (
-                              <span className="absolute -top-1 -right-1 text-[10px] text-white/60">
-                                {hasData ? '✓' : '+'}
-                                      </span>
+                            {!isActive && hasData && (
+                              <span 
+                                className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-bold"
+                                style={{ backgroundColor: discipline.color, color: '#000' }}
+                              >
+                                ✓
+                              </span>
                             )}
-                            <Icon className={`h-4 w-4 ${isActive ? 'text-white' : hasData ? 'text-white/80' : 'text-white/60'}`} />
-                            <span className={`text-xs font-medium ${isActive ? 'text-white' : hasData ? 'text-white/80' : 'text-white/60'}`}>
+                            <Icon 
+                              className="h-4 w-4 transition-colors duration-300" 
+                              style={{ color: isActive || hasData ? discipline.color : 'rgba(255,255,255,0.5)' }}
+                            />
+                            <span 
+                              className="text-xs font-medium transition-colors duration-300"
+                              style={{ color: isActive ? discipline.color : hasData ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)' }}
+                            >
                               {discipline.name}
-                                      </span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
                   {/* Per-discipline performance numbers */}
                   {activeSport && (
-                    <div className="space-y-4">
-                      <h2 className="text-sm font-medium text-white/90">Performance Numbers</h2>
+                    <div 
+                      className="p-4 rounded-2xl backdrop-blur-xl border transition-all duration-300"
+                      style={{
+                        backgroundColor: `${getActiveSportColor()}08`,
+                        borderColor: `${getActiveSportColor()}30`,
+                        boxShadow: `0 4px 30px ${getActiveSportColor()}10`
+                      }}
+                    >
+                      <h2 
+                        className="text-sm font-semibold mb-4 tracking-wide"
+                        style={{ color: getActiveSportColor() }}
+                      >
+                        Performance Numbers
+                      </h2>
 
                       {/* Running */}
                       {activeSport === 'running' && (
-                        <div className="space-y-3 pb-4 border-b border-white/10">
+                        <div className="space-y-3">
                           <div className="flex items-center gap-2">
-                            <Activity className="h-4 w-4 text-white/80" />
+                            <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />
                             <h3 className="text-sm font-medium text-white/90">Running</h3>
-                                    </div>
+                          </div>
                           <div className="flex flex-wrap gap-4">
                             <div className="flex items-center gap-2">
                               <label className="text-xs text-white/60">5K Time</label>
@@ -669,16 +705,16 @@ return (
                                 style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
                               <span className="text-xs text-white/60">/mi</span>
-                                    </div>
-                                    </div>
+                            </div>
+                          </div>
                         </div>
                       )}
 
                       {/* Cycling */}
                       {activeSport === 'cycling' && (
-                        <div className="space-y-3 pb-4 border-b border-white/10">
+                        <div className="space-y-3">
                           <div className="flex items-center gap-2">
-                            <Bike className="h-4 w-4 text-white/80" />
+                            <Bike className="h-4 w-4" style={{ color: SPORT_COLORS.cycling }} />
                             <h3 className="text-sm font-medium text-white/90">Cycling</h3>
                           </div>
                           <div className="flex items-center gap-2">
@@ -704,9 +740,9 @@ return (
 
                       {/* Swimming */}
                       {activeSport === 'swimming' && (
-                        <div className="space-y-3 pb-4 border-b border-white/10">
+                        <div className="space-y-3">
                           <div className="flex items-center gap-2">
-                            <Waves className="h-4 w-4 text-white/80" />
+                            <Waves className="h-4 w-4" style={{ color: SPORT_COLORS.swim }} />
                             <h3 className="text-sm font-medium text-white/90">Swimming</h3>
                           </div>
                           <div className="flex items-center gap-2">
@@ -754,15 +790,21 @@ return (
 
                       {/* Strength */}
                       {activeSport === 'strength' && (
-                        <div className="space-y-3 pb-4">
+                        <div className="space-y-3">
                           <div className="flex items-center gap-2">
-                            <Dumbbell className="h-4 w-4 text-white/80" />
+                            <Dumbbell className="h-4 w-4" style={{ color: SPORT_COLORS.strength }} />
                             <h3 className="text-sm font-medium text-white/90">Strength</h3>
-                            <span className="text-xs text-white/60">1 rep max ({data.units === 'metric' ? 'kg' : 'lbs'})</span>
+                            <span className="text-xs text-white/50">1RM ({data.units === 'metric' ? 'kg' : 'lbs'})</span>
                           </div>
                           
                           {/* Baseline Test Note */}
-                          <div className="p-3 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-md">
+                          <div 
+                            className="p-3 rounded-xl backdrop-blur-lg border"
+                            style={{ 
+                              backgroundColor: `${SPORT_COLORS.strength}10`,
+                              borderColor: `${SPORT_COLORS.strength}30`
+                            }}
+                          >
                             <p className="text-xs text-white/90 mb-2">
                               Don't know your numbers? Or want to retest?
                             </p>
@@ -774,7 +816,8 @@ return (
                                     onOpenBaselineTest('Baseline Test: Lower Body');
                                   }
                                 }}
-                                className="text-cyan-400 hover:text-cyan-300 underline font-medium"
+                                className="underline font-medium hover:opacity-80"
+                                style={{ color: SPORT_COLORS.strength }}
                               >
                                 Baseline Test: Lower Body
                               </button>
@@ -785,7 +828,8 @@ return (
                                     onOpenBaselineTest('Baseline Test: Upper Body');
                                   }
                                 }}
-                                className="text-cyan-400 hover:text-cyan-300 underline font-medium"
+                                className="underline font-medium hover:opacity-80"
+                                style={{ color: SPORT_COLORS.strength }}
                               >
                                 Upper Body
                               </button>
