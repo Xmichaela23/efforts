@@ -71,7 +71,6 @@ const Connections: React.FC = () => {
 
   // Placeholder state for dropdown menu (would normally come from context)
   const [currentPlans] = useState<any[]>([]);
-  const repairPlan = null;
   const [plansMenuOpen, setPlansMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -827,23 +826,6 @@ const Connections: React.FC = () => {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56">
-                  {currentPlans && currentPlans.length > 0 && (
-                    <DropdownMenuItem
-                      onClick={async () => {
-                        try {
-                          const active = currentPlans[0];
-                          if (!active?.id || !repairPlan) return;
-                          const res = await repairPlan(String(active.id));
-                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                          alert(`Plan repaired: ${res.repaired} item(s) updated`);
-                        } catch (e: any) {
-                          alert(`Repair failed: ${e?.message || 'unknown error'}`);
-                        }
-                      }}
-                    >
-                      Repair Active Plan
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuItem onClick={() => navigate('/')}>
                     <Activity className="mr-2 h-4 w-4" />
                     Training Baselines
