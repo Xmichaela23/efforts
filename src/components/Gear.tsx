@@ -309,7 +309,7 @@ export default function Gear({ onClose }: GearProps) {
               <p className="text-white/60">Loading your gear...</p>
             </div>
           ) : (
-            <div className="space-y-5 mt-8">
+            <div className="space-y-5 mt-12">
               {/* Description */}
               <div className="text-center mb-4">
                 <p className="text-white/50 text-sm">Track mileage on your running shoes and bikes</p>
