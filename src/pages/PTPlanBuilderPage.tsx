@@ -201,10 +201,11 @@ function parseLine(line: string): ParsedItem | null {
   
   // Rule 3d: Em dash separator "exercise — sets/reps/weight" format (without pipe)
   if (!notesPart) {
-    // Look for em dash (—) or en dash (–) or double dash (--)
-    const dashMatch = cleaned.match(/[—–-]{1,2}\s*(.+)/);
-    if (dashMatch) {
-      const afterDash = dashMatch[1].trim();
+    // Look for em dash (—) or en dash (–) or double dash (--) or spaced hyphen ( - )
+    // IMPORTANT: Don't match single hyphens in words like "step-ups" or "single-leg"
+    const dashMatch = cleaned.match(/[—–]|--|\s-\s/);
+    if (dashMatch && dashMatch.index !== undefined) {
+      const afterDash = cleaned.substring(dashMatch.index + dashMatch[0].length).trim();
       // Check if it looks like structured data (sets/reps/weight)
       const looksLikeStructured = afterDash.match(/^\d+\s*(?:x\s*\d+|sets?\s*(?:of\s*\d+|until))/i);
       if (!looksLikeStructured && afterDash.length > 10) {
