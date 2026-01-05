@@ -670,41 +670,43 @@ return (
                             <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />
                             <h3 className="text-sm font-medium text-white/90">Running</h3>
                           </div>
-                          <div className="flex flex-wrap gap-4">
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs text-white/60">5K Time</label>
-                                      <input
-                                        type="text"
-                                        value={data.performanceNumbers?.fiveK || ''}
-                                        onChange={(e) => setData(prev => ({
-                                          ...prev,
-                                          performanceNumbers: {
-                                            ...prev.performanceNumbers,
+                          <div className="flex flex-wrap gap-6 mt-2">
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-xs text-white/50 font-medium">5K Time</label>
+                              <input
+                                type="text"
+                                value={data.performanceNumbers?.fiveK || ''}
+                                onChange={(e) => setData(prev => ({
+                                  ...prev,
+                                  performanceNumbers: {
+                                    ...prev.performanceNumbers,
                                     fiveK: e.target.value
-                                          }
-                                        }))}
+                                  }
+                                }))}
                                 placeholder="25:00"
-                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                                className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
                                 style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                                    </div>
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs text-white/60">Easy Pace</label>
-                                      <input
-                                        type="text"
-                                        value={data.performanceNumbers?.easyPace || ''}
-                                        onChange={(e) => setData(prev => ({
-                                          ...prev,
-                                          performanceNumbers: {
-                                            ...prev.performanceNumbers,
-                                            easyPace: e.target.value
-                                          }
-                                        }))}
-                                placeholder="9:30"
-                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                              <span className="text-xs text-white/60">/mi</span>
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-xs text-white/50 font-medium">Easy Pace</label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={data.performanceNumbers?.easyPace || ''}
+                                  onChange={(e) => setData(prev => ({
+                                    ...prev,
+                                    performanceNumbers: {
+                                      ...prev.performanceNumbers,
+                                      easyPace: e.target.value
+                                    }
+                                  }))}
+                                  placeholder="9:30"
+                                  className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
+                                  style={{ fontFamily: 'Inter, sans-serif' }}
+                                />
+                                <span className="text-sm text-white/50">/mi</span>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -910,12 +912,12 @@ return (
                                       />
                                     </div>
                                   </div>
-                          <div className="space-y-3">
-                            <label className="text-xs text-white/60">Equipment Access</label>
+                          <div className="space-y-4 mt-4 pt-4 border-t border-white/10">
+                            <h4 className="text-sm font-medium text-white/80">Equipment Access</h4>
                             
                             {/* Commercial vs Home gym toggle */}
-                            <div className="flex gap-4">
-                          <button
+                            <div className="flex gap-3">
+                              <button
                                 onClick={() => {
                                   // Set to commercial gym, clear individual equipment
                                   setData(prev => ({
@@ -923,16 +925,30 @@ return (
                                     equipment: { ...prev.equipment, strength: ['Commercial gym'] }
                                   }));
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-full border transition-all duration-300 ${
+                                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm rounded-xl border-2 transition-all duration-300 ${
                                   hasCommercialGym
-                                    ? 'border-white/50 bg-white/[0.12] text-white'
-                                    : 'border-white/25 bg-white/[0.08] text-white/80 hover:border-white/35 hover:bg-white/[0.10]'
+                                    ? 'text-white'
+                                    : 'border-white/15 bg-white/[0.04] text-white/60 hover:border-white/25 hover:bg-white/[0.08]'
                                 }`}
-                                style={{ fontFamily: 'Inter, sans-serif' }}
+                                style={{ 
+                                  fontFamily: 'Inter, sans-serif',
+                                  ...(hasCommercialGym ? {
+                                    borderColor: SPORT_COLORS.strength,
+                                    backgroundColor: `${SPORT_COLORS.strength}15`
+                                  } : {})
+                                }}
                               >
-                                <span className={`w-3 h-3 rounded-full border-2 ${hasCommercialGym ? 'border-white/80 bg-white/80' : 'border-white/40'}`} />
+                                <span 
+                                  className="w-4 h-4 rounded-full border-2 flex items-center justify-center"
+                                  style={{ 
+                                    borderColor: hasCommercialGym ? SPORT_COLORS.strength : 'rgba(255,255,255,0.3)',
+                                    backgroundColor: hasCommercialGym ? SPORT_COLORS.strength : 'transparent'
+                                  }}
+                                >
+                                  {hasCommercialGym && <span className="text-[10px] text-black font-bold">✓</span>}
+                                </span>
                                 Commercial gym
-                          </button>
+                              </button>
                               <button
                                 onClick={() => {
                                   // Switch to home gym - only clear if coming FROM commercial gym
@@ -944,37 +960,66 @@ return (
                                   }
                                   // If already home gym, do nothing - keep existing equipment
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-full border transition-all duration-300 ${
+                                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm rounded-xl border-2 transition-all duration-300 ${
                                   !hasCommercialGym
-                                    ? 'border-white/50 bg-white/[0.12] text-white'
-                                    : 'border-white/25 bg-white/[0.08] text-white/80 hover:border-white/35 hover:bg-white/[0.10]'
+                                    ? 'text-white'
+                                    : 'border-white/15 bg-white/[0.04] text-white/60 hover:border-white/25 hover:bg-white/[0.08]'
                                 }`}
-                                style={{ fontFamily: 'Inter, sans-serif' }}
+                                style={{ 
+                                  fontFamily: 'Inter, sans-serif',
+                                  ...(!hasCommercialGym ? {
+                                    borderColor: SPORT_COLORS.strength,
+                                    backgroundColor: `${SPORT_COLORS.strength}15`
+                                  } : {})
+                                }}
                               >
-                                <span className={`w-3 h-3 rounded-full border-2 ${!hasCommercialGym ? 'border-white/80 bg-white/80' : 'border-white/40'}`} />
+                                <span 
+                                  className="w-4 h-4 rounded-full border-2 flex items-center justify-center"
+                                  style={{ 
+                                    borderColor: !hasCommercialGym ? SPORT_COLORS.strength : 'rgba(255,255,255,0.3)',
+                                    backgroundColor: !hasCommercialGym ? SPORT_COLORS.strength : 'transparent'
+                                  }}
+                                >
+                                  {!hasCommercialGym && <span className="text-[10px] text-black font-bold">✓</span>}
+                                </span>
                                 Home gym
                               </button>
-                  </div>
+                            </div>
 
                             {/* Home gym equipment details - only show if not commercial */}
                             {!hasCommercialGym && (
-                              <div className="space-y-2 pl-1">
-                                <p className="text-xs text-white/60">Select your equipment:</p>
-                                <div className="flex flex-wrap gap-2">
+                              <div className="space-y-3">
+                                <p className="text-xs text-white/50 font-medium">Select your equipment:</p>
+                                <div className="grid grid-cols-2 gap-2">
                                   {homeGymEquipmentOptions.map((option) => {
                                     const isSelected = (data.equipment.strength || []).includes(option);
                                     return (
-                        <button
+                                      <button
                                         key={option}
                                         onClick={() => toggleEquipment('strength', option)}
-                                        className={`px-2 py-1 text-xs rounded-full transition-all duration-300 ${
+                                        className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition-all duration-300 ${
                                           isSelected
-                                            ? 'bg-white/[0.12] border border-white/50 text-white'
-                                            : 'bg-white/[0.08] border border-white/25 text-white/80 hover:bg-white/[0.12] hover:border-white/35 hover:text-white'
+                                            ? 'text-white'
+                                            : 'border-white/15 bg-white/[0.04] text-white/60 hover:border-white/25 hover:bg-white/[0.08]'
                                         }`}
-                                        style={{ fontFamily: 'Inter, sans-serif' }}
+                                        style={{ 
+                                          fontFamily: 'Inter, sans-serif',
+                                          ...(isSelected ? {
+                                            borderColor: `${SPORT_COLORS.strength}80`,
+                                            backgroundColor: `${SPORT_COLORS.strength}15`
+                                          } : {})
+                                        }}
                                       >
-                          {option}
+                                        <span 
+                                          className="w-3.5 h-3.5 rounded flex items-center justify-center border"
+                                          style={{ 
+                                            borderColor: isSelected ? SPORT_COLORS.strength : 'rgba(255,255,255,0.25)',
+                                            backgroundColor: isSelected ? SPORT_COLORS.strength : 'transparent'
+                                          }}
+                                        >
+                                          {isSelected && <span className="text-[8px] text-black font-bold">✓</span>}
+                                        </span>
+                                        {option}
                         </button>
                                     );
                                   })}
