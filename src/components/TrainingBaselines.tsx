@@ -472,8 +472,14 @@ return (
             <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
           </div>
         </div>
-        <div className="px-4 pb-6">
+        <div className="px-4 pb-4">
           <h2 className="text-2xl font-bold text-white">Training Baselines</h2>
+          <p className="text-white/50 text-sm mt-3">Your performance data for personalized training plans</p>
+          {lastUpdated && (
+            <p className="text-xs text-white/40 mt-1">
+              Last updated: {new Date(lastUpdated).toLocaleDateString()}
+            </p>
+          )}
         </div>
       </div>
     </header>
@@ -486,14 +492,6 @@ return (
           </div>
         ) : (
           <>
-              <div className="text-center mb-8">
-                <p className="text-white/50 text-sm">Your performance data for personalized training plans</p>
-              {lastUpdated && (
-                <p className="text-xs text-white/60 mt-1">
-                  Last updated: {new Date(lastUpdated).toLocaleDateString()}
-                </p>
-              )}
-            </div>
 
               {/* Tabs - Data Import hidden for now */}
               {/* <div className="flex mb-6">

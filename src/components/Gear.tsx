@@ -296,8 +296,9 @@ export default function Gear({ onClose }: GearProps) {
               <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
             </div>
           </div>
-          <div className="px-4 pb-6">
+          <div className="px-4 pb-4">
             <h2 className="text-2xl font-bold text-white">Gear</h2>
+            <p className="text-white/50 text-sm mt-3">Track mileage on your running shoes and bikes</p>
           </div>
         </div>
       </header>
@@ -310,10 +311,6 @@ export default function Gear({ onClose }: GearProps) {
             </div>
           ) : (
             <div className="space-y-5">
-              {/* Description */}
-              <div className="text-center mb-6">
-                <p className="text-white/50 text-sm">Track mileage on your running shoes and bikes</p>
-              </div>
 
               {/* Tabs: Shoes / Bikes */}
               <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
