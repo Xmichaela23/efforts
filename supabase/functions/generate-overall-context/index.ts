@@ -70,15 +70,29 @@ Deno.serve(async (req) => {
 
     console.log(`📊 Generating block analysis for user ${user_id}, ${weeks_back} weeks`);
 
-    // Fetch all data in parallel
-    const [plannedResult, workoutsResult, plansResult, baselinesResult] = await Promise.all([
-      // Planned workouts (up to yesterday to avoid timezone issues)
+    // First, get the active plan to filter planned_workouts
+    const { data: activePlan } = await supabase
+      .from('plans')
+      .select('id, name, status, config, current_week')
+      .eq('user_id', user_id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    const activePlanId = activePlan?.id;
+    console.log(`📊 Active plan: ${activePlan?.name || 'none'} (${activePlanId || 'no id'})`);
+
+    // Fetch remaining data in parallel
+    const [plannedResult, workoutsResult, baselinesResult] = await Promise.all([
+      // Planned workouts - ONLY from the active plan
       supabase
         .from('planned_workouts')
         .select('*')
         .eq('user_id', user_id)
         .gte('date', startDateISO)
         .lte('date', yesterdayISO)
+        .eq('training_plan_id', activePlanId || 'no-plan') // Filter by active plan
         .order('date', { ascending: true }),
       
       // Completed workouts
@@ -90,16 +104,6 @@ Deno.serve(async (req) => {
         .gte('date', startDateISO)
         .lte('date', endDateISO)
         .order('date', { ascending: true }),
-      
-      // Active plans (for goal context)
-      supabase
-        .from('plans')
-        .select('name, status, config, current_week')
-        .eq('user_id', user_id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single(),
       
       // User baselines
       supabase
@@ -122,7 +126,7 @@ Deno.serve(async (req) => {
     const planned = (plannedResult.data || []) as PlannedWorkout[];
     const completedWorkouts = (workoutsResult.data || []) as Workout[];
     const userBaselines = (baselinesResult.data?.performance_numbers || {}) as UserBaselines;
-    const activePlan = plansResult.data;
+    // activePlan already defined above
 
     console.log(`📊 Data: ${planned.length} planned, ${completedWorkouts.length} completed`);
     console.log(`📊 Date range: ${startDateISO} to ${endDateISO} (planned up to ${yesterdayISO})`);
