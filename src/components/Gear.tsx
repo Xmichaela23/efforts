@@ -303,13 +303,13 @@ export default function Gear({ onClose }: GearProps) {
       </header>
 
       <main className="mobile-main-content">
-        <div className="max-w-2xl mx-auto px-4 pt-4 pb-6">
+        <div className="max-w-2xl mx-auto px-4 pb-6">
           {loading ? (
             <div className="text-center py-8">
               <p className="text-white/60">Loading your gear...</p>
             </div>
           ) : (
-            <div className="space-y-5">
+            <div className="space-y-5 mt-8">
               {/* Description */}
               <div className="text-center mb-4">
                 <p className="text-white/50 text-sm">Track mileage on your running shoes and bikes</p>

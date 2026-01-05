@@ -479,9 +479,9 @@ return (
     </header>
 
       <main className="mobile-main-content">
-        <div className="max-w-2xl mx-auto px-4 pt-4 pb-6">
+        <div className="max-w-2xl mx-auto px-4 pb-6">
           {/* Description with proper spacing */}
-          <div className="text-center mb-6">
+          <div className="text-center mb-6 mt-8">
             <p className="text-white/50 text-sm">Your performance data for personalized training plans</p>
             {lastUpdated && (
               <p className="text-xs text-white/40 mt-2">

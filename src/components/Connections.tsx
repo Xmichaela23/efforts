@@ -873,8 +873,8 @@ const Connections: React.FC = () => {
         </div>
       </header>
       <main className="mobile-main-content overflow-y-auto overflow-x-hidden" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
-        <div className="max-w-4xl mx-auto pt-4 px-6 pb-6 min-h-0">
-          <div className="text-center mb-6">
+        <div className="max-w-4xl mx-auto px-6 pb-6 min-h-0">
+          <div className="text-center mb-6 mt-8">
             <p className="text-white/50 text-sm">
               Connect your fitness services to automatically sync data and enable real-time updates.
             </p>
