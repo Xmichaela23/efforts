@@ -62,7 +62,7 @@ export default function Gear({ onClose }: GearProps) {
     brand: '',
     model: '',
     purchase_date: '',
-    starting_distance: 0,
+    starting_miles: '', // Store as string for input, convert to meters on save
     notes: ''
   });
 
@@ -119,8 +119,8 @@ export default function Gear({ onClose }: GearProps) {
         model: newGear.model.trim() || undefined,
         is_default: existingItems.length === 0, // First item becomes default
         purchase_date: newGear.purchase_date || undefined,
-        starting_distance: newGear.starting_distance || 0,
-        total_distance: newGear.starting_distance || 0,
+        starting_distance: (parseFloat(newGear.starting_miles) || 0) * 1609.34, // Convert miles to meters
+        total_distance: (parseFloat(newGear.starting_miles) || 0) * 1609.34,
         retired: false,
         notes: newGear.notes.trim() || undefined
       };
@@ -143,7 +143,7 @@ export default function Gear({ onClose }: GearProps) {
         setBikes([...bikes, data as GearItem]);
       }
 
-      setNewGear({ name: '', brand: '', model: '', purchase_date: '', starting_distance: 0, notes: '' });
+      setNewGear({ name: '', brand: '', model: '', purchase_date: '', starting_miles: '', notes: '' });
       setShowAddForm(false);
     } catch (e) {
       console.error('Error adding gear:', e);
@@ -495,8 +495,8 @@ export default function Gear({ onClose }: GearProps) {
                           <label className="text-xs text-white/50 font-medium mb-1.5 block">Starting Miles</label>
                           <input
                             type="number"
-                            value={newGear.starting_distance || ''}
-                            onChange={(e) => setNewGear({ ...newGear, starting_distance: parseInt(e.target.value) * 1609.34 || 0 })}
+                            value={newGear.starting_miles}
+                            onChange={(e) => setNewGear({ ...newGear, starting_miles: e.target.value })}
                             placeholder="0"
                             className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
                           />

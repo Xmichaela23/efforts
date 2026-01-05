@@ -23,7 +23,12 @@ CREATE INDEX IF NOT EXISTS gear_user_type_idx ON gear(user_id, type);
 -- Enable RLS
 ALTER TABLE gear ENABLE ROW LEVEL SECURITY;
 
--- RLS policies
+-- RLS policies (drop first to make idempotent)
+DROP POLICY IF EXISTS "Users can view their own gear" ON gear;
+DROP POLICY IF EXISTS "Users can insert their own gear" ON gear;
+DROP POLICY IF EXISTS "Users can update their own gear" ON gear;
+DROP POLICY IF EXISTS "Users can delete their own gear" ON gear;
+
 CREATE POLICY "Users can view their own gear"
   ON gear FOR SELECT
   USING (auth.uid() = user_id);
