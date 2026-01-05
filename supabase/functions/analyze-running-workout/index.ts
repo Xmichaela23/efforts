@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { extractSensorData } from '../../lib/analysis/sensor-data/extractor.ts';
 import { generateIntervalBreakdown } from './lib/intervals/interval-breakdown.ts';
-import { calculatePaceRangeAdherence } from './lib/adherence/pace-adherence.ts';
+import { calculatePaceRangeAdherence, getIntervalType, IntervalType } from './lib/adherence/pace-adherence.ts';
 import { calculateIntervalHeartRate } from './lib/analysis/heart-rate.ts';
 import { calculateIntervalElevation } from './lib/analysis/elevation.ts';
 import { calculateHeartRateDrift } from './lib/analysis/heart-rate-drift.ts';
@@ -1151,8 +1151,16 @@ Deno.serve(async (req) => {
         const targetPaceUpper = workStepsForDetection[0]?.pace_range?.upper;
         
         if (avgPaceSecondsForAdherence && targetPaceLower && targetPaceUpper) {
-          granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper));
-          console.log(`🔍 [PACE ADHERENCE] Using AVERAGE pace adherence: ${granularPaceAdherence}%`);
+          // Determine interval type: check if it's an easy/long run or a work interval
+          const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
+          const stepKind = String(workStepsForDetection[0]?.kind || workStepsForDetection[0]?.role || '').toLowerCase();
+          const isEasyOrLongRun = workoutToken.includes('long') || workoutToken.includes('easy') || 
+                                   workoutToken.includes('recovery') || workoutToken.includes('aerobic') ||
+                                   stepKind === 'easy' || stepKind === 'long' || stepKind === 'aerobic';
+          const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
+          
+          granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper, intervalType));
+          console.log(`🔍 [PACE ADHERENCE] Using AVERAGE pace adherence (${intervalType}): ${granularPaceAdherence}%`);
           console.log(`   - Average pace: ${(avgPaceSecondsForAdherence / 60).toFixed(2)} min/mi (${avgPaceSecondsForAdherence.toFixed(0)}s)`);
           console.log(`   - Target range: ${(targetPaceLower / 60).toFixed(2)}-${(targetPaceUpper / 60).toFixed(2)} min/mi (${targetPaceLower}-${targetPaceUpper}s)`);
           console.log(`   - In range? ${avgPaceSecondsForAdherence >= targetPaceLower && avgPaceSecondsForAdherence <= targetPaceUpper ? 'YES' : 'NO'}`);
@@ -1185,9 +1193,11 @@ Deno.serve(async (req) => {
           const targetUpper = paceRange?.upper || 0;
           
           if (actualPace > 0 && targetLower > 0 && targetUpper > 0) {
-            const adherence = calculatePaceRangeAdherence(actualPace, targetLower, targetUpper);
+            // Use asymmetric scoring: work intervals get lenient "faster" penalties
+            const intervalRole = getIntervalType(interval.role || interval.kind || 'work');
+            const adherence = calculatePaceRangeAdherence(actualPace, targetLower, targetUpper, intervalRole);
             intervalAdherences.push(adherence);
-            console.log(`   - Work interval ${interval.planned_step_id || 'unknown'}: ${(actualPace/60).toFixed(2)} min/mi vs ${(targetLower/60).toFixed(2)}-${(targetUpper/60).toFixed(2)} = ${adherence.toFixed(0)}%`);
+            console.log(`   - Work interval ${interval.planned_step_id || 'unknown'} (${intervalRole}): ${(actualPace/60).toFixed(2)} min/mi vs ${(targetLower/60).toFixed(2)}-${(targetUpper/60).toFixed(2)} = ${adherence.toFixed(0)}%`);
           }
         }
         
@@ -1232,8 +1242,14 @@ Deno.serve(async (req) => {
           }
           
           if (avgPaceSecondsForAdherence && targetPaceLower && targetPaceUpper) {
-            granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper));
-            console.log(`🔍 [PACE ADHERENCE] Steady-state average pace adherence: ${granularPaceAdherence}%`);
+            // Determine interval type for this steady-state workout
+            const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
+            const isEasyOrLongRun = workoutToken.includes('long') || workoutToken.includes('easy') || 
+                                     workoutToken.includes('recovery') || workoutToken.includes('aerobic');
+            const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
+            
+            granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper, intervalType));
+            console.log(`🔍 [PACE ADHERENCE] Steady-state average pace adherence (${intervalType}): ${granularPaceAdherence}%`);
             console.log(`   - Average pace: ${(avgPaceSecondsForAdherence / 60).toFixed(2)} min/mi (${avgPaceSecondsForAdherence.toFixed(0)}s)`);
             console.log(`   - Target range: ${(targetPaceLower / 60).toFixed(2)}-${(targetPaceUpper / 60).toFixed(2)} min/mi (${targetPaceLower}-${targetPaceUpper}s)`);
           } else {
@@ -2276,24 +2292,37 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
       }
     }
     
-    // Calculate pace adherence: time-in-range if we have planned pace, otherwise 1.0
+    // Calculate pace adherence with ASYMMETRIC scoring
+    // Instead of binary in/out, we score each sample using the asymmetric formula
     let paceAdherence = 1.0;
     let timeInRange = 0;
     let timeOutsideRange = 0;
+    let totalSampleScore = 0;
     
     if (plannedPaceLower > 0 && plannedPaceUpper > 0 && validPaceSamples.length > 0) {
-      // Calculate time-in-range adherence (sample-by-sample)
+      // Determine if this is an easy/long run or work interval
+      const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
+      const isEasyOrLongRun = workoutToken.includes('long') || workoutToken.includes('easy') || 
+                               workoutToken.includes('recovery') || workoutToken.includes('aerobic');
+      const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
+      
+      // Calculate weighted adherence per sample (asymmetric scoring)
       for (const sample of validPaceSamples) {
         const pace = sample.pace_s_per_mi;
         if (pace >= plannedPaceLower && pace <= plannedPaceUpper) {
           timeInRange += 1;
+          totalSampleScore += 100;
         } else {
           timeOutsideRange += 1;
+          // Use asymmetric scoring for samples outside range
+          const sampleScore = calculatePaceRangeAdherence(pace, plannedPaceLower, plannedPaceUpper, intervalType);
+          totalSampleScore += sampleScore;
         }
       }
       const totalPaceTime = timeInRange + timeOutsideRange;
-      paceAdherence = totalPaceTime > 0 ? timeInRange / totalPaceTime : 1.0;
-      console.log(`📊 Pace adherence: ${(paceAdherence * 100).toFixed(1)}% (${timeInRange}s in range, ${timeOutsideRange}s outside)`);
+      // Use weighted average score instead of binary in/out
+      paceAdherence = totalPaceTime > 0 ? totalSampleScore / (totalPaceTime * 100) : 1.0;
+      console.log(`📊 Pace adherence (${intervalType}): ${(paceAdherence * 100).toFixed(1)}% (${timeInRange}s in range, ${timeOutsideRange}s outside, asymmetric weighted)`);
     } else {
       console.log('⚠️ No planned pace range found - using default adherence 1.0');
     }
@@ -2859,29 +2888,38 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
   console.log(`🔍 [ANALYZE] Interval ${interval.role || interval.kind}: target pace range ${targetLower.toFixed(0)}-${targetUpper.toFixed(0)}s/mi`);
   console.log(`🔍 [ANALYZE] Range source: target_pace=${!!interval.target_pace}, pace_range=${!!interval.pace_range}, planned.pace_range=${!!interval.planned?.pace_range}`);
   
-  // Sample-by-sample time-in-range calculation (TRUE granular analysis)
+  // Sample-by-sample ASYMMETRIC scoring (not just binary in/out)
   let samplesInRange = 0;
   let samplesOutsideRange = 0;
+  let totalSampleScore = 0;
   const paceValues = validSamples.map(s => s.pace_s_per_mi);
+  
+  // Determine interval type for asymmetric scoring
+  const intervalRole = String(interval.role || interval.kind || 'work').toLowerCase();
+  const intervalType = getIntervalType(intervalRole);
   
   // Debug: Check pace distribution
   const avgPace = paceValues.reduce((sum, p) => sum + p, 0) / paceValues.length;
   const minPace = Math.min(...paceValues);
   const maxPace = Math.max(...paceValues);
-  console.log(`🔍 [ANALYZE] Pace stats: avg=${avgPace.toFixed(0)}s/mi, min=${minPace.toFixed(0)}s/mi, max=${maxPace.toFixed(0)}s/mi, range=${targetLower.toFixed(0)}-${targetUpper.toFixed(0)}s/mi`);
+  console.log(`🔍 [ANALYZE] Pace stats (${intervalType}): avg=${avgPace.toFixed(0)}s/mi, min=${minPace.toFixed(0)}s/mi, max=${maxPace.toFixed(0)}s/mi, range=${targetLower.toFixed(0)}-${targetUpper.toFixed(0)}s/mi`);
   
   for (const pace of paceValues) {
     if (pace >= targetLower && pace <= targetUpper) {
       samplesInRange++;
+      totalSampleScore += 100;
     } else {
       samplesOutsideRange++;
+      // Use asymmetric scoring for samples outside range
+      const sampleScore = calculatePaceRangeAdherence(pace, targetLower, targetUpper, intervalType);
+      totalSampleScore += sampleScore;
     }
   }
   
-  console.log(`🔍 [ANALYZE] Time-in-range: ${samplesInRange}/${paceValues.length} samples (${((samplesInRange/paceValues.length)*100).toFixed(1)}%)`);
-  
   const totalSamples = validSamples.length;
-  const timeInRangeScore = totalSamples > 0 ? samplesInRange / totalSamples : 0;
+  // Use weighted average score (asymmetric) instead of binary in/out
+  const timeInRangeScore = totalSamples > 0 ? totalSampleScore / (totalSamples * 100) : 0;
+  console.log(`🔍 [ANALYZE] Asymmetric adherence: ${(timeInRangeScore * 100).toFixed(1)}% (${samplesInRange}/${paceValues.length} in range, weighted score: ${totalSampleScore.toFixed(0)}/${totalSamples * 100})`);
   
   // Calculate average pace for metrics (already calculated above for debug logging)
   
@@ -3650,40 +3688,51 @@ function generateScoreExplanation(
   const slowIntervals = deviations.filter(d => d.direction === 'slow');
   const okIntervals = deviations.filter(d => d.direction === 'ok');
   
-  // Build explanation text - be explicit about the scoring philosophy
+  // Build explanation text - reflect ASYMMETRIC scoring philosophy
+  // Work intervals: faster = minor penalty (strong), slower = full penalty (missed effort)
+  // Recovery/easy: faster = penalty (didn't recover), slower = fine
   const parts: string[] = [];
   
   // Get the target range for display (use first interval's range as representative)
   const targetRange = deviations[0]?.target || '';
   const paceAdherencePct = Math.round(performance.pace_adherence);
   
-  if (paceAdherencePct < 70) {
-    // Low/moderate adherence - explain the scoring philosophy
-    if (fastIntervals.length > 0 && slowIntervals.length === 0) {
-      // All deviations are "too fast"
-      const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
-      parts.push(`Pace score measures time at prescribed pace (${targetRange}/mi)`);
-      parts.push(`${fastIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgFastDelta)}/mi faster than range — going faster still counts as off-target`);
-    } else if (slowIntervals.length > 0 && fastIntervals.length === 0) {
-      // All deviations are "too slow"
-      const avgSlowDelta = Math.round(slowIntervals.reduce((sum, d) => sum + d.delta, 0) / slowIntervals.length);
-      parts.push(`Pace score measures time at prescribed pace (${targetRange}/mi)`);
-      parts.push(`${slowIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgSlowDelta)}/mi slower than range`);
-    } else if (fastIntervals.length > 0 && slowIntervals.length > 0) {
-      // Mixed deviations
-      parts.push(`Pace score measures time at prescribed pace (${targetRange}/mi)`);
-      parts.push(`${fastIntervals.length} intervals too fast, ${slowIntervals.length} too slow — both directions count as off-target`);
-    }
-  } else if (paceAdherencePct < 90) {
-    // Good but not perfect - brief note
-    if (fastIntervals.length > 0) {
-      parts.push(`${fastIntervals.length} of ${deviations.length} intervals faster than ${targetRange}/mi target`);
-    } else if (slowIntervals.length > 0) {
-      parts.push(`${slowIntervals.length} of ${deviations.length} intervals slower than target range`);
-    }
-  } else if (okIntervals.length === deviations.length) {
-    // Perfect adherence
+  if (paceAdherencePct >= 95 && okIntervals.length === deviations.length) {
+    // Perfect or near-perfect adherence
     parts.push(`All ${deviations.length} work intervals within prescribed ${targetRange}/mi range`);
+  } else if (paceAdherencePct >= 85) {
+    // Good execution
+    if (fastIntervals.length > 0 && slowIntervals.length === 0) {
+      const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
+      parts.push(`Strong execution — ${fastIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgFastDelta)}/mi faster than target`);
+    } else if (slowIntervals.length > 0) {
+      parts.push(`${okIntervals.length} of ${deviations.length} intervals on target`);
+    } else {
+      parts.push(`Good pace execution across ${deviations.length} intervals`);
+    }
+  } else if (paceAdherencePct >= 50) {
+    // Moderate adherence - explain what happened
+    if (fastIntervals.length > 0 && slowIntervals.length === 0) {
+      const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
+      parts.push(`Completed intervals ${fmtDelta(avgFastDelta)}/mi faster than prescribed (${targetRange}/mi)`);
+      if (avgFastDelta > 30) {
+        parts.push(`significantly faster than target — consider injury risk`);
+      }
+    } else if (slowIntervals.length > 0 && fastIntervals.length === 0) {
+      const avgSlowDelta = Math.round(slowIntervals.reduce((sum, d) => sum + d.delta, 0) / slowIntervals.length);
+      parts.push(`${slowIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgSlowDelta)}/mi slower than target (${targetRange}/mi) — missed intended effort`);
+    } else if (fastIntervals.length > 0 && slowIntervals.length > 0) {
+      parts.push(`Inconsistent pacing: ${fastIntervals.length} intervals fast, ${slowIntervals.length} slow`);
+    }
+  } else {
+    // Low adherence - explain the issue
+    if (slowIntervals.length > 0) {
+      const avgSlowDelta = Math.round(slowIntervals.reduce((sum, d) => sum + d.delta, 0) / slowIntervals.length);
+      parts.push(`${slowIntervals.length} of ${deviations.length} intervals missed target by ${fmtDelta(avgSlowDelta)}/mi — workout stimulus not achieved`);
+    } else if (fastIntervals.length > 0) {
+      const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
+      parts.push(`Ran significantly faster (${fmtDelta(avgFastDelta)}/mi) than prescribed ${targetRange}/mi`);
+    }
   }
 
   return parts.length > 0 ? parts.join('. ') + '.' : null;
