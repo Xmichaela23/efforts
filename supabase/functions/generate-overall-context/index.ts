@@ -1603,16 +1603,22 @@ function calculateBucketTrends(
       const previousAvg = previousPowers.reduce((a, b) => a + b, 0) / previousPowers.length;
       const changePercent = ((currentAvg - previousAvg) / previousAvg) * 100;
       
-      trends.push({
-        bucket: 'all',
-        label: 'Avg Power',
-        current: Math.round(currentAvg),
-        previous: Math.round(previousAvg),
-        change: changePercent > 0 ? `+${changePercent.toFixed(1)}%` : `${changePercent.toFixed(1)}%`,
-        current_count: currentPowers.length,
-        previous_count: previousPowers.length,
-        metric_label: 'W'
-      });
+      // Sanity check: >25% change in 2 weeks is unrealistic - likely comparing different workout types
+      if (Math.abs(changePercent) > 25) {
+        console.log(`📊 Bike: Change too large (${changePercent.toFixed(1)}%) - likely inconsistent workout types`);
+        // Don't add trend - data is unreliable
+      } else {
+        trends.push({
+          bucket: 'all',
+          label: 'Avg Power',
+          current: Math.round(currentAvg),
+          previous: Math.round(previousAvg),
+          change: changePercent > 0 ? `+${changePercent.toFixed(1)}%` : `${changePercent.toFixed(1)}%`,
+          current_count: currentPowers.length,
+          previous_count: previousPowers.length,
+          metric_label: 'W'
+        });
+      }
     }
   } else {
     // For runs: compare average pace
@@ -1639,16 +1645,22 @@ function calculateBucketTrends(
       // For pace: lower is better, so flip the change calculation
       const changePercent = ((previousAvg - currentAvg) / previousAvg) * 100;
       
-      trends.push({
-        bucket: 'all',
-        label: 'Avg Pace',
-        current: Math.round(currentAvg),
-        previous: Math.round(previousAvg),
-        change: changePercent > 0 ? `+${changePercent.toFixed(1)}%` : `${changePercent.toFixed(1)}%`,
-        current_count: currentPaces.length,
-        previous_count: previousPaces.length,
-        metric_label: '/mi'
-      });
+      // Sanity check: >15% pace change in 2 weeks is unrealistic
+      if (Math.abs(changePercent) > 15) {
+        console.log(`📊 Run: Change too large (${changePercent.toFixed(1)}%) - likely inconsistent workout types`);
+        // Don't add trend - data is unreliable
+      } else {
+        trends.push({
+          bucket: 'all',
+          label: 'Avg Pace',
+          current: Math.round(currentAvg),
+          previous: Math.round(previousAvg),
+          change: changePercent > 0 ? `+${changePercent.toFixed(1)}%` : `${changePercent.toFixed(1)}%`,
+          current_count: currentPaces.length,
+          previous_count: previousPaces.length,
+          metric_label: '/mi'
+        });
+      }
     }
   }
   
