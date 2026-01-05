@@ -492,16 +492,16 @@ export default function MobilityPlanBuilderPage() {
       </div>
       <div className="space-y-2">
         <label className="text-sm">Plan Name</label>
-        <input className="border rounded px-2 py-2 w-full" value={planName} onChange={(e)=>setPlanName(e.target.value)} />
+        <input className="border rounded px-2 py-2 w-full bg-white text-gray-900" value={planName} onChange={(e)=>setPlanName(e.target.value)} />
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-2">
           <label className="text-sm">Start Date</label>
-          <input type="date" className="border rounded px-2 py-2 w-full" value={startDate} onChange={(e)=>setStartDate(e.target.value)} />
+          <input type="date" className="border rounded px-2 py-2 w-full bg-white text-gray-900" value={startDate} onChange={(e)=>setStartDate(e.target.value)} />
         </div>
         <div className="space-y-2">
           <label className="text-sm">Weeks</label>
-          <input type="number" min={1} max={12} className="border rounded px-2 py-2 w-full" value={weeks} onChange={(e)=>setWeeks(parseInt(e.target.value||'1',10))} />
+          <input type="number" min={1} max={12} className="border rounded px-2 py-2 w-full bg-white text-gray-900" value={weeks} onChange={(e)=>setWeeks(parseInt(e.target.value||'1',10))} />
         </div>
         <div className="space-y-2">
           <label className="text-sm">Days of Week</label>
@@ -522,11 +522,11 @@ export default function MobilityPlanBuilderPage() {
         <div className="text-xs text-gray-500 mb-1">
           Preferred format: <span className="font-mono">Exercise name — sets/reps/weight | notes</span>
         </div>
-        <textarea rows={8} className="border rounded px-2 py-2 w-full font-mono text-sm" value={text} onChange={(e)=>setText(e.target.value)} placeholder={"Example:\nRed superband kickbacks — 2×15 each side, 10-30 lb band | do left until it BURNS, match reps on right\nRed superband half step-outs — 2×15 each side, 10-30 lb band | band perpendicular to chest, arms fully extended\nSide plank with top leg elevated — 3×20 seconds each side, bodyweight | top leg on bench, bottom leg floating\nBird dog rows — 2×8 per side, 20 lb | focus on kicking back leg straight back\nSingle leg RDL rows — 2×12 per side, 25 lb | weight on same side as kicked-back leg"} />
+        <textarea rows={8} className="border rounded px-2 py-2 w-full font-mono text-sm bg-white text-gray-900 placeholder:text-gray-400" value={text} onChange={(e)=>setText(e.target.value)} placeholder={"Example:\nRed superband kickbacks — 2×15 each side, 10-30 lb band | do left until it BURNS, match reps on right\nRed superband half step-outs — 2×15 each side, 10-30 lb band | band perpendicular to chest, arms fully extended\nSide plank with top leg elevated — 3×20 seconds each side, bodyweight | top leg on bench, bottom leg floating\nBird dog rows — 2×8 per side, 20 lb | focus on kicking back leg straight back\nSingle leg RDL rows — 2×12 per side, 25 lb | weight on same side as kicked-back leg"} />
       </div>
       <div className="space-y-2">
         <label className="text-sm">Preview</label>
-        <div className="border rounded p-3 text-sm space-y-2">
+        <div className="border rounded p-3 text-sm space-y-2 bg-white text-gray-900">
           <div className="font-medium">{planName}</div>
           {items.map((it, i)=> (
             <div key={i}>
