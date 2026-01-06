@@ -1137,6 +1137,14 @@ Deno.serve(async (req) => {
       if (isSingleIntervalSteadyState) {
         // SINGLE-INTERVAL STEADY-STATE: Use average pace vs target range
         console.log(`🔍 [PACE ADHERENCE] Single-interval steady-state detected`);
+        console.log(`🔍 [EASY RUN CHECK] Planned workout fields:`, {
+          workout_token: plannedWorkout?.workout_token,
+          workout_name: plannedWorkout?.workout_name,
+          name: plannedWorkout?.name,
+          workout_description: plannedWorkout?.workout_description,
+          description: plannedWorkout?.description,
+          title: plannedWorkout?.title
+        });
         
         const movingTimeForPace = workout?.computed?.overall?.duration_s_moving 
           || (workout.moving_time ? workout.moving_time * 60 : null)
@@ -1154,15 +1162,16 @@ Deno.serve(async (req) => {
           // Determine interval type: check if it's an easy/long run or a work interval
           // Check multiple sources to catch easy runs
           const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-          const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
-          const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
+          const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
+          const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
           const stepKind = String(workStepsForDetection[0]?.kind || workStepsForDetection[0]?.role || '').toLowerCase();
           
           // Expanded detection for easy/recovery runs
-          const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+          const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
           const isEasyOrLongRun = easyKeywords.some(kw => 
             workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
           ) || stepKind === 'easy' || stepKind === 'long' || stepKind === 'aerobic' || stepKind === 'recovery';
+          console.log(`🔍 [EASY RUN DETECTION] isEasyOrLongRun=${isEasyOrLongRun}, workoutName="${workoutName}", workoutToken="${workoutToken}", stepKind="${stepKind}"`);
           
           const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
           console.log(`🔍 [INTERVAL TYPE] Detected as '${intervalType}' - token: ${workoutToken}, name: ${workoutName}, stepKind: ${stepKind}`);
@@ -1193,12 +1202,13 @@ Deno.serve(async (req) => {
         
         // Check if this is an easy/recovery workout (overrides interval role)
         const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-        const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
-        const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
-        const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+        const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
+        const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
+        const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
         const isEasyOrLongRunWorkout = easyKeywords.some(kw => 
           workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
         );
+        console.log(`🔍 [EASY RUN DETECTION MULTI] isEasyOrLongRunWorkout=${isEasyOrLongRunWorkout}, workoutName="${workoutName}"`);
         
         for (const interval of workIntervalsForAdherence) {
           // Get the interval's actual average pace
@@ -1262,15 +1272,16 @@ Deno.serve(async (req) => {
           if (avgPaceSecondsForAdherence && targetPaceLower && targetPaceUpper) {
             // Determine interval type for this steady-state workout
             const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-            const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
-            const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
+            const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
+            const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
             
             // Expanded detection for easy/recovery runs
-            const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+            const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
             const isEasyOrLongRun = easyKeywords.some(kw => 
               workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
             );
             const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
+            console.log(`🔍 [EASY RUN DETECTION FALLBACK] isEasyOrLongRun=${isEasyOrLongRun}, workoutName="${workoutName}"`);
             
             granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper, intervalType));
             console.log(`🔍 [PACE ADHERENCE] Steady-state average pace adherence (${intervalType}): ${granularPaceAdherence}%`);
@@ -2326,15 +2337,16 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
     if (plannedPaceLower > 0 && plannedPaceUpper > 0 && validPaceSamples.length > 0) {
       // Determine if this is an easy/long run or work interval
       const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-      const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
-      const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
+      const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
+      const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
       
       // Expanded detection for easy/recovery runs
-      const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+      const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
       const isEasyOrLongRun = easyKeywords.some(kw => 
         workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
       );
       const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
+      console.log(`🔍 [EASY RUN DETECTION TIR] isEasyOrLongRun=${isEasyOrLongRun}, workoutName="${workoutName}"`);
       
       // Calculate weighted adherence per sample (asymmetric scoring)
       for (const sample of validPaceSamples) {
@@ -2927,15 +2939,16 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
   // Determine interval type - check WORKOUT type first (overrides interval role)
   // An easy run's "work" step should still be scored as easy
   const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-  const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
-  const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
-  const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+  const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
+  const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
+  const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
   const isEasyOrLongRunWorkout = easyKeywords.some(kw => 
     workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
   );
   
   const intervalRole = String(interval.role || interval.kind || 'work').toLowerCase();
   const intervalType = isEasyOrLongRunWorkout ? 'easy' : getIntervalType(intervalRole);
+  console.log(`🔍 [ANALYZE EASY CHECK] isEasyOrLongRunWorkout=${isEasyOrLongRunWorkout}, workoutName="${workoutName}"`);
   
   // Debug: Check pace distribution
   const avgPace = paceValues.reduce((sum, p) => sum + p, 0) / paceValues.length;
@@ -3668,12 +3681,13 @@ function generateScoreExplanation(
   
   // Detect if this is an easy/recovery run (affects messaging)
   const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-  const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
-  const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
-  const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+  const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
+  const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
+  const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
   const isEasyOrRecoveryRun = easyKeywords.some(kw => 
     workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
   );
+  console.log(`🔍 [EXPLANATION EASY CHECK] isEasyOrRecoveryRun=${isEasyOrRecoveryRun}, workoutName="${workoutName}"`);
 
   // Format pace from seconds to MM:SS
   const fmtPace = (secPerMi: number): string => {
