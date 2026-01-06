@@ -75,7 +75,7 @@ const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' 
     'arnold press', 'goblet squat', 'bulgarian split squat',
     'farmer walk', 'farmer walks',
     'walking lunge', 'reverse lunge', 'forward lunge', 'lunge',
-    'single leg rdl', 'single-leg rdl', 'romanian deadlift', 'rdl',
+    'single leg rdl', 'single-leg rdl',  // Single-leg RDLs are typically dumbbell; regular RDL is barbell
     'step up', 'step-up'
   ];
   if (dbPatterns.some(p => name.includes(p))) return 'dumbbell';
