@@ -98,11 +98,36 @@ export function generateIntervalBreakdown(
     const workRangeLower = workPaceRange?.lower || 0;
     const workRangeUpper = workPaceRange?.upper || 0;
     
+    // Determine interval type for asymmetric scoring - check WORKOUT type first
+    const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
+    const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
+    const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
+    const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
+    const isEasyOrLongRun = easyKeywords.some(kw => 
+      workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
+    );
+    
+    // Use asymmetric interval type based on workout type
+    type IntervalType = 'work' | 'recovery' | 'easy' | 'warmup' | 'cooldown';
+    const intervalRole = String(interval.role || interval.kind || 'work').toLowerCase();
+    let intervalType: IntervalType = 'work';
+    if (isEasyOrLongRun) {
+      intervalType = 'easy';
+    } else if (intervalRole.includes('recovery') || intervalRole.includes('rest')) {
+      intervalType = 'recovery';
+    } else if (intervalRole.includes('warmup') || intervalRole.includes('warm')) {
+      intervalType = 'warmup';
+    } else if (intervalRole.includes('cooldown') || intervalRole.includes('cool')) {
+      intervalType = 'cooldown';
+    }
+    
+    console.log(`🔍 [BREAKDOWN EASY CHECK] isEasyOrLongRun=${isEasyOrLongRun}, intervalType=${intervalType}, workoutName="${workoutName}"`);
+    
     // Calculate pace adherence: use range if available, otherwise single target
     let paceAdherence = 0;
     if (workRangeLower > 0 && workRangeUpper > 0 && actualPace > 0) {
-      // Use range-based adherence calculation
-      paceAdherence = calculatePaceRangeAdherence(actualPace, workRangeLower, workRangeUpper);
+      // Use range-based adherence calculation with asymmetric scoring
+      paceAdherence = calculatePaceRangeAdherence(actualPace, workRangeLower, workRangeUpper, intervalType);
     } else if (plannedPace > 0 && actualPace > 0) {
       // Fallback to single target calculation
       const paceDelta = Math.abs(actualPace - plannedPace);
