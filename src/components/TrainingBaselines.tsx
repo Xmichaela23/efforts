@@ -1154,45 +1154,53 @@ return (
                         
                         return (
                           <div className="space-y-4">
-                            <p className="text-xs text-white/40 text-center mb-3">
-                              Based on age ({ageEstimates.age}) - will refine from your training
-                            </p>
+                            {/* Warning banner about estimates */}
+                            <div className="px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                              <p className="text-xs text-yellow-400/90 font-medium mb-1">
+                                These are rough estimates based on age ({ageEstimates.age})
+                              </p>
+                              <p className="text-xs text-yellow-400/60">
+                                Individual max HR can vary ±15-20 bpm from the 220-age formula. 
+                                Analyze your workouts to get accurate values.
+                              </p>
+                            </div>
                             
                             {/* Age-based estimates */}
                             <div className="grid grid-cols-2 gap-3">
-                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-yellow-500/20">
                                 <div>
                                   <div className="text-xs text-white/50">Threshold HR</div>
-                                  <div className="text-sm font-medium text-white">{ageEstimates.thresholdHR} bpm</div>
+                                  <div className="text-sm font-medium text-white/70">{ageEstimates.thresholdHR} bpm</div>
                                 </div>
-                                <div className="text-xs text-yellow-500/70">est.</div>
+                                <div className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">EST</div>
                               </div>
-                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-yellow-500/20">
                                 <div>
                                   <div className="text-xs text-white/50">Easy HR</div>
-                                  <div className="text-sm font-medium text-white">{ageEstimates.easyHR} bpm</div>
+                                  <div className="text-sm font-medium text-white/70">{ageEstimates.easyHR} bpm</div>
                                 </div>
-                                <div className="text-xs text-yellow-500/70">est.</div>
+                                <div className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">EST</div>
                               </div>
-                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-yellow-500/20">
                                 <div>
                                   <div className="text-xs text-white/50">Max HR</div>
-                                  <div className="text-sm font-medium text-white">{ageEstimates.maxHR} bpm</div>
+                                  <div className="text-sm font-medium text-white/70">{ageEstimates.maxHR} bpm</div>
                                 </div>
-                                <div className="text-xs text-yellow-500/70">est.</div>
+                                <div className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">EST</div>
                               </div>
                             </div>
 
+                            {/* CTA to analyze */}
                             <div className="pt-3 border-t border-white/10 text-center">
                               <button
                                 onClick={refreshLearnedProfile}
                                 disabled={learningProfile}
-                                className="px-4 py-2 text-xs rounded-full bg-white/[0.08] border border-white/20 text-white/70 hover:bg-white/[0.12] transition-all disabled:opacity-50"
+                                className="px-5 py-2.5 text-sm font-medium rounded-full bg-teal-500/20 border border-teal-500/50 text-teal-400 hover:bg-teal-500/30 transition-all disabled:opacity-50"
                               >
                                 {learningProfile ? 'Analyzing...' : 'Analyze My Workouts'}
                               </button>
-                              <p className="text-xs text-white/30 mt-2">
-                                Replace estimates with values learned from your training
+                              <p className="text-xs text-white/50 mt-3">
+                                Get accurate zones based on your actual training data
                               </p>
                             </div>
                           </div>
