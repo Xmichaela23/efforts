@@ -628,12 +628,12 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
     }
   }
   
-  // Cruise intervals: cruise_4x1mi_threshold_r60s
-  if (/cruise_\d+x\d+mi_threshold/.test(lower)) {
-    const m = lower.match(/cruise_(\d+)x(\d+)mi_threshold(?:_r(\d+)s)?/);
+  // Cruise intervals: cruise_4x1mi_threshold_r60s or cruise_3x1.5mi_threshold_r60s
+  if (/cruise_\d+x[\d.]+mi_threshold/.test(lower)) {
+    const m = lower.match(/cruise_(\d+)x([\d.]+)mi_threshold(?:_r(\d+)s)?/);
     if (m) {
       const reps = parseInt(m[1], 10);
-      const miles = parseInt(m[2], 10);
+      const miles = parseFloat(m[2]);
       const rest_s = m[3] ? parseInt(m[3], 10) : 60;
       const fkp = secPerMiFromBaseline(baselines, 'fivek');
       const thresholdPace = fkp != null ? (fkp + 20) : undefined;

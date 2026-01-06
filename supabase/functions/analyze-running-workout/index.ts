@@ -1152,12 +1152,20 @@ Deno.serve(async (req) => {
         
         if (avgPaceSecondsForAdherence && targetPaceLower && targetPaceUpper) {
           // Determine interval type: check if it's an easy/long run or a work interval
+          // Check multiple sources to catch easy runs
           const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
+          const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
+          const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
           const stepKind = String(workStepsForDetection[0]?.kind || workStepsForDetection[0]?.role || '').toLowerCase();
-          const isEasyOrLongRun = workoutToken.includes('long') || workoutToken.includes('easy') || 
-                                   workoutToken.includes('recovery') || workoutToken.includes('aerobic') ||
-                                   stepKind === 'easy' || stepKind === 'long' || stepKind === 'aerobic';
+          
+          // Expanded detection for easy/recovery runs
+          const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+          const isEasyOrLongRun = easyKeywords.some(kw => 
+            workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
+          ) || stepKind === 'easy' || stepKind === 'long' || stepKind === 'aerobic' || stepKind === 'recovery';
+          
           const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
+          console.log(`🔍 [INTERVAL TYPE] Detected as '${intervalType}' - token: ${workoutToken}, name: ${workoutName}, stepKind: ${stepKind}`);
           
           granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper, intervalType));
           console.log(`🔍 [PACE ADHERENCE] Using AVERAGE pace adherence (${intervalType}): ${granularPaceAdherence}%`);
@@ -1244,8 +1252,14 @@ Deno.serve(async (req) => {
           if (avgPaceSecondsForAdherence && targetPaceLower && targetPaceUpper) {
             // Determine interval type for this steady-state workout
             const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-            const isEasyOrLongRun = workoutToken.includes('long') || workoutToken.includes('easy') || 
-                                     workoutToken.includes('recovery') || workoutToken.includes('aerobic');
+            const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
+            const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
+            
+            // Expanded detection for easy/recovery runs
+            const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+            const isEasyOrLongRun = easyKeywords.some(kw => 
+              workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
+            );
             const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
             
             granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper, intervalType));
@@ -1597,7 +1611,7 @@ Deno.serve(async (req) => {
     console.log('  - detailedAnalysis value:', JSON.stringify(detailedAnalysis, null, 2));
     
     // Generate deterministic score explanation (explains WHY scores are what they are)
-    const scoreExplanation = generateScoreExplanation(performance, detailedAnalysis);
+    const scoreExplanation = generateScoreExplanation(performance, detailedAnalysis, plannedWorkout);
     console.log('📝 [SCORE EXPLANATION] Generated:', scoreExplanation);
     
     const updatePayload = {
@@ -2302,8 +2316,14 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
     if (plannedPaceLower > 0 && plannedPaceUpper > 0 && validPaceSamples.length > 0) {
       // Determine if this is an easy/long run or work interval
       const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-      const isEasyOrLongRun = workoutToken.includes('long') || workoutToken.includes('easy') || 
-                               workoutToken.includes('recovery') || workoutToken.includes('aerobic');
+      const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
+      const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
+      
+      // Expanded detection for easy/recovery runs
+      const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+      const isEasyOrLongRun = easyKeywords.some(kw => 
+        workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
+      );
       const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
       
       // Calculate weighted adherence per sample (asymmetric scoring)
@@ -3610,7 +3630,8 @@ function generateMileByMileTerrainBreakdown(
  */
 function generateScoreExplanation(
   performance: { execution_adherence: number; pace_adherence: number; duration_adherence: number },
-  detailedAnalysis: any
+  detailedAnalysis: any,
+  plannedWorkout?: any
 ): string | null {
   const intervalBreakdown = detailedAnalysis?.interval_breakdown;
   
@@ -3625,6 +3646,15 @@ function generateScoreExplanation(
   if (workIntervals.length === 0) {
     return null;
   }
+  
+  // Detect if this is an easy/recovery run (affects messaging)
+  const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
+  const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
+  const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
+  const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+  const isEasyOrRecoveryRun = easyKeywords.some(kw => 
+    workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
+  );
 
   // Format pace from seconds to MM:SS
   const fmtPace = (secPerMi: number): string => {
@@ -3705,6 +3735,10 @@ function generateScoreExplanation(
     if (fastIntervals.length > 0 && slowIntervals.length === 0) {
       const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
       parts.push(`Strong execution — ${fastIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgFastDelta)}/mi faster than target`);
+    } else if (slowIntervals.length > 0 && isEasyOrRecoveryRun) {
+      // Easy/recovery run where slower is fine
+      const avgSlowDelta = Math.round(slowIntervals.reduce((sum, d) => sum + d.delta, 0) / slowIntervals.length);
+      parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — good recovery effort`);
     } else if (slowIntervals.length > 0) {
       parts.push(`${okIntervals.length} of ${deviations.length} intervals on target`);
     } else {
@@ -3714,24 +3748,42 @@ function generateScoreExplanation(
     // Moderate adherence - explain what happened
     if (fastIntervals.length > 0 && slowIntervals.length === 0) {
       const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
-      parts.push(`Completed intervals ${fmtDelta(avgFastDelta)}/mi faster than prescribed (${targetRange}/mi)`);
-      if (avgFastDelta > 30) {
-        parts.push(`significantly faster than target — consider injury risk`);
+      if (isEasyOrRecoveryRun) {
+        parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than target — running too hard on recovery days limits adaptation`);
+      } else {
+        parts.push(`Completed intervals ${fmtDelta(avgFastDelta)}/mi faster than prescribed (${targetRange}/mi)`);
+        if (avgFastDelta > 30) {
+          parts.push(`significantly faster than target — consider injury risk`);
+        }
       }
     } else if (slowIntervals.length > 0 && fastIntervals.length === 0) {
       const avgSlowDelta = Math.round(slowIntervals.reduce((sum, d) => sum + d.delta, 0) / slowIntervals.length);
-      parts.push(`${slowIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgSlowDelta)}/mi slower than target (${targetRange}/mi) — missed intended effort`);
+      if (isEasyOrRecoveryRun) {
+        // Easy run where slower is totally fine
+        parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — recovery achieved`);
+      } else {
+        parts.push(`${slowIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgSlowDelta)}/mi slower than target (${targetRange}/mi) — missed intended effort`);
+      }
     } else if (fastIntervals.length > 0 && slowIntervals.length > 0) {
       parts.push(`Inconsistent pacing: ${fastIntervals.length} intervals fast, ${slowIntervals.length} slow`);
     }
   } else {
-    // Low adherence - explain the issue
+    // Low adherence - explain the issue  
     if (slowIntervals.length > 0) {
       const avgSlowDelta = Math.round(slowIntervals.reduce((sum, d) => sum + d.delta, 0) / slowIntervals.length);
-      parts.push(`${slowIntervals.length} of ${deviations.length} intervals missed target by ${fmtDelta(avgSlowDelta)}/mi — workout stimulus not achieved`);
+      if (isEasyOrRecoveryRun) {
+        // Easy run - slower is fine, this shouldn't happen with new scoring but handle it
+        parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — still achieved recovery benefit`);
+      } else {
+        parts.push(`${slowIntervals.length} of ${deviations.length} intervals missed target by ${fmtDelta(avgSlowDelta)}/mi — workout stimulus not achieved`);
+      }
     } else if (fastIntervals.length > 0) {
       const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
-      parts.push(`Ran significantly faster (${fmtDelta(avgFastDelta)}/mi) than prescribed ${targetRange}/mi`);
+      if (isEasyOrRecoveryRun) {
+        parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than prescribed — too hard for recovery day`);
+      } else {
+        parts.push(`Ran significantly faster (${fmtDelta(avgFastDelta)}/mi) than prescribed ${targetRange}/mi`);
+      }
     }
   }
 
