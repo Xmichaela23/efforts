@@ -1356,35 +1356,37 @@ return (
                                       {getConfidenceDots(learnedFitness.ride_ftp_estimated.confidence)}
                                     </div>
                                   </div>
-                                  <div className="mt-1.5">
+                                  <div className="mt-2">
                                     {!showFtpDatePicker ? (
-                                      <div className={`text-[10px] ${learnedFitness.ride_ftp_estimated.confidence === 'low' ? 'text-yellow-400/80' : 'text-white/50'}`}>
-                                        <button 
-                                          onClick={() => setShowFtpDatePicker(true)}
-                                          className="underline hover:text-white/80 inline-flex items-center gap-1"
-                                        >
-                                          <Calendar className="h-3 w-3" />
-                                          {learnedFitness.ride_ftp_estimated.confidence === 'low' ? 'Schedule FTP Test' : 'Retest FTP'}
-                                        </button>
-                                      </div>
+                                      <button 
+                                        onClick={() => setShowFtpDatePicker(true)}
+                                        className={`text-xs px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 transition-colors ${
+                                          learnedFitness.ride_ftp_estimated.confidence === 'low' 
+                                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30' 
+                                            : 'bg-white/10 text-white/80 border border-white/20 hover:bg-white/20'
+                                        }`}
+                                      >
+                                        <Calendar className="h-3.5 w-3.5" />
+                                        {learnedFitness.ride_ftp_estimated.confidence === 'low' ? 'Schedule FTP Test' : 'Retest FTP'}
+                                      </button>
                                     ) : (
-                                      <div className="flex items-center gap-2 mt-1">
+                                      <div className="flex items-center gap-2">
                                         <input
                                           type="date"
                                           value={ftpTestDate}
                                           onChange={(e) => setFtpTestDate(e.target.value)}
                                           min={new Date().toISOString().split('T')[0]}
-                                          className="text-xs px-2 py-1 rounded bg-white/10 border border-white/20 text-white"
+                                          className="text-xs px-2 py-1.5 rounded bg-white/10 border border-white/20 text-white"
                                         />
                                         <button
                                           onClick={scheduleFtpTest}
-                                          className="text-xs px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white"
+                                          className="text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
                                         >
                                           Add
                                         </button>
                                         <button
                                           onClick={() => setShowFtpDatePicker(false)}
-                                          className="text-xs px-2 py-1 text-white/50 hover:text-white"
+                                          className="text-xs px-2 py-1.5 text-white/50 hover:text-white"
                                         >
                                           Cancel
                                         </button>
