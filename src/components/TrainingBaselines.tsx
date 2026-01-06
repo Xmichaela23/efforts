@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Download, Link, Package, Settings, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Download, Link, Package, Settings, RefreshCw, Calendar } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
@@ -8,6 +8,7 @@ import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { supabase } from '@/lib/supabase';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -59,6 +60,39 @@ equipment: {
 export default function TrainingBaselines({ onClose, onOpenBaselineTest }: TrainingBaselinesProps) {
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
 const navigate = useNavigate();
+const { addPlannedWorkout } = usePlannedWorkouts() as any;
+
+// FTP Test workout template
+const scheduleFtpTest = async () => {
+  try {
+    // Schedule for 2 days from now (to give time for rest)
+    const testDate = new Date();
+    testDate.setDate(testDate.getDate() + 2);
+    const dateStr = testDate.toISOString().split('T')[0];
+    
+    await addPlannedWorkout({
+      name: 'FTP Test - 20 Min Protocol',
+      type: 'ride',
+      date: dateStr,
+      description: 'Standard 20-minute FTP test. PREPARATION: No hard training 48 hours prior. Indoor trainer recommended. WARMUP: 10min easy, 3x3min progressive build, 5min recovery. TEST: 20-min maximal sustainable effort. START CONSERVATIVELY, settle into rhythm, empty tank in final 2min. RESULT: Average power × 0.95 = your FTP.',
+      duration: 60,
+      steps_preset: [
+        'bike_warmup_10',
+        'bike_vo2_3x3min_R3min',
+        'bike_recovery_5min_Z1',
+        'bike_ftp_test_20min',
+        'cooldown_bike_easy_10min'
+      ],
+      workout_status: 'planned',
+      tags: ['ftp_test', 'baseline_establishment', 'key_workout']
+    });
+    
+    alert(`FTP Test scheduled for ${testDate.toLocaleDateString()}. Rest up - no hard training until then!`);
+  } catch (error) {
+    console.error('Error scheduling FTP test:', error);
+    alert('Error scheduling FTP test. Please try again.');
+  }
+};
 
 const [data, setData] = useState<BaselineData>({
   age: 0,
@@ -1320,7 +1354,14 @@ return (
                                   </div>
                                   {learnedFitness.ride_ftp_estimated.confidence === 'low' && (
                                     <div className="mt-1.5 text-[10px] text-yellow-400/80">
-                                      Do a hard 20+ min ride for accurate FTP
+                                      <button 
+                                        onClick={scheduleFtpTest}
+                                        className="underline hover:text-yellow-300 inline-flex items-center gap-1"
+                                      >
+                                        <Calendar className="h-3 w-3" />
+                                        Schedule FTP Test
+                                      </button>
+                                      {' '}for accurate power zones
                                     </div>
                                   )}
                                 </div>
