@@ -99,6 +99,11 @@ export const PRESETS: Record<string, Preset> = {
   bike_endurance_150min_Z2: { kind: 'steady', duration_s: 150 * 60, target: 'Z2' },
   bike_endurance_180min_Z2: { kind: 'steady', duration_s: 180 * 60, target: 'Z2' },
   bike_recovery_35min_Z1: { kind: 'steady', duration_s: 35 * 60, target: 'Z1' },
+  bike_recovery_5min_Z1: { kind: 'steady', duration_s: 5 * 60, target: 'Z1' },
+  
+  // FTP Test tokens
+  bike_ss_2x3min_R3min: { kind: 'interval', reps: 2, work: { duration_s: 180, target: '{sweetspot_power}' }, rest: { duration_s: 180 } },
+  bike_ftp_test_20min: { kind: 'steady', duration_s: 20 * 60, target: 'maximal', notes: 'FTP Test - 20min maximal sustainable effort' },
 
   // Strength scaffolds (main blocks)
   strength_main_50min: { exercise: 'block_main', sets: 1, reps: 1, intensity: '50min' },
