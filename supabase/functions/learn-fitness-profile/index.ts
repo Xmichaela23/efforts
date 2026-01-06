@@ -628,18 +628,39 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
   }
 
   // ==========================================================================
-  // STEP 3: Find easy HR (<75% of max)
+  // STEP 3: Find easy HR (65-75% of max, with power filter)
+  // 
+  // Easy zone should be intentional training, not commutes or errands
+  // Filter: Require meaningful power to exclude casual pedaling
   // ==========================================================================
   
   let easy_hr: LearnedMetric | null = null;
 
   if (observedMaxHR) {
+    // Easy zone: 65-75% of max HR (not just <75%)
+    // Below 65% is recovery/commute territory
+    const easyHRFloor = observedMaxHR * 0.65;
     const easyHRCeiling = observedMaxHR * 0.75;
+    
+    // P50 power = moderate effort baseline (filter out casual rides)
+    const p50Power = allPowers.length >= 4 
+      ? allPowers[Math.floor(allPowers.length * 0.50)] 
+      : null;
+    
     const easyEfforts = rides.filter(r => {
       const duration = r.moving_time || r.duration || 0;
       const hr = r.avg_heart_rate || 0;
-      return duration >= 30 && hr > 100 && hr <= easyHRCeiling;
+      const inHRRange = hr >= easyHRFloor && hr <= easyHRCeiling;
+      
+      // If power data available, require at least 50% of P50 (not just pedaling)
+      if (p50Power && r.avg_power) {
+        return duration >= 30 && inHRRange && r.avg_power >= p50Power * 0.50;
+      }
+      
+      return duration >= 30 && inHRRange;
     });
+
+    console.log(`  📊 Easy effort candidates (65-75% max, power-filtered): ${easyEfforts.length}`);
 
     if (easyEfforts.length >= 3) {
       const sortedEasyHRs = easyEfforts.map(r => r.avg_heart_rate).sort((a, b) => a - b);
@@ -648,14 +669,24 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
       easy_hr = {
         value: Math.round(medianEasyHR),
         confidence: easyEfforts.length >= 5 ? 'high' : 'medium',
-        source: `median of ${easyEfforts.length} easy rides (<75% max)`,
+        source: `median of ${easyEfforts.length} easy rides (65-75% max, power-filtered)`,
+        sample_count: easyEfforts.length
+      };
+    } else if (easyEfforts.length >= 1) {
+      // Use what we have
+      const avgEasyHR = easyEfforts.reduce((sum, r) => sum + r.avg_heart_rate, 0) / easyEfforts.length;
+      easy_hr = {
+        value: Math.round(avgEasyHR),
+        confidence: 'low',
+        source: `from ${easyEfforts.length} easy rides (need more data)`,
         sample_count: easyEfforts.length
       };
     } else {
+      // No easy training rides found - use 70% of max as estimate
       easy_hr = {
         value: Math.round(observedMaxHR * 0.70),
         confidence: 'low',
-        source: '70% of observed max (estimated)',
+        source: '70% of observed max (estimated - no easy training rides found)',
         sample_count: 0
       };
     }

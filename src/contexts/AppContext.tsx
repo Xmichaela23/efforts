@@ -428,6 +428,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         trainingBackground: data.training_background || '',
         equipment: data.equipment || {},
         lastUpdated: data.updated_at,
+        // Auto-learned fitness profile
+        learned_fitness: data.learned_fitness || null,
       };
     } catch (error) {
       console.error('Error in loadUserBaselines:', error);
