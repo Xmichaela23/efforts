@@ -247,6 +247,36 @@ const getConfidenceDots = (confidence: string | undefined): string => {
   }
 };
 
+// Calculate age from birthday
+const calculateAge = (birthday: string | undefined): number | null => {
+  if (!birthday) return null;
+  const birthDate = new Date(birthday);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age > 0 && age < 120 ? age : null;
+};
+
+// Calculate age-based HR estimates
+const getAgeBasedHREstimates = (birthday: string | undefined) => {
+  const age = calculateAge(birthday);
+  if (!age) return null;
+  
+  const maxHR = 220 - age;
+  const thresholdHR = Math.round(maxHR * 0.88);
+  const easyHR = Math.round(maxHR * 0.70);
+  
+  return {
+    maxHR,
+    thresholdHR,
+    easyHR,
+    age
+  };
+};
+
 const handleSave = async () => {
   try {
     setSaving(true);
@@ -1108,19 +1138,66 @@ return (
                     </div>
 
                     {!learnedFitness || learnedFitness.learning_status === 'insufficient_data' ? (
-                      <div className="text-center py-6">
-                        <p className="text-sm text-white/60 mb-2">Not enough data yet</p>
-                        <p className="text-xs text-white/40">
-                          Keep training with heart rate and we'll learn your zones automatically.
-                        </p>
-                        <button
-                          onClick={refreshLearnedProfile}
-                          disabled={learningProfile}
-                          className="mt-4 px-4 py-2 text-xs rounded-full bg-white/[0.08] border border-white/20 text-white/70 hover:bg-white/[0.12] transition-all disabled:opacity-50"
-                        >
-                          {learningProfile ? 'Analyzing...' : 'Analyze My Workouts'}
-                        </button>
-                      </div>
+                      (() => {
+                        const ageEstimates = getAgeBasedHREstimates(data.birthday);
+                        
+                        if (!ageEstimates) {
+                          return (
+                            <div className="text-center py-6">
+                              <p className="text-sm text-white/60 mb-2">Add your birthday above to see estimated zones</p>
+                              <p className="text-xs text-white/40">
+                                Or keep training with heart rate and we'll learn your zones automatically.
+                              </p>
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <div className="space-y-4">
+                            <p className="text-xs text-white/40 text-center mb-3">
+                              Based on age ({ageEstimates.age}) - will refine from your training
+                            </p>
+                            
+                            {/* Age-based estimates */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                <div>
+                                  <div className="text-xs text-white/50">Threshold HR</div>
+                                  <div className="text-sm font-medium text-white">{ageEstimates.thresholdHR} bpm</div>
+                                </div>
+                                <div className="text-xs text-yellow-500/70">est.</div>
+                              </div>
+                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                <div>
+                                  <div className="text-xs text-white/50">Easy HR</div>
+                                  <div className="text-sm font-medium text-white">{ageEstimates.easyHR} bpm</div>
+                                </div>
+                                <div className="text-xs text-yellow-500/70">est.</div>
+                              </div>
+                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                <div>
+                                  <div className="text-xs text-white/50">Max HR</div>
+                                  <div className="text-sm font-medium text-white">{ageEstimates.maxHR} bpm</div>
+                                </div>
+                                <div className="text-xs text-yellow-500/70">est.</div>
+                              </div>
+                            </div>
+
+                            <div className="pt-3 border-t border-white/10 text-center">
+                              <button
+                                onClick={refreshLearnedProfile}
+                                disabled={learningProfile}
+                                className="px-4 py-2 text-xs rounded-full bg-white/[0.08] border border-white/20 text-white/70 hover:bg-white/[0.12] transition-all disabled:opacity-50"
+                              >
+                                {learningProfile ? 'Analyzing...' : 'Analyze My Workouts'}
+                              </button>
+                              <p className="text-xs text-white/30 mt-2">
+                                Replace estimates with values learned from your training
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })()
                     ) : (
                       <div className="space-y-4">
                         {/* Running HR Zones */}
