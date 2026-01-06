@@ -995,6 +995,44 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 </div>
               );
             })()}
+            {/* Delete/Reschedule buttons for planned workouts */}
+            {!isCompleted && onDelete && (
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white/60 hover:text-white/80 hover:bg-white/10"
+                  onClick={() => {
+                    const newDate = prompt('Enter new date (YYYY-MM-DD):', (unifiedWorkout as any)?.date || '');
+                    if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+                      // Update the workout date
+                      supabase
+                        .from('planned_workouts')
+                        .update({ date: newDate })
+                        .eq('id', (unifiedWorkout as any)?.id)
+                        .then(() => {
+                          window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+                          onClose();
+                        });
+                    }
+                  }}
+                >
+                  Reschedule
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  onClick={() => {
+                    if (confirm('Delete this planned workout?')) {
+                      onDelete(String((unifiedWorkout as any)?.id));
+                    }
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           {/* Adherence Tab - only rendered when linked, so no need for unlinked state */}
