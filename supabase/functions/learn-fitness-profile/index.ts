@@ -697,8 +697,10 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
   // 
   // FTP estimation hierarchy:
   // 1. Pre-calculated 20-min best power × 0.95 (most accurate)
-  // 2. Best Normalized Power from 20-60 min efforts × 0.95
-  // 3. Best avg power × 1.05 × 0.95 (adjusted for NP/avg gap)
+  // 2. Best NP from HARD efforts (HR > 80% max OR power > P75) × 0.95
+  // 3. Best avg power from hard efforts × 1.05 × 0.95
+  // 
+  // KEY: Filter for hard efforts to exclude casual rides!
   // ==========================================================================
   
   const ridesWithPower = rides.filter(r => 
@@ -713,7 +715,7 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
       return duration >= 20 && duration <= 90;
     });
 
-    // Priority 1: Look for pre-calculated 20-min best power
+    // Priority 1: Look for pre-calculated 20-min best power (already represents hard effort)
     const bestsPower20: number[] = [];
     for (const r of sustainedPowerRides) {
       const p20 = r.computed?.analysis?.bests?.power_20min 
@@ -737,50 +739,91 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
       console.log(`  ⚡ FTP from 20-min bests: ${estimatedFTP}W (from ${best20MinPower}W)`);
     }
 
-    // Priority 2: Use Normalized Power (better than avg power)
+    // Priority 2: Use Normalized Power from HARD efforts only
+    // Hard effort = HR > 80% of max OR power in top quartile
     if (!ftp_estimated) {
-      const normalizedPowers = sustainedPowerRides
+      // Filter for hard efforts
+      const hardEffortRides = sustainedPowerRides.filter(r => {
+        const hr = r.avg_heart_rate || 0;
+        const power = r.normalized_power || r.avg_power || 0;
+        
+        // HR-based: above 80% of observed max
+        const isHardByHR = observedMaxHR && hr >= observedMaxHR * 0.80;
+        
+        // Power-based: above 75th percentile
+        const isHardByPower = p75Power && power >= p75Power * 0.85;
+        
+        return isHardByHR || isHardByPower;
+      });
+
+      console.log(`  📊 Hard effort rides for FTP: ${hardEffortRides.length} (of ${sustainedPowerRides.length} sustained)`);
+
+      const normalizedPowers = hardEffortRides
         .filter(r => r.normalized_power && r.normalized_power > 50)
         .map(r => r.normalized_power)
         .sort((a, b) => b - a);
 
-      if (normalizedPowers.length >= 2) {
-        // NP from a ~60 min hard ride is approximately equal to FTP
-        // For shorter efforts (20-40 min), use 95% of best NP
+      if (normalizedPowers.length >= 1) {
+        // Take best NP from hard efforts
         const bestNP = normalizedPowers[0];
         const estimatedFTP = Math.round(bestNP * 0.95);
         
         ftp_estimated = {
           value: estimatedFTP,
-          confidence: normalizedPowers.length >= 4 ? 'high' : 'medium',
-          source: `95% of best normalized power (${normalizedPowers.length} efforts)`,
+          confidence: normalizedPowers.length >= 3 ? 'high' : (normalizedPowers.length >= 2 ? 'medium' : 'low'),
+          source: `95% of best NP from ${normalizedPowers.length} hard rides`,
           sample_count: normalizedPowers.length
         };
-        console.log(`  ⚡ FTP from NP: ${estimatedFTP}W (from ${bestNP}W NP)`);
+        console.log(`  ⚡ FTP from hard effort NP: ${estimatedFTP}W (from ${bestNP}W NP)`);
       }
     }
 
-    // Priority 3: Use avg power with adjustment factor
-    // NP is typically 1.02-1.10× avg power (higher for variable efforts)
-    // Using 1.05× as middle ground
+    // Priority 3: Use avg power from hard efforts
     if (!ftp_estimated) {
-      const avgPowers = sustainedPowerRides
+      const hardEffortRides = sustainedPowerRides.filter(r => {
+        const hr = r.avg_heart_rate || 0;
+        const power = r.avg_power || 0;
+        const isHardByHR = observedMaxHR && hr >= observedMaxHR * 0.80;
+        const isHardByPower = p75Power && power >= p75Power * 0.85;
+        return isHardByHR || isHardByPower;
+      });
+
+      const avgPowers = hardEffortRides
         .filter(r => r.avg_power && r.avg_power > 50)
         .map(r => r.avg_power)
         .sort((a, b) => b - a);
 
-      if (avgPowers.length >= 2) {
+      if (avgPowers.length >= 1) {
         const bestAvgPower = avgPowers[0];
         // Adjust avg power to approximate NP, then take 95%
         const estimatedFTP = Math.round(bestAvgPower * 1.05 * 0.95);
         
         ftp_estimated = {
           value: estimatedFTP,
-          confidence: avgPowers.length >= 5 ? 'medium' : 'low',
-          source: `estimated from avg power (${avgPowers.length} efforts)`,
+          confidence: avgPowers.length >= 3 ? 'medium' : 'low',
+          source: `estimated from ${avgPowers.length} hard rides`,
           sample_count: avgPowers.length
         };
-        console.log(`  ⚡ FTP from avg power: ${estimatedFTP}W (from ${bestAvgPower}W avg)`);
+        console.log(`  ⚡ FTP from hard effort avg power: ${estimatedFTP}W (from ${bestAvgPower}W avg)`);
+      }
+    }
+
+    // Priority 4: Fallback - no hard efforts found, use best overall power
+    if (!ftp_estimated && sustainedPowerRides.length >= 1) {
+      const allPowersNP = sustainedPowerRides
+        .filter(r => r.normalized_power && r.normalized_power > 50)
+        .map(r => r.normalized_power)
+        .sort((a, b) => b - a);
+      
+      if (allPowersNP.length >= 1) {
+        const bestNP = allPowersNP[0];
+        ftp_estimated = {
+          value: Math.round(bestNP * 0.95),
+          confidence: 'low',
+          source: 'estimated (no hard efforts found - do a hard ride!)',
+          sample_count: allPowersNP.length
+        };
+        console.log(`  ⚡ FTP fallback: ${Math.round(bestNP * 0.95)}W (no hard efforts found)`);
       }
     }
   }
