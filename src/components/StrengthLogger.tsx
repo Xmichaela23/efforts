@@ -2476,8 +2476,38 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Strength: orange-500 (#f97316 = rgb 249,115,22)
   // Mobility: purple-500 (#a855f7 = rgb 168,85,247)
   const themeColors = isMobilityMode
-    ? { border: 'border-purple-500/30', text: 'text-purple-400', rgb: '168,85,247' }
-    : { border: 'border-orange-500/30', text: 'text-orange-400', rgb: '249,115,22' };
+    ? {
+        border: 'border-purple-500/30',
+        text: 'text-purple-400',
+        hoverText: 'hover:text-purple-400',
+        rgb: '168,85,247',
+        // Done button completed state
+        doneBg: 'bg-purple-600/20',
+        doneBorder: 'border-purple-500/40',
+        doneText: 'text-purple-400',
+        // Save button
+        saveBg: 'bg-purple-700/80',
+        saveBorder: 'border-purple-500/40',
+        saveHoverBg: 'hover:bg-purple-700/90',
+        saveHoverBorder: 'hover:border-purple-500/50',
+        saveShadow: 'shadow-[0_0_0_1px_rgba(168,85,247,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
+      }
+    : {
+        border: 'border-orange-500/30',
+        text: 'text-orange-400',
+        hoverText: 'hover:text-orange-400',
+        rgb: '249,115,22',
+        // Done button completed state
+        doneBg: 'bg-orange-600/20',
+        doneBorder: 'border-orange-500/40',
+        doneText: 'text-orange-400',
+        // Save button
+        saveBg: 'bg-orange-700/80',
+        saveBorder: 'border-orange-500/40',
+        saveHoverBg: 'hover:bg-orange-700/90',
+        saveHoverBorder: 'hover:border-orange-500/50',
+        saveShadow: 'shadow-[0_0_0_1px_rgba(249,115,22,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
+      };
 
   // Don't render until properly initialized
   if (!isInitialized) {
@@ -2548,7 +2578,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         setLockManualPrefill(false);
                         setShowPlannedMenu(false);
                       }}
-                      className="text-xs text-cyan-400 hover:text-cyan-300"
+                      className={`text-xs ${themeColors.text} hover:opacity-80`}
                     >
                       Start Fresh
                     </button>
@@ -2665,7 +2695,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         {a.running? 'Pause' : 'Start'}
                       </button>
                     ) : (
-                      <span className="text-cyan-400 text-xs">✓ Done</span>
+                      <span className={`${themeColors.text} text-xs`}>✓ Done</span>
                     )}
                     {/* Remove addon */}
                     <button
@@ -2910,7 +2940,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 setEditingTimerKey(durationTimerKey);
                                 setEditingTimerValue(prefill);
                               }}
-                              className={`h-9 px-2 text-sm rounded-md border-2 flex-1 text-center transition-all duration-300 ${isDurationRunning ? 'text-cyan-400 border-cyan-400/50 bg-white/[0.12]' : 'text-white border-white/25 bg-white/[0.08] backdrop-blur-md'}`}
+                              className={`h-9 px-2 text-sm rounded-md border-2 flex-1 text-center transition-all duration-300 ${isDurationRunning ? `${themeColors.text} ${themeColors.doneBorder} bg-white/[0.12]` : 'text-white border-white/25 bg-white/[0.08] backdrop-blur-md'}`}
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             >
                               {currentDurationSeconds >= 60 
@@ -3081,7 +3111,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       })()}
                       <button
                         onClick={() => handleSetComplete(exercise.id, setIndex)}
-                        className={`text-xs px-2 py-1 rounded-full min-h-[28px] transition-all duration-300 ${set.completed ? 'bg-cyan-600/20 border-2 border-cyan-500/40 text-cyan-400' : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
+                        className={`text-xs px-2 py-1 rounded-full min-h-[28px] transition-all duration-300 ${set.completed ? `${themeColors.doneBg} border-2 ${themeColors.doneBorder} ${themeColors.doneText}` : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         {set.completed ? '✓ Done' : 'Done'}
@@ -3414,13 +3444,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <div className="flex items-center gap-2 text-sm text-white/70 flex-1 justify-center">
                     {isSaving && (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                        <Loader2 className={`h-4 w-4 animate-spin ${themeColors.text}`} />
                         <span>Saving workout... (you don't need to stay here)</span>
                       </>
                     )}
                     {isSaved && (
                       <>
-                        <CheckCircle className="h-4 w-4 text-cyan-400" />
+                        <CheckCircle className={`h-4 w-4 ${themeColors.text}`} />
                         <span>Saved!</span>
                       </>
                     )}
@@ -3429,7 +3459,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <>
                     <button onClick={()=>setShowNotesModal(false)} className="text-sm text-white/70 hover:text-white/90">Cancel</button>
                     <button onClick={()=>{ finalizeSave(); }} className="text-sm text-white/70 hover:text-white/90">Skip</button>
-                    <button onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="text-sm text-white hover:text-cyan-400 rounded-full px-3 py-1.5 bg-white/[0.12] border-2 border-white/35 hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Save</button>
+                    <button onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className={`text-sm text-white ${themeColors.hoverText} rounded-full px-3 py-1.5 bg-white/[0.12] border-2 border-white/35 hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300`} style={{ fontFamily: 'Inter, sans-serif' }}>Save</button>
                   </>
                 )}
               </div>
@@ -3489,13 +3519,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <div className="relative w-full max-w-md mx-4 bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-6 z-10">
             {isSaving ? (
               <div className="flex flex-col items-center justify-center py-8">
-                <Loader2 className="h-12 w-12 text-cyan-400 animate-spin mb-4" />
+                <Loader2 className={`h-12 w-12 ${themeColors.text} animate-spin mb-4`} />
                 <p className="text-lg font-medium text-white/90">Saving workout...</p>
                 <p className="text-sm text-white/60 mt-2">(you don't need to stay here while loading)</p>
               </div>
             ) : isSaved ? (
               <div className="flex flex-col items-center justify-center py-8">
-                <CheckCircle className="h-12 w-12 text-cyan-400 mb-4" />
+                <CheckCircle className={`h-12 w-12 ${themeColors.text} mb-4`} />
                 <p className="text-lg font-medium text-white/90">Saved!</p>
               </div>
             ) : (
@@ -3563,7 +3593,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       >
         <button 
           onClick={saveWorkout}
-          className="w-full h-14 text-base font-medium text-white transition-all duration-200 rounded-full bg-cyan-700/80 backdrop-blur-lg border-2 border-cyan-500/40 hover:bg-cyan-700/90 hover:border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+          className={`w-full h-14 text-base font-medium text-white transition-all duration-200 rounded-full backdrop-blur-lg border-2 ${themeColors.saveBg} ${themeColors.saveBorder} ${themeColors.saveHoverBg} ${themeColors.saveHoverBorder} ${themeColors.saveShadow}`}
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
           Save Workout
