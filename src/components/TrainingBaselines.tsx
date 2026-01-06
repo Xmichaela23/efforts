@@ -76,11 +76,11 @@ const scheduleFtpTest = async () => {
       name: 'FTP Test - 20 Min Protocol',
       type: 'ride',
       date: ftpTestDate,
-      description: 'Standard 20-minute FTP test. PREPARATION: No hard training 48 hours prior. Indoor trainer recommended. WARMUP: 10min easy, 3x3min progressive build, 5min recovery. TEST: 20-min maximal sustainable effort. START CONSERVATIVELY, settle into rhythm, empty tank in final 2min. RESULT: Average power × 0.95 = your FTP.',
+      description: 'Standard 20-minute FTP test. PREPARATION: No hard training 48 hours prior. Indoor trainer recommended. WARMUP: 15min progressive build with fast cadence, then 2x3min sweet spot efforts. TEST: 20-min maximal sustainable effort - START CONSERVATIVELY (first 5min at 90%), settle into rhythm, empty tank in final 2min. RESULT: Average power × 0.95 = your FTP.',
       duration: 60,
       steps_preset: [
-        'bike_warmup_10',
-        'bike_vo2_3x3min_R3min',
+        'warmup_bike_quality_15min_fastpedal',
+        'bike_ss_2x3min_R3min',
         'bike_recovery_5min_Z1',
         'bike_ftp_test_20min',
         'cooldown_bike_easy_10min'
