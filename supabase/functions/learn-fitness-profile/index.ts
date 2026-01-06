@@ -604,14 +604,26 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
         sample_count: thresholdCandidates.length
       };
       console.log(`  💓 Threshold HR: ${thresholdHRValue} bpm`);
-    } else {
-      // Fallback: 88% of max HR
+    } else if (thresholdCandidates.length === 1) {
+      // Single hard effort - use it, it's better than a generic estimate
+      const singleEffortHR = thresholdCandidates[0].avg_heart_rate;
       threshold_hr = {
-        value: Math.round(observedMaxHR * 0.88),
+        value: Math.round(singleEffortHR),
         confidence: 'low',
-        source: '88% of observed max (estimated)',
+        source: 'from 1 hard ride (need more data)',
+        sample_count: 1
+      };
+      console.log(`  💓 Threshold HR from single effort: ${singleEffortHR} bpm`);
+    } else {
+      // No hard efforts found - use 90% of max (higher estimate for cycling)
+      // Cyclists tend to have higher threshold % than runners
+      threshold_hr = {
+        value: Math.round(observedMaxHR * 0.90),
+        confidence: 'low',
+        source: '90% of observed max (estimated - no hard rides found)',
         sample_count: 0
       };
+      console.log(`  💓 Threshold HR fallback: ${Math.round(observedMaxHR * 0.90)} bpm (90% of max)`);
     }
   }
 
