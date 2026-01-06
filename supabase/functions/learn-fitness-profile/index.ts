@@ -286,68 +286,210 @@ function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
     };
   }
 
-  // Calculate average pace across all runs for classification
-  const validPaces = runs
-    .filter(r => r.avg_pace && r.avg_pace > 0 && r.avg_pace < 1000) // sanity check
-    .map(r => r.avg_pace);
-  
-  const avgPaceOverall = validPaces.length > 0 
-    ? validPaces.reduce((a, b) => a + b, 0) / validPaces.length 
-    : 0;
-
-  // Classify runs by effort type
-  const easyRuns: WorkoutRecord[] = [];
-  const thresholdRuns: WorkoutRecord[] = [];
-  const raceRuns: WorkoutRecord[] = [];
-
-  runs.forEach(run => {
-    const duration = run.moving_time || run.duration || 0;
-    const pace = run.avg_pace || 0;
-    const hr = run.avg_heart_rate || 0;
-
-    if (!pace || !hr || duration < 10) return; // Skip incomplete data
-
-    // Classification heuristics:
-    // Easy: slower than 1.15× average pace, duration > 20 min
-    // Threshold: sustained (20-60 min), faster than average but not sprint
-    // Race: short and fast (< 45 min, significantly faster than avg)
-
-    const paceRatio = pace / avgPaceOverall; // Higher = slower
-
-    if (paceRatio > 1.12 && duration >= 20) {
-      // Slow pace, longer duration = easy run
-      easyRuns.push(run);
-    } else if (paceRatio <= 0.92 && duration >= 15 && duration <= 45) {
-      // Fast, short-medium duration = race effort
-      raceRuns.push(run);
-    } else if (paceRatio > 0.92 && paceRatio <= 1.05 && duration >= 20) {
-      // Moderate-fast, sustained = threshold
-      thresholdRuns.push(run);
-    }
-  });
-
-  console.log(`  📊 Classified runs - Easy: ${easyRuns.length}, Threshold: ${thresholdRuns.length}, Race: ${raceRuns.length}`);
-
-  // Extract HR metrics
-  const easy_hr = extractHRMetric(easyRuns, 'easy runs');
-  const threshold_hr = extractHRMetric(thresholdRuns, 'threshold runs');
-  const race_hr = extractHRMetric(raceRuns, 'race efforts');
-
-  // Find max observed HR
+  // ==========================================================================
+  // STEP 1: Find observed max HR (this is reliable)
+  // ==========================================================================
   const allMaxHRs = runs
-    .filter(r => r.max_heart_rate && r.max_heart_rate > 100)
+    .filter(r => r.max_heart_rate && r.max_heart_rate > 100 && r.max_heart_rate < 220)
     .map(r => r.max_heart_rate);
   
-  const max_hr_observed: LearnedMetric | null = allMaxHRs.length > 0 ? {
-    value: Math.max(...allMaxHRs),
+  const observedMaxHR = allMaxHRs.length > 0 ? Math.max(...allMaxHRs) : null;
+  
+  const max_hr_observed: LearnedMetric | null = observedMaxHR ? {
+    value: observedMaxHR,
     confidence: allMaxHRs.length >= 5 ? 'high' : 'medium',
     source: 'max observed across all runs',
     sample_count: allMaxHRs.length
   } : null;
 
-  // Extract pace metrics
-  const easy_pace = extractPaceMetric(easyRuns, 'easy runs');
-  const threshold_pace = extractPaceMetric(thresholdRuns, 'threshold runs');
+  console.log(`  📊 Observed max HR: ${observedMaxHR} from ${allMaxHRs.length} runs`);
+
+  // ==========================================================================
+  // STEP 2: Find threshold HR using HR-based detection (not pace)
+  // Threshold is 85-92% of max HR in sustained efforts
+  // ==========================================================================
+  
+  // Filter for sustained efforts (20-60 min) with valid HR
+  const sustainedEfforts = runs.filter(r => {
+    const duration = r.moving_time || r.duration || 0;
+    const hr = r.avg_heart_rate || 0;
+    return duration >= 20 && duration <= 60 && hr > 100 && hr < 220;
+  });
+
+  console.log(`  📊 Sustained efforts (20-60 min): ${sustainedEfforts.length}`);
+
+  let threshold_hr: LearnedMetric | null = null;
+  let thresholdHRValue: number | null = null;
+
+  if (observedMaxHR && sustainedEfforts.length >= 2) {
+    // Look for efforts in the threshold HR range (85-92% of max)
+    const thresholdLow = observedMaxHR * 0.85;
+    const thresholdHigh = observedMaxHR * 0.92;
+    
+    const thresholdCandidates = sustainedEfforts.filter(r => 
+      r.avg_heart_rate >= thresholdLow && r.avg_heart_rate <= thresholdHigh
+    );
+
+    console.log(`  📊 Threshold candidates (${Math.round(thresholdLow)}-${Math.round(thresholdHigh)} bpm): ${thresholdCandidates.length}`);
+
+    if (thresholdCandidates.length >= 2) {
+      // Take median of threshold efforts
+      const sortedHRs = thresholdCandidates.map(r => r.avg_heart_rate).sort((a, b) => a - b);
+      thresholdHRValue = sortedHRs[Math.floor(sortedHRs.length / 2)];
+      
+      threshold_hr = {
+        value: Math.round(thresholdHRValue),
+        confidence: thresholdCandidates.length >= 5 ? 'high' : 'medium',
+        source: `median of ${thresholdCandidates.length} threshold efforts (85-92% max)`,
+        sample_count: thresholdCandidates.length
+      };
+    } else {
+      // Fallback: Take 95th percentile of all sustained efforts
+      const sortedAllHRs = sustainedEfforts.map(r => r.avg_heart_rate).sort((a, b) => a - b);
+      if (sortedAllHRs.length >= 3) {
+        const idx = Math.floor(sortedAllHRs.length * 0.95);
+        thresholdHRValue = sortedAllHRs[Math.min(idx, sortedAllHRs.length - 1)];
+        
+        threshold_hr = {
+          value: Math.round(thresholdHRValue),
+          confidence: 'low',
+          source: '95th percentile of sustained efforts (no clear threshold data)',
+          sample_count: sortedAllHRs.length
+        };
+      } else {
+        // Last resort: 88% of max HR
+        thresholdHRValue = Math.round(observedMaxHR * 0.88);
+        
+        threshold_hr = {
+          value: thresholdHRValue,
+          confidence: 'low',
+          source: '88% of observed max (estimated)',
+          sample_count: 0
+        };
+      }
+    }
+  }
+
+  console.log(`  📊 Threshold HR determined: ${thresholdHRValue} bpm`);
+
+  // ==========================================================================
+  // STEP 3: Find easy HR (bottom 25% of sustained efforts, or efforts < 75% max)
+  // ==========================================================================
+  
+  let easy_hr: LearnedMetric | null = null;
+
+  if (observedMaxHR) {
+    const easyHRCeiling = observedMaxHR * 0.75;
+    const easyEfforts = runs.filter(r => {
+      const duration = r.moving_time || r.duration || 0;
+      const hr = r.avg_heart_rate || 0;
+      return duration >= 20 && hr > 100 && hr <= easyHRCeiling;
+    });
+
+    if (easyEfforts.length >= 3) {
+      const sortedEasyHRs = easyEfforts.map(r => r.avg_heart_rate).sort((a, b) => a - b);
+      const medianEasyHR = sortedEasyHRs[Math.floor(sortedEasyHRs.length / 2)];
+      
+      easy_hr = {
+        value: Math.round(medianEasyHR),
+        confidence: easyEfforts.length >= 5 ? 'high' : 'medium',
+        source: `median of ${easyEfforts.length} easy runs (<75% max)`,
+        sample_count: easyEfforts.length
+      };
+    } else {
+      // Fallback: 70% of max
+      easy_hr = {
+        value: Math.round(observedMaxHR * 0.70),
+        confidence: 'low',
+        source: '70% of observed max (estimated)',
+        sample_count: 0
+      };
+    }
+  }
+
+  // ==========================================================================
+  // STEP 4: Find race HR (efforts > 92% of max, typically short hard efforts)
+  // ==========================================================================
+  
+  let race_hr: LearnedMetric | null = null;
+
+  if (observedMaxHR) {
+    const raceHRFloor = observedMaxHR * 0.92;
+    const raceEfforts = runs.filter(r => {
+      const duration = r.moving_time || r.duration || 0;
+      const hr = r.avg_heart_rate || 0;
+      // Race efforts: shorter duration (10-45 min), high HR
+      return duration >= 10 && duration <= 45 && hr >= raceHRFloor;
+    });
+
+    if (raceEfforts.length >= 2) {
+      const sortedRaceHRs = raceEfforts.map(r => r.avg_heart_rate).sort((a, b) => a - b);
+      const medianRaceHR = sortedRaceHRs[Math.floor(sortedRaceHRs.length / 2)];
+      
+      race_hr = {
+        value: Math.round(medianRaceHR),
+        confidence: raceEfforts.length >= 3 ? 'high' : 'medium',
+        source: `median of ${raceEfforts.length} race/hard efforts (>92% max)`,
+        sample_count: raceEfforts.length
+      };
+    }
+  }
+
+  // ==========================================================================
+  // STEP 5: Find threshold PACE (pace at which threshold HR occurs)
+  // This is the correct way - HR determines effort, pace follows
+  // ==========================================================================
+  
+  let threshold_pace: LearnedMetric | null = null;
+  let easy_pace: LearnedMetric | null = null;
+
+  if (thresholdHRValue && observedMaxHR) {
+    // Find runs where avg HR was within ±5 bpm of threshold HR
+    const thresholdPaceRuns = runs.filter(r => {
+      const duration = r.moving_time || r.duration || 0;
+      const hr = r.avg_heart_rate || 0;
+      const pace = r.avg_pace || 0;
+      return duration >= 15 && 
+             pace > 150 && pace < 900 && // Valid pace range
+             Math.abs(hr - thresholdHRValue!) <= 5;
+    });
+
+    if (thresholdPaceRuns.length >= 2) {
+      const sortedPaces = thresholdPaceRuns.map(r => r.avg_pace).sort((a, b) => a - b);
+      const medianPace = sortedPaces[Math.floor(sortedPaces.length / 2)];
+      
+      threshold_pace = {
+        value: Math.round(medianPace),
+        confidence: thresholdPaceRuns.length >= 3 ? 'high' : 'medium',
+        source: `pace at threshold HR (${thresholdPaceRuns.length} runs)`,
+        sample_count: thresholdPaceRuns.length
+      };
+    }
+  }
+
+  // Find easy pace (pace when HR is in easy zone)
+  if (easy_hr && observedMaxHR) {
+    const easyPaceRuns = runs.filter(r => {
+      const duration = r.moving_time || r.duration || 0;
+      const hr = r.avg_heart_rate || 0;
+      const pace = r.avg_pace || 0;
+      return duration >= 20 && 
+             pace > 150 && pace < 900 &&
+             hr <= observedMaxHR * 0.75;
+    });
+
+    if (easyPaceRuns.length >= 3) {
+      const sortedPaces = easyPaceRuns.map(r => r.avg_pace).sort((a, b) => a - b);
+      const medianPace = sortedPaces[Math.floor(sortedPaces.length / 2)];
+      
+      easy_pace = {
+        value: Math.round(medianPace),
+        confidence: easyPaceRuns.length >= 5 ? 'high' : 'medium',
+        source: `pace at easy HR (${easyPaceRuns.length} runs)`,
+        sample_count: easyPaceRuns.length
+      };
+    }
+  }
 
   return {
     easy_hr,
@@ -380,57 +522,103 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
     };
   }
 
-  // Calculate average speed across all rides for classification
-  const validSpeeds = rides
-    .filter(r => r.avg_speed && r.avg_speed > 5 && r.avg_speed < 60) // sanity check km/h
-    .map(r => r.avg_speed);
-  
-  const avgSpeedOverall = validSpeeds.length > 0 
-    ? validSpeeds.reduce((a, b) => a + b, 0) / validSpeeds.length 
-    : 0;
-
-  // Classify rides by effort type
-  const easyRides: WorkoutRecord[] = [];
-  const thresholdRides: WorkoutRecord[] = [];
-
-  rides.forEach(ride => {
-    const duration = ride.moving_time || ride.duration || 0;
-    const speed = ride.avg_speed || 0;
-    const hr = ride.avg_heart_rate || 0;
-
-    if (!hr || duration < 15) return; // Skip incomplete data
-
-    // Classification based on speed relative to average
-    const speedRatio = avgSpeedOverall > 0 ? speed / avgSpeedOverall : 1;
-
-    if (speedRatio < 0.9 && duration >= 30) {
-      // Slow, longer duration = easy/endurance ride
-      easyRides.push(ride);
-    } else if (speedRatio >= 0.95 && duration >= 20 && duration <= 90) {
-      // Faster, sustained = threshold effort
-      thresholdRides.push(ride);
-    }
-  });
-
-  console.log(`  📊 Classified rides - Easy: ${easyRides.length}, Threshold: ${thresholdRides.length}`);
-
-  // Extract HR metrics
-  const easy_hr = extractHRMetric(easyRides, 'easy rides');
-  const threshold_hr = extractHRMetric(thresholdRides, 'threshold rides');
-
-  // Find max observed HR
+  // ==========================================================================
+  // STEP 1: Find observed max HR
+  // ==========================================================================
   const allMaxHRs = rides
-    .filter(r => r.max_heart_rate && r.max_heart_rate > 100)
+    .filter(r => r.max_heart_rate && r.max_heart_rate > 100 && r.max_heart_rate < 220)
     .map(r => r.max_heart_rate);
   
-  const max_hr_observed: LearnedMetric | null = allMaxHRs.length > 0 ? {
-    value: Math.max(...allMaxHRs),
+  const observedMaxHR = allMaxHRs.length > 0 ? Math.max(...allMaxHRs) : null;
+  
+  const max_hr_observed: LearnedMetric | null = observedMaxHR ? {
+    value: observedMaxHR,
     confidence: allMaxHRs.length >= 5 ? 'high' : 'medium',
     source: 'max observed across all rides',
     sample_count: allMaxHRs.length
   } : null;
 
-  // Estimate FTP from power data (if available)
+  console.log(`  📊 Ride max HR: ${observedMaxHR} from ${allMaxHRs.length} rides`);
+
+  // ==========================================================================
+  // STEP 2: Find threshold HR using HR-based detection (85-92% of max)
+  // ==========================================================================
+  
+  const sustainedEfforts = rides.filter(r => {
+    const duration = r.moving_time || r.duration || 0;
+    const hr = r.avg_heart_rate || 0;
+    return duration >= 20 && duration <= 90 && hr > 100 && hr < 220;
+  });
+
+  let threshold_hr: LearnedMetric | null = null;
+
+  if (observedMaxHR && sustainedEfforts.length >= 2) {
+    const thresholdLow = observedMaxHR * 0.85;
+    const thresholdHigh = observedMaxHR * 0.92;
+    
+    const thresholdCandidates = sustainedEfforts.filter(r => 
+      r.avg_heart_rate >= thresholdLow && r.avg_heart_rate <= thresholdHigh
+    );
+
+    if (thresholdCandidates.length >= 2) {
+      const sortedHRs = thresholdCandidates.map(r => r.avg_heart_rate).sort((a, b) => a - b);
+      const thresholdHRValue = sortedHRs[Math.floor(sortedHRs.length / 2)];
+      
+      threshold_hr = {
+        value: Math.round(thresholdHRValue),
+        confidence: thresholdCandidates.length >= 4 ? 'high' : 'medium',
+        source: `median of ${thresholdCandidates.length} threshold rides (85-92% max)`,
+        sample_count: thresholdCandidates.length
+      };
+    } else {
+      // Fallback: 88% of max HR
+      threshold_hr = {
+        value: Math.round(observedMaxHR * 0.88),
+        confidence: 'low',
+        source: '88% of observed max (estimated)',
+        sample_count: 0
+      };
+    }
+  }
+
+  // ==========================================================================
+  // STEP 3: Find easy HR (<75% of max)
+  // ==========================================================================
+  
+  let easy_hr: LearnedMetric | null = null;
+
+  if (observedMaxHR) {
+    const easyHRCeiling = observedMaxHR * 0.75;
+    const easyEfforts = rides.filter(r => {
+      const duration = r.moving_time || r.duration || 0;
+      const hr = r.avg_heart_rate || 0;
+      return duration >= 30 && hr > 100 && hr <= easyHRCeiling;
+    });
+
+    if (easyEfforts.length >= 3) {
+      const sortedEasyHRs = easyEfforts.map(r => r.avg_heart_rate).sort((a, b) => a - b);
+      const medianEasyHR = sortedEasyHRs[Math.floor(sortedEasyHRs.length / 2)];
+      
+      easy_hr = {
+        value: Math.round(medianEasyHR),
+        confidence: easyEfforts.length >= 5 ? 'high' : 'medium',
+        source: `median of ${easyEfforts.length} easy rides (<75% max)`,
+        sample_count: easyEfforts.length
+      };
+    } else {
+      easy_hr = {
+        value: Math.round(observedMaxHR * 0.70),
+        confidence: 'low',
+        source: '70% of observed max (estimated)',
+        sample_count: 0
+      };
+    }
+  }
+
+  // ==========================================================================
+  // STEP 4: Estimate FTP from power data
+  // ==========================================================================
+  
   const ridesWithPower = rides.filter(r => r.avg_power && r.avg_power > 50);
   let ftp_estimated: LearnedMetric | null = null;
 
