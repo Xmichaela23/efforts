@@ -7,6 +7,7 @@ import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
 import PowerZoneChart from './PowerZoneChart';
+import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 import { computeDistanceKm } from '@/utils/workoutDataDerivation';
@@ -1454,6 +1455,26 @@ const formatMovingTime = () => {
         return null;
       })()}
       {/* (Removed old mini zones histograms to avoid duplicate zones under splits) */}
+      
+      {/* Post-Workout Feedback Section - Only for runs and rides */}
+      {(workoutData.type === 'run' || workoutData.type === 'ride') && (
+        <div className="mx-[-16px] px-3 pt-4 pb-2">
+          <PostWorkoutFeedback
+            workoutId={workoutData.id}
+            workoutType={workoutData.type as 'run' | 'ride'}
+            workoutName={workoutData.name}
+            existingGearId={(workoutData as any)?.gear_id}
+            existingRpe={(workoutData as any)?.rpe}
+            existingFeeling={(workoutData as any)?.feeling}
+            mode="inline"
+            onSave={(data) => {
+              // Update local state to reflect changes without reloading
+              console.log('Feedback saved:', data);
+            }}
+          />
+        </div>
+      )}
+      
       {/* Single page-level attribution for map tiles */}
       <div className="mx-[-16px] px-3 pt-2 pb-6">
         <small style={{ display: 'block', fontSize: 10, color: '#9aa6b2' }}>

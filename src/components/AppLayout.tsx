@@ -26,6 +26,7 @@ import PlanBuilder from './PlanBuilder';
 import FitFileImporter from './FitFileImporter';
 import TrainingBaselines from './TrainingBaselines';
 import Gear from './Gear';
+import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import PullToRefresh from './PullToRefresh';
 import { supabase } from '@/lib/supabase';
@@ -69,6 +70,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showContext, setShowContext] = useState(false);
   const [contextFocusWorkoutId, setContextFocusWorkoutId] = useState<string | null>(null);
   const [activeBottomNav, setActiveBottomNav] = useState<'home' | 'plans' | 'insights'>('home');
+  
+  // Post-workout feedback popup state
+  const [feedbackWorkout, setFeedbackWorkout] = useState<{
+    id: string;
+    type: 'run' | 'ride';
+    name: string;
+  } | null>(null);
   const [plansMenuOpen, setPlansMenuOpen] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
@@ -598,6 +606,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           console.log('✅ Workload calculated for imported workout');
         } catch (workloadError) {
           console.error('❌ Failed to calculate workload for imported workout:', workloadError);
+        }
+        
+        // Show post-workout feedback popup for runs and rides
+        if ((workoutToSave.type === 'run' || workoutToSave.type === 'ride') && savedWorkout?.id) {
+          setFeedbackWorkout({
+            id: savedWorkout.id,
+            type: workoutToSave.type as 'run' | 'ride',
+            name: workoutToSave.name || `${workoutToSave.type} workout`,
+          });
         }
       } catch (error) {
         console.error('❌ Error importing workout:', error);
@@ -1385,6 +1402,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Post-Workout Feedback Popup */}
+      {feedbackWorkout && (
+        <PostWorkoutFeedback
+          workoutId={feedbackWorkout.id}
+          workoutType={feedbackWorkout.type}
+          workoutName={feedbackWorkout.name}
+          mode="popup"
+          onClose={() => setFeedbackWorkout(null)}
+          onSkip={() => setFeedbackWorkout(null)}
+          onSave={() => setFeedbackWorkout(null)}
+        />
       )}
     </div>
   );
