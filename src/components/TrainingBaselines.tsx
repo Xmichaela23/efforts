@@ -69,6 +69,42 @@ const [ftpTestDate, setFtpTestDate] = useState(() => {
   d.setDate(d.getDate() + 2); // Default to 2 days out
   return d.toISOString().split('T')[0];
 });
+const [scheduledFtpTest, setScheduledFtpTest] = useState<{id: string, date: string} | null>(null);
+const [checkingFtpTest, setCheckingFtpTest] = useState(false);
+
+// Check for existing scheduled FTP test
+const checkScheduledFtpTest = async () => {
+  try {
+    setCheckingFtpTest(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('planned_workouts')
+      .select('id, date, name')
+      .eq('user_id', user.id)
+      .eq('workout_status', 'planned')
+      .ilike('name', '%FTP Test%')
+      .gte('date', new Date().toISOString().split('T')[0])
+      .order('date', { ascending: true })
+      .limit(1);
+    
+    if (data && data.length > 0) {
+      setScheduledFtpTest({ id: data[0].id, date: data[0].date });
+    } else {
+      setScheduledFtpTest(null);
+    }
+  } catch (error) {
+    console.error('Error checking FTP test:', error);
+  } finally {
+    setCheckingFtpTest(false);
+  }
+};
+
+// Check on mount
+useEffect(() => {
+  checkScheduledFtpTest();
+}, []);
 
 const scheduleFtpTest = async () => {
   try {
@@ -90,12 +126,35 @@ const scheduleFtpTest = async () => {
     });
     
     setShowFtpDatePicker(false);
+    await checkScheduledFtpTest(); // Refresh the state
     const displayDate = new Date(ftpTestDate + 'T12:00:00').toLocaleDateString();
     alert(`FTP Test scheduled for ${displayDate}. Rest up - no hard training before then!`);
   } catch (error) {
     console.error('Error scheduling FTP test:', error);
     alert('Error scheduling FTP test. Please try again.');
   }
+};
+
+const deleteFtpTest = async () => {
+  if (!scheduledFtpTest) return;
+  try {
+    await supabase
+      .from('planned_workouts')
+      .delete()
+      .eq('id', scheduledFtpTest.id);
+    
+    setScheduledFtpTest(null);
+  } catch (error) {
+    console.error('Error deleting FTP test:', error);
+    alert('Error deleting FTP test. Please try again.');
+  }
+};
+
+const rescheduleFtpTest = () => {
+  if (scheduledFtpTest) {
+    setFtpTestDate(scheduledFtpTest.date);
+  }
+  setShowFtpDatePicker(true);
 };
 
 const [data, setData] = useState<BaselineData>({
@@ -1357,7 +1416,26 @@ return (
                                     </div>
                                   </div>
                                   <div className="mt-2">
-                                    {!showFtpDatePicker ? (
+                                    {scheduledFtpTest && !showFtpDatePicker ? (
+                                      // Show scheduled test with options
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-xs text-emerald-400">
+                                          Scheduled: {new Date(scheduledFtpTest.date + 'T12:00:00').toLocaleDateString()}
+                                        </span>
+                                        <button
+                                          onClick={rescheduleFtpTest}
+                                          className="text-xs px-2 py-1 rounded bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+                                        >
+                                          Reschedule
+                                        </button>
+                                        <button
+                                          onClick={deleteFtpTest}
+                                          className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    ) : !showFtpDatePicker ? (
                                       <button 
                                         onClick={() => setShowFtpDatePicker(true)}
                                         className={`text-xs px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 transition-colors ${
@@ -1379,10 +1457,15 @@ return (
                                           className="text-xs px-2 py-1.5 rounded bg-white/10 border border-white/20 text-white"
                                         />
                                         <button
-                                          onClick={scheduleFtpTest}
+                                          onClick={async () => {
+                                            if (scheduledFtpTest) {
+                                              await deleteFtpTest();
+                                            }
+                                            await scheduleFtpTest();
+                                          }}
                                           className="text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
                                         >
-                                          Add
+                                          {scheduledFtpTest ? 'Update' : 'Add'}
                                         </button>
                                         <button
                                           onClick={() => setShowFtpDatePicker(false)}
