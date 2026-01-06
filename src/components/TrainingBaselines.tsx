@@ -62,18 +62,20 @@ const { saveUserBaselines, loadUserBaselines } = useAppContext();
 const navigate = useNavigate();
 const { addPlannedWorkout } = usePlannedWorkouts() as any;
 
-// FTP Test workout template
+// FTP Test workout template - let user pick date
+const [showFtpDatePicker, setShowFtpDatePicker] = useState(false);
+const [ftpTestDate, setFtpTestDate] = useState(() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 2); // Default to 2 days out
+  return d.toISOString().split('T')[0];
+});
+
 const scheduleFtpTest = async () => {
   try {
-    // Schedule for 2 days from now (to give time for rest)
-    const testDate = new Date();
-    testDate.setDate(testDate.getDate() + 2);
-    const dateStr = testDate.toISOString().split('T')[0];
-    
     await addPlannedWorkout({
       name: 'FTP Test - 20 Min Protocol',
       type: 'ride',
-      date: dateStr,
+      date: ftpTestDate,
       description: 'Standard 20-minute FTP test. PREPARATION: No hard training 48 hours prior. Indoor trainer recommended. WARMUP: 10min easy, 3x3min progressive build, 5min recovery. TEST: 20-min maximal sustainable effort. START CONSERVATIVELY, settle into rhythm, empty tank in final 2min. RESULT: Average power × 0.95 = your FTP.',
       duration: 60,
       steps_preset: [
@@ -87,7 +89,9 @@ const scheduleFtpTest = async () => {
       tags: ['ftp_test', 'baseline_establishment', 'key_workout']
     });
     
-    alert(`FTP Test scheduled for ${testDate.toLocaleDateString()}. Rest up - no hard training until then!`);
+    setShowFtpDatePicker(false);
+    const displayDate = new Date(ftpTestDate + 'T12:00:00').toLocaleDateString();
+    alert(`FTP Test scheduled for ${displayDate}. Rest up - no hard training before then!`);
   } catch (error) {
     console.error('Error scheduling FTP test:', error);
     alert('Error scheduling FTP test. Please try again.');
@@ -1353,15 +1357,41 @@ return (
                                     </div>
                                   </div>
                                   {learnedFitness.ride_ftp_estimated.confidence === 'low' && (
-                                    <div className="mt-1.5 text-[10px] text-yellow-400/80">
-                                      <button 
-                                        onClick={scheduleFtpTest}
-                                        className="underline hover:text-yellow-300 inline-flex items-center gap-1"
-                                      >
-                                        <Calendar className="h-3 w-3" />
-                                        Schedule FTP Test
-                                      </button>
-                                      {' '}for accurate power zones
+                                    <div className="mt-1.5">
+                                      {!showFtpDatePicker ? (
+                                        <div className="text-[10px] text-yellow-400/80">
+                                          <button 
+                                            onClick={() => setShowFtpDatePicker(true)}
+                                            className="underline hover:text-yellow-300 inline-flex items-center gap-1"
+                                          >
+                                            <Calendar className="h-3 w-3" />
+                                            Schedule FTP Test
+                                          </button>
+                                          {' '}for accurate power zones
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <input
+                                            type="date"
+                                            value={ftpTestDate}
+                                            onChange={(e) => setFtpTestDate(e.target.value)}
+                                            min={new Date().toISOString().split('T')[0]}
+                                            className="text-xs px-2 py-1 rounded bg-white/10 border border-white/20 text-white"
+                                          />
+                                          <button
+                                            onClick={scheduleFtpTest}
+                                            className="text-xs px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white"
+                                          >
+                                            Add
+                                          </button>
+                                          <button
+                                            onClick={() => setShowFtpDatePicker(false)}
+                                            className="text-xs px-2 py-1 text-white/50 hover:text-white"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
