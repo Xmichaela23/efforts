@@ -695,6 +695,19 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
     out.push({ id: uid(), kind:'cooldown', duration_s: sec, power_range: pctRange(0.40, 0.55) }); 
     return out; 
   }
+  // Recovery zone tokens: bike_recovery_5min_Z1
+  if (/bike_recovery_\d+min/.test(lower)) {
+    const sec = minutesTokenToSeconds(lower) ?? 300;
+    out.push({ id: uid(), kind:'recovery', duration_s: sec, power_range: pctRange(0.40, 0.55), label: 'Recovery' });
+    return out;
+  }
+  // FTP Test: bike_ftp_test_20min - maximal sustainable effort (no upper cap!)
+  if (/bike_ftp_test_\d+min/.test(lower)) {
+    const sec = minutesTokenToSeconds(lower) ?? 1200;
+    // No power_range - this is a maximal test, not a zone workout
+    out.push({ id: uid(), kind:'work', duration_s: sec, label: 'FTP Test - Maximal Effort', notes: 'All-out sustainable effort' });
+    return out;
+  }
   // SS: bike_ss_3x12min_R4min
   let m = lower.match(/bike_ss_(\d+)x(\d+)min_r(\d+)min/);
   if (m) { 
