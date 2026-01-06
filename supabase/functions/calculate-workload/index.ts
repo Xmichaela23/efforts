@@ -246,38 +246,64 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
  * Infer intensity from actual performance metrics (for freeform workouts)
  * Used when no steps_preset is available
  * 
- * NOTE: This is a heuristic - ideally would use user baselines (5K pace, FTP, etc.)
- * for more accurate intensity calculation relative to the user's capabilities
+ * Priority for running:
+ *   1. HR-based intensity (actual HR / threshold HR) - most accurate, personalized
+ *   2. Pace-based fallback (heuristic, not personalized)
+ * 
+ * Priority for cycling:
+ *   1. Power-based (avg power / FTP) - most accurate
+ *   2. HR-based (actual HR / threshold HR)
+ *   3. Default fallback
  */
 function inferIntensityFromPerformance(workout: WorkoutData): number {
-  // Running: Infer from pace
-  // avg_pace is typically stored as seconds per km or seconds per mile
-  // Need to check format - if > 100, likely seconds/km, if < 20, likely min/km
-  if (workout.type === 'run' && workout.avg_pace) {
-    let paceMinPerKm: number;
-    
-    // Handle different pace formats
-    if (workout.avg_pace > 100) {
-      // Likely seconds per km (e.g., 300 seconds = 5:00/km)
-      paceMinPerKm = workout.avg_pace / 60;
-    } else if (workout.avg_pace < 20) {
-      // Likely minutes per km (e.g., 5.0 = 5:00/km)
-      paceMinPerKm = workout.avg_pace;
-    } else {
-      // Unclear format, use as-is
-      paceMinPerKm = workout.avg_pace;
+  // =========================================================================
+  // RUNNING: Prefer HR-based intensity (personalized)
+  // =========================================================================
+  if (workout.type === 'run') {
+    // Priority 1: HR-based intensity (if threshold HR available)
+    if (workout.avg_heart_rate && workout.threshold_heart_rate) {
+      const thr = workout.threshold_heart_rate;
+      const hrPercent = workout.avg_heart_rate / thr;
+      
+      // Map HR zones to intensity factor
+      // Threshold HR = intensity 1.0
+      if (hrPercent >= 1.05) return 1.10;      // Above threshold (race/VO2 efforts)
+      if (hrPercent >= 0.95) return 1.00;      // Threshold zone (95-105% THR)
+      if (hrPercent >= 0.88) return 0.88;      // Tempo zone (88-95% THR)
+      if (hrPercent >= 0.80) return 0.80;      // Marathon/moderate (80-88% THR)
+      if (hrPercent >= 0.70) return 0.70;      // Easy zone (70-80% THR)
+      return 0.60;                              // Recovery (<70% THR)
     }
     
-    // Heuristic intensity mapping (relative to typical paces)
-    // Faster pace = higher intensity
-    if (paceMinPerKm < 4.0) return 1.00;      // Very fast (sub-4:00/km) - sprint/interval
-    if (paceMinPerKm < 4.5) return 0.95;     // Fast (4:00-4:30/km) - 5K pace
-    if (paceMinPerKm < 5.0) return 0.90;     // Moderate-fast (4:30-5:00/km) - 10K pace
-    if (paceMinPerKm < 5.5) return 0.85;     // Moderate (5:00-5:30/km) - tempo
-    if (paceMinPerKm < 6.0) return 0.80;     // Moderate-easy (5:30-6:00/km) - marathon pace
-    if (paceMinPerKm < 6.5) return 0.75;     // Easy (6:00-6:30/km) - easy pace
-    if (paceMinPerKm < 7.0) return 0.70;     // Very easy (6:30-7:00/km) - recovery
-    return 0.65;                              // Recovery pace (>7:00/km)
+    // Priority 2: Pace-based fallback (less accurate, not personalized)
+    if (workout.avg_pace) {
+      let paceMinPerKm: number;
+      
+      // Handle different pace formats
+      if (workout.avg_pace > 100) {
+        // Likely seconds per km (e.g., 300 seconds = 5:00/km)
+        paceMinPerKm = workout.avg_pace / 60;
+      } else if (workout.avg_pace < 20) {
+        // Likely minutes per km (e.g., 5.0 = 5:00/km)
+        paceMinPerKm = workout.avg_pace;
+      } else {
+        // Unclear format, use as-is
+        paceMinPerKm = workout.avg_pace;
+      }
+      
+      // Heuristic intensity mapping (relative to typical paces)
+      // These are population averages, not personalized
+      if (paceMinPerKm < 4.0) return 1.00;      // Very fast (sub-4:00/km) - sprint/interval
+      if (paceMinPerKm < 4.5) return 0.95;     // Fast (4:00-4:30/km) - 5K pace
+      if (paceMinPerKm < 5.0) return 0.90;     // Moderate-fast (4:30-5:00/km) - 10K pace
+      if (paceMinPerKm < 5.5) return 0.85;     // Moderate (5:00-5:30/km) - tempo
+      if (paceMinPerKm < 6.0) return 0.80;     // Moderate-easy (5:30-6:00/km) - marathon pace
+      if (paceMinPerKm < 6.5) return 0.75;     // Easy (6:00-6:30/km) - easy pace
+      if (paceMinPerKm < 7.0) return 0.70;     // Very easy (6:30-7:00/km) - recovery
+      return 0.65;                              // Recovery pace (>7:00/km)
+    }
+    
+    return 0; // No inference possible for run
   }
   
   // Cycling: Infer from power (if FTP available) or heart rate
@@ -627,28 +653,60 @@ serve(async (req) => {
       }
     }
     
-    // Fetch user's FTP and threshold HR from user_baselines
+    // Fetch user's FTP and threshold HR from user_baselines (including learned_fitness)
     let userFtp: number | null = null;
     let userThresholdHr: number | null = null;
+    let runThresholdHr: number | null = null;
+    let rideThresholdHr: number | null = null;
     if (userId) {
       try {
         const { data: baseline } = await supabaseClient
           .from('user_baselines')
-          .select('performance_numbers')
+          .select('performance_numbers, learned_fitness')
           .eq('user_id', userId)
           .maybeSingle();
         
+        // Priority 1: Use learned_fitness thresholds (more accurate, data-driven)
+        if (baseline?.learned_fitness) {
+          const learned = typeof baseline.learned_fitness === 'string' 
+            ? JSON.parse(baseline.learned_fitness) 
+            : baseline.learned_fitness;
+          
+          // Run threshold HR from learned data
+          if (learned?.run?.threshold_hr?.value) {
+            runThresholdHr = Number(learned.run.threshold_hr.value);
+            console.log('[calculate-workload] Run THR from learned:', runThresholdHr);
+          }
+          
+          // Ride threshold HR from learned data
+          if (learned?.ride?.threshold_hr?.value) {
+            rideThresholdHr = Number(learned.ride.threshold_hr.value);
+            console.log('[calculate-workload] Ride THR from learned:', rideThresholdHr);
+          }
+          
+          // FTP from learned data (if available)
+          if (learned?.ride?.ftp_estimated?.value) {
+            userFtp = Number(learned.ride.ftp_estimated.value);
+            console.log('[calculate-workload] FTP from learned:', userFtp);
+          }
+        }
+        
+        // Priority 2: Use manual performance_numbers (fallback)
         if (baseline?.performance_numbers) {
           const perfNumbers = typeof baseline.performance_numbers === 'string' 
             ? JSON.parse(baseline.performance_numbers) 
             : baseline.performance_numbers;
-          if (perfNumbers?.ftp) {
+          
+          // Only use manual FTP if we don't have learned FTP
+          if (!userFtp && perfNumbers?.ftp) {
             userFtp = Number(perfNumbers.ftp);
-            console.log('[calculate-workload] User FTP from baselines:', userFtp);
+            console.log('[calculate-workload] FTP from manual baselines:', userFtp);
           }
+          
+          // Manual threshold HR as fallback
           if (perfNumbers?.thresholdHeartRate || perfNumbers?.threshold_heart_rate) {
             userThresholdHr = Number(perfNumbers.thresholdHeartRate || perfNumbers.threshold_heart_rate);
-            console.log('[calculate-workload] User THR from baselines:', userThresholdHr);
+            console.log('[calculate-workload] THR from manual baselines:', userThresholdHr);
           }
         }
       } catch (e) {
@@ -691,13 +749,25 @@ serve(async (req) => {
     
     // Inject user's FTP and threshold HR into workout data if not already present
     // This allows power/HR-based intensity calculation for Strava/Garmin imports
+    // Use sport-specific learned thresholds when available
     if (userFtp && !finalWorkoutData.functional_threshold_power) {
       finalWorkoutData.functional_threshold_power = userFtp;
       console.log('[calculate-workload] Injected user FTP:', userFtp);
     }
-    if (userThresholdHr && !finalWorkoutData.threshold_heart_rate) {
-      finalWorkoutData.threshold_heart_rate = userThresholdHr;
-      console.log('[calculate-workload] Injected user THR:', userThresholdHr);
+    
+    // Inject sport-specific threshold HR
+    const workoutType = finalWorkoutData.type?.toLowerCase() || '';
+    if (!finalWorkoutData.threshold_heart_rate) {
+      if ((workoutType === 'run') && runThresholdHr) {
+        finalWorkoutData.threshold_heart_rate = runThresholdHr;
+        console.log('[calculate-workload] Injected run-specific THR:', runThresholdHr);
+      } else if ((workoutType === 'ride' || workoutType === 'bike') && rideThresholdHr) {
+        finalWorkoutData.threshold_heart_rate = rideThresholdHr;
+        console.log('[calculate-workload] Injected ride-specific THR:', rideThresholdHr);
+      } else if (userThresholdHr) {
+        finalWorkoutData.threshold_heart_rate = userThresholdHr;
+        console.log('[calculate-workload] Injected generic THR:', userThresholdHr);
+      }
     }
     
     // Parse workout_metadata if it's a string (JSONB from database)
@@ -777,6 +847,19 @@ serve(async (req) => {
       )
     }
 
+    // Determine which intensity method was used for debug info
+    let intensityMethod = 'default';
+    const wType = finalWorkoutData?.type?.toLowerCase() || '';
+    if ((wType === 'run') && finalWorkoutData?.avg_heart_rate && finalWorkoutData?.threshold_heart_rate) {
+      intensityMethod = 'hr_based';
+    } else if ((wType === 'ride' || wType === 'bike') && userFtp && finalWorkoutData?.avg_power) {
+      intensityMethod = 'power_based';
+    } else if ((wType === 'ride' || wType === 'bike') && finalWorkoutData?.avg_heart_rate && finalWorkoutData?.threshold_heart_rate) {
+      intensityMethod = 'hr_based';
+    } else if (finalWorkoutData?.steps_preset?.length > 0) {
+      intensityMethod = 'steps_preset';
+    }
+    
     return new Response(
       JSON.stringify({
         success: true,
@@ -786,10 +869,14 @@ serve(async (req) => {
         intensity_factor: intensity,
         planned_workload: plannedWorkload, // For comparison when attached
         workload_difference: plannedWorkload !== null ? workload - plannedWorkload : null,
-        // Debug info for power-based calculation
+        // Debug info for intensity calculation
         user_ftp: userFtp,
+        run_threshold_hr: runThresholdHr,
+        ride_threshold_hr: rideThresholdHr,
         avg_power: finalWorkoutData?.avg_power,
-        intensity_method: userFtp && finalWorkoutData?.avg_power ? 'power_based' : 'default'
+        avg_heart_rate: finalWorkoutData?.avg_heart_rate,
+        threshold_heart_rate: finalWorkoutData?.threshold_heart_rate,
+        intensity_method: intensityMethod
       }),
       { 
         status: 200, 
