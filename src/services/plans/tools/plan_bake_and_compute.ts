@@ -536,6 +536,16 @@ const PRESET_MAP: Record<string, Step[]> = {
     ]}
   ],
 
+  // --- FTP Test tokens ---
+  "bike_recovery_5min_Z1":   [{ kind: "steady", ctrl: "time", val: 5 * 60, intensity: "easy", label: "Recovery" }],
+  "bike_ftp_test_20min":     [{ kind: "steady", ctrl: "time", val: 20 * 60, intensity: "maximal", label: "FTP Test" }],
+  "bike_ss_2x3min_R3min": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "time", val: 3 * 60, intensity: "target", label: "SS" },
+      { kind: "recovery", ctrl: "time", val: 3 * 60, intensity: "easy", label: "Rest" }
+    ]}
+  ],
+
   // --- Generic endurance shorthand used in descriptions ---
   "END_120min": [{ kind: "steady", ctrl: "time", val: 120 * 60, intensity: "easy", label: "Z2" }],
   "END_150min": [{ kind: "steady", ctrl: "time", val: 150 * 60, intensity: "easy", label: "Z2" }],
