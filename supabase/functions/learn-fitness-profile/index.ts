@@ -543,7 +543,11 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
   console.log(`  📊 Ride max HR: ${observedMaxHR} from ${allMaxHRs.length} rides`);
 
   // ==========================================================================
-  // STEP 2: Find threshold HR using HR-based detection (85-92% of max)
+  // STEP 2: Find threshold HR using POWER + HR detection
+  // 
+  // For cycling, HR alone is unreliable (heat, fatigue, caffeine inflate HR on casual rides)
+  // True threshold = high power AND high HR simultaneously
+  // Filter: Only consider rides with power > 75th percentile as threshold candidates
   // ==========================================================================
   
   const sustainedEfforts = rides.filter(r => {
@@ -554,24 +558,52 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
 
   let threshold_hr: LearnedMetric | null = null;
 
+  // Get power distribution to filter for hard efforts
+  const allPowers = rides
+    .filter(r => r.avg_power && r.avg_power > 50)
+    .map(r => r.avg_power)
+    .sort((a, b) => a - b);
+  
+  // 75th percentile power = hard effort threshold
+  const p75Power = allPowers.length >= 4 
+    ? allPowers[Math.floor(allPowers.length * 0.75)] 
+    : null;
+  
+  console.log(`  📊 Ride power distribution: ${allPowers.length} rides, P75=${p75Power}W`);
+
   if (observedMaxHR && sustainedEfforts.length >= 2) {
     const thresholdLow = observedMaxHR * 0.85;
-    const thresholdHigh = observedMaxHR * 0.92;
+    const thresholdHigh = observedMaxHR * 0.95; // Widened to 95% for cycling (more variability)
     
-    const thresholdCandidates = sustainedEfforts.filter(r => 
-      r.avg_heart_rate >= thresholdLow && r.avg_heart_rate <= thresholdHigh
-    );
+    // Filter for HARD efforts: must have power data AND be above 75th percentile
+    // This excludes casual rides where HR is elevated but power is low
+    let thresholdCandidates = sustainedEfforts.filter(r => {
+      const inHRRange = r.avg_heart_rate >= thresholdLow && r.avg_heart_rate <= thresholdHigh;
+      
+      // If we have power data, require high power
+      if (p75Power && r.avg_power) {
+        return inHRRange && r.avg_power >= p75Power * 0.85; // Power must be at least 85% of P75
+      }
+      
+      // No power data available - fall back to HR only (less reliable)
+      return inHRRange;
+    });
+
+    console.log(`  📊 Threshold candidates (power-filtered): ${thresholdCandidates.length}`);
 
     if (thresholdCandidates.length >= 2) {
-      const sortedHRs = thresholdCandidates.map(r => r.avg_heart_rate).sort((a, b) => a - b);
-      const thresholdHRValue = sortedHRs[Math.floor(sortedHRs.length / 2)];
+      // Take the HIGHER end of the HR range (true threshold, not tempo)
+      const sortedHRs = thresholdCandidates.map(r => r.avg_heart_rate).sort((a, b) => b - a); // Descending
+      // Take 25th percentile from top (not median - we want hard efforts, not average)
+      const thresholdHRValue = sortedHRs[Math.floor(sortedHRs.length * 0.25)];
       
       threshold_hr = {
         value: Math.round(thresholdHRValue),
         confidence: thresholdCandidates.length >= 4 ? 'high' : 'medium',
-        source: `median of ${thresholdCandidates.length} threshold rides (85-92% max)`,
+        source: `from ${thresholdCandidates.length} hard rides (power-filtered, 85-95% max HR)`,
         sample_count: thresholdCandidates.length
       };
+      console.log(`  💓 Threshold HR: ${thresholdHRValue} bpm`);
     } else {
       // Fallback: 88% of max HR
       threshold_hr = {
