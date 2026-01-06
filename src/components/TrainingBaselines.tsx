@@ -1271,14 +1271,25 @@ return (
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               {learnedFitness.ride_threshold_hr && (
-                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                  <div>
-                                    <div className="text-xs text-white/50">Threshold HR</div>
-                                    <div className="text-sm font-medium text-white">{learnedFitness.ride_threshold_hr.value} bpm</div>
+                                <div className={`px-3 py-2 rounded-lg border ${
+                                  learnedFitness.ride_threshold_hr.confidence === 'low' 
+                                    ? 'bg-yellow-500/5 border-yellow-500/20' 
+                                    : 'bg-white/[0.04] border-white/10'
+                                }`}>
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="text-xs text-white/50">Threshold HR</div>
+                                      <div className="text-sm font-medium text-white">{learnedFitness.ride_threshold_hr.value} bpm</div>
+                                    </div>
+                                    <div className="text-xs text-white/40">
+                                      {getConfidenceDots(learnedFitness.ride_threshold_hr.confidence)}
+                                    </div>
                                   </div>
-                                  <div className="text-xs text-white/40">
-                                    {getConfidenceDots(learnedFitness.ride_threshold_hr.confidence)}
-                                  </div>
+                                  {learnedFitness.ride_threshold_hr.confidence === 'low' && (
+                                    <div className="mt-1.5 text-[10px] text-yellow-400/80">
+                                      Need more hard rides for accurate threshold
+                                    </div>
+                                  )}
                                 </div>
                               )}
                               {learnedFitness.ride_easy_hr && (
@@ -1293,12 +1304,25 @@ return (
                                 </div>
                               )}
                               {learnedFitness.ride_ftp_estimated && (
-                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                  <div>
-                                    <div className="text-xs text-white/50">FTP</div>
-                                    <div className="text-sm font-medium text-white">{learnedFitness.ride_ftp_estimated.value} W</div>
+                                <div className={`px-3 py-2 rounded-lg border ${
+                                  learnedFitness.ride_ftp_estimated.confidence === 'low' 
+                                    ? 'bg-yellow-500/5 border-yellow-500/20' 
+                                    : 'bg-white/[0.04] border-white/10'
+                                }`}>
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="text-xs text-white/50">FTP</div>
+                                      <div className="text-sm font-medium text-white">{learnedFitness.ride_ftp_estimated.value} W</div>
+                                    </div>
+                                    <div className="text-xs text-white/40">
+                                      {getConfidenceDots(learnedFitness.ride_ftp_estimated.confidence)}
+                                    </div>
                                   </div>
-                                  <div className="text-xs text-white/40">estimated</div>
+                                  {learnedFitness.ride_ftp_estimated.confidence === 'low' && (
+                                    <div className="mt-1.5 text-[10px] text-yellow-400/80">
+                                      Do a hard 20+ min ride for accurate FTP
+                                    </div>
+                                  )}
                                 </div>
                               )}
                               {learnedFitness.ride_max_hr_observed && (
