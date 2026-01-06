@@ -2470,6 +2470,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   // Interpret logger mode (mobility uses strength template but should not auto‑load planned strength)
   const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+  const isMobilityMode = loggerMode === 'mobility';
+
+  // Theme colors based on discipline
+  // Strength: orange-500 (#f97316 = rgb 249,115,22)
+  // Mobility: purple-500 (#a855f7 = rgb 168,85,247)
+  const themeColors = isMobilityMode
+    ? { border: 'border-purple-500/30', text: 'text-purple-400', rgb: '168,85,247' }
+    : { border: 'border-orange-500/30', text: 'text-orange-400', rgb: '249,115,22' };
 
   // Don't render until properly initialized
   if (!isInitialized) {
@@ -2726,9 +2734,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         {exercises.map((exercise, exerciseIndex) => (
           <div 
             key={exercise.id} 
-            className="backdrop-blur-xl border-2 border-amber-500/30 rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(245,158,11,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+            className={`backdrop-blur-xl border-2 ${themeColors.border} rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(${themeColors.rgb},0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]`}
             style={{
-              background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 50%, rgba(255,255,255,0.03) 100%)'
+              background: `linear-gradient(135deg, rgba(${themeColors.rgb},0.15) 0%, rgba(${themeColors.rgb},0.05) 50%, rgba(255,255,255,0.03) 100%)`
             }}
           >
             {/* Core Work exercises use the CoreTimer component */}
@@ -3030,7 +3038,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                                 placeholder="lbs"
                               />
-                              <span className="text-[10px] text-amber-400/90 font-medium whitespace-nowrap">/hand</span>
+                              <span className={`text-[10px] ${themeColors.text}/90 font-medium whitespace-nowrap`}>/hand</span>
                             </div>
                           );
                         }
