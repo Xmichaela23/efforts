@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Download, Link, Package, Settings } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Download, Link, Package, Settings, RefreshCw } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { SPORT_COLORS } from '@/lib/context-utils';
+import { supabase } from '@/lib/supabase';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -80,6 +81,10 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'baselines' | 'data-import'>('baselines');
   const [activeSport, setActiveSport] = useState<string | null>(null);
   const [originalData, setOriginalData] = useState<string>(''); // JSON string for comparison
+
+  // Learned fitness profile state
+  const [learnedFitness, setLearnedFitness] = useState<any>(null);
+  const [learningProfile, setLearningProfile] = useState(false);
 
   // Check if data has changed from original
   const hasChanges = JSON.stringify(data) !== originalData;
@@ -180,6 +185,10 @@ const loadBaselines = async () => {
       setData(baselines as BaselineData);
       setOriginalData(JSON.stringify(baselines)); // Store original for comparison
       setLastUpdated(baselines.lastUpdated || null);
+      // Load learned fitness if available
+      if ((baselines as any).learned_fitness) {
+        setLearnedFitness((baselines as any).learned_fitness);
+      }
     } else {
       // No saved data yet - set original to current defaults
       setOriginalData(JSON.stringify(data));
@@ -188,6 +197,53 @@ const loadBaselines = async () => {
   } catch (error) {
     console.error('Error loading baselines:', error);
     setLoading(false);
+  }
+};
+
+// Fetch learned fitness profile from edge function
+const refreshLearnedProfile = async () => {
+  try {
+    setLearningProfile(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('User not authenticated');
+      return;
+    }
+
+    const { data: result, error } = await supabase.functions.invoke('learn-fitness-profile', {
+      body: { user_id: user.id }
+    });
+
+    if (error) {
+      console.error('Error learning profile:', error);
+      return;
+    }
+
+    setLearnedFitness(result);
+    console.log('Learned fitness profile:', result);
+  } catch (error) {
+    console.error('Error refreshing learned profile:', error);
+  } finally {
+    setLearningProfile(false);
+  }
+};
+
+// Format pace from seconds per km to mm:ss/mi
+const formatPace = (secPerKm: number | undefined): string => {
+  if (!secPerKm) return '--';
+  const secPerMile = secPerKm * 1.60934;
+  const mins = Math.floor(secPerMile / 60);
+  const secs = Math.round(secPerMile % 60);
+  return `${mins}:${String(secs).padStart(2, '0')}/mi`;
+};
+
+// Get confidence dots
+const getConfidenceDots = (confidence: string | undefined): string => {
+  switch (confidence) {
+    case 'high': return '●●●';
+    case 'medium': return '●●○';
+    case 'low': return '●○○';
+    default: return '○○○';
   }
 };
 
@@ -1033,6 +1089,161 @@ return (
                                   )}
                                     </div>
                                   )}
+
+                  {/* Heart Rate Zones - Auto-learned */}
+                  <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] mt-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h2 className="text-sm font-semibold text-white/90 tracking-wide">Heart Rate Zones</h2>
+                        <p className="text-xs text-white/50 mt-0.5">Auto-learned from your training</p>
+                      </div>
+                      <button
+                        onClick={refreshLearnedProfile}
+                        disabled={learningProfile}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full bg-white/[0.08] border border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white transition-all disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${learningProfile ? 'animate-spin' : ''}`} />
+                        {learningProfile ? 'Learning...' : 'Refresh'}
+                      </button>
+                    </div>
+
+                    {!learnedFitness || learnedFitness.learning_status === 'insufficient_data' ? (
+                      <div className="text-center py-6">
+                        <p className="text-sm text-white/60 mb-2">Not enough data yet</p>
+                        <p className="text-xs text-white/40">
+                          Keep training with heart rate and we'll learn your zones automatically.
+                        </p>
+                        <button
+                          onClick={refreshLearnedProfile}
+                          disabled={learningProfile}
+                          className="mt-4 px-4 py-2 text-xs rounded-full bg-white/[0.08] border border-white/20 text-white/70 hover:bg-white/[0.12] transition-all disabled:opacity-50"
+                        >
+                          {learningProfile ? 'Analyzing...' : 'Analyze My Workouts'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Running HR Zones */}
+                        {(learnedFitness.run_threshold_hr || learnedFitness.run_easy_hr) && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />
+                              <span className="text-xs font-medium text-white/80">Running</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              {learnedFitness.run_threshold_hr && (
+                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                  <div>
+                                    <div className="text-xs text-white/50">Threshold HR</div>
+                                    <div className="text-sm font-medium text-white">{learnedFitness.run_threshold_hr.value} bpm</div>
+                                  </div>
+                                  <div className="text-xs text-white/40" title={`${learnedFitness.run_threshold_hr.sample_count} samples`}>
+                                    {getConfidenceDots(learnedFitness.run_threshold_hr.confidence)}
+                                  </div>
+                                </div>
+                              )}
+                              {learnedFitness.run_easy_hr && (
+                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                  <div>
+                                    <div className="text-xs text-white/50">Easy HR</div>
+                                    <div className="text-sm font-medium text-white">{learnedFitness.run_easy_hr.value} bpm</div>
+                                  </div>
+                                  <div className="text-xs text-white/40" title={`${learnedFitness.run_easy_hr.sample_count} samples`}>
+                                    {getConfidenceDots(learnedFitness.run_easy_hr.confidence)}
+                                  </div>
+                                </div>
+                              )}
+                              {learnedFitness.run_threshold_pace_sec_per_km && (
+                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                  <div>
+                                    <div className="text-xs text-white/50">Threshold Pace</div>
+                                    <div className="text-sm font-medium text-white">{formatPace(learnedFitness.run_threshold_pace_sec_per_km.value)}</div>
+                                  </div>
+                                  <div className="text-xs text-white/40">
+                                    {getConfidenceDots(learnedFitness.run_threshold_pace_sec_per_km.confidence)}
+                                  </div>
+                                </div>
+                              )}
+                              {learnedFitness.run_max_hr_observed && (
+                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                  <div>
+                                    <div className="text-xs text-white/50">Max HR</div>
+                                    <div className="text-sm font-medium text-white">{learnedFitness.run_max_hr_observed.value} bpm</div>
+                                  </div>
+                                  <div className="text-xs text-white/40">observed</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Cycling HR Zones */}
+                        {(learnedFitness.ride_threshold_hr || learnedFitness.ride_easy_hr || learnedFitness.ride_ftp_estimated) && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Bike className="h-4 w-4" style={{ color: SPORT_COLORS.cycling }} />
+                              <span className="text-xs font-medium text-white/80">Cycling</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              {learnedFitness.ride_threshold_hr && (
+                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                  <div>
+                                    <div className="text-xs text-white/50">Threshold HR</div>
+                                    <div className="text-sm font-medium text-white">{learnedFitness.ride_threshold_hr.value} bpm</div>
+                                  </div>
+                                  <div className="text-xs text-white/40">
+                                    {getConfidenceDots(learnedFitness.ride_threshold_hr.confidence)}
+                                  </div>
+                                </div>
+                              )}
+                              {learnedFitness.ride_easy_hr && (
+                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                  <div>
+                                    <div className="text-xs text-white/50">Easy HR</div>
+                                    <div className="text-sm font-medium text-white">{learnedFitness.ride_easy_hr.value} bpm</div>
+                                  </div>
+                                  <div className="text-xs text-white/40">
+                                    {getConfidenceDots(learnedFitness.ride_easy_hr.confidence)}
+                                  </div>
+                                </div>
+                              )}
+                              {learnedFitness.ride_ftp_estimated && (
+                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                  <div>
+                                    <div className="text-xs text-white/50">FTP</div>
+                                    <div className="text-sm font-medium text-white">{learnedFitness.ride_ftp_estimated.value} W</div>
+                                  </div>
+                                  <div className="text-xs text-white/40">estimated</div>
+                                </div>
+                              )}
+                              {learnedFitness.ride_max_hr_observed && (
+                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                  <div>
+                                    <div className="text-xs text-white/50">Max HR</div>
+                                    <div className="text-sm font-medium text-white">{learnedFitness.ride_max_hr_observed.value} bpm</div>
+                                  </div>
+                                  <div className="text-xs text-white/40">observed</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Status footer */}
+                        <div className="pt-3 border-t border-white/10 flex items-center justify-between">
+                          <div className="text-xs text-white/40">
+                            {learnedFitness.learning_status === 'confident' ? 'Profile confident' : 'Still learning'} 
+                            {' • '}{learnedFitness.workouts_analyzed} workouts analyzed
+                          </div>
+                          {learnedFitness.last_updated && (
+                            <div className="text-xs text-white/30">
+                              {new Date(learnedFitness.last_updated).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 /* Data Import Tab */
