@@ -50,8 +50,10 @@ interface WorkoutRecord {
   max_heart_rate: number;
   avg_pace: number;  // seconds per km
   avg_power: number;
+  normalized_power: number;
   avg_speed: number; // km/h
   workout_status: string;
+  computed: any; // May contain analysis.bests.power_20min
 }
 
 interface LearnedMetric {
@@ -130,7 +132,7 @@ Deno.serve(async (req) => {
 
     const { data: workouts, error: workoutsError } = await supabase
       .from('workouts')
-      .select('id, type, date, duration, moving_time, distance, avg_heart_rate, max_heart_rate, avg_pace, avg_power, avg_speed, workout_status')
+      .select('id, type, date, duration, moving_time, distance, avg_heart_rate, max_heart_rate, avg_pace, avg_power, normalized_power, avg_speed, workout_status, computed')
       .eq('user_id', user_id)
       .eq('workout_status', 'completed')
       .in('type', ['run', 'ride'])
@@ -617,32 +619,94 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
 
   // ==========================================================================
   // STEP 4: Estimate FTP from power data
+  // 
+  // FTP estimation hierarchy:
+  // 1. Pre-calculated 20-min best power × 0.95 (most accurate)
+  // 2. Best Normalized Power from 20-60 min efforts × 0.95
+  // 3. Best avg power × 1.05 × 0.95 (adjusted for NP/avg gap)
   // ==========================================================================
   
-  const ridesWithPower = rides.filter(r => r.avg_power && r.avg_power > 50);
+  const ridesWithPower = rides.filter(r => 
+    (r.avg_power && r.avg_power > 50) || 
+    (r.normalized_power && r.normalized_power > 50)
+  );
   let ftp_estimated: LearnedMetric | null = null;
 
   if (ridesWithPower.length >= 3) {
-    // Look for sustained efforts (20-60 min) with power
-    const sustainedPowerEfforts = ridesWithPower
-      .filter(r => {
-        const duration = r.moving_time || r.duration || 0;
-        return duration >= 20 && duration <= 90;
-      })
-      .map(r => r.avg_power)
-      .sort((a, b) => b - a); // Highest first
+    const sustainedPowerRides = ridesWithPower.filter(r => {
+      const duration = r.moving_time || r.duration || 0;
+      return duration >= 20 && duration <= 90;
+    });
 
-    if (sustainedPowerEfforts.length >= 2) {
-      // Take 95% of best sustained power as FTP estimate
-      const bestPower = sustainedPowerEfforts[0];
-      const estimatedFTP = Math.round(bestPower * 0.95);
+    // Priority 1: Look for pre-calculated 20-min best power
+    const bestsPower20: number[] = [];
+    for (const r of sustainedPowerRides) {
+      const p20 = r.computed?.analysis?.bests?.power_20min 
+        || r.computed?.analysis?.power?.best_20min
+        || r.computed?.bests?.power_20min;
+      if (p20 && p20 > 50) {
+        bestsPower20.push(p20);
+      }
+    }
 
+    if (bestsPower20.length >= 2) {
+      const best20MinPower = Math.max(...bestsPower20);
+      const estimatedFTP = Math.round(best20MinPower * 0.95);
+      
       ftp_estimated = {
         value: estimatedFTP,
-        confidence: sustainedPowerEfforts.length >= 5 ? 'high' : 'medium',
-        source: '95% of best sustained power',
-        sample_count: sustainedPowerEfforts.length
+        confidence: bestsPower20.length >= 3 ? 'high' : 'medium',
+        source: `95% of 20-min best power (${bestsPower20.length} efforts)`,
+        sample_count: bestsPower20.length
       };
+      console.log(`  ⚡ FTP from 20-min bests: ${estimatedFTP}W (from ${best20MinPower}W)`);
+    }
+
+    // Priority 2: Use Normalized Power (better than avg power)
+    if (!ftp_estimated) {
+      const normalizedPowers = sustainedPowerRides
+        .filter(r => r.normalized_power && r.normalized_power > 50)
+        .map(r => r.normalized_power)
+        .sort((a, b) => b - a);
+
+      if (normalizedPowers.length >= 2) {
+        // NP from a ~60 min hard ride is approximately equal to FTP
+        // For shorter efforts (20-40 min), use 95% of best NP
+        const bestNP = normalizedPowers[0];
+        const estimatedFTP = Math.round(bestNP * 0.95);
+        
+        ftp_estimated = {
+          value: estimatedFTP,
+          confidence: normalizedPowers.length >= 4 ? 'high' : 'medium',
+          source: `95% of best normalized power (${normalizedPowers.length} efforts)`,
+          sample_count: normalizedPowers.length
+        };
+        console.log(`  ⚡ FTP from NP: ${estimatedFTP}W (from ${bestNP}W NP)`);
+      }
+    }
+
+    // Priority 3: Use avg power with adjustment factor
+    // NP is typically 1.02-1.10× avg power (higher for variable efforts)
+    // Using 1.05× as middle ground
+    if (!ftp_estimated) {
+      const avgPowers = sustainedPowerRides
+        .filter(r => r.avg_power && r.avg_power > 50)
+        .map(r => r.avg_power)
+        .sort((a, b) => b - a);
+
+      if (avgPowers.length >= 2) {
+        const bestAvgPower = avgPowers[0];
+        // Adjust avg power to approximate NP, then take 95%
+        const estimatedFTP = Math.round(bestAvgPower * 1.05 * 0.95);
+        
+        ftp_estimated = {
+          value: estimatedFTP,
+          confidence: avgPowers.length >= 5 ? 'medium' : 'low',
+          source: `estimated from avg power (${avgPowers.length} efforts)`,
+          sample_count: avgPowers.length
+        };
+        console.log(`  ⚡ FTP from avg power: ${estimatedFTP}W (from ${bestAvgPower}W avg)`);
+      }
     }
   }
 
