@@ -1191,6 +1191,15 @@ Deno.serve(async (req) => {
         
         const intervalAdherences: number[] = [];
         
+        // Check if this is an easy/recovery workout (overrides interval role)
+        const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
+        const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
+        const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
+        const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+        const isEasyOrLongRunWorkout = easyKeywords.some(kw => 
+          workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
+        );
+        
         for (const interval of workIntervalsForAdherence) {
           // Get the interval's actual average pace
           const actualPace = interval.executed?.avg_pace_s_per_mi || interval.executed?.pace_s_per_mi || 0;
@@ -1201,8 +1210,9 @@ Deno.serve(async (req) => {
           const targetUpper = paceRange?.upper || 0;
           
           if (actualPace > 0 && targetLower > 0 && targetUpper > 0) {
-            // Use asymmetric scoring: work intervals get lenient "faster" penalties
-            const intervalRole = getIntervalType(interval.role || interval.kind || 'work');
+            // Use asymmetric scoring - but check WORKOUT type first (overrides interval role)
+            // An easy run's "work" step should still be scored as easy
+            const intervalRole = isEasyOrLongRunWorkout ? 'easy' : getIntervalType(interval.role || interval.kind || 'work');
             const adherence = calculatePaceRangeAdherence(actualPace, targetLower, targetUpper, intervalRole);
             intervalAdherences.push(adherence);
             console.log(`   - Work interval ${interval.planned_step_id || 'unknown'} (${intervalRole}): ${(actualPace/60).toFixed(2)} min/mi vs ${(targetLower/60).toFixed(2)}-${(targetUpper/60).toFixed(2)} = ${adherence.toFixed(0)}%`);
@@ -2914,9 +2924,18 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
   let totalSampleScore = 0;
   const paceValues = validSamples.map(s => s.pace_s_per_mi);
   
-  // Determine interval type for asymmetric scoring
+  // Determine interval type - check WORKOUT type first (overrides interval role)
+  // An easy run's "work" step should still be scored as easy
+  const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
+  const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || '').toLowerCase();
+  const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || '').toLowerCase();
+  const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2'];
+  const isEasyOrLongRunWorkout = easyKeywords.some(kw => 
+    workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
+  );
+  
   const intervalRole = String(interval.role || interval.kind || 'work').toLowerCase();
-  const intervalType = getIntervalType(intervalRole);
+  const intervalType = isEasyOrLongRunWorkout ? 'easy' : getIntervalType(intervalRole);
   
   // Debug: Check pace distribution
   const avgPace = paceValues.reduce((sum, p) => sum + p, 0) / paceValues.length;
