@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
@@ -1234,9 +1235,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </DrawerContent>
       </Drawer>
       
-      {/* Workout Execution Modal */}
-      {executingWorkout && (
-        <div className="fixed inset-0 z-50">
+      {/* Workout Execution Modal - Rendered via Portal to avoid z-index conflicts */}
+      {executingWorkout && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black">
           <WorkoutExecutionContainer
             plannedWorkoutId={executingWorkout.id}
             plannedWorkoutStructure={executingWorkout.computed || { steps: [], total_duration_seconds: 0 }}
@@ -1249,7 +1250,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               window.dispatchEvent(new CustomEvent('workouts:invalidate'));
             }}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
