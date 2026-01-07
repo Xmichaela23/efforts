@@ -788,32 +788,32 @@ serve(async (req) => {
             : baseline.learned_fitness;
           
           // Run threshold HR from learned data
-          if (learned?.run?.threshold_hr?.value) {
-            runThresholdHr = Number(learned.run.threshold_hr.value);
+          if (learned?.run_threshold_hr?.value) {
+            runThresholdHr = Number(learned.run_threshold_hr.value);
             console.log('[calculate-workload] Run THR from learned:', runThresholdHr);
           }
           
           // Run max HR from learned data (for TRIMP)
-          if (learned?.run?.max_hr?.value) {
-            runMaxHr = Number(learned.run.max_hr.value);
+          if (learned?.run_max_hr_observed?.value) {
+            runMaxHr = Number(learned.run_max_hr_observed.value);
             console.log('[calculate-workload] Run MaxHR from learned:', runMaxHr);
           }
           
           // Ride threshold HR from learned data
-          if (learned?.ride?.threshold_hr?.value) {
-            rideThresholdHr = Number(learned.ride.threshold_hr.value);
+          if (learned?.ride_threshold_hr?.value) {
+            rideThresholdHr = Number(learned.ride_threshold_hr.value);
             console.log('[calculate-workload] Ride THR from learned:', rideThresholdHr);
           }
           
           // Ride max HR from learned data (for TRIMP)
-          if (learned?.ride?.max_hr?.value) {
-            rideMaxHr = Number(learned.ride.max_hr.value);
+          if (learned?.ride_max_hr_observed?.value) {
+            rideMaxHr = Number(learned.ride_max_hr_observed.value);
             console.log('[calculate-workload] Ride MaxHR from learned:', rideMaxHr);
           }
           
           // FTP from learned data (if available)
-          if (learned?.ride?.ftp_estimated?.value) {
-            userFtp = Number(learned.ride.ftp_estimated.value);
+          if (learned?.ride_ftp_estimated?.value) {
+            userFtp = Number(learned.ride_ftp_estimated.value);
             console.log('[calculate-workload] FTP from learned:', userFtp);
           }
         }
