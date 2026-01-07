@@ -26,8 +26,7 @@ import {
   Target,
   AlertTriangle,
   Info,
-  CheckCircle2,
-  Target
+  CheckCircle2
 } from 'lucide-react';
 import { useOverallContext } from '@/hooks/useOverallContext';
 
