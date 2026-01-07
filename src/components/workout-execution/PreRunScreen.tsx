@@ -285,19 +285,17 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
               <>
                 Says "Hard", "Rest", "Cooldown" at changes.
                 <br />
-                Music ducks briefly for announcements.
+                <span className="text-amber-400/80">Note: Music will briefly pause.</span>
               </>
             ) : vibrationEnabled ? (
               <>
-                Vibrates at interval changes. No voice.
+                Vibrates at interval changes.
                 <br />
-                Music plays uninterrupted.
+                <span className="text-green-400/80">Music plays uninterrupted.</span>
               </>
             ) : (
               <>
-                No audio or vibration feedback.
-                <br />
-                Watch screen for interval changes.
+                No feedback. Watch screen for changes.
               </>
             )}
           </div>
