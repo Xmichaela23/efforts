@@ -127,6 +127,17 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
   const lastPositionRef = useRef<GPSSample | null>(null);
   const totalDistanceRef = useRef<number>(0);
   const recentPacesRef = useRef<number[]>([]);
+  
+  // Use refs for callbacks to avoid re-starting GPS on every render
+  const onUpdateRef = useRef(onUpdate);
+  const onStatusChangeRef = useRef(onStatusChange);
+  const onErrorRef = useRef(onError);
+  
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+    onStatusChangeRef.current = onStatusChange;
+    onErrorRef.current = onError;
+  }, [onUpdate, onStatusChange, onError]);
 
   // -------------------------------------------------------------------------
   // Check if geolocation is available
@@ -142,8 +153,8 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
     if (!isAvailable) {
       const errorMsg = 'Geolocation is not available on this device';
       setState((s) => ({ ...s, status: 'error', error: errorMsg }));
-      onError?.(errorMsg);
-      onStatusChange?.('error');
+      onErrorRef.current?.(errorMsg);
+      onStatusChangeRef.current?.('error');
       return;
     }
 
@@ -160,7 +171,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
       smoothedPace: null,
       error: null,
     }));
-    onStatusChange?.('acquiring');
+    onStatusChangeRef.current?.('acquiring');
 
     // Start watching position
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -179,14 +190,14 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
         // Update status on first fix
         setState((s) => {
           if (s.status === 'acquiring') {
-            onStatusChange?.('locked', accuracy);
+            onStatusChangeRef.current?.('locked', accuracy);
             return { ...s, status: 'locked', accuracy };
           }
           return { ...s, accuracy };
         });
 
-        // Filter out low-accuracy readings
-        if (accuracy && accuracy > 20) {
+        // Filter out low-accuracy readings (allow up to 50m for mobile)
+        if (accuracy && accuracy > 50) {
           // Skip this sample, accuracy too poor
           return;
         }
@@ -238,7 +249,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
         }));
 
         // Callback
-        onUpdate?.(sample, totalDistanceRef.current, smoothedPace);
+        onUpdateRef.current?.(sample, totalDistanceRef.current, smoothedPace);
       },
       (error) => {
         let errorMsg: string;
@@ -257,16 +268,16 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
         }
 
         setState((s) => ({ ...s, status: 'error', error: errorMsg }));
-        onError?.(errorMsg);
-        onStatusChange?.('error');
+        onErrorRef.current?.(errorMsg);
+        onStatusChangeRef.current?.('error');
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 15000,
         maximumAge: 0,
       }
     );
-  }, [isAvailable, onUpdate, onStatusChange, onError]);
+  }, [isAvailable]);
 
   // -------------------------------------------------------------------------
   // Stop tracking
