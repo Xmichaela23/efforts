@@ -357,52 +357,13 @@ function inferIntensityFromPerformance(workout: WorkoutData): number {
       return 0.60;                              // Recovery (<70% THR)
     }
     
-    // Priority 1.5: Estimate intensity from max HR (if threshold not available)
-    // Assumes threshold HR is ~88% of max HR
-    if (workout.avg_heart_rate && workout.max_heart_rate && workout.max_heart_rate > 0) {
-      const estimatedThr = workout.max_heart_rate * 0.88;
-      const hrPercent = workout.avg_heart_rate / estimatedThr;
-      
-      console.log(`[Intensity] Run: using max HR fallback - avg ${workout.avg_heart_rate}, max ${workout.max_heart_rate}, est THR ${estimatedThr.toFixed(0)}, %THR ${(hrPercent * 100).toFixed(0)}%`);
-      
-      if (hrPercent >= 1.05) return 1.10;
-      if (hrPercent >= 0.95) return 1.00;
-      if (hrPercent >= 0.88) return 0.88;
-      if (hrPercent >= 0.80) return 0.80;
-      if (hrPercent >= 0.70) return 0.70;
-      return 0.60;
-    }
-    
-    // Priority 2: Pace-based fallback (less accurate, not personalized)
-    if (workout.avg_pace) {
-      let paceMinPerKm: number;
-      
-      // Handle different pace formats
-      if (workout.avg_pace > 100) {
-        // Likely seconds per km (e.g., 300 seconds = 5:00/km)
-        paceMinPerKm = workout.avg_pace / 60;
-      } else if (workout.avg_pace < 20) {
-        // Likely minutes per km (e.g., 5.0 = 5:00/km)
-        paceMinPerKm = workout.avg_pace;
-      } else {
-        // Unclear format, use as-is
-        paceMinPerKm = workout.avg_pace;
-      }
-      
-      // Heuristic intensity mapping (relative to typical paces)
-      // These are population averages, not personalized
-      if (paceMinPerKm < 4.0) return 1.00;      // Very fast (sub-4:00/km) - sprint/interval
-      if (paceMinPerKm < 4.5) return 0.95;     // Fast (4:00-4:30/km) - 5K pace
-      if (paceMinPerKm < 5.0) return 0.90;     // Moderate-fast (4:30-5:00/km) - 10K pace
-      if (paceMinPerKm < 5.5) return 0.85;     // Moderate (5:00-5:30/km) - tempo
-      if (paceMinPerKm < 6.0) return 0.80;     // Moderate-easy (5:30-6:00/km) - marathon pace
-      if (paceMinPerKm < 6.5) return 0.75;     // Easy (6:00-6:30/km) - easy pace
-      if (paceMinPerKm < 7.0) return 0.70;     // Very easy (6:30-7:00/km) - recovery
-      return 0.65;                              // Recovery pace (>7:00/km)
-    }
-    
-    return 0; // No inference possible for run
+    // No threshold HR available - return 0 (will show as N/A)
+    // We don't estimate from max HR - real data only
+    console.log(`[Intensity] Run: no threshold HR available, returning 0`);
+    return 0;
   }
+  
+  // NOTE: Pace-based fallback removed - real HR data only
   
   // Cycling: Infer from power (if FTP available) or heart rate
   if ((workout.type === 'ride' || workout.type === 'bike') && workout.avg_power && workout.functional_threshold_power) {
@@ -431,18 +392,10 @@ function inferIntensityFromPerformance(workout: WorkoutData): number {
     return 0.60;                              // Z1 (<75% THR)
   }
   
-  // Cycling: Fallback to max HR estimation (if no threshold HR)
-  if ((workout.type === 'ride' || workout.type === 'bike') && workout.avg_heart_rate && workout.max_heart_rate && workout.max_heart_rate > 0) {
-    const estimatedThr = workout.max_heart_rate * 0.90; // Cycling threshold ~90% of max
-    const hrPercent = workout.avg_heart_rate / estimatedThr;
-    
-    console.log(`[Intensity] Ride: using max HR fallback - avg ${workout.avg_heart_rate}, max ${workout.max_heart_rate}, est THR ${estimatedThr.toFixed(0)}, %THR ${(hrPercent * 100).toFixed(0)}%`);
-    
-    if (hrPercent >= 0.95) return 1.00;
-    if (hrPercent >= 0.90) return 0.90;
-    if (hrPercent >= 0.85) return 0.80;
-    if (hrPercent >= 0.75) return 0.70;
-    return 0.60;
+  // Cycling: No fallback - require real FTP or threshold HR
+  if (workout.type === 'ride' || workout.type === 'bike') {
+    console.log(`[Intensity] Ride: no FTP or threshold HR available, returning 0`);
+    return 0;
   }
   
   // Swimming: Infer from pace (similar to running)
