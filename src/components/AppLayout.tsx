@@ -1394,8 +1394,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       </main>
 
       {/* Bottom Navigation Tab Bar - Show on all screens (except some loggers and builder) */}
+      {/* Extra 18px padding-bottom creates safe zone for iOS swipe-up gesture */}
       {!(showPilatesYogaLogger || showBuilder || workoutBeingEdited) && (
-        <div className="mobile-tabbar px-4 flex items-center">
+        <div className="mobile-tabbar px-4 flex items-center" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 18px)' }}>
           <div className="w-full">
             <div className="flex justify-center items-center gap-2">
                 <Button
@@ -1413,14 +1414,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   }`}
                   style={{
                     fontFamily: 'Inter, sans-serif',
-                    padding: '12px 16px',
+                    padding: '10px 14px',
                     borderRadius: '1rem',
-                    fontSize: '15px',
-                    minHeight: '48px',
+                    fontSize: '14px',
+                    minHeight: '42px',
                     boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
                   }}
                 >
-                  <Home className="h-5 w-5" />
+                  <Home className="h-4 w-4" />
                 </Button>
                 <Button
                   onClick={() => {
@@ -1438,10 +1439,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   }`}
                   style={{
                     fontFamily: 'Inter, sans-serif',
-                    padding: '12px 16px',
+                    padding: '10px 14px',
                     borderRadius: '1rem',
-                    fontSize: '15px',
-                    minHeight: '48px',
+                    fontSize: '14px',
+                    minHeight: '42px',
                     boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
                   }}
                 >
@@ -1469,10 +1470,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         }`}
                 style={{
                   fontFamily: 'Inter, sans-serif',
-                          padding: '12px 16px',
+                          padding: '10px 14px',
                           borderRadius: '1rem',
-                  fontSize: '15px',
-                  minHeight: '48px',
+                  fontSize: '14px',
+                  minHeight: '42px',
                           boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
                 }}
               >

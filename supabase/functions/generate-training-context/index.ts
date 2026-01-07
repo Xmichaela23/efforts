@@ -723,15 +723,17 @@ function generateInsights(
     });
   }
 
-  // 4. Sport Imbalance (INFO priority)
-  const imbalance = detectSportImbalance(sportBreakdown);
-  if (imbalance) {
-    insights.push({
-      type: 'sport_imbalance',
-      severity: 'info',
-      message: `${imbalance.sport} volume at ${imbalance.percent}% - ensure adequate cross-training`,
-      data: imbalance
-    });
+  // 4. Sport Imbalance (INFO priority) - Skip when on a plan (plan dictates sport mix)
+  if (!hasActivePlan) {
+    const imbalance = detectSportImbalance(sportBreakdown);
+    if (imbalance) {
+      insights.push({
+        type: 'sport_imbalance',
+        severity: 'info',
+        message: `${imbalance.sport} volume at ${imbalance.percent}% - ensure adequate cross-training`,
+        data: imbalance
+      });
+    }
   }
 
   // Sort by severity and limit to 3

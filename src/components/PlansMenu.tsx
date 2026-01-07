@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -25,6 +25,9 @@ interface PlansMenuProps {
   trigger: React.ReactNode;
 }
 
+// Movement threshold in pixels - if touch moves more than this, it's a swipe, not a tap
+const SWIPE_THRESHOLD = 15;
+
 const PlansMenu: React.FC<PlansMenuProps> = ({
   currentPlans = [],
   completedPlans = [],
@@ -34,6 +37,9 @@ const PlansMenu: React.FC<PlansMenuProps> = ({
   trigger,
 }) => {
   const navigate = useNavigate();
+  
+  // Track touch start position for swipe detection
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const handlePlanSelect = (e: React.MouseEvent, planId: string) => {
     e.preventDefault();
@@ -41,11 +47,71 @@ const PlansMenu: React.FC<PlansMenuProps> = ({
     navigate('.', { state: { openPlans: true, focusPlanId: planId } });
     onOpenChange(false);
   };
+  
+  // Handle controlled open changes - filter out swipe gestures
+  const handleOpenChange = useCallback((open: boolean) => {
+    // Always allow closing
+    if (!open) {
+      onOpenChange(false);
+      return;
+    }
+    
+    // For opening, check if this was a tap vs swipe
+    // If we have touch tracking data and movement was too large, ignore
+    if (touchStartRef.current) {
+      // The open is triggered by Radix on pointerdown, but we check on touchend
+      // Since Radix opens on pointer, we'll filter in the wrapper instead
+    }
+    
+    // Allow opening (will be filtered by wrapper touch handlers)
+    onOpenChange(true);
+  }, [onOpenChange]);
+
+  // Wrap trigger with touch movement detection
+  const wrappedTrigger = (
+    <div
+      onTouchStart={(e) => {
+        const touch = e.touches[0];
+        if (touch) {
+          touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (!touchStartRef.current) return;
+        
+        const touch = e.changedTouches[0];
+        if (!touch) {
+          touchStartRef.current = null;
+          return;
+        }
+        
+        const dx = Math.abs(touch.clientX - touchStartRef.current.x);
+        const dy = Math.abs(touch.clientY - touchStartRef.current.y);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // If movement exceeded threshold, this is a swipe - close menu if it opened
+        if (distance > SWIPE_THRESHOLD) {
+          e.preventDefault();
+          e.stopPropagation();
+          // Close menu if it was opened by the swipe
+          setTimeout(() => onOpenChange(false), 0);
+        }
+        
+        touchStartRef.current = null;
+      }}
+      onTouchCancel={() => {
+        touchStartRef.current = null;
+      }}
+      style={{ display: 'contents' }}
+    >
+      {trigger}
+    </div>
+  );
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={onOpenChange}>
+    <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        {trigger}
+        {wrappedTrigger}
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="center"

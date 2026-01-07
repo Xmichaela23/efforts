@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -8,12 +8,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Plus, Waves, Bike, Activity, Dumbbell, Move, CircleDot, X } from 'lucide-react';
 
+// Movement threshold in pixels - if touch moves more than this, it's a swipe, not a tap
+const SWIPE_THRESHOLD = 15;
+
 interface LogFABProps {
   onSelectType: (type: string) => void;
 }
 
 const LogFAB: React.FC<LogFABProps> = ({ onSelectType }) => {
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Track touch start position for swipe detection
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const workoutTypes = [
     { type: 'log-strength', label: 'Log Strength', icon: Dumbbell },
@@ -23,27 +29,77 @@ const LogFAB: React.FC<LogFABProps> = ({ onSelectType }) => {
     { type: 'log-mobility', label: 'Log Mobility', icon: Move },
     { type: 'log-pilates-yoga', label: 'Log Pilates/Yoga', icon: CircleDot },
   ];
+  
+  // Handle controlled open changes - filter out swipe gestures
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setIsOpen(false);
+      return;
+    }
+    setIsOpen(true);
+  }, []);
+
+  // Wrap trigger with touch movement detection
+  const triggerButton = (
+    <Button
+      variant="ghost"
+      className="w-10 h-10 rounded-full bg-white/[0.08] backdrop-blur-lg border-2 border-white/35 text-white font-light hover:bg-white/[0.12] hover:border-white/50 transition-all duration-300 flex items-center justify-center flex-shrink-0 shadow-lg hover:shadow-xl p-0"
+      style={{
+        fontFamily: 'Inter, sans-serif',
+        minHeight: '42px',
+        minWidth: '42px',
+        boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
+        color: 'white',
+      }}
+    >
+      {isOpen ? (
+        <X className="h-4 w-4 stroke-[2] stroke-white" style={{ color: 'white' }} />
+      ) : (
+        <Plus className="h-4 w-4 stroke-[2] stroke-white" style={{ color: 'white' }} />
+      )}
+    </Button>
+  );
 
   return (
     <div className="flex-shrink-0">
-      <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="w-12 h-12 rounded-full bg-white/[0.08] backdrop-blur-lg border-2 border-white/35 text-white font-light hover:bg-white/[0.12] hover:border-white/50 transition-all duration-300 flex items-center justify-center flex-shrink-0 shadow-lg hover:shadow-xl p-0"
-            style={{
-              fontFamily: 'Inter, sans-serif',
-              minHeight: '48px',
-              boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
-              color: 'white',
+          <div
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              if (touch) {
+                touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+              }
             }}
+            onTouchEnd={(e) => {
+              if (!touchStartRef.current) return;
+              
+              const touch = e.changedTouches[0];
+              if (!touch) {
+                touchStartRef.current = null;
+                return;
+              }
+              
+              const dx = Math.abs(touch.clientX - touchStartRef.current.x);
+              const dy = Math.abs(touch.clientY - touchStartRef.current.y);
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              
+              // If movement exceeded threshold, this is a swipe - close menu if it opened
+              if (distance > SWIPE_THRESHOLD) {
+                e.preventDefault();
+                e.stopPropagation();
+                setTimeout(() => setIsOpen(false), 0);
+              }
+              
+              touchStartRef.current = null;
+            }}
+            onTouchCancel={() => {
+              touchStartRef.current = null;
+            }}
+            style={{ display: 'contents' }}
           >
-            {isOpen ? (
-              <X className="h-5 w-5 stroke-[2] stroke-white" style={{ color: 'white' }} />
-            ) : (
-              <Plus className="h-5 w-5 stroke-[2] stroke-white" style={{ color: 'white' }} />
-            )}
-          </Button>
+            {triggerButton}
+          </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
