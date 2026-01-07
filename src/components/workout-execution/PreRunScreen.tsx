@@ -10,7 +10,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { MapPin, Heart, Volume2, VolumeX, Loader2, Check, X, AlertCircle, Settings } from 'lucide-react';
+import { MapPin, Heart, Volume2, VolumeX, Loader2, Check, X, AlertCircle } from 'lucide-react';
 import type { WorkoutEnvironment, WorkoutEquipment, PlannedWorkoutStructure } from '@/types/workoutExecution';
 import type { GPSStatus } from '@/hooks/workout-execution/useGeolocation';
 import type { HRConnectionStatus } from '@/hooks/workout-execution/useBluetoothHR';
@@ -35,7 +35,6 @@ interface PreRunScreenProps {
   // Actions
   onConnectHR: () => void;
   onToggleVoice: () => void;
-  onOpenSettings: () => void;
   onBegin: () => void;
   onBack: () => void;
   
@@ -57,7 +56,6 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
   vibrationEnabled,
   onConnectHR,
   onToggleVoice,
-  onOpenSettings,
   onBegin,
   onBack,
   canStart,
@@ -199,12 +197,7 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
           <span className={`text-sm font-medium ${accentClasses.text}`}>
             {environment === 'outdoor' ? 'Outdoor' : (equipment === 'treadmill' ? 'Treadmill' : 'Trainer')}
           </span>
-          <button 
-            onClick={onOpenSettings}
-            className="text-gray-400 hover:text-white transition-colors p-2"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+          <div className="w-16" /> {/* Spacer for centering */}
         </div>
         
         {/* Workout Info */}

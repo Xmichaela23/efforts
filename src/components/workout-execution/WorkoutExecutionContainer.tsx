@@ -493,7 +493,6 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
           vibrationEnabled={execution.state.vibration_enabled}
           onConnectHR={handleConnectHR}
           onToggleVoice={handleToggleVoice}
-          onOpenSettings={() => {/* TODO: Settings sheet */}}
           onBegin={handleBegin}
           onBack={handleDiscard}
           canStart={execution.canStart}
