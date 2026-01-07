@@ -1,7 +1,8 @@
 /**
  * EDGE FUNCTION: sweep-user-history
  * 
- * Calculates workload for all existing workouts in a user's history
+ * Recalculates workload for all existing workouts in a user's history
+ * Uses the calculate-workload edge function for TRIMP-based calculation
  * Processes workouts in batches with progress tracking
  * 
  * Input: { user_id, batch_size, dry_run }
@@ -11,391 +12,172 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Intensity factors for workload calculation
-const INTENSITY_FACTORS = {
-  run: {
-    easypace: 0.65,
-    warmup_run_easy: 0.65,
-    cooldown_easy: 0.65,
-    longrun_easypace: 0.70,
-    '5kpace_plus1:00': 0.85,
-    '5kpace_plus0:50': 0.87,
-    '5kpace_plus0:45': 0.88,
-    '5kpace_plus0:35': 0.90,
-    '5kpace': 0.95,
-    '10kpace': 0.90,
-    marathon_pace: 0.82,
-    speed: 1.10,
-    strides: 1.05,
-    interval: 0.95,
-    tempo: 0.88,
-    cruise: 0.88
-  },
-  bike: {
-    Z1: 0.55,
-    recovery: 0.55,
-    Z2: 0.70,
-    endurance: 0.70,
-    warmup_bike: 0.60,
-    cooldown_bike: 0.60,
-    tempo: 0.80,
-    ss: 0.90,
-    thr: 1.00,
-    vo2: 1.15,
-    anaerobic: 1.20,
-    neuro: 1.10
-  },
-  swim: {
-    warmup: 0.60,
-    cooldown: 0.60,
-    drill: 0.50,
-    easy: 0.65,
-    aerobic: 0.75,
-    pull: 0.70,
-    kick: 0.75,
-    threshold: 0.95,
-    interval: 1.00
-  },
-  strength: {
-    '@pct60': 0.70,
-    '@pct65': 0.75,
-    '@pct70': 0.80,
-    '@pct75': 0.85,
-    '@pct80': 0.90,
-    '@pct85': 0.95,
-    '@pct90': 1.00,
-    main_: 0.85,
-    acc_: 0.70,
-    core_: 0.60,
-    bodyweight: 0.65
-  }
-}
-
-interface WorkoutData {
-  id: string;
-  type: string;
-  duration: number;
-  workout_status?: string;
-  strength_exercises?: any[];
-  mobility_exercises?: any[];
-  steps_preset?: any[];
-  source?: string;
-}
-
-/**
- * Calculate workload score for a workout
- */
-function calculateWorkload(workout: WorkoutData): number {
-  if (!workout.duration) return 0;
-  
-  const durationHours = workout.duration / 60;
-  const intensity = getSessionIntensity(workout);
-  
-  return Math.round(durationHours * Math.pow(intensity, 2) * 100);
-}
-
-/**
- * Get average intensity for a workout session
- */
-function getSessionIntensity(workout: WorkoutData): number {
-  // Handle strength exercises from both tables
-  if (workout.type === 'strength' && workout.strength_exercises) {
-    return getStrengthIntensity(workout.strength_exercises);
-  }
-  
-  // Handle mobility exercises (only in planned_workouts)
-  if (workout.type === 'mobility' && workout.mobility_exercises) {
-    return getMobilityIntensity(workout.mobility_exercises);
-  }
-  
-  // Handle steps preset (only in planned_workouts)
-  if (workout.steps_preset && workout.steps_preset.length > 0) {
-    return getStepsIntensity(workout.steps_preset, workout.type);
-  }
-  
-  // Fallback to basic intensity based on workout type
-  const typeIntensities: { [key: string]: number } = {
-    'run': 0.75,
-    'ride': 0.70,
-    'bike': 0.70,
-    'swim': 0.80,
-    'strength': 0.85,
-    'mobility': 0.50,
-    'walk': 0.40
-  };
-  
-  return typeIntensities[workout.type] || 0.75;
-}
-
-/**
- * Get intensity from token steps
- */
-function getStepsIntensity(steps: string[], type: string): number {
-  const factors = INTENSITY_FACTORS[type as keyof typeof INTENSITY_FACTORS];
-  if (!factors) return 0.75;
-  
-  const intensities: number[] = [];
-  
-  steps.forEach(token => {
-    for (const [key, value] of Object.entries(factors)) {
-      if (token.toLowerCase().includes(key.toLowerCase())) {
-        intensities.push(value);
-        break;
-      }
-    }
-  });
-  
-  return intensities.length > 0 ? Math.max(...intensities) : 0.75;
-}
-
-/**
- * Get intensity for strength session
- */
-function getStrengthIntensity(exercises: any[]): number {
-  if (!Array.isArray(exercises) || exercises.length === 0) {
-    return 0.75; // Default intensity if no exercises
-  }
-  
-  const intensities = exercises.map(ex => {
-    let base = 0.75;
-    
-    if (ex.weight && String(ex.weight).includes('% 1RM')) {
-      const pct = parseInt(String(ex.weight));
-      const roundedPct = Math.floor(pct / 5) * 5;
-      const key = `@pct${roundedPct}` as keyof typeof INTENSITY_FACTORS.strength;
-      base = INTENSITY_FACTORS.strength[key] || 0.75;
-    } else if (ex.weight && String(ex.weight).toLowerCase().includes('bodyweight')) {
-      base = INTENSITY_FACTORS.strength.bodyweight;
-    }
-    
-    const reps = typeof ex.reps === 'number' ? ex.reps : 8;
-    if (reps <= 5) base *= 1.05;
-    else if (reps >= 13) base *= 0.90;
-    
-    return base;
-  });
-  
-  return intensities.reduce((a, b) => a + b, 0) / intensities.length;
-}
-
-/**
- * Get intensity for mobility session
- */
-function getMobilityIntensity(exercises: any[]): number {
-  if (!Array.isArray(exercises) || exercises.length === 0) {
-    return 0.60; // Default intensity if no exercises
-  }
-  
-  const completedCount = exercises.filter(ex => ex.completed).length;
-  const totalCount = exercises.length;
-  
-  if (totalCount === 0) return 0.60;
-  
-  const baseIntensity = 0.60;
-  const completionRatio = completedCount / totalCount;
-  
-  return baseIntensity + (completionRatio * 0.1);
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
   try {
     // Handle CORS
     if (req.method === 'OPTIONS') {
-      return new Response('ok', { 
-        headers: { 
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        } 
-      })
+      return new Response('ok', { headers: corsHeaders })
     }
 
-    const { user_id, batch_size = 100, dry_run = false } = await req.json()
+    const { user_id, batch_size = 50, dry_run = false } = await req.json()
     
     if (!user_id) {
       return new Response(
         JSON.stringify({ error: 'user_id is required' }),
-        { 
-          status: 400, 
-          headers: { 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-          } 
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+
     // Initialize Supabase client with service role key for database operations
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    )
+    const supabaseClient = createClient(supabaseUrl, serviceRoleKey)
 
     const startTime = Date.now()
     let processed = 0
     let updated = 0
     let errors = 0
-    let offset = 0
+    let skipped = 0
 
-    console.log(`Starting workload sweep for user ${user_id}, batch_size: ${batch_size}, dry_run: ${dry_run}`)
+    console.log(`[sweep] Starting for user ${user_id}, batch_size: ${batch_size}, dry_run: ${dry_run}`)
 
-    while (true) {
-      // Fetch batch of workouts from both tables
-      const { data: completedWorkouts, error: completedError } = await supabaseClient
-        .from('workouts')
-        .select('id, type, duration, workout_status, strength_exercises')
-        .eq('user_id', user_id)
-        .range(offset, offset + batch_size - 1)
-        .order('created_at', { ascending: true })
+    // Fetch ALL completed workouts for this user (not paginated - we need full history for ACWR)
+    const { data: completedWorkouts, error: completedError } = await supabaseClient
+      .from('workouts')
+      .select('id, name, type, date, workout_status, workload_actual, avg_heart_rate')
+      .eq('user_id', user_id)
+      .eq('workout_status', 'completed')
+      .order('date', { ascending: false })
 
-      if (completedError) {
-        console.error('Fetch error for completed workouts:', completedError)
-        return new Response(
-          JSON.stringify({ 
-            error: 'Failed to fetch completed workouts', 
-            details: completedError.message,
-            user_id: user_id,
-            offset: offset
-          }),
-          { 
-            status: 500, 
-            headers: { 
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-            } 
-          }
-        )
-      }
+    if (completedError) {
+      console.error('[sweep] Fetch error:', completedError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch workouts', details: completedError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-      const { data: plannedWorkouts, error: plannedError } = await supabaseClient
-        .from('planned_workouts')
-        .select('id, type, duration, workout_status, strength_exercises, steps_preset, mobility_exercises')
-        .eq('user_id', user_id)
-        .range(offset, offset + batch_size - 1)
-        .order('created_at', { ascending: true })
+    const totalWorkouts = completedWorkouts?.length || 0
+    console.log(`[sweep] Found ${totalWorkouts} completed workouts`)
 
-      if (plannedError) {
-        console.error('Fetch error for planned workouts:', plannedError)
-        return new Response(
-          JSON.stringify({ 
-            error: 'Failed to fetch planned workouts', 
-            details: plannedError.message,
-            user_id: user_id,
-            offset: offset
-          }),
-          { 
-            status: 500, 
-            headers: { 
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-            } 
-          }
-        )
-      }
+    // Filter to workouts that need recalculation:
+    // - NULL workload
+    // - workload = 1 (broken calculation)
+    // - Has HR data (should use TRIMP)
+    const needsRecalc = completedWorkouts?.filter(w => 
+      w.workload_actual === null || 
+      w.workload_actual === 1 ||
+      (w.avg_heart_rate && w.avg_heart_rate > 0)
+    ) || []
 
-      // Combine both datasets
-      const workouts = [
-        ...(completedWorkouts || []).map(w => ({ ...w, source: 'completed' })),
-        ...(plannedWorkouts || []).map(w => ({ ...w, source: 'planned' }))
-      ]
+    console.log(`[sweep] ${needsRecalc.length} workouts need recalculation`)
 
+    if (dry_run) {
+      // Dry run - just report what would be updated
+      return new Response(
+        JSON.stringify({
+          success: true,
+          dry_run: true,
+          total_workouts: totalWorkouts,
+          would_process: needsRecalc.length,
+          sample: needsRecalc.slice(0, 5).map(w => ({
+            id: w.id,
+            name: w.name,
+            date: w.date,
+            current_workload: w.workload_actual,
+            has_hr: !!w.avg_heart_rate
+          }))
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-      if (!workouts || workouts.length === 0) {
-        break // No more workouts to process
-      }
+    // Process in batches to avoid timeout
+    const CONCURRENT_BATCH = 5 // Process 5 at a time within each batch
+    
+    for (let i = 0; i < needsRecalc.length; i += batch_size) {
+      const batch = needsRecalc.slice(i, i + batch_size)
+      console.log(`[sweep] Processing batch ${i / batch_size + 1}: ${batch.length} workouts`)
 
-      console.log(`Processing batch: ${workouts.length} workouts (offset: ${offset})`)
-
-      // Process each workout in the batch
-      for (const workout of workouts) {
-        try {
-          processed++
-          
-          const workload = calculateWorkload(workout)
-          const intensity = getSessionIntensity(workout)
-          
-          if (!dry_run) {
-            // Update the appropriate table based on source
-            const tableName = workout.source === 'completed' ? 'workouts' : 'planned_workouts';
-            const { error: updateError } = await supabaseClient
-              .from(tableName)
-              .update({
-                workload_planned: workout.workout_status === 'planned' ? workload : null,
-                workload_actual: workout.workout_status === 'completed' ? workload : null,
-                intensity_factor: intensity
+      // Process batch with limited concurrency
+      for (let j = 0; j < batch.length; j += CONCURRENT_BATCH) {
+        const concurrent = batch.slice(j, j + CONCURRENT_BATCH)
+        
+        const results = await Promise.allSettled(
+          concurrent.map(async (workout) => {
+            try {
+              // Call calculate-workload edge function
+              const response = await fetch(`${supabaseUrl}/functions/v1/calculate-workload`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceRoleKey}`,
+                },
+                body: JSON.stringify({ workout_id: workout.id })
               })
-              .eq('id', workout.id)
 
-            if (updateError) {
-              console.error(`Update error for workout ${workout.id}:`, updateError)
-              errors++
-            } else {
-              updated++
+              if (!response.ok) {
+                const errorText = await response.text()
+                throw new Error(`HTTP ${response.status}: ${errorText.slice(0, 100)}`)
+              }
+
+              return { success: true, workout_id: workout.id }
+            } catch (error) {
+              return { success: false, workout_id: workout.id, error: error.message }
             }
-          } else {
-            // Dry run - just count what would be updated
+          })
+        )
+
+        // Tally results
+        for (const result of results) {
+          processed++
+          if (result.status === 'fulfilled' && result.value.success) {
             updated++
+          } else {
+            errors++
+            const err = result.status === 'fulfilled' ? result.value.error : result.reason
+            console.error(`[sweep] Error processing workout:`, err)
           }
-
-          // Log progress every 50 workouts
-          if (processed % 50 === 0) {
-            console.log(`Processed ${processed} workouts, updated ${updated}, errors ${errors}`)
-          }
-
-        } catch (error) {
-          console.error(`Error processing workout ${workout.id}:`, error)
-          errors++
         }
       }
 
-      offset += batch_size
+      // Log progress
+      console.log(`[sweep] Progress: ${processed}/${needsRecalc.length} (${updated} ok, ${errors} failed)`)
 
-      // Add a small delay between batches to avoid overwhelming the database
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Small delay between batches
+      await new Promise(resolve => setTimeout(resolve, 200))
     }
 
     const duration = Date.now() - startTime
 
-    console.log(`Sweep completed: processed ${processed}, updated ${updated}, errors ${errors}, duration ${duration}ms`)
-
+    console.log(`[sweep] Complete: processed ${processed}, updated ${updated}, errors ${errors}, ${duration}ms`)
 
     return new Response(
       JSON.stringify({
         success: true,
+        total_workouts: totalWorkouts,
+        needed_recalc: needsRecalc.length,
         processed,
         updated,
         errors,
+        skipped,
         duration_ms: duration,
-        dry_run
+        dry_run: false
       }),
-      { 
-        status: 200, 
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        } 
-      }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('Function error:', error)
+    console.error('[sweep] Function error:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        } 
-      }
+      JSON.stringify({ error: error.message || 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
