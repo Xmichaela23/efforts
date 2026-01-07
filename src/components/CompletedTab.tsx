@@ -1089,6 +1089,15 @@ const formatMovingTime = () => {
               <div className="font-medium">Workload</div>
             </div>
           </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {(workoutData as any)?.intensity_factor ? (workoutData as any).intensity_factor.toFixed(2) : 'N/A'}
+            </div>
+            <div className="text-xs text-muted-foreground font-normal">
+              <div className="font-medium">IF</div>
+            </div>
+          </div>
          </>
        )}
       
