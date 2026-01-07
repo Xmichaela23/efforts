@@ -273,16 +273,37 @@ Deno.serve(async (req) => {
     
     let hasActivePlan = false;
     try {
+      // Method 1: Check training_plans table for is_active = true
       const { data: activePlans } = await supabase
         .from('training_plans')
         .select('id, name')
         .eq('user_id', user_id)
-        .eq('status', 'active')
+        .eq('is_active', true)
         .limit(1);
       
-      hasActivePlan = (activePlans && activePlans.length > 0);
-      if (hasActivePlan) {
+      if (activePlans && activePlans.length > 0) {
+        hasActivePlan = true;
         console.log(`📋 User has active plan: ${activePlans[0].name}`);
+      }
+      
+      // Method 2: Check for upcoming planned workouts (indicates following a plan)
+      if (!hasActivePlan) {
+        const tomorrow = new Date(focusDate);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const nextWeek = new Date(focusDate);
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        
+        const { data: upcomingPlanned, count } = await supabase
+          .from('planned_workouts')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user_id)
+          .gte('date', tomorrow.toLocaleDateString('en-CA'))
+          .lte('date', nextWeek.toLocaleDateString('en-CA'));
+        
+        if (count && count >= 2) {
+          hasActivePlan = true;
+          console.log(`📋 User has ${count} planned workouts in next 7 days - treating as active plan`);
+        }
       }
     } catch (e) {
       console.log('⚠️ Could not check for active plan:', e);
