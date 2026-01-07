@@ -640,72 +640,70 @@ const DisciplineIcon = ({ discipline }: { discipline: string }) => {
 return (
   <div className="mobile-app-container">
     <header className="mobile-header">
-      <div className="w-full">
-        <div className="flex items-center justify-between h-16 w-full px-4">
-          <div className="flex items-center gap-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="text-white/80 hover:text-white transition-colors p-2">
-                  <Menu className="h-5 w-5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuItem onClick={() => navigate('/')}>
-                  <Activity className="mr-2 h-4 w-4" />
-                  Training Baselines
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/connections')}>
-                  <Link className="mr-2 h-4 w-4" />
-                  Connections
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Package className="mr-2 h-4 w-4" />
-                  Gear
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/')}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Import
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Export Data
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  Help & Support
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/')}>
-                  Sign Out
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/plans/admin')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Admin – Add template (JSON)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
-          </div>
-        </div>
-        <div className="px-4 pb-2">
-          <h2 className="text-2xl font-bold text-white">Training Baselines</h2>
+      <div className="flex items-center justify-between h-16 w-full px-4">
+        <div className="flex items-center gap-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="text-white/80 hover:text-white transition-colors p-2">
+                <Menu className="h-5 w-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuItem onClick={() => navigate('/')}>
+                <Activity className="mr-2 h-4 w-4" />
+                Training Baselines
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/connections')}>
+                <Link className="mr-2 h-4 w-4" />
+                Connections
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Package className="mr-2 h-4 w-4" />
+                Gear
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/')}>
+                <Download className="mr-2 h-4 w-4" />
+                Import
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Upload className="mr-2 h-4 w-4" />
+                Export Data
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                Help & Support
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/')}>
+                Sign Out
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/plans/admin')}>
+                <Settings className="mr-2 h-4 w-4" />
+                Admin – Add template (JSON)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
         </div>
       </div>
     </header>
 
-      <main className="mobile-main-content">
-        <div className="max-w-2xl mx-auto px-4 pb-6">
-          {/* Description with proper spacing */}
-          <div className="text-center mb-6 mt-12">
-            <p className="text-white/50 text-sm">Your performance data for personalized training plans</p>
-            {lastUpdated && (
-              <p className="text-xs text-white/40 mt-2">
-                Last updated: {new Date(lastUpdated).toLocaleDateString()}
-              </p>
-            )}
-          </div>
+    <main className="mobile-main-content">
+      <div className="max-w-2xl mx-auto px-4 pb-6">
+        {/* Page title - in scrollable content */}
+        <h2 className="text-2xl font-bold text-white pt-4 pb-2">Training Baselines</h2>
+        
+        {/* Description */}
+        <div className="text-center mb-6">
+          <p className="text-white/50 text-sm">Your performance data for personalized training plans</p>
+          {lastUpdated && (
+            <p className="text-xs text-white/40 mt-2">
+              Last updated: {new Date(lastUpdated).toLocaleDateString()}
+            </p>
+          )}
+        </div>
 
         {loading ? (
           <div className="text-center py-8">
