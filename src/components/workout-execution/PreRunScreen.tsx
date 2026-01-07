@@ -288,8 +288,8 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
         )}
       </div>
       
-      {/* Begin Button - with safe area padding for mobile */}
-      <div className="p-4 pb-safe" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 2rem))' }}>
+      {/* Begin Button - fixed to bottom with safe area */}
+      <div className="sticky bottom-0 left-0 right-0 p-4 pb-10 bg-gradient-to-t from-black via-black to-transparent">
         <button
           onClick={onBegin}
           disabled={!canStart}
