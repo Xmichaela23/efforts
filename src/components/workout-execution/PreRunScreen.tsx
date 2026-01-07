@@ -27,6 +27,7 @@ interface PreRunScreenProps {
   gpsAccuracy?: number;
   hrStatus: HRConnectionStatus;
   hrDeviceName?: string;
+  hrIsAvailable: boolean;
   
   // Settings
   voiceEnabled: boolean;
@@ -52,6 +53,7 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
   gpsAccuracy,
   hrStatus,
   hrDeviceName,
+  hrIsAvailable,
   voiceEnabled,
   vibrationEnabled,
   onConnectHR,
@@ -120,6 +122,15 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
   
   // HR Status Icon
   const renderHRStatus = () => {
+    // Web Bluetooth not available (iOS Safari doesn't support it)
+    if (!hrIsAvailable) {
+      return (
+        <div className="flex items-center gap-2 text-gray-500">
+          <span>Not available on iOS</span>
+        </div>
+      );
+    }
+    
     switch (hrStatus) {
       case 'connecting':
         return (

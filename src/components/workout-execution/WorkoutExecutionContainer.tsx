@@ -498,6 +498,7 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
           gpsAccuracy={execution.state.gps_accuracy_m}
           hrStatus={execution.state.hr_status}
           hrDeviceName={execution.state.hr_device_name}
+          hrIsAvailable={hr.isAvailable}
           voiceEnabled={execution.state.voice_enabled}
           vibrationEnabled={execution.state.vibration_enabled}
           onConnectHR={handleConnectHR}
