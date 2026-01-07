@@ -994,13 +994,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 } catch {}
               };
               return (
-                <div className="mt-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div className="mt-4">
+                  <button
                     onClick={handleClick}
-                    className="bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/90 hover:bg-white/[0.12]"
-                  >Go to workout</Button>
+                    className="w-full px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-sm font-light tracking-wide hover:bg-white/[0.12] transition-all"
+                  >Go to workout</button>
                 </div>
               );
             })()}

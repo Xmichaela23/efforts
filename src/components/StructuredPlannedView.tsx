@@ -44,25 +44,25 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     return (
       <div className="p-3">
         {mobilityList.length ? (
-          <ul className="list-disc pl-5 space-y-1">
+          <ul className="list-disc pl-5 space-y-2 marker:text-white/40">
             {mobilityList.map((m, i)=> (
-              <li key={i} className="text-sm text-gray-800">
-                <span className="font-medium">{m.name}</span>
-                {m.duration ? <span className="text-gray-200"> — {m.duration}</span> : null}
+              <li key={i} className="text-sm text-white/90">
+                <span className="font-medium text-white">{m.name}</span>
+                {m.duration ? <span className="text-white/70"> — {m.duration}</span> : null}
                 {(() => {
                   const w: any = (m as any)?.weight;
                   if (w == null) return null;
                   const num = typeof w === 'number' ? w : (typeof w === 'string' ? parseFloat(w) : NaN);
                   if (!Number.isFinite(num) || num <= 0) return null;
                   const unit = String((m as any)?.unit || 'lb');
-                  return <span className="text-gray-200"> — @ {Math.round(num)} {unit}</span>;
+                  return <span className="text-white/70"> — @ {Math.round(num)} {unit}</span>;
                 })()}
-                {m.description ? <span className="text-gray-200"> — {m.description}</span> : null}
+                {m.description ? <span className="text-white/60"> — {m.description}</span> : null}
               </li>
             ))}
           </ul>
         ) : (
-          <div className="text-sm text-gray-700">Mobility session</div>
+          <div className="text-sm text-white/70">Mobility session</div>
         )}
       </div>
     );
