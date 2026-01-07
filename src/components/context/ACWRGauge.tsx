@@ -89,22 +89,45 @@ export const ACWRGauge: React.FC<ACWRGaugeProps> = ({ acwr, showProjected = true
 
       {/* Info Panel */}
       {showInfo && (
-        <div className="mb-4 p-3 bg-white/[0.05] rounded-lg border border-white/10 text-xs space-y-2">
+        <div className="mb-4 p-3 bg-white/[0.05] rounded-lg border border-white/10 text-xs space-y-3">
           <div className="font-medium text-white/90">Acute:Chronic Workload Ratio</div>
           <div className="text-white/60">
-            Compares your recent training (7 days) to your fitness base (28 days) to help prevent injury from ramping up too fast.
+            Compares your recent training to your fitness base to prevent injury from ramping up too fast.
           </div>
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          
+          {/* The Calculation */}
+          <div className="bg-white/[0.03] rounded p-2.5">
+            <div className="font-medium text-white/70 mb-1.5">Your calculation:</div>
+            <div className="font-mono text-white/80 text-center py-1">
+              ({acwr.acute_total} ÷ 7) ÷ ({acwr.chronic_total} ÷ 28) = <span className={config.textClass}>{acwr.ratio.toFixed(2)}</span>
+            </div>
+            <div className="text-white/50 text-center mt-1">
+              {Math.round(acwr.acute_total / 7)}/day vs {Math.round(acwr.chronic_total / 28)}/day
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
             <div className="bg-white/[0.03] rounded p-2">
-              <div className="font-medium text-white/80">Acute (7d)</div>
-              <div className="text-white/50">Recent stress & fatigue</div>
+              <div className="font-medium text-white/80">Acute (7d): {acwr.acute_total}</div>
+              <div className="text-white/50">Recent stress - what you've done this week</div>
             </div>
             <div className="bg-white/[0.03] rounded p-2">
-              <div className="font-medium text-white/80">Chronic (28d)</div>
-              <div className="text-white/50">Your fitness base - what your body is adapted to handle</div>
+              <div className="font-medium text-white/80">Chronic (28d): {acwr.chronic_total}</div>
+              <div className="text-white/50">Your fitness base - what you're adapted to</div>
             </div>
           </div>
-          <div className="pt-2 space-y-1">
+
+          {/* Chronic explanation */}
+          <div className="bg-white/[0.03] rounded p-2.5 border-l-2 border-green-500/50">
+            <div className="font-medium text-white/80 mb-1">Why Chronic matters:</div>
+            <div className="text-white/50 space-y-1">
+              <div>• Higher chronic = more resilient. You can handle bigger acute weeks.</div>
+              <div>• It's built gradually through consistent training over months.</div>
+              <div>• A sudden spike in acute (with low chronic) = injury risk.</div>
+            </div>
+          </div>
+
+          <div className="pt-1 space-y-1">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-sm bg-blue-500/50"></div>
               <span className="text-white/60">&lt; 0.8 Undertrained - losing fitness</span>
