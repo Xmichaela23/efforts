@@ -9,6 +9,7 @@ import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
+import { WorkoutExecutionContainer } from './workout-execution';
 import { mapUnifiedItemToPlanned, mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
 import { useToast } from '@/components/ui/use-toast';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
@@ -34,6 +35,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [cityName, setCityName] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [selectedPlannedWorkout, setSelectedPlannedWorkout] = useState<any | null>(null);
+  const [executingWorkout, setExecutingWorkout] = useState<any | null>(null);
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
   const today = new Date().toLocaleDateString('en-CA');
@@ -169,6 +171,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const isEnduranceType = (type: string) => {
     const t = (type || '').toLowerCase();
     return ['run', 'ride', 'bike', 'swim', 'cycling'].includes(t);
+  };
+  
+  // Check if workout can be executed on phone (run or ride only for now)
+  const isPhoneExecutable = (type: string) => {
+    const t = (type || '').toLowerCase();
+    return ['run', 'ride', 'bike', 'cycling'].includes(t);
   };
   
   // Check if workout is strength/mobility type
@@ -1177,7 +1185,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
 
           <DrawerFooter className="border-t border-white/10 pt-4">
-            <div className="flex gap-2 w-full">
+            <div className="flex flex-col gap-2 w-full">
+              {/* Start on Phone - Primary action for run/ride */}
+              {selectedPlannedWorkout && isPhoneExecutable(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
+                <button
+                  className="w-full px-4 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-light tracking-wide transition-all shadow-lg shadow-cyan-500/20"
+                  onClick={() => {
+                    setExecutingWorkout(selectedPlannedWorkout);
+                    setSelectedPlannedWorkout(null);
+                  }}
+                >
+                  📱 Start on Phone
+                </button>
+              )}
+              <div className="flex gap-2 w-full">
               {selectedPlannedWorkout && isEnduranceType(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
                 <button
                   className="flex-1 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-sm font-light tracking-wide hover:bg-white/[0.12] transition-all"
@@ -1185,7 +1206,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     handleSendToGarmin(e, selectedPlannedWorkout);
                   }}
                 >
-                  {sendingToGarmin === selectedPlannedWorkout?.id ? 'Sending...' : 'Send to Garmin'}
+                  {sendingToGarmin === selectedPlannedWorkout?.id ? 'Sending...' : '⌚ Send to Garmin'}
                 </button>
               )}
               {selectedPlannedWorkout && isStrengthOrMobility(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
@@ -1207,10 +1228,29 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               >
                 Close
               </button>
+              </div>
             </div>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+      
+      {/* Workout Execution Modal */}
+      {executingWorkout && (
+        <div className="fixed inset-0 z-50">
+          <WorkoutExecutionContainer
+            plannedWorkoutId={executingWorkout.id}
+            plannedWorkoutStructure={executingWorkout.computed || { steps: [], total_duration_seconds: 0 }}
+            workoutType={['ride', 'bike', 'cycling'].includes((executingWorkout.type || executingWorkout.workout_type || '').toLowerCase()) ? 'ride' : 'run'}
+            workoutDescription={executingWorkout.rendered_description || executingWorkout.description || executingWorkout.name}
+            onClose={() => setExecutingWorkout(null)}
+            onComplete={(workoutId) => {
+              setExecutingWorkout(null);
+              // Refresh the view
+              window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };
