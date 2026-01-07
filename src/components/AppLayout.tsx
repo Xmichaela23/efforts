@@ -77,6 +77,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     type: 'run' | 'ride';
     name: string;
   } | null>(null);
+  const feedbackShownIdsRef = useRef<Set<string>>(new Set()); // Track which workouts we've shown popup for
   const [plansMenuOpen, setPlansMenuOpen] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
@@ -282,6 +283,57 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       try { loadProviderData(); } catch {}
     }
   }, [activeTab, loadProviderData, selectedWorkout]);
+
+  // Listen for new workouts via realtime subscription to trigger feedback popup
+  useEffect(() => {
+    let channel: any = null;
+    
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      channel = supabase
+        .channel('new-workouts-feedback')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'workouts',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload: any) => {
+            const newWorkout = payload.new;
+            const workoutType = String(newWorkout?.type || '').toLowerCase();
+            const workoutId = String(newWorkout?.id || '');
+            
+            // Only show popup for runs and rides that we haven't shown before
+            if ((workoutType === 'run' || workoutType === 'ride') && 
+                workoutId && 
+                !feedbackShownIdsRef.current.has(workoutId) &&
+                // Only show if no gear/rpe/feeling set yet
+                !newWorkout.gear_id && !newWorkout.rpe && !newWorkout.feeling) {
+              console.log('🎯 New run/ride detected, showing feedback popup:', workoutId);
+              feedbackShownIdsRef.current.add(workoutId);
+              setFeedbackWorkout({
+                id: workoutId,
+                type: workoutType as 'run' | 'ride',
+                name: newWorkout.name || `${workoutType} workout`,
+              });
+            }
+          }
+        )
+        .subscribe();
+    };
+    
+    setupRealtimeSubscription();
+    
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, []);
 
   // Open weekly planner when routed with state { openPlans, focusPlanId, focusWeek, showCompleted }
   useLayoutEffect(() => {
