@@ -183,7 +183,7 @@ export const PostRunSummary: React.FC<PostRunSummaryProps> = ({
       <div className="p-4 pb-10 space-y-3">
         <button
           onClick={onViewDetails}
-          disabled={isSaving}
+          disabled={isSaving || !!saveError}
           className="w-full py-4 rounded-full bg-white/[0.08] border-2 border-white/30 
                    hover:bg-white/[0.12] hover:border-white/50 text-white text-lg font-light 
                    transition-all duration-300 flex items-center justify-center gap-2
