@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Download, Link, Package, Settings, RefreshCw, Calendar } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Download, Link, Package, Settings, RefreshCw, Calendar, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAppContext } from '@/contexts/AppContext';
 import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
@@ -182,6 +183,10 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   // Learned fitness profile state
   const [learnedFitness, setLearnedFitness] = useState<any>(null);
   const [learningProfile, setLearningProfile] = useState(false);
+  
+  // Resting HR override (optional - user can set their own)
+  const [customRestingHR, setCustomRestingHR] = useState<number | null>(null);
+  const [showPowerZones, setShowPowerZones] = useState(false);
 
   // Check if data has changed from original
   const hasChanges = JSON.stringify(data) !== originalData;
@@ -286,6 +291,10 @@ const loadBaselines = async () => {
       if ((baselines as any).learned_fitness) {
         setLearnedFitness((baselines as any).learned_fitness);
       }
+      // Load custom resting HR if set
+      if ((baselines as any).performanceNumbers?.restingHeartRate) {
+        setCustomRestingHR(Number((baselines as any).performanceNumbers.restingHeartRate));
+      }
     } else {
       // No saved data yet - set original to current defaults
       setOriginalData(JSON.stringify(data));
@@ -372,6 +381,32 @@ const getAgeBasedHREstimates = (birthday: string | undefined) => {
     easyHR,
     age
   };
+};
+
+// Calculate smart resting HR default from threshold HR
+const getSmartRestingHR = (thresholdHR: number | null, customOverride: number | null): { value: number; isCustom: boolean; source: string } => {
+  if (customOverride && customOverride > 0) {
+    return { value: customOverride, isCustom: true, source: 'custom' };
+  }
+  if (thresholdHR && thresholdHR > 0) {
+    // Smart default: threshold - 90 (typical spread), floor at 45
+    const smartDefault = Math.max(thresholdHR - 90, 45);
+    return { value: smartDefault, isCustom: false, source: 'calculated' };
+  }
+  return { value: 60, isCustom: false, source: 'default' };
+};
+
+// Calculate power zones from FTP (Coggan zones)
+const getPowerZones = (ftp: number): { name: string; range: string; color: string }[] => {
+  return [
+    { name: 'Z1 Recovery', range: `< ${Math.round(ftp * 0.55)}W`, color: '#10b981' },
+    { name: 'Z2 Endurance', range: `${Math.round(ftp * 0.55)}-${Math.round(ftp * 0.75)}W`, color: '#84cc16' },
+    { name: 'Z3 Tempo', range: `${Math.round(ftp * 0.76)}-${Math.round(ftp * 0.90)}W`, color: '#f59e0b' },
+    { name: 'Z4 Threshold', range: `${Math.round(ftp * 0.91)}-${Math.round(ftp * 1.05)}W`, color: '#ef4444' },
+    { name: 'Z5 VO2max', range: `${Math.round(ftp * 1.06)}-${Math.round(ftp * 1.20)}W`, color: '#991b1b' },
+    { name: 'Z6 Anaerobic', range: `${Math.round(ftp * 1.21)}-${Math.round(ftp * 1.50)}W`, color: '#7c2d12' },
+    { name: 'Z7 Neuromuscular', range: `> ${Math.round(ftp * 1.50)}W`, color: '#581c87' },
+  ];
 };
 
 const handleSave = async () => {
@@ -1305,6 +1340,74 @@ return (
                       })()
                     ) : (
                       <div className="space-y-4">
+                        {/* Resting HR - Universal baseline */}
+                        {(() => {
+                          const thresholdHR = learnedFitness.run_threshold_hr?.value || learnedFitness.ride_threshold_hr?.value || null;
+                          const restingInfo = getSmartRestingHR(thresholdHR, customRestingHR);
+                          return (
+                            <TooltipProvider>
+                              <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/15">
+                                <div className="flex items-center gap-2">
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs text-white/50">Resting HR</span>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Info className="h-3 w-3 text-white/30 hover:text-white/50 cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="max-w-[250px] text-xs">
+                                          <p className="font-medium mb-1">Used for TRIMP workload calculation</p>
+                                          <p className="text-white/70">
+                                            {restingInfo.source === 'custom' 
+                                              ? 'Using your custom value.' 
+                                              : restingInfo.source === 'calculated'
+                                                ? `Smart estimate: threshold HR (${thresholdHR}) - 90 bpm. Override below if you know your actual resting HR.`
+                                                : 'Default value. Add threshold HR data or set your own.'}
+                                          </p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <input
+                                        type="number"
+                                        value={customRestingHR || restingInfo.value}
+                                        onChange={(e) => {
+                                          const val = parseInt(e.target.value);
+                                          if (val >= 35 && val <= 100) {
+                                            setCustomRestingHR(val);
+                                            setData(prev => ({
+                                              ...prev,
+                                              performanceNumbers: {
+                                                ...prev.performanceNumbers,
+                                                restingHeartRate: val
+                                              }
+                                            }));
+                                          } else if (e.target.value === '') {
+                                            setCustomRestingHR(null);
+                                            const { restingHeartRate, ...rest } = data.performanceNumbers as any;
+                                            setData(prev => ({
+                                              ...prev,
+                                              performanceNumbers: rest
+                                            }));
+                                          }
+                                        }}
+                                        placeholder={String(restingInfo.value)}
+                                        className="w-16 text-sm font-medium text-white bg-transparent border-b border-white/20 focus:border-white/50 outline-none text-center"
+                                        min={35}
+                                        max={100}
+                                      />
+                                      <span className="text-sm text-white/60">bpm</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-[10px] text-white/40">
+                                  {restingInfo.isCustom ? 'custom' : restingInfo.source === 'calculated' ? 'auto' : 'default'}
+                                </div>
+                              </div>
+                            </TooltipProvider>
+                          );
+                        })()}
+
                         {/* Running HR Zones */}
                         {(learnedFitness.run_threshold_hr || learnedFitness.run_easy_hr) && (
                           <div className="space-y-2">
@@ -1488,6 +1591,40 @@ return (
                                 </div>
                               )}
                             </div>
+                            
+                            {/* Power Zones from FTP */}
+                            {learnedFitness.ride_ftp_estimated && (
+                              <div className="col-span-2 mt-2">
+                                <button
+                                  onClick={() => setShowPowerZones(!showPowerZones)}
+                                  className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/70 transition-colors"
+                                >
+                                  {showPowerZones ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                  <span>Power Zones</span>
+                                </button>
+                                
+                                {showPowerZones && (
+                                  <div className="mt-2 space-y-1">
+                                    {getPowerZones(learnedFitness.ride_ftp_estimated.value).map((zone) => (
+                                      <div 
+                                        key={zone.name}
+                                        className="flex items-center justify-between px-2 py-1 rounded text-xs"
+                                        style={{ backgroundColor: `${zone.color}15` }}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <div 
+                                            className="w-2 h-2 rounded-full"
+                                            style={{ backgroundColor: zone.color }}
+                                          />
+                                          <span className="text-white/70">{zone.name}</span>
+                                        </div>
+                                        <span className="text-white/50 font-mono">{zone.range}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
 
