@@ -104,7 +104,74 @@ interface WorkoutData {
   avg_heart_rate?: number; // bpm
   functional_threshold_power?: number; // watts (for cycling intensity zones)
   threshold_heart_rate?: number; // bpm (for HR zones)
+  max_heart_rate?: number; // bpm (for TRIMP calculation)
+  resting_heart_rate?: number; // bpm (for TRIMP calculation)
   workout_metadata?: any; // Unified metadata: { session_rpe?, notes?, readiness? }
+}
+
+/**
+ * Calculate TRIMP (Training Impulse) workload for cardio workouts
+ * 
+ * Uses Banister's TRIMP formula:
+ * TRIMP = Duration (min) × ΔHR ratio × weighting factor
+ * 
+ * Where:
+ * - ΔHR ratio = (avg_HR - resting_HR) / (max_HR - resting_HR)
+ * - Weighting factor = 0.64 × e^(1.92 × ΔHR_ratio) for exponential stress curve
+ * 
+ * Scaled to match existing workload scale (~100 for 1 hour at threshold)
+ */
+function calculateTRIMPWorkload(workout: WorkoutData): number | null {
+  const avgHR = workout.avg_heart_rate;
+  const maxHR = workout.max_heart_rate;
+  const restingHR = workout.resting_heart_rate || 60; // Default resting HR if not set
+  
+  // Need HR data and max HR for TRIMP
+  if (!avgHR || !maxHR || avgHR <= 0 || maxHR <= 0) {
+    return null; // Can't calculate TRIMP
+  }
+  
+  // Ensure avg HR is within valid range
+  if (avgHR < restingHR || avgHR > maxHR) {
+    // HR data seems invalid, fall back to traditional calculation
+    return null;
+  }
+  
+  // Get effective duration (prefer moving_time)
+  let durationMinutes = workout.duration;
+  if ((workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim') 
+      && workout.moving_time && workout.moving_time > 0) {
+    durationMinutes = workout.moving_time;
+  }
+  
+  if (!durationMinutes || durationMinutes <= 0) {
+    return null;
+  }
+  
+  // Calculate ΔHR ratio (0-1 scale, how close to max HR reserve)
+  const hrReserve = maxHR - restingHR;
+  const deltaHR = avgHR - restingHR;
+  const hrRatio = deltaHR / hrReserve;
+  
+  // Banister's exponential weighting factor
+  // This weights higher HR efforts exponentially more
+  const weightingFactor = 0.64 * Math.exp(1.92 * hrRatio);
+  
+  // Raw TRIMP
+  const rawTRIMP = durationMinutes * hrRatio * weightingFactor;
+  
+  // Scale to match existing workload scale
+  // 1 hour at threshold (~88% max HR, hrRatio ~0.85) should ≈ 100
+  // At hrRatio=0.85: weightingFactor = 0.64 × e^(1.92×0.85) = 0.64 × 5.11 = 3.27
+  // Raw TRIMP = 60 × 0.85 × 3.27 = 167
+  // Scale factor = 100 / 167 ≈ 0.6
+  const scaleFactor = 0.6;
+  const scaledWorkload = Math.round(rawTRIMP * scaleFactor);
+  
+  console.log(`[TRIMP] avgHR=${avgHR}, maxHR=${maxHR}, restHR=${restingHR}, duration=${durationMinutes}min`);
+  console.log(`[TRIMP] hrRatio=${hrRatio.toFixed(3)}, weight=${weightingFactor.toFixed(2)}, raw=${rawTRIMP.toFixed(1)}, scaled=${scaledWorkload}`);
+  
+  return scaledWorkload;
 }
 
 /**
@@ -115,7 +182,12 @@ interface WorkoutData {
  *   - Intensity from Session RPE (primary) or RIR (secondary) and exercise characteristics
  *   - Duration is NOT used (it's just logging time, not workout time)
  * 
- * For other workouts: workload = duration (hours) × intensity² × 100
+ * For cardio (run/bike/swim) with HR data: TRIMP (Training Impulse)
+ *   - Uses actual physiological stress, not just external load
+ *   - Captures fatigue, heat, illness, altitude effects
+ *   - Requires avg_heart_rate and max_heart_rate
+ * 
+ * For cardio without HR: workload = duration (hours) × intensity² × 100
  */
 function calculateWorkload(workout: WorkoutData, sessionRPE?: number): number {
   // Strength workouts use volume-based calculation, not duration
@@ -128,11 +200,20 @@ function calculateWorkload(workout: WorkoutData, sessionRPE?: number): number {
     return calculatePilatesYogaWorkload(workout, sessionRPE);
   }
   
-  // Other workout types (run/bike/swim) use duration-based calculation
+  // CARDIO WORKOUTS: Try TRIMP first (HR-based, most accurate)
+  const isCardio = workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim';
+  if (isCardio && workout.avg_heart_rate && workout.max_heart_rate) {
+    const trimpWorkload = calculateTRIMPWorkload(workout);
+    if (trimpWorkload !== null && trimpWorkload > 0) {
+      console.log(`[Workload] Using TRIMP for ${workout.type}: ${trimpWorkload}`);
+      return trimpWorkload;
+    }
+  }
+  
+  // FALLBACK: Duration-based calculation for cardio without HR
   // Prefer moving_time over duration for accurate workload (excludes stops)
   let effectiveDuration = workout.duration;
-  if ((workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim') 
-      && workout.moving_time && workout.moving_time > 0) {
+  if (isCardio && workout.moving_time && workout.moving_time > 0) {
     effectiveDuration = workout.moving_time;
   }
   
@@ -141,6 +222,7 @@ function calculateWorkload(workout: WorkoutData, sessionRPE?: number): number {
   const durationHours = effectiveDuration / 60;
   const intensity = getSessionIntensity(workout, sessionRPE);
   
+  console.log(`[Workload] Using duration-based for ${workout.type}: ${durationHours.toFixed(2)}h × ${intensity.toFixed(2)}² × 100`);
   return Math.round(durationHours * Math.pow(intensity, 2) * 100);
 }
 
@@ -653,11 +735,14 @@ serve(async (req) => {
       }
     }
     
-    // Fetch user's FTP and threshold HR from user_baselines (including learned_fitness)
+    // Fetch user's FTP, threshold HR, max HR, resting HR from user_baselines (including learned_fitness)
     let userFtp: number | null = null;
     let userThresholdHr: number | null = null;
     let runThresholdHr: number | null = null;
     let rideThresholdHr: number | null = null;
+    let runMaxHr: number | null = null;
+    let rideMaxHr: number | null = null;
+    let restingHr: number | null = null;
     if (userId) {
       try {
         const { data: baseline } = await supabaseClient
@@ -678,10 +763,22 @@ serve(async (req) => {
             console.log('[calculate-workload] Run THR from learned:', runThresholdHr);
           }
           
+          // Run max HR from learned data (for TRIMP)
+          if (learned?.run?.max_hr?.value) {
+            runMaxHr = Number(learned.run.max_hr.value);
+            console.log('[calculate-workload] Run MaxHR from learned:', runMaxHr);
+          }
+          
           // Ride threshold HR from learned data
           if (learned?.ride?.threshold_hr?.value) {
             rideThresholdHr = Number(learned.ride.threshold_hr.value);
             console.log('[calculate-workload] Ride THR from learned:', rideThresholdHr);
+          }
+          
+          // Ride max HR from learned data (for TRIMP)
+          if (learned?.ride?.max_hr?.value) {
+            rideMaxHr = Number(learned.ride.max_hr.value);
+            console.log('[calculate-workload] Ride MaxHR from learned:', rideMaxHr);
           }
           
           // FTP from learned data (if available)
@@ -707,6 +804,19 @@ serve(async (req) => {
           if (perfNumbers?.thresholdHeartRate || perfNumbers?.threshold_heart_rate) {
             userThresholdHr = Number(perfNumbers.thresholdHeartRate || perfNumbers.threshold_heart_rate);
             console.log('[calculate-workload] THR from manual baselines:', userThresholdHr);
+          }
+          
+          // Manual max HR (fallback for TRIMP)
+          if (!runMaxHr && (perfNumbers?.maxHeartRate || perfNumbers?.max_heart_rate)) {
+            runMaxHr = Number(perfNumbers.maxHeartRate || perfNumbers.max_heart_rate);
+            rideMaxHr = runMaxHr; // Use same for ride if not learned
+            console.log('[calculate-workload] MaxHR from manual baselines:', runMaxHr);
+          }
+          
+          // Resting HR (for TRIMP calculation)
+          if (perfNumbers?.restingHeartRate || perfNumbers?.resting_heart_rate) {
+            restingHr = Number(perfNumbers.restingHeartRate || perfNumbers.resting_heart_rate);
+            console.log('[calculate-workload] Resting HR from manual baselines:', restingHr);
           }
         }
       } catch (e) {
@@ -768,6 +878,27 @@ serve(async (req) => {
         finalWorkoutData.threshold_heart_rate = userThresholdHr;
         console.log('[calculate-workload] Injected generic THR:', userThresholdHr);
       }
+    }
+    
+    // Inject max HR for TRIMP calculation (sport-specific)
+    if (!finalWorkoutData.max_heart_rate) {
+      if ((workoutType === 'run') && runMaxHr) {
+        finalWorkoutData.max_heart_rate = runMaxHr;
+        console.log('[calculate-workload] Injected run-specific MaxHR:', runMaxHr);
+      } else if ((workoutType === 'ride' || workoutType === 'bike') && rideMaxHr) {
+        finalWorkoutData.max_heart_rate = rideMaxHr;
+        console.log('[calculate-workload] Injected ride-specific MaxHR:', rideMaxHr);
+      } else if (runMaxHr) {
+        // Use run max HR as fallback for swim/other
+        finalWorkoutData.max_heart_rate = runMaxHr;
+        console.log('[calculate-workload] Injected generic MaxHR:', runMaxHr);
+      }
+    }
+    
+    // Inject resting HR for TRIMP calculation
+    if (!finalWorkoutData.resting_heart_rate && restingHr) {
+      finalWorkoutData.resting_heart_rate = restingHr;
+      console.log('[calculate-workload] Injected resting HR:', restingHr);
     }
     
     // Parse workout_metadata if it's a string (JSONB from database)
@@ -847,17 +978,22 @@ serve(async (req) => {
       )
     }
 
-    // Determine which intensity method was used for debug info
-    let intensityMethod = 'default';
+    // Determine which workload method was used for debug info
+    let workloadMethod = 'duration_intensity';
     const wType = finalWorkoutData?.type?.toLowerCase() || '';
-    if ((wType === 'run') && finalWorkoutData?.avg_heart_rate && finalWorkoutData?.threshold_heart_rate) {
-      intensityMethod = 'hr_based';
+    const isCardio = wType === 'run' || wType === 'ride' || wType === 'bike' || wType === 'swim';
+    
+    // Check if TRIMP was used (cardio with HR + max HR)
+    if (isCardio && finalWorkoutData?.avg_heart_rate && finalWorkoutData?.max_heart_rate) {
+      workloadMethod = 'trimp_hr_based';
+    } else if (wType === 'strength') {
+      workloadMethod = 'volume_based';
+    } else if ((wType === 'run') && finalWorkoutData?.avg_heart_rate && finalWorkoutData?.threshold_heart_rate) {
+      workloadMethod = 'hr_intensity';
     } else if ((wType === 'ride' || wType === 'bike') && userFtp && finalWorkoutData?.avg_power) {
-      intensityMethod = 'power_based';
-    } else if ((wType === 'ride' || wType === 'bike') && finalWorkoutData?.avg_heart_rate && finalWorkoutData?.threshold_heart_rate) {
-      intensityMethod = 'hr_based';
+      workloadMethod = 'power_intensity';
     } else if (finalWorkoutData?.steps_preset?.length > 0) {
-      intensityMethod = 'steps_preset';
+      workloadMethod = 'steps_preset';
     }
     
     return new Response(
@@ -869,14 +1005,18 @@ serve(async (req) => {
         intensity_factor: intensity,
         planned_workload: plannedWorkload, // For comparison when attached
         workload_difference: plannedWorkload !== null ? workload - plannedWorkload : null,
-        // Debug info for intensity calculation
+        // Debug info for workload calculation
         user_ftp: userFtp,
         run_threshold_hr: runThresholdHr,
         ride_threshold_hr: rideThresholdHr,
+        run_max_hr: runMaxHr,
+        ride_max_hr: rideMaxHr,
+        resting_hr: restingHr,
         avg_power: finalWorkoutData?.avg_power,
         avg_heart_rate: finalWorkoutData?.avg_heart_rate,
         threshold_heart_rate: finalWorkoutData?.threshold_heart_rate,
-        intensity_method: intensityMethod
+        max_heart_rate: finalWorkoutData?.max_heart_rate,
+        workload_method: workloadMethod
       }),
       { 
         status: 200, 
