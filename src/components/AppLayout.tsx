@@ -499,13 +499,33 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     return () => window.removeEventListener('week:navigate', handler as any);
   }, []);
 
-  // NEW: Training Baselines handler
+  // NEW: Training Baselines handler - clear other views first
   const handleTrainingBaselinesClick = () => {
+    setSelectedWorkout(null);
+    setShowContext(false);
+    setShowStrengthLogger(false);
+    setShowPilatesYogaLogger(false);
+    setShowBuilder(false);
+    setShowGear(false);
+    setShowImportPage(false);
+    setShowAllPlans(false);
+    setShowStrengthPlans(false);
+    setShowPlanBuilder(false);
     setShowTrainingBaselines(true);
   };
 
-  // Gear handler
+  // Gear handler - clear other views first
   const handleGearClick = () => {
+    setSelectedWorkout(null);
+    setShowContext(false);
+    setShowStrengthLogger(false);
+    setShowPilatesYogaLogger(false);
+    setShowBuilder(false);
+    setShowTrainingBaselines(false);
+    setShowImportPage(false);
+    setShowAllPlans(false);
+    setShowStrengthPlans(false);
+    setShowPlanBuilder(false);
     setShowGear(true);
   };
 
@@ -514,8 +534,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     navigate('/connections');
   };
 
-  // NEW: Import handlers
+  // NEW: Import handlers - clear other views first
   const handleImportClick = () => {
+    setSelectedWorkout(null);
+    setShowContext(false);
+    setShowStrengthLogger(false);
+    setShowPilatesYogaLogger(false);
+    setShowBuilder(false);
+    setShowTrainingBaselines(false);
+    setShowGear(false);
+    setShowAllPlans(false);
+    setShowStrengthPlans(false);
+    setShowPlanBuilder(false);
     setShowImportPage(true);
   };
 
@@ -1205,7 +1235,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       </header>
 
       {/* Render UnifiedWorkoutView OUTSIDE mobile-main-content to avoid z-index issues */}
-      {selectedWorkout && !showPlanBuilder && !showStrengthPlans && !showAllPlans && !showStrengthLogger && (
+      {selectedWorkout && !showPlanBuilder && !showStrengthPlans && !showAllPlans && !showStrengthLogger && !showTrainingBaselines && !showGear && !showImportPage && !showContext && !showPilatesYogaLogger && (
         <UnifiedWorkoutView
           workout={selectedWorkout}
           onUpdateWorkout={handleUpdateWorkout}
