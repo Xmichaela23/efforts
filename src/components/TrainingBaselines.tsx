@@ -939,26 +939,123 @@ return (
                             <Bike className="h-4 w-4" style={{ color: SPORT_COLORS.cycling }} />
                             <h3 className="text-sm font-medium text-white/90">Cycling</h3>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-xs text-white/60">FTP</label>
-                                      <input
-                              type="number"
-                              value={data.performanceNumbers?.ftp || ''}
-                                        onChange={(e) => setData(prev => ({
-                                          ...prev,
-                                          performanceNumbers: {
-                                            ...prev.performanceNumbers,
-                                  ftp: parseInt(e.target.value) || undefined
-                                          }
-                                        }))}
-                              placeholder="250"
-                              className="w-20 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                              style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                            <span className="text-xs text-white/60">watts</span>
-                                    </div>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs text-white/60">FTP</label>
+                              <input
+                                type="number"
+                                value={data.performanceNumbers?.ftp || ''}
+                                onChange={(e) => setData(prev => ({
+                                  ...prev,
+                                  performanceNumbers: {
+                                    ...prev.performanceNumbers,
+                                    ftp: parseInt(e.target.value) || undefined
+                                  }
+                                }))}
+                                placeholder="250"
+                                className="w-20 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
+                              />
+                              <span className="text-xs text-white/60">watts</span>
+                            </div>
+                            
+                            {/* Power Zones from FTP */}
+                            {(data.performanceNumbers?.ftp || learnedFitness?.ride_ftp_estimated?.value) && (
+                              <div className="ml-0">
+                                <button
+                                  onClick={() => setShowPowerZones(!showPowerZones)}
+                                  className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/70 transition-colors"
+                                >
+                                  {showPowerZones ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                  <span>Power Zones</span>
+                                  <span className="text-white/30 ml-1">
+                                    (from {data.performanceNumbers?.ftp ? 'manual' : 'learned'} FTP)
+                                  </span>
+                                </button>
+                                
+                                {showPowerZones && (
+                                  <div className="mt-2 space-y-1">
+                                    {getPowerZones(data.performanceNumbers?.ftp || learnedFitness?.ride_ftp_estimated?.value).map((zone) => (
+                                      <div 
+                                        key={zone.name}
+                                        className="flex items-center justify-between px-2 py-1 rounded text-xs"
+                                        style={{ backgroundColor: `${zone.color}15` }}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <div 
+                                            className="w-2 h-2 rounded-full"
+                                            style={{ backgroundColor: zone.color }}
+                                          />
+                                          <span className="text-white/70">{zone.name}</span>
+                                        </div>
+                                        <span className="text-white/50 font-mono">{zone.range}</span>
+                                      </div>
+                                    ))}
                                   </div>
                                 )}
+                              </div>
+                            )}
+                            
+                            {/* FTP Test Scheduling */}
+                            <div className="pt-2 border-t border-white/10">
+                              {scheduledFtpTest && !showFtpDatePicker ? (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs text-emerald-400">
+                                    FTP Test: {new Date(scheduledFtpTest.date + 'T12:00:00').toLocaleDateString()}
+                                  </span>
+                                  <button
+                                    onClick={rescheduleFtpTest}
+                                    className="text-xs px-2 py-1 rounded bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+                                  >
+                                    Reschedule
+                                  </button>
+                                  <button
+                                    onClick={deleteFtpTest}
+                                    className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              ) : !showFtpDatePicker ? (
+                                <button 
+                                  onClick={() => setShowFtpDatePicker(true)}
+                                  className="text-xs px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 bg-white/10 text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
+                                >
+                                  <Calendar className="h-3.5 w-3.5" />
+                                  Schedule FTP Test
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="date"
+                                    value={ftpTestDate}
+                                    onChange={(e) => setFtpTestDate(e.target.value)}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    className="text-xs px-2 py-1.5 rounded bg-white/10 border border-white/20 text-white"
+                                  />
+                                  <button
+                                    onClick={async () => {
+                                      if (scheduledFtpTest) {
+                                        await deleteFtpTest();
+                                      }
+                                      await scheduleFtpTest();
+                                    }}
+                                    className="text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
+                                  >
+                                    {scheduledFtpTest ? 'Update' : 'Add'}
+                                  </button>
+                                  <button
+                                    onClick={() => setShowFtpDatePicker(false)}
+                                    className="text-xs px-2 py-1.5 text-white/50 hover:text-white"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Swimming */}
                       {activeSport === 'swimming' && (
@@ -1463,7 +1560,7 @@ return (
                         )}
 
                         {/* Cycling HR Zones */}
-                        {(learnedFitness.ride_threshold_hr || learnedFitness.ride_easy_hr || learnedFitness.ride_ftp_estimated) && (
+                        {(learnedFitness.ride_threshold_hr || learnedFitness.ride_easy_hr || learnedFitness.ride_max_hr_observed) && (
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
                               <Bike className="h-4 w-4" style={{ color: SPORT_COLORS.cycling }} />
@@ -1503,84 +1600,6 @@ return (
                                   </div>
                                 </div>
                               )}
-                              {learnedFitness.ride_ftp_estimated && (
-                                <div className={`px-3 py-2 rounded-lg border ${
-                                  learnedFitness.ride_ftp_estimated.confidence === 'low' 
-                                    ? 'bg-yellow-500/5 border-yellow-500/20' 
-                                    : 'bg-white/[0.04] border-white/10'
-                                }`}>
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <div className="text-xs text-white/50">FTP</div>
-                                      <div className="text-sm font-medium text-white">{learnedFitness.ride_ftp_estimated.value} W</div>
-                                    </div>
-                                    <div className="text-xs text-white/40">
-                                      {getConfidenceDots(learnedFitness.ride_ftp_estimated.confidence)}
-                                    </div>
-                                  </div>
-                                  <div className="mt-2">
-                                    {scheduledFtpTest && !showFtpDatePicker ? (
-                                      // Show scheduled test with options
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-xs text-emerald-400">
-                                          Scheduled: {new Date(scheduledFtpTest.date + 'T12:00:00').toLocaleDateString()}
-                                        </span>
-                                        <button
-                                          onClick={rescheduleFtpTest}
-                                          className="text-xs px-2 py-1 rounded bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
-                                        >
-                                          Reschedule
-                                        </button>
-                                        <button
-                                          onClick={deleteFtpTest}
-                                          className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                                        >
-                                          Delete
-                                        </button>
-                                      </div>
-                                    ) : !showFtpDatePicker ? (
-                                      <button 
-                                        onClick={() => setShowFtpDatePicker(true)}
-                                        className={`text-xs px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 transition-colors ${
-                                          learnedFitness.ride_ftp_estimated.confidence === 'low' 
-                                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30' 
-                                            : 'bg-white/10 text-white/80 border border-white/20 hover:bg-white/20'
-                                        }`}
-                                      >
-                                        <Calendar className="h-3.5 w-3.5" />
-                                        {learnedFitness.ride_ftp_estimated.confidence === 'low' ? 'Schedule FTP Test' : 'Retest FTP'}
-                                      </button>
-                                    ) : (
-                                      <div className="flex items-center gap-2">
-                                        <input
-                                          type="date"
-                                          value={ftpTestDate}
-                                          onChange={(e) => setFtpTestDate(e.target.value)}
-                                          min={new Date().toISOString().split('T')[0]}
-                                          className="text-xs px-2 py-1.5 rounded bg-white/10 border border-white/20 text-white"
-                                        />
-                                        <button
-                                          onClick={async () => {
-                                            if (scheduledFtpTest) {
-                                              await deleteFtpTest();
-                                            }
-                                            await scheduleFtpTest();
-                                          }}
-                                          className="text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
-                                        >
-                                          {scheduledFtpTest ? 'Update' : 'Add'}
-                                        </button>
-                                        <button
-                                          onClick={() => setShowFtpDatePicker(false)}
-                                          className="text-xs px-2 py-1.5 text-white/50 hover:text-white"
-                                        >
-                                          Cancel
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
                               {learnedFitness.ride_max_hr_observed && (
                                 <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
                                   <div>
@@ -1591,40 +1610,6 @@ return (
                                 </div>
                               )}
                             </div>
-                            
-                            {/* Power Zones from FTP */}
-                            {learnedFitness.ride_ftp_estimated && (
-                              <div className="col-span-2 mt-2">
-                                <button
-                                  onClick={() => setShowPowerZones(!showPowerZones)}
-                                  className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/70 transition-colors"
-                                >
-                                  {showPowerZones ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                  <span>Power Zones</span>
-                                </button>
-                                
-                                {showPowerZones && (
-                                  <div className="mt-2 space-y-1">
-                                    {getPowerZones(learnedFitness.ride_ftp_estimated.value).map((zone) => (
-                                      <div 
-                                        key={zone.name}
-                                        className="flex items-center justify-between px-2 py-1 rounded text-xs"
-                                        style={{ backgroundColor: `${zone.color}15` }}
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          <div 
-                                            className="w-2 h-2 rounded-full"
-                                            style={{ backgroundColor: zone.color }}
-                                          />
-                                          <span className="text-white/70">{zone.name}</span>
-                                        </div>
-                                        <span className="text-white/50 font-mono">{zone.range}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
                           </div>
                         )}
 
