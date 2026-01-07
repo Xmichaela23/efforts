@@ -124,7 +124,13 @@ interface WorkoutData {
 function calculateTRIMPWorkload(workout: WorkoutData): number | null {
   const avgHR = workout.avg_heart_rate;
   const maxHR = workout.max_heart_rate;
-  const restingHR = workout.resting_heart_rate || 60; // Default resting HR if not set
+  
+  // Smart resting HR default: threshold_HR - 90 (typical spread for most athletes)
+  // Falls back to 60 bpm if no threshold HR available
+  const smartRestingDefault = workout.threshold_heart_rate 
+    ? Math.max(workout.threshold_heart_rate - 90, 45) // Floor at 45 bpm
+    : 60;
+  const restingHR = workout.resting_heart_rate || smartRestingDefault;
   
   // Need HR data and max HR for TRIMP
   if (!avgHR || !maxHR || avgHR <= 0 || maxHR <= 0) {
@@ -168,7 +174,7 @@ function calculateTRIMPWorkload(workout: WorkoutData): number | null {
   const scaleFactor = 0.6;
   const scaledWorkload = Math.round(rawTRIMP * scaleFactor);
   
-  console.log(`[TRIMP] avgHR=${avgHR}, maxHR=${maxHR}, restHR=${restingHR}, duration=${durationMinutes}min`);
+  console.log(`[TRIMP] avgHR=${avgHR}, maxHR=${maxHR}, restHR=${restingHR} (thr=${workout.threshold_heart_rate || 'none'}), duration=${durationMinutes}min`);
   console.log(`[TRIMP] hrRatio=${hrRatio.toFixed(3)}, weight=${weightingFactor.toFixed(2)}, raw=${rawTRIMP.toFixed(1)}, scaled=${scaledWorkload}`);
   
   return scaledWorkload;
