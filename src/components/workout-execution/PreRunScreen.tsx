@@ -227,7 +227,10 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
         </div>
         
         {/* Audio Row */}
-        <div className="bg-white/[0.05] backdrop-blur-lg border border-white/20 rounded-xl p-4">
+        <button 
+          onClick={onToggleVoice}
+          className="w-full bg-white/[0.05] backdrop-blur-lg border border-white/20 rounded-xl p-4 text-left"
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {voiceEnabled ? (
@@ -237,17 +240,35 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
               )}
               <span className="text-white">Audio</span>
             </div>
-            <button 
-              onClick={onToggleVoice}
-              className="text-gray-300 hover:text-white transition-colors"
-            >
+            <span className="text-cyan-400">
               {voiceEnabled 
                 ? (vibrationEnabled ? 'Voice + Vibe' : 'Voice only')
                 : (vibrationEnabled ? 'Vibe only' : 'Silent')
               }
-            </button>
+            </span>
           </div>
-        </div>
+          <div className="mt-3 text-gray-400 text-xs font-light leading-relaxed">
+            {voiceEnabled ? (
+              <>
+                Announces interval changes with countdown.
+                <br />
+                Music will briefly duck during announcements.
+              </>
+            ) : vibrationEnabled ? (
+              <>
+                Vibrates at interval changes. No voice.
+                <br />
+                Music plays uninterrupted.
+              </>
+            ) : (
+              <>
+                No audio or vibration feedback.
+                <br />
+                Watch screen for interval changes.
+              </>
+            )}
+          </div>
+        </button>
         
         {/* Treadmill Pace Hint */}
         {environment === 'indoor' && equipment === 'treadmill' && paceHint && (
