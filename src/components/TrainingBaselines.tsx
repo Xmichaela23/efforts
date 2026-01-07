@@ -940,24 +940,78 @@ return (
                             <h3 className="text-sm font-medium text-white/90">Cycling</h3>
                           </div>
                           <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs text-white/60">FTP</label>
-                              <input
-                                type="number"
-                                value={data.performanceNumbers?.ftp || ''}
-                                onChange={(e) => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: {
-                                    ...prev.performanceNumbers,
-                                    ftp: parseInt(e.target.value) || undefined
-                                  }
-                                }))}
-                                placeholder="250"
-                                className="w-20 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                              />
-                              <span className="text-xs text-white/60">watts</span>
-                            </div>
+                            {/* FTP Input with Smart Status */}
+                            {(() => {
+                              const manualFtp = data.performanceNumbers?.ftp;
+                              const learnedFtp = learnedFitness?.ride_ftp_estimated?.value;
+                              const effectiveFtp = manualFtp || learnedFtp;
+                              const learnedImproved = manualFtp && learnedFtp && learnedFtp > manualFtp;
+                              
+                              return (
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-xs text-white/60">FTP</label>
+                                    <input
+                                      type="number"
+                                      value={manualFtp || learnedFtp || ''}
+                                      onChange={(e) => setData(prev => ({
+                                        ...prev,
+                                        performanceNumbers: {
+                                          ...prev.performanceNumbers,
+                                          ftp: parseInt(e.target.value) || undefined
+                                        }
+                                      }))}
+                                      placeholder="250"
+                                      className="w-20 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                                      style={{ fontFamily: 'Inter, sans-serif' }}
+                                    />
+                                    <span className="text-xs text-white/60">watts</span>
+                                  </div>
+                                  
+                                  {/* Status helper text */}
+                                  <div className="text-[11px] text-white/40 pl-8">
+                                    {!manualFtp && !learnedFtp && (
+                                      <span>Enter your FTP or we'll learn it from your workouts</span>
+                                    )}
+                                    {!manualFtp && learnedFtp && (
+                                      <span className="text-teal-400/70">
+                                        Auto-learned from workouts • Edit to override
+                                      </span>
+                                    )}
+                                    {manualFtp && !learnedImproved && (
+                                      <span className="flex items-center gap-1">
+                                        <span>Manual</span>
+                                        {learnedFtp && (
+                                          <button
+                                            onClick={() => setData(prev => {
+                                              const { ftp, ...rest } = prev.performanceNumbers as any;
+                                              return { ...prev, performanceNumbers: rest };
+                                            })}
+                                            className="text-white/50 hover:text-white/70 underline"
+                                          >
+                                            • Clear to use auto-learned ({learnedFtp}W)
+                                          </button>
+                                        )}
+                                      </span>
+                                    )}
+                                    {manualFtp && learnedImproved && (
+                                      <span className="text-amber-400/70 flex items-center gap-1">
+                                        <span>Manual (auto-learned improved to {learnedFtp}W)</span>
+                                        <button
+                                          onClick={() => setData(prev => {
+                                            const { ftp, ...rest } = prev.performanceNumbers as any;
+                                            return { ...prev, performanceNumbers: rest };
+                                          })}
+                                          className="underline hover:text-amber-300"
+                                        >
+                                          • Use learned
+                                        </button>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                             
                             {/* Power Zones from FTP */}
                             {(data.performanceNumbers?.ftp || learnedFitness?.ride_ftp_estimated?.value) && (
@@ -968,9 +1022,6 @@ return (
                                 >
                                   {showPowerZones ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                                   <span>Power Zones</span>
-                                  <span className="text-white/30 ml-1">
-                                    (from {data.performanceNumbers?.ftp ? 'manual' : 'learned'} FTP)
-                                  </span>
                                 </button>
                                 
                                 {showPowerZones && (
