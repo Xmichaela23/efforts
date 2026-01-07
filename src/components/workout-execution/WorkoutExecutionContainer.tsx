@@ -370,11 +370,20 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
   // -------------------------------------------------------------------------
   
   const handleDiscard = useCallback(async () => {
+    // Delete from server if already saved
+    if (savedWorkoutId) {
+      try {
+        await supabase.from('workouts').delete().eq('id', savedWorkoutId);
+      } catch (err) {
+        console.error('Failed to delete workout from server:', err);
+      }
+    }
+    
     await executionStorage.deleteSession(sessionId);
     execution.discardWorkout();
     await wakeLock.release();
     onClose();
-  }, [sessionId, execution, wakeLock, onClose]);
+  }, [sessionId, savedWorkoutId, execution, wakeLock, onClose]);
   
   // -------------------------------------------------------------------------
   // View Details

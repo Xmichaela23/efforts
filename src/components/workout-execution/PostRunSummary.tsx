@@ -199,7 +199,7 @@ export const PostRunSummary: React.FC<PostRunSummaryProps> = ({
           className="w-full py-4 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white 
                    text-lg font-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          SAVE
+          DONE
         </button>
         
         <button
