@@ -159,8 +159,8 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
     }
   };
   
-  // Discipline colors
-  const disciplineColor = isRun ? 'teal' : 'green';
+  // Discipline colors - teal for run (20,184,166), green for ride (22,163,74)
+  const rgb = isRun ? '20,184,166' : '22,163,74';
   const accentClasses = isRun 
     ? { text: 'text-teal-400', border: 'border-teal-500/30', bg: 'bg-teal-600', hoverBg: 'hover:bg-teal-500' }
     : { text: 'text-green-400', border: 'border-green-500/30', bg: 'bg-green-600', hoverBg: 'hover:bg-green-500' };
@@ -170,10 +170,24 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
       className="min-h-screen flex flex-col"
       style={{
         background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+        backgroundImage: `
+          radial-gradient(circle at 20% 50%, rgba(${rgb}, 0.08) 0%, transparent 60%),
+          radial-gradient(circle at 80% 80%, rgba(${rgb}, 0.05) 0%, transparent 60%),
+          radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+          linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%)
+        `,
+        backgroundAttachment: 'fixed'
       }}
     >
       {/* Header Card - Like StrengthLogger */}
-      <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pb-4 mb-4 mx-3 mt-3 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
+      <div 
+        className="backdrop-blur-xl border-2 pb-4 mb-4 mx-3 mt-3 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+        style={{
+          background: `linear-gradient(135deg, rgba(${rgb},0.15) 0%, rgba(${rgb},0.05) 50%, rgba(255,255,255,0.03) 100%)`,
+          borderColor: `rgba(${rgb}, 0.3)`
+        }}
+      >
         {/* Top bar */}
         <div className="flex items-center justify-between p-4">
           <button 
@@ -209,9 +223,15 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
       {/* Sensor Status Cards */}
       <div className="flex-1 px-3 space-y-3">
         {/* GPS Row (outdoor only) */}
-        <div className={`bg-white/[0.05] backdrop-blur-xl border-2 ${accentClasses.border} rounded-2xl p-4
-                       shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]
-                       ${!isOutdoor ? 'opacity-50' : ''}`}>
+        <div 
+          className={`backdrop-blur-xl border-2 rounded-2xl p-4
+                     shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]
+                     ${!isOutdoor ? 'opacity-50' : ''}`}
+          style={{
+            background: `linear-gradient(135deg, rgba(${rgb},0.12) 0%, rgba(${rgb},0.04) 50%, rgba(255,255,255,0.02) 100%)`,
+            borderColor: `rgba(${rgb}, 0.3)`
+          }}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <MapPin className={`w-5 h-5 ${isOutdoor ? accentClasses.text : 'text-gray-500'}`} />
@@ -224,11 +244,17 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
         </div>
         
         {/* HR Row */}
-        <div className={`bg-white/[0.05] backdrop-blur-xl border-2 ${accentClasses.border} rounded-2xl p-4
-                        shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]`}>
+        <div 
+          className="backdrop-blur-xl border-2 rounded-2xl p-4
+                    shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+          style={{
+            background: `linear-gradient(135deg, rgba(${rgb},0.12) 0%, rgba(${rgb},0.04) 50%, rgba(255,255,255,0.02) 100%)`,
+            borderColor: `rgba(${rgb}, 0.3)`
+          }}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Heart className="w-5 h-5 text-white" />
+              <Heart className={`w-5 h-5 ${accentClasses.text}`} />
               <span className="text-white">Heart Rate</span>
             </div>
             {renderHRStatus()}
@@ -238,8 +264,12 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
         {/* Audio Row */}
         <button 
           onClick={onToggleVoice}
-          className={`w-full bg-white/[0.05] backdrop-blur-xl border-2 ${accentClasses.border} rounded-2xl p-4 text-left
-                     shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]`}
+          className="w-full backdrop-blur-xl border-2 rounded-2xl p-4 text-left
+                   shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]"
+          style={{
+            background: `linear-gradient(135deg, rgba(${rgb},0.12) 0%, rgba(${rgb},0.04) 50%, rgba(255,255,255,0.02) 100%)`,
+            borderColor: `rgba(${rgb}, 0.3)`
+          }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
