@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Download, Link, Package, Settings, RefreshCw, Calendar, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, Menu, User, Upload, Download, Link, Package, Settings, RefreshCw, Calendar, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAppContext } from '@/contexts/AppContext';
 import StravaPreview from '@/components/StravaPreview';
@@ -186,7 +186,6 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   
   // Resting HR override (optional - user can set their own)
   const [customRestingHR, setCustomRestingHR] = useState<number | null>(null);
-  const [showPowerZones, setShowPowerZones] = useState(false);
 
   // Check if data has changed from original
   const hasChanges = JSON.stringify(data) !== originalData;
@@ -1013,37 +1012,28 @@ return (
                               );
                             })()}
                             
-                            {/* Power Zones from FTP */}
+                            {/* Power Zones from FTP - always visible */}
                             {(data.performanceNumbers?.ftp || learnedFitness?.ride_ftp_estimated?.value) && (
-                              <div className="ml-0">
-                                <button
-                                  onClick={() => setShowPowerZones(!showPowerZones)}
-                                  className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/70 transition-colors"
-                                >
-                                  {showPowerZones ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                  <span>Power Zones</span>
-                                </button>
-                                
-                                {showPowerZones && (
-                                  <div className="mt-2 space-y-1">
-                                    {getPowerZones(data.performanceNumbers?.ftp || learnedFitness?.ride_ftp_estimated?.value).map((zone) => (
-                                      <div 
-                                        key={zone.name}
-                                        className="flex items-center justify-between px-2 py-1 rounded text-xs"
-                                        style={{ backgroundColor: `${zone.color}15` }}
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          <div 
-                                            className="w-2 h-2 rounded-full"
-                                            style={{ backgroundColor: zone.color }}
-                                          />
-                                          <span className="text-white/70">{zone.name}</span>
-                                        </div>
-                                        <span className="text-white/50 font-mono">{zone.range}</span>
+                              <div className="space-y-1.5">
+                                <div className="text-xs text-white/50 font-medium">Power Zones</div>
+                                <div className="space-y-1">
+                                  {getPowerZones(data.performanceNumbers?.ftp || learnedFitness?.ride_ftp_estimated?.value).map((zone) => (
+                                    <div 
+                                      key={zone.name}
+                                      className="flex items-center justify-between px-2 py-1 rounded text-xs"
+                                      style={{ backgroundColor: `${zone.color}15` }}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div 
+                                          className="w-2 h-2 rounded-full"
+                                          style={{ backgroundColor: zone.color }}
+                                        />
+                                        <span className="text-white/70">{zone.name}</span>
                                       </div>
-                                    ))}
-                                  </div>
-                                )}
+                                      <span className="text-white/50 font-mono">{zone.range}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
                             
