@@ -21,11 +21,19 @@
  * - Workload (strength): volume_factor × intensity² × 100
  * - ACWR: (7-day sum / 7) / (28-day sum / 28)
  * 
- * ACWR THRESHOLDS:
+ * ACWR THRESHOLDS (plan-aware):
+ * 
+ * Without active plan:
  * - < 0.80: undertrained
  * - 0.80 - 1.30: optimal
- * - 1.30 - 1.50: elevated
- * - > 1.50: high_risk
+ * - 1.30 - 1.50: elevated (warning)
+ * - > 1.50: high_risk (critical)
+ * 
+ * With active plan (trust the plan's periodization):
+ * - < 0.80: undertrained
+ * - 0.80 - 1.50: optimal (plan progression)
+ * - 1.50 - 1.70: elevated (warning)
+ * - > 1.70: high_risk (critical)
  * =============================================================================
  */
 
@@ -260,10 +268,31 @@ Deno.serve(async (req) => {
     const weekComparison = calculateWeekComparison(workouts, sevenDaysAgo, focusDate, previousWeekStart);
 
     // ==========================================================================
+    // CHECK FOR ACTIVE TRAINING PLAN
+    // ==========================================================================
+    
+    let hasActivePlan = false;
+    try {
+      const { data: activePlans } = await supabase
+        .from('training_plans')
+        .select('id, name')
+        .eq('user_id', user_id)
+        .eq('status', 'active')
+        .limit(1);
+      
+      hasActivePlan = (activePlans && activePlans.length > 0);
+      if (hasActivePlan) {
+        console.log(`📋 User has active plan: ${activePlans[0].name}`);
+      }
+    } catch (e) {
+      console.log('⚠️ Could not check for active plan:', e);
+    }
+
+    // ==========================================================================
     // GENERATE SMART INSIGHTS
     // ==========================================================================
 
-    const insights = generateInsights(acwr, sportBreakdown, weekComparison, timeline);
+    const insights = generateInsights(acwr, sportBreakdown, weekComparison, timeline, hasActivePlan);
 
     // ==========================================================================
     // BUILD RESPONSE
@@ -598,38 +627,62 @@ function generateInsights(
   acwr: ACWRData,
   sportBreakdown: SportBreakdown,
   weekComparison: WeekComparison,
-  timeline: TimelineDay[]
+  timeline: TimelineDay[],
+  hasActivePlan: boolean = false
 ): Insight[] {
   const insights: Insight[] = [];
 
-  // 1. High ACWR Warning (CRITICAL priority)
-  if (acwr.ratio > 1.30 && acwr.data_days >= 7) {
-    const severity = acwr.ratio > 1.50 ? 'critical' : 'warning';
+  // ==========================================================================
+  // PLAN-AWARE THRESHOLDS
+  // When following a plan, we trust the plan's periodization
+  // Only warn at higher thresholds, and use softer messaging
+  // ==========================================================================
+  
+  // ACWR thresholds: higher when on a plan (trust the plan)
+  const acwrWarningThreshold = hasActivePlan ? 1.50 : 1.30;
+  const acwrCriticalThreshold = hasActivePlan ? 1.70 : 1.50;
+  
+  // Weekly jump threshold: higher when on a plan (planned progression)
+  const weeklyJumpThreshold = hasActivePlan ? 50 : 30;
+
+  // 1. High ACWR Warning
+  if (acwr.ratio > acwrWarningThreshold && acwr.data_days >= 7) {
+    const severity = acwr.ratio > acwrCriticalThreshold ? 'critical' : 'warning';
+    const message = hasActivePlan
+      ? `ACWR at ${acwr.ratio.toFixed(2)} - elevated even for plan progression, consider extra recovery`
+      : `ACWR at ${acwr.ratio.toFixed(2)} - consider reducing load or adding recovery`;
     insights.push({
       type: 'acwr_high',
       severity,
-      message: `ACWR at ${acwr.ratio.toFixed(2)} - consider reducing load or adding recovery`,
+      message,
       data: { ratio: acwr.ratio, status: acwr.status }
     });
   }
 
-  // 2. Consecutive Hard Days (WARNING priority)
+  // 2. Consecutive Hard Days (softened when on a plan)
   const consecutiveHardDays = calculateConsecutiveHardDays(timeline);
-  if (consecutiveHardDays >= 3) {
+  const consecutiveThreshold = hasActivePlan ? 4 : 3; // Allow more consecutive days when on plan
+  if (consecutiveHardDays >= consecutiveThreshold) {
+    const message = hasActivePlan
+      ? `${consecutiveHardDays} consecutive quality days - ensure adequate sleep/nutrition`
+      : `${consecutiveHardDays} consecutive quality days - prioritize recovery`;
     insights.push({
       type: 'consecutive_hard',
       severity: 'warning',
-      message: `${consecutiveHardDays} consecutive quality days - prioritize recovery`,
+      message,
       data: { days: consecutiveHardDays }
     });
   }
 
-  // 3. Large Weekly Jump (WARNING priority)
-  if (weekComparison.change_direction === 'increase' && weekComparison.change_percent > 30) {
+  // 3. Large Weekly Jump (higher threshold and softer message when on plan)
+  if (weekComparison.change_direction === 'increase' && weekComparison.change_percent > weeklyJumpThreshold) {
+    const message = hasActivePlan
+      ? `Weekly load increased ${weekComparison.change_percent}% - normal for build phase, monitor recovery`
+      : `Weekly load increased ${weekComparison.change_percent}% - monitor for fatigue signals`;
     insights.push({
       type: 'weekly_jump',
-      severity: 'warning',
-      message: `Weekly load increased ${weekComparison.change_percent}% - monitor for fatigue signals`,
+      severity: hasActivePlan ? 'info' : 'warning',
+      message,
       data: { 
         change: weekComparison.change_percent,
         current: weekComparison.current_week_total,
