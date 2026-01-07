@@ -174,9 +174,9 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
             PREPARE
           </span>
           {environment === 'outdoor' ? (
-            <span className="text-green-400 text-xs">🌳 Outdoor</span>
+            <span className="text-green-400 text-xs">Outdoor</span>
           ) : (
-            <span className="text-blue-400 text-xs">🏠 {equipment === 'treadmill' ? 'Treadmill' : 'Trainer'}</span>
+            <span className="text-blue-400 text-xs">{equipment === 'treadmill' ? 'Treadmill' : 'Trainer'}</span>
           )}
         </div>
         <button 
@@ -253,7 +253,7 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
         {environment === 'indoor' && equipment === 'treadmill' && paceHint && (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
             <div className="flex items-start gap-3">
-              <span className="text-amber-400">💡</span>
+              <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
                 <div className="text-amber-200 text-sm font-light">
                   Set treadmill to target pace
@@ -267,8 +267,8 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
         )}
       </div>
       
-      {/* Begin Button */}
-      <div className="p-4 pb-8">
+      {/* Begin Button - with safe area padding for mobile */}
+      <div className="p-4 pb-safe" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 2rem))' }}>
         <button
           onClick={onBegin}
           disabled={!canStart}
@@ -278,7 +278,7 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
                       : 'bg-white/10 text-gray-500 cursor-not-allowed'
                     }`}
         >
-          {isRun ? '🏃 BEGIN RUN' : '🚴 BEGIN RIDE'}
+          {isRun ? 'BEGIN RUN' : 'BEGIN RIDE'}
         </button>
         
         {!canStart && isOutdoor && gpsStatus === 'acquiring' && (
