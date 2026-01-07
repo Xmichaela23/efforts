@@ -779,20 +779,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     
     // Check if we should go directly to logger (from "Go to workout" button)
     if ((workout as any)?.__openLogger && status === 'planned') {
-      const isStrengthOrMobility = ['strength', 'mobility'].includes(workoutType);
+      const isStrength = workoutType === 'strength';
+      const isMobility = workoutType === 'mobility';
       const isPilatesYoga = workoutType === 'pilates_yoga';
       
-      if (isStrengthOrMobility) {
-        // Set the scheduled workout and open strength logger
-        setLoggerScheduledWorkout({
-          ...workout,
-          logger_mode: workoutType === 'mobility' ? 'mobility' : undefined,
-        });
-        setShowStrengthLogger(true);
+      if (isStrength) {
+        // Strength goes directly to logger
+        window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: workout } }));
+        return;
+      } else if (isMobility) {
+        // Mobility needs conversion - dispatch event to go through proper handler
+        window.dispatchEvent(new CustomEvent('open:mobilityLogger', { detail: { planned: workout } }));
         return;
       } else if (isPilatesYoga) {
-        setLoggerScheduledWorkout(workout);
-        setShowPilatesYogaLogger(true);
+        window.dispatchEvent(new CustomEvent('open:pilatesYogaLogger', { detail: { planned: workout } }));
         return;
       }
     }
