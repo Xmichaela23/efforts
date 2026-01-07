@@ -88,6 +88,7 @@ interface TimelineWorkout {
   type: string;
   name: string;
   workload_actual: number;
+  intensity_factor: number | null;
   duration: number;
   status: 'completed' | 'planned' | 'skipped';
 }
@@ -96,6 +97,7 @@ interface TimelineDay {
   date: string;
   workouts: TimelineWorkout[];
   daily_total: number;
+  max_intensity_factor: number | null;
   is_acute_window: boolean;
 }
 
@@ -128,6 +130,7 @@ interface WorkoutRecord {
   date: string;
   workload_actual: number;
   workload_planned: number;
+  intensity_factor: number | null;
   duration: number;
   moving_time: number;
   workout_status: string;
@@ -213,7 +216,7 @@ Deno.serve(async (req) => {
     // Fetch completed workouts for last 28 days
     const { data: completedWorkouts, error: completedError } = await supabase
       .from('workouts')
-      .select('id, type, name, date, workload_actual, workload_planned, duration, moving_time, workout_status')
+      .select('id, type, name, date, workload_actual, workload_planned, intensity_factor, duration, moving_time, workout_status')
       .eq('user_id', user_id)
       .eq('workout_status', 'completed')
       .gte('date', twentyEightDaysAgoISO)
@@ -525,6 +528,7 @@ function buildTimeline(
       type: w.type,
       name: w.name || getDefaultWorkoutName(w.type),
       workload_actual: w.workload_actual || 0,
+      intensity_factor: w.intensity_factor,
       duration: w.moving_time || w.duration || 0,
       status: 'completed'
     });
@@ -541,6 +545,7 @@ function buildTimeline(
       type: p.type,
       name: p.name || getDefaultWorkoutName(p.type),
       workload_actual: p.workload_planned || 0, // Use planned workload
+      intensity_factor: null, // Planned workouts don't have IF yet
       duration: p.duration || 0,
       status: 'planned'
     });
@@ -553,9 +558,14 @@ function buildTimeline(
     const dateKey = dayDate.toLocaleDateString('en-CA');
     
     const dayWorkouts = workoutsByDate.get(dateKey) || [];
-    const dailyTotal = dayWorkouts
-      .filter(w => w.status === 'completed')
-      .reduce((sum, w) => sum + w.workload_actual, 0);
+    const completedWorkoutsForDay = dayWorkouts.filter(w => w.status === 'completed');
+    const dailyTotal = completedWorkoutsForDay.reduce((sum, w) => sum + w.workload_actual, 0);
+    
+    // Get max intensity factor for the day (for quality day detection)
+    const intensityFactors = completedWorkoutsForDay
+      .map(w => w.intensity_factor)
+      .filter((v): v is number => v !== null && v > 0);
+    const maxIF = intensityFactors.length > 0 ? Math.max(...intensityFactors) : null;
     
     // Determine if this day is in the acute window (last 7 days)
     const isAcuteWindow = dayDate >= sevenDaysAgo;
@@ -564,6 +574,7 @@ function buildTimeline(
       date: dateKey,
       workouts: dayWorkouts,
       daily_total: dailyTotal,
+      max_intensity_factor: maxIF,
       is_acute_window: isAcuteWindow
     });
   }
@@ -731,7 +742,13 @@ function generateInsights(
 }
 
 function calculateConsecutiveHardDays(timeline: TimelineDay[]): number {
-  const HARD_THRESHOLD = 80; // Workload threshold for "hard" day
+  // A "quality" or "hard" day is determined by INTENSITY, not just workload
+  // This distinguishes:
+  //   - Easy long run (high workload from duration, low IF ~0.7) = NOT quality
+  //   - Tempo/threshold run (IF >= 0.85) = quality
+  //   - Hard intervals (IF > 1.0) = quality
+  const QUALITY_IF_THRESHOLD = 0.85; // Threshold intensity or above
+  const FALLBACK_WORKLOAD_THRESHOLD = 100; // Only used if IF not available
   
   let maxConsecutive = 0;
   let current = 0;
@@ -741,7 +758,25 @@ function calculateConsecutiveHardDays(timeline: TimelineDay[]): number {
   const chronological = [...timeline].reverse();
   
   for (const day of chronological) {
-    if (day.daily_total >= HARD_THRESHOLD) {
+    // Skip days with no workouts
+    if (day.daily_total === 0) {
+      current = 0;
+      continue;
+    }
+    
+    // Determine if this is a quality day using IF (preferred) or workload (fallback)
+    let isQualityDay = false;
+    
+    if (day.max_intensity_factor !== null) {
+      // Use IF to determine quality - this is the accurate method
+      isQualityDay = day.max_intensity_factor >= QUALITY_IF_THRESHOLD;
+    } else {
+      // Fallback for older data without IF: use workload threshold
+      // This is less accurate but maintains backward compatibility
+      isQualityDay = day.daily_total >= FALLBACK_WORKLOAD_THRESHOLD;
+    }
+    
+    if (isQualityDay) {
       current++;
       maxConsecutive = Math.max(maxConsecutive, current);
     } else {

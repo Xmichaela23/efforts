@@ -11,7 +11,8 @@
  * - Progressive disclosure for insufficient data
  */
 
-import React from 'react';
+import React, { useState } from 'react';
+import { Info, X } from 'lucide-react';
 import { ACWR_STATUS_CONFIG } from '@/lib/context-utils';
 import type { ACWRData } from '@/hooks/useTrainingContext';
 
@@ -21,6 +22,7 @@ interface ACWRGaugeProps {
 }
 
 export const ACWRGauge: React.FC<ACWRGaugeProps> = ({ acwr, showProjected = true }) => {
+  const [showInfo, setShowInfo] = useState(false);
   const config = ACWR_STATUS_CONFIG[acwr.status];
   
   // Calculate gauge position (0.5 = leftmost, 2.0 = rightmost)
@@ -57,20 +59,71 @@ export const ACWRGauge: React.FC<ACWRGaugeProps> = ({ acwr, showProjected = true
     <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
       {/* ACWR Value and Status */}
       <div className="flex items-center justify-between mb-3">
-        <div>
-          <div className="text-2xl font-bold text-white">
-            {acwr.ratio.toFixed(2)}
+        <div className="flex items-center gap-2">
+          <div>
+            <div className="text-2xl font-bold text-white">
+              {acwr.ratio.toFixed(2)}
+            </div>
+            <div className={`text-sm ${config.textClass}`}>
+              {config.label}
+              {caveat && <span className="text-white/40 ml-1">{caveat}</span>}
+            </div>
           </div>
-          <div className={`text-sm ${config.textClass}`}>
-            {config.label}
-            {caveat && <span className="text-white/40 ml-1">{caveat}</span>}
-          </div>
+          <button
+            onClick={() => setShowInfo(!showInfo)}
+            className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
+            aria-label="What is ACWR?"
+          >
+            {showInfo ? (
+              <X className="w-4 h-4 text-white/50" />
+            ) : (
+              <Info className="w-4 h-4 text-white/50" />
+            )}
+          </button>
         </div>
         <div className="text-right text-sm text-white/60">
           <div>Acute (7d): {acwr.acute_total}</div>
           <div>Chronic (28d): {acwr.chronic_total}</div>
         </div>
       </div>
+
+      {/* Info Panel */}
+      {showInfo && (
+        <div className="mb-4 p-3 bg-white/[0.05] rounded-lg border border-white/10 text-xs space-y-2">
+          <div className="font-medium text-white/90">Acute:Chronic Workload Ratio</div>
+          <div className="text-white/60">
+            Compares your recent training (7 days) to your fitness base (28 days) to help prevent injury from ramping up too fast.
+          </div>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="bg-white/[0.03] rounded p-2">
+              <div className="font-medium text-white/80">Acute (7d)</div>
+              <div className="text-white/50">Recent stress & fatigue</div>
+            </div>
+            <div className="bg-white/[0.03] rounded p-2">
+              <div className="font-medium text-white/80">Chronic (28d)</div>
+              <div className="text-white/50">Your fitness base - what your body is adapted to handle</div>
+            </div>
+          </div>
+          <div className="pt-2 space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-sm bg-blue-500/50"></div>
+              <span className="text-white/60">&lt; 0.8 Undertrained - losing fitness</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-sm bg-green-500/50"></div>
+              <span className="text-white/60">0.8-1.3 Optimal - safe progression</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-sm bg-yellow-500/50"></div>
+              <span className="text-white/60">1.3-1.5 Elevated - prioritize recovery</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-sm bg-red-500/50"></div>
+              <span className="text-white/60">&gt; 1.5 High Risk - injury/illness risk</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Gauge Bar */}
       <div className="relative h-3 bg-white/10 rounded-full overflow-hidden mb-2">
