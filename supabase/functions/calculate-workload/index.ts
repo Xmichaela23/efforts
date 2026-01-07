@@ -357,6 +357,22 @@ function inferIntensityFromPerformance(workout: WorkoutData): number {
       return 0.60;                              // Recovery (<70% THR)
     }
     
+    // Priority 1.5: Estimate intensity from max HR (if threshold not available)
+    // Assumes threshold HR is ~88% of max HR
+    if (workout.avg_heart_rate && workout.max_heart_rate && workout.max_heart_rate > 0) {
+      const estimatedThr = workout.max_heart_rate * 0.88;
+      const hrPercent = workout.avg_heart_rate / estimatedThr;
+      
+      console.log(`[Intensity] Run: using max HR fallback - avg ${workout.avg_heart_rate}, max ${workout.max_heart_rate}, est THR ${estimatedThr.toFixed(0)}, %THR ${(hrPercent * 100).toFixed(0)}%`);
+      
+      if (hrPercent >= 1.05) return 1.10;
+      if (hrPercent >= 0.95) return 1.00;
+      if (hrPercent >= 0.88) return 0.88;
+      if (hrPercent >= 0.80) return 0.80;
+      if (hrPercent >= 0.70) return 0.70;
+      return 0.60;
+    }
+    
     // Priority 2: Pace-based fallback (less accurate, not personalized)
     if (workout.avg_pace) {
       let paceMinPerKm: number;
@@ -413,6 +429,20 @@ function inferIntensityFromPerformance(workout: WorkoutData): number {
     if (hrPercent >= 0.85) return 0.80;      // Z3 (85-90% THR)
     if (hrPercent >= 0.75) return 0.70;      // Z2 (75-85% THR)
     return 0.60;                              // Z1 (<75% THR)
+  }
+  
+  // Cycling: Fallback to max HR estimation (if no threshold HR)
+  if ((workout.type === 'ride' || workout.type === 'bike') && workout.avg_heart_rate && workout.max_heart_rate && workout.max_heart_rate > 0) {
+    const estimatedThr = workout.max_heart_rate * 0.90; // Cycling threshold ~90% of max
+    const hrPercent = workout.avg_heart_rate / estimatedThr;
+    
+    console.log(`[Intensity] Ride: using max HR fallback - avg ${workout.avg_heart_rate}, max ${workout.max_heart_rate}, est THR ${estimatedThr.toFixed(0)}, %THR ${(hrPercent * 100).toFixed(0)}%`);
+    
+    if (hrPercent >= 0.95) return 1.00;
+    if (hrPercent >= 0.90) return 0.90;
+    if (hrPercent >= 0.85) return 0.80;
+    if (hrPercent >= 0.75) return 0.70;
+    return 0.60;
   }
   
   // Swimming: Infer from pace (similar to running)
@@ -828,7 +858,7 @@ serve(async (req) => {
     if (!finalWorkoutData) {
       const { data: workout, error: workoutError } = await supabaseClient
         .from('workouts')
-        .select('type, duration, strength_exercises, mobility_exercises, steps_preset, workout_status, moving_time, avg_pace, avg_power, avg_heart_rate, functional_threshold_power, threshold_heart_rate')
+        .select('type, duration, strength_exercises, mobility_exercises, steps_preset, workout_status, moving_time, avg_pace, avg_power, avg_heart_rate, max_heart_rate, functional_threshold_power, threshold_heart_rate')
         .eq('id', workout_id)
         .single()
       
