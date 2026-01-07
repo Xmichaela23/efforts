@@ -6,7 +6,6 @@
  */
 
 import React from 'react';
-import { Trees, Home, Footprints } from 'lucide-react';
 import type { WorkoutEnvironment, WorkoutEquipment } from '@/types/workoutExecution';
 
 interface EnvironmentSelectorProps {
@@ -48,43 +47,26 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
           {/* Outdoor Option */}
           <button
             onClick={() => onSelect('outdoor')}
-            className="w-full bg-white/[0.05] backdrop-blur-lg border-2 border-white/25 rounded-2xl p-6 
-                     hover:bg-white/[0.08] hover:border-white/40 transition-all duration-300
-                     flex items-center gap-4 group"
+            className="w-full bg-white/[0.05] backdrop-blur-lg border-2 border-white/25 rounded-2xl p-5 
+                     hover:bg-white/[0.08] hover:border-green-500/50 transition-all duration-300"
           >
-            <div className="w-14 h-14 rounded-xl bg-green-500/20 border border-green-500/30 
-                          flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
-              <Trees className="w-7 h-7 text-green-400" />
-            </div>
-            <div className="flex-1 text-left">
-              <div className="text-white text-lg font-light">Outdoor</div>
-              <div className="text-gray-400 text-sm font-light">
-                GPS tracking enabled
-              </div>
+            <div className="text-white text-lg font-light">Outdoor</div>
+            <div className="text-gray-400 text-sm font-light mt-1">
+              GPS tracking enabled
             </div>
           </button>
           
           {/* Indoor Option */}
           <button
             onClick={() => onSelect('indoor', isRun ? 'treadmill' : 'trainer')}
-            className="w-full bg-white/[0.05] backdrop-blur-lg border-2 border-white/25 rounded-2xl p-6 
-                     hover:bg-white/[0.08] hover:border-white/40 transition-all duration-300
-                     flex items-center gap-4 group"
+            className="w-full bg-white/[0.05] backdrop-blur-lg border-2 border-white/25 rounded-2xl p-5 
+                     hover:bg-white/[0.08] hover:border-blue-500/50 transition-all duration-300"
           >
-            <div className="w-14 h-14 rounded-xl bg-blue-500/20 border border-blue-500/30 
-                          flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
-              <Home className="w-7 h-7 text-blue-400" />
-            </div>
-            <div className="flex-1 text-left">
-              <div className="text-white text-lg font-light">Indoor</div>
-              <div className="text-gray-400 text-sm font-light">
-                {isRun ? 'Treadmill / Track' : 'Trainer'}
-              </div>
+            <div className="text-white text-lg font-light">Indoor</div>
+            <div className="text-gray-400 text-sm font-light mt-1">
+              {isRun ? 'Treadmill / Track' : 'Trainer'}
             </div>
           </button>
-          
-          {/* Track option for running (appears after indoor selection in a real app) */}
-          {/* For MVP, we treat track as indoor with manual laps later */}
         </div>
       </div>
     </div>
