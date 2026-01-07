@@ -38,7 +38,8 @@ function parseLine(line: string): ParsedItem | null {
   
   // Step 1: Clean input
   const cleaned = raw.replace(/^[-•\s]+/, '').trim();
-  const out: ParsedItem = { name: cleaned, perSide: /per\s*side/i.test(cleaned) };
+  // Detect "per side" OR "each side" for bilateral exercises
+  const out: ParsedItem = { name: cleaned, perSide: /(?:per\s*side|each\s+side)/i.test(cleaned) };
   
   // Step 2: Extract structured data (sets, reps, weight) - deterministic patterns
   // Multiple patterns handle different input variations - all deterministic regex

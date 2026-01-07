@@ -2096,6 +2096,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const exerciseType = getExerciseType(exercise.name);
         const newSet: LoggedSet = {
           reps: lastSet?.reps ?? undefined, // Preserve undefined for "until" patterns
+          duration_seconds: lastSet?.duration_seconds, // Copy duration for duration-based exercises
           weight: lastSet?.weight || 0,
           barType: lastSet?.barType || 'standard',
           resistance_level: exerciseType === 'band' ? (lastSet?.resistance_level || 'Light') : lastSet?.resistance_level,
