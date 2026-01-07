@@ -720,15 +720,10 @@ serve(async (req) => {
       )
     }
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service role (bypasses RLS)
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     // SMART SERVER: Always fetch workout_metadata from database (client doesn't pass it)
@@ -740,11 +735,16 @@ serve(async (req) => {
     // Always fetch workout_metadata and user_id from database (even if workout_data is provided)
     // This ensures we get Session RPE for strength workouts and can fetch user's FTP
     let userId: string | null = null;
+    
+    console.log(`[calculate-workload] Looking up workout_id: ${workout_id}`);
+    
     const { data: dbWorkout, error: dbError } = await supabaseClient
       .from('workouts')
       .select('workout_status, workout_metadata, user_id')
       .eq('id', workout_id)
       .single()
+    
+    console.log(`[calculate-workload] Query result: ${JSON.stringify({ dbWorkout, dbError })}`);
     
     if (!dbError && dbWorkout) {
       workoutStatus = workoutStatus || dbWorkout.workout_status || 'completed';
@@ -856,11 +856,14 @@ serve(async (req) => {
     
     // If workout_data not provided, fetch full workout data
     if (!finalWorkoutData) {
+      console.log(`[calculate-workload] Fetching full workout data for ${workout_id}`);
       const { data: workout, error: workoutError } = await supabaseClient
         .from('workouts')
-        .select('type, duration, strength_exercises, mobility_exercises, steps_preset, workout_status, moving_time, avg_pace, avg_power, avg_heart_rate, max_heart_rate, functional_threshold_power, threshold_heart_rate')
+        .select('type, duration, strength_exercises, mobility_exercises, workout_status, moving_time, avg_pace, avg_power, avg_heart_rate, max_heart_rate, functional_threshold_power, threshold_heart_rate')
         .eq('id', workout_id)
         .single()
+      
+      console.log(`[calculate-workload] Full workout query: ${JSON.stringify({ found: !!workout, error: workoutError?.message })}`);
       
       if (workoutError) {
         // Try planned_workouts table
