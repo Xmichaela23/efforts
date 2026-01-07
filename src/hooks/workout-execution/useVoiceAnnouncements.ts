@@ -26,10 +26,11 @@ export interface UseVoiceAnnouncementsOptions {
 // Voice Scripts
 // ============================================================================
 
+// Single word cues - minimal and clear
 const STEP_KIND_NAMES: Record<StepKind, string> = {
   warmup: 'Warmup',
-  work: 'Interval',
-  recovery: 'Recovery',
+  work: 'Hard',
+  recovery: 'Rest',
   cooldown: 'Cooldown',
   rest: 'Rest',
 };
@@ -175,34 +176,15 @@ export function useVoiceAnnouncements(options: UseVoiceAnnouncementsOptions = {}
   
   const announceStepChange = useCallback((
     stepKind: StepKind,
-    stepNumber?: number,
-    totalSteps?: number,
-    durationS?: number,
-    distanceM?: number,
-    targetPace?: string
+    _stepNumber?: number,
+    _totalSteps?: number,
+    _durationS?: number,
+    _distanceM?: number,
+    _targetPace?: string
   ) => {
+    // Just speak the single word - minimal and clear
     const kindName = STEP_KIND_NAMES[stepKind];
-    
-    let text = kindName;
-    
-    // Add interval number for work intervals
-    if (stepKind === 'work' && stepNumber && totalSteps && totalSteps > 1) {
-      text = `${kindName} ${stepNumber}`;
-    }
-    
-    // Add duration or distance
-    if (distanceM) {
-      text += `. ${formatDistanceForSpeech(distanceM)}`;
-    } else if (durationS) {
-      text += `. ${formatDurationForSpeech(durationS)}`;
-    }
-    
-    // Add target pace for work intervals
-    if (stepKind === 'work' && targetPace) {
-      text += `. Target ${targetPace}`;
-    }
-    
-    speak(text, 'high');
+    speak(kindName, 'high');
   }, [speak]);
   
   const announceCountdown = useCallback((seconds: number) => {
@@ -246,15 +228,12 @@ export function useVoiceAnnouncements(options: UseVoiceAnnouncementsOptions = {}
     speak(messages[status] || '', 'normal');
   }, [speak]);
   
-  const announceWorkoutStart = useCallback((workoutName?: string) => {
-    const text = workoutName 
-      ? `Starting workout. ${workoutName}`
-      : 'Starting workout';
-    speak(text, 'high');
+  const announceWorkoutStart = useCallback((_workoutName?: string) => {
+    speak('Go', 'high');
   }, [speak]);
   
   const announceWorkoutComplete = useCallback(() => {
-    speak('Workout complete. Great job.', 'high');
+    speak('Done', 'high');
   }, [speak]);
   
   const announcePaused = useCallback(() => {

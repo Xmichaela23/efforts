@@ -250,9 +250,9 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
           <div className="mt-3 text-gray-400 text-xs font-light leading-relaxed">
             {voiceEnabled ? (
               <>
-                Announces interval changes with countdown.
+                Says "Hard", "Rest", "Cooldown" at changes.
                 <br />
-                Music will briefly duck during announcements.
+                Music ducks briefly for announcements.
               </>
             ) : vibrationEnabled ? (
               <>
