@@ -1216,11 +1216,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                       const activityType = workout.activity_type || workout.provider_sport || '';
                       const poolLength = workout.pool_length || null;
                       const numberOfLengths = workout.number_of_active_lengths || null;
-                      const hasGps = Array.isArray(workout.gps_track) && workout.gps_track.length > 0;
-                      
-                      // Check for indoor/treadmill indicators
+                      // Check for indoor/treadmill indicators - must be STABLE to avoid UI flicker
+                      const gpsTrack = workout.gps_track;
+                      const hasGpsTrack = (Array.isArray(gpsTrack) && gpsTrack.length > 0) || 
+                                          (typeof gpsTrack === 'string' && gpsTrack.length > 10);
+                      const hasGps = hasGpsTrack; // Keep variable for swim detection
                       const isTrainer = (workout as any)?.strava_data?.original_activity?.trainer === true;
-                      const isIndoorRun = (type === 'run' || type === 'walk') && (isTrainer || !hasGps);
+                      // Check start position as fallback indicator
+                      const hasStartPosition = Number.isFinite(workout?.start_position_lat) && 
+                                               workout?.start_position_lat !== 0;
+                      // Only classify as indoor if we're sure: trainer flag OR (gps_track explicitly empty AND no start position)
+                      const isConfirmedIndoor = isTrainer || 
+                                                (Array.isArray(gpsTrack) && gpsTrack.length === 0 && !hasStartPosition);
+                      const isIndoorRun = (type === 'run' || type === 'walk') && isConfirmedIndoor;
                       
                       // Check if name is already nice (not a raw activity_type or single lowercase word)
                       const existingName = workout.name;

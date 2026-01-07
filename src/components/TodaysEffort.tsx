@@ -679,10 +679,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       || workout?.provider_sport
       || '';
     
-    // Check for indoor/treadmill indicators
+    // Check for indoor/treadmill indicators - must be STABLE to avoid UI flicker
     const isTrainer = workout?.strava_data?.original_activity?.trainer === true;
-    const hasGps = Array.isArray(workout?.gps_track) && workout.gps_track.length > 0;
-    const isIndoorRun = (type === 'run' || type === 'walk') && (isTrainer || !hasGps);
+    // Check GPS data - handle both array and JSON string formats
+    const gpsTrack = workout?.gps_track;
+    const hasGpsTrack = (Array.isArray(gpsTrack) && gpsTrack.length > 0) || 
+                        (typeof gpsTrack === 'string' && gpsTrack.length > 10);
+    // Check start position as fallback indicator
+    const hasStartPosition = Number.isFinite(workout?.start_position_lat) && 
+                             workout?.start_position_lat !== 0;
+    // Only classify as indoor if we're sure: trainer flag OR (gps_track explicitly empty AND no start position)
+    const isConfirmedIndoor = isTrainer || 
+                              (Array.isArray(gpsTrack) && gpsTrack.length === 0 && !hasStartPosition);
+    const isIndoorRun = (type === 'run' || type === 'walk') && isConfirmedIndoor;
 
     // For indoor runs, return "Indoor Run" or "Treadmill"
     if (isIndoorRun && type === 'run') {

@@ -620,10 +620,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     const rawProvider = String((workout as any)?.provider_sport || (workout as any)?.activity_type || '').toLowerCase();
     const humanize = (s: string) => s.replace(/_/g,' ').replace(/\s+/g,' ').trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
     
-    // Check for indoor/treadmill indicators
+    // Check for indoor/treadmill indicators - must be STABLE to avoid UI flicker
     const isTrainer = (workout as any)?.strava_data?.original_activity?.trainer === true;
-    const hasGps = Array.isArray((workout as any)?.gps_track) && (workout as any).gps_track.length > 0;
-    const isIndoorRun = (activityType === 'run' || activityType === 'walk') && (isTrainer || !hasGps);
+    // Check GPS data - handle both array and JSON string formats
+    const gpsTrack = (workout as any)?.gps_track;
+    const hasGpsTrack = (Array.isArray(gpsTrack) && gpsTrack.length > 0) || 
+                        (typeof gpsTrack === 'string' && gpsTrack.length > 10);
+    // Check start position as fallback indicator
+    const hasStartPosition = Number.isFinite((workout as any)?.start_position_lat) && 
+                             (workout as any)?.start_position_lat !== 0;
+    // Only classify as indoor if we're sure: trainer flag OR (gps_track explicitly empty AND no start position)
+    const isConfirmedIndoor = isTrainer || 
+                              (Array.isArray(gpsTrack) && gpsTrack.length === 0 && !hasStartPosition);
+    const isIndoorRun = (activityType === 'run' || activityType === 'walk') && isConfirmedIndoor;
     
     const friendlySport = () => {
       if (activityType === 'swim') {

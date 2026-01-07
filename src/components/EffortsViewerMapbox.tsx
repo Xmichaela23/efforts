@@ -893,6 +893,18 @@ function EffortsViewerMapbox({
     return Array.isArray(trackLngLat) && trackLngLat.length > 1 ? trackLngLat : undefined;
   }, [trackLngLat]);
   
+  // Memoize simplified track for map - MUST be outside conditional to avoid hooks violation
+  const simplifiedTrackForMap = useMemo(() => {
+    try {
+      const raw = Array.isArray(trackLngLat) ? trackLngLat : [];
+      // Use Douglas-Peucker algorithm for intelligent route simplification
+      const simplified = simplifyRouteForMap(raw);
+      return simplified;
+    } catch (error) {
+      return Array.isArray(trackLngLat) ? trackLngLat : [];
+    }
+  }, [trackLngLat]);
+  
   useEffect(() => { try { window.localStorage.setItem('map_theme', theme); } catch {} }, [theme]);
 
   // Weather data
@@ -1803,16 +1815,7 @@ function EffortsViewerMapbox({
         })()
       ) : (
         <MapEffort
-          trackLngLat={useMemo(() => {
-            try {
-              const raw = Array.isArray(trackLngLat) ? trackLngLat : [];
-              // Use Douglas-Peucker algorithm for intelligent route simplification
-              const simplified = simplifyRouteForMap(raw);
-              return simplified;
-            } catch (error) {
-              return Array.isArray(trackLngLat) ? trackLngLat : [];
-            }
-          }, [trackLngLat, theme]) as any}
+          trackLngLat={simplifiedTrackForMap}
           cursorDist_m={distNow}
           totalDist_m={dTotal}
           theme={theme}
