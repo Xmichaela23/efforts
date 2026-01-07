@@ -29,6 +29,7 @@ interface PostRunSummaryProps {
   saveError?: string;
   onViewDetails: () => void;
   onDone: () => void;
+  onDiscard: () => void;
 }
 
 // ============================================================================
@@ -67,6 +68,7 @@ export const PostRunSummary: React.FC<PostRunSummaryProps> = ({
   saveError,
   onViewDetails,
   onDone,
+  onDiscard,
 }) => {
   // Filter to just work intervals for display
   const workIntervals = intervals.filter(i => i.step.kind === 'work');
@@ -178,7 +180,7 @@ export const PostRunSummary: React.FC<PostRunSummaryProps> = ({
       )}
       
       {/* Actions */}
-      <div className="p-4 pb-8 space-y-3">
+      <div className="p-4 pb-10 space-y-3">
         <button
           onClick={onViewDetails}
           disabled={isSaving}
@@ -197,7 +199,16 @@ export const PostRunSummary: React.FC<PostRunSummaryProps> = ({
           className="w-full py-4 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white 
                    text-lg font-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          DONE
+          SAVE
+        </button>
+        
+        <button
+          onClick={onDiscard}
+          disabled={isSaving}
+          className="w-full py-3 text-red-400 hover:text-red-300 text-sm font-light transition-colors
+                   disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Discard Run
         </button>
       </div>
     </div>

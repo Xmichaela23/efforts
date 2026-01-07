@@ -534,6 +534,7 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
           saveError={saveError ?? undefined}
           onViewDetails={handleViewDetails}
           onDone={handleDone}
+          onDiscard={handleDiscard}
         />
       );
     
