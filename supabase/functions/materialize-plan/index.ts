@@ -1205,8 +1205,11 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
       for (const st of steps) {
         const kind = String((st as any)?.kind || '').toLowerCase();
         if (kind === 'recovery' || kind === 'rest') continue;
+        // Don't apply default power to maximal effort steps (like FTP tests)
+        const label = String((st as any)?.label || '').toLowerCase();
+        const isMaximalEffort = label.includes('maximal') || label.includes('ftp test') || label.includes('all-out');
         if (pr && !(Array.isArray((st as any)?.pace_range))) (st as any).pace_range = pr;
-        if (pow && !((st as any)?.power_range && typeof (st as any).power_range.lower==='number')) (st as any).power_range = pow;
+        if (pow && !isMaximalEffort && !((st as any)?.power_range && typeof (st as any).power_range.lower==='number')) (st as any).power_range = pow;
       }
     }
   } catch {}
