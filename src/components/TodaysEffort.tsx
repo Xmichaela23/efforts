@@ -14,6 +14,7 @@ import { WorkoutExecutionContainer } from './workout-execution';
 import { mapUnifiedItemToPlanned, mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
 import { useToast } from '@/components/ui/use-toast';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
+import { isWatchConnectivityAvailable, sendWorkoutToWatch, convertToWatchWorkout } from '@/services/watchConnectivity';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -136,6 +137,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // Expanded details toggle per workout (id → boolean)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [sendingToGarmin, setSendingToGarmin] = useState<string | null>(null);
+  const [sendingToWatch, setSendingToWatch] = useState<string | null>(null);
+  const [watchAvailable, setWatchAvailable] = useState(false);
+  
+  // Check if Apple Watch is available (on iOS native app)
+  useEffect(() => {
+    isWatchConnectivityAvailable().then(setWatchAvailable);
+  }, []);
   
   // Send workout to Garmin
   const handleSendToGarmin = async (e: React.MouseEvent, workout: any) => {
@@ -178,6 +186,37 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const isPhoneExecutable = (type: string) => {
     const t = (type || '').toLowerCase();
     return ['run', 'ride', 'bike', 'cycling'].includes(t);
+  };
+  
+  // Send workout to Apple Watch
+  const handleSendToWatch = async (e: React.MouseEvent, workout: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    try {
+      setSendingToWatch(workout.id);
+      
+      const workoutType = ['ride', 'bike', 'cycling'].includes((workout.type || workout.workout_type || '').toLowerCase()) ? 'ride' : 'run';
+      const watchWorkout = convertToWatchWorkout(
+        workout.id,
+        workout.rendered_description || workout.description || workout.name || 'Workout',
+        workoutType,
+        workout.computed || { steps: [], total_duration_seconds: 0 }
+      );
+      
+      const sent = await sendWorkoutToWatch(watchWorkout);
+      
+      if (sent) {
+        toast({ title: 'Sent!', description: 'Workout sent to Apple Watch' });
+        setSelectedPlannedWorkout(null);
+      } else {
+        toast({ title: 'Error', description: 'Failed to send to Apple Watch', variant: 'destructive' });
+      }
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to send to Apple Watch', variant: 'destructive' });
+    } finally {
+      setSendingToWatch(null);
+    }
   };
   
   // Check if workout is strength/mobility type
@@ -1207,7 +1246,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     handleSendToGarmin(e, selectedPlannedWorkout);
                   }}
                 >
-                  {sendingToGarmin === selectedPlannedWorkout?.id ? 'Sending...' : '⌚ Send to Garmin'}
+                  {sendingToGarmin === selectedPlannedWorkout?.id ? 'Sending...' : 'Send to Garmin'}
+                </button>
+              )}
+              {/* Apple Watch - only shows in native iOS app with paired watch */}
+              {watchAvailable && selectedPlannedWorkout && isPhoneExecutable(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
+                <button
+                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-sm font-light tracking-wide hover:bg-white/[0.12] transition-all"
+                  onClick={(e) => {
+                    handleSendToWatch(e, selectedPlannedWorkout);
+                  }}
+                >
+                  {sendingToWatch === selectedPlannedWorkout?.id ? 'Sending...' : 'Send to Watch'}
                 </button>
               )}
               {selectedPlannedWorkout && isStrengthOrMobility(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
