@@ -1933,48 +1933,56 @@ export default function PlanWizard() {
               
               {/* Tier selection - only show if frequency > 0 */}
               {state.strengthFrequency > 0 && (
-                <div className="pt-4 border-t">
-                  <p className="text-sm text-gray-500 mb-3">What type?</p>
+                <div className="pt-4 border-t border-white/10">
+                  <p className="text-sm text-gray-400 mb-3">What type?</p>
                   <RadioGroup
                     value={state.strengthTier}
                     onValueChange={(v) => updateState('strengthTier', v as StrengthTier)}
                     className="space-y-3"
                   >
-                    <div className={`p-3 border rounded-lg ${state.strengthTier === 'injury_prevention' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
+                    <div className={`p-4 rounded-xl border transition-colors ${
+                      state.strengthTier === 'injury_prevention' 
+                        ? 'border-amber-500/60 bg-amber-500/15' 
+                        : 'border-amber-500/30 bg-black/40 hover:border-amber-500/50'
+                    }`}>
                       <div className="flex items-start space-x-3">
                         <RadioGroupItem value="injury_prevention" id="injury_prevention" className="mt-1" />
                         <Label htmlFor="injury_prevention" className="flex-1 cursor-pointer">
                           <span className="flex items-center gap-2">
-                            <span className="font-medium">Functional Strength</span>
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Recommended</span>
+                            <span className="font-medium text-white">Functional Strength</span>
+                            <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full border border-green-500/30">Recommended</span>
                           </span>
-                          <span className="block text-sm text-gray-500 mt-1">
+                          <span className="block text-sm text-gray-400 mt-1">
                             Bodyweight progressions with clear level-ups
                           </span>
-                          <span className="block text-xs text-gray-400 mt-1">
+                          <span className="block text-xs text-gray-500 mt-1">
                             Push-ups, lunges, single-leg work, core stability
                           </span>
-                          <span className="block text-xs text-green-600 mt-1">
+                          <span className="block text-xs text-amber-400 mt-2">
                             → No setup needed, start immediately
                           </span>
                         </Label>
                       </div>
                     </div>
-                    <div className={`p-3 border rounded-lg ${state.strengthTier === 'strength_power' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
+                    <div className={`p-4 rounded-xl border transition-colors ${
+                      state.strengthTier === 'strength_power' 
+                        ? 'border-amber-500/60 bg-amber-500/15' 
+                        : 'border-amber-500/30 bg-black/40 hover:border-amber-500/50'
+                    }`}>
                       <div className="flex items-start space-x-3">
                         <RadioGroupItem value="strength_power" id="strength_power" className="mt-1" />
                         <Label htmlFor="strength_power" className="flex-1 cursor-pointer">
                           <span className="flex items-center gap-2">
-                            <span className="font-medium">Strength & Power</span>
-                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">Advanced</span>
+                            <span className="font-medium text-white">Strength & Power</span>
+                            <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">Advanced</span>
                           </span>
-                          <span className="block text-sm text-gray-500 mt-1">
+                          <span className="block text-sm text-gray-400 mt-1">
                             Barbell lifts with calculated weights based on your 1RMs
                           </span>
-                          <span className="block text-xs text-gray-400 mt-1">
+                          <span className="block text-xs text-gray-500 mt-1">
                             Hip thrusts, RDL, squats, bench, rows + plyometrics
                           </span>
-                          <span className="block text-xs text-blue-600 mt-1">
+                          <span className="block text-xs text-amber-400 mt-2">
                             → You'll set up your 1RM baselines after creating the plan
                           </span>
                         </Label>
@@ -1986,22 +1994,26 @@ export default function PlanWizard() {
               
               {/* Equipment selection - only show if Strength & Power tier */}
               {state.strengthFrequency > 0 && state.strengthTier === 'strength_power' && (
-                <div className="pt-4 border-t">
-                  <p className="text-sm text-gray-500 mb-3">Where will you train?</p>
+                <div className="pt-4 border-t border-white/10">
+                  <p className="text-sm text-gray-400 mb-3">Where will you train?</p>
                   <RadioGroup
                     value={state.equipmentType}
                     onValueChange={(v) => updateState('equipmentType', v as EquipmentType)}
                     className="space-y-3"
                   >
-                    <div className={`p-3 border rounded-lg ${state.equipmentType === 'commercial_gym' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
+                    <div className={`p-4 rounded-xl border transition-colors ${
+                      state.equipmentType === 'commercial_gym' 
+                        ? 'border-amber-500/60 bg-amber-500/15' 
+                        : 'border-amber-500/30 bg-black/40 hover:border-amber-500/50'
+                    }`}>
                       <div className="flex items-start space-x-3">
                         <RadioGroupItem value="commercial_gym" id="commercial_gym" className="mt-1" />
                         <Label htmlFor="commercial_gym" className="flex-1 cursor-pointer">
-                          <span className="font-medium">Commercial Gym</span>
-                          <span className="block text-sm text-gray-500 mt-1">
+                          <span className="font-medium text-white">Commercial Gym</span>
+                          <span className="block text-sm text-gray-400 mt-1">
                             Full gym with rack, cables, machines
                           </span>
-                          <span className="block text-xs text-gray-400 mt-1">
+                          <span className="block text-xs text-gray-500 mt-1">
                             {state.strengthFrequency === 3 
                               ? 'Squats, hip thrusts, lat pulldowns, box jumps'
                               : 'Squats, hip thrusts, RDL, box jumps'}
@@ -2009,15 +2021,19 @@ export default function PlanWizard() {
                         </Label>
                       </div>
                     </div>
-                    <div className={`p-3 border rounded-lg ${state.equipmentType === 'home_gym' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
+                    <div className={`p-4 rounded-xl border transition-colors ${
+                      state.equipmentType === 'home_gym' 
+                        ? 'border-amber-500/60 bg-amber-500/15' 
+                        : 'border-amber-500/30 bg-black/40 hover:border-amber-500/50'
+                    }`}>
                       <div className="flex items-start space-x-3">
                         <RadioGroupItem value="home_gym" id="home_gym" className="mt-1" />
                         <Label htmlFor="home_gym" className="flex-1 cursor-pointer">
-                          <span className="font-medium">Home Gym</span>
-                          <span className="block text-sm text-gray-500 mt-1">
+                          <span className="font-medium text-white">Home Gym</span>
+                          <span className="block text-sm text-gray-400 mt-1">
                             Rack, bench, barbell, dumbbells, bands
                           </span>
-                          <span className="block text-xs text-gray-400 mt-1">
+                          <span className="block text-xs text-gray-500 mt-1">
                             {state.strengthFrequency === 3 
                               ? 'Rack for: Squats, inverted rows. Barbell for: Hip thrusts, RDL'
                               : 'Rack for: Squats. Barbell for: Hip thrusts, RDL'}
