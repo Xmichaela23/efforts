@@ -433,7 +433,7 @@ export default function PlanWizard() {
         
         const { data } = await supabase
           .from('user_baselines')
-          .select('performance_numbers, effort_paces')
+          .select('performance_numbers, effort_paces, effort_score')
           .eq('user_id', user.id)
           .maybeSingle();
         
@@ -446,7 +446,8 @@ export default function PlanWizard() {
           // Check for saved pace data
           const easyPace = ep.base || pn.easyPace || pn.easy_pace;
           const fiveKTime = pn.fiveK || pn.fiveKTime;
-          let effortScore = pn.effortScore || pn.effort_score;
+          // effort_score is saved as a column when plan is generated
+          let effortScore = data.effort_score || pn.effortScore || pn.effort_score;
           
           // If we have 5K time but no effortScore, calculate it
           if (!effortScore && fiveKTime && typeof fiveKTime === 'number') {
