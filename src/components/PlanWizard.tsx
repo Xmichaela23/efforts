@@ -111,7 +111,7 @@ function getMarathonDate(marathon: MajorMarathon, year: number): Date {
   return getNthWeekdayOfMonth(year, pattern.month, pattern.weekday, pattern.weekNum);
 }
 
-// Find ALL matching marathons for a given date (within 7 days tolerance), sorted by proximity
+// Find ALL matching marathons for a given date (within 3 days tolerance), sorted by proximity
 function findMatchingMarathons(dateStr: string): { marathon: MajorMarathon; diffDays: number }[] {
   if (!dateStr) return [];
   
@@ -124,7 +124,8 @@ function findMatchingMarathons(dateStr: string): { marathon: MajorMarathon; diff
     const marathonDate = getMarathonDate(marathon, year);
     const diffDays = Math.abs((selectedDate.getTime() - marathonDate.getTime()) / (24 * 60 * 60 * 1000));
     
-    if (diffDays <= 7) {
+    // Only show marathons within 3 days of selected date
+    if (diffDays <= 3) {
       matches.push({ marathon, diffDays });
     }
   }
@@ -1705,22 +1706,31 @@ export default function PlanWizard() {
                         })()}
                         onChange={(e) => {
                           const newStart = e.target.value;
+                          if (!newStart) return; // Don't update if empty
                           // Calculate weeks from start to race (use ceil to include race week)
                           const startDate = new Date(newStart + 'T00:00:00');
                           const raceDate = new Date(state.raceDate + 'T00:00:00');
+                          if (isNaN(startDate.getTime()) || isNaN(raceDate.getTime())) return;
                           const diffMs = raceDate.getTime() - startDate.getTime();
                           const weeks = Math.max(4, Math.min(24, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))));
                           setState(prev => ({ ...prev, startDate: newStart, duration: weeks }));
                         }}
                         className="w-full p-3 bg-white/5 border border-teal-500/30 rounded-xl text-base text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                       />
-                      {/* Plan duration summary */}
-                      <div className="p-4 bg-teal-500/10 rounded-xl border border-teal-500/30">
-                        <p className="text-sm text-teal-300 font-medium">{state.duration} week plan</p>
-                        <p className="text-xs text-teal-400/80 mt-1">
-                          {new Date(state.startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} → {new Date(state.raceDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                        </p>
-                      </div>
+                      {/* Plan duration summary - only show if valid dates */}
+                      {state.startDate && state.raceDate && !isNaN(state.duration) && (
+                        <div className="p-4 bg-teal-500/10 rounded-xl border border-teal-500/30">
+                          <p className="text-sm text-teal-300 font-medium">{state.duration} week plan</p>
+                          <p className="text-xs text-teal-400/80 mt-1">
+                            {(() => {
+                              const startDate = new Date(state.startDate + 'T00:00:00');
+                              const raceDate = new Date(state.raceDate + 'T00:00:00');
+                              if (isNaN(startDate.getTime()) || isNaN(raceDate.getTime())) return 'Select dates';
+                              return `${startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} → ${raceDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`;
+                            })()}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                   
