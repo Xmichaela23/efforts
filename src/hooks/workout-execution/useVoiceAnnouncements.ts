@@ -30,6 +30,7 @@ export interface UseVoiceAnnouncementsOptions {
 const STEP_KIND_NAMES: Record<StepKind, string> = {
   warmup: 'Warmup',
   work: 'Hard',
+  easy: 'Easy',
   recovery: 'Rest',
   cooldown: 'Cooldown',
   rest: 'Rest',

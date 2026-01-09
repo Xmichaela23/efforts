@@ -21,7 +21,7 @@ export type ExecutionStatus =
   | 'completed'      // Done
   | 'cancelled';     // User discarded
 
-export type StepKind = 'warmup' | 'work' | 'recovery' | 'cooldown' | 'rest';
+export type StepKind = 'warmup' | 'work' | 'recovery' | 'cooldown' | 'rest' | 'easy';
 
 export type ZoneStatus = 'in_zone' | 'too_slow' | 'too_fast' | 'way_too_slow' | 'way_too_fast' | 'unknown';
 
@@ -34,7 +34,8 @@ export interface PlannedStep {
   planned_index: number;
   kind: StepKind;
   duration_s?: number;       // Time-based step
-  distance_m?: number;       // Distance-based step
+  distance_m?: number;       // Distance-based step (normalized)
+  distanceMeters?: number;   // Distance-based step (from v3 computed)
   seconds?: number;          // Estimated duration (even for distance steps)
   pace_range?: {
     lower: number;           // Slowest acceptable pace (s/mi)

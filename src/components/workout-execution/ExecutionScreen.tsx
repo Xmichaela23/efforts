@@ -19,6 +19,7 @@ interface ExecutionScreenProps {
   totalSteps: number;
   totalElapsedS: number;
   totalDistanceM: number;
+  targetDistanceM?: number;  // Total target distance for the workout (e.g., 12 miles)
   
   // Actions
   onPause: () => void;
@@ -121,6 +122,7 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
   totalSteps,
   totalElapsedS,
   totalDistanceM,
+  targetDistanceM,
   onPause,
   onResume,
   onSkip,
@@ -140,21 +142,32 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
   const { step, elapsed_s, remaining_s, distance_remaining_m, progress_pct, zone_status, current_hr_bpm, current_pace_s_per_mi, interval_number, total_intervals } = currentStep;
   
   // Determine what to show as the primary metric
-  const isDistanceBased = !!step.distance_m;
+  // Check both distance_m (normalized) and distanceMeters (v3 computed)
+  const stepDistanceM = step.distance_m || (step as any).distanceMeters || 0;
+  const isStepDistanceBased = stepDistanceM > 0;
+  const isWorkoutDistanceBased = !!targetDistanceM && targetDistanceM > 0;
   const isIndoor = environment === 'indoor';
   
-  // Primary display: distance remaining, time remaining, or elapsed time
+  // Primary display logic:
+  // 1. Step has distance_m -> show step distance remaining
+  // 2. Workout has target distance -> show workout distance remaining  
+  // 3. Step has duration_s -> show time remaining
+  // 4. Fallback -> show elapsed time
   let primaryValue: string;
   let primaryLabel: string;
   
-  if (isDistanceBased && distance_remaining_m !== undefined) {
+  if (isStepDistanceBased && distance_remaining_m !== undefined) {
+    // Step-level distance remaining
     if (isIndoor) {
-      // Indoor distance-based: show estimated distance with ~
       primaryValue = `~${Math.round(distance_remaining_m)}m`;
     } else {
-      // Outdoor distance-based: show actual distance
       primaryValue = formatDistance(distance_remaining_m);
     }
+    primaryLabel = 'to go';
+  } else if (isWorkoutDistanceBased && !isIndoor) {
+    // Workout-level distance remaining (for easy runs like "12 miles")
+    const workoutDistanceRemaining = Math.max(0, targetDistanceM - totalDistanceM);
+    primaryValue = formatDistance(workoutDistanceRemaining);
     primaryLabel = 'to go';
   } else if (remaining_s && remaining_s > 0) {
     // Time-based with remaining time

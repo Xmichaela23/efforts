@@ -10,7 +10,7 @@
  * Wires together all hooks and components.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/lib/supabase';
@@ -111,6 +111,19 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
   const vibration = useVibration(execution.state.vibration_enabled);
   
   const wakeLock = useWakeLock();
+  
+  // -------------------------------------------------------------------------
+  // Calculate target distance from workout structure
+  // -------------------------------------------------------------------------
+  
+  const targetDistanceM = useMemo(() => {
+    if (!plannedWorkoutStructure?.steps) return 0;
+    return plannedWorkoutStructure.steps.reduce((total, step) => {
+      // Check both distance_m (normalized) and distanceMeters (v3 computed)
+      const stepDistance = step.distance_m || step.distanceMeters || 0;
+      return total + stepDistance;
+    }, 0);
+  }, [plannedWorkoutStructure]);
   
   // -------------------------------------------------------------------------
   // Initialize workout structure
@@ -518,6 +531,7 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
           totalSteps={execution.totalSteps}
           totalElapsedS={execution.state.total_elapsed_s}
           totalDistanceM={execution.state.total_distance_m}
+          targetDistanceM={targetDistanceM}
           onPause={handlePause}
           onResume={handleResume}
           onSkip={handleSkip}

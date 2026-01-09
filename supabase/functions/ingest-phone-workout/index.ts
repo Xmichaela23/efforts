@@ -177,23 +177,27 @@ serve(async (req) => {
     }
 
     // Create workout record
+    // NOTE: Database stores distance in KM, duration in MINUTES
+    const distanceKm = total_distance_m / 1000;
+    const durationMinutes = Math.round(total_duration_s / 60);
+    
     const workoutData = {
       user_id: user.id,
       type: workout_type,
       date: workout_date,
       workout_status: 'completed',
       
-      // Metrics
-      distance: total_distance_m,
-      duration: Math.round(total_duration_s),
-      moving_time: Math.round(total_duration_s), // For phone workouts, assume all moving
-      elapsed_time: Math.round(total_duration_s),
+      // Metrics (distance in km, duration in minutes)
+      distance: Number(distanceKm.toFixed(3)),
+      duration: Math.max(1, durationMinutes),
+      moving_time: Math.max(1, durationMinutes), // For phone workouts, assume all moving
+      elapsed_time: Math.max(1, durationMinutes),
       avg_heart_rate: metrics.avg_hr,
       max_heart_rate: metrics.max_hr,
       avg_speed,
       
-      // Raw data
-      sensor_data,
+      // Raw data - wrap in samples object for consistency
+      sensor_data: { samples: sensor_data },
       gps_track: gps_track.length > 0 ? gps_track : null,
       
       // Link to planned workout
