@@ -94,7 +94,7 @@ const PlansMenu: React.FC<PlansMenuProps> = ({
             }
             onOpenChange(!isOpen);
           }}
-          style={{ display: 'contents' }}
+          className="flex-1"
         >
           {trigger}
         </div>
@@ -105,7 +105,7 @@ const PlansMenu: React.FC<PlansMenuProps> = ({
           side="top"
           align="center"
           sideOffset={8}
-          collisionPadding={{ bottom: 80 }}
+          avoidCollisions={false}
           className={cn(
             "z-50 rounded-2xl border border-white/25 bg-black/80 backdrop-blur-xl p-3 shadow-xl",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
