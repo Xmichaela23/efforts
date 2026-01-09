@@ -470,8 +470,9 @@ export default function PlanWizard() {
             effortPaces = getPacesFromScore(effortScore);
           }
           
-          // Only set if we have meaningful data
-          if (effortPaces || effortScore) {
+          // Set if we have ANY meaningful pace/performance data
+          const hasData = effortPaces || effortScore || easyPace || fiveKTime;
+          if (hasData) {
             console.log('[PlanWizard] Setting saved baselines:', { easyPace, fiveKTime, effortScore, effortPaces });
             setSavedBaselines({
               easyPace: typeof easyPace === 'number' ? easyPace : undefined,
@@ -1153,15 +1154,27 @@ export default function PlanWizard() {
                   
                   // If using saved baselines, auto-populate from them
                   if (method === 'saved' && savedBaselines) {
-                    const paces = savedBaselines.effortPaces 
-                      || (savedBaselines.effortScore ? getPacesFromScore(savedBaselines.effortScore) : null);
+                    let paces = savedBaselines.effortPaces;
+                    let score = savedBaselines.effortScore;
+                    
+                    // If we have 5K time but no score/paces, calculate them
+                    if (!paces && !score && savedBaselines.fiveKTime) {
+                      const result = calculateEffortScoreResult(5000, savedBaselines.fiveKTime);
+                      score = result.score;
+                      paces = getPacesFromScore(score);
+                    }
+                    // If we have score but no paces, calculate paces
+                    else if (!paces && score) {
+                      paces = getPacesFromScore(score);
+                    }
+                    
                     setState(prev => ({
                       ...prev,
                       paceInputMethod: method,
                       hasRecentRace: false,
-                      effortScore: savedBaselines.effortScore || null,
-                      effortPaces: paces,
-                      effortScoreStatus: savedBaselines.effortScore ? 'verified' : null,
+                      effortScore: score || null,
+                      effortPaces: paces || null,
+                      effortScoreStatus: score ? 'verified' : null,
                       effortRaceDistance: null,
                       effortRaceTime: '',
                       effortRaceRecency: null,
@@ -1190,21 +1203,26 @@ export default function PlanWizard() {
                 }}
                 className="space-y-2"
               >
-                {/* Show saved paces option if user has baselines */}
-                {(savedBaselines?.effortScore || savedBaselines?.effortPaces) && (
+                {/* Always show saved option if ANY baseline data exists */}
+                {savedBaselines && (
                   <RadioOption 
                     value="saved" 
-                    label="Use my saved paces" 
-                    description={savedBaselines.effortScore 
-                      ? `Effort Score: ${savedBaselines.effortScore}${savedBaselines.easyPace ? ` • Easy: ${formatPace(savedBaselines.easyPace)}/mi` : ''}`
-                      : savedBaselines.effortPaces 
-                        ? `Easy: ${formatPace(savedBaselines.effortPaces.base)}/mi • Race: ${formatPace(savedBaselines.effortPaces.race)}/mi`
-                        : 'Your saved training paces'
+                    label="Use my saved baselines" 
+                    description={
+                      savedBaselines.effortScore 
+                        ? `Effort Score: ${savedBaselines.effortScore}${savedBaselines.easyPace ? ` • Easy: ${formatPace(savedBaselines.easyPace)}/mi` : ''}`
+                        : savedBaselines.effortPaces 
+                          ? `Easy: ${formatPace(savedBaselines.effortPaces.base)}/mi • Race: ${formatPace(savedBaselines.effortPaces.race)}/mi`
+                          : savedBaselines.easyPace
+                            ? `Easy pace: ${formatPace(savedBaselines.easyPace)}/mi`
+                            : savedBaselines.fiveKTime
+                              ? `5K time: ${Math.floor(savedBaselines.fiveKTime / 60)}:${String(savedBaselines.fiveKTime % 60).padStart(2, '0')}`
+                              : 'Your saved performance data'
                     }
                   />
                 )}
-                <RadioOption value="race" label="I have a recent race time" description="Recommended for accurate pacing" />
-                <RadioOption value="paces" label="I know my easy pace and 5K time" description="We'll calculate your training zones" />
+                <RadioOption value="race" label={savedBaselines ? "Enter new race time" : "I have a recent race time"} description="Recommended for accurate pacing" />
+                <RadioOption value="paces" label={savedBaselines ? "Enter new paces" : "I know my easy pace and 5K time"} description="We'll calculate your training zones" />
                 <RadioOption value="estimate" label="Estimate for me" description="We'll set a starting point" />
               </RadioGroup>
               
