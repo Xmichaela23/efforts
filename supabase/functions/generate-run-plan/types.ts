@@ -18,6 +18,8 @@ export interface GeneratePlanRequest {
   equipment_type?: 'home_gym' | 'commercial_gym';
   race_date?: string;
   race_name?: string;
+  // User's current weekly mileage (for gating short plans)
+  current_weekly_miles?: number;
   // Effort Score (for Balanced Build / speed goal)
   effort_score?: number;
   effort_source_distance?: number; // meters
@@ -73,6 +75,8 @@ export interface GeneratorParams {
   start_date?: string;  // ISO date string (YYYY-MM-DD) - plan start date
   race_date?: string;   // ISO date string (YYYY-MM-DD) - race day
   race_name?: string;   // Optional race name (e.g., "Boston Marathon")
+  // User's current weekly mileage (for scaling starting volume)
+  current_weekly_miles?: number;
   // Effort Score for pace calculations (Balanced Build only)
   effort_score?: number;
   effort_paces?: {
@@ -323,4 +327,115 @@ export interface ValidationResult {
   valid: boolean;
   errors: string[];
   warnings?: string[];
+}
+
+// ============================================================================
+// MARATHON DURATION REQUIREMENTS
+// ============================================================================
+
+export interface DurationRequirements {
+  minWeeklyMiles: number;
+  peakLongRun: number;
+  taperWeeks: number;
+  startingLongRun: number;
+  warning: string | null;
+  additionalPrereqs: string[];
+}
+
+/**
+ * Marathon plan requirements based on duration
+ * Shorter plans require more established base fitness
+ */
+export const MARATHON_DURATION_REQUIREMENTS: Record<number, DurationRequirements> = {
+  16: {
+    minWeeklyMiles: 0,
+    peakLongRun: 20,
+    taperWeeks: 3,
+    startingLongRun: 10,
+    warning: null,
+    additionalPrereqs: []
+  },
+  15: {
+    minWeeklyMiles: 0,
+    peakLongRun: 20,
+    taperWeeks: 3,
+    startingLongRun: 10,
+    warning: null,
+    additionalPrereqs: []
+  },
+  14: {
+    minWeeklyMiles: 15,
+    peakLongRun: 20,
+    taperWeeks: 3,
+    startingLongRun: 10,
+    warning: null,
+    additionalPrereqs: ['Should be comfortable running 8-10 miles']
+  },
+  13: {
+    minWeeklyMiles: 15,
+    peakLongRun: 20,
+    taperWeeks: 3,
+    startingLongRun: 10,
+    warning: null,
+    additionalPrereqs: ['Should be comfortable running 8-10 miles']
+  },
+  12: {
+    minWeeklyMiles: 20,
+    peakLongRun: 20,
+    taperWeeks: 3,
+    startingLongRun: 12,
+    warning: 'A 12-week marathon plan is compressed. Ensure you have a solid base.',
+    additionalPrereqs: [
+      'Recent long runs of 8-10 miles',
+      'Comfortable with easy-paced running'
+    ]
+  },
+  11: {
+    minWeeklyMiles: 25,
+    peakLongRun: 18,
+    taperWeeks: 2,
+    startingLongRun: 12,
+    warning: 'An 11-week plan is aggressive and assumes significant running fitness. Consider a longer plan if this is your first marathon or returning from time off.',
+    additionalPrereqs: [
+      'Completed a half marathon or equivalent',
+      'Recent long runs of 10-12 miles',
+      'Comfortable with structured interval training'
+    ]
+  },
+  10: {
+    minWeeklyMiles: 25,
+    peakLongRun: 18,
+    taperWeeks: 2,
+    startingLongRun: 12,
+    warning: 'A 10-week plan is aggressive and assumes significant running fitness. Consider a longer plan if this is your first marathon or returning from time off.',
+    additionalPrereqs: [
+      'Completed a half marathon or equivalent',
+      'Recent long runs of 10-12 miles',
+      'Comfortable with structured interval training'
+    ]
+  }
+};
+
+/**
+ * Get duration requirements for a marathon plan
+ * Falls back to nearest defined duration if exact match not found
+ */
+export function getMarathonDurationRequirements(weeks: number): DurationRequirements {
+  // Direct match
+  if (MARATHON_DURATION_REQUIREMENTS[weeks]) {
+    return MARATHON_DURATION_REQUIREMENTS[weeks];
+  }
+  
+  // For durations > 16, use 16-week requirements
+  if (weeks > 16) {
+    return MARATHON_DURATION_REQUIREMENTS[16];
+  }
+  
+  // For durations < 10, use 10-week requirements (strictest)
+  if (weeks < 10) {
+    return MARATHON_DURATION_REQUIREMENTS[10];
+  }
+  
+  // Should not reach here, but fallback to 12
+  return MARATHON_DURATION_REQUIREMENTS[12];
 }

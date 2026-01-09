@@ -1801,10 +1801,13 @@ export default function PlanWizard() {
                             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Recommended</span>
                           </span>
                           <span className="block text-sm text-gray-500 mt-1">
-                            Single-leg stability, hip strength, movement quality
+                            Bodyweight progressions with clear level-ups
                           </span>
                           <span className="block text-xs text-gray-400 mt-1">
-                            Equipment: Bodyweight + dumbbells (15-25 lbs)
+                            Push-ups, lunges, single-leg work, core stability
+                          </span>
+                          <span className="block text-xs text-green-600 mt-1">
+                            → No setup needed, start immediately
                           </span>
                         </Label>
                       </div>
@@ -1818,13 +1821,13 @@ export default function PlanWizard() {
                             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">Advanced</span>
                           </span>
                           <span className="block text-sm text-gray-500 mt-1">
-                            Lower body focus: Hip thrusts, RDL, squats, plyometrics
+                            Barbell lifts with calculated weights based on your 1RMs
                           </span>
                           <span className="block text-xs text-gray-400 mt-1">
-                            Equipment: Rack, bench, barbell required
+                            Hip thrusts, RDL, squats, bench, rows + plyometrics
                           </span>
-                          <span className="block text-xs text-amber-600 mt-1">
-                            Upper body optional - minimal running benefit. Only add for balance and aesthetics.
+                          <span className="block text-xs text-blue-600 mt-1">
+                            → You'll set up your 1RM baselines after creating the plan
                           </span>
                         </Label>
                       </div>

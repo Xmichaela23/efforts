@@ -806,6 +806,8 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           let percent_1rm: number | undefined = undefined;
           let resolved_from: string | undefined = undefined;
           let weightDisplay: string | undefined = undefined;
+          let baselineMissing = false;
+          let requiredBaseline: string | undefined = undefined;
           
           if (!isBandExercise && exerciseConfig) {
             // Use new research-based config
@@ -814,6 +816,10 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             if (result.weight != null && result.weight > 0) {
               prescribed = result.weight;
               weightDisplay = formatWeightDisplay(result.weight, result.displayFormat);
+            } else if (exerciseConfig.primaryRef) {
+              // Weight couldn't be calculated - baseline is missing
+              baselineMissing = true;
+              requiredBaseline = exerciseConfig.primaryRef;
             }
             percent_1rm = targetPercent;
             resolved_from = exerciseConfig.primaryRef || undefined;
@@ -835,11 +841,23 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             } else if (prescribed != null) {
               weightDisplay = `${prescribed} lb`;
             }
+            // Check if baseline is missing for non-bodyweight exercises
+            if (prescribed == null && pick.ref != null) {
+              baselineMissing = true;
+              requiredBaseline = pick.ref;
+            }
             percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
             resolved_from = pick.ref || undefined;
           }
           
-          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes } as any;
+          // Map baseline key to human-readable name
+          const baselineLabel = requiredBaseline === 'squat' ? 'Squat' 
+            : requiredBaseline === 'deadlift' ? 'Deadlift'
+            : requiredBaseline === 'bench' ? 'Bench Press'
+            : requiredBaseline === 'overhead' ? 'Overhead Press'
+            : requiredBaseline;
+          
+          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel } as any;
           if (name.toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -891,6 +909,8 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           let percent_1rm: number | undefined = undefined;
           let resolved_from: string | undefined = undefined;
           let weightDisplay: string | undefined = undefined;
+          let baselineMissing = false;
+          let requiredBaseline: string | undefined = undefined;
           
           if (!isBandExercise && exerciseConfig) {
             // Use new research-based config
@@ -899,6 +919,10 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             if (result.weight != null && result.weight > 0) {
               prescribed = result.weight;
               weightDisplay = formatWeightDisplay(result.weight, result.displayFormat);
+            } else if (exerciseConfig.primaryRef) {
+              // Weight couldn't be calculated - baseline is missing
+              baselineMissing = true;
+              requiredBaseline = exerciseConfig.primaryRef;
             }
             percent_1rm = targetPercent;
             resolved_from = exerciseConfig.primaryRef || undefined;
@@ -920,11 +944,23 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             } else if (prescribed != null) {
               weightDisplay = `${prescribed} lb`;
             }
+            // Check if baseline is missing for non-bodyweight exercises
+            if (prescribed == null && pick.ref != null) {
+              baselineMissing = true;
+              requiredBaseline = pick.ref;
+            }
             percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
             resolved_from = pick.ref || undefined;
           }
           
-          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes } as any;
+          // Map baseline key to human-readable name
+          const baselineLabel = requiredBaseline === 'squat' ? 'Squat' 
+            : requiredBaseline === 'deadlift' ? 'Deadlift'
+            : requiredBaseline === 'bench' ? 'Bench Press'
+            : requiredBaseline === 'overhead' ? 'Overhead Press'
+            : requiredBaseline;
+          
+          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel } as any;
           if (name.toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }

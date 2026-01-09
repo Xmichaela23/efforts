@@ -16,7 +16,7 @@ import {
 import { validateRequest, validatePlanSchema, validateTokens, detectScheduleConflicts } from './validation.ts';
 import { SimpleCompletionGenerator } from './generators/simple-completion.ts';
 import { BalancedBuildGenerator } from './generators/balanced-build.ts';
-import { overlayStrength } from './strength-overlay.ts';
+import { overlayStrength, overlayStrengthLegacy } from './strength-overlay.ts';
 import { 
   calculateEffortScore, 
   getPacesFromScore, 
@@ -110,6 +110,7 @@ Deno.serve(async (req: Request) => {
       start_date: startDate,
       race_date: request.race_date,
       race_name: request.race_name,
+      current_weekly_miles: request.current_weekly_miles,
       effort_score: effortScore,
       effort_paces: effortPaces
     };
@@ -141,7 +142,8 @@ Deno.serve(async (req: Request) => {
     if (request.strength_frequency && request.strength_frequency > 0) {
       const tier = request.strength_tier || 'injury_prevention';
       const equipment = request.equipment_type || 'home_gym';
-      plan = overlayStrength(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment);
+      // Use legacy function to map old tier names ('injury_prevention', 'strength_power') to new ('bodyweight', 'barbell')
+      plan = overlayStrengthLegacy(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment);
     }
 
     // Validate generated plan

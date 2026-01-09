@@ -11,7 +11,7 @@
 // This is an adaptation and not officially endorsed by Jack Daniels or Human Kinetics.
 
 import { BaseGenerator } from './base-generator.ts';
-import { TrainingPlan, Session, Phase, PhaseStructure, TOKEN_PATTERNS } from '../types.ts';
+import { TrainingPlan, Session, Phase, PhaseStructure, TOKEN_PATTERNS, getMarathonDurationRequirements } from '../types.ts';
 
 // Long run progression by fitness level (in miles)
 const LONG_RUN_PROGRESSION: Record<string, Record<string, number[]>> = {
@@ -386,6 +386,59 @@ export class BalancedBuildGenerator extends BaseGenerator {
   }
 
   /**
+   * Check if this is a short/aggressive plan (≤12 weeks)
+   */
+  private isShortPlan(): boolean {
+    return this.params.duration_weeks <= 12;
+  }
+
+  /**
+   * Calculate starting long run based on current weekly mileage
+   * Scales down if user's baseline suggests they're not ready for the default start
+   * 
+   * Guidelines:
+   * - 15-19 mpw: max 8-mile start
+   * - 20-24 mpw: max 10-mile start
+   * - 25-29 mpw: max 12-mile start
+   * - 30+ mpw: can handle 12-mile start
+   */
+  private calculateStartingLongRun(defaultStart: number): number {
+    const currentMiles = this.params.current_weekly_miles;
+    
+    // If no current mileage provided, use default from duration requirements
+    if (!currentMiles) {
+      return defaultStart;
+    }
+    
+    // Scale starting long run based on current weekly mileage
+    let maxStart: number;
+    if (currentMiles < 20) {
+      maxStart = 8;
+    } else if (currentMiles < 25) {
+      maxStart = 10;
+    } else if (currentMiles < 30) {
+      maxStart = 12;
+    } else {
+      maxStart = 12; // Cap at 12 even for high mileage runners
+    }
+    
+    // Use the lower of default and calculated max
+    return Math.min(defaultStart, maxStart);
+  }
+
+  /**
+   * Get Week 1 modification note for short plans
+   */
+  private getWeek1ModificationNote(weekInPhase: number): string {
+    if (weekInPhase === 1 && this.isShortPlan()) {
+      return ` [Compressed plan note: This assumes recent interval training. ` +
+        `If you haven't done structured speed work in 2+ months, reduce Week 1 by 25% ` +
+        `(e.g., 3×800m instead of 4×800m, 2×1mi instead of 3×1mi).]`;
+    }
+    return '';
+  }
+
+  /**
    * Base phase intervals - introductory volume
    * Week 1: 4×800m, Week 2: 5×800m, Week 3: 6×800m
    */
@@ -393,13 +446,14 @@ export class BalancedBuildGenerator extends BaseGenerator {
     const reps = Math.min(6, 3 + weekInPhase); // 4, 5, 6
     const restSec = 120;
     const qualityMiles = reps * 0.5;
+    const modNote = this.getWeek1ModificationNote(weekInPhase);
 
     return this.createSession(
       'Tuesday',
       'I Pace Intervals',
       `${reps}×800m at I pace (5K effort). ` +
       `Jog ${restSec}s recovery between reps. ` +
-      `Total quality: ~${qualityMiles.toFixed(1)} miles.`,
+      `Total quality: ~${qualityMiles.toFixed(1)} miles.${modNote}`,
       45,
       [
         TOKEN_PATTERNS.warmup_1mi,
@@ -418,13 +472,14 @@ export class BalancedBuildGenerator extends BaseGenerator {
     const reps = 3;
     const milesEach = weekInPhase >= 3 ? 1.5 : 1;
     const totalQuality = reps * milesEach;
+    const modNote = this.getWeek1ModificationNote(weekInPhase);
 
     return this.createSession(
       'Thursday',
       'Cruise Intervals',
       `${reps}×${milesEach}mi at T pace with 60s jog recovery. ` +
       `Total: ${totalQuality} miles @ T (comfortably hard, ~10K effort). ` +
-      `These build lactate threshold.`,
+      `These build lactate threshold.${modNote}`,
       45,
       [
         TOKEN_PATTERNS.warmup_1mi,
@@ -520,88 +575,244 @@ export class BalancedBuildGenerator extends BaseGenerator {
 
   /**
    * Calculate dynamic long run progression based on plan duration
-   * Ensures peak long run is always 3 weeks before race (Daniels methodology)
-   * Uses 3-up, 1-down pattern for build phase
+   * Duration-aware: shorter plans have earlier peaks and capped distances
    * 
-   * Note on weeksFromRace:
-   *   weeksFromRace = planWeeks - week + 1
-   *   - weeksFromRace === 1: race week (0 weeks before race Sunday)
-   *   - weeksFromRace === 2: 1 week before race
-   *   - weeksFromRace === 3: 2 weeks before race  
-   *   - weeksFromRace === 4: 3 weeks before race (PEAK per Daniels)
+   * Key principles:
+   * - Never repeat same distance two weeks in a row (except intentional recovery)
+   * - Max +2 miles per week increase
+   * - Peak timing and distance based on plan duration
+   * - Proper taper (2-3 weeks depending on duration)
+   * - Starting volume scales with current weekly mileage
+   * - Week before peak must be at peakMiles - 2 to avoid big jumps
    */
   private calculateLongRunProgression(): number[] {
     const planWeeks = this.params.duration_weeks;
-    const peakWeek = planWeeks - 3;  // Peak is 3 weeks before race week
-    const maxLongRun = this.getMaxLongRunMiles();
+    const durationReqs = getMarathonDurationRequirements(planWeeks);
     
-    const progression: number[] = [];
+    const peakMiles = durationReqs.peakLongRun;
+    const taperWeeks = durationReqs.taperWeeks;
     
+    // Scale starting volume based on current weekly mileage
+    const startMiles = this.calculateStartingLongRun(durationReqs.startingLongRun);
+    
+    // Calculate peak week position
+    const peakWeek = this.calculatePeakWeek(planWeeks, taperWeeks);
+    
+    // Build the progression using a two-pass approach:
+    // 1. First pass: establish the framework (peak, taper, recovery weeks)
+    // 2. Second pass: fill in build weeks ensuring smooth progression
+    
+    const progression: number[] = new Array(planWeeks).fill(0);
+    const weekTypes: string[] = new Array(planWeeks).fill('build');
+    
+    // Pass 1: Mark special weeks
     for (let week = 1; week <= planWeeks; week++) {
       const weeksFromRace = planWeeks - week + 1;
+      const idx = week - 1;
       
-      // Taper phase (final 4 weeks including peak)
-      if (weeksFromRace === 1) {
-        // Race week - minimal long run (may be skipped by race proximity logic)
-        progression.push(8);
-      } else if (weeksFromRace === 2) {
-        // 1 week before race - final taper
-        progression.push(10);
-      } else if (weeksFromRace === 3) {
-        // 2 weeks before race - step down from peak
-        progression.push(12);
-      } else if (weeksFromRace === 4) {
-        // 3 weeks before race - PEAK long run
-        progression.push(maxLongRun);
+      // Taper weeks
+      if (weeksFromRace <= taperWeeks) {
+        progression[idx] = this.getTaperMiles(weeksFromRace, taperWeeks, peakMiles);
+        weekTypes[idx] = weeksFromRace === 1 ? 'race' : 'taper';
       }
-      // Build phase with 3-up, 1-down pattern
-      else if (week % 4 === 0 && week < peakWeek) {
-        // Recovery every 4th week during build phase
-        // Recovery weeks scale with progress: 10 → 10 → 12
-        progression.push(10 + Math.floor(week / 8) * 2);
+      // Peak week
+      else if (week === peakWeek) {
+        progression[idx] = peakMiles;
+        weekTypes[idx] = 'peak';
+      }
+      // Week before peak - must be peakMiles - 2 for smooth transition
+      else if (week === peakWeek - 1) {
+        progression[idx] = peakMiles - 2;
+        weekTypes[idx] = 'pre-peak';
+      }
+      // Post-peak weeks (between peak and taper) - declining volume
+      else if (week > peakWeek && weeksFromRace > taperWeeks) {
+        // Calculate declining mileage from peak toward taper
+        const weeksAfterPeak = week - peakWeek;
+        // Determine first taper week's mileage to ensure smooth transition
+        const firstTaperMiles = this.getTaperMiles(taperWeeks, taperWeeks, peakMiles);
+        // Post-peak should bridge from peak to taper smoothly
+        // Start at peakMiles - 4, end just above first taper week
+        const postPeakStart = peakMiles - 4;
+        const postPeakEnd = firstTaperMiles + 2; // End 2 miles above taper start
+        const postPeakWeeks = planWeeks - peakWeek - taperWeeks;
+        
+        if (postPeakWeeks <= 1) {
+          progression[idx] = postPeakStart;
+        } else {
+          // Linear decline from postPeakStart to postPeakEnd
+          const step = (postPeakStart - postPeakEnd) / (postPeakWeeks - 1);
+          progression[idx] = Math.round(postPeakStart - step * (weeksAfterPeak - 1));
+        }
+        weekTypes[idx] = 'post-peak';
+      }
+      // Recovery weeks (every 4th week, but not too close to peak)
+      else if (week % 4 === 0 && week < peakWeek - 2) {
+        progression[idx] = this.getRecoveryWeekMiles(week, startMiles);
+        weekTypes[idx] = 'recovery';
+      }
+    }
+    
+    // Pass 2: Fill in build weeks with smooth progression
+    // Work forward, ensuring each build week increases by 1-2 miles
+    // Build weeks cap at peakMiles - 3, only pre-peak gets peakMiles - 2
+    let lastBuildMiles = startMiles - 1; // So first week starts at startMiles
+    const buildCap = peakMiles - 3; // e.g., 17 for 20mi peak
+    
+    for (let week = 1; week <= planWeeks; week++) {
+      const idx = week - 1;
+      
+      // Skip already-filled weeks
+      if (progression[idx] > 0) {
+        // After recovery, don't reset lastBuildMiles - keep building
+        if (weekTypes[idx] !== 'recovery') {
+          lastBuildMiles = progression[idx];
+        }
+        continue;
+      }
+      
+      // Calculate target for this build week
+      const milesNeeded = buildCap - lastBuildMiles; // Need to reach buildCap (not pre-peak value)
+      
+      // How many build weeks remain? (excluding recovery weeks and pre-peak)
+      let buildWeeksRemaining = 0;
+      for (let w = week; w < peakWeek - 1; w++) {
+        if (weekTypes[w - 1] !== 'recovery' && weekTypes[w - 1] !== 'pre-peak') {
+          buildWeeksRemaining++;
+        }
+      }
+      
+      let targetMiles: number;
+      if (buildWeeksRemaining <= 0) {
+        targetMiles = buildCap;
       } else {
-        // Progressive build toward peak
-        progression.push(this.calculateBuildUpMiles(week, peakWeek, maxLongRun));
+        // Calculate ideal increment
+        const idealIncrement = milesNeeded / buildWeeksRemaining;
+        // Constrain to 1-2 mile increase
+        const increment = Math.max(1, Math.min(2, Math.ceil(idealIncrement)));
+        targetMiles = lastBuildMiles + increment;
       }
+      
+      // Ensure we don't exceed build cap (save peakMiles-2 for pre-peak only)
+      targetMiles = Math.min(targetMiles, buildCap);
+      
+      // Ensure we don't repeat same distance
+      if (targetMiles === lastBuildMiles) {
+        targetMiles = Math.min(buildCap, lastBuildMiles + 1);
+      }
+      
+      progression[idx] = targetMiles;
+      lastBuildMiles = targetMiles;
     }
     
     return progression;
   }
 
   /**
-   * Get maximum long run distance by fitness level
-   * Per Daniels' Running Formula: 20 miles max for all levels
+   * Calculate peak week position based on plan duration
+   * Shorter plans peak earlier to allow proper taper
+   * Goal: Peak should be 4-6 weeks before race for optimal recovery
+   */
+  private calculatePeakWeek(planWeeks: number, _taperWeeks: number): number {
+    if (planWeeks <= 10) {
+      return 6;  // Week 6 for 10-week plans (4 weeks out)
+    } else if (planWeeks <= 11) {
+      return 6;  // Week 6 for 11-week plans (5 weeks out)
+    } else if (planWeeks <= 12) {
+      return 8;  // Week 8 for 12-week plans (4 weeks out)
+    } else if (planWeeks <= 13) {
+      return 9;  // Week 9 for 13-week plans (4 weeks out)
+    } else if (planWeeks <= 14) {
+      return 10; // Week 10 for 14-week plans (4 weeks out)
+    } else if (planWeeks <= 15) {
+      return 11; // Week 11 for 15-week plans (4 weeks out)
+    } else {
+      return 12; // Week 12 for 16-week plans (4 weeks out)
+    }
+  }
+
+  /**
+   * Get taper week long run miles
+   * Progressive reduction toward race week
+   */
+  private getTaperMiles(weeksFromRace: number, totalTaperWeeks: number, peakMiles: number): number {
+    // Race week
+    if (weeksFromRace === 1) {
+      return 8;  // Minimal long run, may be skipped by race proximity logic
+    }
+    
+    // Progressive taper based on weeks from race
+    if (totalTaperWeeks >= 3) {
+      // 3-week taper: 14 → 10 → 8
+      if (weeksFromRace === 2) return 10;
+      if (weeksFromRace === 3) return 14;
+    } else {
+      // 2-week taper: 10 → 8
+      if (weeksFromRace === 2) return 10;
+    }
+    
+    // Fallback
+    return Math.round(peakMiles * 0.6);
+  }
+
+  /**
+   * Get recovery week long run miles
+   * Scales slightly with progress through the plan
+   */
+  private getRecoveryWeekMiles(week: number, startMiles: number): number {
+    // Recovery weeks: start at 10, can go up to 12 later in plan
+    return Math.min(12, startMiles - 2 + Math.floor(week / 8) * 2);
+  }
+
+  /**
+   * Get peak long run distance based on plan duration and fitness
+   * Shorter plans cap at 18 miles; longer plans can reach 20
    */
   private getMaxLongRunMiles(): number {
-    const maxByLevel: Record<string, number> = {
-      'beginner': 18,
-      'intermediate': 20,  // Daniels maximum
-      'advanced': 20       // Still 20, NOT 22 (diminishing returns beyond 20)
-    };
-    return maxByLevel[this.params.fitness] || 20;
+    const durationReqs = getMarathonDurationRequirements(this.params.duration_weeks);
+    return durationReqs.peakLongRun;
   }
 
   /**
    * Calculate progressive build-up miles for a given week
-   * Gradual progression: 10 → 12 → 14 → 16 → 18 (caps at maxMiles - 2 to reserve peak)
+   * Ensures:
+   * - Minimum +1 mile per week (except recovery)
+   * - Maximum +2 miles per week
+   * - Never repeat same distance
    */
   private calculateBuildUpMiles(
     currentWeek: number,
     peakWeek: number,
-    maxMiles: number
+    peakMiles: number,
+    startMiles: number,
+    previousMiles: number
   ): number {
-    // Calculate progress as percentage of build phase completed
-    const buildPhaseWeeks = peakWeek - 1;  // Weeks available to build
-    const progress = Math.min(1, (currentWeek - 1) / Math.max(1, buildPhaseWeeks - 1));
+    // Calculate how many build weeks we have (excluding recovery weeks)
+    const buildWeeks = peakWeek - 1;
+    const recoveryWeeksInBuild = Math.floor(buildWeeks / 4);
+    const effectiveBuildWeeks = buildWeeks - recoveryWeeksInBuild;
     
-    // Starting point is 10 miles
-    // Cap build phase at maxMiles - 2 so peak week is distinct
-    const startMiles = 10;
-    const buildMaxMiles = maxMiles - 2;  // e.g., 18 for intermediate (peak is 20)
-    const targetMiles = startMiles + (buildMaxMiles - startMiles) * progress;
+    // Calculate effective week (excluding recovery weeks already passed)
+    const recoveryWeeksPassed = Math.floor((currentWeek - 1) / 4);
+    const effectiveWeek = currentWeek - recoveryWeeksPassed;
     
-    // Round to even numbers for cleaner progressions
-    return Math.round(targetMiles / 2) * 2;
+    // Calculate target miles based on linear progression
+    const milesNeeded = peakMiles - 2 - startMiles;  // -2 so peak week is distinct
+    const progressRatio = Math.min(1, (effectiveWeek - 1) / Math.max(1, effectiveBuildWeeks - 1));
+    let targetMiles = startMiles + milesNeeded * progressRatio;
+    
+    // Ensure at least +1 mile from previous (unless that would exceed cap)
+    const minMiles = previousMiles > 0 ? previousMiles + 1 : startMiles;
+    const maxMiles = previousMiles > 0 ? previousMiles + 2 : startMiles + 2;
+    
+    // Round and constrain
+    targetMiles = Math.round(targetMiles);
+    targetMiles = Math.max(minMiles, Math.min(maxMiles, targetMiles));
+    
+    // Never exceed peak - 2 during build
+    targetMiles = Math.min(targetMiles, peakMiles - 2);
+    
+    return targetMiles;
   }
 
   private getMPSegmentMiles(weekNumber: number, phase: Phase): number {

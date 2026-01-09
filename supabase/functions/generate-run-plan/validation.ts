@@ -5,7 +5,8 @@ import {
   GeneratePlanRequest, 
   TrainingPlan, 
   ValidationResult,
-  APPROACH_CONSTRAINTS 
+  APPROACH_CONSTRAINTS,
+  getMarathonDurationRequirements
 } from './types.ts';
 
 // ============================================================================
@@ -87,6 +88,55 @@ export function validateRequest(request: GeneratePlanRequest): ValidationResult 
       errors.push('Invalid race_date format. Use ISO date format (YYYY-MM-DD)');
     } else if (raceDate < now) {
       errors.push('race_date must be in the future');
+    }
+  }
+
+  // Marathon duration validation - stricter requirements for shorter plans
+  if (request.distance === 'marathon' && request.duration_weeks) {
+    const durationReqs = getMarathonDurationRequirements(request.duration_weeks);
+    
+    // Minimum duration check
+    if (request.duration_weeks < 10) {
+      errors.push(
+        `Marathon plans require at least 10 weeks. ${request.duration_weeks} weeks is too short ` +
+        `to safely prepare for 26.2 miles.`
+      );
+    }
+    
+    // Minimum weekly miles check for short plans
+    if (durationReqs.minWeeklyMiles > 0) {
+      if (request.current_weekly_miles === undefined) {
+        warnings.push(
+          `A ${request.duration_weeks}-week marathon plan requires an established running base. ` +
+          `Confirm you are currently running at least ${durationReqs.minWeeklyMiles} miles per week.`
+        );
+      } else if (request.current_weekly_miles < durationReqs.minWeeklyMiles) {
+        errors.push(
+          `A ${request.duration_weeks}-week marathon plan requires at least ${durationReqs.minWeeklyMiles} miles/week baseline. ` +
+          `Your current ${request.current_weekly_miles} mpw suggests a longer plan (14-16 weeks) would be safer.`
+        );
+      }
+    }
+    
+    // Beginner + short plan check
+    if (request.fitness === 'beginner' && request.duration_weeks < 14) {
+      errors.push(
+        `Beginners should use a 14+ week marathon plan. ` +
+        `A ${request.duration_weeks}-week plan is too aggressive for first-time marathoners.`
+      );
+    }
+    
+    // Add warning for aggressive timelines
+    if (durationReqs.warning) {
+      warnings.push(durationReqs.warning);
+    }
+    
+    // Add prerequisite info as warnings
+    if (durationReqs.additionalPrereqs.length > 0) {
+      warnings.push(
+        `Prerequisites for ${request.duration_weeks}-week marathon plan: ` +
+        durationReqs.additionalPrereqs.join('; ')
+      );
     }
   }
 

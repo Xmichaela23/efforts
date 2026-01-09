@@ -1,24 +1,33 @@
 /**
  * Research-Based Exercise Configuration
  * 
- * Maps exercises to their primary 1RM reference and research-based ratios.
+ * Maps exercises to their primary baseline lift and research-based ratios.
+ * These ratios are used to ESTIMATE TRAINING LOADS, not to predict actual 1RMs.
+ * 
  * Sources:
  * - NSCA Essentials of Strength Training & Conditioning
  * - Schoenfeld et al. (2021) - Unilateral vs bilateral strength
  * - Helms et al. (2016) - Accessory movement prescriptions
+ * - Contreras et al. (2017) - Hip thrust mechanics
+ * 
+ * IMPORTANT: Individual variation is ~10-20%. These ratios are:
+ * ✅ Good for prescribing working weights (70-80% of estimated load)
+ * ❌ Not accurate for testing or competition
  * 
  * Key Concepts:
- * - ratio: The exercise's 1RM relative to the primary lift (e.g., BSS = 0.60 of squat)
+ * - ratio: The exercise's estimated working capacity relative to the primary lift
+ *   (conservative mid-point of research ranges for safe training load prescription)
  * - displayFormat: How weight should be shown to the user
  * - isUnilateral: Whether the exercise works one side at a time
- * - perHandDivide: For dumbbell exercises, whether to divide total by 2
+ * - confidence: 'high' (±10%), 'medium' (±15%), 'low' (±20%) variance expected
  */
 
 export interface ExerciseConfig {
   primaryRef: 'squat' | 'deadlift' | 'bench' | 'overhead' | 'hipThrust' | null;
-  ratio: number;           // 1RM ratio to primary lift
+  ratio: number;           // Training load ratio to primary lift (conservative estimate)
   displayFormat: 'total' | 'perHand' | 'perLeg' | 'bodyweight' | 'band' | 'dipsAdded';
   isUnilateral: boolean;
+  confidence?: 'high' | 'medium' | 'low';  // Expected variance: high=±10%, medium=±15%, low=±20%
   notes?: string;
 }
 
@@ -70,6 +79,12 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'perHand',
     isUnilateral: true
   },
+  'lateral lunges': {
+    primaryRef: 'squat',
+    ratio: 0.45,
+    displayFormat: 'perHand',
+    isUnilateral: true
+  },
   
   // Goblet Squat: Limited by upper body hold capacity
   // Typically ~40-50% of back squat due to hold limitation
@@ -89,6 +104,12 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: true
   },
   'step ups': {
+    primaryRef: 'squat',
+    ratio: 0.40,
+    displayFormat: 'perHand',
+    isUnilateral: true
+  },
+  'step-ups': {
     primaryRef: 'squat',
     ratio: 0.40,
     displayFormat: 'perHand',
@@ -123,20 +144,23 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // HIP DOMINANT (Deadlift Reference)
   // ============================================================================
   
-  // Hip Thrust: Research shows can exceed DL 1RM when hip-focused
+  // Hip Thrust: Research shows 90-110% of DL, using conservative 0.90 for training loads
   // Contreras et al. (2017): Hip thrust 1RM averages ~90-110% of deadlift
+  // Using 0.90 (low end) for safe training load prescription
   'hip thrust': {
     primaryRef: 'deadlift',
-    ratio: 1.00,
+    ratio: 0.90,
     displayFormat: 'total',
     isUnilateral: false,
-    notes: 'Barbell or smith machine. Can match or exceed deadlift loads.'
+    confidence: 'medium',
+    notes: 'Barbell or smith machine. Strong hip-dominant athletes may exceed this.'
   },
   'hip thrusts': {
     primaryRef: 'deadlift',
-    ratio: 1.00,
+    ratio: 0.90,
     displayFormat: 'total',
-    isUnilateral: false
+    isUnilateral: false,
+    confidence: 'medium'
   },
   
   // Romanian Deadlift: ~70-80% of conventional (longer moment arm)
@@ -144,13 +168,15 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     primaryRef: 'deadlift',
     ratio: 0.75,
     displayFormat: 'total',
-    isUnilateral: false
+    isUnilateral: false,
+    confidence: 'high'
   },
   'rdl': {
     primaryRef: 'deadlift',
     ratio: 0.75,
     displayFormat: 'total',
-    isUnilateral: false
+    isUnilateral: false,
+    confidence: 'high'
   },
   
   // Single Leg RDL: Unilateral, stability limited
@@ -305,37 +331,54 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // ============================================================================
   
   // Barbell Row: ~80-90% of bench for strong pullers
+  // Using 0.85 as midpoint; technique-dependent (strict vs momentum)
   'barbell row': {
     primaryRef: 'bench',
     ratio: 0.85,
     displayFormat: 'total',
-    isUnilateral: false
+    isUnilateral: false,
+    confidence: 'medium'
   },
   'barbell rows': {
     primaryRef: 'bench',
     ratio: 0.85,
     displayFormat: 'total',
-    isUnilateral: false
+    isUnilateral: false,
+    confidence: 'medium'
   },
   'bent over row': {
     primaryRef: 'bench',
     ratio: 0.85,
     displayFormat: 'total',
-    isUnilateral: false
+    isUnilateral: false,
+    confidence: 'medium'
   },
   
-  // Dumbbell Row: Each DB ~40-45% of bench
+  // Dumbbell Row: Each DB ~40-45% of bench (per hand)
+  // ratio is per-hand weight, not total
   'dumbbell row': {
     primaryRef: 'bench',
     ratio: 0.45,
     displayFormat: 'perHand',
-    isUnilateral: true
+    isUnilateral: true,
+    confidence: 'high'
   },
   'dumbbell rows': {
     primaryRef: 'bench',
     ratio: 0.45,
     displayFormat: 'perHand',
-    isUnilateral: true
+    isUnilateral: true,
+    confidence: 'high'
+  },
+  
+  // Generic "rows" alias (for abbreviated instructions)
+  'rows': {
+    primaryRef: 'bench',
+    ratio: 0.85,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'medium',
+    notes: 'Generic rows - assumes barbell row weight.'
   },
   
   // Face Pull: Light prehab work
@@ -362,6 +405,21 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     ratio: 0.70,
     displayFormat: 'perHand',
     isUnilateral: false
+  },
+  'db shoulder press': {
+    primaryRef: 'overhead',
+    ratio: 0.70,
+    displayFormat: 'perHand',
+    isUnilateral: false
+  },
+  
+  // Standing/Seated Shoulder Press (OHP): Uses overhead 1RM directly
+  'shoulder press': {
+    primaryRef: 'overhead',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'high'
   },
   
   // Lateral Raise: Very light, isolation
@@ -570,6 +628,255 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   
   // ============================================================================
+  // PULL-UPS / BODYWEIGHT UPPER PULL
+  // Pull-ups: Bodyweight by default, can add weight for advanced
+  // ============================================================================
+  
+  'pull-up': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+    notes: 'Bodyweight. Add weight when 3x12 is easy.'
+  },
+  'pull-ups': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'pullup': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'pullups': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'chin-up': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'chin-ups': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'lat pulldown': {
+    primaryRef: 'bench',
+    ratio: 0.65,
+    displayFormat: 'total',
+    isUnilateral: false
+  },
+  
+  // Inverted Rows: Bodyweight horizontal pull
+  'inverted row': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+    notes: 'Feet elevated for progression.'
+  },
+  'inverted rows': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  
+  // ============================================================================
+  // PUSH-UPS / BODYWEIGHT UPPER PUSH
+  // ============================================================================
+  
+  'push-up': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+    notes: 'Standard → Diamond → Decline → Archer for progression.'
+  },
+  'push-ups': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'pushup': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'pushups': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'diamond push-up': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'diamond push-ups': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'decline push-up': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'decline push-ups': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'archer push-up': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'archer push-ups': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'pike push-up': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+    notes: 'Elevate feet to progress toward HSPU.'
+  },
+  'pike push-ups': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  
+  // ============================================================================
+  // EXPLOSIVE LOWER BODY (Bodyweight)
+  // ============================================================================
+  
+  'skater hop': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'skater hops': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'jump lunge': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'jump lunges': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  
+  // ============================================================================
+  // BAND EXERCISES
+  // ============================================================================
+  
+  'lateral band walk': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+    notes: 'Mini band around ankles or above knees.'
+  },
+  'lateral band walks': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false
+  },
+  'band face pull': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false
+  },
+  'band face pulls': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false
+  },
+  
+  // ============================================================================
+  // ADDITIONAL CORE (Bodyweight)
+  // ============================================================================
+  
+  'copenhagen plank': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true,
+    notes: 'Adductor-focused core stability.'
+  },
+  'copenhagen planks': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'core circuit': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'core work': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  
+  // ============================================================================
+  // SINGLE LEG GLUTE BRIDGE (Bodyweight)
+  // ============================================================================
+  
+  'single leg glute bridge': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'single leg glute bridges': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  
+  // ============================================================================
   // SWINGS (Deadlift Reference)
   // Kettlebell/dumbbell swings: ~20-25% of deadlift for explosive work
   // ============================================================================
@@ -597,6 +904,84 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     primaryRef: 'deadlift',
     ratio: 0.25,
     displayFormat: 'total',
+    isUnilateral: false
+  },
+  
+  // Alias: KB/DB Swings (common in programming)
+  'kb/db swings': {
+    primaryRef: 'deadlift',
+    ratio: 0.25,
+    displayFormat: 'total',
+    isUnilateral: false
+  },
+  'kb swings': {
+    primaryRef: 'deadlift',
+    ratio: 0.25,
+    displayFormat: 'total',
+    isUnilateral: false
+  },
+  'db swings': {
+    primaryRef: 'deadlift',
+    ratio: 0.25,
+    displayFormat: 'total',
+    isUnilateral: false
+  },
+  
+  // ============================================================================
+  // STEP-UPS (Squat Reference) - additional aliases
+  // ============================================================================
+  
+  'box step-up': {
+    primaryRef: 'squat',
+    ratio: 0.40,
+    displayFormat: 'perHand',
+    isUnilateral: true
+  },
+  'box step-ups': {
+    primaryRef: 'squat',
+    ratio: 0.40,
+    displayFormat: 'perHand',
+    isUnilateral: true
+  },
+  
+  // ============================================================================
+  // SQUAT VARIANTS (Bodyweight explosives)
+  // ============================================================================
+  
+  'squat jump': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'squat jumps': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'bodyweight squat': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'bodyweight squats': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'air squat': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'air squats': {
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
     isUnilateral: false
   },
 };
