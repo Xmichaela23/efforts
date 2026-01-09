@@ -14,7 +14,6 @@ import {
   formatPace,
   parsePace,
   adjustScoreForRecency,
-  estimateScoreFromFitness,
   getPacesFromScore,
   calculatePacesFromKnownPaces,
   validatePaceConsistency,
@@ -39,7 +38,7 @@ type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
 type StrengthTier = 'injury_prevention' | 'strength_power';
 type EquipmentType = 'home_gym' | 'commercial_gym';
 
-type PaceInputMethod = 'race' | 'paces' | 'estimate' | 'saved' | null;
+type PaceInputMethod = 'race' | 'paces' | 'saved' | 'unknown' | null;
 
 // ============================================================================
 // MAJOR MARATHONS DATABASE
@@ -1089,18 +1088,6 @@ export default function PlanWizard() {
           });
         };
         
-        const handleEstimateFromFitness = (level: 'beginner' | 'intermediate' | 'advanced') => {
-          const score = estimateScoreFromFitness(level);
-          const result = calculateEffortScoreResult(5000, 
-            level === 'beginner' ? 1800 : level === 'intermediate' ? 1440 : 1200
-          );
-          setState(prev => ({
-            ...prev,
-            effortScore: score,
-            effortPaces: result.paces,
-            effortScoreStatus: 'estimated'
-          }));
-        };
         
         // Handler for known paces calculation
         const handleKnownPacesChange = (easyPace: string, fiveKTime: string) => {
@@ -1188,7 +1175,7 @@ export default function PlanWizard() {
                   setState(prev => ({
                     ...prev,
                     paceInputMethod: method,
-                    hasRecentRace: method === 'race' ? true : method === 'estimate' ? false : null,
+                    hasRecentRace: method === 'race' ? true : method === 'unknown' ? false : null,
                     // Clear previous data when switching methods
                     effortRaceDistance: method === 'race' ? prev.effortRaceDistance : null,
                     effortRaceTime: method === 'race' ? prev.effortRaceTime : '',
@@ -1223,7 +1210,7 @@ export default function PlanWizard() {
                 )}
                 <RadioOption value="race" label={savedBaselines ? "Enter new race time" : "I have a recent race time"} description="Recommended for accurate pacing" />
                 <RadioOption value="paces" label={savedBaselines ? "Enter new paces" : "I know my easy pace and 5K time"} description="We'll calculate your training zones" />
-                <RadioOption value="estimate" label="Estimate for me" description="We'll set a starting point" />
+                <RadioOption value="unknown" label="I don't know my paces" description="We'll help you figure them out" />
               </RadioGroup>
               
               {/* Race time entry */}
@@ -1463,113 +1450,47 @@ export default function PlanWizard() {
                 </div>
               )}
               
-              {/* Estimate from fitness level */}
-              {state.paceInputMethod === 'estimate' && (
-                <div className="space-y-4 pt-4 border-t">
-                  <p className="text-sm text-gray-600">How would you describe your running?</p>
-                  <RadioGroup
-                    value={state.effortScoreStatus === 'estimated' ? 
-                      (state.effortScore === 32 ? 'beginner' : state.effortScore === 40 ? 'intermediate' : 'advanced') 
-                      : ''
-                    }
-                    onValueChange={(v) => handleEstimateFromFitness(v as 'beginner' | 'intermediate' | 'advanced')}
-                    className="space-y-2"
-                  >
-                    <RadioOption 
-                      value="beginner" 
-                      label="Building consistency" 
-                      description="20-30 miles/week, few races"
-                    />
-                    <RadioOption 
-                      value="intermediate" 
-                      label="Regular runner" 
-                      description="30-40 miles/week, some race experience"
-                    />
-                    <RadioOption 
-                      value="advanced" 
-                      label="Experienced competitor" 
-                      description="40+ miles/week, regular racing"
-                    />
-                  </RadioGroup>
-                  
-                  {/* Show estimated score with paces */}
-                  {state.effortScore && state.effortPaces && state.effortScoreStatus === 'estimated' && (
-                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-lg font-semibold text-gray-900">
-                        Estimated Effort Score: {state.effortScore}
-                      </p>
-                      <div className="mt-3 text-sm text-gray-700 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span>Base pace:</span>
-                          <input
-                            type="text"
-                            key={`est-base-${state.effortPaces.base}`}
-                            defaultValue={formatPace(state.effortPaces.base)}
-                            onBlur={(e) => {
-                              const seconds = parsePace(e.target.value);
-                              if (seconds && state.effortPaces) {
-                                setState(prev => ({
-                                  ...prev,
-                                  effortPaces: { ...prev.effortPaces!, base: seconds },
-                                  effortPacesSource: 'manual'
-                                }));
-                              } else {
-                                e.target.value = formatPace(state.effortPaces!.base);
-                              }
-                            }}
-                            className="w-20 px-2 py-1 text-right font-mono border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          /><span className="ml-1">/mi</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Race pace:</span>
-                          <input
-                            type="text"
-                            key={`est-race-${state.effortPaces.race}`}
-                            defaultValue={formatPace(state.effortPaces.race)}
-                            onBlur={(e) => {
-                              const seconds = parsePace(e.target.value);
-                              if (seconds && state.effortPaces) {
-                                setState(prev => ({
-                                  ...prev,
-                                  effortPaces: { ...prev.effortPaces!, race: seconds },
-                                  effortPacesSource: 'manual'
-                                }));
-                              } else {
-                                e.target.value = formatPace(state.effortPaces!.race);
-                              }
-                            }}
-                            className="w-20 px-2 py-1 text-right font-mono border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          /><span className="ml-1">/mi</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Steady pace:</span>
-                          <input
-                            type="text"
-                            key={`est-steady-${state.effortPaces.steady}`}
-                            defaultValue={formatPace(state.effortPaces.steady)}
-                            onBlur={(e) => {
-                              const seconds = parsePace(e.target.value);
-                              if (seconds && state.effortPaces) {
-                                setState(prev => ({
-                                  ...prev,
-                                  effortPaces: { ...prev.effortPaces!, steady: seconds },
-                                  effortPacesSource: 'manual'
-                                }));
-                              } else {
-                                e.target.value = formatPace(state.effortPaces!.steady);
-                              }
-                            }}
-                            className="w-20 px-2 py-1 text-right font-mono border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          /><span className="ml-1">/mi</span>
-                        </div>
-                      </div>
-                      <p className="mt-3 text-xs text-gray-500">
-                        {state.effortPacesSource === 'manual' 
-                          ? 'Using your custom paces.' 
-                          : 'Tap to adjust. Update anytime with a race result.'}
+              {/* Don't know paces - show guidance */}
+              {state.paceInputMethod === 'unknown' && (
+                <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-base font-semibold text-amber-900 mb-3">
+                    No problem! Here's how to get started:
+                  </p>
+                  <div className="space-y-4 text-sm text-amber-800">
+                    <div>
+                      <p className="font-medium">Option 1: Choose "Complete" goal</p>
+                      <p className="text-amber-700 mt-1">
+                        Go back and select "Complete" instead of "Perform". 
+                        The completion-focused plan uses effort-based training that doesn't require precise paces.
                       </p>
                     </div>
-                  )}
+                    <div>
+                      <p className="font-medium">Option 2: Run a time trial</p>
+                      <p className="text-amber-700 mt-1">
+                        Run a hard 5K effort (at a local parkrun, track, or measured route). 
+                        Come back and enter your time - we'll calculate everything from there.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Option 3: Train for a week</p>
+                      <p className="text-amber-700 mt-1">
+                        Connect Strava or Garmin and run a few easy runs. 
+                        After a week of data, we can learn your paces automatically.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-amber-200">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Go back to goal step and suggest Complete
+                        setStep(step - 1);
+                      }}
+                      className="text-sm text-amber-900 underline hover:no-underline"
+                    >
+                      ← Go back to choose "Complete" goal
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
