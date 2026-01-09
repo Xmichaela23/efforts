@@ -421,6 +421,7 @@ export default function PlanWizard() {
     easyPace?: number; // seconds per mile
     fiveKTime?: number; // seconds
     effortScore?: number;
+    effortPaces?: TrainingPaces;
   } | null>(null);
 
   // Load user's saved baselines on mount
@@ -436,6 +437,8 @@ export default function PlanWizard() {
           .eq('user_id', user.id)
           .maybeSingle();
         
+        console.log('[PlanWizard] Loaded baselines:', data);
+        
         if (data) {
           const pn = data.performance_numbers || {};
           const ep = data.effort_paces || {};
@@ -443,13 +446,37 @@ export default function PlanWizard() {
           // Check for saved pace data
           const easyPace = ep.base || pn.easyPace || pn.easy_pace;
           const fiveKTime = pn.fiveK || pn.fiveKTime;
-          const effortScore = pn.effortScore || pn.effort_score;
+          let effortScore = pn.effortScore || pn.effort_score;
           
-          if (easyPace || fiveKTime || effortScore) {
+          // If we have 5K time but no effortScore, calculate it
+          if (!effortScore && fiveKTime && typeof fiveKTime === 'number') {
+            const fiveKMeters = 5000;
+            const result = calculateEffortScoreResult(fiveKMeters, fiveKTime);
+            effortScore = result.score;
+          }
+          
+          // Build effort paces from saved data
+          let effortPaces: TrainingPaces | undefined;
+          if (ep.base && ep.race && ep.steady && ep.power && ep.speed) {
+            effortPaces = {
+              base: ep.base,
+              race: ep.race,
+              steady: ep.steady,
+              power: ep.power,
+              speed: ep.speed
+            };
+          } else if (effortScore) {
+            effortPaces = getPacesFromScore(effortScore);
+          }
+          
+          // Only set if we have meaningful data
+          if (effortPaces || effortScore) {
+            console.log('[PlanWizard] Setting saved baselines:', { easyPace, fiveKTime, effortScore, effortPaces });
             setSavedBaselines({
               easyPace: typeof easyPace === 'number' ? easyPace : undefined,
               fiveKTime: typeof fiveKTime === 'number' ? fiveKTime : undefined,
-              effortScore: typeof effortScore === 'number' ? effortScore : undefined
+              effortScore: typeof effortScore === 'number' ? effortScore : undefined,
+              effortPaces
             });
           }
         }
@@ -1125,9 +1152,8 @@ export default function PlanWizard() {
                   
                   // If using saved baselines, auto-populate from them
                   if (method === 'saved' && savedBaselines) {
-                    const paces = savedBaselines.effortScore 
-                      ? getPacesFromScore(savedBaselines.effortScore)
-                      : null;
+                    const paces = savedBaselines.effortPaces 
+                      || (savedBaselines.effortScore ? getPacesFromScore(savedBaselines.effortScore) : null);
                     setState(prev => ({
                       ...prev,
                       paceInputMethod: method,
@@ -1164,11 +1190,16 @@ export default function PlanWizard() {
                 className="space-y-2"
               >
                 {/* Show saved paces option if user has baselines */}
-                {savedBaselines?.effortScore && (
+                {(savedBaselines?.effortScore || savedBaselines?.effortPaces) && (
                   <RadioOption 
                     value="saved" 
                     label="Use my saved paces" 
-                    description={`Effort Score: ${savedBaselines.effortScore}${savedBaselines.easyPace ? ` • Easy: ${formatPace(savedBaselines.easyPace)}/mi` : ''}`}
+                    description={savedBaselines.effortScore 
+                      ? `Effort Score: ${savedBaselines.effortScore}${savedBaselines.easyPace ? ` • Easy: ${formatPace(savedBaselines.easyPace)}/mi` : ''}`
+                      : savedBaselines.effortPaces 
+                        ? `Easy: ${formatPace(savedBaselines.effortPaces.base)}/mi • Race: ${formatPace(savedBaselines.effortPaces.race)}/mi`
+                        : 'Your saved training paces'
+                    }
                   />
                 )}
                 <RadioOption value="race" label="I have a recent race time" description="Recommended for accurate pacing" />
