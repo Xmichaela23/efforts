@@ -686,6 +686,39 @@ export default function PlanWizard() {
 
       setGenerateProgress(20);
 
+      // Save equipment selection to baselines if not already saved
+      if (state.strengthFrequency > 0 && state.strengthTier === 'strength_power' && !savedBaselines?.equipment?.length) {
+        const equipmentToSave = state.equipmentType === 'commercial_gym' 
+          ? ['Commercial gym'] 
+          : ['Home gym', 'Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)'];
+        
+        // First check if user has existing baselines
+        const { data: existing } = await supabase
+          .from('user_baselines')
+          .select('equipment')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        // Merge with existing equipment data
+        const mergedEquipment = {
+          ...(existing?.equipment || {}),
+          strength: equipmentToSave
+        };
+        
+        // Upsert equipment to user_baselines (only updates equipment field)
+        await supabase
+          .from('user_baselines')
+          .upsert({
+            user_id: user.id,
+            equipment: mergedEquipment,
+            updated_at: new Date().toISOString()
+          }, { 
+            onConflict: 'user_id',
+            ignoreDuplicates: false 
+          });
+        console.log('[PlanWizard] Saved equipment preference:', equipmentToSave);
+      }
+
       // Build request body
       const requestBody: Record<string, unknown> = {
         user_id: user.id,
