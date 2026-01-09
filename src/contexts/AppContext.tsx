@@ -518,6 +518,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  // Calculate current week based on plan start date and today
+  const calculateCurrentWeekForPlan = (plan: any): number => {
+    try {
+      // Get start date from config
+      const startDateStr = plan.config?.user_selected_start_date || plan.config?.start_date;
+      if (!startDateStr) return plan.current_week || 1;
+      
+      const startDate = new Date(startDateStr + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Normalize to midnight
+      
+      const diffTime = today.getTime() - startDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Week 1 starts on day 0-6, Week 2 on day 7-13, etc.
+      const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
+      
+      // Cap at plan duration
+      const maxWeeks = plan.duration || plan.duration_weeks || plan.config?.duration_weeks || 52;
+      return Math.min(weekNumber, maxWeeks);
+    } catch {
+      return plan.current_week || 1;
+    }
+  };
+
   const loadPlans = async () => {
     try {
       setPlansLoading(true);
@@ -530,13 +555,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       const { data: plans, error } = await supabase.from('plans').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
       if (error) return;
-      const active = plans?.filter(p => p.status === 'active' || p.status === 'paused').map(plan => ({ ...plan, currentWeek: plan.current_week })) || [];
-      const completed = plans?.filter(p => p.status === 'completed' || p.status === 'ended').map(plan => ({ ...plan, currentWeek: plan.current_week })) || [];
+      
+      // Calculate dynamic current week for each plan based on start date
+      const active = plans?.filter(p => p.status === 'active' || p.status === 'paused').map(plan => ({ 
+        ...plan, 
+        currentWeek: calculateCurrentWeekForPlan(plan)
+      })) || [];
+      const completed = plans?.filter(p => p.status === 'completed' || p.status === 'ended').map(plan => ({ 
+        ...plan, 
+        currentWeek: calculateCurrentWeekForPlan(plan)
+      })) || [];
+      
       setCurrentPlans(active);
       setCompletedPlans(completed);
       const detailed: any = {};
       plans?.forEach(plan => {
-        detailed[plan.id] = { ...plan, currentWeek: plan.current_week };
+        detailed[plan.id] = { ...plan, currentWeek: calculateCurrentWeekForPlan(plan) };
       });
       setDetailedPlans(detailed);
     } catch (error) {
