@@ -1263,85 +1263,94 @@ export default function PlanWizard() {
                     </>
                   )}
                   
-                  {/* Show calculated score with editable paces */}
+                  {/* Show calculated score with editable paces - glass morphism */}
                   {state.effortScore && state.effortPaces && (
-                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <p className="text-lg font-semibold text-blue-900">
-                        Effort Score: {state.effortScore}
-                      </p>
-                      <div className="mt-3 text-sm text-blue-700 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span>Base pace:</span>
-                          <input
-                            type="text"
-                            key={`base-${state.effortPaces.base}`}
-                            defaultValue={formatPace(state.effortPaces.base)}
-                            onBlur={(e) => {
-                              const seconds = parsePace(e.target.value);
-                              if (seconds && state.effortPaces) {
-                                setState(prev => ({
-                                  ...prev,
-                                  effortPaces: { ...prev.effortPaces!, base: seconds },
-                                  effortPacesSource: 'manual'
-                                }));
-                              } else {
-                                // Reset to original if invalid
-                                e.target.value = formatPace(state.effortPaces!.base);
-                              }
-                            }}
-                            className="w-20 px-2 py-1 text-right font-mono border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          /><span className="ml-1">/mi</span>
+                    <div className="relative mt-4">
+                      {/* Teal glow effect */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-teal-500/20 via-cyan-500/10 to-transparent rounded-2xl blur-xl" />
+                      <div className="relative p-5 bg-black/40 backdrop-blur-sm rounded-xl border border-teal-500/30">
+                        <p className="text-lg font-semibold text-white">
+                          Effort Score: {state.effortScore}
+                        </p>
+                        <div className="mt-4 text-sm space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400">Base pace:</span>
+                            <div className="flex items-center">
+                              <input
+                                type="text"
+                                key={`base-${state.effortPaces.base}`}
+                                defaultValue={formatPace(state.effortPaces.base)}
+                                onBlur={(e) => {
+                                  const seconds = parsePace(e.target.value);
+                                  if (seconds && state.effortPaces) {
+                                    setState(prev => ({
+                                      ...prev,
+                                      effortPaces: { ...prev.effortPaces!, base: seconds },
+                                      effortPacesSource: 'manual'
+                                    }));
+                                  } else {
+                                    e.target.value = formatPace(state.effortPaces!.base);
+                                  }
+                                }}
+                                className="w-20 px-2 py-1.5 text-right font-mono text-teal-200 bg-white/10 border border-teal-500/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-400"
+                              /><span className="ml-2 text-gray-500">/mi</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400">Race pace:</span>
+                            <div className="flex items-center">
+                              <input
+                                type="text"
+                                key={`race-${state.effortPaces.race}`}
+                                defaultValue={formatPace(state.effortPaces.race)}
+                                onBlur={(e) => {
+                                  const seconds = parsePace(e.target.value);
+                                  if (seconds && state.effortPaces) {
+                                    setState(prev => ({
+                                      ...prev,
+                                      effortPaces: { ...prev.effortPaces!, race: seconds },
+                                      effortPacesSource: 'manual'
+                                    }));
+                                  } else {
+                                    e.target.value = formatPace(state.effortPaces!.race);
+                                  }
+                                }}
+                                className="w-20 px-2 py-1.5 text-right font-mono text-teal-200 bg-white/10 border border-teal-500/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-400"
+                              /><span className="ml-2 text-gray-500">/mi</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400">Steady pace:</span>
+                            <div className="flex items-center">
+                              <input
+                                type="text"
+                                key={`steady-${state.effortPaces.steady}`}
+                                defaultValue={formatPace(state.effortPaces.steady)}
+                                onBlur={(e) => {
+                                  const seconds = parsePace(e.target.value);
+                                  if (seconds && state.effortPaces) {
+                                    setState(prev => ({
+                                      ...prev,
+                                      effortPaces: { ...prev.effortPaces!, steady: seconds },
+                                      effortPacesSource: 'manual'
+                                    }));
+                                  } else {
+                                    e.target.value = formatPace(state.effortPaces!.steady);
+                                  }
+                                }}
+                                className="w-20 px-2 py-1.5 text-right font-mono text-teal-200 bg-white/10 border border-teal-500/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-400"
+                              /><span className="ml-2 text-gray-500">/mi</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span>Race pace:</span>
-                          <input
-                            type="text"
-                            key={`race-${state.effortPaces.race}`}
-                            defaultValue={formatPace(state.effortPaces.race)}
-                            onBlur={(e) => {
-                              const seconds = parsePace(e.target.value);
-                              if (seconds && state.effortPaces) {
-                                setState(prev => ({
-                                  ...prev,
-                                  effortPaces: { ...prev.effortPaces!, race: seconds },
-                                  effortPacesSource: 'manual'
-                                }));
-                              } else {
-                                e.target.value = formatPace(state.effortPaces!.race);
-                              }
-                            }}
-                            className="w-20 px-2 py-1 text-right font-mono border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          /><span className="ml-1">/mi</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Steady pace:</span>
-                          <input
-                            type="text"
-                            key={`steady-${state.effortPaces.steady}`}
-                            defaultValue={formatPace(state.effortPaces.steady)}
-                            onBlur={(e) => {
-                              const seconds = parsePace(e.target.value);
-                              if (seconds && state.effortPaces) {
-                                setState(prev => ({
-                                  ...prev,
-                                  effortPaces: { ...prev.effortPaces!, steady: seconds },
-                                  effortPacesSource: 'manual'
-                                }));
-                              } else {
-                                e.target.value = formatPace(state.effortPaces!.steady);
-                              }
-                            }}
-                            className="w-20 px-2 py-1 text-right font-mono border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          /><span className="ml-1">/mi</span>
-                        </div>
+                        <p className="mt-4 text-xs text-teal-400/80">
+                          {state.effortPacesSource === 'manual' 
+                            ? 'Using your custom paces.' 
+                            : state.effortRaceRecency && state.effortRaceRecency !== 'recent'
+                              ? 'Adjusted for race recency. Tap to customize.'
+                              : 'Tap to customize.'}
+                        </p>
                       </div>
-                      <p className="mt-3 text-xs text-blue-600">
-                        {state.effortPacesSource === 'manual' 
-                          ? 'Using your custom paces.' 
-                          : state.effortRaceRecency && state.effortRaceRecency !== 'recent'
-                            ? 'Adjusted for race recency. Tap to customize.'
-                            : 'Tap to customize.'}
-                      </p>
                     </div>
                   )}
                 </div>
@@ -1388,32 +1397,36 @@ export default function PlanWizard() {
                   
                   {/* Validation warning */}
                   {state.paceValidationWarning && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <p className="text-sm text-amber-800">{state.paceValidationWarning}</p>
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl backdrop-blur-sm">
+                      <p className="text-sm text-amber-200">{state.paceValidationWarning}</p>
                     </div>
                   )}
                   
-                  {/* Show calculated paces */}
+                  {/* Show calculated paces - glass morphism with teal glow */}
                   {state.effortScore && state.effortPaces && state.paceInputMethod === 'paces' && (
-                    <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                      <p className="text-lg font-semibold text-green-900">
-                        Effort Score: {state.effortScore}
-                      </p>
-                      <p className="text-xs text-green-700 mt-1 mb-3">
-                        Calculated from your 5K time. Your easy pace is used as-is.
-                      </p>
-                      <div className="text-sm text-green-700 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span>Base pace:</span>
-                          <span className="font-mono">{formatPace(state.effortPaces.base)}/mi</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Race pace <span className="text-xs text-green-600">(marathon)</span>:</span>
-                          <span className="font-mono font-semibold">{formatPace(state.effortPaces.race)}/mi</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Steady pace <span className="text-xs text-green-600">(threshold)</span>:</span>
-                          <span className="font-mono">{formatPace(state.effortPaces.steady)}/mi</span>
+                    <div className="relative mt-4">
+                      {/* Teal glow effect */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-teal-500/20 via-cyan-500/10 to-transparent rounded-2xl blur-xl" />
+                      <div className="relative p-5 bg-black/40 backdrop-blur-sm rounded-xl border border-teal-500/30">
+                        <p className="text-lg font-semibold text-white">
+                          Effort Score: {state.effortScore}
+                        </p>
+                        <p className="text-xs text-teal-300 mt-1 mb-4">
+                          Calculated from your 5K time. Your easy pace is used as-is.
+                        </p>
+                        <div className="text-sm space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400">Base pace:</span>
+                            <span className="font-mono text-teal-200">{formatPace(state.effortPaces.base)}/mi</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400">Race pace <span className="text-xs text-teal-400/60">(marathon)</span>:</span>
+                            <span className="font-mono font-semibold text-teal-200">{formatPace(state.effortPaces.race)}/mi</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400">Steady pace <span className="text-xs text-teal-400/60">(threshold)</span>:</span>
+                            <span className="font-mono text-teal-200">{formatPace(state.effortPaces.steady)}/mi</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1421,59 +1434,67 @@ export default function PlanWizard() {
                 </div>
               )}
               
-              {/* Using saved baselines */}
+              {/* Using saved baselines - glass morphism with teal glow */}
               {state.paceInputMethod === 'saved' && state.effortScore && state.effortPaces && (
-                <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-lg font-semibold text-green-900">
-                    ✓ Using Saved Paces
-                  </p>
-                  <p className="text-xs text-green-700 mt-1 mb-3">
-                    Effort Score: {state.effortScore}
-                  </p>
-                  <div className="text-sm text-green-700 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span>Base pace:</span>
-                      <span className="font-mono">{formatPace(state.effortPaces.base)}/mi</span>
+                <div className="relative mt-4">
+                  {/* Teal glow effect */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-teal-500/20 via-cyan-500/10 to-transparent rounded-2xl blur-xl" />
+                  <div className="relative p-5 bg-black/40 backdrop-blur-sm rounded-xl border border-teal-500/30">
+                    <p className="text-lg font-semibold text-white">
+                      ✓ Using Saved Paces
+                    </p>
+                    <p className="text-xs text-teal-300 mt-1 mb-4">
+                      Effort Score: {state.effortScore}
+                    </p>
+                    <div className="text-sm text-gray-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Base pace:</span>
+                        <span className="font-mono text-teal-200">{formatPace(state.effortPaces.base)}/mi</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Race pace:</span>
+                        <span className="font-mono text-teal-200">{formatPace(state.effortPaces.race)}/mi</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Interval pace:</span>
+                        <span className="font-mono text-teal-200">{formatPace(state.effortPaces.power)}/mi</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span>Race pace:</span>
-                      <span className="font-mono">{formatPace(state.effortPaces.race)}/mi</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Interval pace:</span>
-                      <span className="font-mono">{formatPace(state.effortPaces.power)}/mi</span>
-                    </div>
+                    <p className="text-xs text-teal-400/80 mt-4">
+                      These paces will be used for your training plan.
+                    </p>
                   </div>
-                  <p className="text-xs text-green-600 mt-3">
-                    These paces will be used for your training plan.
-                  </p>
                 </div>
               )}
               
-              {/* Don't know paces - direct to baselines */}
+              {/* Don't know paces - glass morphism with teal glow */}
               {state.paceInputMethod === 'unknown' && (
-                <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <p className="text-base font-semibold text-amber-900 mb-2">
-                    No problem!
-                  </p>
-                  <p className="text-sm text-amber-800 mb-4">
-                    Go to Baselines where you can schedule a 5K time trial or easy pace test. We'll calculate your training paces from the results.
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={() => navigate('/baselines')}
-                      className="w-full px-4 py-2.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700"
-                    >
-                      Go to Baselines →
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStep(step - 1)}
-                      className="w-full px-4 py-2 text-amber-800 text-sm hover:underline"
-                    >
-                      ← Or choose "Complete" goal instead
-                    </button>
+                <div className="relative mt-4">
+                  {/* Teal glow effect */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-teal-500/20 via-cyan-500/10 to-transparent rounded-2xl blur-xl" />
+                  <div className="relative p-5 bg-black/40 backdrop-blur-sm rounded-xl border border-teal-500/30">
+                    <p className="text-lg font-semibold text-white mb-2">
+                      No problem!
+                    </p>
+                    <p className="text-sm text-gray-300 mb-5">
+                      Go to Baselines where you can schedule a 5K time trial or easy pace test. We'll calculate your training paces from the results.
+                    </p>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        type="button"
+                        onClick={() => navigate('/baselines')}
+                        className="w-full px-4 py-3 bg-teal-600 text-white text-sm font-medium rounded-xl hover:bg-teal-500 transition-colors"
+                      >
+                        Go to Baselines →
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep(step - 1)}
+                        className="w-full px-4 py-2 text-gray-400 text-sm hover:text-white transition-colors"
+                      >
+                        ← Or choose "Complete" goal instead
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
