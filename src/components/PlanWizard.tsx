@@ -1454,41 +1454,49 @@ export default function PlanWizard() {
               {state.paceInputMethod === 'unknown' && (
                 <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
                   <p className="text-base font-semibold text-amber-900 mb-3">
-                    No problem! Here's how to get started:
+                    No problem! Here's how to find your paces:
                   </p>
                   <div className="space-y-4 text-sm text-amber-800">
                     <div>
-                      <p className="font-medium">Option 1: Choose "Complete" goal</p>
+                      <p className="font-medium">Option 1: Run a 5K time trial</p>
                       <p className="text-amber-700 mt-1">
-                        Go back and select "Complete" instead of "Perform". 
-                        The completion-focused plan uses effort-based training that doesn't require precise paces.
+                        Run a hard 5K effort and log it in the app. We'll calculate all your training paces from that single result.
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/baselines?test=5k')}
+                        className="mt-2 px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded hover:bg-amber-700"
+                      >
+                        Schedule 5K Time Trial →
+                      </button>
                     </div>
                     <div>
-                      <p className="font-medium">Option 2: Run a time trial</p>
+                      <p className="font-medium">Option 2: Test your easy pace</p>
                       <p className="text-amber-700 mt-1">
-                        Run a hard 5K effort (at a local parkrun, track, or measured route). 
-                        Come back and enter your time - we'll calculate everything from there.
+                        Go for a comfortable run where you can hold a conversation. Log it and we'll use that as your baseline.
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/baselines?test=easy')}
+                        className="mt-2 px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded hover:bg-amber-700"
+                      >
+                        Log Easy Pace Run →
+                      </button>
                     </div>
                     <div>
-                      <p className="font-medium">Option 3: Train for a week</p>
+                      <p className="font-medium">Option 3: Let the app learn</p>
                       <p className="text-amber-700 mt-1">
-                        Connect Strava or Garmin and run a few easy runs. 
-                        After a week of data, we can learn your paces automatically.
+                        Just start running! After a few tracked runs, we'll automatically calculate your paces from your data.
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-amber-200">
+                  <div className="mt-4 pt-3 border-t border-amber-200 flex gap-4">
                     <button
                       type="button"
-                      onClick={() => {
-                        // Go back to goal step and suggest Complete
-                        setStep(step - 1);
-                      }}
+                      onClick={() => setStep(step - 1)}
                       className="text-sm text-amber-900 underline hover:no-underline"
                     >
-                      ← Go back to choose "Complete" goal
+                      ← Choose "Complete" goal instead
                     </button>
                   </div>
                 </div>
