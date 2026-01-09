@@ -131,24 +131,24 @@ function createMondayLowerBody(
     if (isRecovery) {
       // Recovery: Same weight, reduced volume (3 sets → 2 sets)
       exercises.push(
-        { name: 'Hip Thrusts', sets: 2, reps: 8, weight: '75% 1RM' },
-        { name: 'Romanian Deadlift', sets: 2, reps: 8, weight: '70% 1RM' },
-        { name: 'Goblet Squat', sets: 2, reps: 10, weight: 'Light DB' },
+        { name: 'Back Squat', sets: 2, reps: 8, weight: '65% 1RM' },
+        { name: 'Hip Thrusts', sets: 2, reps: 8, weight: '70% 1RM' },
+        { name: 'Romanian Deadlift', sets: 2, reps: 8, weight: '65% 1RM' },
         { name: 'Box Jumps', sets: 2, reps: 3, weight: 'Bodyweight' }
       );
       duration = 35;
       description = 'Recovery Week - Same weights, reduced volume. Let your body adapt to recent increases. Target: 2 sets, RIR 4-5.';
     } else if (phase.name === 'Base') {
-      // Base: Build hip power foundation
+      // Base: Build hip power foundation + squat strength
       const load = 70 + Math.min(5, weekInPhase); // 71%, 72%, 73%, 74%, 75%
       exercises.push(
+        { name: 'Back Squat', sets: 3, reps: 8, weight: `${load}% 1RM` },
         { name: 'Hip Thrusts', sets: 4, reps: 8, weight: `${load}% 1RM` },
-        { name: 'Romanian Deadlift', sets: 4, reps: 8, weight: `${load - 5}% 1RM` },
-        { name: 'Goblet Squat', sets: 3, reps: 10, weight: 'Moderate DB' },
-        { name: 'Walking Lunges', sets: 3, reps: '8/leg', weight: 'Bodyweight' }
+        { name: 'Romanian Deadlift', sets: 3, reps: 8, weight: `${load - 5}% 1RM` },
+        { name: 'Walking Lunges', sets: 3, reps: '8/leg', weight: 'Light DB' }
       );
       duration = 45;
-      description = `Week ${weekInPhase} Base - Building hip power foundation. Add 5-10 lbs per week on hip thrusts and RDL. Target: 4x8 @ ${load}% 1RM, RIR 2-3.`;
+      description = `Week ${weekInPhase} Base - Building lower body foundation. Add 5-10 lbs per week on squat, hip thrusts, and RDL. Target: 3-4x8 @ ${load}% 1RM, RIR 2-3.`;
     } else if (phase.name === 'Speed') {
       // Speed: Explosive power, convert strength to speed
       exercises.push(
