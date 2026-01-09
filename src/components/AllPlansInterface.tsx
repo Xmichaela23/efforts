@@ -1678,6 +1678,30 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           if (typeof w.duration === 'number' && w.duration > 0) meta.push(fmtHM(w.duration));
           lines.push(`- ${w.name}${meta.length ? ` (${meta.join(' • ')})` : ''}`);
           if (w.description) lines.push(`  - ${w.description}`);
+          
+          // Include materialized strength exercises with calculated weights
+          const strengthExercises = w.computed?.steps?.filter((s: any) => s?.kind === 'strength')?.map((s: any) => s.strength) 
+            || w.strength_exercises 
+            || [];
+          if (Array.isArray(strengthExercises) && strengthExercises.length > 0) {
+            lines.push(`  - **Exercises:**`);
+            for (const ex of strengthExercises) {
+              const name = ex?.name || 'Exercise';
+              const sets = ex?.sets || 0;
+              const reps = ex?.reps || 0;
+              const weightDisplay = ex?.weight_display;
+              const notes = ex?.notes ? ` (${ex.notes})` : '';
+              
+              let weightStr = '';
+              if (weightDisplay && weightDisplay !== 'Bodyweight' && weightDisplay !== 'Band') {
+                weightStr = ` @ ${weightDisplay}`;
+              } else if (ex?.baseline_missing) {
+                weightStr = ' @ [Setup 1RM]';
+              }
+              
+              lines.push(`    - ${name}: ${sets}×${reps}${weightStr}${notes}`);
+            }
+          }
         }
         lines.push('');
       }
