@@ -143,23 +143,27 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
   const isDistanceBased = !!step.distance_m;
   const isIndoor = environment === 'indoor';
   
-  // Primary display: distance remaining (outdoor distance-based) or time remaining
+  // Primary display: distance remaining, time remaining, or elapsed time
   let primaryValue: string;
   let primaryLabel: string;
   
-  if (isDistanceBased) {
+  if (isDistanceBased && distance_remaining_m !== undefined) {
     if (isIndoor) {
       // Indoor distance-based: show estimated distance with ~
-      primaryValue = `~${Math.round(distance_remaining_m || 0)}m`;
+      primaryValue = `~${Math.round(distance_remaining_m)}m`;
     } else {
       // Outdoor distance-based: show actual distance
-      primaryValue = `${Math.round(distance_remaining_m || 0)}m`;
+      primaryValue = formatDistance(distance_remaining_m);
     }
     primaryLabel = 'to go';
-  } else {
-    // Time-based
-    primaryValue = formatTime(remaining_s || 0);
+  } else if (remaining_s && remaining_s > 0) {
+    // Time-based with remaining time
+    primaryValue = formatTime(remaining_s);
     primaryLabel = 'remaining';
+  } else {
+    // Fallback: show elapsed time
+    primaryValue = formatTime(elapsed_s || 0);
+    primaryLabel = 'elapsed';
   }
   
   // Step header
