@@ -3,7 +3,7 @@ import Capacitor
 import WatchConnectivity
 
 @objc(WatchConnectivityPlugin)
-public class WatchConnectivityPlugin: CAPPlugin, CAPBridgedPlugin {
+public class WatchConnectivityPlugin: CAPPlugin, CAPBridgedPlugin, WCSessionDelegate {
     public let identifier = "WatchConnectivityPlugin"
     public let jsName = "WatchConnectivity"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -11,7 +11,7 @@ public class WatchConnectivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "isPaired", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "isReachable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sendWorkout", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "clearWorkout", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearWorkout", returnType: CAPPluginReturnPromise)
     ]
     
     private var session: WCSession?
@@ -24,13 +24,9 @@ public class WatchConnectivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
     
-    // MARK: - Check Support
-    
     @objc func isSupported(_ call: CAPPluginCall) {
         call.resolve(["supported": WCSession.isSupported()])
     }
-    
-    // MARK: - Check Paired
     
     @objc func isPaired(_ call: CAPPluginCall) {
         guard let session = session else {
@@ -40,8 +36,6 @@ public class WatchConnectivityPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["paired": session.isPaired])
     }
     
-    // MARK: - Check Reachable
-    
     @objc func isReachable(_ call: CAPPluginCall) {
         guard let session = session else {
             call.resolve(["reachable": false])
@@ -50,44 +44,29 @@ public class WatchConnectivityPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["reachable": session.isReachable])
     }
     
-    // MARK: - Send Workout to Watch
-    
     @objc func sendWorkout(_ call: CAPPluginCall) {
-        guard let session = session else {
-            call.reject("WatchConnectivity not available")
-            return
-        }
-        
-        guard session.isPaired else {
-            call.reject("Apple Watch not paired")
-            return
-        }
-        
         guard let workoutJson = call.getString("workout") else {
             call.reject("Missing workout data")
             return
         }
         
-        guard let workoutData = workoutJson.data(using: .utf8) else {
-            call.reject("Invalid workout data")
+        guard let session = session, session.isPaired else {
+            call.reject("Watch not paired")
             return
         }
         
-        let message: [String: Any] = [
-            "action": "sendWorkout",
-            "workout": workoutData
-        ]
+        let message = ["workout": workoutJson]
         
-        // Try to send immediately if reachable
+        // Try to send directly if reachable
         if session.isReachable {
-            session.sendMessage(message, replyHandler: { reply in
+            session.sendMessage(message, replyHandler: { _ in
                 call.resolve(["sent": true, "method": "message"])
             }, errorHandler: { error in
                 // Fall back to application context
                 self.sendViaApplicationContext(message: message, call: call)
             })
         } else {
-            // Use application context (persisted)
+            // Use application context for background transfer
             sendViaApplicationContext(message: message, call: call)
         }
     }
@@ -100,60 +79,38 @@ public class WatchConnectivityPlugin: CAPPlugin, CAPBridgedPlugin {
         
         do {
             try session.updateApplicationContext(message)
-            call.resolve(["sent": true, "method": "context"])
+            call.resolve(["sent": true, "method": "applicationContext"])
         } catch {
             call.reject("Failed to send: \(error.localizedDescription)")
         }
     }
     
-    // MARK: - Clear Workout
-    
     @objc func clearWorkout(_ call: CAPPluginCall) {
         guard let session = session else {
-            call.reject("WatchConnectivity not available")
+            call.reject("Session not available")
             return
         }
         
-        let message: [String: Any] = ["action": "clearWorkout"]
-        
-        if session.isReachable {
-            session.sendMessage(message, replyHandler: { _ in
-                call.resolve(["cleared": true])
-            }, errorHandler: { error in
-                call.reject("Failed to clear: \(error.localizedDescription)")
-            })
-        } else {
-            do {
-                try session.updateApplicationContext(message)
-                call.resolve(["cleared": true])
-            } catch {
-                call.reject("Failed to clear: \(error.localizedDescription)")
-            }
+        do {
+            try session.updateApplicationContext(["workout": ""])
+            call.resolve(["cleared": true])
+        } catch {
+            call.reject("Failed to clear: \(error.localizedDescription)")
         }
     }
-}
-
-// MARK: - WCSessionDelegate
-
-extension WatchConnectivityPlugin: WCSessionDelegate {
+    
+    // MARK: - WCSessionDelegate
+    
     public func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        if let error = error {
-            print("WCSession activation failed: \(error.localizedDescription)")
-        }
+        // Session activated
     }
     
     public func sessionDidBecomeInactive(_ session: WCSession) {
-        // Handle inactive state
+        // Session became inactive
     }
     
     public func sessionDidDeactivate(_ session: WCSession) {
-        // Reactivate session
+        // Session deactivated - reactivate
         session.activate()
     }
-    
-    public func sessionReachabilityDidChange(_ session: WCSession) {
-        // Notify JS about reachability change
-        notifyListeners("reachabilityChanged", data: ["reachable": session.isReachable])
-    }
 }
-

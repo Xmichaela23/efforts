@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { loadPlansBundle } from '@/services/plans/BundleLoader';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { augmentPlan } from '@/services/plans/tools/plan_bake_and_compute';
+import { Capacitor } from '@capacitor/core';
+import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 export interface WorkoutInterval {
   id: string;
@@ -187,6 +189,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [plansAuthReady, setPlansAuthReady] = useState(false);
   const [plansBundleReady, setPlansBundleReady] = useState<boolean>(false);
   const [plansBundleError, setPlansBundleError] = useState<string | null>(null);
+
+  // Auto-request HealthKit authorization on first iOS app launch
+  useEffect(() => {
+    const requestHealthKitOnFirstLaunch = async () => {
+      // Only on native iOS
+      if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
+        return;
+      }
+      
+      // Check if we've already requested (stored in localStorage)
+      const hasRequested = localStorage.getItem('healthkit_requested');
+      if (hasRequested) {
+        return;
+      }
+      
+      // Check if HealthKit is available
+      const available = await isHealthKitAvailable();
+      if (!available) {
+        return;
+      }
+      
+      // Request authorization
+      try {
+        await requestHealthKitAuthorization();
+        localStorage.setItem('healthkit_requested', 'true');
+      } catch (error) {
+        console.log('HealthKit authorization request failed:', error);
+      }
+    };
+    
+    // Small delay to ensure app is fully loaded
+    const timer = setTimeout(requestHealthKitOnFirstLaunch, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ✅ FIXED: Plans get their own auth management similar to useWorkouts
   useEffect(() => {

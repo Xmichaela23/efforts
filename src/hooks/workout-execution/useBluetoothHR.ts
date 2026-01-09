@@ -2,13 +2,21 @@
  * useBluetoothHR - Heart Rate Monitor Connection
  * 
  * Connects to Bluetooth heart rate straps (Polar, Garmin, Wahoo, etc.)
- * Uses native Capacitor plugin on iOS (where Web Bluetooth doesn't work)
+ * Uses custom native plugin on iOS (where Web Bluetooth doesn't work)
  * Falls back to Web Bluetooth API on Android/Desktop
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { BleClient, numberToUUID } from '@capacitor-community/bluetooth-le';
+import { Capacitor, PluginListenerHandle } from '@capacitor/core';
+import {
+  isNativeBluetoothAvailable,
+  scanForHRDevices,
+  connectToHRDevice,
+  disconnectHRDevice,
+  addHeartRateListener,
+  addConnectionListener,
+  HRDevice
+} from '@/services/bluetoothHR';
 
 // ============================================================================
 // Types
@@ -31,13 +39,10 @@ export interface UseBluetoothHROptions {
 }
 
 // ============================================================================
-// Constants
+// Constants (for Web Bluetooth)
 // ============================================================================
 
-// Bluetooth GATT Service UUIDs
-const HEART_RATE_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
 const HEART_RATE_SERVICE_SHORT = 'heart_rate';
-const HEART_RATE_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
 const HEART_RATE_MEASUREMENT_SHORT = 'heart_rate_measurement';
 
 // ============================================================================
@@ -99,19 +104,25 @@ export function useBluetoothHR(options: UseBluetoothHROptions = {}) {
     onErrorRef.current = onError;
   }, [onHeartRateUpdate, onStatusChange, onError]);
   
+  // For native plugin listeners
+  const hrListenerRef = useRef<PluginListenerHandle | null>(null);
+  const connectionListenerRef = useRef<PluginListenerHandle | null>(null);
+  
   // -------------------------------------------------------------------------
   // Check Bluetooth availability
   // -------------------------------------------------------------------------
   
   useEffect(() => {
     const checkAvailability = async () => {
-      // Native platform (iOS/Android via Capacitor)
-      if (isNativePlatform()) {
+      // Native iOS platform - use our custom plugin
+      if (isNativePlatform() && Capacitor.getPlatform() === 'ios') {
         try {
-          await BleClient.initialize();
-          const enabled = await BleClient.isEnabled();
-          setState(s => ({ ...s, isAvailable: enabled }));
-        } catch {
+          console.log('[BLE] Native iOS detected, checking availability...');
+          const available = await isNativeBluetoothAvailable();
+          console.log('[BLE] Bluetooth available:', available);
+          setState(s => ({ ...s, isAvailable: available }));
+        } catch (err) {
+          console.error('[BLE] Error checking availability:', err);
           setState(s => ({ ...s, isAvailable: false }));
         }
         return;
@@ -134,7 +145,7 @@ export function useBluetoothHR(options: UseBluetoothHROptions = {}) {
     checkAvailability();
     
     // Listen for availability changes (web only)
-    if (!isNativePlatform() && navigator.bluetooth) {
+    if (!isNativePlatform() && typeof navigator !== 'undefined' && navigator.bluetooth) {
       navigator.bluetooth.addEventListener?.('availabilitychanged', (event: Event) => {
         setState(s => ({ ...s, isAvailable: (event as any).value }));
       });
@@ -165,7 +176,7 @@ export function useBluetoothHR(options: UseBluetoothHROptions = {}) {
   }, []);
   
   // -------------------------------------------------------------------------
-  // Connect - Native (iOS/Android)
+  // Connect - Native iOS (using custom BluetoothHR plugin)
   // -------------------------------------------------------------------------
   
   const connectNative = useCallback(async (): Promise<boolean> => {
@@ -173,49 +184,49 @@ export function useBluetoothHR(options: UseBluetoothHROptions = {}) {
     onStatusChangeRef.current?.('connecting');
     
     try {
-      await BleClient.initialize();
+      // Scan for devices
+      console.log('[BLE] Scanning for HR devices...');
+      const devices = await scanForHRDevices(10);
       
-      // Request device with heart rate service
-      const device = await BleClient.requestDevice({
-        services: [HEART_RATE_SERVICE],
-        optionalServices: [numberToUUID(0x180F)], // Battery service
-      });
+      if (devices.length === 0) {
+        throw new Error('No heart rate monitors found. Make sure your device is on and nearby.');
+      }
+      
+      // For now, connect to the first device found
+      // TODO: Show a picker if multiple devices
+      const device = devices[0];
+      console.log('[BLE] Found device:', device.name);
       
       nativeDeviceIdRef.current = device.deviceId;
       
-      // Connect to device
-      await BleClient.connect(device.deviceId, (deviceId) => {
-        // Disconnection callback
-        console.log('Device disconnected:', deviceId);
-        setState(s => ({
-          ...s,
-          status: 'disconnected',
-          currentBPM: null,
-        }));
-        onStatusChangeRef.current?.('disconnected');
-        nativeDeviceIdRef.current = null;
+      // Set up listeners before connecting
+      hrListenerRef.current = await addHeartRateListener((bpm) => {
+        if (bpm >= 30 && bpm <= 250) {
+          setState(s => ({ ...s, currentBPM: bpm }));
+          onHeartRateUpdateRef.current?.(bpm);
+        }
       });
       
-      // Start notifications for heart rate
-      await BleClient.startNotifications(
-        device.deviceId,
-        HEART_RATE_SERVICE,
-        HEART_RATE_MEASUREMENT,
-        (value) => {
-          // Parse heart rate from DataView
-          const dataView = value;
-          const flags = dataView.getUint8(0);
-          const is16Bit = (flags & 0x01) === 1;
-          const bpm = is16Bit ? dataView.getUint16(1, true) : dataView.getUint8(1);
-          
-          if (bpm >= 30 && bpm <= 250) {
-            setState(s => ({ ...s, currentBPM: bpm }));
-            onHeartRateUpdateRef.current?.(bpm);
-          }
+      connectionListenerRef.current = await addConnectionListener((connectionState, deviceName) => {
+        if (connectionState === 'disconnected') {
+          setState(s => ({
+            ...s,
+            status: 'disconnected',
+            currentBPM: null,
+          }));
+          onStatusChangeRef.current?.('disconnected');
+          nativeDeviceIdRef.current = null;
         }
-      );
+      });
       
-      const deviceName = device.name || 'HR Monitor';
+      // Connect to the device
+      const result = await connectToHRDevice(device.deviceId);
+      
+      if (!result.success) {
+        throw new Error('Failed to connect to device');
+      }
+      
+      const deviceName = result.deviceName || device.name || 'HR Monitor';
       
       setState(s => ({
         ...s,
@@ -349,15 +360,17 @@ export function useBluetoothHR(options: UseBluetoothHROptions = {}) {
   // -------------------------------------------------------------------------
   
   const disconnect = useCallback(async () => {
-    // Native disconnect
-    if (isNativePlatform() && nativeDeviceIdRef.current) {
+    // Native disconnect (iOS)
+    if (isNativePlatform() && Capacitor.getPlatform() === 'ios') {
       try {
-        await BleClient.stopNotifications(
-          nativeDeviceIdRef.current,
-          HEART_RATE_SERVICE,
-          HEART_RATE_MEASUREMENT
-        );
-        await BleClient.disconnect(nativeDeviceIdRef.current);
+        // Remove listeners
+        hrListenerRef.current?.remove();
+        connectionListenerRef.current?.remove();
+        hrListenerRef.current = null;
+        connectionListenerRef.current = null;
+        
+        // Disconnect device
+        await disconnectHRDevice();
       } catch {
         // Ignore errors during cleanup
       }

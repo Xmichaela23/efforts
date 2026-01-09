@@ -122,11 +122,11 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
   
   // HR Status Icon
   const renderHRStatus = () => {
-    // Web Bluetooth not available (iOS Safari doesn't support it)
+    // Bluetooth not available
     if (!hrIsAvailable) {
       return (
         <div className="flex items-center gap-2 text-gray-500">
-          <span>Not available on iOS</span>
+          <span>Turn on Bluetooth</span>
         </div>
       );
     }

@@ -78,13 +78,17 @@ const HealthKit = registerPlugin<HealthKitPlugin>('HealthKit');
  */
 export async function isHealthKitAvailable(): Promise<boolean> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
+    console.log('[HealthKit] Not native iOS');
     return false;
   }
   
   try {
+    console.log('[HealthKit] Calling isAvailable...');
     const result = await HealthKit.isAvailable();
+    console.log('[HealthKit] isAvailable result:', result);
     return result.available;
-  } catch {
+  } catch (error: any) {
+    console.error('[HealthKit] isAvailable error:', error?.message || error);
     return false;
   }
 }

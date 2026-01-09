@@ -19,13 +19,16 @@ import {
   Download,
   Link,
   Home,
-  Package
+  Package,
+  Heart
 } from 'lucide-react';
 import PlansMenu from './PlansMenu';
 import LogFAB from './LogFAB';
 import { useToast } from './ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '../lib/supabase';
+import { Capacitor } from '@capacitor/core';
+import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 interface ConnectionStatus {
   provider: string;
@@ -65,6 +68,19 @@ const Connections: React.FC = () => {
   const navigate = useNavigate();
   const [sourcePreference, setSourcePreference] = useState<'garmin' | 'strava' | 'both'>('both');
   const [savingPreference, setSavingPreference] = useState(false);
+  
+  // Apple Health state (only relevant on iOS native app)
+  const [isNativeIOS, setIsNativeIOS] = useState(false);
+  const [healthKitAvailable, setHealthKitAvailable] = useState(false);
+  const [healthKitAuthorized, setHealthKitAuthorized] = useState(() => {
+    // Check localStorage for previously saved authorization state
+    return localStorage.getItem('healthKitAuthorized') === 'true';
+  });
+  const [healthKitLoading, setHealthKitLoading] = useState(false);
+  const [healthKitSyncEnabled, setHealthKitSyncEnabled] = useState(() => {
+    const stored = localStorage.getItem('healthKitSyncEnabled');
+    return stored !== null ? stored === 'true' : true; // Default to enabled
+  });
 
   // Garmin connection state
   const [garminConnected, setGarminConnected] = useState(false);
@@ -74,6 +90,58 @@ const Connections: React.FC = () => {
   // Placeholder state for dropdown menu (would normally come from context)
   const [currentPlans] = useState<any[]>([]);
   const [plansMenuOpen, setPlansMenuOpen] = useState(false);
+
+  // Check if we're on native iOS and if HealthKit is available
+  useEffect(() => {
+    const checkHealthKit = async () => {
+      const isNative = Capacitor.isNativePlatform();
+      const platform = Capacitor.getPlatform();
+      const isIOS = isNative && platform === 'ios';
+      setIsNativeIOS(isIOS);
+      
+      if (isIOS) {
+        // Retry multiple times since plugin may still be registering
+        let available = false;
+        for (let i = 0; i < 10; i++) {
+          available = await isHealthKitAvailable();
+          if (available) break;
+          await new Promise(r => setTimeout(r, 300)); // Wait 300ms between retries
+        }
+        setHealthKitAvailable(available);
+      }
+    };
+    checkHealthKit();
+  }, []);
+
+  const handleConnectHealthKit = async () => {
+    setHealthKitLoading(true);
+    try {
+      const authorized = await requestHealthKitAuthorization();
+      setHealthKitAuthorized(authorized);
+      // Save to localStorage so it persists across app launches
+      localStorage.setItem('healthKitAuthorized', authorized ? 'true' : 'false');
+      if (authorized) {
+        toast({
+          title: 'Apple Health Connected',
+          description: 'Your workouts will now sync with Apple Health.',
+        });
+      } else {
+        toast({
+          title: 'Permission Denied',
+          description: 'Please enable Health access in Settings > Privacy > Health.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Connection Failed',
+        description: 'Could not connect to Apple Health.',
+        variant: 'destructive',
+      });
+    } finally {
+      setHealthKitLoading(false);
+    }
+  };
 
   useEffect(() => {
     // On desktop, show controls by default; on mobile, keep them collapsed
@@ -867,18 +935,14 @@ const Connections: React.FC = () => {
               <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
             </div>
           </div>
-          <div className="px-4 pb-2">
-            <h2 className="text-2xl font-bold text-white">Connections</h2>
-          </div>
         </div>
       </header>
       <main className="mobile-main-content overflow-y-auto overflow-x-hidden" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
         <div className="max-w-4xl mx-auto px-6 pb-6 min-h-0">
-          <div className="text-center mb-6 mt-12">
-            <p className="text-white/50 text-sm">
-              Connect your fitness services to automatically sync data and enable real-time updates.
-            </p>
-          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Connections</h2>
+          <p className="text-white/50 text-sm mb-6">
+            Connect your fitness services to automatically sync data and enable real-time updates.
+          </p>
 
       <div className="grid gap-6">
         {connections.map((connection) => (
@@ -1136,6 +1200,72 @@ const Connections: React.FC = () => {
           </Card>
         ))}
       </div>
+
+      {/* Apple Health Section - Only visible on iOS native app */}
+      {isNativeIOS && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-white/90">
+              <Heart className="h-5 w-5 text-red-400" />
+              <span>Apple Health</span>
+              {healthKitAuthorized && (
+                <Badge variant="outline" className="ml-2 border-green-500/50 text-green-400">
+                  Connected
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription className="text-white/60">
+              Sync your workouts with Apple Health to track all your fitness data in one place.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!healthKitAvailable ? (
+              <p className="text-white/50 text-sm">Apple Health is not available on this device.</p>
+            ) : healthKitAuthorized ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Activity className="h-4 w-4 text-green-400" />
+                    <span className="text-sm text-white/90">Sync workouts to Apple Health</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newValue = !healthKitSyncEnabled;
+                      setHealthKitSyncEnabled(newValue);
+                      localStorage.setItem('healthKitSyncEnabled', String(newValue));
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      healthKitSyncEnabled ? 'bg-green-500' : 'bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        healthKitSyncEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-white/50 text-xs">
+                  {healthKitSyncEnabled 
+                    ? 'Completed workouts will automatically be saved to Apple Health.'
+                    : 'Syncing is disabled. Workouts will not be saved to Apple Health.'}
+                </p>
+                <p className="text-white/40 text-xs">
+                  To revoke permissions, go to Settings → Privacy & Security → Health → Efforts
+                </p>
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectHealthKit}
+                disabled={healthKitLoading}
+                className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
+              >
+                {healthKitLoading ? 'Connecting...' : 'Connect to Apple Health'}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Activity Source Preference Section */}
       <Card className="mt-6">

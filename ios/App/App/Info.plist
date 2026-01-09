@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CAPACITOR_DEBUG</key>
+	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Efforts</string>
+	<string>Efforts</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,6 +24,28 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Efforts uses Bluetooth to connect to your heart rate monitor during workouts</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Efforts uses Bluetooth to connect to your heart rate monitor during workouts</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Efforts reads your health data to show workout history and training metrics</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Efforts saves your workouts to Apple Health</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Efforts uses your location to track pace, distance, and route during outdoor workouts, even when the app is in the background</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Efforts uses your location to track pace, distance, and route during outdoor workouts</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>bluetooth-central</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -47,22 +69,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Efforts uses Bluetooth to connect to your heart rate monitor during workouts</string>
-	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Efforts uses Bluetooth to connect to your heart rate monitor during workouts</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Efforts uses your location to track pace, distance, and route during outdoor workouts</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Efforts uses your location to track pace, distance, and route during outdoor workouts, even when the app is in the background</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>location</string>
-		<string>bluetooth-central</string>
-	</array>
-	<key>NSHealthShareUsageDescription</key>
-	<string>Efforts reads your health data to show workout history and training metrics</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>Efforts saves your workouts to Apple Health</string>
 </dict>
 </plist>

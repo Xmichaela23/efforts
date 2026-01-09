@@ -144,15 +144,14 @@
     top: 0;
     left: 0;
     right: 0;
-    height: var(--header-h);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    /* Height includes safe area for notch/dynamic island */
+    height: calc(var(--header-h) + env(safe-area-inset-top));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    /* Solid dark background that matches the app theme */
+    background: hsl(0 0% 8%);
     z-index: 50;
-    /* Avoid notch/status bar overlap in PWA */
+    /* Push content below notch/status bar */
     padding-top: env(safe-area-inset-top);
-    box-shadow: 0 1px 8px rgba(0,0,0,0.3);
   }
   
   /* 🚨 MOBILE MAIN CONTENT - Full viewport, scrolls behind fixed header/nav */
@@ -320,4 +319,28 @@
 
 @media not all and (display-mode: standalone) {
   :root { --todays-h: 14rem; --cal-cell-h: 150px; }
+}
+
+/* iOS WebView backdrop-filter support */
+@layer utilities {
+  .backdrop-blur-lg {
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+  }
+  .backdrop-blur-md {
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  .backdrop-blur-sm {
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+  .backdrop-blur {
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
 }
