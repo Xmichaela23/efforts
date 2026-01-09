@@ -1696,7 +1696,7 @@ export default function PlanWizard() {
                   {state.raceDate && (
                     <div className="space-y-3">
                       <p className="text-sm text-gray-400">When do you want to start training?</p>
-                      <p className="text-xs text-gray-500">Must be at least 4 weeks before race day</p>
+                      <p className="text-xs text-gray-500">4-24 weeks before race day</p>
                       <input
                         type="date"
                         value={state.startDate}
@@ -1710,12 +1710,12 @@ export default function PlanWizard() {
                           return `${year}-${month}-${day}`;
                         })()}
                         min={(() => {
-                          // Min start date is tomorrow
-                          const tomorrow = new Date();
-                          tomorrow.setDate(tomorrow.getDate() + 1);
-                          const year = tomorrow.getFullYear();
-                          const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
-                          const day = String(tomorrow.getDate()).padStart(2, '0');
+                          // Min start date is 24 weeks before race (max plan length)
+                          const race = new Date(state.raceDate + 'T00:00:00');
+                          race.setDate(race.getDate() - 24 * 7);
+                          const year = race.getFullYear();
+                          const month = String(race.getMonth() + 1).padStart(2, '0');
+                          const day = String(race.getDate()).padStart(2, '0');
                           return `${year}-${month}-${day}`;
                         })()}
                         onChange={(e) => {
