@@ -1583,16 +1583,29 @@ export default function PlanWizard() {
           const startDate = calculateStartFromRace(raceDate, weeks);
           
           // Check if this matches a major marathon (only for marathon distance)
-          const matchingMarathon = state.distance === 'marathon' ? findMatchingMarathon(raceDate) : null;
+          const matches = state.distance === 'marathon' ? findMatchingMarathons(raceDate) : [];
+          const exactMatch = matches.find(m => m.diffDays === 0);
           
-          setState(prev => ({
-            ...prev,
-            raceDate,
-            duration: weeks,
-            startDate,
-            // Auto-fill race name if we found a match (but don't overwrite if user already entered one)
-            raceName: matchingMarathon && !prev.raceName ? matchingMarathon.name : prev.raceName
-          }));
+          setState(prev => {
+            // Determine new race name:
+            // 1. If there's an exact match, use it
+            // 2. If current name matches a suggestion, keep it
+            // 3. Otherwise clear it (user will need to select)
+            let newRaceName = '';
+            if (exactMatch) {
+              newRaceName = exactMatch.marathon.name;
+            } else if (prev.raceName && matches.some(m => m.marathon.name === prev.raceName)) {
+              newRaceName = prev.raceName;
+            }
+            
+            return {
+              ...prev,
+              raceDate,
+              duration: weeks,
+              startDate,
+              raceName: newRaceName
+            };
+          });
         };
         
         return (
@@ -1683,6 +1696,7 @@ export default function PlanWizard() {
                   {state.raceDate && (
                     <div className="space-y-3">
                       <p className="text-sm text-gray-400">When do you want to start training?</p>
+                      <p className="text-xs text-gray-500">Must be at least 4 weeks before race day</p>
                       <input
                         type="date"
                         value={state.startDate}
