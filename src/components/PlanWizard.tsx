@@ -431,6 +431,7 @@ export default function PlanWizard() {
     fiveKTime?: number; // seconds
     effortScore?: number;
     effortPaces?: TrainingPaces;
+    equipment?: string[]; // strength equipment from baselines
   } | null>(null);
 
   // Load user's saved baselines on mount
@@ -442,7 +443,7 @@ export default function PlanWizard() {
         
         const { data } = await supabase
           .from('user_baselines')
-          .select('performance_numbers, effort_paces, effort_score')
+          .select('performance_numbers, effort_paces, effort_score, equipment')
           .eq('user_id', user.id)
           .maybeSingle();
         
@@ -479,16 +480,33 @@ export default function PlanWizard() {
             effortPaces = getPacesFromScore(effortScore);
           }
           
-          // Set if we have ANY meaningful pace/performance data
-          const hasData = effortPaces || effortScore || easyPace || fiveKTime;
+          // Get equipment data
+          const equipment = data.equipment?.strength as string[] | undefined;
+          
+          // Set if we have ANY meaningful data
+          const hasData = effortPaces || effortScore || easyPace || fiveKTime || equipment?.length;
           if (hasData) {
-            console.log('[PlanWizard] Setting saved baselines:', { easyPace, fiveKTime, effortScore, effortPaces });
+            console.log('[PlanWizard] Setting saved baselines:', { easyPace, fiveKTime, effortScore, effortPaces, equipment });
             setSavedBaselines({
               easyPace: typeof easyPace === 'number' ? easyPace : undefined,
               fiveKTime: typeof fiveKTime === 'number' ? fiveKTime : undefined,
               effortScore: typeof effortScore === 'number' ? effortScore : undefined,
-              effortPaces
+              effortPaces,
+              equipment
             });
+            
+            // Auto-set equipment type based on saved preferences
+            if (equipment?.length) {
+              const hasCommercialGym = equipment.includes('Commercial gym');
+              const hasHomeGymEquipment = equipment.some(e => 
+                ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)'].includes(e)
+              );
+              if (hasCommercialGym) {
+                setState(prev => ({ ...prev, equipmentType: 'commercial_gym' }));
+              } else if (hasHomeGymEquipment) {
+                setState(prev => ({ ...prev, equipmentType: 'home_gym' }));
+              }
+            }
           }
         }
       } catch (e) {
@@ -2019,7 +2037,23 @@ export default function PlanWizard() {
               {/* Equipment selection - only show if Strength & Power tier */}
               {state.strengthFrequency > 0 && state.strengthTier === 'strength_power' && (
                 <div className="pt-4 border-t border-white/10">
-                  <p className="text-sm text-gray-400 mb-3">Where will you train?</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm text-gray-400">Where will you train?</p>
+                    {savedBaselines?.equipment?.length ? (
+                      <a 
+                        href="/baselines" 
+                        className="text-xs text-amber-400 hover:text-amber-300"
+                      >
+                        Edit equipment →
+                      </a>
+                    ) : null}
+                  </div>
+                  {savedBaselines?.equipment?.length ? (
+                    <p className="text-xs text-amber-400/70 mb-3">
+                      Using your saved equipment: {savedBaselines.equipment.slice(0, 3).join(', ')}
+                      {savedBaselines.equipment.length > 3 ? ` +${savedBaselines.equipment.length - 3} more` : ''}
+                    </p>
+                  ) : null}
                   <RadioGroup
                     value={state.equipmentType}
                     onValueChange={(v) => updateState('equipmentType', v as EquipmentType)}
