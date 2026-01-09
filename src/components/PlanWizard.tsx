@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -39,7 +39,7 @@ type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
 type StrengthTier = 'injury_prevention' | 'strength_power';
 type EquipmentType = 'home_gym' | 'commercial_gym';
 
-type PaceInputMethod = 'race' | 'paces' | 'estimate' | null;
+type PaceInputMethod = 'race' | 'paces' | 'estimate' | 'saved' | null;
 
 // ============================================================================
 // MAJOR MARATHONS DATABASE
@@ -416,6 +416,49 @@ export default function PlanWizard() {
     equipmentType: 'commercial_gym'
   });
 
+  // Saved baselines (loaded from DB)
+  const [savedBaselines, setSavedBaselines] = useState<{
+    easyPace?: number; // seconds per mile
+    fiveKTime?: number; // seconds
+    effortScore?: number;
+  } | null>(null);
+
+  // Load user's saved baselines on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const { data } = await supabase
+          .from('user_baselines')
+          .select('performance_numbers, effort_paces')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (data) {
+          const pn = data.performance_numbers || {};
+          const ep = data.effort_paces || {};
+          
+          // Check for saved pace data
+          const easyPace = ep.base || pn.easyPace || pn.easy_pace;
+          const fiveKTime = pn.fiveK || pn.fiveKTime;
+          const effortScore = pn.effortScore || pn.effort_score;
+          
+          if (easyPace || fiveKTime || effortScore) {
+            setSavedBaselines({
+              easyPace: typeof easyPace === 'number' ? easyPace : undefined,
+              fiveKTime: typeof fiveKTime === 'number' ? fiveKTime : undefined,
+              effortScore: typeof effortScore === 'number' ? effortScore : undefined
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load baselines:', e);
+      }
+    })();
+  }, []);
+
   // Get default duration based on distance, fitness, and MPW
   const getDefaultDuration = (distance: Distance | null, fitness: Fitness | null, mpw: MpwRange | null): number => {
     if (distance !== 'marathon') {
@@ -501,6 +544,10 @@ export default function PlanWizard() {
       case 'effortScore':
         // Must have selected an input method
         if (state.paceInputMethod === null) return false;
+        // Saved baselines - already has score
+        if (state.paceInputMethod === 'saved') {
+          return state.effortScore !== null;
+        }
         // If they have a race time, must have entered time and recency
         if (state.paceInputMethod === 'race') {
           if (!state.effortRaceDistance || !state.effortRaceTime || !state.effortRaceRecency) return false;
@@ -1075,6 +1122,29 @@ export default function PlanWizard() {
                 value={state.paceInputMethod || ''}
                 onValueChange={(v) => {
                   const method = v as PaceInputMethod;
+                  
+                  // If using saved baselines, auto-populate from them
+                  if (method === 'saved' && savedBaselines) {
+                    const paces = savedBaselines.effortScore 
+                      ? getPacesFromScore(savedBaselines.effortScore)
+                      : null;
+                    setState(prev => ({
+                      ...prev,
+                      paceInputMethod: method,
+                      hasRecentRace: false,
+                      effortScore: savedBaselines.effortScore || null,
+                      effortPaces: paces,
+                      effortScoreStatus: savedBaselines.effortScore ? 'verified' : null,
+                      effortRaceDistance: null,
+                      effortRaceTime: '',
+                      effortRaceRecency: null,
+                      knownEasyPace: '',
+                      knownFiveKPace: '',
+                      paceValidationWarning: null
+                    }));
+                    return;
+                  }
+                  
                   setState(prev => ({
                     ...prev,
                     paceInputMethod: method,
@@ -1093,6 +1163,14 @@ export default function PlanWizard() {
                 }}
                 className="space-y-2"
               >
+                {/* Show saved paces option if user has baselines */}
+                {savedBaselines?.effortScore && (
+                  <RadioOption 
+                    value="saved" 
+                    label="Use my saved paces" 
+                    description={`Effort Score: ${savedBaselines.effortScore}${savedBaselines.easyPace ? ` • Easy: ${formatPace(savedBaselines.easyPace)}/mi` : ''}`}
+                  />
+                )}
                 <RadioOption value="race" label="I have a recent race time" description="Recommended for accurate pacing" />
                 <RadioOption value="paces" label="I know my easy pace and 5K time" description="We'll calculate your training zones" />
                 <RadioOption value="estimate" label="Estimate for me" description="We'll set a starting point" />
@@ -1303,6 +1381,35 @@ export default function PlanWizard() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+              
+              {/* Using saved baselines */}
+              {state.paceInputMethod === 'saved' && state.effortScore && state.effortPaces && (
+                <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-lg font-semibold text-green-900">
+                    ✓ Using Saved Paces
+                  </p>
+                  <p className="text-xs text-green-700 mt-1 mb-3">
+                    Effort Score: {state.effortScore}
+                  </p>
+                  <div className="text-sm text-green-700 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span>Base pace:</span>
+                      <span className="font-mono">{formatPace(state.effortPaces.base)}/mi</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Race pace:</span>
+                      <span className="font-mono">{formatPace(state.effortPaces.race)}/mi</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Interval pace:</span>
+                      <span className="font-mono">{formatPace(state.effortPaces.power)}/mi</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-green-600 mt-3">
+                    These paces will be used for your training plan.
+                  </p>
                 </div>
               )}
               
