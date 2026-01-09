@@ -1215,18 +1215,18 @@ export default function PlanWizard() {
               
               {/* Race time entry */}
               {state.paceInputMethod === 'race' && (
-                <div className="space-y-4 pt-4 border-t">
-                  <p className="text-sm text-gray-600">Which race distance?</p>
-                  <div className="flex gap-2">
+                <div className="space-y-5 pt-4 border-t border-white/10">
+                  <p className="text-sm text-gray-400">Which race distance?</p>
+                  <div className="flex flex-wrap gap-2">
                     {(['5k', '10k', 'half', 'marathon'] as RaceDistance[]).map(dist => (
                       <button
                         key={dist}
                         type="button"
                         onClick={() => handleRaceDistanceChange(dist)}
-                        className={`px-4 py-2 rounded-lg border text-sm ${
+                        className={`px-4 py-2 rounded-full border text-sm transition-colors ${
                           state.effortRaceDistance === dist 
-                            ? 'bg-gray-100 border-gray-900 font-medium' 
-                            : 'border-gray-300 hover:border-gray-400'
+                            ? 'bg-teal-500/20 border-teal-500 text-teal-300 font-medium' 
+                            : 'border-white/20 text-gray-400 hover:border-teal-500/50 hover:text-teal-400'
                         }`}
                       >
                         {dist === 'half' ? 'Half' : dist === 'marathon' ? 'Marathon' : dist.toUpperCase()}
@@ -1235,32 +1235,48 @@ export default function PlanWizard() {
                   </div>
                   
                   {state.effortRaceDistance && (
-                    <>
-                      <p className="text-sm text-gray-600 pt-2">Your time?</p>
-                      <input
-                        type="text"
-                        placeholder={state.effortRaceDistance === 'marathon' || state.effortRaceDistance === 'half' ? 'H:MM:SS' : 'MM:SS'}
-                        value={state.effortRaceTime}
-                        onChange={(e) => handleRaceTimeChange(e.target.value)}
-                        className="w-full p-3 bg-white/[0.08] border border-white/20 rounded-lg text-lg font-mono text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30"
-                      />
-                    </>
+                    <div className="pt-2">
+                      <p className="text-sm text-teal-400 mb-2">Your time?</p>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="text"
+                          placeholder={state.effortRaceDistance === 'marathon' || state.effortRaceDistance === 'half' ? 'H:MM:SS' : 'MM:SS'}
+                          value={state.effortRaceTime}
+                          onChange={(e) => handleRaceTimeChange(e.target.value)}
+                          className="w-32 p-3 bg-white/5 border border-teal-500/30 rounded-xl text-lg font-mono text-teal-200 placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+                        />
+                        <span className="text-gray-500 text-sm">
+                          {state.effortRaceDistance === 'marathon' || state.effortRaceDistance === 'half' ? 'H:MM:SS' : 'MM:SS'}
+                        </span>
+                      </div>
+                    </div>
                   )}
                   
                   {state.effortRaceDistance && state.effortRaceTime && (
-                    <>
-                      <p className="text-sm text-gray-600 pt-2">When did you run this?</p>
-                      <RadioGroup
-                        value={state.effortRaceRecency || ''}
-                        onValueChange={(v) => handleRecencyChange(v as RaceRecency)}
-                        className="space-y-2"
-                      >
-                        <RadioOption value="recent" label="Last 3 months" />
-                        <RadioOption value="3-6months" label="3-6 months ago" />
-                        <RadioOption value="6-12months" label="6-12 months ago" />
-                        <RadioOption value="over1year" label="Over a year ago" />
-                      </RadioGroup>
-                    </>
+                    <div className="pt-3">
+                      <p className="text-sm text-gray-400 mb-3">When did you run this?</p>
+                      <div className="flex flex-wrap gap-2">
+                        {([
+                          { value: 'recent', label: 'Last 3 months' },
+                          { value: '3-6months', label: '3-6 months' },
+                          { value: '6-12months', label: '6-12 months' },
+                          { value: 'over1year', label: '1+ year' }
+                        ] as const).map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => handleRecencyChange(opt.value)}
+                            className={`px-4 py-2 rounded-full border text-sm transition-colors ${
+                              state.effortRaceRecency === opt.value
+                                ? 'bg-teal-500/20 border-teal-500 text-teal-300 font-medium'
+                                : 'border-white/20 text-gray-400 hover:border-teal-500/50 hover:text-teal-400'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   
                   {/* Show calculated score with editable paces - glass morphism */}
@@ -1358,40 +1374,40 @@ export default function PlanWizard() {
               
               {/* Known paces entry */}
               {state.paceInputMethod === 'paces' && (
-                <div className="space-y-4 pt-4 border-t">
+                <div className="space-y-6 pt-5 border-t border-white/10">
                   {/* Easy Pace Input */}
                   <div>
-                    <p className="text-sm font-medium text-gray-900 mb-1">Easy pace</p>
-                    <p className="text-xs text-gray-500 mb-2">
-                      Your comfortable, conversational pace. You could talk in full sentences while running at this pace. Most of your training miles should feel this easy.
+                    <p className="text-sm font-medium text-teal-400 mb-1">Easy pace</p>
+                    <p className="text-xs text-gray-400 mb-3">
+                      Your comfortable, conversational pace. You could talk in full sentences while running at this pace.
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <input
                         type="text"
                         placeholder="10:30"
                         value={state.knownEasyPace}
                         onChange={(e) => handleKnownPacesChange(e.target.value, state.knownFiveKPace)}
-                        className="w-24 p-3 bg-white/[0.08] border border-white/20 rounded-lg text-lg font-mono text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+                        className="w-28 p-3 bg-white/5 border border-teal-500/30 rounded-xl text-lg font-mono text-teal-200 placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
                       />
-                      <span className="text-white/60">/mi</span>
+                      <span className="text-gray-500">/mi</span>
                     </div>
                   </div>
                   
                   {/* 5K Time Input */}
                   <div>
-                    <p className="text-sm font-medium text-gray-900 mb-1">5K time</p>
-                    <p className="text-xs text-gray-500 mb-2">
-                      Your best recent 5K time (3.1 miles). This is an all-out race effort, hard but sustainable for 20-30 minutes.
+                    <p className="text-sm font-medium text-teal-400 mb-1">5K time</p>
+                    <p className="text-xs text-gray-400 mb-3">
+                      Your best recent 5K time (3.1 miles). An all-out effort, hard but sustainable for 20-30 minutes.
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <input
                         type="text"
                         placeholder="25:00"
                         value={state.knownFiveKPace}
                         onChange={(e) => handleKnownPacesChange(state.knownEasyPace, e.target.value)}
-                        className="w-24 p-3 bg-white/[0.08] border border-white/20 rounded-lg text-lg font-mono text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+                        className="w-28 p-3 bg-white/5 border border-teal-500/30 rounded-xl text-lg font-mono text-teal-200 placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
                       />
-                      <span className="text-white/60">MM:SS</span>
+                      <span className="text-gray-500">MM:SS</span>
                     </div>
                   </div>
                   
@@ -1467,34 +1483,27 @@ export default function PlanWizard() {
                 </div>
               )}
               
-              {/* Don't know paces - glass morphism with teal glow */}
+              {/* Don't know paces - simple guidance */}
               {state.paceInputMethod === 'unknown' && (
-                <div className="relative mt-4">
-                  {/* Teal glow effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-teal-500/20 via-cyan-500/10 to-transparent rounded-2xl blur-xl" />
-                  <div className="relative p-5 bg-black/40 backdrop-blur-sm rounded-xl border border-teal-500/30">
-                    <p className="text-lg font-semibold text-white mb-2">
-                      No problem!
-                    </p>
-                    <p className="text-sm text-gray-300 mb-5">
-                      Go to Baselines where you can schedule a 5K time trial or easy pace test. We'll calculate your training paces from the results.
-                    </p>
-                    <div className="flex flex-col gap-3">
-                      <button
-                        type="button"
-                        onClick={() => navigate('/baselines')}
-                        className="w-full px-4 py-3 bg-teal-600 text-white text-sm font-medium rounded-xl hover:bg-teal-500 transition-colors"
-                      >
-                        Go to Baselines →
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStep(step - 1)}
-                        className="w-full px-4 py-2 text-gray-400 text-sm hover:text-white transition-colors"
-                      >
-                        ← Or choose "Complete" goal instead
-                      </button>
-                    </div>
+                <div className="mt-6 space-y-4">
+                  <p className="text-sm text-gray-400">
+                    Go to Baselines to schedule a 5K time trial or easy pace test. We'll calculate your training paces from the results.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/baselines')}
+                      className="px-5 py-2.5 border border-teal-500 text-teal-400 text-sm font-medium rounded-full hover:bg-teal-500/10 transition-colors"
+                    >
+                      Go to Baselines →
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStep(step - 1)}
+                      className="px-5 py-2.5 border border-white/20 text-gray-400 text-sm rounded-full hover:border-white/40 hover:text-white transition-colors"
+                    >
+                      ← Choose "Complete" goal
+                    </button>
                   </div>
                 </div>
               )}
