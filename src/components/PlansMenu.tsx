@@ -104,7 +104,8 @@ const PlansMenu: React.FC<PlansMenuProps> = ({
         <PopoverPrimitive.Content
           side="top"
           align="center"
-          sideOffset={16}
+          sideOffset={8}
+          collisionPadding={{ bottom: 80 }}
           className={cn(
             "z-50 rounded-2xl border border-white/25 bg-black/80 backdrop-blur-xl p-3 shadow-xl",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
