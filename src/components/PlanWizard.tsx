@@ -1450,53 +1450,29 @@ export default function PlanWizard() {
                 </div>
               )}
               
-              {/* Don't know paces - show guidance */}
+              {/* Don't know paces - direct to baselines */}
               {state.paceInputMethod === 'unknown' && (
                 <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <p className="text-base font-semibold text-amber-900 mb-3">
-                    No problem! Here's how to find your paces:
+                  <p className="text-base font-semibold text-amber-900 mb-2">
+                    No problem!
                   </p>
-                  <div className="space-y-4 text-sm text-amber-800">
-                    <div>
-                      <p className="font-medium">Option 1: Run a 5K time trial</p>
-                      <p className="text-amber-700 mt-1">
-                        Run a hard 5K effort and log it in the app. We'll calculate all your training paces from that single result.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => navigate('/baselines?test=5k')}
-                        className="mt-2 px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded hover:bg-amber-700"
-                      >
-                        Schedule 5K Time Trial →
-                      </button>
-                    </div>
-                    <div>
-                      <p className="font-medium">Option 2: Test your easy pace</p>
-                      <p className="text-amber-700 mt-1">
-                        Go for a comfortable run where you can hold a conversation. Log it and we'll use that as your baseline.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => navigate('/baselines?test=easy')}
-                        className="mt-2 px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded hover:bg-amber-700"
-                      >
-                        Log Easy Pace Run →
-                      </button>
-                    </div>
-                    <div>
-                      <p className="font-medium">Option 3: Let the app learn</p>
-                      <p className="text-amber-700 mt-1">
-                        Just start running! After a few tracked runs, we'll automatically calculate your paces from your data.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-amber-200 flex gap-4">
+                  <p className="text-sm text-amber-800 mb-4">
+                    Go to Baselines where you can schedule a 5K time trial or easy pace test. We'll calculate your training paces from the results.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/baselines')}
+                      className="w-full px-4 py-2.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700"
+                    >
+                      Go to Baselines →
+                    </button>
                     <button
                       type="button"
                       onClick={() => setStep(step - 1)}
-                      className="text-sm text-amber-900 underline hover:no-underline"
+                      className="w-full px-4 py-2 text-amber-800 text-sm hover:underline"
                     >
-                      ← Choose "Complete" goal instead
+                      ← Or choose "Complete" goal instead
                     </button>
                   </div>
                 </div>
