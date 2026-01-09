@@ -2132,9 +2132,9 @@ export default function PlanWizard() {
             
             {/* Show volume warning */}
             {isHighVolume(state.daysPerWeek) && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-sm font-medium text-amber-800">High Training Volume</p>
-                <p className="text-xs text-amber-700 mt-1">
+              <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/40 rounded-xl">
+                <p className="text-sm font-medium text-amber-300">High Training Volume</p>
+                <p className="text-xs text-amber-400/80 mt-1">
                   {state.daysPerWeek === '6-7' ? '6' : '5-6'} days running + {state.strengthFrequency}x strength = 10+ hours/week. 
                   This is advanced volume. Consider {runRec.recommended} days running for better recovery.
                 </p>
@@ -2143,8 +2143,8 @@ export default function PlanWizard() {
             
             {/* Show detailed weekly structure based on strength + running selection */}
             {state.daysPerWeek && (
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg space-y-2">
-                <p className="text-sm font-medium text-gray-700">Your typical week:</p>
+              <div className="mt-4 p-4 bg-black/40 backdrop-blur-sm rounded-xl border border-teal-500/30 space-y-2">
+                <p className="text-sm font-medium text-teal-300">Your typical week:</p>
                 {(() => {
                   const runDays = state.daysPerWeek === '3-4' ? 4 : state.daysPerWeek === '4-5' ? 5 : 6; // 5-6 and 6-7 both cap at 6
                   const strengthDays = state.strengthFrequency;
@@ -2219,11 +2219,11 @@ export default function PlanWizard() {
                   const dayLines = days.map(formatDay).filter(Boolean);
                   
                   return (
-                    <div className="text-xs text-gray-600 space-y-1">
+                    <div className="text-sm text-gray-300 space-y-1">
                       {dayLines.map((line, i) => (
                         <p key={i}>{line}</p>
                       ))}
-                      <p className="text-gray-500 mt-2 pt-2 border-t border-gray-200">
+                      <p className="text-teal-400/80 mt-2 pt-2 border-t border-teal-500/20">
                         {runDays} running days • {strengthDays > 0 ? `${doubleDays} doubles` : 'No strength'}
                       </p>
                     </div>
