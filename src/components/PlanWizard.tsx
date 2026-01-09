@@ -111,23 +111,32 @@ function getMarathonDate(marathon: MajorMarathon, year: number): Date {
   return getNthWeekdayOfMonth(year, pattern.month, pattern.weekday, pattern.weekNum);
 }
 
-// Find matching marathon for a given date (within 3 days tolerance)
-function findMatchingMarathon(dateStr: string): MajorMarathon | null {
-  if (!dateStr) return null;
+// Find ALL matching marathons for a given date (within 7 days tolerance), sorted by proximity
+function findMatchingMarathons(dateStr: string): { marathon: MajorMarathon; diffDays: number }[] {
+  if (!dateStr) return [];
   
   const selectedDate = new Date(dateStr + 'T00:00:00');
   const year = selectedDate.getFullYear();
+  
+  const matches: { marathon: MajorMarathon; diffDays: number }[] = [];
   
   for (const marathon of MAJOR_MARATHONS) {
     const marathonDate = getMarathonDate(marathon, year);
     const diffDays = Math.abs((selectedDate.getTime() - marathonDate.getTime()) / (24 * 60 * 60 * 1000));
     
-    if (diffDays <= 3) {
-      return marathon;
+    if (diffDays <= 7) {
+      matches.push({ marathon, diffDays });
     }
   }
   
-  return null;
+  // Sort by proximity (closest first)
+  return matches.sort((a, b) => a.diffDays - b.diffDays);
+}
+
+// Find single best matching marathon (for backwards compatibility)
+function findMatchingMarathon(dateStr: string): MajorMarathon | null {
+  const matches = findMatchingMarathons(dateStr);
+  return matches.length > 0 ? matches[0].marathon : null;
 }
 
 interface WizardState {
@@ -1609,29 +1618,70 @@ export default function PlanWizard() {
               {/* Race date picker */}
               {state.hasRaceDate === true && (
                 <div className="space-y-4 pt-4 border-t">
-                  <p className="text-sm text-gray-600">When is your race?</p>
+                  <p className="text-sm text-gray-400">When is your race?</p>
                   <input
                     type="date"
                     value={state.raceDate}
                     min={getMinRaceDate()}
                     onChange={(e) => handleRaceDateChange(e.target.value)}
-                    className="w-full p-3 bg-white/[0.08] border border-white/20 rounded-lg text-base text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+                    className="w-full p-3 bg-white/5 border border-teal-500/30 rounded-xl text-base text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
-                  <div className="space-y-1">
-                    <input
-                      type="text"
-                      value={state.raceName}
-                      onChange={(e) => setState(prev => ({ ...prev, raceName: e.target.value }))}
-                      placeholder="Race name (optional)"
-                      className="w-full p-3 bg-white/[0.08] border border-white/20 rounded-lg text-base text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
-                    />
-                    {state.distance === 'marathon' && state.raceDate && findMatchingMarathon(state.raceDate) && state.raceName === findMatchingMarathon(state.raceDate)?.name && (
-                      <p className="text-xs text-green-600">Auto-detected major marathon</p>
+                  <div className="space-y-2">
+                    {/* Show marathon suggestions if any match */}
+                    {state.distance === 'marathon' && state.raceDate && (() => {
+                      const matches = findMatchingMarathons(state.raceDate);
+                      if (matches.length > 0) {
+                        return (
+                          <div className="space-y-2">
+                            <p className="text-xs text-gray-400">Select your race:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {matches.map(({ marathon, diffDays }) => (
+                                <button
+                                  key={marathon.name}
+                                  type="button"
+                                  onClick={() => setState(prev => ({ ...prev, raceName: marathon.name }))}
+                                  className={`px-4 py-2 rounded-full border text-sm transition-colors ${
+                                    state.raceName === marathon.name
+                                      ? 'bg-teal-500/20 border-teal-400 text-teal-300 font-medium'
+                                      : 'border-teal-500/40 text-gray-300 hover:border-teal-400 hover:text-teal-300'
+                                  }`}
+                                >
+                                  {marathon.name}
+                                  {diffDays > 0 && <span className="text-xs text-gray-500 ml-1">(±{diffDays}d)</span>}
+                                </button>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => setState(prev => ({ ...prev, raceName: '' }))}
+                                className={`px-4 py-2 rounded-full border text-sm transition-colors ${
+                                  state.raceName && !matches.some(m => m.marathon.name === state.raceName)
+                                    ? 'bg-teal-500/20 border-teal-400 text-teal-300 font-medium'
+                                    : 'border-teal-500/40 text-gray-300 hover:border-teal-400 hover:text-teal-300'
+                                }`}
+                              >
+                                Other
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    {/* Custom race name input - show if Other selected or no matches */}
+                    {(state.distance !== 'marathon' || !state.raceDate || findMatchingMarathons(state.raceDate).length === 0 || 
+                      (state.raceName && !findMatchingMarathons(state.raceDate).some(m => m.marathon.name === state.raceName))) && (
+                      <input
+                        type="text"
+                        value={state.raceName}
+                        onChange={(e) => setState(prev => ({ ...prev, raceName: e.target.value }))}
+                        placeholder="Race name (optional)"
+                        className="w-full p-3 bg-white/5 border border-teal-500/30 rounded-xl text-base text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      />
                     )}
                   </div>
                   {state.raceDate && (
                     <div className="space-y-3">
-                      <p className="text-sm text-gray-600">When do you want to start training?</p>
+                      <p className="text-sm text-gray-400">When do you want to start training?</p>
                       <input
                         type="date"
                         value={state.startDate}
@@ -1662,11 +1712,12 @@ export default function PlanWizard() {
                           const weeks = Math.max(4, Math.min(24, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))));
                           setState(prev => ({ ...prev, startDate: newStart, duration: weeks }));
                         }}
-                        className="w-full p-3 bg-white/[0.08] border border-white/20 rounded-lg text-base text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+                        className="w-full p-3 bg-white/5 border border-teal-500/30 rounded-xl text-base text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                       />
-                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm text-blue-800 font-medium">{state.duration} week plan</p>
-                        <p className="text-xs text-blue-600 mt-1">
+                      {/* Plan duration summary */}
+                      <div className="p-4 bg-teal-500/10 rounded-xl border border-teal-500/30">
+                        <p className="text-sm text-teal-300 font-medium">{state.duration} week plan</p>
+                        <p className="text-xs text-teal-400/80 mt-1">
                           {new Date(state.startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} → {new Date(state.raceDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                         </p>
                       </div>
@@ -1675,18 +1726,18 @@ export default function PlanWizard() {
                   
                   {/* Warning if weeks are outside recommended range */}
                   {state.raceDate && durationGating && (
-                    <div className={`p-4 rounded-lg border ${
+                    <div className={`p-4 rounded-xl border ${
                       durationGating.riskLevel === 'high_risk' 
-                        ? 'bg-red-50 border-red-200' 
-                        : 'bg-amber-50 border-amber-200'
+                        ? 'bg-red-500/10 border-red-500/40' 
+                        : 'bg-amber-500/10 border-amber-500/40'
                     }`}>
                       <p className={`text-sm font-medium mb-1 ${
-                        durationGating.riskLevel === 'high_risk' ? 'text-red-800' : 'text-amber-800'
+                        durationGating.riskLevel === 'high_risk' ? 'text-red-300' : 'text-amber-300'
                       }`}>
                         {durationGating.warningTitle}
                       </p>
                       <p className={`text-xs ${
-                        durationGating.riskLevel === 'high_risk' ? 'text-red-700' : 'text-amber-700'
+                        durationGating.riskLevel === 'high_risk' ? 'text-red-400/80' : 'text-amber-400/80'
                       }`}>
                         {durationGating.warningMessage}
                       </p>
