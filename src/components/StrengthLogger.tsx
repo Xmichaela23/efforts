@@ -1370,17 +1370,29 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               rir: undefined,
               completed: false
             };
+            
+            // Parse reps - handle strings like "20/side", "8-10", "5 min", "Max reps"
+            const rawReps = exercise.reps;
+            let numericReps: number | undefined;
+            if (typeof rawReps === 'number' && rawReps > 0) {
+              numericReps = rawReps;
+            } else if (typeof rawReps === 'string') {
+              // Extract first number from string (e.g., "20/side" -> 20, "8-10" -> 8, "5 min" -> 5)
+              const match = rawReps.match(/^(\d+)/);
+              if (match) {
+                numericReps = parseInt(match[1], 10);
+              }
+            }
+            
             // Duration-based exercises (planks, holds, carries)
-            // Check if exercise has duration_seconds explicitly, OR if it's a duration-based exercise by name
-            // and has reps (which should be converted to duration_seconds)
             if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
               baseSet.duration_seconds = exercise.duration_seconds;
-            } else if (isDurationBasedExercise(exercise.name) && exercise.reps && exercise.reps > 0) {
+            } else if (isDurationBasedExercise(exercise.name) && numericReps) {
               // Convert reps to duration_seconds for duration-based exercises (e.g., "Planks 3×60" where 60 is seconds, not reps)
-              baseSet.duration_seconds = exercise.reps;
-            } else if (exercise.reps !== undefined && exercise.reps > 0) {
-              // Rep-based exercises (traditional lifts) - only set reps if they exist
-              baseSet.reps = exercise.reps;
+              baseSet.duration_seconds = numericReps;
+            } else if (numericReps) {
+              // Rep-based exercises (traditional lifts)
+              baseSet.reps = numericReps;
             }
             // If no reps and not duration-based, leave reps undefined (for "until" patterns)
             return baseSet;
@@ -1507,15 +1519,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       rir: undefined,
                       completed: false
                     };
-                    // Only set reps if they exist (for "until" patterns, reps should be undefined)
-                    if (exercise.reps !== undefined && exercise.reps > 0) {
-                      baseSet.reps = exercise.reps;
+                    // Parse reps - handle strings like "20/side", "8-10", "5 min"
+                    const rawReps = exercise.reps;
+                    let numericReps: number | undefined;
+                    if (typeof rawReps === 'number' && rawReps > 0) {
+                      numericReps = rawReps;
+                    } else if (typeof rawReps === 'string') {
+                      const match = rawReps.match(/^(\d+)/);
+                      if (match) numericReps = parseInt(match[1], 10);
                     }
                     // Check for duration-based exercises
                     if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
                       baseSet.duration_seconds = exercise.duration_seconds;
-                    } else if (isDurationBasedExercise(exercise.name) && exercise.reps && exercise.reps > 0) {
-                      baseSet.duration_seconds = exercise.reps;
+                    } else if (isDurationBasedExercise(exercise.name) && numericReps) {
+                      baseSet.duration_seconds = numericReps;
+                    } else if (numericReps) {
+                      baseSet.reps = numericReps;
                     }
                     return baseSet;
                   })
@@ -1603,17 +1622,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   rir: undefined,
                   completed: false
                 };
+                // Parse reps - handle strings like "20/side", "8-10", "5 min"
+                const rawReps = exercise.reps;
+                let numericReps: number | undefined;
+                if (typeof rawReps === 'number' && rawReps > 0) {
+                  numericReps = rawReps;
+                } else if (typeof rawReps === 'string') {
+                  const match = rawReps.match(/^(\d+)/);
+                  if (match) numericReps = parseInt(match[1], 10);
+                }
                 // Duration-based exercises (planks, holds, carries)
-                // Check if exercise has duration_seconds explicitly, OR if it's a duration-based exercise by name
-                // and has reps (which should be converted to duration_seconds)
                 if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
                   baseSet.duration_seconds = exercise.duration_seconds;
-                } else if (isDurationBasedExercise(exercise.name) && exercise.reps && exercise.reps > 0) {
-                  // Convert reps to duration_seconds for duration-based exercises (e.g., "Planks 3×60" where 60 is seconds, not reps)
-                  baseSet.duration_seconds = exercise.reps;
-                } else if (exercise.reps !== undefined && exercise.reps > 0) {
-                  // Rep-based exercises (traditional lifts) - only set reps if they exist
-                  baseSet.reps = exercise.reps;
+                } else if (isDurationBasedExercise(exercise.name) && numericReps) {
+                  baseSet.duration_seconds = numericReps;
+                } else if (numericReps) {
+                  baseSet.reps = numericReps;
                 }
                 // If no reps and not duration-based, leave reps undefined (for "until" patterns)
                 return baseSet;
