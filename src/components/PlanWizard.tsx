@@ -2348,28 +2348,46 @@ export default function PlanWizard() {
       dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day)
     );
 
+    // Helper to determine if session is running vs strength
+    const isRunningSession = (name: string) => {
+      const runKeywords = ['run', 'easy', 'tempo', 'interval', 'pace', 'long', 'recovery', 'jog'];
+      return runKeywords.some(kw => name.toLowerCase().includes(kw));
+    };
+
     return (
-      <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)' }}>
+      <div className="min-h-screen relative" style={{ background: 'linear-gradient(to bottom, #0f172a, #0c0c0c, #000000)' }}>
+        {/* Subtle teal glow at top */}
+        <div 
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse at center, rgba(20, 184, 166, 0.15) 0%, transparent 70%)' }}
+        />
+        
         {/* Header */}
-        <div className="border-b border-white/10 px-4 py-3">
-          <h1 className="text-lg font-semibold text-center text-white/80">Your Plan</h1>
+        <div className="relative border-b border-teal-500/20 px-4 py-3">
+          <h1 className="text-lg font-semibold text-center text-white">Your Plan</h1>
         </div>
 
         {/* Content */}
-        <div className="p-4 pb-32 max-w-lg mx-auto">
-          {/* Plan summary */}
-          <div className="mb-6 bg-white/[0.05] backdrop-blur-xl border border-white/15 rounded-2xl p-4">
-            <h2 className="text-xl font-semibold mb-2 text-orange-400">{generatedPlan.name}</h2>
-            <p className="text-sm text-white/70 mb-3">{generatedPlan.description}</p>
-            <div className="flex gap-4 text-sm text-white/50">
-              <span>{generatedPlan.duration_weeks} weeks</span>
-              <span>Starts {new Date(state.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        <div className="relative p-4 pb-32 max-w-lg mx-auto">
+          {/* Plan summary card with teal accent */}
+          <div className="mb-6 bg-black/40 backdrop-blur-xl border border-teal-500/30 rounded-2xl p-5 relative overflow-hidden">
+            {/* Teal glow behind card */}
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-teal-500/20 rounded-full blur-2xl" />
+            <h2 className="text-xl font-semibold mb-2 text-teal-400 relative">{generatedPlan.name}</h2>
+            <p className="text-sm text-gray-300 mb-4 leading-relaxed relative">{generatedPlan.description}</p>
+            <div className="flex gap-4 text-sm relative">
+              <span className="px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                {generatedPlan.duration_weeks} weeks
+              </span>
+              <span className="px-3 py-1 rounded-full bg-white/10 text-gray-300 border border-white/20">
+                Starts {new Date(state.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
             </div>
           </div>
 
           {/* Week 1 preview */}
           <div className="mb-4">
-            <h3 className="text-sm font-medium text-white/50 mb-3">WEEK 1 PREVIEW</h3>
+            <h3 className="text-sm font-medium text-teal-400/80 mb-3 tracking-wide">WEEK 1 PREVIEW</h3>
             <div className="space-y-2">
               {(() => {
                 // Group sessions by day
@@ -2385,26 +2403,41 @@ export default function PlanWizard() {
                   const isRest = daySessions.length === 0;
                   
                   return (
-                    <div key={day} className={`p-3 rounded-xl ${isRest ? 'bg-white/[0.03] border border-white/10' : 'bg-white/[0.08] backdrop-blur-md border border-white/15'}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-white/40 w-12">
+                    <div key={day} className={`p-3 rounded-xl transition-all ${
+                      isRest 
+                        ? 'bg-white/[0.02] border border-white/5' 
+                        : 'bg-black/40 backdrop-blur-md border border-white/10'
+                    }`}>
+                      <div className="flex gap-3">
+                        <span className={`text-xs font-semibold w-10 pt-1 ${isRest ? 'text-white/20' : 'text-teal-500'}`}>
                           {day.slice(0, 3)}
                         </span>
                         {isRest ? (
-                          <span className="text-sm text-white/30 italic">Rest</span>
+                          <span className="text-sm text-white/20 italic">Rest</span>
                         ) : (
-                          <div className="flex-1 space-y-2">
-                            {daySessions.map((session: any, idx: number) => (
-                              <div key={idx} className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <span className="font-medium text-sm text-white">{session.name}</span>
-                                  {session.description && (
-                                    <p className="text-xs text-white/50 mt-0.5">{session.description}</p>
-                                  )}
+                          <div className="flex-1 space-y-3">
+                            {daySessions.map((session: any, idx: number) => {
+                              const isRun = isRunningSession(session.name);
+                              return (
+                                <div key={idx} className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      {/* Color indicator */}
+                                      <div className={`w-1 h-4 rounded-full ${isRun ? 'bg-teal-500' : 'bg-amber-500'}`} />
+                                      <span className={`font-medium text-sm ${isRun ? 'text-teal-300' : 'text-amber-300'}`}>
+                                        {session.name}
+                                      </span>
+                                    </div>
+                                    {session.description && (
+                                      <p className="text-xs text-gray-400 mt-1 ml-3 leading-relaxed">{session.description}</p>
+                                    )}
+                                  </div>
+                                  <span className={`text-xs ml-2 px-2 py-0.5 rounded ${isRun ? 'bg-teal-500/20 text-teal-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                    {session.duration}m
+                                  </span>
                                 </div>
-                                <span className="text-xs text-white/40 ml-2">{session.duration}m</span>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -2426,10 +2459,10 @@ export default function PlanWizard() {
         <div 
           className="fixed bottom-0 left-0 right-0 px-4 py-3"
           style={{ 
-            background: 'rgba(0, 0, 0, 0.4)',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.8))',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            borderTop: '1px solid rgba(20, 184, 166, 0.2)',
             paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)'
           }}
         >
@@ -2437,14 +2470,14 @@ export default function PlanWizard() {
             <button
               type="button"
               onClick={handleReject}
-              className="px-4 py-2 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors"
+              className="px-5 py-2.5 rounded-full bg-white/[0.06] backdrop-blur-md border border-white/15 text-gray-300 hover:bg-white/[0.1] hover:text-white transition-all"
             >
               Start Over
             </button>
             <button
               type="button"
               onClick={handleAccept}
-              className="px-5 py-2 rounded-full bg-white/[0.12] backdrop-blur-md border border-white/25 text-white font-medium hover:bg-white/[0.16] transition-colors"
+              className="px-6 py-2.5 rounded-full bg-teal-600 border border-teal-400/40 text-white font-medium hover:bg-teal-500 transition-all shadow-lg shadow-teal-500/20"
             >
               Accept Plan
             </button>
