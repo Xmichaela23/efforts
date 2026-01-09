@@ -1225,8 +1225,8 @@ export default function PlanWizard() {
                         onClick={() => handleRaceDistanceChange(dist)}
                         className={`px-4 py-2 rounded-full border text-sm transition-colors ${
                           state.effortRaceDistance === dist 
-                            ? 'bg-teal-500/20 border-teal-500 text-teal-300 font-medium' 
-                            : 'border-white/20 text-gray-400 hover:border-teal-500/50 hover:text-teal-400'
+                            ? 'bg-teal-500/20 border-teal-400 text-teal-300 font-medium' 
+                            : 'border-teal-500/40 text-gray-300 hover:border-teal-400 hover:text-teal-300'
                         }`}
                       >
                         {dist === 'half' ? 'Half' : dist === 'marathon' ? 'Marathon' : dist.toUpperCase()}
@@ -1268,8 +1268,8 @@ export default function PlanWizard() {
                             onClick={() => handleRecencyChange(opt.value)}
                             className={`px-4 py-2 rounded-full border text-sm transition-colors ${
                               state.effortRaceRecency === opt.value
-                                ? 'bg-teal-500/20 border-teal-500 text-teal-300 font-medium'
-                                : 'border-white/20 text-gray-400 hover:border-teal-500/50 hover:text-teal-400'
+                                ? 'bg-teal-500/20 border-teal-400 text-teal-300 font-medium'
+                                : 'border-teal-500/40 text-gray-300 hover:border-teal-400 hover:text-teal-300'
                             }`}
                           >
                             {opt.label}
@@ -1485,7 +1485,7 @@ export default function PlanWizard() {
               
               {/* Don't know paces - simple guidance */}
               {state.paceInputMethod === 'unknown' && (
-                <div className="mt-6 space-y-4">
+                <div className="mt-6 space-y-5">
                   <p className="text-sm text-gray-400">
                     Go to Baselines to schedule a 5K time trial or easy pace test. We'll calculate your training paces from the results.
                   </p>
@@ -1493,16 +1493,21 @@ export default function PlanWizard() {
                     <button
                       type="button"
                       onClick={() => navigate('/baselines')}
-                      className="px-5 py-2.5 border border-teal-500 text-teal-400 text-sm font-medium rounded-full hover:bg-teal-500/10 transition-colors"
+                      className="px-5 py-2.5 border border-teal-400 text-teal-300 text-sm font-medium rounded-full hover:bg-teal-500/10 transition-colors"
                     >
                       Go to Baselines →
                     </button>
+                  </div>
+                  <div className="pt-2 border-t border-white/10">
+                    <p className="text-xs text-gray-500 mb-3">
+                      Don't want to test? Choose "Complete" goal for effort-based training that doesn't require precise paces.
+                    </p>
                     <button
                       type="button"
                       onClick={() => setStep(step - 1)}
-                      className="px-5 py-2.5 border border-white/20 text-gray-400 text-sm rounded-full hover:border-white/40 hover:text-white transition-colors"
+                      className="px-5 py-2.5 border border-teal-500/40 text-gray-300 text-sm rounded-full hover:border-teal-400 hover:text-teal-300 transition-colors"
                     >
-                      ← Choose "Complete" goal
+                      ← Back to goal selection
                     </button>
                   </div>
                 </div>
