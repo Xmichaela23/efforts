@@ -93,7 +93,11 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
   const rows = allKeys.map(k => {
     const p = plannedMap.get(k);
     const c = completedMap.get(k);
-    const isBodyweight = /dip|chin\-?ups?|pull\-?ups?|push\-?ups?|plank/.test(k);
+    // Check if exercise pattern suggests bodyweight, BUT if weight was logged, treat as weighted
+    const cSetsArrCheck = (c as any)?.setsArray as StrengthSet[] | undefined;
+    const hasLoggedWeight = Array.isArray(cSetsArrCheck) && cSetsArrCheck.some(s => s.weight && s.weight > 0);
+    const isBodyweightPattern = /dip|chin\-?ups?|pull\-?ups?|push\-?ups?|plank/.test(k);
+    const isBodyweight = isBodyweightPattern && !hasLoggedWeight && !(p?.weight && p.weight > 0);
     const pSets = (p?.sets || 0);
     const pReps = (p?.reps || 0);
     const pDuration = (p?.duration_seconds || 0);
