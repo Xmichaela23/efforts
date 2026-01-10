@@ -722,6 +722,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // Use updatedWorkoutData if available (refreshed after auto-attach), otherwise fall back to workout prop
   const sourceWorkout = updatedWorkoutData || workout;
   const isLinked = Boolean((sourceWorkout as any)?.planned_id) || Boolean(currentPlannedId) || Boolean(linkedPlanned?.id);
+  
+  // Mobility styling for visual continuity with logger
+  const isMobility = String(workout?.type || '').toLowerCase() === 'mobility';
+  const mobilityCardStyle = isMobility ? {
+    background: 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(168,85,247,0.05) 50%, rgba(255,255,255,0.03) 100%)'
+  } : {};
+  const mobilityCardClass = isMobility ? 'backdrop-blur-xl border border-purple-500/30 rounded-2xl mx-1 shadow-[0_0_0_1px_rgba(168,85,247,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]' : '';
 
   return (
     <div 
@@ -960,112 +967,120 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         >
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-2">
-            <StructuredPlannedView 
-              workout={getUnifiedPlannedWorkout(unifiedWorkout, isCompleted, hydratedPlanned, linkedPlanned)}
-              showHeader={true}
-            />
-            {(() => {
-              // Show inline launcher for planned sessions (strength, mobility, and pilates_yoga)
-              const row = isCompleted ? (linkedPlanned || null) : unifiedWorkout;
-              const isPlanned = String((row as any)?.workout_status || '').toLowerCase() === 'planned';
-              const type = String((row as any)?.type || '').toLowerCase();
-              if (!row || !isPlanned || (type!=='strength' && type!=='mobility' && type!=='pilates_yoga')) return null;
-              const handleClick = () => {
-                try {
-                  const rowAny: any = row as any;
-                  const basePlanned = rowAny?.planned && typeof rowAny.planned === 'object' ? { ...rowAny.planned } : { ...rowAny };
-                  // Always include date/type/name for the logger header and fallbacks
-                  basePlanned.date = rowAny?.date || basePlanned.date;
-                  basePlanned.type = basePlanned.type || type;
-                  basePlanned.name = basePlanned.name || (
-                    type==='mobility' ? 'Mobility Session' : 
-                    type==='pilates_yoga' ? 'Pilates/Yoga Session' : 
-                    'Strength'
-                  );
+            <div className={mobilityCardClass} style={mobilityCardStyle}>
+              <div className={isMobility ? 'p-4' : ''}>
+                <StructuredPlannedView 
+                  workout={getUnifiedPlannedWorkout(unifiedWorkout, isCompleted, hydratedPlanned, linkedPlanned)}
+                  showHeader={true}
+                />
+                {(() => {
+                  // Show inline launcher for planned sessions (strength, mobility, and pilates_yoga)
+                  const row = isCompleted ? (linkedPlanned || null) : unifiedWorkout;
+                  const isPlanned = String((row as any)?.workout_status || '').toLowerCase() === 'planned';
+                  const type = String((row as any)?.type || '').toLowerCase();
+                  if (!row || !isPlanned || (type!=='strength' && type!=='mobility' && type!=='pilates_yoga')) return null;
+                  const handleClick = () => {
+                    try {
+                      const rowAny: any = row as any;
+                      const basePlanned = rowAny?.planned && typeof rowAny.planned === 'object' ? { ...rowAny.planned } : { ...rowAny };
+                      // Always include date/type/name for the logger header and fallbacks
+                      basePlanned.date = rowAny?.date || basePlanned.date;
+                      basePlanned.type = basePlanned.type || type;
+                      basePlanned.name = basePlanned.name || (
+                        type==='mobility' ? 'Mobility Session' : 
+                        type==='pilates_yoga' ? 'Pilates/Yoga Session' : 
+                        'Strength'
+                      );
 
-                  if (type==='strength') {
-                    window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: basePlanned } }));
-                  } else if (type==='mobility') {
-                    // Mobility → keep unified simple; route via app handler
-                    window.dispatchEvent(new CustomEvent('open:mobilityLogger', { detail: { planned: basePlanned } }));
-                  } else if (type==='pilates_yoga') {
-                    window.dispatchEvent(new CustomEvent('open:pilatesYogaLogger', { detail: { planned: basePlanned } }));
-                  }
-                } catch {}
-              };
-              return (
-                <div className="mt-4">
-                  <button
-                    onClick={handleClick}
-                    className="w-full px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-sm font-light tracking-wide hover:bg-white/[0.12] transition-all"
-                  >Go to workout</button>
-                </div>
-              );
-            })()}
-            {/* Delete/Reschedule buttons for planned workouts */}
-            {!isCompleted && onDelete && (
-              <div className="mt-4 pt-3 border-t border-white/10 flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white/60 hover:text-white/80 hover:bg-white/10"
-                  onClick={() => {
-                    const newDate = prompt('Enter new date (YYYY-MM-DD):', (unifiedWorkout as any)?.date || '');
-                    if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-                      // Update the workout date
-                      supabase
-                        .from('planned_workouts')
-                        .update({ date: newDate })
-                        .eq('id', (unifiedWorkout as any)?.id)
-                        .then(() => {
-                          window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-                          onClose();
-                        });
-                    }
-                  }}
-                >
-                  Reschedule
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                  onClick={() => {
-                    if (confirm('Delete this planned workout?')) {
-                      onDelete(String((unifiedWorkout as any)?.id));
-                    }
-                  }}
-                >
-                  Delete
-                </Button>
+                      if (type==='strength') {
+                        window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: basePlanned } }));
+                      } else if (type==='mobility') {
+                        // Mobility → keep unified simple; route via app handler
+                        window.dispatchEvent(new CustomEvent('open:mobilityLogger', { detail: { planned: basePlanned } }));
+                      } else if (type==='pilates_yoga') {
+                        window.dispatchEvent(new CustomEvent('open:pilatesYogaLogger', { detail: { planned: basePlanned } }));
+                      }
+                    } catch {}
+                  };
+                  return (
+                    <div className="mt-4">
+                      <button
+                        onClick={handleClick}
+                        className={`w-full px-4 py-3 rounded-xl ${isMobility ? 'bg-purple-500/20 border-purple-500/40 hover:bg-purple-500/30' : 'bg-white/[0.08] border-white/30 hover:bg-white/[0.12]'} backdrop-blur-md border text-white text-sm font-light tracking-wide transition-all`}
+                      >Go to workout</button>
+                    </div>
+                  );
+                })()}
+                {/* Delete/Reschedule buttons for planned workouts */}
+                {!isCompleted && onDelete && (
+                  <div className="mt-4 pt-3 border-t border-white/10 flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-white/60 hover:text-white/80 hover:bg-white/10"
+                      onClick={() => {
+                        const newDate = prompt('Enter new date (YYYY-MM-DD):', (unifiedWorkout as any)?.date || '');
+                        if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+                          // Update the workout date
+                          supabase
+                            .from('planned_workouts')
+                            .update({ date: newDate })
+                            .eq('id', (unifiedWorkout as any)?.id)
+                            .then(() => {
+                              window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+                              onClose();
+                            });
+                        }
+                      }}
+                    >
+                      Reschedule
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      onClick={() => {
+                        if (confirm('Delete this planned workout?')) {
+                          onDelete(String((unifiedWorkout as any)?.id));
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </TabsContent>
 
           {/* Adherence Tab - only rendered when linked, so no need for unlinked state */}
           <TabsContent value="summary" className="flex-1 p-2">
-            {/* Inline Strength Logger editor */}
-            {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
-              <div className="mb-4 border border-white/20 rounded-md">
-                <StrengthLogger
-                  onClose={()=> setEditingInline(false)}
-                  scheduledWorkout={(isCompleted ? workout : (linkedPlanned || workout))}
-                  onWorkoutSaved={(saved)=>{
-                    setEditingInline(false);
-                    setActiveTab('summary');
-                    try { (workout as any).id = (saved as any)?.id || (workout as any).id; } catch {}
-                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                  }}
-                  targetDate={(workout as any)?.date}
+            <div className={mobilityCardClass} style={mobilityCardStyle}>
+              <div className={isMobility ? 'p-4' : ''}>
+                {/* Inline Strength Logger editor */}
+                {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
+                  <div className="mb-4 border border-white/20 rounded-md">
+                    <StrengthLogger
+                      onClose={()=> setEditingInline(false)}
+                      scheduledWorkout={(isCompleted ? workout : (linkedPlanned || workout))}
+                      onWorkoutSaved={(saved)=>{
+                        setEditingInline(false);
+                        setActiveTab('summary');
+                        try { (workout as any).id = (saved as any)?.id || (workout as any).id; } catch {}
+                        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                      }}
+                      targetDate={(workout as any)?.date}
+                    />
+                  </div>
+                )}
+                <MobileSummary 
+                  planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
+                  completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
+                  onNavigateToContext={onNavigateToContext}
                 />
               </div>
-            )}
-            <MobileSummary 
-              planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
-              completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
-              onNavigateToContext={onNavigateToContext}
-            />
+            </div>
             {onDelete && workout?.id && (
               <Button
                 variant="ghost"
@@ -1083,53 +1098,57 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Completed Tab */}
           <TabsContent value="completed" className="flex-1 p-2">
-            {isCompleted ? (
-              <div>
-                  {/* Delete control removed per product decision */}
-                  {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
-                    <div>
-                      <CompletedTab 
-                        workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
-                        workoutData={completedData}
-                      />
-                    </div>
-                  ) : (workout.type === 'strength' || workout.type === 'mobility' || workout.type === 'pilates_yoga') ? (
-                    <div>
-                      {/* StrengthCompletedView has its own header with workout name */}
-                      <StrengthCompletedView 
-                        workoutData={completedData}
-                        plannedWorkout={linkedPlanned}
-                      />
-                      {assocOpen && (
-                        <AssociatePlannedDialog
-                          workout={workout}
-                          open={assocOpen}
-                          onClose={()=>setAssocOpen(false)}
-                          onAssociated={async(pid)=>{ 
-                            setAssocOpen(false);
-                            // Just dispatch invalidation - AppLayout and useEffects will handle the rest
-                            try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                            try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                            try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-                          }}
-                        />
+            <div className={mobilityCardClass} style={mobilityCardStyle}>
+              <div className={isMobility ? 'p-4' : ''}>
+                {isCompleted ? (
+                  <div>
+                      {/* Delete control removed per product decision */}
+                      {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
+                        <div>
+                          <CompletedTab 
+                            workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
+                            workoutData={completedData}
+                          />
+                        </div>
+                      ) : (workout.type === 'strength' || workout.type === 'mobility' || workout.type === 'pilates_yoga') ? (
+                        <div>
+                          {/* StrengthCompletedView has its own header with workout name */}
+                          <StrengthCompletedView 
+                            workoutData={completedData}
+                            plannedWorkout={linkedPlanned}
+                          />
+                          {assocOpen && (
+                            <AssociatePlannedDialog
+                              workout={workout}
+                              open={assocOpen}
+                              onClose={()=>setAssocOpen(false)}
+                              onAssociated={async(pid)=>{ 
+                                setAssocOpen(false);
+                                // Just dispatch invalidation - AppLayout and useEffects will handle the rest
+                                try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                                try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                                try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+                              }}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <div>
+                          <h3 className="font-semibold mb-4 text-white/90">Workout Completed</h3>
+                          <p className="text-white/60">Workout type not yet supported in completed view.</p>
+                        </div>
                       )}
-                    </div>
-                  ) : (
-                    <div>
-                      <h3 className="font-semibold mb-4 text-white/90">Workout Completed</h3>
-                      <p className="text-white/60">Workout type not yet supported in completed view.</p>
-                    </div>
-                  )}
+                  </div>
+                ) : (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                    <h3 className="font-semibold text-amber-400 mb-2">Not Yet Completed</h3>
+                    <p className="text-sm text-amber-300/80">
+                      This workout hasn't been completed yet. Complete it to see detailed analytics.
+                    </p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-                <h3 className="font-semibold text-amber-400 mb-2">Not Yet Completed</h3>
-                <p className="text-sm text-amber-300/80">
-                  This workout hasn't been completed yet. Complete it to see detailed analytics.
-                </p>
-              </div>
-            )}
+            </div>
           </TabsContent>
         </div>
       </Tabs>
