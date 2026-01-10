@@ -11,6 +11,8 @@ interface StrengthAdjustmentModalProps {
   actualRir?: number;
   planId?: string;
   isBodyweight?: boolean;
+  hasPlannedWeight?: boolean;
+  clickY?: number;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -21,16 +23,22 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   currentReps,
   planId,
   isBodyweight,
+  hasPlannedWeight,
+  clickY,
   onClose,
   onSaved,
 }) => {
   // Check if this is a bodyweight-type exercise (dips, pull-ups, etc.) - always show reps
   const isBodyweightType = isBodyweight || /dip|pull\-?ups?|chin\-?ups?/i.test(exerciseName);
   
+  // Only pre-fill weight if it was actually planned (not just logged)
   const [repsInput, setRepsInput] = useState<string>(currentReps?.toString() || '');
-  const [weightInput, setWeightInput] = useState<string>(currentWeight?.toString() || '');
+  const [weightInput, setWeightInput] = useState<string>(hasPlannedWeight ? currentWeight?.toString() || '' : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Calculate position - appear near where user clicked
+  const topPosition = clickY ? Math.max(60, Math.min(clickY - 100, window.innerHeight - 300)) : undefined;
 
   const getFinalWeight = (): number | null => {
     const val = parseInt(weightInput);
@@ -107,11 +115,14 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-[200] flex justify-center px-4" style={{ alignItems: topPosition ? 'flex-start' : 'center' }}>
       <div className="fixed inset-0 bg-black/60" onClick={onClose} />
       <div 
         className="relative w-full max-w-xs bg-zinc-900 border border-white/20 rounded-2xl shadow-xl p-5 z-10"
-        style={{ fontFamily: 'Inter, sans-serif' }}
+        style={{ 
+          fontFamily: 'Inter, sans-serif',
+          marginTop: topPosition ? `${topPosition}px` : undefined
+        }}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
