@@ -21,16 +21,20 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   onSaved,
 }) => {
   // Weight options: use smaller increments for light weights
+  // Special case: adding weight to bodyweight exercise (currentWeight = 0)
+  const isAddingWeight = currentWeight === 0;
   const increment = currentWeight <= 15 ? 2.5 : 5;
-  const minWeight = increment; // 2.5 or 5 lb minimum
+  const minWeight = isAddingWeight ? 0 : increment;
   
-  const rawOptions = [
-    currentWeight - (increment * 2),
-    currentWeight - increment,
-    currentWeight,
-    currentWeight + increment,
-    currentWeight + (increment * 2),
-  ].map(w => Math.max(minWeight, w));
+  const rawOptions = isAddingWeight
+    ? [0, 10, 15, 20, 25, 35] // Starting weights for adding to bodyweight
+    : [
+        currentWeight - (increment * 2),
+        currentWeight - increment,
+        currentWeight,
+        currentWeight + increment,
+        currentWeight + (increment * 2),
+      ].map(w => Math.max(minWeight, w));
   
   // Remove duplicates while preserving order
   const weightOptions = [...new Set(rawOptions)];
@@ -121,17 +125,21 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Adjust {exerciseName}</h3>
+          <h3 className="text-lg font-semibold text-white">
+            {isAddingWeight ? `Add Weight to ${exerciseName}` : `Adjust ${exerciseName}`}
+          </h3>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10">
             <X className="h-5 w-5 text-white/60" />
           </button>
         </div>
 
         {/* Current weight context */}
-        <div className="mb-4 text-center">
-          <span className="text-sm text-white/60">Current: </span>
-          <span className="text-sm text-white font-medium">{currentWeight} lb</span>
-        </div>
+        {!isAddingWeight && (
+          <div className="mb-4 text-center">
+            <span className="text-sm text-white/60">Current: </span>
+            <span className="text-sm text-white font-medium">{currentWeight} lb</span>
+          </div>
+        )}
 
         {/* Weight selector */}
         <div className="mb-4">

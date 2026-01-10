@@ -182,6 +182,21 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
                     Adjust
                   </button>
                 )}
+                {/* Add Weight button - show for bodyweight exercises that could be weighted */}
+                {planId && r.isBodyweight && /dip|pull\-?ups?|chin\-?ups?/i.test(r.name) && (
+                  <button
+                    onClick={() => setAdjustingExercise({
+                      name: r.name,
+                      currentWeight: 0,
+                      nextPlannedWeight: 10,
+                      targetRir: r.targetRir,
+                      actualRir: r.actualRir
+                    })}
+                    className="px-2.5 py-1 text-xs font-medium rounded border transition-colors bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:text-white/80"
+                  >
+                    + Weight
+                  </button>
+                )}
               </div>
               {/* RIR comparison - show when both target and actual exist */}
               {r.targetRir != null && r.actualRir != null && (
