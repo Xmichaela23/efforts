@@ -44,17 +44,7 @@ interface StrengthCompareTableProps {
 }
 
 export default function StrengthCompareTable({ planned, completed, planId: initialPlanId, plannedWorkoutId, onAdjustmentSaved }: StrengthCompareTableProps){
-  const [adjustingExercise, setAdjustingExercise] = useState<{
-    name: string;
-    currentWeight: number;
-    currentReps?: number;
-    nextPlannedWeight: number;
-    targetRir?: number;
-    actualRir?: number;
-    isBodyweight?: boolean;
-    hasPlannedWeight?: boolean;
-    buttonRect?: DOMRect;
-  } | null>(null);
+  const [adjustingExerciseIndex, setAdjustingExerciseIndex] = useState<number | null>(null);
   
   // Fetch plan ID from planned workout if not provided
   const [resolvedPlanId, setResolvedPlanId] = useState<string | undefined>(initialPlanId);
@@ -167,53 +157,40 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-white">{r.name}</span>
-                {/* Adjust button - show for weighted exercises when planId is available */}
-                {planId && hasWeight && !r.isBodyweight && (
-                  <button
-                    onClick={(e) => {
-                      const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                      setAdjustingExercise({
-                        name: r.name,
-                        currentWeight: r.cWAvg || r.pW,
-                        currentReps: r.cRepsAvg || r.pReps,
-                        nextPlannedWeight: Math.round((r.pW || r.cWAvg) * 1.025 / 5) * 5 || r.cWAvg || r.pW,
-                        targetRir: r.targetRir,
-                        actualRir: r.actualRir,
-                        isBodyweight: false,
-                        hasPlannedWeight: r.pW > 0,
-                        buttonRect: rect
-                      });
-                    }}
-                    className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors ${
-                      rirConcern 
-                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30' 
-                        : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:text-white/80'
-                    }`}
-                  >
-                    Adjust
-                  </button>
-                )}
-                {/* Adjust button for bodyweight exercises (dips, pull-ups, chin-ups) */}
-                {planId && r.isBodyweight && /dip|pull\-?ups?|chin\-?ups?/i.test(r.name) && (
-                  <button
-                    onClick={(e) => {
-                      const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                      setAdjustingExercise({
-                        name: r.name,
-                        currentWeight: r.cWAvg || 0,
-                        currentReps: r.cRepsAvg || r.pReps || 8,
-                        nextPlannedWeight: 10,
-                        targetRir: r.targetRir,
-                        actualRir: r.actualRir,
-                        isBodyweight: true,
-                        hasPlannedWeight: false,
-                        buttonRect: rect
-                      });
-                    }}
-                    className="px-2.5 py-1 text-xs font-medium rounded border transition-colors bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:text-white/80"
-                  >
-                    Adjust
-                  </button>
+                {/* Adjust button with inline dropdown */}
+                {planId && (hasWeight || (r.isBodyweight && /dip|pull\-?ups?|chin\-?ups?/i.test(r.name))) && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setAdjustingExerciseIndex(adjustingExerciseIndex === i ? null : i)}
+                      className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors ${
+                        rirConcern 
+                          ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30' 
+                          : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:text-white/80'
+                      }`}
+                    >
+                      Adjust
+                    </button>
+                    
+                    {/* Inline dropdown */}
+                    {adjustingExerciseIndex === i && (
+                      <StrengthAdjustmentModal
+                        exerciseName={r.name}
+                        currentWeight={r.cWAvg || r.pW || 0}
+                        currentReps={r.cRepsAvg || r.pReps}
+                        nextPlannedWeight={Math.round((r.pW || r.cWAvg || 0) * 1.025 / 5) * 5 || r.cWAvg || r.pW || 0}
+                        targetRir={r.targetRir}
+                        actualRir={r.actualRir}
+                        planId={planId}
+                        isBodyweight={r.isBodyweight || /dip|pull\-?ups?|chin\-?ups?/i.test(r.name)}
+                        hasPlannedWeight={r.pW > 0}
+                        onClose={() => setAdjustingExerciseIndex(null)}
+                        onSaved={() => {
+                          setAdjustingExerciseIndex(null);
+                          onAdjustmentSaved?.();
+                        }}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
               {/* RIR comparison - show when both target and actual exist */}
@@ -291,24 +268,11 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
         </div>
       )}
       
-      {/* Adjustment Modal */}
-      {adjustingExercise && planId && (
-        <StrengthAdjustmentModal
-          exerciseName={adjustingExercise.name}
-          currentWeight={adjustingExercise.currentWeight}
-          currentReps={adjustingExercise.currentReps}
-          nextPlannedWeight={adjustingExercise.nextPlannedWeight}
-          targetRir={adjustingExercise.targetRir}
-          actualRir={adjustingExercise.actualRir}
-          planId={planId}
-          isBodyweight={adjustingExercise.isBodyweight}
-          hasPlannedWeight={adjustingExercise.hasPlannedWeight}
-          buttonRect={adjustingExercise.buttonRect}
-          onClose={() => setAdjustingExercise(null)}
-          onSaved={() => {
-            setAdjustingExercise(null);
-            onAdjustmentSaved?.();
-          }}
+      {/* Click outside to close dropdown */}
+      {adjustingExerciseIndex !== null && (
+        <div 
+          className="fixed inset-0 z-[199]" 
+          onClick={() => setAdjustingExerciseIndex(null)} 
         />
       )}
     </div>

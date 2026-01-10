@@ -12,7 +12,6 @@ interface StrengthAdjustmentModalProps {
   planId?: string;
   isBodyweight?: boolean;
   hasPlannedWeight?: boolean;
-  buttonRect?: DOMRect;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -24,7 +23,6 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   planId,
   isBodyweight,
   hasPlannedWeight,
-  buttonRect,
   onClose,
   onSaved,
 }) => {
@@ -36,25 +34,6 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   const [weightInput, setWeightInput] = useState<string>(hasPlannedWeight ? currentWeight?.toString() || '' : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Calculate dropdown position - appear below button, or above if not enough space
-  const modalHeight = 220; // Approximate height of modal
-  const spaceBelow = window.innerHeight - (buttonRect?.bottom || 0);
-  const spaceAbove = buttonRect?.top || 0;
-  const showAbove = buttonRect && spaceBelow < modalHeight + 20 && spaceAbove > modalHeight;
-  
-  const dropdownStyle: React.CSSProperties = buttonRect ? {
-    position: 'fixed',
-    top: showAbove ? buttonRect.top - modalHeight - 8 : buttonRect.bottom + 8,
-    left: Math.max(16, Math.min(buttonRect.left - 100, window.innerWidth - 280)),
-    width: 264,
-  } : {
-    position: 'fixed',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: 264,
-  };
 
   const getFinalWeight = (): number | null => {
     const val = parseInt(weightInput);
@@ -131,85 +110,74 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[200]">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div 
-        className="bg-zinc-900 border border-white/20 rounded-xl shadow-2xl p-4 z-10"
-        style={{ 
-          fontFamily: 'Inter, sans-serif',
-          ...dropdownStyle
-        }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-white">{exerciseName}</h3>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10">
-            <X className="h-5 w-5 text-white/60" />
-          </button>
-        </div>
+    <div 
+      className="absolute top-full right-0 mt-2 z-[200] bg-zinc-900 border border-white/20 rounded-xl shadow-2xl p-4"
+      style={{ fontFamily: 'Inter, sans-serif', width: 260 }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-white">{exerciseName}</h3>
+        <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10">
+          <X className="h-4 w-4 text-white/60" />
+        </button>
+      </div>
 
-        {/* Input fields */}
-        <div className="flex gap-3 mb-4">
-          {/* Reps input - show for bodyweight-type exercises */}
-          {isBodyweightType && (
-            <div className="flex-1">
-              <label className="text-xs text-white/50 uppercase tracking-wide mb-1.5 block">Reps</label>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={repsInput}
-                onChange={(e) => setRepsInput(e.target.value)}
-                placeholder="8"
-                className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-center text-lg font-medium placeholder:text-white/30 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-          )}
-          
-          {/* Weight input */}
+      {/* Input fields */}
+      <div className="flex gap-3 mb-3">
+        {/* Reps input - show for bodyweight-type exercises */}
+        {isBodyweightType && (
           <div className="flex-1">
-            <label className="text-xs text-white/50 uppercase tracking-wide mb-1.5 block">Weight</label>
-            <div className="relative">
-              <input
-                type="number"
-                inputMode="numeric"
-                value={weightInput}
-                onChange={(e) => setWeightInput(e.target.value)}
-                placeholder="0"
-                className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-center text-lg font-medium placeholder:text-white/30 focus:outline-none focus:border-amber-500"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 text-sm">lb</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Explanation */}
-        <p className="text-xs text-white/40 text-center mb-4">
-          Updates plan going forward
-        </p>
-
-        {/* Error */}
-        {error && (
-          <div className="mb-4 p-2 bg-red-500/20 border border-red-500/50 rounded text-red-400 text-sm text-center">
-            {error}
+            <label className="text-xs text-white/50 uppercase tracking-wide mb-1 block">Reps</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={repsInput}
+              onChange={(e) => setRepsInput(e.target.value)}
+              placeholder="8"
+              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-center font-medium placeholder:text-white/30 focus:outline-none focus:border-amber-500"
+            />
           </div>
         )}
-
-        {/* Actions */}
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 px-4 rounded-xl border border-white/20 text-white/60 hover:bg-white/5 transition-colors text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || (getFinalWeight() == null && getFinalReps() == null)}
-            className="flex-1 py-2.5 px-4 rounded-xl bg-amber-500 text-black font-medium hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
+        
+        {/* Weight input */}
+        <div className="flex-1">
+          <label className="text-xs text-white/50 uppercase tracking-wide mb-1 block">Weight</label>
+          <div className="relative">
+            <input
+              type="number"
+              inputMode="numeric"
+              value={weightInput}
+              onChange={(e) => setWeightInput(e.target.value)}
+              placeholder="0"
+              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-center font-medium placeholder:text-white/30 focus:outline-none focus:border-amber-500"
+            />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 text-xs">lb</span>
+          </div>
         </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="mb-3 p-2 bg-red-500/20 border border-red-500/50 rounded text-red-400 text-xs text-center">
+          {error}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button
+          onClick={onClose}
+          className="flex-1 py-2.5 px-4 rounded-xl border border-white/20 text-white/60 hover:bg-white/5 transition-colors text-sm"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving || (getFinalWeight() == null && getFinalReps() == null)}
+          className="flex-1 py-2.5 px-4 rounded-xl bg-amber-500 text-black font-medium hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
       </div>
     </div>
   );
