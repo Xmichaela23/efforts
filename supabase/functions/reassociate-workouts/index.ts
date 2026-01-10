@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     console.log(`📅 Plan date range: ${startDate} to ${endDate}`);
 
     // 2. Get all planned_workouts for this plan
-    console.log(`🔍 Querying planned_workouts for plan_id: ${plan_id}, user_id: ${user.id}`);
+    console.log(`🔍 Querying planned_workouts for training_plan_id: ${plan_id}, user_id: ${user.id}`);
     
     let plannedWorkouts: any[] | null = null;
     let plannedError: any = null;
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
       const result = await supabase
         .from('planned_workouts')
         .select('id, date, type, name')
-        .eq('plan_id', plan_id)
+        .eq('training_plan_id', plan_id)
         .eq('user_id', user.id)
         .order('date', { ascending: true });
       
