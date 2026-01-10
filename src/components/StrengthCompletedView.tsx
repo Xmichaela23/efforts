@@ -361,22 +361,25 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                 ? Math.round(exercise.sets.filter(s => s.weight > 0).reduce((sum, s) => sum + s.weight, 0) / exercise.sets.filter(s => s.weight > 0).length)
                 : 0;
               
-              // Determine if RIR is concerning (lower than target by 0.5+)
-              const rirConcern = avgRir != null && plannedData?.targetRir != null && avgRir < plannedData.targetRir - 0.5;
+              // Determine if RIR is concerning (lower than target by 0.5+, or very low RIR without target)
+              const rirConcern = avgRir != null && (
+                (plannedData?.targetRir != null && avgRir < plannedData.targetRir - 0.5) ||
+                (plannedData?.targetRir == null && avgRir < 2)
+              );
 
               return (
                 <div key={exercise.id || index} className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-white">{exercise.name}</h3>
-                      {/* Adjust button - only show for weighted exercises with planned data */}
-                      {hasWeight && plannedData && !isMobility && (
+                      {/* Adjust button - show for all weighted exercises */}
+                      {hasWeight && !isMobility && (
                         <button
                           onClick={() => setAdjustingExercise({
                             name: exercise.name,
                             currentWeight: avgWeight,
-                            nextPlannedWeight: Math.round(plannedData.weight * 1.025 / 5) * 5 || avgWeight, // Estimate next weight as +2.5%
-                            targetRir: plannedData.targetRir,
+                            nextPlannedWeight: plannedData ? Math.round(plannedData.weight * 1.025 / 5) * 5 || avgWeight : avgWeight,
+                            targetRir: plannedData?.targetRir,
                             actualRir: avgRir
                           })}
                           className={`px-2 py-0.5 text-xs rounded border transition-colors ${
