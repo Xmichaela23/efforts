@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import StrengthCompareTable from './StrengthCompareTable';
 import { useAppContext } from '@/contexts/AppContext';
-import { Dumbbell } from 'lucide-react';
 import { getSessionRPE, getWorkoutNotes, getWorkoutReadiness } from '@/utils/workoutMetadata';
 
 interface StrengthCompletedViewProps {
@@ -200,33 +199,22 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
   
   return (
     <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
-      {/* Header */}
+      {/* Summary line - volume/workload only (title shown in parent) */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {!isMobility && <Dumbbell className="h-5 w-5 text-white/60" />}
-            <h1 className="text-xl font-semibold text-white">{workoutData.name}</h1>
+        <div className="flex items-center justify-between text-sm text-white/60">
+          <div className="flex items-center gap-4">
+            {!isMobility && workoutStats.actual.volume > 0 && (
+              <span className="font-medium">{workoutStats.actual.volume.toLocaleString()} lbs total</span>
+            )}
+            {(workoutData as any).workload_actual || (workoutData as any).workload_planned ? (
+              <span>
+                Workload: {(workoutData as any).workload_actual || (workoutData as any).workload_planned}
+              </span>
+            ) : null}
           </div>
-          {(getSessionRPE(workoutData) !== undefined || getWorkoutNotes(workoutData)) && (
-            <div className="flex items-center gap-4 text-sm text-white/70">
-              {getSessionRPE(workoutData) !== undefined && (
-                <div className="px-2 py-1 rounded bg-white/10">RPE: {getSessionRPE(workoutData)}</div>
-              )}
-              {getWorkoutNotes(workoutData) && (
-                <div className="hidden sm:block max-w-[360px] truncate" title={getWorkoutNotes(workoutData)}>Notes: {getWorkoutNotes(workoutData)}</div>
-              )}
-            </div>
+          {getSessionRPE(workoutData) !== undefined && (
+            <div className="px-2 py-1 rounded bg-white/10 text-white/70">RPE: {getSessionRPE(workoutData)}</div>
           )}
-        </div>
-        <div className="flex items-center gap-4 text-sm text-white/60">
-          {!isMobility && workoutStats.actual.volume > 0 && (
-            <span className="font-medium">{workoutStats.actual.volume.toLocaleString()} lbs total</span>
-          )}
-          {(workoutData as any).workload_actual || (workoutData as any).workload_planned ? (
-            <span className="workload-line">
-              Workload: {(workoutData as any).workload_actual || (workoutData as any).workload_planned}
-            </span>
-          ) : null}
         </div>
         
         {/* Compare to Plan button - only show if planned has exercises */}
@@ -234,7 +222,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           const plannedExercises = (plannedWorkout as any).strength_exercises || (plannedWorkout as any).mobility_exercises || [];
           return plannedExercises.length > 0;
         })() && (
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               onClick={() => setShowComparison(!showComparison)}
               className="text-sm text-white/60 hover:text-white/80 font-medium"

@@ -723,12 +723,33 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const sourceWorkout = updatedWorkoutData || workout;
   const isLinked = Boolean((sourceWorkout as any)?.planned_id) || Boolean(currentPlannedId) || Boolean(linkedPlanned?.id);
   
-  // Mobility styling for visual continuity with logger
-  const isMobility = String(workout?.type || '').toLowerCase() === 'mobility';
-  const mobilityCardStyle = isMobility ? {
-    background: 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(168,85,247,0.05) 50%, rgba(255,255,255,0.03) 100%)'
-  } : {};
-  const mobilityCardClass = isMobility ? 'backdrop-blur-xl border border-purple-500/30 rounded-2xl mx-1 shadow-[0_0_0_1px_rgba(168,85,247,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]' : '';
+  // Workout type styling for visual continuity with loggers
+  const workoutType = String(workout?.type || '').toLowerCase();
+  const isMobility = workoutType === 'mobility';
+  const isStrength = workoutType === 'strength';
+  
+  // Color theme: purple for mobility, amber for strength
+  const getCardStyle = () => {
+    if (isMobility) {
+      return { background: 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(168,85,247,0.05) 50%, rgba(255,255,255,0.03) 100%)' };
+    }
+    if (isStrength) {
+      return { background: 'linear-gradient(135deg, rgba(249,115,22,0.15) 0%, rgba(249,115,22,0.05) 50%, rgba(255,255,255,0.03) 100%)' };
+    }
+    return {};
+  };
+  const getCardClass = () => {
+    if (isMobility) {
+      return 'backdrop-blur-xl border border-purple-500/30 rounded-2xl mx-1 shadow-[0_0_0_1px_rgba(168,85,247,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]';
+    }
+    if (isStrength) {
+      return 'backdrop-blur-xl border border-orange-500/30 rounded-2xl mx-1 shadow-[0_0_0_1px_rgba(249,115,22,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]';
+    }
+    return '';
+  };
+  const cardStyle = getCardStyle();
+  const cardClass = getCardClass();
+  const hasCardStyle = isMobility || isStrength;
 
   return (
     <div 
@@ -967,8 +988,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         >
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-2">
-            <div className={mobilityCardClass} style={mobilityCardStyle}>
-              <div className={isMobility ? 'p-4' : ''}>
+            <div className={cardClass} style={cardStyle}>
+              <div className={hasCardStyle ? 'p-4' : ''}>
                 <StructuredPlannedView 
                   workout={getUnifiedPlannedWorkout(unifiedWorkout, isCompleted, hydratedPlanned, linkedPlanned)}
                   showHeader={true}
@@ -1006,7 +1027,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     <div className="mt-4">
                       <button
                         onClick={handleClick}
-                        className={`w-full px-4 py-3 rounded-xl ${isMobility ? 'bg-purple-500/20 border-purple-500/40 hover:bg-purple-500/30' : 'bg-white/[0.08] border-white/30 hover:bg-white/[0.12]'} backdrop-blur-md border text-white text-sm font-light tracking-wide transition-all`}
+                        className={`w-full px-4 py-3 rounded-xl ${isMobility ? 'bg-purple-500/20 border-purple-500/40 hover:bg-purple-500/30' : isStrength ? 'bg-orange-500/20 border-orange-500/40 hover:bg-orange-500/30' : 'bg-white/[0.08] border-white/30 hover:bg-white/[0.12]'} backdrop-blur-md border text-white text-sm font-light tracking-wide transition-all`}
                       >Go to workout</button>
                     </div>
                   );
@@ -1055,8 +1076,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Adherence Tab - only rendered when linked, so no need for unlinked state */}
           <TabsContent value="summary" className="flex-1 p-2">
-            <div className={mobilityCardClass} style={mobilityCardStyle}>
-              <div className={isMobility ? 'p-4' : ''}>
+            <div className={cardClass} style={cardStyle}>
+              <div className={hasCardStyle ? 'p-4' : ''}>
                 {/* Inline Strength Logger editor */}
                 {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
                   <div className="mb-4 border border-white/20 rounded-md">
@@ -1098,8 +1119,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Completed Tab */}
           <TabsContent value="completed" className="flex-1 p-2">
-            <div className={mobilityCardClass} style={mobilityCardStyle}>
-              <div className={isMobility ? 'p-4' : ''}>
+            <div className={cardClass} style={cardStyle}>
+              <div className={hasCardStyle ? 'p-4' : ''}>
                 {isCompleted ? (
                   <div>
                       {/* Delete control removed per product decision */}
