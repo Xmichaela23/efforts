@@ -233,15 +233,19 @@ export default function WorkloadAdmin() {
             <div className="space-y-2">
               <Label htmlFor="planSelect">Target Plan</Label>
               <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-white/10 border-white/20">
                   <SelectValue placeholder="Select a plan..." />
                 </SelectTrigger>
-                <SelectContent>
-                  {plans.map((plan) => (
-                    <SelectItem key={plan.id} value={plan.id}>
-                      {plan.name} {plan.status === 'active' && '(active)'}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="bg-zinc-900 border border-white/20 shadow-xl z-50">
+                  {plans.length === 0 ? (
+                    <SelectItem value="_none" disabled>No plans found</SelectItem>
+                  ) : (
+                    plans.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id} className="hover:bg-white/10">
+                        {plan.name} {plan.status === 'active' && '(active)'}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {selectedPlanId && plans.find(p => p.id === selectedPlanId)?.config && (
