@@ -163,10 +163,23 @@ export default function WorkloadAdmin() {
       console.log('🔗 Reassociate response:', { data, error });
       
       if (error) {
-        // Try to get more details from the error
-        const errorDetails = typeof error === 'object' ? JSON.stringify(error) : String(error);
-        console.error('Reassociate error details:', errorDetails);
-        setResults({ error: `Function error: ${errorDetails}`, raw: error });
+        // Try to get the actual response body from the error
+        let errorMessage = 'Unknown error';
+        try {
+          // FunctionsHttpError has a context with the response
+          if ((error as any).context?.body) {
+            const bodyText = await (error as any).context.body.text();
+            console.error('Error body:', bodyText);
+            errorMessage = bodyText;
+          } else if ((error as any).message) {
+            errorMessage = (error as any).message;
+          }
+        } catch (e) {
+          console.error('Could not parse error body:', e);
+          errorMessage = JSON.stringify(error);
+        }
+        console.error('Reassociate error:', errorMessage);
+        setResults({ error: errorMessage });
         return;
       }
 

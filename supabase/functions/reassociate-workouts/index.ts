@@ -88,14 +88,32 @@ Deno.serve(async (req) => {
     console.log(`📅 Plan date range: ${startDate} to ${endDate}`);
 
     // 2. Get all planned_workouts for this plan
-    const { data: plannedWorkouts, error: plannedError } = await supabase
-      .from('planned_workouts')
-      .select('id, date, type, name')
-      .eq('plan_id', plan_id)
-      .eq('user_id', user.id)
-      .order('date', { ascending: true });
+    console.log(`🔍 Querying planned_workouts for plan_id: ${plan_id}, user_id: ${user.id}`);
+    
+    let plannedWorkouts: any[] | null = null;
+    let plannedError: any = null;
+    
+    try {
+      const result = await supabase
+        .from('planned_workouts')
+        .select('id, date, type, name')
+        .eq('plan_id', plan_id)
+        .eq('user_id', user.id)
+        .order('date', { ascending: true });
+      
+      plannedWorkouts = result.data;
+      plannedError = result.error;
+      console.log(`✅ Query completed. Found: ${plannedWorkouts?.length || 0}, Error: ${plannedError ? JSON.stringify(plannedError) : 'none'}`);
+    } catch (queryErr: any) {
+      console.error(`❌ Query threw exception:`, queryErr.message, queryErr.stack);
+      return new Response(JSON.stringify({ error: 'Query exception', message: queryErr.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     if (plannedError) {
+      console.error(`❌ Planned workouts query error:`, JSON.stringify(plannedError));
       return new Response(JSON.stringify({ error: 'Failed to fetch planned workouts', details: plannedError }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
