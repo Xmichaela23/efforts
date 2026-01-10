@@ -113,21 +113,27 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
               );
             })}
           </div>
-          <div className="text-xs border-t border-white/10 pt-1 flex items-center justify-end gap-2">
-            <span className="text-white/50">Vol:</span>
-            <span className="text-white/60">{r.pVol.toLocaleString()} lb</span>
-            <span className="text-white/40">→</span>
-            <span className="text-white/80">{r.cVol.toLocaleString()} lb</span>
-            <span className={(r.cVol - r.pVol)>=0 ? 'text-green-400' : 'text-rose-400'}>
-              {(r.cVol - r.pVol >= 0 ? '+' : '-')}{Math.abs(r.cVol - r.pVol).toLocaleString()} lb
-            </span>
-          </div>
+          {/* Only show volume line for exercises with meaningful weight */}
+          {(r.pVol > 0 || r.cVol > 0) && (
+            <div className="text-xs border-t border-white/10 pt-1 flex items-center justify-end gap-2">
+              <span className="text-white/50">Vol:</span>
+              <span className="text-white/60">{r.pVol.toLocaleString()} lb</span>
+              <span className="text-white/40">→</span>
+              <span className="text-white/80">{r.cVol.toLocaleString()} lb</span>
+              <span className={(r.cVol - r.pVol)>=0 ? 'text-green-400' : 'text-rose-400'}>
+                {(r.cVol - r.pVol >= 0 ? '+' : '-')}{Math.abs(r.cVol - r.pVol).toLocaleString()} lb
+              </span>
+            </div>
+          )}
         </div>
       ))}
-      <div className="grid grid-cols-12 text-sm font-semibold border-t border-white/20 pt-2 text-white">
-        <div className="col-span-7">Totals</div>
-        <div className="col-span-5 text-right text-white/80">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()} lb</div>
-      </div>
+      {/* Only show totals when there's meaningful volume */}
+      {(totals.pVol > 0 || totals.cVol > 0) && (
+        <div className="grid grid-cols-12 text-sm font-semibold border-t border-white/20 pt-2 text-white">
+          <div className="col-span-7">Totals</div>
+          <div className="col-span-5 text-right text-white/80">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()} lb</div>
+        </div>
+      )}
     </div>
   );
 }

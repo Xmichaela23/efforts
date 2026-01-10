@@ -1392,6 +1392,9 @@ export const useWorkouts = () => {
         
         // Unified workout metadata (single source of truth)
         workout_metadata: (workoutData as any).workout_metadata ? JSON.stringify((workoutData as any).workout_metadata) : null,
+        
+        // Link to planned workout if provided
+        planned_id: (workoutData as any).planned_id ?? null,
       };
 
       console.log("Saving workout with ALL FIT data:", toSave);
@@ -1399,7 +1402,7 @@ export const useWorkouts = () => {
       const { data, error } = await supabase
         .from("workouts")
         .insert([toSave])
-        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,workout_metadata,created_at,updated_at')
+        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,workout_metadata,planned_id,created_at,updated_at')
         .single();
 
       if (error) {
@@ -1707,7 +1710,7 @@ export const useWorkouts = () => {
         .update(updateObject)
         .eq("id", id)
         .eq("user_id", user.id)
-        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,workout_metadata,created_at,updated_at')
+        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,workout_metadata,planned_id,created_at,updated_at')
         .single();
 
       if (error) throw error;
