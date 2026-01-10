@@ -184,7 +184,7 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
                 <span className={`text-xs px-2 py-0.5 rounded ${
                   rirConcern ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-white/50'
                 }`}>
-                  RIR: {r.actualRir.toFixed(1)} / {r.targetRir}
+                  Avg RIR: {r.actualRir.toFixed(1)} <span className="text-white/40">(target: {r.targetRir})</span>
                 </span>
               )}
             </div>

@@ -113,8 +113,8 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+    <div className="fixed inset-0 z-[200] flex items-start justify-center pt-20 pb-8 overflow-y-auto">
+      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
       <div 
         className="relative w-full max-w-sm mx-4 bg-zinc-900/95 backdrop-blur-md border border-white/20 rounded-xl shadow-xl p-5 z-10"
         style={{ fontFamily: 'Inter, sans-serif' }}
