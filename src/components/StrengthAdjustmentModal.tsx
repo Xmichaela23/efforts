@@ -37,13 +37,24 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Calculate dropdown position - appear right below the button
+  // Calculate dropdown position - appear below button, or above if not enough space
+  const modalHeight = 220; // Approximate height of modal
+  const spaceBelow = window.innerHeight - (buttonRect?.bottom || 0);
+  const spaceAbove = buttonRect?.top || 0;
+  const showAbove = buttonRect && spaceBelow < modalHeight + 20 && spaceAbove > modalHeight;
+  
   const dropdownStyle: React.CSSProperties = buttonRect ? {
     position: 'fixed',
-    top: buttonRect.bottom + 8,
+    top: showAbove ? buttonRect.top - modalHeight - 8 : buttonRect.bottom + 8,
     left: Math.max(16, Math.min(buttonRect.left - 100, window.innerWidth - 280)),
     width: 264,
-  } : {};
+  } : {
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: 264,
+  };
 
   const getFinalWeight = (): number | null => {
     const val = parseInt(weightInput);
