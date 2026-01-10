@@ -59,11 +59,14 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
 };
 
 // Smart exercise type detection from name
-const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' => {
+const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' | 'bodyweight' => {
   const name = exerciseName.toLowerCase();
   
-  // Band exercises
-  if (name.includes('band') || name.includes('banded')) return 'band';
+  // Bodyweight / core exercises (no equipment needed)
+  if (name.includes('core circuit') || name.includes('core work') || name.includes('calf raise')) return 'bodyweight';
+  
+  // Band exercises (including those that commonly use bands)
+  if (name.includes('band') || name.includes('banded') || name.includes('clamshell')) return 'band';
   
   // Dumbbell exercises
   if (name.includes('dumbbell') || name.includes('db ')) return 'dumbbell';
@@ -417,7 +420,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Helper: detect duration-based exercises by name (planks, holds, carries)
   const isDurationBasedExercise = (name: string): boolean => {
     const n = String(name || '').toLowerCase();
-    return /plank|hold|carry|farmer|suitcase|wall sit|iso|isometric|time|seconds?|sec/.test(n);
+    return /plank|hold|carry|farmer|suitcase|wall sit|iso|isometric|time|seconds?|sec|core circuit|core work|circuit/.test(n);
   };
   
   // Helper: detect if this is a Core Work exercise that should use CoreTimer
@@ -3159,6 +3162,31 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         return null;
                       }
                       const exerciseType = getExerciseType(exercise.name);
+                      // Band exercises - show resistance selector
+                      if (exerciseType === 'band') {
+                        return (
+                          <div className="flex items-center justify-between mt-0.5 mb-2">
+                            <span className="text-xs text-amber-400/80">Band</span>
+                            <Select
+                              value={set.resistance_level || 'Light'}
+                              onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
+                            >
+                              <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-white/70 hover:text-white/90 gap-1 w-auto border-none">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
+                                <SelectItem value="Light" className="hover:bg-white/[0.15]">Light</SelectItem>
+                                <SelectItem value="Medium" className="hover:bg-white/[0.15]">Medium</SelectItem>
+                                <SelectItem value="Heavy" className="hover:bg-white/[0.15]">Heavy</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        );
+                      }
+                      // Bodyweight exercises - no equipment UI
+                      if (exerciseType === 'bodyweight') {
+                        return null;
+                      }
                       // Only show Plates/Barbell UI for barbell exercises
                       if (exerciseType === 'barbell') {
                         return (
