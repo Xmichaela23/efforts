@@ -181,13 +181,15 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
               </div>
               {/* RIR comparison - show when both target and actual exist */}
               {r.targetRir != null && r.actualRir != null && (
-                <div className={`flex items-center gap-2 px-2.5 py-1 rounded ${
+                <div className={`flex items-center gap-1 px-2.5 py-1 rounded text-sm ${
                   rirConcern ? 'bg-amber-500/20' : 'bg-white/5'
                 }`}>
-                  <span className={`text-sm font-semibold ${rirConcern ? 'text-amber-400' : 'text-white/80'}`}>
-                    RIR {r.actualRir.toFixed(1)}
+                  <span className={`font-semibold ${rirConcern ? 'text-amber-400' : 'text-white'}`}>
+                    {r.actualRir.toFixed(1)}
                   </span>
-                  <span className="text-xs text-white/40">Target: {r.targetRir}</span>
+                  <span className="text-white/40">/</span>
+                  <span className="font-semibold text-white/60">{r.targetRir}</span>
+                  <span className="text-white/40 text-xs ml-1">RIR</span>
                 </div>
               )}
             </div>
