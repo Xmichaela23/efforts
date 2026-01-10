@@ -75,7 +75,7 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
         <div key={i} className="space-y-2">
           <div className="text-sm font-medium text-white flex items-center gap-2">
             <span>{r.name}</span>
-            {r.status==='swapped' && (<span className="px-1.5 py-0.5 text-[11px] rounded bg-blue-500/20 text-blue-300 border border-blue-400/30">completed only</span>)}
+            {/* Don't show "completed only" badge - it's confusing for mobility/expanded exercises */}
           </div>
           <div className="grid grid-cols-12 text-xs font-medium text-white/50 border-b border-white/20 pb-1">
             <div className="col-span-2">Set</div>
@@ -113,8 +113,8 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
               );
             })}
           </div>
-          {/* Only show volume line for exercises with meaningful weight */}
-          {(r.pVol > 0 || r.cVol > 0) && (
+          {/* Only show volume line when planned has volume to compare against */}
+          {r.pVol > 0 && (
             <div className="text-xs border-t border-white/10 pt-1 flex items-center justify-end gap-2">
               <span className="text-white/50">Vol:</span>
               <span className="text-white/60">{r.pVol.toLocaleString()} lb</span>
@@ -127,8 +127,8 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
           )}
         </div>
       ))}
-      {/* Only show totals when there's meaningful volume */}
-      {(totals.pVol > 0 || totals.cVol > 0) && (
+      {/* Only show totals when there's planned volume to compare */}
+      {totals.pVol > 0 && (
         <div className="grid grid-cols-12 text-sm font-semibold border-t border-white/20 pt-2 text-white">
           <div className="col-span-7">Totals</div>
           <div className="col-span-5 text-right text-white/80">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()} lb</div>

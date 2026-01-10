@@ -1095,11 +1095,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     </div>
                   ) : (workout.type === 'strength' || workout.type === 'mobility' || workout.type === 'pilates_yoga') ? (
                     <div>
-                      <h3 className="font-semibold mb-4 text-white/90">
-                        {workout.type === 'mobility' ? 'Mobility' : 
-                         workout.type === 'pilates_yoga' ? 'Pilates/Yoga' : 
-                         'Strength'} Workout Completed</h3>
-                      {/* Use StrengthCompletedView for both strength and mobility workouts */}
+                      {/* StrengthCompletedView has its own header with workout name */}
                       <StrengthCompletedView 
                         workoutData={completedData}
                         plannedWorkout={linkedPlanned}

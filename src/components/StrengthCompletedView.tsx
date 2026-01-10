@@ -229,8 +229,11 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           ) : null}
         </div>
         
-        {/* Compare to Plan button */}
-        {plannedWorkout && (
+        {/* Compare to Plan button - only show if planned has exercises */}
+        {plannedWorkout && (() => {
+          const plannedExercises = (plannedWorkout as any).strength_exercises || (plannedWorkout as any).mobility_exercises || [];
+          return plannedExercises.length > 0;
+        })() && (
           <div className="pt-2">
             <button
               onClick={() => setShowComparison(!showComparison)}
@@ -251,29 +254,24 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
       )}
 
       {/* Exercises */}
-      {showComparison && plannedWorkout ? (
-        <StrengthCompareTable
-          planned={((plannedWorkout as any).strength_exercises || (plannedWorkout as any).mobility_exercises || []).map((ex: any)=>{
-            // Normalize planned fields - handle both array and individual value formats
-            const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
-            const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
-            const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
-            const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
-            
-            console.log('🔍 Mapping planned exercise:', {
-              original: ex,
-              setsArr,
-              setsNum,
-              repsNum,
-              weightNum,
-              mapped: { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum }
-            });
-            
-            return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum };
-          })}
-          completed={completedExercises.map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }))}
-        />
-      ) : (
+      {showComparison && plannedWorkout ? (() => {
+        const plannedExercises = ((plannedWorkout as any).strength_exercises || (plannedWorkout as any).mobility_exercises || []).map((ex: any) => {
+          const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
+          const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
+          const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
+          const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
+          const durationNum = typeof ex.duration_seconds === 'number' ? ex.duration_seconds : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.duration_seconds)||0), 0) / setsArr.length) : 0);
+          return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum, duration_seconds: durationNum };
+        });
+        const completedForTable = completedExercises.map((ex: any) => ({ name: ex.name, setsArray: Array.isArray(ex.sets) ? ex.sets : [] }));
+        
+        return (
+          <StrengthCompareTable
+            planned={plannedExercises}
+            completed={completedForTable}
+          />
+        );
+      })() : (
                 // Clean completed view (default)
         <div className="space-y-6">
           {completedExercises.length === 0 ? (
