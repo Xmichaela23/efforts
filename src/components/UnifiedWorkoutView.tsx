@@ -1137,6 +1137,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                           <StrengthCompletedView 
                             workoutData={completedData}
                             plannedWorkout={linkedPlanned}
+                            planId={(linkedPlanned as any)?.training_plan_id || (hydratedPlanned as any)?.training_plan_id}
                           />
                           {assocOpen && (
                             <AssociatePlannedDialog

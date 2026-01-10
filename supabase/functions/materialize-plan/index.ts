@@ -7,9 +7,62 @@
 // - Expands steps_preset tokens into computed.steps with stable ids
 // - Resolves run paces (fiveK/easy) and bike power (FTP %) using user_baselines.performance_numbers
 // - Persists computed.steps and duration
+// - Applies user plan_adjustments to modify prescribed weights
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from './exercise-config.ts';
+
+// Type for plan adjustments
+type PlanAdjustment = {
+  id: string;
+  exercise_name: string;
+  adjustment_factor?: number;
+  absolute_weight?: number;
+  applies_from: string;
+  applies_until?: string;
+  status: string;
+};
+
+// Apply adjustment to a calculated weight
+function applyAdjustment(
+  exerciseName: string, 
+  calculatedWeight: number | undefined, 
+  adjustments: PlanAdjustment[], 
+  workoutDate: string
+): { weight: number | undefined; adjusted: boolean; adjustmentId?: string } {
+  if (calculatedWeight == null || !adjustments.length) {
+    return { weight: calculatedWeight, adjusted: false };
+  }
+  
+  const normalizedName = exerciseName.toLowerCase().trim();
+  
+  // Find matching active adjustment for this exercise and date
+  const adjustment = adjustments.find(adj => {
+    if (adj.status !== 'active') return false;
+    const adjName = adj.exercise_name.toLowerCase().trim();
+    if (adjName !== normalizedName && !normalizedName.includes(adjName) && !adjName.includes(normalizedName)) return false;
+    if (adj.applies_from > workoutDate) return false;
+    if (adj.applies_until && adj.applies_until < workoutDate) return false;
+    return true;
+  });
+  
+  if (!adjustment) {
+    return { weight: calculatedWeight, adjusted: false };
+  }
+  
+  // Apply adjustment
+  let adjustedWeight: number;
+  if (adjustment.absolute_weight != null) {
+    adjustedWeight = adjustment.absolute_weight;
+  } else if (adjustment.adjustment_factor != null) {
+    adjustedWeight = Math.round(calculatedWeight * adjustment.adjustment_factor / 5) * 5;
+  } else {
+    return { weight: calculatedWeight, adjusted: false };
+  }
+  
+  console.log(`🔧 Applied adjustment to ${exerciseName}: ${calculatedWeight} lb → ${adjustedWeight} lb`);
+  return { weight: adjustedWeight, adjusted: true, adjustmentId: adjustment.id };
+}
 
 type Baselines = { 
   ftp?: number; 
@@ -741,9 +794,10 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
   return out;
 }
 
-function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; total_s: number } {
+function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdjustment[] = []): { steps: any[]; total_s: number } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   const discipline = String(row?.type||'').toLowerCase();
+  const workoutDate = row?.date || new Date().toISOString().split('T')[0];
   const steps: any[] = [];
   // Infer session-level swim equipment from tags (e.g., req:board, req:fins, req:buoy, req:snorkel)
   const inferEquipFromTagsOrDesc = (): string | null => {
@@ -860,7 +914,19 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           // Extract target RIR from the exercise (if present from overlay)
           const target_rir = typeof ex?.target_rir === 'number' ? ex.target_rir : undefined;
           
-          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir } as any;
+          // Apply plan adjustments if any
+          const adjustResult = applyAdjustment(name, prescribed, adjustments, workoutDate);
+          const finalWeight = adjustResult.weight;
+          const wasAdjusted = adjustResult.adjusted;
+          
+          // Update weight display if adjusted
+          let finalWeightDisplay = weightDisplay;
+          if (wasAdjusted && finalWeight != null) {
+            const config = getExerciseConfig(name);
+            finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total');
+          }
+          
+          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted } as any;
           if (name.toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -966,7 +1032,19 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
           // Extract target RIR from the exercise (if present from overlay)
           const target_rir = typeof ex?.target_rir === 'number' ? ex.target_rir : undefined;
           
-          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir } as any;
+          // Apply plan adjustments if any
+          const adjustResult = applyAdjustment(name, prescribed, adjustments, workoutDate);
+          const finalWeight = adjustResult.weight;
+          const wasAdjusted = adjustResult.adjusted;
+          
+          // Update weight display if adjusted
+          let finalWeightDisplay = weightDisplay;
+          if (wasAdjusted && finalWeight != null) {
+            const config = getExerciseConfig(name);
+            finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total');
+          }
+          
+          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted } as any;
           if (name.toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -1450,11 +1528,27 @@ Deno.serve(async (req) => {
       console.error(`❌ [FTP DEBUG] Error loading baselines:`, e);
     }
 
+    // Load active plan adjustments for this user
+    let adjustments: PlanAdjustment[] = [];
+    try {
+      const { data: adjData } = await supabase
+        .from('plan_adjustments')
+        .select('id, exercise_name, adjustment_factor, absolute_weight, applies_from, applies_until, status')
+        .eq('user_id', userId)
+        .eq('status', 'active');
+      adjustments = adjData || [];
+      if (adjustments.length > 0) {
+        console.log(`🔧 Found ${adjustments.length} active plan adjustments for user`);
+      }
+    } catch (e) {
+      console.error(`❌ Error loading plan adjustments:`, e);
+    }
+
     let count = 0;
     for (const row of rows) {
       try {
         console.log(`📋 Materializing: ${row.type} - ${row.name} (${row.id})`);
-        const { steps, total_s } = expandTokensForRow(row, baselines);
+        const { steps, total_s } = expandTokensForRow(row, baselines, adjustments);
         console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
         if (steps && steps.length) {
           // Count recovery steps

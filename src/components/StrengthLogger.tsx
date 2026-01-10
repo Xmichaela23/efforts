@@ -2621,7 +2621,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       {/* Spacer for app header */}
       <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
       {/* Header */}
-      <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pb-2 mb-2 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]" style={{ zIndex: 1 }}>
+      <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pt-3 pb-3 mb-3 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]" style={{ zIndex: 1 }}>
         <div className="flex items-center justify-between w-full px-4">
           <h1 className="text-xl font-medium text-white/90">
             {(() => {
@@ -2734,7 +2734,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </div>
         </div>
         {sourcePlannedName && (
-          <div className="mt-2 text-sm text-white/60 px-4">Source: {sourcePlannedName}</div>
+          <div className="mt-1 text-sm text-white/60 px-4">Source: {sourcePlannedName}</div>
         )}
       </div>
 
@@ -2998,13 +2998,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         </div>
                       )}
                       
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 text-xs text-white/60 text-right">{setIndex + 1}</div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-6 text-xs text-white/60 text-right pt-2">{setIndex + 1}</div>
                         
                         {/* Duration-based exercises show timer input, rep-based show reps input */}
                         {isDurationBased ? (
                           // DURATION-BASED EXERCISE - Simple timer display matching reps input style
-                          <div className="flex-1 flex items-center gap-1 relative">
+                          <div className="flex-1 flex flex-col items-center gap-0.5 relative">
                             <button
                               onClick={() => {
                                 const cur = set.duration_seconds || 60;
@@ -3080,16 +3080,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // REP-BASED EXERCISE (e.g., Squat, Bench Press)
                         // Hide reps input if no reps are prescribed (for "until" patterns)
                         set.reps === undefined ? null : (
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={set.reps === 0 ? '' : set.reps.toString()}
-                            onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                            className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                            style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                            placeholder="Reps"
-                          />
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={set.reps === 0 ? '' : set.reps.toString()}
+                              onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
+                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                              style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+                              placeholder=""
+                            />
+                            <span className="text-[9px] text-white/50 font-medium">Reps</span>
+                          </div>
                         )
                       )}
                       
@@ -3129,7 +3132,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // Dumbbell exercises: Show weight input with /hand label
                         if (exerciseType === 'dumbbell') {
                           return (
-                            <div className="flex items-center gap-1 flex-1">
+                            <div className="flex flex-col items-center gap-0.5">
                               <Input
                                 type="number"
                                 inputMode="numeric"
@@ -3138,9 +3141,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
                                 className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                                placeholder="lbs"
+                                placeholder=""
                               />
-                              <span className={`text-[10px] ${themeColors.text}/90 font-medium whitespace-nowrap`}>/hand</span>
+                              <span className="text-[9px] text-white/50 font-medium">lb/hand</span>
                             </div>
                           );
                         }
@@ -3148,7 +3151,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // Goblet exercises (lateral lunges, goblet squat): Single weight, no /hand
                         if (exerciseType === 'goblet') {
                           return (
-                            <div className="flex items-center gap-1 flex-1">
+                            <div className="flex flex-col items-center gap-0.5">
                               <Input
                                 type="number"
                                 inputMode="numeric"
@@ -3157,25 +3160,28 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
                                 className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                                placeholder="lbs"
+                                placeholder=""
                               />
-                              <span className={`text-[10px] ${themeColors.text}/90 font-medium whitespace-nowrap`}>lb</span>
+                              <span className="text-[9px] text-white/50 font-medium">Weight</span>
                             </div>
                           );
                         }
                         
                         // Barbell exercises: Standard weight input
                         return (
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={set.weight === 0 ? '' : set.weight.toString()}
-                            onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                            className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                            style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                            placeholder="Weight"
-                          />
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={set.weight === 0 ? '' : set.weight.toString()}
+                              onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
+                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                              style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+                              placeholder=""
+                            />
+                            <span className="text-[9px] text-white/50 font-medium">Weight</span>
+                          </div>
                         );
                       })()}
                       {/* RIR input - hidden for mobility mode, duration-based, and plyometric exercises */}
@@ -3194,32 +3200,40 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               pattern="[0-9]*"
                               value={set.rir || ''}
                               onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/35 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-amber-400/60 w-16 focus-visible:ring-0 focus-visible:border-white/35 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                               min="0"
                               max="5"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                              placeholder={targetRir ? `→${targetRir}` : 'RIR'}
+                              placeholder={targetRir ? `→${targetRir}` : ''}
                             />
-                            {targetRir && (
-                              <span className="text-[9px] text-amber-400/70 font-medium">Target: {targetRir}</span>
-                            )}
+                            <span className={`text-[9px] font-medium ${targetRir ? 'text-amber-400/70' : 'text-white/50'}`}>
+                              {targetRir ? `Target: ${targetRir}` : 'RIR'}
+                            </span>
                           </div>
                         );
                       })()}
-                      <button
-                        onClick={() => handleSetComplete(exercise.id, setIndex)}
-                        className={`text-xs px-2 py-1 rounded-full min-h-[28px] transition-all duration-300 ${set.completed ? `${themeColors.doneBg} border-2 ${themeColors.doneBorder} ${themeColors.doneText}` : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
-                        style={{ fontFamily: 'Inter, sans-serif' }}
-                      >
-                        {set.completed ? '✓ Done' : 'Done'}
-                      </button>
-                      <button
-                        onClick={() => deleteSet(exercise.id, setIndex)}
-                        className="p-2 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/60 hover:text-red-400 hover:bg-white/[0.12] hover:border-red-400/60 transition-all duration-300 h-8 w-8 flex items-center justify-center flex-shrink-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                        aria-label="Delete set"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                      {/* Spacer to push buttons right when fewer inputs are shown */}
+                      <div className="flex-1 min-w-4" />
+                      <div className="flex flex-col items-center gap-0.5">
+                        <button
+                          onClick={() => handleSetComplete(exercise.id, setIndex)}
+                          className={`text-xs px-2 py-1 rounded-full h-9 transition-all duration-300 ${set.completed ? `${themeColors.doneBg} border-2 ${themeColors.doneBorder} ${themeColors.doneText}` : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
+                          style={{ fontFamily: 'Inter, sans-serif' }}
+                        >
+                          {set.completed ? '✓' : 'Done'}
+                        </button>
+                        <span className="text-[9px] text-transparent font-medium select-none">.</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <button
+                          onClick={() => deleteSet(exercise.id, setIndex)}
+                          className="rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/60 hover:text-red-400 hover:bg-white/[0.12] hover:border-red-400/60 transition-all duration-300 h-9 w-9 flex items-center justify-center flex-shrink-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                          aria-label="Delete set"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                        <span className="text-[9px] text-transparent font-medium select-none">.</span>
+                      </div>
                     </div>
                     {(() => {
                       // Duration-based exercises don't need equipment selection (bodyweight)
@@ -3331,7 +3345,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     
                     {/* Rest timer - only show when rest is actually needed, positioned after all set content */}
                     {showRestTimer && (
-                      <div className="flex items-center gap-2 mt-4 mb-2 ml-8 relative">
+                      <div className="flex items-center gap-2 mt-2 mb-1 ml-8 relative">
                         <span className="text-xs text-white/60">Rest</span>
                         <button
                           onClick={() => {
@@ -3567,14 +3581,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     {isSaving && (
                       <>
                         <Loader2 className={`h-4 w-4 animate-spin ${themeColors.text}`} />
-                        <span>Saving workout... (you don't need to stay here)</span>
+                        <span>Saving...</span>
                       </>
                     )}
                     {isSaved && (
-                      <>
-                        <CheckCircle className={`h-4 w-4 ${themeColors.text}`} />
-                        <span>Saved!</span>
-                      </>
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className={`h-4 w-4 ${themeColors.text}`} />
+                          <span>Saved!</span>
+                        </div>
+                        <span className="text-xs text-white/50">View Details to adjust weights for next time</span>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -3643,12 +3660,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               <div className="flex flex-col items-center justify-center py-8">
                 <Loader2 className={`h-12 w-12 ${themeColors.text} animate-spin mb-4`} />
                 <p className="text-lg font-medium text-white/90">Saving workout...</p>
-                <p className="text-sm text-white/60 mt-2">(you don't need to stay here while loading)</p>
+                <p className="text-sm text-white/60 mt-2">(you don't need to stay here)</p>
               </div>
             ) : isSaved ? (
               <div className="flex flex-col items-center justify-center py-8">
                 <CheckCircle className={`h-12 w-12 ${themeColors.text} mb-4`} />
                 <p className="text-lg font-medium text-white/90">Saved!</p>
+                <p className="text-sm text-white/50 mt-2">View Details to adjust weights for next time</p>
               </div>
             ) : (
               <>
