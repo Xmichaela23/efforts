@@ -778,7 +778,7 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
         
         for (const ex of exs) {
           const originalName = String(ex?.name||'exercise');
-          const reps = (typeof ex?.reps==='number'? ex.reps : undefined);
+          const reps = (typeof ex?.reps==='number'? ex.reps : (typeof ex?.reps==='string'? ex.reps : undefined));
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
           
           // Get percentage for band resistance guidance (from percent_1rm field OR weight string)
