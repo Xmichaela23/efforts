@@ -212,9 +212,16 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
   // Helper to get planned exercise data for an exercise name
   const getPlannedExerciseData = (exerciseName: string) => {
     const plannedExercises = (plannedWorkout as any)?.strength_exercises || (plannedWorkout as any)?.mobility_exercises || [];
-    const planned = plannedExercises.find((ex: any) => 
-      ex.name.toLowerCase() === exerciseName.toLowerCase()
-    );
+    const normalizedName = exerciseName.toLowerCase().replace(/s$/, ''); // Remove trailing 's' for matching
+    
+    const planned = plannedExercises.find((ex: any) => {
+      const plannedName = String(ex.name || '').toLowerCase().replace(/s$/, '');
+      // Exact match (normalized)
+      if (plannedName === normalizedName) return true;
+      // One contains the other
+      if (plannedName.includes(normalizedName) || normalizedName.includes(plannedName)) return true;
+      return false;
+    });
     if (!planned) return null;
     
     // Get weight from various sources
