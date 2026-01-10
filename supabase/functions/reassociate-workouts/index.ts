@@ -123,15 +123,33 @@ Deno.serve(async (req) => {
     console.log(`📋 Found ${plannedWorkouts?.length || 0} planned workouts in plan`);
 
     // 3. Get all logged workouts in the date range for this user
-    const { data: loggedWorkouts, error: loggedError } = await supabase
-      .from('workouts')
-      .select('id, date, type, name, source_planned_id')
-      .eq('user_id', user.id)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: true });
+    console.log(`🔍 Querying workouts for user_id: ${user.id}, date range: ${startDate} to ${endDate}`);
+    
+    let loggedWorkouts: any[] | null = null;
+    let loggedError: any = null;
+    
+    try {
+      const result = await supabase
+        .from('workouts')
+        .select('id, date, type, name, planned_id')
+        .eq('user_id', user.id)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true });
+      
+      loggedWorkouts = result.data;
+      loggedError = result.error;
+      console.log(`✅ Workouts query completed. Found: ${loggedWorkouts?.length || 0}, Error: ${loggedError ? JSON.stringify(loggedError) : 'none'}`);
+    } catch (queryErr: any) {
+      console.error(`❌ Workouts query threw exception:`, queryErr.message, queryErr.stack);
+      return new Response(JSON.stringify({ error: 'Workouts query exception', message: queryErr.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     if (loggedError) {
+      console.error(`❌ Logged workouts query error:`, JSON.stringify(loggedError));
       return new Response(JSON.stringify({ error: 'Failed to fetch logged workouts', details: loggedError }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -139,6 +157,8 @@ Deno.serve(async (req) => {
     }
 
     console.log(`📝 Found ${loggedWorkouts?.length || 0} logged workouts in date range`);
+
+    console.log(`🔄 Starting matching logic...`);
 
     // 4. Build a lookup map: date + type -> planned_workout
     const plannedByDateType: Record<string, any[]> = {};
@@ -198,7 +218,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      const alreadyLinked = lw.source_planned_id === bestMatch.id;
+      const alreadyLinked = lw.planned_id === bestMatch.id;
       
       matches.push({
         logged_id: lw.id,
@@ -217,6 +237,8 @@ Deno.serve(async (req) => {
       }
     }
 
+    console.log(`✅ Matching complete. Matches: ${matches.length}, Unmatched: ${unmatched.length}`);
+
     // 6. Execute updates (if not dry run)
     let updated = 0;
     let skipped = 0;
@@ -231,7 +253,7 @@ Deno.serve(async (req) => {
 
         const { error: updateError } = await supabase
           .from('workouts')
-          .update({ source_planned_id: match.planned_id })
+          .update({ planned_id: match.planned_id })
           .eq('id', match.logged_id);
 
         if (updateError) {
@@ -243,6 +265,8 @@ Deno.serve(async (req) => {
     }
 
     const toUpdate = matches.filter(m => !m.already_linked).length;
+
+    console.log(`📤 Returning response. Dry run: ${dry_run}, to_update: ${toUpdate}`);
 
     return new Response(JSON.stringify({
       success: true,
