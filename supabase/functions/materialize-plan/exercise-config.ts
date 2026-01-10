@@ -76,13 +76,13 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   'lateral lunge': {
     primaryRef: 'squat',
     ratio: 0.45,
-    displayFormat: 'perHand',
+    displayFormat: 'total',  // Goblet hold - one weight
     isUnilateral: true
   },
   'lateral lunges': {
     primaryRef: 'squat',
     ratio: 0.45,
-    displayFormat: 'perHand',
+    displayFormat: 'total',  // Goblet hold - one weight
     isUnilateral: true
   },
   
