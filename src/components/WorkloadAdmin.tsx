@@ -151,6 +151,7 @@ export default function WorkloadAdmin() {
     if (!user?.id || !selectedPlanId) return;
     
     setReassociateLoading(true);
+    console.log('🔗 Calling reassociate with plan_id:', selectedPlanId, 'dry_run:', reassociateDryRun);
     try {
       const { data, error } = await supabase.functions.invoke('reassociate-workouts', {
         body: {
@@ -159,14 +160,20 @@ export default function WorkloadAdmin() {
         }
       });
 
+      console.log('🔗 Reassociate response:', { data, error });
+      
       if (error) {
-        throw error;
+        // Try to get more details from the error
+        const errorDetails = typeof error === 'object' ? JSON.stringify(error) : String(error);
+        console.error('Reassociate error details:', errorDetails);
+        setResults({ error: `Function error: ${errorDetails}`, raw: error });
+        return;
       }
 
       setResults(data);
     } catch (error: any) {
       console.error('Reassociate failed:', error);
-      setResults({ error: error.message });
+      setResults({ error: error.message || String(error) });
     } finally {
       setReassociateLoading(false);
     }
