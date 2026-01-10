@@ -23,7 +23,7 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   onClose,
   onSaved,
 }) => {
-  const [selectedOption, setSelectedOption] = useState<'keep' | 'stay' | 'reduce' | 'custom'>('keep');
+  const [selectedOption, setSelectedOption] = useState<'stay' | 'reduce' | 'custom'>('reduce');
   const [customWeight, setCustomWeight] = useState<string>('');
   const [scope, setScope] = useState<'session' | '7days' | '14days'>('session');
   const [reason, setReason] = useState('');
@@ -35,16 +35,15 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   const reduceWeight = rawReduce >= nextPlannedWeight ? nextPlannedWeight - 5 : rawReduce;
   
   // Determine which options to show (hide duplicates)
-  const showStay = currentWeight !== nextPlannedWeight;
-  const showReduce = reduceWeight > 0 && reduceWeight !== nextPlannedWeight && reduceWeight !== currentWeight;
+  const showStay = true; // Always show current weight option
+  const showReduce = reduceWeight > 0 && reduceWeight !== currentWeight; // Show reduce if different from current
 
   const getSelectedWeight = (): number => {
     switch (selectedOption) {
-      case 'keep': return nextPlannedWeight;
       case 'stay': return currentWeight;
       case 'reduce': return reduceWeight;
       case 'custom': return parseInt(customWeight) || currentWeight;
-      default: return nextPlannedWeight;
+      default: return reduceWeight;
     }
   };
 
@@ -151,25 +150,8 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
 
         {/* Options */}
         <div className="space-y-2 mb-4">
-          <label className="text-xs text-white/60 uppercase tracking-wide">Next session weight</label>
+          <label className="text-xs text-white/60 uppercase tracking-wide">Adjust to</label>
           
-          <div 
-            onClick={() => setSelectedOption('keep')}
-            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-              selectedOption === 'keep' 
-                ? 'border-amber-500 bg-amber-500/10' 
-                : 'border-white/20 bg-white/5 hover:bg-white/10'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`w-4 h-4 rounded-full border-2 ${selectedOption === 'keep' ? 'border-amber-500 bg-amber-500' : 'border-white/40'}`} />
-              <div>
-                <div className="text-sm text-white font-medium">Keep plan ({nextPlannedWeight} lb)</div>
-                <div className="text-xs text-white/50">Continue with planned progression</div>
-              </div>
-            </div>
-          </div>
-
           {showStay && (
             <div 
               onClick={() => setSelectedOption('stay')}
