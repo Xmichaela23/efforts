@@ -80,6 +80,55 @@ export function overlayStrength(
 }
 
 // ============================================================================
+// RIR (REPS IN RESERVE) GUIDANCE
+// ============================================================================
+// RIR helps users self-regulate intensity:
+// - RIR 1: Very hard, could do 1 more rep
+// - RIR 2: Hard, could do 2 more reps  
+// - RIR 3: Challenging but sustainable
+// - RIR 4: Moderate effort
+// - RIR 5: Easy, lots left in tank
+
+function getTargetRIR(
+  phase: Phase, 
+  isRecovery: boolean, 
+  isUpperBodyPeak: boolean = false,
+  isBodyweight: boolean = false
+): number {
+  // Recovery weeks: Easy effort
+  if (isRecovery) return 4;
+  
+  // Upper body peak test: Go hard
+  if (isUpperBodyPeak) return 1;
+  
+  // Phase-based targets
+  switch (phase.name) {
+    case 'Base':
+      // Building phase - challenging but sustainable
+      return isBodyweight ? 3 : 3;
+    case 'Speed':
+      // Harder training, closer to failure
+      return isBodyweight ? 2 : 2;
+    case 'Race Prep':
+      // Maintenance - don't grind
+      return 3;
+    case 'Taper':
+      // Light work only
+      return 4;
+    default:
+      return 3;
+  }
+}
+
+// Apply target RIR to all exercises in a session
+function applyTargetRIR(exercises: StrengthExercise[], targetRIR: number): StrengthExercise[] {
+  return exercises.map(ex => ({
+    ...ex,
+    target_rir: targetRIR
+  }));
+}
+
+// ============================================================================
 // SESSION CREATION
 // ============================================================================
 
@@ -213,13 +262,17 @@ function createMondayLowerBody(
   // Core work for all sessions
   exercises.push({ name: 'Core Circuit', sets: 1, reps: '5 min', weight: 'Planks, dead bugs, bird dogs' });
   
+  // Apply target RIR based on phase
+  const targetRIR = getTargetRIR(phase, isRecovery, false, tier === 'bodyweight');
+  const exercisesWithRIR = applyTargetRIR(exercises, targetRIR);
+  
   return {
     day: 'Monday',
     type: 'strength',
     name: `Lower Body: Power & Posterior${isRecovery ? ' (Recovery)' : ''}`,
     description,
     duration,
-    strength_exercises: exercises,
+    strength_exercises: exercisesWithRIR,
     tags: ['strength', 'lower_body', `tier:${tier}`, `phase:${phase.name.toLowerCase()}`, 'focus:posterior_chain']
   };
 }
@@ -364,13 +417,17 @@ function createWednesdayUpperBody(
   // Core work
   exercises.push({ name: 'Core Circuit', sets: 1, reps: '5 min', weight: 'Anti-rotation focus (Pallof press, dead bugs)' });
   
+  // Apply target RIR - upper body peak week gets RIR 1 (go hard!)
+  const targetRIR = getTargetRIR(phase, isRecovery, isUpperPeakWeek, tier === 'bodyweight');
+  const exercisesWithRIR = applyTargetRIR(exercises, targetRIR);
+  
   return {
     day: 'Wednesday',
     type: 'strength',
     name: isUpperPeakWeek ? '🏆 Upper Body: Peak Test' : `Upper Body: Progression${isRecovery ? ' (Recovery)' : ''}`,
     description,
     duration,
-    strength_exercises: exercises,
+    strength_exercises: exercisesWithRIR,
     tags: ['strength', 'upper_body', `tier:${tier}`, `phase:${phase.name.toLowerCase()}`, 'focus:gains', 'priority:high']
   };
 }
@@ -479,13 +536,17 @@ function createFridayLowerBody(
   // Core work
   exercises.push({ name: 'Core Circuit', sets: 1, reps: '5 min', weight: 'Side planks, Copenhagen planks' });
   
+  // Apply target RIR - Friday is stability work, can be slightly easier
+  const targetRIR = getTargetRIR(phase, isRecovery, false, tier === 'bodyweight');
+  const exercisesWithRIR = applyTargetRIR(exercises, targetRIR);
+  
   return {
     day: 'Friday',
     type: 'strength',
     name: `Lower Body: Stability${isRecovery ? ' (Recovery)' : ''}${isOptional ? ' (Optional)' : ''}`,
     description,
     duration,
-    strength_exercises: exercises,
+    strength_exercises: exercisesWithRIR,
     tags: [
       'strength', 
       'lower_body', 
@@ -508,6 +569,7 @@ function createTaperSessions(
 ): Session[] {
   const sessions: Session[] = [];
   const isRaceWeek = week === totalWeeks;
+  const taperRIR = 4; // Easy effort for taper
   
   if (isRaceWeek) {
     // Race week: Skip strength entirely or very minimal
@@ -518,54 +580,58 @@ function createTaperSessions(
       description: 'Race week - Skip entirely or just 10-15 min of light movement to stay loose. Nothing that will make you sore.',
       duration: 15,
       strength_exercises: [
-        { name: 'Bodyweight Squats', sets: 2, reps: 10, weight: 'Bodyweight' },
-        { name: 'Glute Bridges', sets: 2, reps: 10, weight: 'Bodyweight' },
-        { name: 'Push-ups', sets: 2, reps: 10, weight: 'Bodyweight' }
+        { name: 'Bodyweight Squats', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
+        { name: 'Glute Bridges', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
+        { name: 'Push-ups', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR }
       ],
       tags: ['strength', 'full_body', 'phase:taper', 'optional', `tier:${tier}`]
     });
   } else {
     // Taper week (not race week): Light maintenance
+    const mondayExercises: StrengthExercise[] = tier === 'barbell' 
+      ? [
+          { name: 'Hip Thrusts', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
+          { name: 'Bench Press', sets: 2, reps: 8, weight: '50% 1RM', target_rir: taperRIR },
+          { name: 'Rows', sets: 2, reps: 8, weight: '50% 1RM', target_rir: taperRIR },
+          { name: 'Glute Bridges', sets: 2, reps: 12, weight: 'Bodyweight', target_rir: taperRIR }
+        ]
+      : [
+          { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: taperRIR },
+          { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard', target_rir: taperRIR },
+          { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard', target_rir: taperRIR },
+          { name: 'Walking Lunges', sets: 2, reps: '8/leg', weight: 'Bodyweight', target_rir: taperRIR }
+        ];
+        
     sessions.push({
       day: 'Monday',
       type: 'strength',
       name: 'Taper: Light Full Body',
       description: 'Taper week - Light movement to maintain patterns. 50-60% effort max. Save energy for race day.',
       duration: 25,
-      strength_exercises: tier === 'barbell' 
-        ? [
-            { name: 'Hip Thrusts', sets: 2, reps: 10, weight: 'Bodyweight' },
-            { name: 'Bench Press', sets: 2, reps: 8, weight: '50% 1RM' },
-            { name: 'Rows', sets: 2, reps: 8, weight: '50% 1RM' },
-            { name: 'Glute Bridges', sets: 2, reps: 12, weight: 'Bodyweight' }
-          ]
-        : [
-            { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
-            { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard' },
-            { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard' },
-            { name: 'Walking Lunges', sets: 2, reps: '8/leg', weight: 'Bodyweight' }
-          ],
+      strength_exercises: mondayExercises,
       tags: ['strength', 'full_body', 'phase:taper', `tier:${tier}`]
     });
     
     // Optional Wednesday for taper week - very light upper if user wants it
+    const wednesdayExercises: StrengthExercise[] = tier === 'barbell'
+      ? [
+          { name: 'Bench Press', sets: 2, reps: 10, weight: '50% 1RM', target_rir: taperRIR },
+          { name: 'Rows', sets: 2, reps: 10, weight: '50% 1RM', target_rir: taperRIR },
+          { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Light', target_rir: taperRIR }
+        ]
+      : [
+          { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard', target_rir: taperRIR },
+          { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard', target_rir: taperRIR },
+          { name: 'Pike Push-ups', sets: 2, reps: 8, weight: 'Standard', target_rir: taperRIR }
+        ];
+        
     sessions.push({
       day: 'Wednesday',
       type: 'strength',
       name: 'Taper: Upper Body Maintenance (Optional)',
       description: 'Optional - Only if you feel good. Light upper body to stay sharp. Skip if any fatigue.',
       duration: 20,
-      strength_exercises: tier === 'barbell'
-        ? [
-            { name: 'Bench Press', sets: 2, reps: 10, weight: '50% 1RM' },
-            { name: 'Rows', sets: 2, reps: 10, weight: '50% 1RM' },
-            { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Light' }
-          ]
-        : [
-            { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard' },
-            { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard' },
-            { name: 'Pike Push-ups', sets: 2, reps: 8, weight: 'Standard' }
-          ],
+      strength_exercises: wednesdayExercises,
       tags: ['strength', 'upper_body', 'phase:taper', 'optional', `tier:${tier}`]
     });
   }

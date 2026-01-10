@@ -121,6 +121,7 @@ export interface StrengthExercise {
   sets: number;
   reps: number | string;
   weight: string;
+  target_rir?: number; // Target Reps In Reserve (1-5). Lower = harder. Guides user effort.
 }
 
 export interface WeeklySummary {

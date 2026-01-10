@@ -30,6 +30,7 @@ interface LoggedExercise {
   sets: LoggedSet[];
   expanded?: boolean;
   notes?: string;
+  target_rir?: number; // Target RIR from prescription (1-5)
 }
 
 interface StrengthLoggerProps {
@@ -1103,6 +1104,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (!byName[name]) {
           // Extract notes separately - ensure they don't end up in the name
           const rawNotes = String(notes || '').trim();
+          // Extract target RIR from the strength prescription
+          const targetRir = typeof s?.target_rir === 'number' ? s.target_rir : undefined;
           byName[name] = {
             id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             name,
@@ -1112,6 +1115,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             unit: 'lb',
             notes: rawNotes || undefined,
             rir: null,
+            target_rir: targetRir, // Target RIR from prescription
           } as LoggedExercise;
         }
         const targetSets = Math.max(1, sets);
@@ -3181,19 +3185,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // Duration-based exercises (planks, holds, carries) don't use RIR
                         // Plyometrics are explosive - you don't gauge effort, you just do max power reps
                         if (isMobilityMode || isDurationBased || isPlyometric(exercise.name)) return null;
+                        const targetRir = exercise.target_rir;
                         return (
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={set.rir || ''}
-                            onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                            className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/35 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                            min="0"
-                            max="5"
-                            style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                            placeholder="RIR"
-                          />
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={set.rir || ''}
+                              onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
+                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/35 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                              min="0"
+                              max="5"
+                              style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+                              placeholder={targetRir ? `→${targetRir}` : 'RIR'}
+                            />
+                            {targetRir && (
+                              <span className="text-[9px] text-amber-400/70 font-medium">Target: {targetRir}</span>
+                            )}
+                          </div>
                         );
                       })()}
                       <button

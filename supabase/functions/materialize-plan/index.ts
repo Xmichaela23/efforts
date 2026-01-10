@@ -857,7 +857,10 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             : requiredBaseline === 'overhead' ? 'Overhead Press'
             : requiredBaseline;
           
-          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel } as any;
+          // Extract target RIR from the exercise (if present from overlay)
+          const target_rir = typeof ex?.target_rir === 'number' ? ex.target_rir : undefined;
+          
+          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir } as any;
           if (name.toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -960,7 +963,10 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
             : requiredBaseline === 'overhead' ? 'Overhead Press'
             : requiredBaseline;
           
-          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel } as any;
+          // Extract target RIR from the exercise (if present from overlay)
+          const target_rir = typeof ex?.target_rir === 'number' ? ex.target_rir : undefined;
+          
+          const strength = { name, sets, reps, weight: prescribed, weight_display: weightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir } as any;
           if (name.toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
