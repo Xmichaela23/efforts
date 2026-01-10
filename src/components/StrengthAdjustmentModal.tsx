@@ -12,7 +12,7 @@ interface StrengthAdjustmentModalProps {
   planId?: string;
   isBodyweight?: boolean;
   hasPlannedWeight?: boolean;
-  clickY?: number;
+  buttonRect?: DOMRect;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -24,7 +24,7 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   planId,
   isBodyweight,
   hasPlannedWeight,
-  clickY,
+  buttonRect,
   onClose,
   onSaved,
 }) => {
@@ -37,8 +37,13 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Calculate position - appear near where user clicked
-  const topPosition = clickY ? Math.max(60, Math.min(clickY - 100, window.innerHeight - 300)) : undefined;
+  // Calculate dropdown position - appear right below the button
+  const dropdownStyle: React.CSSProperties = buttonRect ? {
+    position: 'fixed',
+    top: buttonRect.bottom + 8,
+    left: Math.max(16, Math.min(buttonRect.left - 100, window.innerWidth - 280)),
+    width: 264,
+  } : {};
 
   const getFinalWeight = (): number | null => {
     const val = parseInt(weightInput);
@@ -115,13 +120,13 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex justify-center px-4" style={{ alignItems: topPosition ? 'flex-start' : 'center' }}>
-      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
+    <div className="fixed inset-0 z-[200]">
+      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
       <div 
-        className="relative w-full max-w-xs bg-zinc-900 border border-white/20 rounded-2xl shadow-xl p-5 z-10"
+        className="bg-zinc-900 border border-white/20 rounded-xl shadow-2xl p-4 z-10"
         style={{ 
           fontFamily: 'Inter, sans-serif',
-          marginTop: topPosition ? `${topPosition}px` : undefined
+          ...dropdownStyle
         }}
       >
         {/* Header */}

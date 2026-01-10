@@ -53,7 +53,7 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
     actualRir?: number;
     isBodyweight?: boolean;
     hasPlannedWeight?: boolean;
-    clickY?: number;
+    buttonRect?: DOMRect;
   } | null>(null);
   
   // Fetch plan ID from planned workout if not provided
@@ -170,17 +170,20 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
                 {/* Adjust button - show for weighted exercises when planId is available */}
                 {planId && hasWeight && !r.isBodyweight && (
                   <button
-                    onClick={(e) => setAdjustingExercise({
-                      name: r.name,
-                      currentWeight: r.cWAvg || r.pW,
-                      currentReps: r.cRepsAvg || r.pReps,
-                      nextPlannedWeight: Math.round((r.pW || r.cWAvg) * 1.025 / 5) * 5 || r.cWAvg || r.pW,
-                      targetRir: r.targetRir,
-                      actualRir: r.actualRir,
-                      isBodyweight: false,
-                      hasPlannedWeight: r.pW > 0,
-                      clickY: e.clientY
-                    })}
+                    onClick={(e) => {
+                      const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                      setAdjustingExercise({
+                        name: r.name,
+                        currentWeight: r.cWAvg || r.pW,
+                        currentReps: r.cRepsAvg || r.pReps,
+                        nextPlannedWeight: Math.round((r.pW || r.cWAvg) * 1.025 / 5) * 5 || r.cWAvg || r.pW,
+                        targetRir: r.targetRir,
+                        actualRir: r.actualRir,
+                        isBodyweight: false,
+                        hasPlannedWeight: r.pW > 0,
+                        buttonRect: rect
+                      });
+                    }}
                     className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors ${
                       rirConcern 
                         ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30' 
@@ -193,17 +196,20 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
                 {/* Adjust button for bodyweight exercises (dips, pull-ups, chin-ups) */}
                 {planId && r.isBodyweight && /dip|pull\-?ups?|chin\-?ups?/i.test(r.name) && (
                   <button
-                    onClick={(e) => setAdjustingExercise({
-                      name: r.name,
-                      currentWeight: r.cWAvg || 0,
-                      currentReps: r.cRepsAvg || r.pReps || 8,
-                      nextPlannedWeight: 10,
-                      targetRir: r.targetRir,
-                      actualRir: r.actualRir,
-                      isBodyweight: true,
-                      hasPlannedWeight: false,
-                      clickY: e.clientY
-                    })}
+                    onClick={(e) => {
+                      const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                      setAdjustingExercise({
+                        name: r.name,
+                        currentWeight: r.cWAvg || 0,
+                        currentReps: r.cRepsAvg || r.pReps || 8,
+                        nextPlannedWeight: 10,
+                        targetRir: r.targetRir,
+                        actualRir: r.actualRir,
+                        isBodyweight: true,
+                        hasPlannedWeight: false,
+                        buttonRect: rect
+                      });
+                    }}
                     className="px-2.5 py-1 text-xs font-medium rounded border transition-colors bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:text-white/80"
                   >
                     Adjust
@@ -297,7 +303,7 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
           planId={planId}
           isBodyweight={adjustingExercise.isBodyweight}
           hasPlannedWeight={adjustingExercise.hasPlannedWeight}
-          clickY={adjustingExercise.clickY}
+          buttonRect={adjustingExercise.buttonRect}
           onClose={() => setAdjustingExercise(null)}
           onSaved={() => {
             setAdjustingExercise(null);
