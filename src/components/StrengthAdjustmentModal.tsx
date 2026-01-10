@@ -84,6 +84,18 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
         return;
       }
 
+      // Re-materialize the plan so all views show updated weights
+      if (planId) {
+        try {
+          await supabase.functions.invoke('materialize-plan', {
+            body: { plan_id: planId }
+          });
+        } catch (materializeErr) {
+          console.error('Failed to re-materialize plan:', materializeErr);
+          // Don't block - adjustment is saved, views will update on next materialization
+        }
+      }
+
       onSaved();
       onClose();
     } catch (err: any) {
