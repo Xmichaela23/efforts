@@ -211,7 +211,28 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
   
   // Helper to get planned exercise data for an exercise name
   const getPlannedExerciseData = (exerciseName: string) => {
-    const plannedExercises = (plannedWorkout as any)?.strength_exercises || (plannedWorkout as any)?.mobility_exercises || [];
+    // Try multiple sources for planned exercises
+    let plannedExercises: any[] = [];
+    
+    // Source 1: Direct strength_exercises or mobility_exercises
+    if (Array.isArray((plannedWorkout as any)?.strength_exercises)) {
+      plannedExercises = (plannedWorkout as any).strength_exercises;
+    } else if (Array.isArray((plannedWorkout as any)?.mobility_exercises)) {
+      plannedExercises = (plannedWorkout as any).mobility_exercises;
+    }
+    
+    // Source 2: Materialized computed.steps (has nested .strength object)
+    if (plannedExercises.length === 0 && (plannedWorkout as any)?.computed?.steps) {
+      const steps = (plannedWorkout as any).computed.steps;
+      if (Array.isArray(steps)) {
+        plannedExercises = steps
+          .filter((s: any) => s.kind === 'strength' && s.strength)
+          .map((s: any) => s.strength);
+      }
+    }
+    
+    if (plannedExercises.length === 0) return null;
+    
     const normalizedName = exerciseName.toLowerCase().replace(/s$/, ''); // Remove trailing 's' for matching
     
     const planned = plannedExercises.find((ex: any) => {
