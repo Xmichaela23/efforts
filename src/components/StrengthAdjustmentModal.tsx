@@ -20,14 +20,20 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   onClose,
   onSaved,
 }) => {
-  // Weight options: -10, -5, current, +5, +10
-  const weightOptions = [
-    Math.max(5, currentWeight - 10),
-    Math.max(5, currentWeight - 5),
+  // Weight options: use smaller increments for light weights
+  const increment = currentWeight <= 15 ? 2.5 : 5;
+  const minWeight = increment; // 2.5 or 5 lb minimum
+  
+  const rawOptions = [
+    currentWeight - (increment * 2),
+    currentWeight - increment,
     currentWeight,
-    currentWeight + 5,
-    currentWeight + 10,
-  ];
+    currentWeight + increment,
+    currentWeight + (increment * 2),
+  ].map(w => Math.max(minWeight, w));
+  
+  // Remove duplicates while preserving order
+  const weightOptions = [...new Set(rawOptions)];
   
   const [selectedWeight, setSelectedWeight] = useState<number | null>(null);
   const [customWeight, setCustomWeight] = useState<string>('');
