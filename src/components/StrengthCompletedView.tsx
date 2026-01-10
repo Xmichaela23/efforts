@@ -361,10 +361,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                 ? Math.round(exercise.sets.filter(s => s.weight > 0).reduce((sum, s) => sum + s.weight, 0) / exercise.sets.filter(s => s.weight > 0).length)
                 : 0;
               
-              // Determine if RIR is concerning (lower than target by 0.5+, or very low RIR without target)
+              // Determine if RIR is concerning (lower than target by 0.5+, or low RIR without target)
               const rirConcern = avgRir != null && (
                 (plannedData?.targetRir != null && avgRir < plannedData.targetRir - 0.5) ||
-                (plannedData?.targetRir == null && avgRir < 2)
+                (plannedData?.targetRir == null && avgRir <= 2)
               );
 
               return (

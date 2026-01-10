@@ -30,8 +30,13 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Calculate suggested reduce weight (5% less than next planned)
-  const reduceWeight = Math.round((nextPlannedWeight * 0.95) / 5) * 5;
+  // Calculate suggested reduce weight (5% less than next planned, minimum 5 lb reduction)
+  const rawReduce = Math.round((nextPlannedWeight * 0.95) / 5) * 5;
+  const reduceWeight = rawReduce >= nextPlannedWeight ? nextPlannedWeight - 5 : rawReduce;
+  
+  // Determine which options to show (hide duplicates)
+  const showStay = currentWeight !== nextPlannedWeight;
+  const showReduce = reduceWeight > 0 && reduceWeight !== nextPlannedWeight && reduceWeight !== currentWeight;
 
   const getSelectedWeight = (): number => {
     switch (selectedOption) {
@@ -165,39 +170,43 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
             </div>
           </div>
 
-          <div 
-            onClick={() => setSelectedOption('stay')}
-            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-              selectedOption === 'stay' 
-                ? 'border-amber-500 bg-amber-500/10' 
-                : 'border-white/20 bg-white/5 hover:bg-white/10'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`w-4 h-4 rounded-full border-2 ${selectedOption === 'stay' ? 'border-amber-500 bg-amber-500' : 'border-white/40'}`} />
-              <div>
-                <div className="text-sm text-white font-medium">Stay at current ({currentWeight} lb)</div>
-                <div className="text-xs text-white/50">Focus on hitting target RIR</div>
+          {showStay && (
+            <div 
+              onClick={() => setSelectedOption('stay')}
+              className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                selectedOption === 'stay' 
+                  ? 'border-amber-500 bg-amber-500/10' 
+                  : 'border-white/20 bg-white/5 hover:bg-white/10'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-4 h-4 rounded-full border-2 ${selectedOption === 'stay' ? 'border-amber-500 bg-amber-500' : 'border-white/40'}`} />
+                <div>
+                  <div className="text-sm text-white font-medium">Stay at current ({currentWeight} lb)</div>
+                  <div className="text-xs text-white/50">Focus on hitting target RIR</div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          <div 
-            onClick={() => setSelectedOption('reduce')}
-            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-              selectedOption === 'reduce' 
-                ? 'border-amber-500 bg-amber-500/10' 
-                : 'border-white/20 bg-white/5 hover:bg-white/10'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`w-4 h-4 rounded-full border-2 ${selectedOption === 'reduce' ? 'border-amber-500 bg-amber-500' : 'border-white/40'}`} />
-              <div>
-                <div className="text-sm text-white font-medium">Reduce to {reduceWeight} lb</div>
-                <div className="text-xs text-white/50">If fatigue is high</div>
+          {showReduce && (
+            <div 
+              onClick={() => setSelectedOption('reduce')}
+              className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                selectedOption === 'reduce' 
+                  ? 'border-amber-500 bg-amber-500/10' 
+                  : 'border-white/20 bg-white/5 hover:bg-white/10'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-4 h-4 rounded-full border-2 ${selectedOption === 'reduce' ? 'border-amber-500 bg-amber-500' : 'border-white/40'}`} />
+                <div>
+                  <div className="text-sm text-white font-medium">Reduce to {reduceWeight} lb</div>
+                  <div className="text-xs text-white/50">If fatigue is high</div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div 
             onClick={() => setSelectedOption('custom')}
