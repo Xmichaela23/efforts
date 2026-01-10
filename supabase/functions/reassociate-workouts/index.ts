@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
 
     // 1. Get the plan to find its date range
     const { data: plan, error: planError } = await supabase
-      .from('training_plans')
+      .from('plans')
       .select('id, name, config')
       .eq('id', plan_id)
       .eq('user_id', user.id)

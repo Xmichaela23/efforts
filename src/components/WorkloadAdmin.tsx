@@ -37,14 +37,20 @@ export default function WorkloadAdmin() {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      console.log('👤 Admin user:', user?.id);
       
       // Load user's plans
       if (user) {
-        const { data: userPlans } = await supabase
-          .from('training_plans')
+        const { data: userPlans, error } = await supabase
+          .from('plans')
           .select('id, name, config, status')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
+        
+        console.log('📋 Plans loaded:', userPlans?.length, 'error:', error);
+        if (error) {
+          console.error('Plans fetch error:', error);
+        }
         setPlans(userPlans || []);
       }
     };
