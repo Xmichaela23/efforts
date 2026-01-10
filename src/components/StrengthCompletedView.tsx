@@ -304,29 +304,40 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                   </div>
                   
                   <div className="space-y-2">
-                    <div className={`grid ${hasWeight ? 'grid-cols-4' : 'grid-cols-2'} gap-2 text-xs font-medium text-white/60 pb-1 border-b border-white/20`}>
-                      <span>Set</span>
-                      {hasWeight && <span>Weight</span>}
-                      <span>Reps</span>
-                      {hasWeight && <span>RIR</span>}
-                    </div>
-                    
-                    {exercise.sets.map((set, setIndex) => {
+                    {(() => {
+                      const hasDuration = exercise.sets.some(s => s.duration_seconds && s.duration_seconds > 0);
+                      const formatDuration = (secs: number) => {
+                        const mins = Math.floor(secs / 60);
+                        const remaining = secs % 60;
+                        return mins > 0 ? `${mins}:${String(remaining).padStart(2, '0')}` : `${secs}s`;
+                      };
+                      
                       return (
-                        <div key={setIndex} className={`grid ${hasWeight ? 'grid-cols-4' : 'grid-cols-2'} gap-2 text-sm text-white`}>
-                          <span className="text-white/70">{setIndex + 1}</span>
-                          {hasWeight && (
-                            <span className="font-medium">
-                              {set.weight || 0} lbs
-                            </span>
-                          )}
-                          <span>
-                            {set.reps || 0}
-                          </span>
-                          {hasWeight && <span className="text-white/60">{set.rir || '-'}</span>}
-                        </div>
+                        <>
+                          <div className={`grid ${hasWeight ? 'grid-cols-4' : 'grid-cols-2'} gap-2 text-xs font-medium text-white/60 pb-1 border-b border-white/20`}>
+                            <span>Set</span>
+                            {hasWeight && <span>Weight</span>}
+                            <span>{hasDuration ? 'Duration' : 'Reps'}</span>
+                            {hasWeight && <span>RIR</span>}
+                          </div>
+                          
+                          {exercise.sets.map((set, setIndex) => (
+                            <div key={setIndex} className={`grid ${hasWeight ? 'grid-cols-4' : 'grid-cols-2'} gap-2 text-sm text-white`}>
+                              <span className="text-white/70">{setIndex + 1}</span>
+                              {hasWeight && (
+                                <span className="font-medium">
+                                  {set.weight || 0} lbs
+                                </span>
+                              )}
+                              <span>
+                                {hasDuration && set.duration_seconds ? formatDuration(set.duration_seconds) : (set.reps || 0)}
+                              </span>
+                              {hasWeight && <span className="text-white/60">{set.rir || '-'}</span>}
+                            </div>
+                          ))}
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
                 </div>
               );

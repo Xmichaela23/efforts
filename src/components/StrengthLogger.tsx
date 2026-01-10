@@ -1274,6 +1274,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     let workoutToLoad = scheduledWorkout;
     // Track if we successfully loaded exercises from the passed workout
     let exercisesLoadedFromWorkout = false;
+    
+    // Set sourcePlannedId from scheduledWorkout if it's a planned workout
+    if (scheduledWorkout?.id && String((scheduledWorkout as any)?.workout_status || 'planned').toLowerCase() !== 'completed') {
+      console.log('🔗 Setting sourcePlannedId from scheduledWorkout:', scheduledWorkout.id);
+      setSourcePlannedId(String(scheduledWorkout.id));
+      setSourcePlannedName(scheduledWorkout.name || 'Workout');
+      setSourcePlannedDate(scheduledWorkout.date || null);
+    }
 
     // If no scheduled workout provided, do a FRESH check for selected date's planned workout
     if (!workoutToLoad) {
@@ -1310,6 +1318,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (todaysStrengthWorkouts.length > 0) {
         workoutToLoad = todaysStrengthWorkouts[0];
         console.log('✅ Using planned workout:', workoutToLoad.name);
+        // Set sourcePlannedId for auto-discovered planned workout
+        if (workoutToLoad?.id) {
+          console.log('🔗 Setting sourcePlannedId from discovered workout:', workoutToLoad.id);
+          setSourcePlannedId(String(workoutToLoad.id));
+          setSourcePlannedName(workoutToLoad.name || 'Workout');
+          setSourcePlannedDate(workoutToLoad.date || null);
+        }
       } else {
         console.log('ℹ️ No planned strength workout found for today');
       }
