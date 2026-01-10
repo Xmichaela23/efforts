@@ -412,8 +412,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const isBodyweightMove = (raw?: string): boolean => {
     try {
       const n = String(raw || '').toLowerCase().replace(/[\s-]/g,'');
-      // Include plyometrics as bodyweight (jumps, bounds, hops)
-      return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls|swissballwalk|swissball|walkout|jump|bound|hop|plyo/.test(n);
+      // Include plyometrics as bodyweight (jumps, bounds, hops), calf raises, core work
+      return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls|swissballwalk|swissball|walkout|jump|bound|hop|plyo|calfraise|corecircuit|corework/.test(n);
     } catch { return false; }
   };
 
@@ -424,9 +424,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
   
   // Helper: detect if this is a Core Work exercise that should use CoreTimer
-  const isCoreWorkExercise = (name: string): boolean => {
+  const isCoreWorkExercise = (name: string, reps?: string | number): boolean => {
     const n = String(name || '').toLowerCase();
-    return n.includes('core work') && (n.includes('min') || n.includes('choice'));
+    const r = String(reps || '').toLowerCase();
+    // Match "core work", "core circuit", or any core exercise with time-based reps
+    if (n.includes('core work') || n.includes('core circuit')) {
+      return true;
+    }
+    // Also match if it has "min" in the reps (e.g., "5 min")
+    if (n.includes('core') && r.includes('min')) {
+      return true;
+    }
+    return false;
   };
   
   // Helper: parse duration in seconds from exercise name (e.g., "5 min" -> 300, "3 min" -> 180)
@@ -1357,7 +1366,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => {
         // Extract notes separately - ensure they don't end up in the name
         const rawName = String(exercise.name || '').trim();
-        const rawNotes = String(exercise.notes || exercise.description || '').trim();
+        // Notes can come from notes, description, or weight (if weight is a string like "Planks, dead bugs, bird dogs")
+        const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) ? exercise.weight : '';
+        const rawNotes = String(exercise.notes || exercise.description || weightAsNotes || '').trim();
         console.log(`📝 Exercise ${index}: name="${rawName}", notes="${rawNotes}", duration_seconds=${exercise.duration_seconds}, sets=${exercise.sets}, reps=${exercise.reps}, full_exercise:`, exercise);
         // Clean name - remove any notes that might have been concatenated
         const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
@@ -1508,7 +1519,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             if (se.length) {
               const pre: LoggedExercise[] = se.map((exercise: any, index: number) => {
                 const rawName = String(exercise.name || '').trim();
-                const rawNotes = String(exercise.notes || exercise.description || '').trim();
+                const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) ? exercise.weight : '';
+                const rawNotes = String(exercise.notes || exercise.description || weightAsNotes || '').trim();
                 const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
                 return {
                   id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
@@ -1611,7 +1623,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (Array.isArray((data as any).strength_exercises) && (data as any).strength_exercises.length>0) {
           const pre: LoggedExercise[] = (data as any).strength_exercises.map((exercise: any, index: number) => {
             const rawName = String(exercise.name || '').trim();
-            const rawNotes = String(exercise.notes || exercise.description || '').trim();
+            const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) ? exercise.weight : '';
+            const rawNotes = String(exercise.notes || exercise.description || weightAsNotes || '').trim();
             const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
             return {
               id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
@@ -2797,11 +2810,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               background: `linear-gradient(135deg, rgba(${themeColors.rgb},0.15) 0%, rgba(${themeColors.rgb},0.05) 50%, rgba(255,255,255,0.03) 100%)`
             }}
           >
-            {/* Core Work exercises use the CoreTimer component */}
-            {isCoreWorkExercise(exercise.name) ? (
+            {/* Core Work/Circuit exercises use the CoreTimer component */}
+            {isCoreWorkExercise(exercise.name, exercise.notes) ? (
               <div className="p-2">
                 <CoreTimer
-                  initialDuration={parseCoreWorkDuration(exercise.name)}
+                  initialDuration={parseCoreWorkDuration(exercise.name) || parseCoreWorkDuration(exercise.notes || '') || 300}
                   onComplete={(coreExercises, totalSeconds) => {
                     // Store the completed core exercises in notes
                     const coreNotes = coreExercises
