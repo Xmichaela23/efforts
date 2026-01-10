@@ -1072,7 +1072,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const name = String(s?.name || '').trim();
         if (!name) continue;
         const repsRaw: any = s?.reps;
-        const reps = typeof repsRaw === 'number' ? Math.max(0, Math.round(repsRaw)) : 0;
+        // Parse reps - handle numbers and strings like "20/side", "8-10", "10/leg"
+        let reps = 0;
+        if (typeof repsRaw === 'number') {
+          reps = Math.max(0, Math.round(repsRaw));
+        } else if (typeof repsRaw === 'string') {
+          const match = repsRaw.match(/^(\d+)/);
+          if (match) {
+            reps = parseInt(match[1], 10);
+          }
+        }
         const isAmrap = typeof repsRaw === 'string' && /amrap/i.test(repsRaw);
         const weightNum = typeof s?.weight === 'number' ? round5(s.weight) : 0;
         const sets = Number(s?.sets) || 0;
