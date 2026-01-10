@@ -169,10 +169,10 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
                       targetRir: r.targetRir,
                       actualRir: r.actualRir
                     })}
-                    className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                    className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors ${
                       rirConcern 
                         ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30' 
-                        : 'bg-white/5 border-white/20 text-white/50 hover:bg-white/10 hover:text-white/70'
+                        : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:text-white/80'
                     }`}
                   >
                     Adjust
@@ -181,11 +181,14 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
               </div>
               {/* RIR comparison - show when both target and actual exist */}
               {r.targetRir != null && r.actualRir != null && (
-                <span className={`text-xs px-2 py-0.5 rounded ${
-                  rirConcern ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-white/50'
+                <div className={`flex items-center gap-2 px-2.5 py-1 rounded ${
+                  rirConcern ? 'bg-amber-500/20' : 'bg-white/5'
                 }`}>
-                  Avg RIR: {r.actualRir.toFixed(1)} <span className="text-white/40">(target: {r.targetRir})</span>
-                </span>
+                  <span className={`text-sm font-semibold ${rirConcern ? 'text-amber-400' : 'text-white/80'}`}>
+                    RIR {r.actualRir.toFixed(1)}
+                  </span>
+                  <span className="text-xs text-white/40">Target: {r.targetRir}</span>
+                </div>
               )}
             </div>
             <div className="grid grid-cols-12 text-xs font-medium text-white/50 border-b border-white/20 pb-1">
