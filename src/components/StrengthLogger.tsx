@@ -3590,7 +3590,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           <CheckCircle className={`h-4 w-4 ${themeColors.text}`} />
                           <span>Saved!</span>
                         </div>
-                        <span className="text-xs text-white/50">View Details to adjust weights for next time</span>
+                        <span className="text-xs text-white/50">View Adherence to adjust weights for next time</span>
                       </div>
                     )}
                   </div>

@@ -370,8 +370,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           return 0;
         })();
         const weight = Number(s?.weight || s?.load || 0);
+        const target_rir = typeof s?.target_rir === 'number' ? s.target_rir : undefined;
         
-        return { name, sets, reps, weight };
+        return { name, sets, reps, weight, target_rir };
       });
     } catch (e) {
       return [];
@@ -409,7 +410,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           const durationNum = typeof ex.duration_seconds === 'number' ? ex.duration_seconds : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.duration_seconds)||0), 0) / setsArr.length) : 0);
           const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
           const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
-          const result: any = { name: ex.name, sets: setsNum, weight: weightNum };
+          const target_rir = typeof ex.target_rir === 'number' ? ex.target_rir : undefined;
+          const result: any = { name: ex.name, sets: setsNum, weight: weightNum, target_rir };
           if (durationNum > 0) {
             result.duration_seconds = durationNum;
           } else {
@@ -456,9 +458,17 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       // Handle standard format with sets array
       return { name: ex.name, setsArray: Array.isArray(ex.sets) ? ex.sets : [] };
     });
+    // Get plan ID for adjustments
+    const planId = (planned as any)?.training_plan_id || (completed as any)?.training_plan_id;
+    
     return (
       <div className="space-y-4">
-        <StrengthCompareTable planned={plannedExercises} completed={completedExercises} />
+        <StrengthCompareTable 
+          planned={plannedExercises} 
+          completed={completedExercises} 
+          planId={planId}
+          onAdjustmentSaved={() => window.dispatchEvent(new CustomEvent('plan:adjusted'))}
+        />
         {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
           <div className="text-sm text-gray-700">
             <div className="font-medium mb-1">Add‑ons</div>

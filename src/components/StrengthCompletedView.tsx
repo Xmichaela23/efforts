@@ -1,14 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import StrengthCompareTable from './StrengthCompareTable';
-import StrengthAdjustmentModal from './StrengthAdjustmentModal';
 import { useAppContext } from '@/contexts/AppContext';
 import { getSessionRPE, getWorkoutNotes, getWorkoutReadiness } from '@/utils/workoutMetadata';
-import { Settings2 } from 'lucide-react';
 
 interface StrengthCompletedViewProps {
   workoutData: any;
   plannedWorkout?: any; // Optional planned workout data for comparison
-  planId?: string; // Plan ID for adjustments
 }
 
 interface CompletedExercise {
@@ -25,18 +22,9 @@ interface CompletedExercise {
   weight?: number;
 }
 
-const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData, plannedWorkout: passedPlannedWorkout, planId }) => {
+const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData, plannedWorkout: passedPlannedWorkout }) => {
   const { workouts } = useAppContext();
   const [showComparison, setShowComparison] = useState(false);
-  
-  // Adjustment modal state
-  const [adjustingExercise, setAdjustingExercise] = useState<{
-    name: string;
-    currentWeight: number;
-    nextPlannedWeight: number;
-    targetRir?: number;
-    actualRir?: number;
-  } | null>(null);
 
 
 
@@ -208,75 +196,9 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
   }, [completedExercises]);
 
   const isMobility = String(workoutData?.type || '').toLowerCase() === 'mobility';
-  
-  // Helper to get planned exercise data for an exercise name
-  const getPlannedExerciseData = (exerciseName: string) => {
-    // Try multiple sources for planned exercises
-    let plannedExercises: any[] = [];
-    
-    // Source 1: Direct strength_exercises or mobility_exercises
-    if (Array.isArray((plannedWorkout as any)?.strength_exercises)) {
-      plannedExercises = (plannedWorkout as any).strength_exercises;
-    } else if (Array.isArray((plannedWorkout as any)?.mobility_exercises)) {
-      plannedExercises = (plannedWorkout as any).mobility_exercises;
-    }
-    
-    // Source 2: Materialized computed.steps (has nested .strength object)
-    if (plannedExercises.length === 0 && (plannedWorkout as any)?.computed?.steps) {
-      const steps = (plannedWorkout as any).computed.steps;
-      if (Array.isArray(steps)) {
-        plannedExercises = steps
-          .filter((s: any) => s.kind === 'strength' && s.strength)
-          .map((s: any) => s.strength);
-      }
-    }
-    
-    if (plannedExercises.length === 0) return null;
-    
-    const normalizedName = exerciseName.toLowerCase().replace(/s$/, ''); // Remove trailing 's' for matching
-    
-    const planned = plannedExercises.find((ex: any) => {
-      const plannedName = String(ex.name || '').toLowerCase().replace(/s$/, '');
-      // Exact match (normalized)
-      if (plannedName === normalizedName) return true;
-      // One contains the other
-      if (plannedName.includes(normalizedName) || normalizedName.includes(plannedName)) return true;
-      return false;
-    });
-    if (!planned) return null;
-    
-    // Get weight from various sources
-    let weight = 0;
-    if (typeof planned.weight === 'number') weight = planned.weight;
-    else if (planned.weight_display) {
-      const match = String(planned.weight_display).match(/(\d+)/);
-      if (match) weight = parseInt(match[1]);
-    }
-    
-    return {
-      weight,
-      targetRir: planned.target_rir
-    };
-  };
-  
-  // Calculate average RIR for a set of logged sets
-  const calculateAverageRir = (sets: Array<{ rir?: number }>) => {
-    const rirsWithValues = sets.filter(s => typeof s.rir === 'number').map(s => s.rir as number);
-    if (rirsWithValues.length === 0) return undefined;
-    return rirsWithValues.reduce((a, b) => a + b, 0) / rirsWithValues.length;
-  };
 
   return (
     <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
-      {/* Adjustment hint - show for strength workouts with planned data */}
-      {!isMobility && plannedWorkout && (
-        <div className="px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-          <p className="text-xs text-amber-400/80">
-            Tap Adjust to modify your next session or plan.
-          </p>
-        </div>
-      )}
-      
       {/* Summary line - volume/workload only (title shown in parent) */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm text-white/60">
@@ -338,7 +260,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           />
         );
       })() : (
-                // Clean completed view (default)
+        // Clean completed view (default)
         <div className="space-y-6">
           {completedExercises.length === 0 ? (
             <div className="text-center py-8 text-white/50">
@@ -353,45 +275,11 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
               
               const exerciseVolume = calculateExerciseVolume(exercise.sets);
               const hasWeight = exercise.sets.some(s => s.weight && s.weight > 0);
-              
-              // Get planned data and calculate RIR comparison
-              const plannedData = getPlannedExerciseData(exercise.name);
-              const avgRir = calculateAverageRir(exercise.sets);
-              const avgWeight = hasWeight 
-                ? Math.round(exercise.sets.filter(s => s.weight > 0).reduce((sum, s) => sum + s.weight, 0) / exercise.sets.filter(s => s.weight > 0).length)
-                : 0;
-              
-              // Determine if RIR is concerning (lower than target by 0.5+, or low RIR without target)
-              const rirConcern = avgRir != null && (
-                (plannedData?.targetRir != null && avgRir < plannedData.targetRir - 0.5) ||
-                (plannedData?.targetRir == null && avgRir <= 2)
-              );
 
               return (
                 <div key={exercise.id || index} className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-white">{exercise.name}</h3>
-                      {/* Adjust button - show for all weighted exercises */}
-                      {hasWeight && !isMobility && (
-                        <button
-                          onClick={() => setAdjustingExercise({
-                            name: exercise.name,
-                            currentWeight: avgWeight,
-                            nextPlannedWeight: plannedData ? Math.round(plannedData.weight * 1.025 / 5) * 5 || avgWeight : avgWeight,
-                            targetRir: plannedData?.targetRir,
-                            actualRir: avgRir
-                          })}
-                          className={`px-2 py-0.5 text-xs rounded border transition-colors ${
-                            rirConcern 
-                              ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30' 
-                              : 'bg-white/5 border-white/20 text-white/50 hover:bg-white/10 hover:text-white/70'
-                          }`}
-                        >
-                          Adjust
-                        </button>
-                      )}
-                    </div>
+                    <h3 className="font-semibold text-white">{exercise.name}</h3>
                     {hasWeight && exerciseVolume > 0 && (
                       <div className="text-right">
                         <div className="text-sm font-medium text-white/70">
@@ -400,15 +288,6 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                       </div>
                     )}
                   </div>
-                  
-                  {/* RIR Summary - show if we have both actual and target RIR */}
-                  {hasWeight && avgRir != null && plannedData?.targetRir != null && (
-                    <div className={`text-xs px-2 py-1 rounded ${
-                      rirConcern ? 'bg-amber-500/10 text-amber-400/80' : 'bg-white/5 text-white/50'
-                    }`}>
-                      Avg RIR: {avgRir.toFixed(1)} (target: {plannedData.targetRir})
-                    </div>
-                  )}
                   
                   <div className="space-y-2">
                     {(() => {
@@ -524,23 +403,6 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
             </div>
           </div>
         </div>
-      )}
-      
-      {/* Adjustment Modal */}
-      {adjustingExercise && (
-        <StrengthAdjustmentModal
-          exerciseName={adjustingExercise.name}
-          currentWeight={adjustingExercise.currentWeight}
-          nextPlannedWeight={adjustingExercise.nextPlannedWeight}
-          targetRir={adjustingExercise.targetRir}
-          actualRir={adjustingExercise.actualRir}
-          planId={planId}
-          onClose={() => setAdjustingExercise(null)}
-          onSaved={() => {
-            // Could trigger a refresh here if needed
-            window.dispatchEvent(new CustomEvent('plan:adjusted'));
-          }}
-        />
       )}
     </div>
   );
