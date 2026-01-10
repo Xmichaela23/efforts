@@ -47,9 +47,11 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
   const [adjustingExercise, setAdjustingExercise] = useState<{
     name: string;
     currentWeight: number;
+    currentReps?: number;
     nextPlannedWeight: number;
     targetRir?: number;
     actualRir?: number;
+    isBodyweight?: boolean;
   } | null>(null);
   
   // Fetch plan ID from planned workout if not provided
@@ -169,9 +171,11 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
                     onClick={() => setAdjustingExercise({
                       name: r.name,
                       currentWeight: r.cWAvg || r.pW,
+                      currentReps: r.cRepsAvg || r.pReps,
                       nextPlannedWeight: Math.round((r.pW || r.cWAvg) * 1.025 / 5) * 5 || r.cWAvg || r.pW,
                       targetRir: r.targetRir,
-                      actualRir: r.actualRir
+                      actualRir: r.actualRir,
+                      isBodyweight: false
                     })}
                     className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors ${
                       rirConcern 
@@ -182,19 +186,21 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
                     Adjust
                   </button>
                 )}
-                {/* Add Weight button - show for bodyweight exercises that could be weighted */}
+                {/* Adjust button for bodyweight exercises (dips, pull-ups, chin-ups) */}
                 {planId && r.isBodyweight && /dip|pull\-?ups?|chin\-?ups?/i.test(r.name) && (
                   <button
                     onClick={() => setAdjustingExercise({
                       name: r.name,
-                      currentWeight: 0,
+                      currentWeight: r.cWAvg || 0,
+                      currentReps: r.cRepsAvg || r.pReps || 8,
                       nextPlannedWeight: 10,
                       targetRir: r.targetRir,
-                      actualRir: r.actualRir
+                      actualRir: r.actualRir,
+                      isBodyweight: true
                     })}
                     className="px-2.5 py-1 text-xs font-medium rounded border transition-colors bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:text-white/80"
                   >
-                    + Weight
+                    Adjust
                   </button>
                 )}
               </div>
@@ -278,10 +284,12 @@ export default function StrengthCompareTable({ planned, completed, planId: initi
         <StrengthAdjustmentModal
           exerciseName={adjustingExercise.name}
           currentWeight={adjustingExercise.currentWeight}
+          currentReps={adjustingExercise.currentReps}
           nextPlannedWeight={adjustingExercise.nextPlannedWeight}
           targetRir={adjustingExercise.targetRir}
           actualRir={adjustingExercise.actualRir}
           planId={planId}
+          isBodyweight={adjustingExercise.isBodyweight}
           onClose={() => setAdjustingExercise(null)}
           onSaved={() => {
             setAdjustingExercise(null);
