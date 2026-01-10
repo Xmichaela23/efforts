@@ -31,10 +31,12 @@ export default function WorkloadAdmin() {
   const [reassociateLoading, setReassociateLoading] = useState(false);
   const [reassociateDryRun, setReassociateDryRun] = useState(true);
   const [plans, setPlans] = useState<any[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
 
   useEffect(() => {
     const getUser = async () => {
+      setPlansLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
       console.log('👤 Admin user:', user?.id);
@@ -47,12 +49,13 @@ export default function WorkloadAdmin() {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         
-        console.log('📋 Plans loaded:', userPlans?.length, 'error:', error);
+        console.log('📋 Plans loaded:', userPlans?.length, 'plans:', userPlans, 'error:', error);
         if (error) {
           console.error('Plans fetch error:', error);
         }
         setPlans(userPlans || []);
       }
+      setPlansLoading(false);
     };
     getUser();
   }, []);
@@ -237,13 +240,15 @@ export default function WorkloadAdmin() {
             </p>
             
             <div className="space-y-2">
-              <Label htmlFor="planSelect">Target Plan</Label>
-              <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+              <Label htmlFor="planSelect">Target Plan {plansLoading && '(loading...)'}</Label>
+              <Select value={selectedPlanId} onValueChange={setSelectedPlanId} disabled={plansLoading}>
                 <SelectTrigger className="bg-white/10 border-white/20">
-                  <SelectValue placeholder="Select a plan..." />
+                  <SelectValue placeholder={plansLoading ? "Loading plans..." : "Select a plan..."} />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-900 border border-white/20 shadow-xl z-50">
-                  {plans.length === 0 ? (
+                  {plansLoading ? (
+                    <SelectItem value="_loading" disabled>Loading...</SelectItem>
+                  ) : plans.length === 0 ? (
                     <SelectItem value="_none" disabled>No plans found</SelectItem>
                   ) : (
                     plans.map((plan) => (
@@ -254,6 +259,7 @@ export default function WorkloadAdmin() {
                   )}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-white/40">Found {plans.length} plans</p>
               {selectedPlanId && plans.find(p => p.id === selectedPlanId)?.config && (
                 <p className="text-xs text-white/50">
                   {plans.find(p => p.id === selectedPlanId)?.config?.user_selected_start_date} → {plans.find(p => p.id === selectedPlanId)?.config?.race_date}
