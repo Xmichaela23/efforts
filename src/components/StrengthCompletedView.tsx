@@ -289,17 +289,17 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                 <div key={exercise.id || index} className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold text-gray-900">{exercise.name}</h3>
+                      <h3 className="font-semibold text-white">{exercise.name}</h3>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-white/80">
                         {exerciseVolume.toLocaleString()} lbs
                       </div>
                     </div>
                   </div>
                   
                   <div className="space-y-2">
-                    <div className="grid grid-cols-4 gap-2 text-xs font-medium text-gray-500 pb-1 border-b border-gray-200">
+                    <div className="grid grid-cols-4 gap-2 text-xs font-medium text-white/50 pb-1 border-b border-white/20">
                       <span>Set</span>
                       <span>Weight</span>
                       <span>Reps</span>
@@ -308,15 +308,15 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                     
                     {exercise.sets.map((set, setIndex) => {
                       return (
-                        <div key={setIndex} className="grid grid-cols-4 gap-2 text-sm">
-                          <span className="text-gray-600">{setIndex + 1}</span>
+                        <div key={setIndex} className="grid grid-cols-4 gap-2 text-sm text-white/90">
+                          <span className="text-white/60">{setIndex + 1}</span>
                           <span className="font-medium">
                             {set.weight || 0} lbs
                           </span>
                           <span>
                             {set.reps || 0}
                           </span>
-                          <span className="text-gray-500">{set.rir || '-'}</span>
+                          <span className="text-white/50">{set.rir || '-'}</span>
                         </div>
                       );
                     })}

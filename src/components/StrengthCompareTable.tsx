@@ -5,8 +5,10 @@ export interface StrengthExercise { name: string; sets?: number; reps?: number; 
 
 function normalizeName(raw: string): string {
   // Keep only minimal normalization to avoid merging distinct movements
+  // Also remove (Left)/(Right) suffixes so L/R expanded exercises match their base
   return String(raw || '')
     .toLowerCase()
+    .replace(/\s*\((?:left|right)\)\s*/gi, '') // Remove (Left) or (Right)
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -71,11 +73,11 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
     <div className="space-y-3">
       {rows.map((r: any, i)=> (
         <div key={i} className="space-y-2">
-          <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+          <div className="text-sm font-medium text-white flex items-center gap-2">
             <span>{r.name}</span>
-            {r.status==='swapped' && (<span className="px-1.5 py-0.5 text-[11px] rounded bg-blue-50 text-blue-700 border border-blue-200">completed only</span>)}
+            {r.status==='swapped' && (<span className="px-1.5 py-0.5 text-[11px] rounded bg-blue-500/20 text-blue-300 border border-blue-400/30">completed only</span>)}
           </div>
-          <div className="grid grid-cols-12 text-xs font-medium text-gray-500 border-b border-gray-200 pb-1">
+          <div className="grid grid-cols-12 text-xs font-medium text-white/50 border-b border-white/20 pb-1">
             <div className="col-span-2">Set</div>
             <div className="col-span-5">Planned</div>
             <div className="col-span-5">Completed</div>
@@ -104,27 +106,27 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
               };
               return (
                 <div key={idx} className="grid grid-cols-12 text-sm">
-                  <div className="col-span-2 text-gray-600">{idx+1}</div>
-                  <div className="col-span-5 text-gray-600">{fmt(p, r.isBodyweight)}</div>
-                  <div className="col-span-5 text-gray-800">{fmt(c, false)}</div>
+                  <div className="col-span-2 text-white/60">{idx+1}</div>
+                  <div className="col-span-5 text-white/60">{fmt(p, r.isBodyweight)}</div>
+                  <div className="col-span-5 text-white/90">{fmt(c, false)}</div>
                 </div>
               );
             })}
           </div>
-          <div className="text-xs border-t border-gray-100 pt-1 flex items-center justify-end gap-2">
-            <span className="text-gray-500">Vol:</span>
-            <span className="text-gray-600">{r.pVol.toLocaleString()} lb</span>
-            <span className="text-gray-400">→</span>
-            <span className="text-gray-800">{r.cVol.toLocaleString()} lb</span>
-            <span className={(r.cVol - r.pVol)>=0 ? 'text-green-600' : 'text-rose-600'}>
+          <div className="text-xs border-t border-white/10 pt-1 flex items-center justify-end gap-2">
+            <span className="text-white/50">Vol:</span>
+            <span className="text-white/60">{r.pVol.toLocaleString()} lb</span>
+            <span className="text-white/40">→</span>
+            <span className="text-white/80">{r.cVol.toLocaleString()} lb</span>
+            <span className={(r.cVol - r.pVol)>=0 ? 'text-green-400' : 'text-rose-400'}>
               {(r.cVol - r.pVol >= 0 ? '+' : '-')}{Math.abs(r.cVol - r.pVol).toLocaleString()} lb
             </span>
           </div>
         </div>
       ))}
-      <div className="grid grid-cols-12 text-sm font-semibold border-t border-gray-200 pt-2">
+      <div className="grid grid-cols-12 text-sm font-semibold border-t border-white/20 pt-2 text-white">
         <div className="col-span-7">Totals</div>
-        <div className="col-span-5 text-right text-gray-700">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()} lb</div>
+        <div className="col-span-5 text-right text-white/80">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()} lb</div>
       </div>
     </div>
   );
