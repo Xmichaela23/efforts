@@ -24,41 +24,22 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   onClose,
   onSaved,
 }) => {
-  // Weight options: use smaller increments for light weights
-  // Special case: adding weight to bodyweight exercise (currentWeight = 0)
-  const isAddingWeight = currentWeight === 0;
-  const increment = currentWeight <= 15 ? 2.5 : 5;
-  const minWeight = isAddingWeight ? 0 : increment;
+  // Check if this is a bodyweight-type exercise (dips, pull-ups, etc.) - always show reps
+  const isBodyweightType = isBodyweight || /dip|pull\-?ups?|chin\-?ups?/i.test(exerciseName);
   
-  const rawOptions = isAddingWeight
-    ? [0, 10, 15, 20, 25, 35] // Starting weights for adding to bodyweight
-    : [
-        currentWeight - (increment * 2),
-        currentWeight - increment,
-        currentWeight,
-        currentWeight + increment,
-        currentWeight + (increment * 2),
-      ].map(w => Math.max(minWeight, w));
-  
-  // Remove duplicates while preserving order
-  const weightOptions = [...new Set(rawOptions)];
-  
-  // Rep options for bodyweight exercises
-  const repOptions = [6, 8, 10, 12, 15];
-  
-  const [selectedWeight, setSelectedWeight] = useState<number | null>(null);
-  const [selectedReps, setSelectedReps] = useState<number | null>(currentReps || null);
-  const [customWeight, setCustomWeight] = useState<string>('');
-  const [showCustomWeight, setShowCustomWeight] = useState(false);
+  const [repsInput, setRepsInput] = useState<string>(currentReps?.toString() || '');
+  const [weightInput, setWeightInput] = useState<string>(currentWeight?.toString() || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const getFinalWeight = (): number | null => {
-    if (showCustomWeight) {
-      const val = parseInt(customWeight);
-      return val >= 0 ? val : null;
-    }
-    return selectedWeight;
+    const val = parseInt(weightInput);
+    return val >= 0 ? val : null;
+  };
+  
+  const getFinalReps = (): number | null => {
+    const val = parseInt(repsInput);
+    return val > 0 ? val : null;
   };
 
   const handleSave = async () => {
@@ -91,7 +72,7 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
         plan_id: planId || null,
         exercise_name: exerciseName,
         absolute_weight: weight,
-        absolute_reps: selectedReps || null,
+        absolute_reps: getFinalReps() || null,
         applies_from: today,
         applies_until: null,
         status: 'active',
@@ -126,107 +107,57 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center px-4">
       <div className="fixed inset-0 bg-black/60" onClick={onClose} />
       <div 
-        className="relative w-full max-w-lg bg-zinc-900 border-t border-white/20 rounded-t-2xl shadow-xl p-5 pb-8 z-10 animate-in slide-in-from-bottom duration-200"
+        className="relative w-full max-w-xs bg-zinc-900 border border-white/20 rounded-2xl shadow-xl p-5 z-10"
         style={{ fontFamily: 'Inter, sans-serif' }}
       >
-        {/* Handle bar */}
-        <div className="flex justify-center mb-3">
-          <div className="w-10 h-1 bg-white/20 rounded-full" />
-        </div>
-        
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">
-            {isAddingWeight ? `Add Weight to ${exerciseName}` : `Adjust ${exerciseName}`}
-          </h3>
+          <h3 className="text-base font-semibold text-white">{exerciseName}</h3>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10">
             <X className="h-5 w-5 text-white/60" />
           </button>
         </div>
 
-        {/* Current context */}
-        {!isAddingWeight && (
-          <div className="mb-4 text-center">
-            <span className="text-sm text-white/60">Current: </span>
-            <span className="text-sm text-white font-medium">
-              {currentReps && `${currentReps} reps @ `}{currentWeight} lb
-            </span>
-          </div>
-        )}
-
-        {/* Reps selector - show for bodyweight exercises */}
-        {(isBodyweight || isAddingWeight) && (
-          <div className="mb-4">
-            <label className="text-xs text-white/60 uppercase tracking-wide mb-2 block text-center">Reps</label>
-            <div className="flex gap-2 justify-center">
-              {repOptions.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setSelectedReps(r)}
-                  className={`w-12 h-12 rounded-lg border text-sm font-medium transition-colors ${
-                    selectedReps === r
-                      ? 'border-amber-500 bg-amber-500/20 text-amber-400'
-                      : 'border-white/20 bg-white/5 text-white hover:bg-white/10'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Weight selector */}
-        <div className="mb-4">
-          <label className="text-xs text-white/60 uppercase tracking-wide mb-2 block text-center">Weight</label>
-          
-          <div className="flex gap-2 justify-center flex-wrap">
-            {weightOptions.map((w) => (
-              <button
-                key={w}
-                onClick={() => { setSelectedWeight(w); setShowCustomWeight(false); }}
-                className={`w-12 h-12 rounded-lg border text-sm font-medium transition-colors ${
-                  selectedWeight === w && !showCustomWeight
-                    ? 'border-amber-500 bg-amber-500/20 text-amber-400'
-                    : 'border-white/20 bg-white/5 text-white hover:bg-white/10'
-                }`}
-              >
-                {w}
-              </button>
-            ))}
-            <button
-              onClick={() => { setShowCustomWeight(true); setSelectedWeight(null); }}
-              className={`w-12 h-12 rounded-lg border text-xs font-medium transition-colors ${
-                showCustomWeight
-                  ? 'border-amber-500 bg-amber-500/20 text-amber-400'
-                  : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10'
-              }`}
-            >
-              ...
-            </button>
-          </div>
-
-          {showCustomWeight && (
-            <div className="mt-3 flex justify-center">
+        {/* Input fields */}
+        <div className="flex gap-3 mb-4">
+          {/* Reps input - show for bodyweight-type exercises */}
+          {isBodyweightType && (
+            <div className="flex-1">
+              <label className="text-xs text-white/50 uppercase tracking-wide mb-1.5 block">Reps</label>
               <input
                 type="number"
-                value={customWeight}
-                onChange={(e) => setCustomWeight(e.target.value)}
-                placeholder="Weight"
-                className="w-24 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-center text-sm placeholder:text-white/40 focus:outline-none focus:border-amber-500"
-                autoFocus
+                inputMode="numeric"
+                value={repsInput}
+                onChange={(e) => setRepsInput(e.target.value)}
+                placeholder="8"
+                className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-center text-lg font-medium placeholder:text-white/30 focus:outline-none focus:border-amber-500"
               />
-              <span className="ml-2 text-white/60 self-center">lb</span>
             </div>
           )}
+          
+          {/* Weight input */}
+          <div className="flex-1">
+            <label className="text-xs text-white/50 uppercase tracking-wide mb-1.5 block">Weight</label>
+            <div className="relative">
+              <input
+                type="number"
+                inputMode="numeric"
+                value={weightInput}
+                onChange={(e) => setWeightInput(e.target.value)}
+                placeholder="0"
+                className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-center text-lg font-medium placeholder:text-white/30 focus:outline-none focus:border-amber-500"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 text-sm">lb</span>
+            </div>
+          </div>
         </div>
 
         {/* Explanation */}
-        <p className="text-xs text-white/50 text-center mb-4">
-          Updates your plan going forward.
+        <p className="text-xs text-white/40 text-center mb-4">
+          Updates plan going forward
         </p>
 
         {/* Error */}
@@ -240,14 +171,14 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-3 px-4 rounded-xl border border-white/20 text-white/70 hover:bg-white/5 transition-colors"
+            className="flex-1 py-2.5 px-4 rounded-xl border border-white/20 text-white/60 hover:bg-white/5 transition-colors text-sm"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || getFinalWeight() == null}
-            className="flex-1 py-3 px-4 rounded-xl bg-amber-500 text-black font-medium hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            disabled={saving || (getFinalWeight() == null && getFinalReps() == null)}
+            className="flex-1 py-2.5 px-4 rounded-xl bg-amber-500 text-black font-medium hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
           >
             {saving ? 'Saving...' : 'Save'}
           </button>
