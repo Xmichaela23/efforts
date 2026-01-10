@@ -438,8 +438,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       
       // COMPLETED: Show actual metrics
       if (workout.type === 'strength') {
-        // Strength: show exercise abbreviations with their set/rep/weight info
-        // Read from strength_exercises field which contains the actual workout data
+        // Strength: show clean summary (exercise count + total volume)
         const parseSets = (x:any)=> {
           if (Array.isArray(x)) return x;
           if (typeof x === 'string') { try { const p = JSON.parse(x); return Array.isArray(p) ? p : []; } catch { return []; } }
@@ -459,78 +458,38 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           const b = normalizeExercises((workout as any)?.computed?.strength_exercises);
           return b;
         })();
-        try {
-          // Debug logging removed to prevent infinite re-renders
-        } catch {}
         
         if (exercises.length > 0) {
-          // Create exercise summaries with abbreviations
-          const exerciseSummaries = exercises.map(ex => {
-            const exerciseName = (ex.name || '').trim();
-            const lower = exerciseName.toLowerCase();
-            const sets = ex.sets?.length || 0;
-            const avgReps = ex.sets?.reduce((total, set) => total + (set.reps || 0), 0) / (sets || 1);
-
-            // Compute weight range across sets
-            let weightRange = '';
-            if (Array.isArray(ex.sets) && ex.sets.length > 0) {
-              const weights = ex.sets.map((s:any)=> Number(s?.weight || 0)).filter((w:number)=> isFinite(w) && w>0);
-              if (weights.length > 0) {
-                const minWeight = Math.min(...weights);
-                const maxWeight = Math.max(...weights);
-                weightRange = (minWeight === maxWeight) ? `${minWeight}lbs` : `${minWeight}-${maxWeight}lbs`;
-              } else {
-                weightRange = '';
+          // Calculate total volume (sets × reps × weight)
+          let totalVolume = 0;
+          let totalSets = 0;
+          exercises.forEach(ex => {
+            const sets = ex.sets || [];
+            totalSets += sets.length;
+            sets.forEach((s: any) => {
+              const reps = Number(s?.reps) || 0;
+              const weight = Number(s?.weight) || 0;
+              if (reps > 0 && weight > 0) {
+                totalVolume += reps * weight;
               }
-            }
-
-            // Abbreviation map
-            const abbrevFor = (): string => {
-              const has = (s: string) => lower.includes(s);
-              if (has('ohp') || has('overhead press') || has('shoulder press')) return 'OHP';
-              if (has('bench press') || has('flat bench')) return 'BP';
-              if (has('incline bench')) return 'IBP';
-              if (has('deadlift') || has('dead lift')) return has('romanian') || has('rdl') ? 'RDL' : 'DL';
-              if (has('front squat')) return 'FSQ';
-              if (has('goblet squat')) return 'GSQ';
-              if (has('squat')) return 'SQ';
-              if (has('bent over row') || has('barbell row') || has('row')) return 'ROW';
-              if (has('pull-up') || has('pull up')) return 'PU';
-              if (has('chin-up') || has('chin up')) return 'CU';
-              if (has('lat pulldown') || has('lat pull-down') || has('pulldown')) return 'LPD';
-              if (has('face pull')) return 'FP';
-              if (has('lateral raise') || has('lat raise')) return 'LR';
-              if (has('hip thrust')) return 'HT';
-              if (has('lunge')) return 'LNG';
-              if (has('dip')) return 'DIP';
-              if (has('curl')) return 'CURL';
-              // Multi-word fallback: initials
-              const words = exerciseName.split(/\s+/).filter(Boolean);
-              if (words.length >= 2) return words.map(w => w[0]).join('').toUpperCase().slice(0,4);
-              // Single-word fallback: first 3 letters
-              return exerciseName.slice(0,3).toUpperCase();
-            };
-
-            const abbreviation = abbrevFor();
-            const reps = Math.round(avgReps || 0);
-            const lead = weightRange ? `${weightRange} ${sets}×${reps}` : `${sets}×${reps}`;
-            return `${abbreviation} ${lead}`.trim();
+            });
           });
           
-          return exerciseSummaries.map((summary, index) => {
-            return {
-              icon: Dumbbell,
-              value: summary
-            };
-          });
+          const metrics: any[] = [];
+          metrics.push({ icon: Dumbbell, value: `${exercises.length} exercises` });
+          if (totalSets > 0) {
+            metrics.push({ icon: Activity, value: `${totalSets} sets` });
+          }
+          if (totalVolume > 0) {
+            const volumeK = totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}k` : `${totalVolume}`;
+            metrics.push({ icon: Activity, value: `${volumeK} lb` });
+          }
+          return metrics;
         }
 
-        // Fallback if no exercises
-        return [
-          { icon: Dumbbell, value: 'No exercises' }
-        ];
+        return [{ icon: Dumbbell, value: 'No exercises' }];
       } else if (workout.type === 'mobility') {
-        // Mobility: show simple set summaries from executed.mobility_exercises (unified source)
+        // Mobility: show clean summary (exercise count + duration)
         const parseList = (src:any): any[] => {
           if (Array.isArray(src)) return src;
           if (typeof src === 'string') { try { const p = JSON.parse(src); return Array.isArray(p) ? p : []; } catch { return []; } }
@@ -538,38 +497,24 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         };
         const items = parseList((workout as any)?.mobility_exercises) || parseList((workout as any)?.computed?.mobility_exercises);
         if (items.length > 0) {
-          const codeFromName = (nm:string): string => {
-            const name = String(nm||'').trim();
-            const lower = name.toLowerCase();
-            // Use simple initials for multi-word names; else first 3 letters
-            const words = name.split(/\s+/).filter(Boolean);
-            if (words.length >= 2) return words.map(w=>w[0]).join('').toUpperCase().slice(0,4);
-            return name.slice(0,3).toUpperCase();
-          };
-          const chips = items.map((it:any)=>{
-            const name = String(it?.name||'').trim();
-            const dur = String(it?.duration||'');
-            const m = dur.match(/(\d+)\s*[x×]\s*(\d+)/i);
-            const sets = m ? parseInt(m[1],10) : undefined;
-            const reps = m ? parseInt(m[2],10) : undefined;
-            // Prefer weight_display (includes "each" for per-hand exercises)
-            const weightDisplay = it?.weight_display;
-            let w = it?.weight; let wNum = (typeof w==='number') ? w : (typeof w==='string' ? parseFloat(w): 0);
-            if (!Number.isFinite(wNum)) wNum = 0;
-            const parts: string[] = [];
-            parts.push(codeFromName(name));
-            if (typeof sets==='number' && typeof reps==='number') parts.push(`${sets}×${reps}`);
-            if (weightDisplay && weightDisplay !== 'Bodyweight' && weightDisplay !== 'Band') {
-              parts.push(`@ ${weightDisplay}`);
-            } else if (wNum>0) {
-              parts.push(`@ ${Math.round(wNum)} lb`);
-            }
-            const val = parts.join(' ');
-            return { icon: Dumbbell, value: val || codeFromName(name) };
+          const metrics: any[] = [];
+          metrics.push({ icon: Dumbbell, value: `${items.length} exercises` });
+          
+          // Calculate total sets if available
+          let totalSets = 0;
+          items.forEach((it: any) => {
+            const dur = String(it?.duration || '');
+            const m = dur.match(/(\d+)\s*[x×]/i);
+            if (m) totalSets += parseInt(m[1], 10);
+            else totalSets += 1; // Default 1 set if not specified
           });
-          return chips;
+          if (totalSets > 0) {
+            metrics.push({ icon: Activity, value: `${totalSets} sets` });
+          }
+          
+          return metrics;
         }
-        return [ { icon: Dumbbell, value: 'No exercises' } ];
+        return [{ icon: Dumbbell, value: 'No exercises' }];
       } else if (workout.type === 'pilates_yoga') {
         // Pilates/Yoga: show session type, duration, RPE, and focus areas
         const metadata = (workout as any)?.workout_metadata || {};
