@@ -196,19 +196,21 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     };
   }, [completedExercises]);
 
+  const isMobility = String(workoutData?.type || '').toLowerCase() === 'mobility';
+  
   return (
     <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
-      {/* Header - Single header with dumbbell icon */}
+      {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Dumbbell className="h-5 w-5 text-gray-600" />
-            <h1 className="text-xl font-semibold text-gray-900">{workoutData.name}</h1>
+            {!isMobility && <Dumbbell className="h-5 w-5 text-white/60" />}
+            <h1 className="text-xl font-semibold text-white">{workoutData.name}</h1>
           </div>
           {(getSessionRPE(workoutData) !== undefined || getWorkoutNotes(workoutData)) && (
-            <div className="flex items-center gap-4 text-sm text-gray-700">
+            <div className="flex items-center gap-4 text-sm text-white/70">
               {getSessionRPE(workoutData) !== undefined && (
-                <div className="px-2 py-1 rounded bg-gray-100">RPE: {getSessionRPE(workoutData)}</div>
+                <div className="px-2 py-1 rounded bg-white/10">RPE: {getSessionRPE(workoutData)}</div>
               )}
               {getWorkoutNotes(workoutData) && (
                 <div className="hidden sm:block max-w-[360px] truncate" title={getWorkoutNotes(workoutData)}>Notes: {getWorkoutNotes(workoutData)}</div>
@@ -216,8 +218,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
             </div>
           )}
         </div>
-        <div className="flex items-center gap-4 text-sm text-gray-600">
-          <span className="font-medium">{workoutStats.actual.volume.toLocaleString()} lbs total</span>
+        <div className="flex items-center gap-4 text-sm text-white/60">
+          {!isMobility && workoutStats.actual.volume > 0 && (
+            <span className="font-medium">{workoutStats.actual.volume.toLocaleString()} lbs total</span>
+          )}
           {(workoutData as any).workload_actual || (workoutData as any).workload_planned ? (
             <span className="workload-line">
               Workload: {(workoutData as any).workload_actual || (workoutData as any).workload_planned}
@@ -230,7 +234,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           <div className="pt-2">
             <button
               onClick={() => setShowComparison(!showComparison)}
-              className="text-sm text-gray-600 hover:text-gray-700 font-medium"
+              className="text-sm text-white/60 hover:text-white/80 font-medium"
             >
               {showComparison ? 'Hide Plan Comparison' : 'Compare to Plan →'}
             </button>
@@ -240,9 +244,9 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
       {/* Notes (expanded block on mobile/smaller screens) */}
       {getWorkoutNotes(workoutData) && (
-        <div className="p-3 bg-gray-50 rounded-md sm:hidden">
-          <div className="text-sm text-gray-900 font-medium mb-1">Notes</div>
-          <div className="text-sm text-gray-700 whitespace-pre-wrap">{getWorkoutNotes(workoutData)}</div>
+        <div className="p-3 bg-white/5 rounded-md sm:hidden">
+          <div className="text-sm text-white font-medium mb-1">Notes</div>
+          <div className="text-sm text-white/70 whitespace-pre-wrap">{getWorkoutNotes(workoutData)}</div>
         </div>
       )}
 
@@ -273,7 +277,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                 // Clean completed view (default)
         <div className="space-y-6">
           {completedExercises.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-white/50">
               No completed exercises found
             </div>
           ) : (
@@ -284,6 +288,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
               if (!exercise.sets || !Array.isArray(exercise.sets)) return null;
               
               const exerciseVolume = calculateExerciseVolume(exercise.sets);
+              const hasWeight = exercise.sets.some(s => s.weight && s.weight > 0);
 
               return (
                 <div key={exercise.id || index} className="space-y-3">
@@ -291,32 +296,36 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                     <div>
                       <h3 className="font-semibold text-white">{exercise.name}</h3>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-white/80">
-                        {exerciseVolume.toLocaleString()} lbs
+                    {hasWeight && exerciseVolume > 0 && (
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-white/70">
+                          {exerciseVolume.toLocaleString()} lbs
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
-                    <div className="grid grid-cols-4 gap-2 text-xs font-medium text-white/50 pb-1 border-b border-white/20">
+                    <div className={`grid ${hasWeight ? 'grid-cols-4' : 'grid-cols-2'} gap-2 text-xs font-medium text-white/60 pb-1 border-b border-white/20`}>
                       <span>Set</span>
-                      <span>Weight</span>
+                      {hasWeight && <span>Weight</span>}
                       <span>Reps</span>
-                      <span>RIR</span>
+                      {hasWeight && <span>RIR</span>}
                     </div>
                     
                     {exercise.sets.map((set, setIndex) => {
                       return (
-                        <div key={setIndex} className="grid grid-cols-4 gap-2 text-sm text-white/90">
-                          <span className="text-white/60">{setIndex + 1}</span>
-                          <span className="font-medium">
-                            {set.weight || 0} lbs
-                          </span>
+                        <div key={setIndex} className={`grid ${hasWeight ? 'grid-cols-4' : 'grid-cols-2'} gap-2 text-sm text-white`}>
+                          <span className="text-white/70">{setIndex + 1}</span>
+                          {hasWeight && (
+                            <span className="font-medium">
+                              {set.weight || 0} lbs
+                            </span>
+                          )}
                           <span>
                             {set.reps || 0}
                           </span>
-                          <span className="text-white/50">{set.rir || '-'}</span>
+                          {hasWeight && <span className="text-white/60">{set.rir || '-'}</span>}
                         </div>
                       );
                     })}
@@ -334,10 +343,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
         if (sessionRPE === undefined) return null;
         return (
           <div className="py-4">
-            <h3 className="font-medium text-gray-900 mb-2">Session RPE</h3>
+            <h3 className="font-medium text-white mb-2">Session RPE</h3>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-gray-900">{sessionRPE}</span>
-              <span className="text-sm text-gray-600">
+              <span className="text-2xl font-bold text-white">{sessionRPE}</span>
+              <span className="text-sm text-white/60">
                 {sessionRPE <= 3 ? 'Light' :
                  sessionRPE <= 5 ? 'Moderate' :
                  sessionRPE <= 7 ? 'Hard' :
@@ -354,18 +363,18 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
         if (!readiness) return null;
         return (
           <div className="py-4">
-            <h3 className="font-medium text-gray-900 mb-2">Pre-Workout Readiness</h3>
-            <div className="grid grid-cols-3 gap-4 text-sm">
+            <h3 className="font-medium text-white mb-2">Pre-Workout Readiness</h3>
+            <div className="grid grid-cols-3 gap-4 text-sm text-white">
               <div>
-                <div className="text-gray-600">Energy</div>
+                <div className="text-white/60">Energy</div>
                 <div className="font-medium">{readiness.energy}/10</div>
               </div>
               <div>
-                <div className="text-gray-600">Soreness</div>
+                <div className="text-white/60">Soreness</div>
                 <div className="font-medium">{readiness.soreness}/10</div>
               </div>
               <div>
-                <div className="text-gray-600">Sleep</div>
+                <div className="text-white/60">Sleep</div>
                 <div className="font-medium">{readiness.sleep}h</div>
               </div>
             </div>
@@ -376,28 +385,30 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
       {/* Notes Section */}
       {workoutData.userComments && (
         <div className="py-4">
-          <h3 className="font-medium text-gray-900 mb-2">Notes</h3>
-          <p className="text-sm text-gray-700">{workoutData.userComments}</p>
+          <h3 className="font-medium text-white mb-2">Notes</h3>
+          <p className="text-sm text-white/70">{workoutData.userComments}</p>
         </div>
       )}
 
-      {/* Workout Statistics */}
-      <div className="py-4">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-lg font-semibold text-gray-900">{workoutStats.actual.sets}</div>
-            <div className="text-xs text-gray-500">Total Sets</div>
-          </div>
-          <div>
-            <div className="text-lg font-semibold text-gray-900">{workoutStats.actual.reps}</div>
-            <div className="text-xs text-gray-500">Total Reps</div>
-          </div>
-          <div>
-            <div className="text-lg font-semibold text-gray-900">{workoutStats.actual.volume.toLocaleString()}</div>
-            <div className="text-xs text-gray-500">Volume (lbs)</div>
+      {/* Workout Statistics - only show for strength (has weight data) */}
+      {!isMobility && workoutStats.actual.volume > 0 && (
+        <div className="py-4">
+          <div className="grid grid-cols-3 gap-4 text-center text-white">
+            <div>
+              <div className="text-lg font-semibold">{workoutStats.actual.sets}</div>
+              <div className="text-xs text-white/50">Total Sets</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold">{workoutStats.actual.reps}</div>
+              <div className="text-xs text-white/50">Total Reps</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold">{workoutStats.actual.volume.toLocaleString()}</div>
+              <div className="text-xs text-white/50">Volume (lbs)</div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
