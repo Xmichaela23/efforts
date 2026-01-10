@@ -458,8 +458,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       // Handle standard format with sets array
       return { name: ex.name, setsArray: Array.isArray(ex.sets) ? ex.sets : [] };
     });
-    // Get plan ID for adjustments
-    const planId = (planned as any)?.training_plan_id || (completed as any)?.training_plan_id;
+    // Get plan ID for adjustments - try multiple field names
+    const planId = (planned as any)?.training_plan_id 
+      || (completed as any)?.training_plan_id 
+      || (completed as any)?.plan_id
+      || (planned as any)?.plan_id;
+    
+    // Also need planned workout ID to fetch plan_id if missing
+    const plannedWorkoutId = (planned as any)?.id || (completed as any)?.planned_id;
     
     return (
       <div className="space-y-4">
@@ -467,6 +473,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           planned={plannedExercises} 
           completed={completedExercises} 
           planId={planId}
+          plannedWorkoutId={plannedWorkoutId}
           onAdjustmentSaved={() => window.dispatchEvent(new CustomEvent('plan:adjusted'))}
         />
         {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (

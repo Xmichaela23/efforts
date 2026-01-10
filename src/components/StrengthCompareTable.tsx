@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import StrengthAdjustmentModal from './StrengthAdjustmentModal';
+import { supabase } from '@/lib/supabase';
 
 export interface StrengthSet { reps?: number; duration_seconds?: number; weight: number; rir?: number; completed?: boolean }
 export interface StrengthExercise { 
@@ -38,10 +39,11 @@ interface StrengthCompareTableProps {
   planned: StrengthExercise[];
   completed: StrengthExercise[];
   planId?: string;
+  plannedWorkoutId?: string;
   onAdjustmentSaved?: () => void;
 }
 
-export default function StrengthCompareTable({ planned, completed, planId, onAdjustmentSaved }: StrengthCompareTableProps){
+export default function StrengthCompareTable({ planned, completed, planId: initialPlanId, plannedWorkoutId, onAdjustmentSaved }: StrengthCompareTableProps){
   const [adjustingExercise, setAdjustingExercise] = useState<{
     name: string;
     currentWeight: number;
@@ -49,6 +51,37 @@ export default function StrengthCompareTable({ planned, completed, planId, onAdj
     targetRir?: number;
     actualRir?: number;
   } | null>(null);
+  
+  // Fetch plan ID from planned workout if not provided
+  const [resolvedPlanId, setResolvedPlanId] = useState<string | undefined>(initialPlanId);
+  
+  useEffect(() => {
+    if (initialPlanId) {
+      setResolvedPlanId(initialPlanId);
+      return;
+    }
+    
+    // If no planId but we have plannedWorkoutId, fetch it
+    if (!initialPlanId && plannedWorkoutId) {
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from('planned_workouts')
+            .select('training_plan_id')
+            .eq('id', plannedWorkoutId)
+            .maybeSingle();
+          
+          if (data?.training_plan_id) {
+            setResolvedPlanId(data.training_plan_id);
+          }
+        } catch (e) {
+          console.error('Failed to fetch plan ID:', e);
+        }
+      })();
+    }
+  }, [initialPlanId, plannedWorkoutId]);
+  
+  const planId = resolvedPlanId;
 
   const plannedMap = new Map<string, StrengthExercise>();
   planned.forEach(p => plannedMap.set(normalizeName(p.name), p));
