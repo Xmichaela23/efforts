@@ -111,8 +111,8 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
 
   return (
     <div 
-      className="absolute top-full right-0 mt-2 z-[200] bg-zinc-900 border border-white/20 rounded-xl shadow-2xl p-4"
-      style={{ fontFamily: 'Inter, sans-serif', width: 260 }}
+      className="absolute top-full left-0 mt-2 z-[200] bg-zinc-900 border border-white/20 rounded-xl shadow-2xl p-4"
+      style={{ fontFamily: 'Inter, sans-serif', width: 240, minWidth: 200 }}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
