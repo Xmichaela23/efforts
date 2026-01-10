@@ -140,11 +140,12 @@ function createMondayLowerBody(
       description = 'Recovery Week - Same weights, reduced volume. Let your body adapt to recent increases. Target: 2 sets, RIR 4-5.';
     } else if (phase.name === 'Base') {
       // Base: Build hip power foundation + squat strength
-      const load = 70 + Math.min(5, weekInPhase); // 71%, 72%, 73%, 74%, 75%
+      // Use 3% increments (70%, 73%, 76%, 79%) to ensure visible weight changes with 5lb rounding
+      const load = 70 + (Math.min(4, weekInPhase) * 3); // 70%, 73%, 76%, 79%
       exercises.push(
         { name: 'Back Squat', sets: 3, reps: 8, weight: `${load}% 1RM` },
         { name: 'Hip Thrusts', sets: 4, reps: 8, weight: `${load}% 1RM` },
-        { name: 'Romanian Deadlift', sets: 3, reps: 8, weight: `${load - 5}% 1RM` },
+        { name: 'Romanian Deadlift', sets: 3, reps: 8, weight: `${Math.max(65, load - 5)}% 1RM` },
         { name: 'Walking Lunges', sets: 3, reps: '8/leg', weight: 'Light DB' }
       );
       duration = 45;
@@ -259,7 +260,8 @@ function createWednesdayUpperBody(
       description = 'Recovery Week - Same weights as last week, fewer sets. Your muscles adapt during rest. Resume progression next week.';
     } else if (phase.name === 'Base') {
       // Base: Hypertrophy focus (4x10 → 4x8 as weights increase)
-      const baseLoad = 70 + Math.min(5, weekInPhase); // Progress 70% → 75%
+      // Use 3% increments (70%, 73%, 76%, 79%) to ensure visible weight changes with 5lb rounding
+      const baseLoad = 70 + (Math.min(4, weekInPhase) * 3); // Progress 70% → 79%
       exercises.push(
         { name: 'Bench Press', sets: 4, reps: 10, weight: `${baseLoad}% 1RM` },
         { name: 'Barbell Rows', sets: 4, reps: 10, weight: `${baseLoad}% 1RM` },
@@ -405,10 +407,11 @@ function createFridayLowerBody(
       duration = 30;
       description = 'Recovery Week - Light single-leg work. Maintain patterns, no fatigue.';
     } else if (phase.name === 'Base') {
-      const load = 60 + Math.min(5, weekInPhase); // 61% → 65%
+      // Use 3% increments (60%, 63%, 66%, 69%) to ensure visible weight changes with 5lb rounding
+      const load = 60 + (Math.min(4, weekInPhase) * 3); // 60% → 69%
       exercises.push(
         { name: 'Bulgarian Split Squat', sets: 3, reps: '10/leg', weight: `${load}% 1RM` },
-        { name: 'Single Leg RDL', sets: 3, reps: '10/leg', weight: `${load - 5}% 1RM` },
+        { name: 'Single Leg RDL', sets: 3, reps: '10/leg', weight: `${Math.max(55, load - 5)}% 1RM` },
         { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: 'Light DBs' },
         { name: 'Clamshells', sets: 2, reps: '20/side', weight: 'Light band' },
         { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight' }
