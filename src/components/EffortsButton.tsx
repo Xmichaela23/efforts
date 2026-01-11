@@ -13,6 +13,10 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
   const uniqueId = React.useId().replace(/:/g, '');
   const fontFamily = "'Rajdhani', 'Orbitron', system-ui, sans-serif";
   const circleSize = size * 2.4; // larger circle for breathing room
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  
+  // Parallax state
+  const [parallax, setParallax] = React.useState({ x: 0, y: 0 });
   
   // Discipline colors for gradient ring
   const colors = {
@@ -23,8 +27,64 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
     swim: '#2B5A8C',
   };
   
+  // Parallax effect - device orientation for mobile, mouse for desktop
+  React.useEffect(() => {
+    const handleDeviceOrientation = (e: DeviceOrientationEvent) => {
+      if (e.gamma !== null && e.beta !== null) {
+        // Normalize device orientation to parallax values
+        const x = (e.gamma / 45) * 2; // -2 to 2
+        const y = (e.beta / 45) * 2; // -2 to 2
+        setParallax({ x: Math.max(-2, Math.min(2, x)), y: Math.max(-2, Math.min(2, y)) });
+      }
+    };
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const x = ((e.clientX - centerX) / rect.width) * 4; // -2 to 2
+      const y = ((e.clientY - centerY) / rect.height) * 4; // -2 to 2
+      setParallax({ x: Math.max(-2, Math.min(2, x)), y: Math.max(-2, Math.min(2, y)) });
+    };
+    
+    const handleMouseLeave = () => {
+      setParallax({ x: 0, y: 0 });
+    };
+    
+    // Try device orientation first (mobile)
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', handleDeviceOrientation as EventListener);
+    }
+    
+    // Mouse parallax for desktop
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('mousemove', handleMouseMove);
+      container.addEventListener('mouseleave', handleMouseLeave);
+    }
+    
+    return () => {
+      window.removeEventListener('deviceorientation', handleDeviceOrientation as EventListener);
+      if (container) {
+        container.removeEventListener('mousemove', handleMouseMove);
+        container.removeEventListener('mouseleave', handleMouseLeave);
+      }
+    };
+  }, []);
+  
+  // Parallax multipliers for each cascade layer (deeper = more movement)
+  const parallaxLayers = [
+    0,      // white e - no parallax
+    0.3,    // teal - closest
+    0.5,    // orange
+    0.7,    // green
+    0.9,    // purple
+    1.1,    // swim blue - furthest
+  ];
+  
   return (
-    <div className={`relative inline-flex items-center ${className}`}>
+    <div ref={containerRef} className={`relative inline-flex items-center ${className}`}>
       {/* Gradient circle with full-size "e" */}
       <svg
         width={circleSize}
@@ -77,7 +137,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           filter={`url(#ringGlow-${uniqueId})`}
         />
         
-        {/* WHITE "e" - centered with breathing room */}
+        {/* WHITE "e" - centered with breathing room, minimal parallax */}
         <text
           x={42}
           y={42}
@@ -88,11 +148,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          transform={`translate(${parallax.x * parallaxLayers[0]}, ${parallax.y * parallaxLayers[0]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
         
-        {/* Teal */}
+        {/* Teal - layer 1 */}
         <text
           x={56}
           y={56}
@@ -103,11 +165,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          transform={`translate(${parallax.x * parallaxLayers[1]}, ${parallax.y * parallaxLayers[1]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
         
-        {/* Orange */}
+        {/* Orange - layer 2 */}
         <text
           x={67}
           y={67}
@@ -118,11 +182,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          transform={`translate(${parallax.x * parallaxLayers[2]}, ${parallax.y * parallaxLayers[2]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
         
-        {/* Green */}
+        {/* Green - layer 3 */}
         <text
           x={76}
           y={76}
@@ -133,11 +199,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          transform={`translate(${parallax.x * parallaxLayers[3]}, ${parallax.y * parallaxLayers[3]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
         
-        {/* Purple */}
+        {/* Purple - layer 4 */}
         <text
           x={84}
           y={84}
@@ -148,11 +216,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          transform={`translate(${parallax.x * parallaxLayers[4]}, ${parallax.y * parallaxLayers[4]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
         
-        {/* Swim blue */}
+        {/* Swim blue - layer 5, deepest */}
         <text
           x={91}
           y={91}
@@ -163,6 +233,8 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          transform={`translate(${parallax.x * parallaxLayers[5]}, ${parallax.y * parallaxLayers[5]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
