@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
+import { EffortsWordmark } from './EffortsButton';
 import {
   calculateEffortScoreResult,
   raceDistanceToMeters,
@@ -2551,7 +2552,8 @@ export default function PlanWizard() {
       <header className="mobile-header">
         <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full">
-            <div className="flex items-center space-x-1 pl-4">
+            {/* Left: Menu */}
+            <div className="flex items-center pl-4 w-12">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="p-0.5 text-white/80 hover:text-white hover:bg-white/10">
@@ -2564,10 +2566,15 @@ export default function PlanWizard() {
                   <DropdownMenuItem onClick={() => navigate('/')} className="text-white/80 hover:text-white hover:bg-white/10">Dashboard</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-
-              <h1 className="text-2xl font-bold text-white">efforts</h1>
             </div>
-            <div className="pr-4">
+
+            {/* Center: Wordmark - offset to center the circle */}
+            <div className="flex-1 flex justify-center items-center" style={{ marginLeft: 60, marginTop: 4 }}>
+              <EffortsWordmark size={38} />
+            </div>
+
+            {/* Right: Step counter */}
+            <div className="w-12 pr-4 flex justify-end">
               <span className="text-sm text-white/60">
                 {step + 1} of {getStepCount()}
               </span>
