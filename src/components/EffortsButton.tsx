@@ -239,24 +239,6 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           e
         </text>
       </svg>
-      
-      {/* "fforts" text - aligned with white e baseline */}
-      <span
-        style={{
-          fontSize: size,
-          fontWeight: 300,
-          fontFamily,
-          letterSpacing: '0.08em',
-          color: '#fff',
-          textTransform: 'lowercase',
-          position: 'relative',
-          zIndex: 3, // on top for bright ff
-          marginTop: -size * 0.25, // lower to match white e
-          marginLeft: -size * 0.02,
-        }}
-      >
-        fforts
-      </span>
     </div>
   );
 }
@@ -521,9 +503,10 @@ function EffortsButtonGradient({
           {/* Conic gradient for the ring */}
           <linearGradient id={`arcGradient-${uniqueId}`} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={colors.swim}/>
-            <stop offset="25%" stopColor={colors.run}/>
-            <stop offset="50%" stopColor={colors.strength}/>
-            <stop offset="75%" stopColor={colors.pilates}/>
+            <stop offset="20%" stopColor="#3b82f6"/> {/* Blue */}
+            <stop offset="40%" stopColor={colors.run}/>
+            <stop offset="60%" stopColor={colors.strength}/>
+            <stop offset="80%" stopColor={colors.pilates}/>
             <stop offset="100%" stopColor={colors.swim}/>
           </linearGradient>
           

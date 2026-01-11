@@ -1,0 +1,50 @@
+<svg width="180" height="180" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Black background for entire icon -->
+  <rect width="200" height="200" fill="#000000"/>
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap');
+    </style>
+    <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2B5A8C"/>
+      <stop offset="20%" stop-color="#3b82f6"/>
+      <stop offset="40%" stop-color="#14b8a6"/>
+      <stop offset="60%" stop-color="#f97316"/>
+      <stop offset="80%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#2B5A8C"/>
+    </linearGradient>
+    <filter id="glowGradient" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="whiteGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="shadow"/>
+      <feFlood flood-color="black" flood-opacity="0.5"/>
+      <feComposite in2="shadow" operator="in" result="darkHalo"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="softGlow"/>
+      <feMerge>
+        <feMergeNode in="darkHalo"/>
+        <feMergeNode in="softGlow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="85" fill="none" stroke="url(#arcGradient)" stroke-width="2.5" filter="url(#glowGradient)" opacity="0.7"/>
+  <circle cx="100" cy="100" r="75" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+  <text x="92" y="92" text-anchor="middle" dominant-baseline="central" fill="white" font-size="140" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#whiteGlow)">e</text>
+  <text x="112" y="112" text-anchor="middle" dominant-baseline="central" fill="#14b8a6" font-size="105" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow)">e</text>
+  <text x="128" y="128" text-anchor="middle" dominant-baseline="central" fill="#f97316" font-size="78" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow)">e</text>
+  <text x="142" y="142" text-anchor="middle" dominant-baseline="central" fill="#22c55e" font-size="55" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow)">e</text>
+  <text x="154" y="154" text-anchor="middle" dominant-baseline="central" fill="#a855f7" font-size="38" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow)">e</text>
+  <text x="164" y="164" text-anchor="middle" dominant-baseline="central" fill="#2B5A8C" font-size="26" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow)">e</text>
+</svg>
