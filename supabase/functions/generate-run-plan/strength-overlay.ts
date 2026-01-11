@@ -477,6 +477,7 @@ function createFridayLowerBody(
       const bssWeight = weekInPhase >= 3 ? 30 : 25; // Bulgarian Split Squat
       const slrdlWeight = weekInPhase >= 3 ? 25 : 20; // Single Leg RDL
       const lateralWeight = weekInPhase >= 3 ? 40 : 35; // Lateral Lunges
+      console.log(`[StrengthOverlay] Friday Base: weekInPhase=${weekInPhase}, bssWeight=${bssWeight}, condition=${weekInPhase >= 3}`);
       exercises.push(
         { name: 'Bulgarian Split Squat', sets: 3, reps: '10/leg', weight: `${bssWeight} lb each` },
         { name: 'Single Leg RDL', sets: 3, reps: '10/leg', weight: `${slrdlWeight} lb each` },
