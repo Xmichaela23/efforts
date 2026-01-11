@@ -467,14 +467,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     // Also need planned workout ID to fetch plan_id if missing
     const plannedWorkoutId = (planned as any)?.id || (completed as any)?.planned_id;
     
-    console.log('📊 [MobileSummary] planId for adjustments:', {
-      planId,
-      'planned?.training_plan_id': (planned as any)?.training_plan_id,
-      'completed?.training_plan_id': (completed as any)?.training_plan_id,
-      'planned?.id': (planned as any)?.id,
-      plannedWorkoutId
-    });
-    
     return (
       <div className="space-y-4">
         <StrengthCompareTable 
