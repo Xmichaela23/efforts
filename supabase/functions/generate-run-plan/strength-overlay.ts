@@ -1,5 +1,5 @@
 // ============================================================================
-// STRENGTH OVERLAY SYSTEM v2.0
+// STRENGTH OVERLAY SYSTEM v2.1 - Equipment-aware dumbbell progression
 // 
 // PHILOSOPHY: Upper Body Gains + Lower Body Support
 // 
