@@ -189,18 +189,15 @@ function createMondayLowerBody(
       description = 'Recovery Week - Same weights, reduced volume. Let your body adapt to recent increases. Target: 2 sets, RIR 4-5.';
     } else if (phase.name === 'Base') {
       // Base: Build hip power foundation + squat strength
-      // Use 5% increments (70%, 75%, 80%, 85%) to ensure visible weight changes with 5lb rounding
       const load = 70 + (Math.min(4, weekInPhase) * 5); // 70%, 75%, 80%, 85%
-      // Walking Lunges with DBs: Fixed progression (DBs come in 5 lb increments)
-      const lungeWeight = weekInPhase >= 3 ? 30 : 25;
       exercises.push(
         { name: 'Back Squat', sets: 3, reps: 8, weight: `${load}% 1RM` },
         { name: 'Hip Thrusts', sets: 4, reps: 8, weight: `${load}% 1RM` },
         { name: 'Romanian Deadlift', sets: 3, reps: 8, weight: `${Math.max(65, load - 5)}% 1RM` },
-        { name: 'Walking Lunges', sets: 3, reps: '8/leg', weight: `${lungeWeight} lb each` }
+        { name: 'Walking Lunges', sets: 3, reps: '8/leg', weight: `${load - 10}% 1RM` }
       );
       duration = 45;
-      description = `Week ${weekInPhase} Base - Building lower body foundation. Add 5-10 lbs per week on squat, hip thrusts, and RDL. Target: 3-4x8 @ ${load}% 1RM, RIR 2-3.`;
+      description = `Week ${weekInPhase} Base - Building lower body foundation. Target: 3-4x8 @ ${load}% 1RM, RIR 2-3.`;
     } else if (phase.name === 'Speed') {
       // Speed: Explosive power, convert strength to speed
       exercises.push(
@@ -315,34 +312,28 @@ function createWednesdayUpperBody(
       description = 'Recovery Week - Same weights as last week, fewer sets. Your muscles adapt during rest. Resume progression next week.';
     } else if (phase.name === 'Base') {
       // Base: Build strength foundation (4x10 → 4x8 as weights increase)
-      // Use 5% increments (70%, 75%, 80%, 85%) to ensure visible weight changes with 5lb rounding
       const baseLoad = 70 + (Math.min(4, weekInPhase) * 5); // Progress 70% → 85%
-      // DB Shoulder Press: Fixed progression (DBs come in 5 lb increments)
-      const dbShoulderWeight = weekInPhase >= 3 ? 30 : 25;
       exercises.push(
         { name: 'Bench Press', sets: 4, reps: 10, weight: `${baseLoad}% 1RM` },
         { name: 'Barbell Rows', sets: 4, reps: 10, weight: `${baseLoad}% 1RM` },
         { name: 'Pull-ups', sets: 4, reps: '8-10', weight: 'Bodyweight' },
-        { name: 'DB Shoulder Press', sets: 3, reps: 10, weight: `${dbShoulderWeight} lb each` },
+        { name: 'DB Shoulder Press', sets: 3, reps: 10, weight: `${baseLoad - 10}% 1RM` },
         { name: 'Band Face Pulls', sets: 3, reps: 15, weight: 'Light band/cable' }
       );
       duration = 45;
-      description = `Week ${weekInPhase} Base - Building strength foundation. When you hit 4x10 cleanly, add 5 lbs next week. Target: 4x10 @ ${baseLoad}% 1RM.`;
+      description = `Week ${weekInPhase} Base - Building strength foundation. Target: 4x10 @ ${baseLoad}% 1RM.`;
     } else if (phase.name === 'Speed') {
       // Speed: KEEP BUILDING - upper body doesn't need to back off
-      // Use 3% increments (78%, 81%, 84%) - smaller than base but still visible progression
       const speedLoad = 78 + (Math.min(3, weekInPhase) * 3); // Progress 78% → 87%
-      // DB Shoulder Press: Continue progression from base phase
-      const dbShoulderWeight = weekInPhase >= 2 ? 35 : 30;
       exercises.push(
         { name: 'Bench Press', sets: 4, reps: 8, weight: `${speedLoad}% 1RM` },
         { name: 'Barbell Rows', sets: 4, reps: 8, weight: `${speedLoad}% 1RM` },
         { name: 'Pull-ups', sets: 4, reps: '6-8', weight: 'Add weight if able' },
-        { name: 'DB Shoulder Press', sets: 3, reps: 8, weight: `${dbShoulderWeight} lb each` },
+        { name: 'DB Shoulder Press', sets: 3, reps: 8, weight: `${speedLoad - 10}% 1RM` },
         { name: 'Band Face Pulls', sets: 3, reps: 15, weight: 'Moderate band/cable' }
       );
       duration = 45;
-      description = `Week ${weekInPhase} Speed - KEEP BUILDING upper body. Running is harder, but your chest and back can still progress. You should be 10-20 lbs heavier on all lifts vs Week 1. Target: 4x8 @ ${speedLoad}% 1RM.`;
+      description = `Week ${weekInPhase} Speed - KEEP BUILDING upper body. Target: 4x8 @ ${speedLoad}% 1RM.`;
     } else if (isUpperPeakWeek) {
       // Race Prep Week 1: PEAK TEST - this is when you test your gains!
       exercises.push(
@@ -462,38 +453,33 @@ function createFridayLowerBody(
   
   if (tier === 'barbell') {
     if (isRecovery) {
-      // Recovery: -5 lb from Week 1 base weights
+      // Recovery: Reduced load and volume
       exercises.push(
-        { name: 'Bulgarian Split Squat', sets: 2, reps: '8/leg', weight: '20 lb each' },
-        { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: '15 lb each' },
-        { name: 'Lateral Lunges', sets: 2, reps: '8/leg', weight: 'Bodyweight' },
+        { name: 'Bulgarian Split Squat', sets: 2, reps: '8/leg', weight: '55% 1RM' },
+        { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: '50% 1RM' },
+        { name: 'Lateral Lunges', sets: 2, reps: '8/leg', weight: '50% 1RM' },
         { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
       );
       duration = 30;
       description = 'Recovery Week - Light single-leg work. Maintain patterns, no fatigue.';
     } else if (phase.name === 'Base') {
-      // Dumbbell accessories: Fixed weight progression (DBs come in 5 lb increments)
-      // Week 1-2: Hold base weight, Week 3+: +5 lb jump
-      const bssWeight = weekInPhase >= 3 ? 30 : 25; // Bulgarian Split Squat
-      const slrdlWeight = weekInPhase >= 3 ? 25 : 20; // Single Leg RDL
-      const lateralWeight = weekInPhase >= 3 ? 40 : 35; // Lateral Lunges
-      console.log(`[StrengthOverlay] Friday Base: weekInPhase=${weekInPhase}, bssWeight=${bssWeight}, condition=${weekInPhase >= 3}`);
+      // Use percentage-based progression - materializer will calculate from user's 1RM
+      const load = 60 + (Math.min(4, weekInPhase) * 5); // 65%, 70%, 75%, 80%
       exercises.push(
-        { name: 'Bulgarian Split Squat', sets: 3, reps: '10/leg', weight: `${bssWeight} lb each` },
-        { name: 'Single Leg RDL', sets: 3, reps: '10/leg', weight: `${slrdlWeight} lb each` },
-        { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: `${lateralWeight} lb` },
+        { name: 'Bulgarian Split Squat', sets: 3, reps: '10/leg', weight: `${load}% 1RM` },
+        { name: 'Single Leg RDL', sets: 3, reps: '10/leg', weight: `${Math.max(55, load - 5)}% 1RM` },
+        { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: `${load}% 1RM` },
         { name: 'Clamshells', sets: 2, reps: '20/side', weight: 'Light band' },
         { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight' }
       );
       duration = 40;
-      description = `Week ${weekInPhase} Base - Single-leg stability development. Dumbbells progress in 5 lb jumps (typically every 2-3 weeks).`;
+      description = `Week ${weekInPhase} Base - Single-leg stability development. Target: 3x10/leg @ ${load}% 1RM.`;
     } else if (phase.name === 'Speed') {
-      // Speed: Maintain Week 3 weights (post-progression)
-      const bssWeight = weekInPhase >= 2 ? 30 : 25;
-      const slrdlWeight = weekInPhase >= 2 ? 25 : 20;
+      // Speed: Maintain strength with reduced volume
+      const load = 65 + (Math.min(3, weekInPhase) * 3); // 68%, 71%, 74%
       exercises.push(
-        { name: 'Bulgarian Split Squat', sets: 2, reps: '8/leg', weight: `${bssWeight} lb each` },
-        { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: `${slrdlWeight} lb each` },
+        { name: 'Bulgarian Split Squat', sets: 2, reps: '8/leg', weight: `${load}% 1RM` },
+        { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: `${Math.max(60, load - 5)}% 1RM` },
         { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Moderate band' },
         { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' }
       );

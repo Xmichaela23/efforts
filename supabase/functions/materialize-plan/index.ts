@@ -867,21 +867,7 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
           let baselineMissing = false;
           let requiredBaseline: string | undefined = undefined;
           
-          // First check if weight is already an absolute value (e.g., "30 lb each", "25 lb")
-          const rawWeight = String((ex as any)?.weight || '');
-          const absoluteWeightMatch = rawWeight.match(/^(\d+(?:\.\d+)?)\s*lb/i);
-          const isAbsoluteWeight = absoluteWeightMatch && !rawWeight.toLowerCase().includes('1rm');
-          
-          if (isAbsoluteWeight) {
-            // Use the pre-set absolute weight from the strength overlay
-            const parsedWeight = parseFloat(absoluteWeightMatch[1]);
-            if (!isNaN(parsedWeight)) {
-              prescribed = parsedWeight;
-              weightDisplay = rawWeight; // Preserve original formatting ("30 lb each")
-              resolved_from = 'overlay'; // Mark as coming from overlay, not calculated
-              console.log(`[Materialize] Using pre-set weight for ${name}: ${rawWeight}`);
-            }
-          } else if (!isBandExercise && exerciseConfig) {
+          if (!isBandExercise && exerciseConfig) {
             // Use new research-based config for percentage-based weights
             const targetPercent = typeof percentRaw === 'number' ? percentRaw : 0.70; // Default 70%
             const result = calculateWeightFromConfig(name, targetPercent, baselines as any, reps);
@@ -1000,21 +986,7 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
           let baselineMissing = false;
           let requiredBaseline: string | undefined = undefined;
           
-          // First check if weight is already an absolute value (e.g., "30 lb each", "25 lb")
-          const rawWeight = String((ex as any)?.weight || '');
-          const absoluteWeightMatch = rawWeight.match(/^(\d+(?:\.\d+)?)\s*lb/i);
-          const isAbsoluteWeight = absoluteWeightMatch && !rawWeight.toLowerCase().includes('1rm');
-          
-          if (isAbsoluteWeight) {
-            // Use the pre-set absolute weight from the strength overlay
-            const parsedWeight = parseFloat(absoluteWeightMatch[1]);
-            if (!isNaN(parsedWeight)) {
-              prescribed = parsedWeight;
-              weightDisplay = rawWeight; // Preserve original formatting ("30 lb each")
-              resolved_from = 'overlay'; // Mark as coming from overlay, not calculated
-              console.log(`[Materialize] Using pre-set weight for ${name}: ${rawWeight}`);
-            }
-          } else if (!isBandExercise && exerciseConfig) {
+          if (!isBandExercise && exerciseConfig) {
             // Use new research-based config for percentage-based weights
             const targetPercent = typeof percentRaw === 'number' ? percentRaw : 0.70;
             const result = calculateWeightFromConfig(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined);
