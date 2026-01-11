@@ -721,12 +721,12 @@ export default function WorkoutCalendar({
                           const parts = label.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
                           if (parts.length > 0) {
                             const nonNumericParts = label.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
-                            return nonNumericParts.map((part, i) => {
-                              const isNumeric = parts.includes(part);
-                              return isNumeric ? (
-                                <span key={i} style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace" }}>{part}</span>
-                              ) : part;
-                            });
+                              return nonNumericParts.map((part, i) => {
+                                const isNumeric = parts.includes(part);
+                                return isNumeric ? (
+                                  <span key={i} style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", letterSpacing: '0.03em' }}>{part}</span>
+                                ) : part;
+                              });
                           }
                           return label;
                         })()}
@@ -825,11 +825,11 @@ export default function WorkoutCalendar({
                     </Popover>
                     <div className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      <span className="text-sm">{weeklyStats.planned}</span>
+                      <span className="text-sm" style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", letterSpacing: '0.02em' }}>{weeklyStats.planned}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" />
-                      <span className="text-sm">{weeklyStats.completed}</span>
+                      <span className="text-sm" style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", letterSpacing: '0.02em' }}>{weeklyStats.completed}</span>
                     </div>
                   </div>
                   
@@ -841,11 +841,13 @@ export default function WorkoutCalendar({
                     // Distance Totals - server-provided
                     if (weeklyStats.distances) {
                       if (weeklyStats.distances.run_meters > 0) {
+                        const runValue = useImperial 
+                          ? `${(weeklyStats.distances.run_meters / 1609.34).toFixed(1)} mi`
+                          : `${(weeklyStats.distances.run_meters / 1000).toFixed(1)} km`;
                         metrics.push({
                           label: 'Run:',
-                          value: useImperial 
-                            ? `${(weeklyStats.distances.run_meters / 1609.34).toFixed(1)} mi`
-                            : `${(weeklyStats.distances.run_meters / 1000).toFixed(1)} km`
+                          value: runValue,
+                          isNumeric: true
                         });
                       }
                       if (weeklyStats.distances.swim_meters > 0) {
@@ -899,9 +901,11 @@ export default function WorkoutCalendar({
                     }
                     
                     if (totalVolumeLoad > 0) {
+                      const strengthValue = `${totalVolumeLoad.toLocaleString()} ${useImperial ? 'lb' : 'kg'}`;
                       metrics.push({
                         label: 'Strength:',
-                        value: `${totalVolumeLoad.toLocaleString()} ${useImperial ? 'lb' : 'kg'}`
+                        value: strengthValue,
+                        isNumeric: true
                       });
                     }
                     
@@ -956,12 +960,33 @@ export default function WorkoutCalendar({
                     if (metrics.length > 0) {
                       return (
                         <div className="space-y-1 pt-1">
-                          {metrics.map((metric, index) => (
-                            <div key={index} className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">{metric.label}</span>
-                              <span className="font-light tracking-normal text-foreground">{metric.value}</span>
-                            </div>
-                          ))}
+                          {metrics.map((metric, index) => {
+                            // Extract numbers from value for monospace styling
+                            const valueParts = String(metric.value).match(/(\d+[.,]?\d*)/g) || [];
+                            const hasNumbers = valueParts.length > 0;
+                            
+                            return (
+                              <div key={index} className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">{metric.label}</span>
+                                <span 
+                                  className="font-light tracking-normal text-foreground"
+                                  style={hasNumbers ? { 
+                                    fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace",
+                                    letterSpacing: '0.02em'
+                                  } : {}}
+                                >
+                                  {hasNumbers ? (
+                                    String(metric.value).split(/(\d+[.,]?\d*)/g).map((part, i) => {
+                                      const isNumeric = valueParts.includes(part);
+                                      return isNumeric ? (
+                                        <span key={i} style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", letterSpacing: '0.02em' }}>{part}</span>
+                                      ) : part;
+                                    })
+                                  ) : metric.value}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     }

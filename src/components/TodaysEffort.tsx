@@ -1091,7 +1091,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const sec = resolveMovingSeconds(workout);
                             if (Number.isFinite(sec as any) && (sec as number) > 0) {
                               const mins = Math.round((sec as number) / 60);
-                              return <span className="text-white font-light" style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace" }}>{mins}:00</span>;
+                              return <span className="text-white font-light" style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", letterSpacing: '0.02em' }}>{mins}:00</span>;
                             }
                             return null;
                           })()}
