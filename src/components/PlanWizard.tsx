@@ -2437,7 +2437,7 @@ export default function PlanWizard() {
           {state.strengthFrequency > 0 && (
             <div className="mb-6 p-4 bg-amber-500/10 backdrop-blur-sm rounded-xl border border-amber-500/20">
               <p className="text-sm text-amber-200 leading-relaxed">
-                <span className="font-semibold text-amber-300">💪 Strength Training:</span> Weights are calculated from your 1RM baselines using research-backed ratios. Each session has a target RIR (Reps In Reserve). Adjust weights up or down based on how your actual RIR compares to the target.
+                <span className="font-semibold text-amber-300">Strength Training:</span> Weights are calculated from your 1RM baselines using research-backed ratios. Each session has a target RIR (Reps In Reserve). Adjust weights up or down based on how your actual RIR compares to the target.
               </p>
             </div>
           )}
