@@ -869,7 +869,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         <div className="space-y-1">
           {/* Line 1: Date */}
           <div>
-            <span className="text-lg font-light tracking-wide text-foreground">
+            <span className="text-lg font-semibold tracking-wide text-foreground">
               {formatDisplayDate(activeDate)}
             </span>
           </div>

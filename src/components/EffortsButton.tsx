@@ -92,10 +92,10 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate opacity for each layer (VU meter effect)
+  // Calculate opacity for each layer (VU meter effect - more pronounced heartbeat)
   const getVUOpacity = (layerIndex: number) => {
     const phase = pulsePhase + (layerIndex * 0.3); // Stagger each layer
-    return 0.85 + (Math.sin(phase) * 0.15); // Pulse between 0.85 and 1.0
+    return 0.7 + (Math.sin(phase) * 0.3); // Pulse between 0.7 and 1.0 (more visible)
   };
   
   return (
@@ -153,7 +153,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           filter={`url(#ringGlow-${uniqueId})`}
         /> */}
         
-        {/* WHITE "e" - centered with breathing room, minimal parallax */}
+        {/* WHITE "e" - centered with breathing room, minimal parallax, pulsing heartbeat */}
         <text
           x={42}
           y={42}
@@ -164,8 +164,9 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          opacity={getVUOpacity(0)}
           transform={`translate(${parallax.x * parallaxLayers[0]}, ${parallax.y * parallaxLayers[0]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>

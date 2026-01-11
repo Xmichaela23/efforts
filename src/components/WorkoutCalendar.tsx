@@ -645,7 +645,7 @@ export default function WorkoutCalendar({
       }}
     >
       {/* 3-column week grid filling remaining height with min cell size */}
-      <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full flex-1 relative" style={{ rowGap: 0, columnGap: 0, alignContent: 'stretch', alignItems: 'stretch' }}>
+      <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full flex-1 relative" style={{ rowGap: '2px', columnGap: '2px', alignContent: 'stretch', alignItems: 'stretch' }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -657,11 +657,12 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/20 rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-3 flex flex-col justify-between items-stretch",
+                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-2.5 flex flex-col justify-between items-stretch",
                 "hover:bg-white/[0.05] transition-all",
               ].join(" ")}
               style={{
                 aspectRatio: '1', // Perfect squares for geometric precision
+                border: '0.5px solid rgba(255, 255, 255, 0.12)', // Hairline border for module divisions (more visible)
               }}
             >
               {/* Top row: Day + Date inline */}
@@ -731,9 +732,10 @@ export default function WorkoutCalendar({
                                     
                                     return {
                                       textShadow: `
-                                        0 0 2px ${glowColor},
-                                        0 0 4px ${glowColor.replace('0.8', '0.4')},
-                                        0 0 8px ${glowColor.replace('0.8', '0.1')}
+                                        0 0 2px ${glowColor.replace('0.8', '1')},
+                                        0 0 4px ${glowColor.replace('0.8', '0.6')},
+                                        0 0 6px ${glowColor.replace('0.8', '0.3')},
+                                        0 0 8px ${glowColor.replace('0.8', '0.15')}
                                       `
                                     };
                                   })()}
