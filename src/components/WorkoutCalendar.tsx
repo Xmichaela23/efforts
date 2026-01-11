@@ -670,7 +670,7 @@ export default function WorkoutCalendar({
               </div>
 
               {/* Bottom area: Event labels anchored at bottom */}
-              <div className="flex flex-col gap-1 items-start">
+              <div className={`flex flex-col gap-1 ${items.length === 0 && trainingPlanContext ? 'items-center justify-center flex-1' : 'items-start'}`}>
                 {items.length > 0 && (
                   items.map((evt, i) => {
                     // Check actual workout_status from _src
@@ -715,17 +715,12 @@ export default function WorkoutCalendar({
                   </>
                 )}
                 {items.length === 0 && !loadingDebounced && (() => {
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  const cellDate = new Date(d);
-                  cellDate.setHours(0, 0, 0, 0);
-                  const isPastDate = cellDate < today;
-                  // Show "Rest" if there's an active plan and date is not in the past
-                  const isRestDay = !isPastDate && trainingPlanContext;
+                  // Show "Rest" if there's an active plan (for any date, past or future)
+                  const isRestDay = trainingPlanContext;
                   
                   if (isRestDay) {
                     return (
-                      <span className="text-xs text-muted-foreground/60 italic">Rest</span>
+                      <span className="text-base text-muted-foreground/70 italic">Rest</span>
                     );
                   }
                   return (

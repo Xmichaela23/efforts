@@ -938,11 +938,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
           <div className="flex items-center justify-center h-full px-4">
-            <p className="text-muted-foreground text-xs text-center">
-              {isPastDate 
-                ? 'No effort logged' 
-                : trainingPlanContext
-                  ? 'Rest'
+            <p className={`text-center ${
+              trainingPlanContext
+                ? 'text-muted-foreground text-lg font-medium italic'
+                : isPastDate
+                  ? 'text-muted-foreground text-xs'
+                  : 'text-muted-foreground text-xs'
+            }`}>
+              {trainingPlanContext
+                ? 'Rest'
+                : isPastDate
+                  ? 'No effort logged'
                   : 'No effort scheduled'
               }
             </p>
