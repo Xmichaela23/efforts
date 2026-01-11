@@ -81,16 +81,18 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: true,
     ratioIsTotal: true
   },
+  // Lateral Lunge: Much lighter than BSS due to adductor/abductor limitation
+  // Typical athlete can only lateral lunge ~30% of squat 1RM (goblet hold)
   'lateral lunge': {
     primaryRef: 'squat',
-    ratio: 0.45,
+    ratio: 0.30,
     displayFormat: 'total',  // Goblet hold - one weight
     isUnilateral: true
   },
   'lateral lunges': {
     primaryRef: 'squat',
-    ratio: 0.45,
-    displayFormat: 'total',  // Goblet hold - one weight
+    ratio: 0.30,
+    displayFormat: 'total',
     isUnilateral: true
   },
   
@@ -187,18 +189,18 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     confidence: 'high'
   },
   
-  // Single Leg RDL: Unilateral, stability limited
-  // ~35-40% of bilateral deadlift per leg
+  // Single Leg RDL: Unilateral, heavily stability-limited
+  // Conservative 0.25 ratio - balance is typically the limiter, not strength
   'single leg rdl': {
     primaryRef: 'deadlift',
-    ratio: 0.35,
+    ratio: 0.25,
     displayFormat: 'perHand',
     isUnilateral: true,
     notes: 'Hold dumbbell on opposite side of working leg.'
   },
   'single leg romanian deadlift': {
     primaryRef: 'deadlift',
-    ratio: 0.35,
+    ratio: 0.25,
     displayFormat: 'perHand',
     isUnilateral: true
   },
