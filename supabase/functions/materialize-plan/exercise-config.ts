@@ -190,18 +190,19 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   
   // Single Leg RDL: Unilateral, heavily stability-limited
+  // Uses ONE dumbbell (contralateral hold), so displayFormat is 'total' not 'perHand'
   // Conservative 0.25 ratio - balance is typically the limiter, not strength
   'single leg rdl': {
     primaryRef: 'deadlift',
     ratio: 0.25,
-    displayFormat: 'perHand',
+    displayFormat: 'total',  // One DB held opposite working leg
     isUnilateral: true,
     notes: 'Hold dumbbell on opposite side of working leg.'
   },
   'single leg romanian deadlift': {
     primaryRef: 'deadlift',
     ratio: 0.25,
-    displayFormat: 'perHand',
+    displayFormat: 'total',
     isUnilateral: true
   },
   
