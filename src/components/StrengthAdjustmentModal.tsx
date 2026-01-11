@@ -33,6 +33,7 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
   const [repsInput, setRepsInput] = useState<string>(currentReps?.toString() || '');
   const [weightInput, setWeightInput] = useState<string>(hasPlannedWeight ? currentWeight?.toString() || '' : '');
   const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'saving' | 'updating' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
 
   const getFinalWeight = (): number | null => {
@@ -51,11 +52,13 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
     
     try {
       setSaving(true);
+      setStatus('saving');
       setError(null);
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setError('You must be logged in');
+        setStatus('idle');
         return;
       }
 
@@ -84,11 +87,13 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
       if (insertError) {
         console.error('Failed to save adjustment:', insertError);
         setError('Failed to save adjustment');
+        setStatus('idle');
         return;
       }
 
       // Re-materialize the plan so all views show updated weights
       if (planId) {
+        setStatus('updating');
         try {
           await supabase.functions.invoke('materialize-plan', {
             body: { plan_id: planId }
@@ -99,11 +104,16 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
         }
       }
 
-      onSaved();
-      onClose();
+      setStatus('done');
+      // Brief pause to show success before closing
+      setTimeout(() => {
+        onSaved();
+        onClose();
+      }, 600);
     } catch (err: any) {
       console.error('Error saving adjustment:', err);
       setError(err.message || 'Failed to save');
+      setStatus('idle');
     } finally {
       setSaving(false);
     }
@@ -167,16 +177,24 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
       <div className="flex gap-3">
         <button
           onClick={onClose}
-          className="flex-1 py-2.5 px-4 rounded-xl border border-white/20 text-white/60 hover:bg-white/5 transition-colors text-sm"
+          disabled={status !== 'idle'}
+          className="flex-1 py-2.5 px-4 rounded-xl border border-white/20 text-white/60 hover:bg-white/5 transition-colors text-sm disabled:opacity-50"
         >
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={saving || (getFinalWeight() == null && getFinalReps() == null)}
-          className="flex-1 py-2.5 px-4 rounded-xl bg-amber-500 text-black font-medium hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+          className={`flex-1 py-2.5 px-4 rounded-xl font-medium transition-colors text-sm ${
+            status === 'done' 
+              ? 'bg-green-500 text-white' 
+              : 'bg-amber-500 text-black hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed'
+          }`}
         >
-          {saving ? 'Saving...' : 'Save'}
+          {status === 'saving' && 'Saving...'}
+          {status === 'updating' && 'Updating plan...'}
+          {status === 'done' && 'Done!'}
+          {status === 'idle' && 'Save'}
         </button>
       </div>
     </div>
