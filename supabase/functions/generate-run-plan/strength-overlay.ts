@@ -306,7 +306,7 @@ function createWednesdayUpperBody(
       exercises.push(
         { name: 'Bench Press', sets: 3, reps: 8, weight: '75% 1RM' },
         { name: 'Barbell Rows', sets: 3, reps: 8, weight: '70% 1RM' },
-        { name: 'Pull-ups or Lat Pulldown', sets: 3, reps: 8, weight: 'Bodyweight or moderate' },
+        { name: 'Pull-ups', sets: 3, reps: 8, weight: 'Bodyweight' },
         { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Light band/cable' }
       );
       duration = 35;
@@ -318,7 +318,7 @@ function createWednesdayUpperBody(
       exercises.push(
         { name: 'Bench Press', sets: 4, reps: 10, weight: `${baseLoad}% 1RM` },
         { name: 'Barbell Rows', sets: 4, reps: 10, weight: `${baseLoad}% 1RM` },
-        { name: 'Pull-ups or Lat Pulldown', sets: 4, reps: '8-10', weight: 'Bodyweight or add weight' },
+        { name: 'Pull-ups', sets: 4, reps: '8-10', weight: 'Bodyweight' },
         { name: 'DB Shoulder Press', sets: 3, reps: 10, weight: 'Moderate DBs' },
         { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Light band/cable' }
       );
@@ -330,7 +330,7 @@ function createWednesdayUpperBody(
       exercises.push(
         { name: 'Bench Press', sets: 4, reps: 8, weight: `${speedLoad}% 1RM` },
         { name: 'Barbell Rows', sets: 4, reps: 8, weight: `${speedLoad}% 1RM` },
-        { name: 'Weighted Pull-ups or Heavy Pulldown', sets: 4, reps: '6-8', weight: 'Add weight' },
+        { name: 'Pull-ups', sets: 4, reps: '6-8', weight: 'Add weight if able' },
         { name: 'DB Shoulder Press', sets: 3, reps: 8, weight: 'Heavier DBs' },
         { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Moderate band/cable' }
       );
@@ -378,7 +378,7 @@ function createWednesdayUpperBody(
         { name: 'Push-ups', sets: 4, reps: 12, weight: `Progress: ${pushProgression}` },
         { name: 'Inverted Rows', sets: 4, reps: 12, weight: 'Feet elevated when easy' },
         { name: 'Pike Push-ups', sets: 3, reps: 10, weight: 'Elevate feet to progress' },
-        { name: 'Negative Pull-ups or Band Assist', sets: 3, reps: '5-8', weight: 'Slow negatives' },
+        { name: 'Pull-ups', sets: 3, reps: '5-8', weight: 'Assisted or negatives OK' },
         { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Light band' }
       );
       duration = 40;
