@@ -756,14 +756,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const isRun = workoutTypeForGradient === 'run';
   const runRgb = '20,184,166'; // Teal for runs
   
-  // Teal gradient style for run workouts (matching logger)
+  // Teal gradient style for run workouts (matching logger, enhanced for mobile visibility)
   const getRunGradientStyle = () => {
     if (!isRun) return {};
     return {
       background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
       backgroundImage: `
-        radial-gradient(circle at 20% 50%, rgba(${runRgb}, 0.08) 0%, transparent 60%),
-        radial-gradient(circle at 80% 80%, rgba(${runRgb}, 0.05) 0%, transparent 60%),
+        radial-gradient(circle at 20% 50%, rgba(${runRgb}, 0.15) 0%, transparent 60%),
+        radial-gradient(circle at 80% 80%, rgba(${runRgb}, 0.12) 0%, transparent 60%),
+        radial-gradient(circle at 50% 20%, rgba(${runRgb}, 0.08) 0%, transparent 50%),
         radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
         linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
         linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%)
