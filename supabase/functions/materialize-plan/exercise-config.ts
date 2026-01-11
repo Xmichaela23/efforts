@@ -27,6 +27,8 @@ export interface ExerciseConfig {
   ratio: number;           // Training load ratio to primary lift (conservative estimate)
   displayFormat: 'total' | 'perHand' | 'perLeg' | 'bodyweight' | 'band' | 'dipsAdded';
   isUnilateral: boolean;
+  ratioIsTotal?: boolean;  // TRUE = ratio gives total load, divide by 2 for perHand display
+                           // FALSE/undefined = ratio already represents per-implement load
   confidence?: 'high' | 'medium' | 'low';  // Expected variance: high=±10%, medium=±15%, low=±20%
   notes?: string;
 }
@@ -39,39 +41,45 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   
   // Bulgarian Split Squat: Research shows ~60-70% of back squat 1RM (total load)
   // Speirs et al. (2016): BSS 1RM ≈ 60% of bilateral squat
+  // Using 0.50 for general population (stability/balance demands)
   'bulgarian split squat': {
     primaryRef: 'squat',
-    ratio: 0.60,
+    ratio: 0.50,
     displayFormat: 'perHand',
     isUnilateral: true,
-    notes: 'Hold dumbbells at sides. Total load ~60% of squat 1RM.'
+    ratioIsTotal: true,  // 0.50 = total load, divide by 2 for per-hand
+    notes: 'Hold dumbbells at sides.'
   },
   
   // Walking/Reverse Lunges: Similar to BSS but slightly less stable
   'walking lunge': {
     primaryRef: 'squat',
-    ratio: 0.55,
+    ratio: 0.50,
     displayFormat: 'perHand',
     isUnilateral: true,
-    notes: 'Hold dumbbells at sides or goblet position.'
+    ratioIsTotal: true,
+    notes: 'Hold dumbbells at sides.'
   },
   'walking lunges': {
     primaryRef: 'squat',
-    ratio: 0.55,
+    ratio: 0.50,
     displayFormat: 'perHand',
-    isUnilateral: true
+    isUnilateral: true,
+    ratioIsTotal: true
   },
   'reverse lunge': {
     primaryRef: 'squat',
-    ratio: 0.55,
+    ratio: 0.50,
     displayFormat: 'perHand',
-    isUnilateral: true
+    isUnilateral: true,
+    ratioIsTotal: true
   },
   'reverse lunges': {
     primaryRef: 'squat',
-    ratio: 0.55,
+    ratio: 0.50,
     displayFormat: 'perHand',
-    isUnilateral: true
+    isUnilateral: true,
+    ratioIsTotal: true
   },
   'lateral lunge': {
     primaryRef: 'squat',
@@ -257,13 +265,15 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     primaryRef: 'bench',
     ratio: 0.80, // Total DB load = 80% of barbell
     displayFormat: 'perHand',
-    isUnilateral: false
+    isUnilateral: false,
+    ratioIsTotal: true  // 0.80 = total, divide by 2 for each hand
   },
   'db bench press': {
     primaryRef: 'bench',
     ratio: 0.80,
     displayFormat: 'perHand',
-    isUnilateral: false
+    isUnilateral: false,
+    ratioIsTotal: true
   },
   
   // Incline Bench: ~80-85% of flat bench
@@ -280,12 +290,13 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false
   },
   
-  // Dumbbell Incline: Each DB ~35% of flat barbell
+  // Dumbbell Incline: Total ~70% of flat barbell
   'dumbbell incline press': {
     primaryRef: 'bench',
     ratio: 0.70,
     displayFormat: 'perHand',
-    isUnilateral: false
+    isUnilateral: false,
+    ratioIsTotal: true
   },
   
   // Close Grip Bench: ~90% of regular bench
@@ -330,25 +341,25 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // UPPER PULL (Bench Reference as proxy)
   // ============================================================================
   
-  // Barbell Row: ~80-90% of bench for strong pullers
-  // Using 0.85 as midpoint; technique-dependent (strict vs momentum)
+  // Barbell Row: ~75-85% of bench for strict form
+  // Using 0.80 for clean technique (no momentum)
   'barbell row': {
     primaryRef: 'bench',
-    ratio: 0.85,
+    ratio: 0.80,
     displayFormat: 'total',
     isUnilateral: false,
     confidence: 'medium'
   },
   'barbell rows': {
     primaryRef: 'bench',
-    ratio: 0.85,
+    ratio: 0.80,
     displayFormat: 'total',
     isUnilateral: false,
     confidence: 'medium'
   },
   'bent over row': {
     primaryRef: 'bench',
-    ratio: 0.85,
+    ratio: 0.80,
     displayFormat: 'total',
     isUnilateral: false,
     confidence: 'medium'
@@ -399,18 +410,20 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // SHOULDERS (Overhead Press Reference)
   // ============================================================================
   
-  // Dumbbell Shoulder Press: Each DB ~30-35% of barbell OHP
+  // Dumbbell Shoulder Press: Total ~70% of barbell OHP
   'dumbbell shoulder press': {
     primaryRef: 'overhead',
     ratio: 0.70,
     displayFormat: 'perHand',
-    isUnilateral: false
+    isUnilateral: false,
+    ratioIsTotal: true  // 0.70 = total, divide by 2 for each hand
   },
   'db shoulder press': {
     primaryRef: 'overhead',
     ratio: 0.70,
     displayFormat: 'perHand',
-    isUnilateral: false
+    isUnilateral: false,
+    ratioIsTotal: true
   },
   
   // Standing/Seated Shoulder Press (OHP): Uses overhead 1RM directly
@@ -1112,16 +1125,12 @@ export function calculatePrescribedWeight(
   // Round to nearest 5 lbs
   prescribedTotal = Math.max(5, Math.round(prescribedTotal / 5) * 5);
   
-  // For perHand exercises: check if ratio represents total or per-hand
-  // Ratios < 0.50 are typically per-hand (e.g., lateral raises 0.25)
-  // Ratios >= 0.50 are typically total load (e.g., dumbbell bench 0.80)
-  if (config.displayFormat === 'perHand') {
-    if (config.ratio >= 0.50) {
-      // Ratio represents total load, divide by 2 to get per-hand
-      prescribedTotal = Math.max(5, Math.round(prescribedTotal / 2 / 5) * 5);
-    }
-    // If ratio < 0.50, it's already per-hand, no division needed
+  // For perHand exercises: divide by 2 if ratio represents total load
+  if (config.displayFormat === 'perHand' && config.ratioIsTotal) {
+    // Ratio represents total load, divide by 2 to get per-hand
+    prescribedTotal = Math.max(5, Math.round(prescribedTotal / 2 / 5) * 5);
   }
+  // If ratioIsTotal is false/undefined, ratio already represents per-implement load
   
   return { 
     weight: prescribedTotal, 

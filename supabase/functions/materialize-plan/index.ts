@@ -198,8 +198,8 @@ function calculateWeightFromConfig(
   // Round to nearest 5 lbs
   prescribedTotal = Math.max(5, Math.round(prescribedTotal / 5) * 5);
   
-  // For perHand exercises, divide by 2
-  if (config.displayFormat === 'perHand') {
+  // For perHand exercises: divide by 2 only if ratio represents total load
+  if (config.displayFormat === 'perHand' && config.ratioIsTotal) {
     prescribedTotal = Math.max(5, Math.round(prescribedTotal / 2 / 5) * 5);
   }
   
