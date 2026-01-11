@@ -124,8 +124,8 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           </filter>
         </defs>
         
-        {/* Dark background inside circle - semi-transparent to show letters */}
-        <circle cx={50} cy={50} r={44} fill="rgba(10,10,10,0.7)"/>
+        {/* Dark background inside circle - removed */}
+        {/* <circle cx={50} cy={50} r={44} fill="rgba(10,10,10,0.7)"/> */}
         
         {/* Gradient ring - hidden */}
         {/* <circle

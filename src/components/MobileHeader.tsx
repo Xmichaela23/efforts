@@ -99,8 +99,8 @@ export function MobileHeader({
             </DropdownMenu>
           </div>
 
-          {/* Center: Wordmark - offset to center the circle */}
-          <div className="flex-1 flex justify-center items-center" style={{ marginLeft: 60 }}>
+          {/* Center: Wordmark - centered */}
+          <div className="flex-1 flex justify-center items-center">
             <EffortsWordmark size={wordmarkSize} />
           </div>
 
