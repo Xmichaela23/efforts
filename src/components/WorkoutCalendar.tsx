@@ -714,9 +714,19 @@ export default function WorkoutCalendar({
                     <span className="h-[18px] rounded w-3/4 bg-white/[0.03]" />
                   </>
                 )}
-                {items.length === 0 && !loadingDebounced && (
-                  <span className="text-xs text-muted-foreground/50">&nbsp;</span>
-                )}
+                {items.length === 0 && !loadingDebounced && (() => {
+                  const isPastDate = d < new Date(new Date().setHours(0, 0, 0, 0));
+                  const isRestDay = !isPastDate && trainingPlanContext?.currentWeek;
+                  
+                  if (isRestDay) {
+                    return (
+                      <span className="text-xs text-muted-foreground/60 italic">Rest</span>
+                    );
+                  }
+                  return (
+                    <span className="text-xs text-muted-foreground/50">&nbsp;</span>
+                  );
+                })()}
               </div>
             </button>
           );
