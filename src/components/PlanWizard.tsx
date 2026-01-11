@@ -1420,6 +1420,23 @@ export default function PlanWizard() {
                             </div>
                           </div>
                         </div>
+                        {/* Estimated Marathon Time */}
+                        {state.effortPaces?.race && (
+                          <div className="mt-4 pt-4 border-t border-teal-500/20">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-400">Est. marathon time:</span>
+                              <span className="font-mono font-semibold text-lg text-teal-300">
+                                {(() => {
+                                  const marathonSeconds = state.effortPaces.race * 26.2;
+                                  const hours = Math.floor(marathonSeconds / 3600);
+                                  const mins = Math.floor((marathonSeconds % 3600) / 60);
+                                  const secs = Math.round(marathonSeconds % 60);
+                                  return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                         <p className="mt-4 text-xs text-teal-400/80">
                           {state.effortPacesSource === 'manual' 
                             ? 'Using your custom paces.' 
@@ -1505,6 +1522,21 @@ export default function PlanWizard() {
                             <span className="font-mono text-teal-200">{formatPace(state.effortPaces.steady)}/mi</span>
                           </div>
                         </div>
+                        {/* Estimated Marathon Time */}
+                        <div className="mt-4 pt-4 border-t border-teal-500/20">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400">Est. marathon time:</span>
+                            <span className="font-mono font-semibold text-lg text-teal-300">
+                              {(() => {
+                                const marathonSeconds = state.effortPaces.race * 26.2;
+                                const hours = Math.floor(marathonSeconds / 3600);
+                                const mins = Math.floor((marathonSeconds % 3600) / 60);
+                                const secs = Math.round(marathonSeconds % 60);
+                                return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                              })()}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1535,6 +1567,21 @@ export default function PlanWizard() {
                       <div className="flex items-center justify-between">
                         <span className="text-gray-400">Interval pace:</span>
                         <span className="font-mono text-teal-200">{formatPace(state.effortPaces.power)}/mi</span>
+                      </div>
+                    </div>
+                    {/* Estimated Marathon Time */}
+                    <div className="mt-4 pt-4 border-t border-teal-500/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Est. marathon time:</span>
+                        <span className="font-mono font-semibold text-lg text-teal-300">
+                          {(() => {
+                            const marathonSeconds = state.effortPaces.race * 26.2;
+                            const hours = Math.floor(marathonSeconds / 3600);
+                            const mins = Math.floor((marathonSeconds % 3600) / 60);
+                            const secs = Math.round(marathonSeconds % 60);
+                            return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                          })()}
+                        </span>
                       </div>
                     </div>
                     <p className="text-xs text-teal-400/80 mt-4">
@@ -2384,6 +2431,15 @@ export default function PlanWizard() {
               </span>
             </div>
           </div>
+
+          {/* Training info notes */}
+          {state.strengthFrequency > 0 && (
+            <div className="mb-6 p-4 bg-amber-500/10 backdrop-blur-sm rounded-xl border border-amber-500/20">
+              <p className="text-sm text-amber-200 leading-relaxed">
+                <span className="font-semibold text-amber-300">💪 Strength Training:</span> Weights are calculated from your 1RM baselines using research-backed ratios. Each session has a target RIR (Reps In Reserve). Adjust weights up or down based on how your actual RIR compares to the target.
+              </p>
+            </div>
+          )}
 
           {/* Week 1 preview */}
           <div className="mb-4">
