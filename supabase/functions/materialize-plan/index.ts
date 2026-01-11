@@ -18,6 +18,7 @@ type PlanAdjustment = {
   exercise_name: string;
   adjustment_factor?: number;
   absolute_weight?: number;
+  weight_offset?: number; // Offset maintains plan progression (e.g., -10 lb)
   applies_from: string;
   applies_until?: string;
   status: string;
@@ -50,9 +51,12 @@ function applyAdjustment(
     return { weight: calculatedWeight, adjusted: false };
   }
   
-  // Apply adjustment
+  // Apply adjustment - priority: weight_offset > absolute_weight > adjustment_factor
   let adjustedWeight: number;
-  if (adjustment.absolute_weight != null) {
+  if (adjustment.weight_offset != null) {
+    // Offset maintains plan progression: 25→27→30 with -10 offset = 15→17→20
+    adjustedWeight = Math.max(0, Math.round((calculatedWeight + adjustment.weight_offset) / 5) * 5);
+  } else if (adjustment.absolute_weight != null) {
     adjustedWeight = adjustment.absolute_weight;
   } else if (adjustment.adjustment_factor != null) {
     adjustedWeight = Math.round(calculatedWeight * adjustment.adjustment_factor / 5) * 5;
@@ -1533,7 +1537,7 @@ Deno.serve(async (req) => {
     try {
       const { data: adjData } = await supabase
         .from('plan_adjustments')
-        .select('id, exercise_name, adjustment_factor, absolute_weight, applies_from, applies_until, status')
+        .select('id, exercise_name, adjustment_factor, absolute_weight, weight_offset, applies_from, applies_until, status')
         .eq('user_id', userId)
         .eq('status', 'active');
       adjustments = adjData || [];
