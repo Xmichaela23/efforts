@@ -1206,8 +1206,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               </DropdownMenu>
             </div>
 
-            {/* Center: Wordmark */}
-            <div className="flex-1 flex justify-center">
+            {/* Center: Wordmark - offset to center the circle */}
+            <div className="flex-1 flex justify-center" style={{ marginLeft: -60 }}>
               <EffortsWordmark size={38} />
             </div>
 
