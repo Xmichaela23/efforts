@@ -16,6 +16,17 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		5C8C267F2F10AA97004715FC /* BluetoothHRPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8C267E2F10AA97004715FC /* BluetoothHRPlugin.swift */; };
+		5C9517952F141BED00D58C8E /* HealthKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8AA5E2F1036CF00A9216D /* HealthKitPlugin.swift */; };
+		5C9517962F141BED00D58C8E /* BluetoothHRPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8C267E2F10AA97004715FC /* BluetoothHRPlugin.swift */; };
+		5C9517972F141BED00D58C8E /* WatchConnectivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8AA5F2F1036CF00A9216D /* WatchConnectivityPlugin.swift */; };
+		5C9517982F141BED00D58C8E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
+		5C95179A2F141BED00D58C8E /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 5C9517922F141BED00D58C8E /* CapApp-SPM */; };
+		5C95179C2F141BED00D58C8E /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
+		5C95179D2F141BED00D58C8E /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		5C95179E2F141BED00D58C8E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
+		5C95179F2F141BED00D58C8E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
+		5C9517A02F141BED00D58C8E /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
+		5C9517A12F141BED00D58C8E /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		5CF8AA602F1036CF00A9216D /* HealthKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8AA5E2F1036CF00A9216D /* HealthKitPlugin.swift */; };
 		5CF8AA612F1036CF00A9216D /* WatchConnectivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8AA5F2F1036CF00A9216D /* WatchConnectivityPlugin.swift */; };
 /* End PBXBuildFile section */
@@ -31,6 +42,8 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		5C8C267E2F10AA97004715FC /* BluetoothHRPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothHRPlugin.swift; sourceTree = "<group>"; };
+		5C9517A52F141BED00D58C8E /* App copy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "App copy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5C9517A62F141BED00D58C8E /* App copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "App copy-Info.plist"; path = "/Users/michaelambp/efforts/ios/App/App copy-Info.plist"; sourceTree = "<absolute>"; };
 		5CF8AA5E2F1036CF00A9216D /* HealthKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitPlugin.swift; sourceTree = "<group>"; };
 		5CF8AA5F2F1036CF00A9216D /* WatchConnectivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityPlugin.swift; sourceTree = "<group>"; };
 		5CF8AA622F10376300A9216D /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
@@ -46,6 +59,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5C9517992F141BED00D58C8E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5C95179A2F141BED00D58C8E /* CapApp-SPM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -54,6 +75,7 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				5C9517A62F141BED00D58C8E /* App copy-Info.plist */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -62,6 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				5C9517A52F141BED00D58C8E /* App copy.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -108,6 +131,26 @@
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		5C9517912F141BED00D58C8E /* App copy */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5C9517A22F141BED00D58C8E /* Build configuration list for PBXNativeTarget "App copy" */;
+			buildPhases = (
+				5C9517942F141BED00D58C8E /* Sources */,
+				5C9517992F141BED00D58C8E /* Frameworks */,
+				5C95179B2F141BED00D58C8E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "App copy";
+			packageProductDependencies = (
+				5C9517922F141BED00D58C8E /* CapApp-SPM */,
+			);
+			productName = App;
+			productReference = 5C9517A52F141BED00D58C8E /* App copy.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -141,6 +184,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				5C9517912F141BED00D58C8E /* App copy */,
 			);
 		};
 /* End PBXProject section */
@@ -159,6 +203,19 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5C95179B2F141BED00D58C8E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5C95179C2F141BED00D58C8E /* LaunchScreen.storyboard in Resources */,
+				5C95179D2F141BED00D58C8E /* public in Resources */,
+				5C95179E2F141BED00D58C8E /* Assets.xcassets in Resources */,
+				5C95179F2F141BED00D58C8E /* capacitor.config.json in Resources */,
+				5C9517A02F141BED00D58C8E /* Main.storyboard in Resources */,
+				5C9517A12F141BED00D58C8E /* config.xml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -170,6 +227,17 @@
 				5C8C267F2F10AA97004715FC /* BluetoothHRPlugin.swift in Sources */,
 				5CF8AA612F1036CF00A9216D /* WatchConnectivityPlugin.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5C9517942F141BED00D58C8E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5C9517952F141BED00D58C8E /* HealthKitPlugin.swift in Sources */,
+				5C9517962F141BED00D58C8E /* BluetoothHRPlugin.swift in Sources */,
+				5C9517972F141BED00D58C8E /* WatchConnectivityPlugin.swift in Sources */,
+				5C9517982F141BED00D58C8E /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -371,6 +439,61 @@
 			};
 			name = Release;
 		};
+		5C9517A32F141BED00D58C8E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JF7GQ9R4F9;
+				INFOPLIST_FILE = "App copy-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
+				PRODUCT_BUNDLE_IDENTIFIER = com.efforts.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5C9517A42F141BED00D58C8E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JF7GQ9R4F9;
+				INFOPLIST_FILE = "App copy-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.efforts.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -392,9 +515,22 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		5C9517A22F141BED00D58C8E /* Build configuration list for PBXNativeTarget "App copy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5C9517A32F141BED00D58C8E /* Debug */,
+				5C9517A42F141BED00D58C8E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		5C9517932F141BED00D58C8E /* XCLocalSwiftPackageReference "CapApp-SPM" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "CapApp-SPM";
+		};
 		D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "CapApp-SPM";
@@ -405,6 +541,11 @@
 		4D22ABE82AF431CB00220026 /* CapApp-SPM */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
+			productName = "CapApp-SPM";
+		};
+		5C9517922F141BED00D58C8E /* CapApp-SPM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5C9517932F141BED00D58C8E /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
 		};
 /* End XCSwiftPackageProductDependency section */

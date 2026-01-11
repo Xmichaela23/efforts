@@ -127,8 +127,8 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
         {/* Dark background inside circle - semi-transparent to show letters */}
         <circle cx={50} cy={50} r={44} fill="rgba(10,10,10,0.7)"/>
         
-        {/* Gradient ring */}
-        <circle
+        {/* Gradient ring - hidden */}
+        {/* <circle
           cx={50}
           cy={50}
           r={46}
@@ -136,7 +136,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           stroke={`url(#ringGrad-${uniqueId})`}
           strokeWidth={2}
           filter={`url(#ringGlow-${uniqueId})`}
-        />
+        /> */}
         
         {/* WHITE "e" - centered with breathing room, minimal parallax */}
         <text

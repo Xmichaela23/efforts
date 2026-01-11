@@ -754,7 +754,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // Check if this is a run workout for teal gradient
   const workoutTypeForGradient = getWorkoutType();
   const isRun = workoutTypeForGradient === 'run';
-  const runRgb = '20,184,166'; // Teal for runs
+  // Use exact teal-500 from discipline color chart: #14b8a6 = rgb(20,184,166)
+  const runRgb = '20,184,166'; // Teal-500 (#14b8a6) - matches SPORT_COLORS.run
   
   // Teal gradient style for run workouts (matching logger, enhanced for mobile visibility)
   const getRunGradientStyle = () => {
