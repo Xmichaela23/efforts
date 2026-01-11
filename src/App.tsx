@@ -19,6 +19,7 @@ import PlansCatalogPage from "./pages/PlansCatalog.tsx";
 import MobilityPlanBuilderPage from "./pages/PTPlanBuilderPage";
 import PlansBuild from "./pages/PlansBuild";
 import PlanWizard from "./components/PlanWizard";
+import EffortsButtonDemo from "./components/EffortsButtonDemo";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
 <Route path="/plans/build" element={<PlansBuild />} />
 <Route path="/plans/pt" element={<MobilityPlanBuilderPage />} />
 <Route path="/plans/generate" element={<PlanWizard />} />
+<Route path="/button-demo" element={<EffortsButtonDemo />} />
 <Route path="*" element={<NotFound />} />
 </Routes>
 </BrowserRouter>

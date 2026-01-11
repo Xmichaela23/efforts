@@ -30,6 +30,7 @@ import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import PullToRefresh from './PullToRefresh';
 import { supabase } from '@/lib/supabase';
+import { EffortsWordmark } from './EffortsButton';
 
 interface AppLayoutProps {
   onLogout?: () => void;
@@ -1203,7 +1204,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
+              <EffortsWordmark size={28} />
               {(selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
                   {!selectedWorkout && (
