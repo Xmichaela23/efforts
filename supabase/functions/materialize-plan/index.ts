@@ -922,6 +922,7 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
           const adjustResult = applyAdjustment(name, prescribed, adjustments, workoutDate);
           const finalWeight = adjustResult.weight;
           const wasAdjusted = adjustResult.adjusted;
+          const originalWeight = wasAdjusted ? prescribed : undefined; // Store original for UI display
           
           // Update weight display if adjusted
           let finalWeightDisplay = weightDisplay;
@@ -930,7 +931,7 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
             finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total');
           }
           
-          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted } as any;
+          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
           if (name.toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -1040,6 +1041,7 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
           const adjustResult = applyAdjustment(name, prescribed, adjustments, workoutDate);
           const finalWeight = adjustResult.weight;
           const wasAdjusted = adjustResult.adjusted;
+          const originalWeight = wasAdjusted ? prescribed : undefined; // Store original for UI display
           
           // Update weight display if adjusted
           let finalWeightDisplay = weightDisplay;
@@ -1048,7 +1050,7 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
             finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total');
           }
           
-          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted } as any;
+          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
           if (name.toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }

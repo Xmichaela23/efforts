@@ -22,7 +22,12 @@ export function formatStrengthExercise(
   
   const weightDisplay = exercise?.weight_display;
   if (weightDisplay && weightDisplay !== 'Bodyweight' && weightDisplay !== 'Band') {
-    parts.push(`@ ${weightDisplay}`);
+    // Show original weight if adjusted
+    if (exercise?.adjusted && exercise?.original_weight != null) {
+      parts.push(`@ ${weightDisplay} (was ${exercise.original_weight} lb)`);
+    } else {
+      parts.push(`@ ${weightDisplay}`);
+    }
   } else if (exercise?.baseline_missing) {
     parts.push(`@ [Setup Required]`);
   }
