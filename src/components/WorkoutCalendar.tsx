@@ -704,7 +704,12 @@ export default function WorkoutCalendar({
                                 {nonNumericParts.map((part, i) => {
                                   const isNumeric = parts.includes(part);
                                   return isNumeric ? (
-                                    <span key={i} style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace" }}>{part}</span>
+                                    <span key={i} style={{ 
+                                      fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
+                                      letterSpacing: '0.03em',
+                                      textShadow: '0 0 2px currentColor, 0 0 4px currentColor',
+                                      filter: 'drop-shadow(0 0 1px currentColor)'
+                                    }}>{part}</span>
                                   ) : part;
                                 })}
                                 <span 
@@ -723,9 +728,14 @@ export default function WorkoutCalendar({
                             const nonNumericParts = label.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
                               return nonNumericParts.map((part, i) => {
                                 const isNumeric = parts.includes(part);
-                                return isNumeric ? (
-                                  <span key={i} style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", letterSpacing: '0.03em' }}>{part}</span>
-                                ) : part;
+                                  return isNumeric ? (
+                                    <span key={i} style={{ 
+                                      fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
+                                      letterSpacing: '0.03em',
+                                      textShadow: '0 0 2px currentColor, 0 0 4px currentColor',
+                                      filter: 'drop-shadow(0 0 1px currentColor)'
+                                    }}>{part}</span>
+                                  ) : part;
                               });
                           }
                           return label;
@@ -825,11 +835,21 @@ export default function WorkoutCalendar({
                     </Popover>
                     <div className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      <span className="text-sm" style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", letterSpacing: '0.02em' }}>{weeklyStats.planned}</span>
+                      <span className="text-sm" style={{ 
+                        fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
+                        letterSpacing: '0.02em',
+                        textShadow: '0 0 3px currentColor, 0 0 6px currentColor',
+                        filter: 'drop-shadow(0 0 1px currentColor)'
+                      }}>{weeklyStats.planned}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" />
-                      <span className="text-sm" style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", letterSpacing: '0.02em' }}>{weeklyStats.completed}</span>
+                      <span className="text-sm" style={{ 
+                        fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
+                        letterSpacing: '0.02em',
+                        textShadow: '0 0 3px currentColor, 0 0 6px currentColor',
+                        filter: 'drop-shadow(0 0 1px currentColor)'
+                      }}>{weeklyStats.completed}</span>
                     </div>
                   </div>
                   
@@ -972,14 +992,21 @@ export default function WorkoutCalendar({
                                   className="font-light tracking-normal text-foreground"
                                   style={hasNumbers ? { 
                                     fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace",
-                                    letterSpacing: '0.02em'
+                                    letterSpacing: '0.02em',
+                                    textShadow: '0 0 3px currentColor, 0 0 6px currentColor',
+                                    filter: 'drop-shadow(0 0 1px currentColor)'
                                   } : {}}
                                 >
                                   {hasNumbers ? (
                                     String(metric.value).split(/(\d+[.,]?\d*)/g).map((part, i) => {
                                       const isNumeric = valueParts.includes(part);
                                       return isNumeric ? (
-                                        <span key={i} style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", letterSpacing: '0.02em' }}>{part}</span>
+                                        <span key={i} style={{ 
+                                          fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
+                                          letterSpacing: '0.02em',
+                                          textShadow: '0 0 3px currentColor, 0 0 6px currentColor',
+                                          filter: 'drop-shadow(0 0 1px currentColor)'
+                                        }}>{part}</span>
                                       ) : part;
                                     })
                                   ) : metric.value}
