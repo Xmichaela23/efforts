@@ -1079,10 +1079,31 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           {workout.workout_status === 'completed' && (
                             <span 
                               className={`ml-2 ${getDisciplineCheckmarkColor(workout.type || workout.workout_type || '')}`}
-                              style={{
-                                textShadow: `0 0 4px currentColor, 0 0 8px currentColor`,
-                                filter: 'drop-shadow(0 0 2px currentColor)',
-                              }}
+                              style={(() => {
+                                // Get color based on workout type for tight LED glow
+                                const t = String(workout.type || workout.workout_type || '').toLowerCase();
+                                let glowColor = 'rgba(255, 255, 255, 0.6)'; // default white
+                                
+                                if (t === 'run' || t === 'running') {
+                                  glowColor = 'rgba(20, 184, 166, 0.8)'; // teal-500
+                                } else if (t === 'strength' || t === 'weight' || t === 'weights') {
+                                  glowColor = 'rgba(249, 115, 22, 0.8)'; // orange-500
+                                } else if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') {
+                                  glowColor = 'rgba(192, 132, 252, 0.8)'; // purple-500
+                                } else if (t === 'ride' || t === 'cycling' || t === 'bike') {
+                                  glowColor = 'rgba(34, 197, 94, 0.8)'; // green-500
+                                } else if (t === 'swim' || t === 'swimming') {
+                                  glowColor = 'rgba(43, 90, 140, 0.8)'; // swim blue
+                                }
+                                
+                                return {
+                                  textShadow: `
+                                    0 0 2px ${glowColor},
+                                    0 0 4px ${glowColor.replace('0.8', '0.4')},
+                                    0 0 8px ${glowColor.replace('0.8', '0.1')}
+                                  `
+                                };
+                              })()}
                             >✓</span>
                           )}
                         </div>
@@ -1093,9 +1114,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                               const mins = Math.round((sec as number) / 60);
                               return <span className="text-white font-light" style={{ 
                                 fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
-                                letterSpacing: '0.02em',
-                                textShadow: '0 0 3px currentColor, 0 0 6px currentColor',
-                                filter: 'drop-shadow(0 0 1px currentColor)'
+                                letterSpacing: '0.02em'
                               }}>{mins}:00</span>;
                             }
                             return null;
