@@ -751,6 +751,27 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const cardClass = getCardClass();
   const hasCardStyle = isMobility || isStrength;
 
+  // Check if this is a run workout for teal gradient
+  const workoutTypeForGradient = getWorkoutType();
+  const isRun = workoutTypeForGradient === 'run';
+  const runRgb = '20,184,166'; // Teal for runs
+  
+  // Teal gradient style for run workouts (matching logger)
+  const getRunGradientStyle = () => {
+    if (!isRun) return {};
+    return {
+      background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+      backgroundImage: `
+        radial-gradient(circle at 20% 50%, rgba(${runRgb}, 0.08) 0%, transparent 60%),
+        radial-gradient(circle at 80% 80%, rgba(${runRgb}, 0.05) 0%, transparent 60%),
+        radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+        linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%)
+      `,
+      backgroundAttachment: 'fixed'
+    };
+  };
+
   return (
     <div 
       className="fixed inset-0 flex flex-col z-40"
@@ -1075,7 +1096,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Adherence Tab - only rendered when linked, so no need for unlinked state */}
-          <TabsContent value="summary" className="flex-1 p-2">
+          <TabsContent 
+            value="summary" 
+            className="flex-1 p-2"
+            style={getRunGradientStyle()}
+          >
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'p-4' : ''}>
                 {/* Inline Strength Logger editor */}
@@ -1118,7 +1143,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent value="completed" className="flex-1 p-2">
+          <TabsContent 
+            value="completed" 
+            className="flex-1 p-2"
+            style={getRunGradientStyle()}
+          >
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'p-4' : ''}>
                 {isCompleted ? (
