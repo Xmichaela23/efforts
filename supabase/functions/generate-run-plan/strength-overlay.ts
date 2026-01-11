@@ -312,7 +312,7 @@ function createWednesdayUpperBody(
       duration = 35;
       description = 'Recovery Week - Same weights as last week, fewer sets. Your muscles adapt during rest. Resume progression next week.';
     } else if (phase.name === 'Base') {
-      // Base: Hypertrophy focus (4x10 → 4x8 as weights increase)
+      // Base: Build strength foundation (4x10 → 4x8 as weights increase)
       // Use 5% increments (70%, 75%, 80%, 85%) to ensure visible weight changes with 5lb rounding
       const baseLoad = 70 + (Math.min(4, weekInPhase) * 5); // Progress 70% → 85%
       exercises.push(
@@ -323,7 +323,7 @@ function createWednesdayUpperBody(
         { name: 'Band Face Pulls', sets: 3, reps: 15, weight: 'Light band/cable' }
       );
       duration = 45;
-      description = `Week ${weekInPhase} Base - Hypertrophy phase. When you hit 4x10 cleanly, add 5 lbs next week. Focus on volume accumulation. Target: 4x10 @ ${baseLoad}% 1RM.`;
+      description = `Week ${weekInPhase} Base - Building strength foundation. When you hit 4x10 cleanly, add 5 lbs next week. Target: 4x10 @ ${baseLoad}% 1RM.`;
     } else if (phase.name === 'Speed') {
       // Speed: KEEP BUILDING - upper body doesn't need to back off
       // Use 3% increments (78%, 81%, 84%) - smaller than base but still visible progression
