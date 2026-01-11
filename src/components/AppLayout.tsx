@@ -1159,7 +1159,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       <header className="mobile-header">
         <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full">
-            <div className="flex items-center space-x-1 pl-4">
+            {/* Left: Menu */}
+            <div className="flex items-center pl-4 w-12">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="text-white/80 hover:text-white transition-colors p-2">
@@ -1203,8 +1204,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
 
+            {/* Center: Wordmark */}
+            <div className="flex-1 flex justify-center">
               <EffortsWordmark size={38} />
+            </div>
+
+            {/* Right: Spacer for balance */}
+            <div className="w-12 pr-4">
               {(selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
                   {!selectedWorkout && (
