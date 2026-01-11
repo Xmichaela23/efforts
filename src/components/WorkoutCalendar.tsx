@@ -715,8 +715,13 @@ export default function WorkoutCalendar({
                   </>
                 )}
                 {items.length === 0 && !loadingDebounced && (() => {
-                  const isPastDate = d < new Date(new Date().setHours(0, 0, 0, 0));
-                  const isRestDay = !isPastDate && trainingPlanContext?.currentWeek;
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const cellDate = new Date(d);
+                  cellDate.setHours(0, 0, 0, 0);
+                  const isPastDate = cellDate < today;
+                  // Show "Rest" if there's an active plan and date is not in the past
+                  const isRestDay = !isPastDate && trainingPlanContext;
                   
                   if (isRestDay) {
                     return (

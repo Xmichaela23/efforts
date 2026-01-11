@@ -941,7 +941,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             <p className="text-muted-foreground text-xs text-center">
               {isPastDate 
                 ? 'No effort logged' 
-                : trainingPlanContext?.currentWeek
+                : trainingPlanContext
                   ? 'Rest'
                   : 'No effort scheduled'
               }
