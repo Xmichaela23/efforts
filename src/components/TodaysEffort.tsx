@@ -1077,7 +1077,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             <span className="text-xs ml-2 text-muted-foreground">(planned)</span>
                           )}
                           {workout.workout_status === 'completed' && (
-                            <span className={`ml-2 ${getDisciplineCheckmarkColor(workout.type || workout.workout_type || '')}`}>✓</span>
+                            <span 
+                              className={`ml-2 ${getDisciplineCheckmarkColor(workout.type || workout.workout_type || '')}`}
+                              style={{
+                                textShadow: `0 0 4px currentColor, 0 0 8px currentColor`,
+                                filter: 'drop-shadow(0 0 2px currentColor)',
+                              }}
+                            >✓</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs">
@@ -1085,7 +1091,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const sec = resolveMovingSeconds(workout);
                             if (Number.isFinite(sec as any) && (sec as number) > 0) {
                               const mins = Math.round((sec as number) / 60);
-                              return <span className="text-white font-light">{mins}:00</span>;
+                              return <span className="text-white font-light" style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace" }}>{mins}:00</span>;
                             }
                             return null;
                           })()}

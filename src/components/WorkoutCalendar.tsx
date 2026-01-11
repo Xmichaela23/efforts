@@ -657,9 +657,12 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/20 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-3 flex flex-col justify-between items-stretch",
+                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/20 rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-3 flex flex-col justify-between items-stretch",
                 "hover:bg-white/[0.05] transition-all",
               ].join(" ")}
+              style={{
+                aspectRatio: '1', // Perfect squares for geometric precision
+              }}
             >
               {/* Top row: Day + Date inline */}
               <div className="flex items-baseline justify-start">
@@ -693,12 +696,37 @@ export default function WorkoutCalendar({
                           const hasCheckmark = /✓+$/.test(label);
                           if (hasCheckmark && isCompleted) {
                             const labelText = label.replace(/✓+$/, '').trim();
+                            // Extract numbers for monospace font
+                            const parts = labelText.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
+                            const nonNumericParts = labelText.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
                             return (
                               <>
-                                {labelText}
-                                <span className={getDisciplineCheckmarkColor(workoutType)}> ✓</span>
+                                {nonNumericParts.map((part, i) => {
+                                  const isNumeric = parts.includes(part);
+                                  return isNumeric ? (
+                                    <span key={i} style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace" }}>{part}</span>
+                                  ) : part;
+                                })}
+                                <span 
+                                  className={getDisciplineCheckmarkColor(workoutType)}
+                                  style={{
+                                    textShadow: `0 0 4px currentColor, 0 0 8px currentColor`,
+                                    filter: 'drop-shadow(0 0 2px currentColor)',
+                                  }}
+                                > ✓</span>
                               </>
                             );
+                          }
+                          // Apply monospace to numbers in regular labels too
+                          const parts = label.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
+                          if (parts.length > 0) {
+                            const nonNumericParts = label.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
+                            return nonNumericParts.map((part, i) => {
+                              const isNumeric = parts.includes(part);
+                              return isNumeric ? (
+                                <span key={i} style={{ fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace" }}>{part}</span>
+                              ) : part;
+                            });
                           }
                           return label;
                         })()}

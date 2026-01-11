@@ -82,6 +82,21 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
     4.5,    // purple (much more movement)
     5.5,    // swim blue - furthest (much more movement)
   ];
+
+  // VU meter pulse animation - subtle opacity variations
+  const [pulsePhase, setPulsePhase] = React.useState(0);
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setPulsePhase(prev => (prev + 0.1) % (Math.PI * 2));
+    }, 50); // 50ms updates for smooth animation
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate opacity for each layer (VU meter effect)
+  const getVUOpacity = (layerIndex: number) => {
+    const phase = pulsePhase + (layerIndex * 0.3); // Stagger each layer
+    return 0.85 + (Math.sin(phase) * 0.15); // Pulse between 0.85 and 1.0
+  };
   
   return (
     <div ref={containerRef} className={`relative inline-flex items-center ${className}`}>
@@ -166,8 +181,9 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          opacity={getVUOpacity(1)}
           transform={`translate(${parallax.x * parallaxLayers[1]}, ${parallax.y * parallaxLayers[1]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>
@@ -183,8 +199,9 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          opacity={getVUOpacity(2)}
           transform={`translate(${parallax.x * parallaxLayers[2]}, ${parallax.y * parallaxLayers[2]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>
@@ -200,8 +217,9 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          opacity={getVUOpacity(3)}
           transform={`translate(${parallax.x * parallaxLayers[3]}, ${parallax.y * parallaxLayers[3]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>
@@ -217,8 +235,9 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          opacity={getVUOpacity(4)}
           transform={`translate(${parallax.x * parallaxLayers[4]}, ${parallax.y * parallaxLayers[4]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>
@@ -234,8 +253,9 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           filter={`url(#cascade-glow-${uniqueId})`}
+          opacity={getVUOpacity(5)}
           transform={`translate(${parallax.x * parallaxLayers[5]}, ${parallax.y * parallaxLayers[5]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>

@@ -1154,7 +1154,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   };
 
   return (
-    <div className="mobile-app-container">
+    <div className="mobile-app-container synth-texture">
       <MobileHeader
         showBackButton={
           (selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showImportPage || showContext) && !showSummary && !selectedWorkout
