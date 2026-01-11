@@ -72,12 +72,18 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
         .eq('exercise_name', exerciseName)
         .eq('status', 'active');
 
+      // Calculate adjustment factor to maintain progression
+      // If user changes from 25 lb to 15 lb, factor = 0.6 (60%)
+      // Future weights will be multiplied by this factor
+      const adjustmentFactor = currentWeight > 0 ? weight / currentWeight : null;
+      
       // Insert new adjustment (applies_until = null = forever until changed)
       const { error: insertError } = await supabase.from('plan_adjustments').insert({
         user_id: user.id,
         plan_id: planId || null,
         exercise_name: exerciseName,
-        absolute_weight: weight,
+        adjustment_factor: adjustmentFactor, // Use factor to maintain progression
+        absolute_weight: null, // Don't use fixed weight
         absolute_reps: getFinalReps() || null,
         applies_from: today,
         applies_until: null,
