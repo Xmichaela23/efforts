@@ -1204,7 +1204,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <EffortsWordmark size={28} />
+              <EffortsWordmark size={38} />
               {(selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showImportPage || showContext) && !showSummary && (
                 <div className="flex items-center gap-3">
                   {!selectedWorkout && (
