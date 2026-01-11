@@ -1120,20 +1120,19 @@ export function calculatePrescribedWeight(
   
   // Apply target percentage and rep adjustment
   const repScale = getRepScale(reps);
-  let prescribedTotal = inferred1RM * targetPercent * repScale;
+  let prescribedWeight = inferred1RM * targetPercent * repScale;
   
-  // Round to nearest 5 lbs
-  prescribedTotal = Math.max(5, Math.round(prescribedTotal / 5) * 5);
-  
-  // For perHand exercises: divide by 2 if ratio represents total load
+  // For perHand exercises: divide BEFORE rounding (so we round to real dumbbell weights)
   if (config.displayFormat === 'perHand' && config.ratioIsTotal) {
-    // Ratio represents total load, divide by 2 to get per-hand
-    prescribedTotal = Math.max(5, Math.round(prescribedTotal / 2 / 5) * 5);
+    prescribedWeight = prescribedWeight / 2;
   }
   // If ratioIsTotal is false/undefined, ratio already represents per-implement load
   
+  // Round to nearest 5 lbs (matches real gym equipment)
+  prescribedWeight = Math.max(5, Math.round(prescribedWeight / 5) * 5);
+  
   return { 
-    weight: prescribedTotal, 
+    weight: prescribedWeight, 
     displayFormat: config.displayFormat,
     notes: config.notes
   };
