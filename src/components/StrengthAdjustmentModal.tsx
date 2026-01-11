@@ -94,14 +94,18 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
       // Re-materialize the plan so all views show updated weights
       if (planId) {
         setStatus('updating');
+        console.log('📢 Rematerializing plan:', planId, 'for exercise:', exerciseName);
         try {
-          await supabase.functions.invoke('materialize-plan', {
+          const { data, error: materializeError } = await supabase.functions.invoke('materialize-plan', {
             body: { plan_id: planId }
           });
+          console.log('📢 Materialize result:', { data, error: materializeError });
         } catch (materializeErr) {
           console.error('Failed to re-materialize plan:', materializeErr);
           // Don't block - adjustment is saved, views will update on next materialization
         }
+      } else {
+        console.warn('📢 No planId available for rematerialization');
       }
 
       setStatus('done');
