@@ -362,3 +362,9 @@
     backdrop-filter: blur(8px);
   }
 }
+
+/* Logo pulse animation - slow, rhythmic heartbeat */
+@keyframes logoPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1.0; }
+}

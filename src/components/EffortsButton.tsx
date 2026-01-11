@@ -18,13 +18,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
   // Parallax state
   const [parallax, setParallax] = React.useState({ x: 0, y: 0 });
   
-  // Discipline colors for gradient ring
+  // Discipline colors for gradient ring - vibrant, distinct colors
   const colors = {
-    run: '#14b8a6',
-    strength: '#f97316',
-    ride: '#22c55e',
-    pilates: '#c084fc',
-    swim: '#2B5A8C',
+    run: '#00FFC8',      // Bright cyan/teal
+    strength: '#FF8C00', // Bright orange
+    ride: '#22c55e',     // Green (keep as is)
+    pilates: '#B464FF',  // Bright purple
+    swim: '#2B5A8C',     // Deep blue (keep as is)
   };
   
   // Parallax effect - device orientation for mobile, mouse for desktop
@@ -130,13 +130,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
             </feMerge>
           </filter>
           
-          <filter id={`cascade-glow-${uniqueId}`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="1" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
+          {/* Removed blur filter for clarity - each "e" should be sharp and distinct */}
         </defs>
         
         {/* Dark background inside circle - removed */}
@@ -153,110 +147,116 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           filter={`url(#ringGlow-${uniqueId})`}
         /> */}
         
-        {/* WHITE "e" - centered with breathing room, minimal parallax, pulsing heartbeat */}
+        {/* WHITE "e" - sharp, with pulse animation */}
         <text
           x={42}
           y={42}
           textAnchor="middle"
           dominantBaseline="central"
-          fill="white"
+          fill="#FFFFFF"
           fontSize={55}
           fontWeight={300}
           fontFamily={fontFamily}
-          filter={`url(#cascade-glow-${uniqueId})`}
-          opacity={getVUOpacity(0)}
           transform={`translate(${parallax.x * parallaxLayers[0]}, ${parallax.y * parallaxLayers[0]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ 
+            transition: 'transform 0.1s ease-out',
+            animation: 'logoPulse 2.5s ease-in-out infinite',
+          }}
         >
           e
         </text>
         
-        {/* Teal - layer 1 */}
+        {/* Teal - layer 1 - vibrant cyan, sharp, with staggered pulse */}
         <text
-          x={56}
-          y={56}
+          x={58}
+          y={58}
           textAnchor="middle"
           dominantBaseline="central"
           fill={colors.run}
           fontSize={38}
           fontWeight={300}
           fontFamily={fontFamily}
-          filter={`url(#cascade-glow-${uniqueId})`}
-          opacity={getVUOpacity(1)}
           transform={`translate(${parallax.x * parallaxLayers[1]}, ${parallax.y * parallaxLayers[1]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ 
+            transition: 'transform 0.1s ease-out',
+            animation: 'logoPulse 2.5s ease-in-out 0.15s infinite',
+          }}
         >
           e
         </text>
 
-        {/* Orange - layer 2 */}
+        {/* Orange - layer 2 - vibrant orange, sharp, with staggered pulse */}
         <text
-          x={67}
-          y={67}
+          x={70}
+          y={70}
           textAnchor="middle"
           dominantBaseline="central"
           fill={colors.strength}
           fontSize={28}
           fontWeight={300}
           fontFamily={fontFamily}
-          filter={`url(#cascade-glow-${uniqueId})`}
-          opacity={getVUOpacity(2)}
           transform={`translate(${parallax.x * parallaxLayers[2]}, ${parallax.y * parallaxLayers[2]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ 
+            transition: 'transform 0.1s ease-out',
+            animation: 'logoPulse 2.5s ease-in-out 0.3s infinite',
+          }}
         >
           e
         </text>
 
-        {/* Green - layer 3 */}
+        {/* Green - layer 3 - sharp, with staggered pulse */}
         <text
-          x={76}
-          y={76}
+          x={80}
+          y={80}
           textAnchor="middle"
           dominantBaseline="central"
           fill={colors.ride}
           fontSize={20}
           fontWeight={300}
           fontFamily={fontFamily}
-          filter={`url(#cascade-glow-${uniqueId})`}
-          opacity={getVUOpacity(3)}
           transform={`translate(${parallax.x * parallaxLayers[3]}, ${parallax.y * parallaxLayers[3]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ 
+            transition: 'transform 0.1s ease-out',
+            animation: 'logoPulse 2.5s ease-in-out 0.45s infinite',
+          }}
         >
           e
         </text>
 
-        {/* Purple - layer 4 */}
+        {/* Purple - layer 4 - vibrant purple, sharp, with staggered pulse */}
         <text
-          x={84}
-          y={84}
+          x={88}
+          y={88}
           textAnchor="middle"
           dominantBaseline="central"
           fill={colors.pilates}
           fontSize={14}
           fontWeight={300}
           fontFamily={fontFamily}
-          filter={`url(#cascade-glow-${uniqueId})`}
-          opacity={getVUOpacity(4)}
           transform={`translate(${parallax.x * parallaxLayers[4]}, ${parallax.y * parallaxLayers[4]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ 
+            transition: 'transform 0.1s ease-out',
+            animation: 'logoPulse 2.5s ease-in-out 0.6s infinite',
+          }}
         >
           e
         </text>
 
-        {/* Swim blue - layer 5, deepest */}
+        {/* Swim blue - layer 5, deepest - sharp, with staggered pulse */}
         <text
-          x={91}
-          y={91}
+          x={95}
+          y={95}
           textAnchor="middle"
           dominantBaseline="central"
           fill={colors.swim}
           fontSize={10}
           fontWeight={300}
           fontFamily={fontFamily}
-          filter={`url(#cascade-glow-${uniqueId})`}
-          opacity={getVUOpacity(5)}
           transform={`translate(${parallax.x * parallaxLayers[5]}, ${parallax.y * parallaxLayers[5]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ 
+            transition: 'transform 0.1s ease-out',
+            animation: 'logoPulse 2.5s ease-in-out 0.75s infinite',
+          }}
         >
           e
         </text>

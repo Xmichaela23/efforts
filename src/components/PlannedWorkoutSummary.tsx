@@ -606,7 +606,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="flex-1">
-        <div className="font-semibold tracking-normal text-base text-white flex items-center gap-2">
+        <div className="font-light tracking-normal text-base text-white flex items-center gap-2">
           <span>{title}</span>
           <span className="flex items-center gap-1">
             {(typeof minutes === 'number') ? (
