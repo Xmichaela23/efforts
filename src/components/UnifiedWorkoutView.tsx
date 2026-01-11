@@ -1005,7 +1005,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
         <div 
           className="flex-1 overflow-y-auto overscroll-contain pt-3"
-          style={{ WebkitOverflowScrolling: 'touch' }}
+          style={{ 
+            WebkitOverflowScrolling: 'touch',
+            ...(isRun && (activeTab === 'summary' || activeTab === 'completed') ? getRunGradientStyle() : {})
+          }}
         >
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-2">
@@ -1096,11 +1099,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Adherence Tab - only rendered when linked, so no need for unlinked state */}
-          <TabsContent 
-            value="summary" 
-            className="flex-1 p-2"
-            style={getRunGradientStyle()}
-          >
+          <TabsContent value="summary" className="flex-1 p-2">
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'p-4' : ''}>
                 {/* Inline Strength Logger editor */}
@@ -1143,11 +1142,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent 
-            value="completed" 
-            className="flex-1 p-2"
-            style={getRunGradientStyle()}
-          >
+          <TabsContent value="completed" className="flex-1 p-2">
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'p-4' : ''}>
                 {isCompleted ? (
