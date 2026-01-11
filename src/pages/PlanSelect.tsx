@@ -7,6 +7,7 @@ import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';
 import { augmentPlan } from '@/services/plans/tools/plan_bake_and_compute';
 import { Progress } from '@/components/ui/progress';
+import { MobileHeader } from '@/components/MobileHeader';
 
 function computeNextMonday(): string {
   const d = new Date();
@@ -1106,19 +1107,13 @@ export default function PlanSelect() {
 
   if (loading) return (
     <div className="mobile-app-container">
-      <header className="mobile-header">
-        <div className="w-full">
-          <div className="flex items-center justify-between h-16 w-full px-4">
-            <div className="flex items-center gap-3">
-              <button onClick={() => { if (window.history.length>1) navigate(-1); else navigate('/'); }} className="text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</button>
-              <h1 className="text-2xl font-bold">Select a Plan</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/')} className="text-sm font-medium text-gray-700 hover:bg-gray-50">Dashboard</button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <MobileHeader
+        showBackButton
+        onBack={() => { if (window.history.length>1) navigate(-1); else navigate('/'); }}
+        rightContent={
+          <button onClick={() => navigate('/')} className="text-sm font-medium text-white/80 hover:text-white hover:bg-white/10">Dashboard</button>
+        }
+      />
       <main className="mobile-main-content">
         <div className="w-full max-w-3xl mx-auto px-4 py-4">Loading…</div>
       </main>
@@ -1126,19 +1121,13 @@ export default function PlanSelect() {
   );
   if (error) return (
     <div className="mobile-app-container">
-      <header className="mobile-header">
-        <div className="w-full">
-          <div className="flex items-center justify-between h-16 w-full px-4">
-            <div className="flex items-center gap-3">
-              <button onClick={() => { if (window.history.length>1) navigate(-1); else navigate('/'); }} className="text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</button>
-              <h1 className="text-2xl font-bold">Select a Plan</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/')} className="text-sm font-medium text-gray-700 hover:bg-gray-50">Dashboard</button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <MobileHeader
+        showBackButton
+        onBack={() => { if (window.history.length>1) navigate(-1); else navigate('/'); }}
+        rightContent={
+          <button onClick={() => navigate('/')} className="text-sm font-medium text-white/80 hover:text-white hover:bg-white/10">Dashboard</button>
+        }
+      />
       <main className="mobile-main-content">
         <div className="w-full max-w-3xl mx-auto px-4 py-4 text-red-600">{error}</div>
       </main>
@@ -1146,19 +1135,13 @@ export default function PlanSelect() {
   );
   if (!libPlan) return (
     <div className="mobile-app-container">
-      <header className="mobile-header">
-        <div className="w-full">
-          <div className="flex items-center justify-between h-16 w-full px-4">
-            <div className="flex items-center gap-3">
-              <button onClick={() => { if (window.history.length>1) navigate(-1); else navigate('/'); }} className="text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</button>
-              <h1 className="text-2xl font-bold">Select a Plan</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/')} className="text-sm font-medium text-gray-700 hover:bg-gray-50">Dashboard</button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <MobileHeader
+        showBackButton
+        onBack={() => { if (window.history.length>1) navigate(-1); else navigate('/'); }}
+        rightContent={
+          <button onClick={() => navigate('/')} className="text-sm font-medium text-white/80 hover:text-white hover:bg-white/10">Dashboard</button>
+        }
+      />
       <main className="mobile-main-content">
         <div className="w-full max-w-3xl mx-auto px-4 py-4">Plan not found</div>
       </main>

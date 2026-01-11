@@ -2,8 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Menu, User, Upload, Download, Settings, Activity, Link, ArrowRight, Calendar, BarChart3, Home, Package } from 'lucide-react';
+import { ArrowRight, Calendar, BarChart3, Home } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
@@ -30,7 +29,7 @@ import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import PullToRefresh from './PullToRefresh';
 import { supabase } from '@/lib/supabase';
-import { EffortsWordmark } from './EffortsButton';
+import { MobileHeader } from './MobileHeader';
 
 interface AppLayoutProps {
   onLogout?: () => void;
@@ -1156,92 +1155,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   return (
     <div className="mobile-app-container">
-      <header className="mobile-header">
-        <div className="w-full">
-          <div className="flex items-center justify-between h-16 w-full">
-            {/* Left: Menu */}
-            <div className="flex items-center pl-4 w-12">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="text-white/80 hover:text-white transition-colors p-2">
-                    <Menu className="h-5 w-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem onClick={handleTrainingBaselinesClick}>
-                    <Activity className="mr-2 h-4 w-4" />
-                    Training Baselines
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleConnectionsClick}>
-                    <Link className="mr-2 h-4 w-4" />
-                    Connections
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleGearClick}>
-                    <Package className="mr-2 h-4 w-4" />
-                    Gear
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleImportClick}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Import
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Export Data
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    Help & Support
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onLogout}>
-                    Sign Out
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { navigate('/plans/admin'); }}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Admin – Add template (JSON)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Center: Wordmark - offset to center the circle */}
-            <div className="flex-1 flex justify-center items-center" style={{ marginLeft: 60, marginTop: 8 }}>
-              <EffortsWordmark size={32} />
-            </div>
-
-            {/* Right: Spacer for balance */}
-            <div className="w-12 pr-4">
-              {(selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showImportPage || showContext) && !showSummary && (
-                <div className="flex items-center gap-3">
-                  {!selectedWorkout && (
-                  <Button
-                    onClick={handleHeaderBack}
-                      className="bg-white/[0.05] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.08] hover:text-white hover:border-white/35 transition-all duration-300 shadow-lg hover:shadow-xl"
-                      style={{
-                        fontFamily: 'Inter, sans-serif',
-                        padding: '8px 12px',
-                        borderRadius: '0.75rem',
-                        fontSize: '14px'
-                      }}
-                  >
-                    ← Back
-                  </Button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center">
-            </div>
-
-            <div className="flex items-center pr-4">
-              {/* Date removed - now shown in TodaysEffort */}
-            </div>
-          </div>
-        </div>
-      </header>
+      <MobileHeader
+        showBackButton={
+          (selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showImportPage || showContext) && !showSummary && !selectedWorkout
+        }
+        onBack={handleHeaderBack}
+        onLogout={onLogout}
+        onTrainingBaselinesClick={handleTrainingBaselinesClick}
+        onConnectionsClick={handleConnectionsClick}
+        onGearClick={handleGearClick}
+        onImportClick={handleImportClick}
+      />
 
       {/* Render UnifiedWorkoutView OUTSIDE mobile-main-content to avoid z-index issues */}
       {selectedWorkout && !showPlanBuilder && !showStrengthPlans && !showAllPlans && !showStrengthLogger && !showTrainingBaselines && !showGear && !showImportPage && !showContext && !showPilatesYogaLogger && (

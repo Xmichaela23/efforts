@@ -1,0 +1,101 @@
+/**
+ * This script needs to run in a browser environment to capture the actual rendered SVG
+ * For now, let's create an HTML page that renders the component and we can capture it
+ */
+
+import { writeFileSync } from 'fs';
+import { join } from 'path';
+
+const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Capture Wordmark SVG</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    #container {
+      width: 512px;
+      height: 512px;
+    }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <script type="module">
+    // This would need to import and render the React component
+    // For now, we'll create the SVG directly matching the component structure
+    const container = document.getElementById('container');
+    const size = 512;
+    const viewBoxSize = 100;
+    
+    const colors = {
+      run: '#14b8a6',
+      strength: '#f97316',
+      ride: '#22c55e',
+      pilates: '#c084fc',
+      swim: '#2B5A8C',
+    };
+    
+    const svg = \`<svg width="\${size}" height="\${size}" viewBox="0 0 \${viewBoxSize} \${viewBoxSize}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="\${colors.pilates}"/>
+          <stop offset="20%" stop-color="\${colors.swim}"/>
+          <stop offset="40%" stop-color="\${colors.run}"/>
+          <stop offset="60%" stop-color="\${colors.ride}"/>
+          <stop offset="80%" stop-color="\${colors.strength}"/>
+          <stop offset="100%" stop-color="\${colors.pilates}"/>
+        </linearGradient>
+        <filter id="ringGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2" result="blur"/>
+          <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+        <filter id="cascade-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1" result="blur"/>
+          <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <circle cx="50" cy="50" r="44" fill="rgba(10,10,10,0.7)"/>
+      <circle cx="50" cy="50" r="46" fill="none" stroke="url(#ringGrad)" stroke-width="2" filter="url(#ringGlow)"/>
+      <text x="42" y="42" text-anchor="middle" dominant-baseline="central" fill="white" font-size="55" font-weight="300" font-family="Rajdhani, Orbitron, system-ui, sans-serif" filter="url(#cascade-glow)">e</text>
+      <text x="56" y="56" text-anchor="middle" dominant-baseline="central" fill="\${colors.run}" font-size="38" font-weight="300" font-family="Rajdhani, Orbitron, system-ui, sans-serif" filter="url(#cascade-glow)">e</text>
+      <text x="67" y="67" text-anchor="middle" dominant-baseline="central" fill="\${colors.strength}" font-size="28" font-weight="300" font-family="Rajdhani, Orbitron, system-ui, sans-serif" filter="url(#cascade-glow)">e</text>
+      <text x="76" y="76" text-anchor="middle" dominant-baseline="central" fill="\${colors.ride}" font-size="20" font-weight="300" font-family="Rajdhani, Orbitron, system-ui, sans-serif" filter="url(#cascade-glow)">e</text>
+      <text x="84" y="84" text-anchor="middle" dominant-baseline="central" fill="\${colors.pilates}" font-size="14" font-weight="300" font-family="Rajdhani, Orbitron, system-ui, sans-serif" filter="url(#cascade-glow)">e</text>
+      <text x="91" y="91" text-anchor="middle" dominant-baseline="central" fill="\${colors.swim}" font-size="10" font-weight="300" font-family="Rajdhani, Orbitron, system-ui, sans-serif" filter="url(#cascade-glow)">e</text>
+    </svg>\`;
+    
+    container.innerHTML = svg;
+    
+    // Export functionality
+    window.exportSVG = () => {
+      const svgElement = container.querySelector('svg');
+      const svgData = new XMLSerializer().serializeToString(svgElement);
+      const blob = new Blob([svgData], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'icon.svg';
+      a.click();
+    };
+  </script>
+</body>
+</html>`;
+
+const publicDir = join(process.cwd(), 'public');
+writeFileSync(join(publicDir, 'capture-wordmark.html'), html);
+console.log('Created capture-wordmark.html - open it in browser to see the rendered SVG with correct font');

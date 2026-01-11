@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Efforts Button Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #050505;
+      color: white;
+      font-family: 'Rajdhani', system-ui, sans-serif;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 60px;
+      min-height: 100vh;
+    }
+    h1 {
+      font-weight: 300;
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+    }
+    .button-container {
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>Efforts Button</h1>
+    <p style="color: rgba(255,255,255,0.4); font-size: 14px;">Gradient variant with holographic cascade</p>
+  </div>
+
+  <div class="section">
+    <h2 style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.2em; color: rgba(255,255,255,0.3); margin-bottom: 20px;">Discipline Gradient</h2>
+    <div class="button-container">
+      <!-- 160px -->
+      <svg viewBox="0 0 200 200" width="160" height="160" style="cursor: pointer;">
+        <defs>
+          <linearGradient id="arcGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#2B5A8C"/>
+            <stop offset="20%" stopColor="#3b82f6"/>
+            <stop offset="40%" stopColor="#14b8a6"/>
+            <stop offset="60%" stopColor="#f97316"/>
+            <stop offset="80%" stopColor="#c084fc"/>
+            <stop offset="100%" stopColor="#2B5A8C"/>
+          </linearGradient>
+          <radialGradient id="ringGrad1" cx="50%" cy="50%">
+            <stop offset="0%" stopColor="#2B5A8C"/>
+            <stop offset="20%" stopColor="#3b82f6"/>
+            <stop offset="40%" stopColor="#14b8a6"/>
+            <stop offset="60%" stopColor="#f97316"/>
+            <stop offset="80%" stopColor="#c084fc"/>
+            <stop offset="100%" stopColor="#2B5A8C"/>
+          </radialGradient>
+          <filter id="glow1" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id="neonGlow1" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id="whiteGlow1" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="shadow"/>
+            <feFlood floodColor="black" floodOpacity="0.5"/>
+            <feComposite in2="shadow" operator="in" result="darkHalo"/>
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="softGlow"/>
+            <feMerge>
+              <feMergeNode in="darkHalo"/>
+              <feMergeNode in="softGlow"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <circle cx="100" cy="100" r="90" fill="#0a0a0a"/>
+        <circle cx="100" cy="100" r="88" fill="none" stroke="url(#arcGradient1)" stroke-width="4" filter="url(#glow1)" opacity="1" stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="75" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+        <text x="92" y="92" text-anchor="middle" dominant-baseline="central" fill="white" font-size="140" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#whiteGlow1)">e</text>
+        <text x="112" y="112" text-anchor="middle" dominant-baseline="central" fill="#14b8a6" font-size="105" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow1)">e</text>
+        <text x="128" y="128" text-anchor="middle" dominant-baseline="central" fill="#f97316" font-size="78" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow1)">e</text>
+        <text x="142" y="142" text-anchor="middle" dominant-baseline="central" fill="#22c55e" font-size="55" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow1)">e</text>
+        <text x="154" y="154" text-anchor="middle" dominant-baseline="central" fill="#c084fc" font-size="38" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow1)">e</text>
+        <text x="164" y="164" text-anchor="middle" dominant-baseline="central" fill="#2B5A8C" font-size="26" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow1)">e</text>
+      </svg>
+
+      <!-- 120px -->
+      <svg viewBox="0 0 200 200" width="120" height="120" style="cursor: pointer;">
+        <defs>
+          <linearGradient id="arcGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#2B5A8C"/>
+            <stop offset="20%" stopColor="#3b82f6"/>
+            <stop offset="40%" stopColor="#14b8a6"/>
+            <stop offset="60%" stopColor="#f97316"/>
+            <stop offset="80%" stopColor="#c084fc"/>
+            <stop offset="100%" stopColor="#2B5A8C"/>
+          </linearGradient>
+          <filter id="glow2" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id="neonGlow2" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id="whiteGlow2" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="shadow"/>
+            <feFlood floodColor="black" floodOpacity="0.5"/>
+            <feComposite in2="shadow" operator="in" result="darkHalo"/>
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="softGlow"/>
+            <feMerge>
+              <feMergeNode in="darkHalo"/>
+              <feMergeNode in="softGlow"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <circle cx="100" cy="100" r="90" fill="#0a0a0a"/>
+        <circle cx="100" cy="100" r="85" fill="none" stroke="url(#arcGradient2)" stroke-width="2.5" filter="url(#glow2)" opacity="0.7"/>
+        <circle cx="100" cy="100" r="75" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+        <text x="92" y="92" text-anchor="middle" dominant-baseline="central" fill="white" font-size="140" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#whiteGlow2)">e</text>
+        <text x="112" y="112" text-anchor="middle" dominant-baseline="central" fill="#14b8a6" font-size="105" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow2)">e</text>
+        <text x="128" y="128" text-anchor="middle" dominant-baseline="central" fill="#f97316" font-size="78" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow2)">e</text>
+        <text x="142" y="142" text-anchor="middle" dominant-baseline="central" fill="#22c55e" font-size="55" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow2)">e</text>
+        <text x="154" y="154" text-anchor="middle" dominant-baseline="central" fill="#c084fc" font-size="38" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow2)">e</text>
+        <text x="164" y="164" text-anchor="middle" dominant-baseline="central" fill="#2B5A8C" font-size="26" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow2)">e</text>
+      </svg>
+
+      <!-- 80px -->
+      <svg viewBox="0 0 200 200" width="80" height="80" style="cursor: pointer;">
+        <defs>
+          <linearGradient id="arcGradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#2B5A8C"/>
+            <stop offset="20%" stopColor="#3b82f6"/>
+            <stop offset="40%" stopColor="#14b8a6"/>
+            <stop offset="60%" stopColor="#f97316"/>
+            <stop offset="80%" stopColor="#c084fc"/>
+            <stop offset="100%" stopColor="#2B5A8C"/>
+          </linearGradient>
+          <filter id="glow3" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id="neonGlow3" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id="whiteGlow3" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="shadow"/>
+            <feFlood floodColor="black" floodOpacity="0.5"/>
+            <feComposite in2="shadow" operator="in" result="darkHalo"/>
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="softGlow"/>
+            <feMerge>
+              <feMergeNode in="darkHalo"/>
+              <feMergeNode in="softGlow"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <circle cx="100" cy="100" r="90" fill="#0a0a0a"/>
+        <circle cx="100" cy="100" r="85" fill="none" stroke="url(#arcGradient3)" stroke-width="2.5" filter="url(#glow3)" opacity="0.7"/>
+        <circle cx="100" cy="100" r="75" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+        <text x="92" y="92" text-anchor="middle" dominant-baseline="central" fill="white" font-size="140" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#whiteGlow3)">e</text>
+        <text x="112" y="112" text-anchor="middle" dominant-baseline="central" fill="#14b8a6" font-size="105" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow3)">e</text>
+        <text x="128" y="128" text-anchor="middle" dominant-baseline="central" fill="#f97316" font-size="78" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow3)">e</text>
+        <text x="142" y="142" text-anchor="middle" dominant-baseline="central" fill="#22c55e" font-size="55" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow3)">e</text>
+        <text x="154" y="154" text-anchor="middle" dominant-baseline="central" fill="#c084fc" font-size="38" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow3)">e</text>
+        <text x="164" y="164" text-anchor="middle" dominant-baseline="central" fill="#2B5A8C" font-size="26" font-weight="300" font-family="'Rajdhani', system-ui, sans-serif" filter="url(#neonGlow3)">e</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
-import { EffortsWordmark } from './EffortsButton';
+import { MobileHeader } from './MobileHeader';
 import {
   calculateEffortScoreResult,
   raceDistanceToMeters,
@@ -2549,39 +2549,20 @@ export default function PlanWizard() {
   return (
     <div className="mobile-app-container">
       {/* Header */}
-      <header className="mobile-header">
-        <div className="w-full">
-          <div className="flex items-center justify-between h-16 w-full">
-            {/* Left: Menu */}
-            <div className="flex items-center pl-4 w-12">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="p-0.5 text-white/80 hover:text-white hover:bg-white/10">
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56 bg-white/[0.12] backdrop-blur-xl border border-white/25">
-                  <DropdownMenuItem onClick={() => navigate('/baselines')} className="text-white/80 hover:text-white hover:bg-white/10">Training Baselines</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/connections')} className="text-white/80 hover:text-white hover:bg-white/10">Connections</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/')} className="text-white/80 hover:text-white hover:bg-white/10">Dashboard</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Center: Wordmark - offset to center the circle */}
-            <div className="flex-1 flex justify-center items-center" style={{ marginLeft: 60, marginTop: 4 }}>
-              <EffortsWordmark size={38} />
-            </div>
-
-            {/* Right: Step counter */}
-            <div className="w-12 pr-4 flex justify-end">
-              <span className="text-sm text-white/60">
-                {step + 1} of {getStepCount()}
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
+      <MobileHeader
+        rightContent={
+          <span className="text-sm text-white/60">
+            {step + 1} of {getStepCount()}
+          </span>
+        }
+        menuItems={
+          <>
+            <DropdownMenuItem onClick={() => navigate('/baselines')} className="text-white/80 hover:text-white hover:bg-white/10">Training Baselines</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/connections')} className="text-white/80 hover:text-white hover:bg-white/10">Connections</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/')} className="text-white/80 hover:text-white hover:bg-white/10">Dashboard</DropdownMenuItem>
+          </>
+        }
+      />
 
       {/* Progress bar */}
       <div className="h-1 bg-white/10">

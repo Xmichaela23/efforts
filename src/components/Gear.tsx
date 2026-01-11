@@ -5,7 +5,7 @@ import {
   Plus, Trash2, Check, X, AlertTriangle
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { MobileHeader } from './MobileHeader';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { supabase } from '@/lib/supabase';
 
@@ -246,61 +246,10 @@ export default function Gear({ onClose }: GearProps) {
 
   return (
     <div className="mobile-app-container">
-      <header className="mobile-header">
-        <div className="w-full">
-          <div className="flex items-center justify-between h-16 w-full px-4">
-            <div className="flex items-center gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="text-white/80 hover:text-white transition-colors p-2">
-                    <Menu className="h-5 w-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem onClick={() => navigate('/baselines')}>
-                    <Activity className="mr-2 h-4 w-4" />
-                    Training Baselines
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/connections')}>
-                    <Link className="mr-2 h-4 w-4" />
-                    Connections
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/gear')}>
-                    <Package className="mr-2 h-4 w-4" />
-                    Gear
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Download className="mr-2 h-4 w-4" />
-                    Import
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Export Data
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    Help & Support
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/')}>
-                    Sign Out
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/plans/admin')}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Admin – Add template (JSON)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
-            </div>
-          </div>
-          <div className="px-4 pb-2">
-            <h2 className="text-2xl font-bold text-white">Gear</h2>
-          </div>
-        </div>
-      </header>
+      <MobileHeader />
+      <div className="px-4 pb-2 pt-2">
+        <h2 className="text-2xl font-bold text-white">Gear</h2>
+      </div>
 
       <main className="mobile-main-content">
         <div className="max-w-2xl mx-auto px-4 pb-6">

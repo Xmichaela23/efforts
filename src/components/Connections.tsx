@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { MobileHeader } from './MobileHeader';
 import { 
   Activity, 
   Clock,
@@ -885,58 +885,7 @@ const Connections: React.FC = () => {
 
   return (
     <div className="mobile-app-container">
-      <header className="mobile-header">
-        <div className="w-full">
-          <div className="flex items-center justify-between h-16 w-full px-4">
-            <div className="flex items-center gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="text-white/80 hover:text-white transition-colors p-2">
-                    <Menu className="h-5 w-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem onClick={() => navigate('/')}>
-                    <Activity className="mr-2 h-4 w-4" />
-                    Training Baselines
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/connections')}>
-                    <Link className="mr-2 h-4 w-4" />
-                    Connections
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Package className="mr-2 h-4 w-4" />
-                    Gear
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/')}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Import
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Export Data
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    Help & Support
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/')}>
-                    Sign Out
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/plans/admin')}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Admin – Add template (JSON)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
-            </div>
-          </div>
-        </div>
-      </header>
+      <MobileHeader />
       <main className="mobile-main-content overflow-y-auto overflow-x-hidden" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
         <div className="max-w-4xl mx-auto px-6 pb-6 min-h-0">
           <h2 className="text-2xl font-bold text-white mb-2">Connections</h2>

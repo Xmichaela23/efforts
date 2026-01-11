@@ -31,10 +31,10 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
   React.useEffect(() => {
     const handleDeviceOrientation = (e: DeviceOrientationEvent) => {
       if (e.gamma !== null && e.beta !== null) {
-        // Normalize device orientation to parallax values
-        const x = (e.gamma / 45) * 2; // -2 to 2
-        const y = (e.beta / 45) * 2; // -2 to 2
-        setParallax({ x: Math.max(-2, Math.min(2, x)), y: Math.max(-2, Math.min(2, y)) });
+        // Normalize device orientation to parallax values - increased sensitivity
+        const x = (e.gamma / 30) * 3; // -3 to 3 (increased from -2 to 2)
+        const y = (e.beta / 30) * 3; // -3 to 3 (increased from -2 to 2)
+        setParallax({ x: Math.max(-3, Math.min(3, x)), y: Math.max(-3, Math.min(3, y)) });
       }
     };
     
@@ -43,9 +43,9 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
       const rect = containerRef.current.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      const x = ((e.clientX - centerX) / rect.width) * 4; // -2 to 2
-      const y = ((e.clientY - centerY) / rect.height) * 4; // -2 to 2
-      setParallax({ x: Math.max(-2, Math.min(2, x)), y: Math.max(-2, Math.min(2, y)) });
+      const x = ((e.clientX - centerX) / rect.width) * 6; // -3 to 3 (increased from -2 to 2)
+      const y = ((e.clientY - centerY) / rect.height) * 6; // -3 to 3 (increased from -2 to 2)
+      setParallax({ x: Math.max(-3, Math.min(3, x)), y: Math.max(-3, Math.min(3, y)) });
     };
     
     const handleMouseLeave = () => {
@@ -76,11 +76,11 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
   // Parallax multipliers for each cascade layer (deeper = more movement)
   const parallaxLayers = [
     0,      // white e - no parallax
-    0.3,    // teal - closest
-    0.5,    // orange
-    0.7,    // green
-    0.9,    // purple
-    1.1,    // swim blue - furthest
+    1.5,    // teal - closest (much more movement)
+    2.5,    // orange (much more movement)
+    3.5,    // green (much more movement)
+    4.5,    // purple (much more movement)
+    5.5,    // swim blue - furthest (much more movement)
   ];
   
   return (
@@ -93,6 +93,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
         style={{ 
           marginRight: -size * 0.85, // overlap more onto ff
           zIndex: 2,
+          display: 'block', // ensure proper centering
         }}
       >
         <defs>
@@ -170,7 +171,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
         >
           e
         </text>
-        
+
         {/* Orange - layer 2 */}
         <text
           x={67}
@@ -187,7 +188,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
         >
           e
         </text>
-        
+
         {/* Green - layer 3 */}
         <text
           x={76}
@@ -204,7 +205,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
         >
           e
         </text>
-        
+
         {/* Purple - layer 4 */}
         <text
           x={84}
@@ -221,7 +222,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
         >
           e
         </text>
-        
+
         {/* Swim blue - layer 5, deepest */}
         <text
           x={91}
@@ -239,6 +240,26 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           e
         </text>
       </svg>
+      
+      {/* "fforts" text - aligned with white e baseline */}
+      <span
+        style={{
+          fontSize: size,
+          fontWeight: 300,
+          fontFamily,
+          letterSpacing: '0.08em',
+          color: '#fff',
+          textTransform: 'lowercase',
+          position: 'relative',
+          zIndex: 3, // on top for bright ff
+          marginTop: -size * 0.10, // lowered to align with white e baseline
+          marginLeft: -size * 0.02,
+          display: 'inline-block',
+          lineHeight: 1, // tight line height for precise alignment
+        }}
+      >
+        fforts
+      </span>
     </div>
   );
 }

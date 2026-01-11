@@ -1,8 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MobileHeader } from '@/components/MobileHeader';
 
 export default function PlansBuild() {
   const navigate = useNavigate();
@@ -25,36 +23,15 @@ export default function PlansBuild() {
 
   return (
     <div className="mobile-app-container">
-      <header className="mobile-header">
-        <div className="w-full">
-          <div className="flex items-center justify-between h-16 w-full">
-            <div className="flex items-center space-x-1 pl-4">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="text-white/80 hover:text-white transition-colors p-2">
-                    <Menu className="h-5 w-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem onClick={() => navigate('/baselines')}>Training Baselines</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/connections')}>Connections</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/')}>Dashboard</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <h1 className="text-3xl font-extralight tracking-widest text-white">efforts</h1>
-              <div className="flex items-center gap-3">
-                <Button onClick={safeBack} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">
-                  ← Back
-                </Button>
-                <Button onClick={() => navigate('/')} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">
-                  Dashboard
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <MobileHeader
+        showBackButton
+        onBack={safeBack}
+        rightContent={
+          <Button onClick={() => navigate('/')} variant="ghost" className="text-sm font-medium text-white/80 hover:text-white hover:bg-white/10">
+            Dashboard
+          </Button>
+        }
+      />
       <main className="mobile-main-content">
         <div className="max-w-3xl mx-auto p-4 space-y-6">
           <div>
