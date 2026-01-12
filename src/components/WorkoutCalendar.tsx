@@ -667,7 +667,7 @@ export default function WorkoutCalendar({
             >
               {/* Top row: Day + Date inline */}
               <div className="flex items-baseline justify-start">
-                <div className="text-sm font-light tracking-wider text-foreground uppercase">
+                <div className="text-sm font-light tracking-wider text-foreground">
                   {weekdayFmt.format(d)}
                 </div>
                 <div className="ml-2 text-sm text-muted-foreground">{d.getDate()}</div>

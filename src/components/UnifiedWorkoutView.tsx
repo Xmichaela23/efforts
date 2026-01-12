@@ -791,7 +791,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       <div className="p-3">
         {/* Row 1: Title + Attach/Unattach */}
         <div className="flex items-center justify-between">
-          <h2 className="font-light tracking-normal text-xl text-white">
+          <h2 className="font-light tracking-normal text-base text-white">
             {(() => {
               const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
               if (st) return st;
@@ -871,7 +871,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       href={stravaUrl} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-xs text-[#FC5200] font-medium underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
+                      className="text-xs text-[#FC5200] font-light underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
                     >
                       View on Strava
                     </a>
@@ -889,7 +889,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 <svg width="8" height="10" viewBox="0 0 10 12" className="flex-shrink-0">
                   <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
                 </svg>
-                <span className="text-[#007CC3] font-medium text-xs">Garmin Connect</span>
+                <span className="text-[#007CC3] font-light text-xs">Garmin Connect</span>
                 {deviceName && <span className="text-gray-400 text-xs">({deviceName})</span>}
                 {garminUrl && (
                   <>
@@ -898,7 +898,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       href={garminUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-[#007CC3] font-medium underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
+                      className="text-xs text-[#007CC3] font-light underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
                     >
                       View
                     </a>
@@ -1181,14 +1181,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         </div>
                       ) : (
                         <div>
-                          <h3 className="font-semibold mb-4 text-white/90">Workout Completed</h3>
+                          <h3 className="font-light mb-4 text-white/90">Workout Completed</h3>
                           <p className="text-white/60">Workout type not yet supported in completed view.</p>
                         </div>
                       )}
                   </div>
                 ) : (
                   <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-                    <h3 className="font-semibold text-amber-400 mb-2">Not Yet Completed</h3>
+                    <h3 className="font-light text-amber-400 mb-2">Not Yet Completed</h3>
                     <p className="text-sm text-amber-300/80">
                       This workout hasn't been completed yet. Complete it to see detailed analytics.
                     </p>

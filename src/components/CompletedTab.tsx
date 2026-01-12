@@ -880,7 +880,7 @@ const formatMovingTime = () => {
        <div className="grid grid-cols-3 gap-1 px-2 -mt-10">
          {/* Distance */}
          <div className="px-2 pb-1">
-           <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
              {(() => {
                const src = (hydrated || workoutData);
                const km = (computeDistanceKm(src) ?? Number((src as any)?.distance)) || 0;
@@ -889,18 +889,18 @@ const formatMovingTime = () => {
                return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
              })()}
            </div>
-           <div className="text-xs text-muted-foreground font-normal"><div className="font-medium">Distance</div></div>
+           <div className="text-xs text-white/70 font-light">Distance</div>
          </div>
 
          {/* Moving Time */}
          <div className="px-2 pb-1">
-          <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{formatMovingTime()}</div>
-          <div className="text-xs text-muted-foreground font-normal"><div className="font-medium">Moving Time</div></div>
+          <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{formatMovingTime()}</div>
+          <div className="text-xs text-white/70 font-light">Moving Time</div>
          </div>
 
          {/* Avg Pace /100 */}
          <div className="px-2 pb-1">
-           <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
                 const pace = useImperial ? norm.avg_swim_pace_per_100yd : norm.avg_swim_pace_per_100m;
                 if (!pace) return 'N/A';
@@ -909,44 +909,44 @@ const formatMovingTime = () => {
                 return `${mins}:${String(secs).padStart(2, '0')}`;
               })()}
            </div>
-           <div className="text-xs text-muted-foreground font-normal"><div className="font-medium">Avg Pace {useImperial ? '/100yd' : '/100m'}</div></div>
+           <div className="text-xs text-white/70 font-light">Avg Pace {useImperial ? '/100yd' : '/100m'}</div>
          </div>
 
          {/* Duration (Elapsed) */}
          <div className="px-2 py-1">
-          <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+          <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
             {norm.elapsed_s ? formatDuration(norm.elapsed_s) : 'N/A'}
           </div>
-           <div className="text-xs text-muted-foreground font-normal"><div className="font-medium">Duration</div></div>
+           <div className="text-xs text-white/70 font-light">Duration</div>
          </div>
 
          {/* Avg HR */}
          <div className="px-2 py-1">
-           <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
             {Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A'}
            </div>
-           <div className="text-xs text-muted-foreground font-normal"><div className="font-medium">Avg HR</div></div>
+           <div className="text-xs text-white/70 font-light">Avg HR</div>
          </div>
 
          {/* Lengths */}
          <div className="px-2 py-1">
-           <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
              {(() => { const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null); return n != null ? String(n) : 'N/A'; })()}
            </div>
-           <div className="text-xs text-muted-foreground font-normal"><div className="font-medium">Lengths</div></div>
+           <div className="text-xs text-white/70 font-light">Lengths</div>
          </div>
 
          {/* Avg stroke rate */}
          <div className="px-2 py-1">
-           <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
              {(() => { const v = computeAvgStrokeRate(); return v != null ? String(v) : 'N/A'; })()}
            </div>
-           <div className="text-xs text-muted-foreground font-normal"><div className="font-medium">Avg stroke rate</div></div>
+           <div className="text-xs text-white/70 font-light">Avg stroke rate</div>
          </div>
 
          {/* Pool length */}
          <div className="px-2 py-1">
-           <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
              {(() => {
                const Lm = Number(poolLengthMeters ?? (workoutData as any)?.pool_length);
                if (!Lm) return 'N/A';
@@ -954,23 +954,23 @@ const formatMovingTime = () => {
                return isYd ? `${Math.round(Lm / 0.9144)} yd` : `${Lm} m`;
              })()}
            </div>
-           <div className="text-xs text-muted-foreground font-normal"><div className="font-medium">Pool</div></div>
+           <div className="text-xs text-white/70 font-light">Pool</div>
          </div>
 
          {/* Max HR */}
          <div className="px-2 py-1">
-           <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
             {Number.isFinite(norm.max_hr as any) ? String(norm.max_hr) : 'N/A'}
            </div>
-           <div className="text-xs text-muted-foreground font-normal"><div className="font-medium">Max HR</div></div>
+           <div className="text-xs text-white/70 font-light">Max HR</div>
          </div>
 
          {/* Calories */}
          <div className="px-2 py-1">
-           <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
             {Number.isFinite(norm.calories as any) ? String(norm.calories) : 'N/A'}
            </div>
-           <div className="text-xs text-muted-foreground font-normal"><div className="font-medium">Calories</div></div>
+           <div className="text-xs text-white/70 font-light">Calories</div>
          </div>
        </div>
      ) : (
@@ -980,122 +980,122 @@ const formatMovingTime = () => {
          <>
           {/* Row 1 */}
           <div className="px-2 pb-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.distance_km ? formatDistance(norm.distance_km, useImperial) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Distance</div>
+              <div className="text-xs text-white/70 font-light">Distance</div>
             </div>
           </div>
 
           <div className="px-2 pb-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.elapsed_s ? formatDuration(norm.elapsed_s) : (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Duration</div>
+              <div className="text-xs text-white/70 font-light">Duration</div>
             </div>
           </div>
 
           <div className="px-2 pb-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Moving Time</div>
+              <div className="text-xs text-white/70 font-light">Moving Time</div>
             </div>
           </div>
 
           {/* Row 2 */}
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.avg_pace_s_per_km ? formatPace(norm.avg_pace_s_per_km, useImperial) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Avg Pace</div>
+              <div className="text-xs text-white/70 font-light">Avg Pace</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.max_pace_s_per_km ? formatPace(norm.max_pace_s_per_km, useImperial) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Max Pace</div>
+              <div className="text-xs text-white/70 font-light">Max Pace</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.avg_hr ? `${norm.avg_hr} bpm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Avg HR</div>
+              <div className="text-xs text-white/70 font-light">Avg HR</div>
             </div>
           </div>
 
           {/* Row 3 */}
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.max_hr ? `${norm.max_hr} bpm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Max HR</div>
+              <div className="text-xs text-white/70 font-light">Max HR</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.elevation_gain_m ? `${(useImperial ? norm.elevation_gain_m * 3.28084 : norm.elevation_gain_m).toFixed(0)} ${useImperial ? 'ft' : 'm'}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Elevation</div>
+              <div className="text-xs text-white/70 font-light">Elevation</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.avg_running_cadence_spm ? `${norm.avg_running_cadence_spm} spm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Cadence</div>
+              <div className="text-xs text-white/70 font-light">Cadence</div>
             </div>
           </div>
 
           {/* Row 4 */}
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.max_cadence_rpm ? `${norm.max_cadence_rpm} spm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Max Cadence</div>
+              <div className="text-xs text-white/70 font-light">Max Cadence</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.calories ? String(norm.calories) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Calories</div>
+              <div className="text-xs text-white/70 font-light">Calories</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(workoutData as any)?.workload_actual || (workoutData as any)?.workload_planned || 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Workload</div>
+              <div className="text-xs text-white/70 font-light">Workload</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(workoutData as any)?.intensity_factor ? (workoutData as any).intensity_factor.toFixed(2) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">IF</div>
+              <div className="text-xs text-white/70 font-light">IF</div>
             </div>
           </div>
          </>
@@ -1105,63 +1105,63 @@ const formatMovingTime = () => {
         <>
           {/* Row 1 */}
           <div className="px-2 pb-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.distance_km ? `${(useImperial ? norm.distance_km * 0.621371 : norm.distance_km).toFixed(1)} ${useImperial ? 'mi' : 'km'}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Distance</div>
+              <div className="text-xs text-white/70 font-light">Distance</div>
             </div>
           </div>
 
           <div className="px-2 pb-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.elapsed_s ? formatDuration(norm.elapsed_s) : (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Duration</div>
+              <div className="text-xs text-white/70 font-light">Duration</div>
             </div>
           </div>
 
           <div className="px-2 pb-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Moving Time</div>
+              <div className="text-xs text-white/70 font-light">Moving Time</div>
             </div>
           </div>
 
           {/* Row 2 */}
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.avg_speed_kmh ? `${(useImperial ? norm.avg_speed_kmh * 0.621371 : norm.avg_speed_kmh).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Avg Speed</div>
+              <div className="text-xs text-white/70 font-light">Avg Speed</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.max_speed_mps ? `${(useImperial ? norm.max_speed_mps * 2.23694 : norm.max_speed_mps * 3.6).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Max Speed</div>
+              <div className="text-xs text-white/70 font-light">Max Speed</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.avg_power ? `${norm.avg_power} W` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Avg Power</div>
+              <div className="text-xs text-white/70 font-light">Avg Power</div>
             </div>
           </div>
 
           {/* Row 3 */}
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.max_power ? `${norm.max_power} W` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
@@ -1170,7 +1170,7 @@ const formatMovingTime = () => {
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.normalized_power ? `${norm.normalized_power} W` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
@@ -1179,67 +1179,67 @@ const formatMovingTime = () => {
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.avg_hr ? `${norm.avg_hr} bpm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Avg HR</div>
+              <div className="text-xs text-white/70 font-light">Avg HR</div>
             </div>
           </div>
 
           {/* Row 4 */}
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.max_hr ? `${norm.max_hr} bpm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Max HR</div>
+              <div className="text-xs text-white/70 font-light">Max HR</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.elevation_gain_m ? `${(useImperial ? norm.elevation_gain_m * 3.28084 : norm.elevation_gain_m).toFixed(0)} ${useImperial ? 'ft' : 'm'}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Elevation</div>
+              <div className="text-xs text-white/70 font-light">Elevation</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.avg_cycling_cadence_rpm ? `${norm.avg_cycling_cadence_rpm} rpm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Cadence</div>
+              <div className="text-xs text-white/70 font-light">Cadence</div>
             </div>
           </div>
 
           {/* Row 5 - Calories, Workload, IF */}
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.calories ? `${norm.calories}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Calories</div>
+              <div className="text-xs text-white/70 font-light">Calories</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(workoutData as any)?.workload_actual || (workoutData as any)?.workload_planned || 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Workload</div>
+              <div className="text-xs text-white/70 font-light">Workload</div>
             </div>
           </div>
 
           <div className="px-2 py-1">
-            <div className="text-base font-semibold text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {norm.intensity_factor ? norm.intensity_factor.toFixed(2) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">IF</div>
+              <div className="text-xs text-white/70 font-light">IF</div>
             </div>
           </div>
 

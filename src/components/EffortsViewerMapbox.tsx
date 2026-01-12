@@ -2168,7 +2168,7 @@ function EffortsViewerMapbox({
 
       {/* Chart */}
       <div style={{ marginTop: 0, overflow: 'visible' }} onMouseLeave={onMouseLeave}>
-        <div className="rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25 p-4" style={{ marginBottom: 8 }}>
+        <div className="rounded-xl bg-black/40 border border-white/10 p-4" style={{ marginBottom: 8 }}>
           <svg
             ref={svgRef}
             viewBox={`-10 -30 ${W + 10} ${SVG_HEIGHT + 75}`}   // responsive: all drawn in SVG units, with top/bottom padding for drag hints
@@ -2377,18 +2377,18 @@ function EffortsViewerMapbox({
 
       {/* Splits */}
       <div style={{ marginTop: 14, borderTop: "1px solid rgba(255, 255, 255, 0.1)", paddingTop: 10 }}>
-        <div style={{ fontWeight: 700, color: "rgba(255, 255, 255, 0.9)", marginBottom: 8 }}>Splits ({useMiles ? "mi" : "km"})</div>
-        <div style={{ display: "grid", gridTemplateColumns: "64px 1fr 1fr 1fr 1fr", gap: 8, fontSize: 14 }}>
-          <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>#</div>
-          <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>Time</div>
-          <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>
+        <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.95)", marginBottom: 6, fontSize: 13 }}>Splits ({useMiles ? "mi" : "km"})</div>
+        <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 1fr 1fr 1fr", gap: 4, fontSize: 12, overflowX: "auto" }}>
+          <div style={{ fontWeight: 500, color: "rgba(255, 255, 255, 0.7)", fontSize: 11 }}>#</div>
+          <div style={{ fontWeight: 500, color: "rgba(255, 255, 255, 0.7)", fontSize: 11 }}>Time</div>
+          <div style={{ fontWeight: 500, color: "rgba(255, 255, 255, 0.7)", fontSize: 11 }}>
             {workoutData?.type === 'ride' ? 'Speed' : 'Pace'}
           </div>
-          <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>BPM</div>
-          <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>Grade</div>
+          <div style={{ fontWeight: 500, color: "rgba(255, 255, 255, 0.7)", fontSize: 11 }}>BPM</div>
+          <div style={{ fontWeight: 500, color: "rgba(255, 255, 255, 0.7)", fontSize: 11 }}>Grade</div>
           {splits.map((sp, i) => {
             const active = i === activeSplitIx;
-            const cell = (c: any) => <div style={{ padding: "8px 4px", background: active ? "rgba(255, 255, 255, 0.1)" : undefined, borderRadius: 8, color: active ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.9)" }}>{c}</div>;
+            const cell = (c: any) => <div style={{ padding: "6px 2px", background: active ? "rgba(255, 255, 255, 0.15)" : undefined, borderRadius: 4, color: active ? "rgba(255, 255, 255, 1)" : "rgba(255, 255, 255, 0.95)", fontSize: 11 }}>{c}</div>;
             return (
               <React.Fragment key={i}>
                 {cell(i + 1)}
