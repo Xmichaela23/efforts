@@ -1941,11 +1941,11 @@ function EffortsViewerMapbox({
       )}
 
       {/* Data pills above chart */}
-      <div style={{ marginTop: 16, padding: "0 6px" }}>
+      <div style={{ marginTop: 16, padding: "0 12px" }}>
         {/* Current metric values aligned with tabs
             Running: Pace, HR, Grade, Cadence, Power
             Cycling: Speed, Power, HR, Grade, Cadence, VAM */}
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 4, marginBottom: 8, padding: "0 8px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 4, marginBottom: 8, padding: "0 4px" }}>
           {/* Speed/Pace - always first */}
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
