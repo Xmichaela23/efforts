@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 
 import { useAppContext } from '@/contexts/AppContext';
@@ -62,7 +62,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const [showVam, setShowVam] = useState(false);
   const [plannedTokens, setPlannedTokens] = useState<string[] | null>(null);
   const [plannedLabel, setPlannedLabel] = useState<string | null>(null);
-  const [isPollingForProcessing, setIsPollingForProcessing] = useState(false);
+  const processingTriggeredRef = useRef<Set<string>>(new Set()); // Track which workouts we've triggered
+  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const norm = useWorkoutData(hydrated||workoutData);
   
   // Trigger processing once and poll for completion when series is missing
@@ -71,63 +72,88 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
     const hasSeries = series && Array.isArray(series?.distance_m) && series.distance_m.length > 1;
     const workoutId = (hydrated||workoutData)?.id;
     
-    if (!hasSeries && workoutId && !isPollingForProcessing) {
-      setIsPollingForProcessing(true);
+    // If we have series or no workout ID, do nothing
+    if (hasSeries || !workoutId) {
+      return;
+    }
+    
+    // If we already triggered processing for this workout, just poll (don't trigger again)
+    const alreadyTriggered = processingTriggeredRef.current.has(workoutId);
+    
+    if (!alreadyTriggered) {
+      // Mark as triggered immediately to prevent duplicate triggers
+      processingTriggeredRef.current.add(workoutId);
       
       // Trigger processing once (fire-and-forget)
       supabase.functions.invoke('compute-workout-analysis', {
         body: { workout_id: workoutId }
       }).catch(err => {
         console.warn('Failed to trigger processing:', err);
+        // Remove from set on error so it can retry
+        processingTriggeredRef.current.delete(workoutId);
       });
-      
-      let attempt = 0;
-      const maxAttempts = 30; // ~30 seconds max (1s intervals)
-      
-      const poll = async () => {
-        if (attempt >= maxAttempts) {
-          setIsPollingForProcessing(false);
-          return;
-        }
-        
-        try {
-          const { data, error } = await supabase
-            .from('workouts')
-            .select('computed')
-            .eq('id', workoutId)
-            .single();
-          
-          if (!error && data) {
-            const computed = typeof data.computed === 'string' ? JSON.parse(data.computed) : data.computed;
-            const s = computed?.analysis?.series || null;
-            const hasData = s && Array.isArray(s?.distance_m) && s.distance_m.length > 1;
-            
-            if (hasData) {
-              // Processing complete! Refresh the workout data
-              setIsPollingForProcessing(false);
-              // Trigger a refetch by updating hydrated state
-              setHydrated((prev: any) => ({ ...prev, computed }));
-              return;
-            }
-          }
-        } catch (err) {
-          console.warn('Polling error:', err);
-        }
-        
-        attempt++;
-        // Poll every 1 second
-        setTimeout(poll, 1000);
-      };
-      
-      // Start polling after 2 second delay (give processing time to start)
-      const timeout = setTimeout(poll, 2000);
-      
-      return () => {
-        clearTimeout(timeout);
-        setIsPollingForProcessing(false);
-      };
     }
-  }, [hydrated, workoutData, isPollingForProcessing]);
+    
+    // Poll for completion (whether we just triggered or were already polling)
+    let attempt = 0;
+    const maxAttempts = 30; // ~30 seconds max (1s intervals)
+    
+    const poll = async () => {
+      // Check if we now have series (component might have updated)
+      const currentSeries = (hydrated||workoutData)?.computed?.analysis?.series || null;
+      const currentHasSeries = currentSeries && Array.isArray(currentSeries?.distance_m) && currentSeries.distance_m.length > 1;
+      
+      if (currentHasSeries || attempt >= maxAttempts) {
+        if (pollingTimeoutRef.current) {
+          clearTimeout(pollingTimeoutRef.current);
+          pollingTimeoutRef.current = null;
+        }
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from('workouts')
+          .select('computed')
+          .eq('id', workoutId)
+          .single();
+        
+        if (!error && data) {
+          const computed = typeof data.computed === 'string' ? JSON.parse(data.computed) : data.computed;
+          const s = computed?.analysis?.series || null;
+          const hasData = s && Array.isArray(s?.distance_m) && s.distance_m.length > 1;
+          
+          if (hasData) {
+            // Processing complete! Refresh the workout data
+            if (pollingTimeoutRef.current) {
+              clearTimeout(pollingTimeoutRef.current);
+              pollingTimeoutRef.current = null;
+            }
+            // Trigger a refetch by updating hydrated state
+            setHydrated((prev: any) => ({ ...prev, computed }));
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Polling error:', err);
+      }
+      
+      attempt++;
+      // Poll every 2 seconds (less aggressive)
+      pollingTimeoutRef.current = setTimeout(poll, 2000);
+    };
+    
+    // Start polling after 2 second delay (give processing time to start)
+    pollingTimeoutRef.current = setTimeout(poll, 2000);
+    
+    // Cleanup: stop polling when component unmounts or dependencies change
+    return () => {
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+        pollingTimeoutRef.current = null;
+      }
+    };
+  }, [hydrated, workoutData]);
   
   useEffect(() => {
     setHydrated((prev: any) => {
