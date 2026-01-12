@@ -169,7 +169,25 @@ Deno.serve(async (req) => {
     };
     const processingComplete = hasSeries((detail as any).computed);
 
-    // Return workout data immediately (processing happens at import time, not here)
+    // For old workouts missing series: trigger processing async (fire-and-forget, non-blocking)
+    if (!processingComplete) {
+      // Trigger processing in background - don't wait, don't block response
+      const functionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
+      fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!}`,
+        },
+        body: JSON.stringify({ workout_id: id }),
+      }).catch(err => {
+        // Silently fail - processing will happen eventually
+        console.warn('Background processing trigger failed (non-critical):', err);
+      });
+      // Continue immediately without waiting
+    }
+
+    // Return workout data immediately (processing happens in background for old workouts)
     return new Response(JSON.stringify({ 
       workout: detail,
       processing_complete: processingComplete

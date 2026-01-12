@@ -62,7 +62,64 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const [showVam, setShowVam] = useState(false);
   const [plannedTokens, setPlannedTokens] = useState<string[] | null>(null);
   const [plannedLabel, setPlannedLabel] = useState<string | null>(null);
+  const [isPollingForProcessing, setIsPollingForProcessing] = useState(false);
   const norm = useWorkoutData(hydrated||workoutData);
+  
+  // Poll for processing completion when series is missing
+  useEffect(() => {
+    const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
+    const hasSeries = series && Array.isArray(series?.distance_m) && series.distance_m.length > 1;
+    const workoutId = (hydrated||workoutData)?.id;
+    
+    if (!hasSeries && workoutId && !isPollingForProcessing) {
+      setIsPollingForProcessing(true);
+      let attempt = 0;
+      const maxAttempts = 20; // ~20 seconds max (1s intervals)
+      
+      const poll = async () => {
+        if (attempt >= maxAttempts) {
+          setIsPollingForProcessing(false);
+          return;
+        }
+        
+        try {
+          const { data, error } = await supabase
+            .from('workouts')
+            .select('computed')
+            .eq('id', workoutId)
+            .single();
+          
+          if (!error && data) {
+            const computed = typeof data.computed === 'string' ? JSON.parse(data.computed) : data.computed;
+            const s = computed?.analysis?.series || null;
+            const hasData = s && Array.isArray(s?.distance_m) && s.distance_m.length > 1;
+            
+            if (hasData) {
+              // Processing complete! Refresh the workout data
+              setIsPollingForProcessing(false);
+              // Trigger a refetch by updating hydrated state
+              setHydrated((prev: any) => ({ ...prev, computed }));
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('Polling error:', err);
+        }
+        
+        attempt++;
+        // Poll every 1 second
+        setTimeout(poll, 1000);
+      };
+      
+      // Start polling after 1 second delay
+      const timeout = setTimeout(poll, 1000);
+      
+      return () => {
+        clearTimeout(timeout);
+        setIsPollingForProcessing(false);
+      };
+    }
+  }, [hydrated, workoutData, isPollingForProcessing]);
   
   useEffect(() => {
     setHydrated((prev: any) => {
