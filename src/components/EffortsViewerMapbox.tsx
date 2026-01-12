@@ -2379,7 +2379,7 @@ function EffortsViewerMapbox({
       <div style={{ marginTop: 14, borderTop: "1px solid rgba(255, 255, 255, 0.1)", paddingTop: 10 }}>
         <div style={{ fontWeight: 700, color: "rgba(255, 255, 255, 0.9)", marginBottom: 8, textAlign: "center" }}>Splits ({useMiles ? "mi" : "km"})</div>
         <div style={{ display: "flex", justifyContent: "center", paddingLeft: 16, paddingRight: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "32px 70px 80px 70px 60px", gap: 10, fontSize: 13 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "36px 80px 90px 80px 70px", gap: 12, fontSize: 13 }}>
           <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>#</div>
           <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>Time</div>
           <div style={{ fontWeight: 600, color: "rgba(255, 255, 255, 0.6)" }}>
