@@ -147,7 +147,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           filter={`url(#ringGlow-${uniqueId})`}
         /> */}
         
-        {/* WHITE "e" - sharp, with pulse animation */}
+        {/* WHITE "e" - sharp, static */}
         <text
           x={42}
           y={42}
@@ -158,15 +158,12 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           transform={`translate(${parallax.x * parallaxLayers[0]}, ${parallax.y * parallaxLayers[0]})`}
-          style={{ 
-            transition: 'transform 0.1s ease-out',
-            animation: 'logoPulse 2.5s ease-in-out infinite',
-          }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
         
-        {/* Teal - layer 1 - vibrant cyan, sharp, with staggered pulse */}
+        {/* Teal - layer 1 - vibrant cyan, sharp, static */}
         <text
           x={58}
           y={58}
@@ -177,15 +174,12 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           transform={`translate(${parallax.x * parallaxLayers[1]}, ${parallax.y * parallaxLayers[1]})`}
-          style={{ 
-            transition: 'transform 0.1s ease-out',
-            animation: 'logoPulse 2.5s ease-in-out 0.15s infinite',
-          }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Orange - layer 2 - vibrant orange, sharp, with staggered pulse */}
+        {/* Orange - layer 2 - vibrant orange, sharp, static */}
         <text
           x={70}
           y={70}
@@ -196,15 +190,12 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           transform={`translate(${parallax.x * parallaxLayers[2]}, ${parallax.y * parallaxLayers[2]})`}
-          style={{ 
-            transition: 'transform 0.1s ease-out',
-            animation: 'logoPulse 2.5s ease-in-out 0.3s infinite',
-          }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Green - layer 3 - sharp, with staggered pulse */}
+        {/* Green - layer 3 - sharp, static */}
         <text
           x={80}
           y={80}
@@ -215,15 +206,12 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           transform={`translate(${parallax.x * parallaxLayers[3]}, ${parallax.y * parallaxLayers[3]})`}
-          style={{ 
-            transition: 'transform 0.1s ease-out',
-            animation: 'logoPulse 2.5s ease-in-out 0.45s infinite',
-          }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Purple - layer 4 - vibrant purple, sharp, with staggered pulse */}
+        {/* Purple - layer 4 - vibrant purple, sharp, static */}
         <text
           x={88}
           y={88}
@@ -234,15 +222,12 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           transform={`translate(${parallax.x * parallaxLayers[4]}, ${parallax.y * parallaxLayers[4]})`}
-          style={{ 
-            transition: 'transform 0.1s ease-out',
-            animation: 'logoPulse 2.5s ease-in-out 0.6s infinite',
-          }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Swim blue - layer 5, deepest - sharp, with staggered pulse */}
+        {/* Swim blue - layer 5, deepest - sharp, static */}
         <text
           x={95}
           y={95}
@@ -253,10 +238,7 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           fontWeight={300}
           fontFamily={fontFamily}
           transform={`translate(${parallax.x * parallaxLayers[5]}, ${parallax.y * parallaxLayers[5]})`}
-          style={{ 
-            transition: 'transform 0.1s ease-out',
-            animation: 'logoPulse 2.5s ease-in-out 0.75s infinite',
-          }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
