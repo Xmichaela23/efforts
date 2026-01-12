@@ -2327,7 +2327,7 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Metric buttons */}
-      <div style={{ marginTop: 0, padding: "0 8px" }}>
+      <div style={{ marginTop: 0, padding: "0 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
           {( (
             [
