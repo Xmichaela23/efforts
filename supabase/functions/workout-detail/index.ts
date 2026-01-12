@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
       (detail as any).pool_length = row.pool_length ?? null;
     }
 
-    // Smart server: Check if analysis exists, compute if missing
+    // Check if processing is complete (for UI to show loading state if needed)
     const hasSeries = (computed: any) => {
       try {
         const s = computed?.analysis?.series || null;
@@ -167,69 +167,13 @@ Deno.serve(async (req) => {
         return n > 1 && nt > 1;
       } catch { return false; }
     };
+    const processingComplete = hasSeries((detail as any).computed);
 
-    // If analysis missing, compute it server-side (smart server, dumb client)
-    if (!hasSeries((detail as any).computed)) {
-      try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-        const functionUrl = `${supabaseUrl}/functions/v1/compute-workout-analysis`;
-        
-        // Call compute-workout-analysis server-to-server
-        const analysisResponse = await fetch(functionUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!}`,
-          },
-          body: JSON.stringify({ workout_id: id }),
-        });
-
-        if (!analysisResponse.ok) {
-          const errorText = await analysisResponse.text();
-          console.warn(`⚠️ compute-workout-analysis failed: ${analysisResponse.status} ${errorText}`);
-        } else {
-          const analysisResult = await analysisResponse.json();
-          if (analysisResult.success) {
-            // Wait briefly for database write to be visible
-            await new Promise((r) => setTimeout(r, 500));
-            
-            // Re-fetch workout data with updated computed field
-            let retryQuery = supabase.from('workouts').select(select).eq('id', id) as any;
-            if (userId) retryQuery = retryQuery.eq('user_id', userId);
-            const { data: updatedRow, error: retryError } = await retryQuery.maybeSingle();
-            
-            if (!retryError && updatedRow) {
-              // Update detail with fresh computed data
-              try { 
-                (detail as any).computed = (()=>{ 
-                  try { 
-                    return typeof updatedRow.computed === 'string' ? JSON.parse(updatedRow.computed) : (updatedRow.computed || null); 
-                  } catch { 
-                    return updatedRow.computed || null; 
-                  } 
-                })(); 
-              } catch {}
-              
-              // Also update workout_analysis if it changed
-              try { 
-                (detail as any).workout_analysis = (()=>{ 
-                  try { 
-                    return typeof updatedRow.workout_analysis === 'string' ? JSON.parse(updatedRow.workout_analysis) : (updatedRow.workout_analysis || null); 
-                  } catch { 
-                    return updatedRow.workout_analysis || null; 
-                  } 
-                })(); 
-              } catch {}
-            }
-          }
-        }
-      } catch (err) {
-        // Log but don't fail - return workout data even if analysis computation failed
-        console.error('Failed to compute workout analysis server-side:', err);
-      }
-    }
-
-    return new Response(JSON.stringify({ workout: detail }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Return workout data immediately (processing happens at import time, not here)
+    return new Response(JSON.stringify({ 
+      workout: detail,
+      processing_complete: processingComplete
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     const msg = (e && (e.message || e.msg)) ? (e.message || e.msg) : String(e);
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

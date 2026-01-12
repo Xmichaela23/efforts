@@ -97,8 +97,8 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
         return remote;
       }
     },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: 60 * 60 * 1000, // 60 minutes - computed data is immutable once created
+    gcTime: 6 * 60 * 60 * 1000, // 6 hours
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });

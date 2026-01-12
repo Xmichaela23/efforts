@@ -1271,13 +1271,14 @@ const formatMovingTime = () => {
         // For historical workouts: render with whatever data exists (graceful degradation)
         const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
         
-        // If no series at all, show loading (shouldn't happen for valid workouts)
+        // If no series at all, show loading state (processing in background)
         if (!series) {
           return (
-            <div className="mt-6 mb-6 mx-[-16px] flex items-center justify-center" style={{ minHeight: 700 }}>
-              <div className="text-center text-muted-foreground">
-                <div className="text-lg font-semibold mb-2">Processing workout data...</div>
-                <div className="text-sm">Charts will appear automatically when ready</div>
+            <div className="mt-6 mb-6 mx-[-16px] flex items-center justify-center" style={{ minHeight: 400 }}>
+              <div className="text-center text-white/70">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white/30 mb-3"></div>
+                <div className="text-base font-light mb-1">Processing workout data...</div>
+                <div className="text-sm text-white/50 font-light">Charts will appear automatically when ready</div>
               </div>
             </div>
           );
