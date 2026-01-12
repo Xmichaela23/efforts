@@ -117,7 +117,9 @@ Deno.serve(async (req) => {
       // Achievements (PRs, segments)
       'achievements',
       // Workload data (single source of truth from calculate-workload)
-      'workload_actual','workload_planned','intensity_factor'
+      'workload_actual','workload_planned','intensity_factor',
+      // Timestamp for processing trigger deduplication
+      'updated_at'
     ].join(',');
     const gpsSel = opts.include_gps ? ',gps_track' : '';
     const sensSel = opts.include_sensors ? ',sensor_data' : '';
@@ -169,23 +171,8 @@ Deno.serve(async (req) => {
     };
     const processingComplete = hasSeries((detail as any).computed);
 
-    // For old workouts missing series: trigger processing async (fire-and-forget, non-blocking)
-    if (!processingComplete) {
-      // Trigger processing in background - don't wait, don't block response
-      const functionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
-      fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!}`,
-        },
-        body: JSON.stringify({ workout_id: id }),
-      }).catch(err => {
-        // Silently fail - processing will happen eventually
-        console.warn('Background processing trigger failed (non-critical):', err);
-      });
-      // Continue immediately without waiting
-    }
+    // Don't trigger processing here - let frontend handle it once
+    // This prevents duplicate triggers from polling
 
     // Return workout data immediately (processing happens in background for old workouts)
     return new Response(JSON.stringify({ 

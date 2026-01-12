@@ -65,7 +65,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const [isPollingForProcessing, setIsPollingForProcessing] = useState(false);
   const norm = useWorkoutData(hydrated||workoutData);
   
-  // Poll for processing completion when series is missing
+  // Trigger processing once and poll for completion when series is missing
   useEffect(() => {
     const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
     const hasSeries = series && Array.isArray(series?.distance_m) && series.distance_m.length > 1;
@@ -73,8 +73,16 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
     
     if (!hasSeries && workoutId && !isPollingForProcessing) {
       setIsPollingForProcessing(true);
+      
+      // Trigger processing once (fire-and-forget)
+      supabase.functions.invoke('compute-workout-analysis', {
+        body: { workout_id: workoutId }
+      }).catch(err => {
+        console.warn('Failed to trigger processing:', err);
+      });
+      
       let attempt = 0;
-      const maxAttempts = 20; // ~20 seconds max (1s intervals)
+      const maxAttempts = 30; // ~30 seconds max (1s intervals)
       
       const poll = async () => {
         if (attempt >= maxAttempts) {
@@ -111,8 +119,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
         setTimeout(poll, 1000);
       };
       
-      // Start polling after 1 second delay
-      const timeout = setTimeout(poll, 1000);
+      // Start polling after 2 second delay (give processing time to start)
+      const timeout = setTimeout(poll, 2000);
       
       return () => {
         clearTimeout(timeout);
