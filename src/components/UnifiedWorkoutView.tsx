@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
+import { SPORT_COLORS, getDisciplineColor } from '@/lib/context-utils';
 
 // Get unified planned workout data with pace ranges (same as Today's Effort and Weekly)
 const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPlanned: any, linkedPlanned: any) => {
@@ -751,26 +752,32 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const cardClass = getCardClass();
   const hasCardStyle = isMobility || isStrength;
 
-  // Check if this is a run workout for teal gradient
+  // Get workout type and sport color for gradient
   const workoutTypeForGradient = getWorkoutType();
-  const isRun = workoutTypeForGradient === 'run';
-  // Use exact teal-500 from discipline color chart: #14b8a6 = rgb(20,184,166)
-  const runRgb = '20,184,166'; // Teal-500 (#14b8a6) - matches SPORT_COLORS.run
+  const sportColor = getDisciplineColor(workoutTypeForGradient);
   
-  // Teal gradient style for run workouts (matching logger, enhanced for mobile visibility)
-  const getRunGradientStyle = () => {
-    if (!isRun) return {};
+  // Convert hex color to RGB string for gradient
+  const hexToRgb = (hex: string): string => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!result) return '20,184,166'; // fallback to teal
+    return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
+  };
+  
+  const sportRgb = hexToRgb(sportColor);
+  
+  // Sport color gradient style for all disciplines (consistent positioning)
+  // Applied to fixed parent container so it stays in place without needing background-attachment: fixed
+  const getSportGradientStyle = () => {
     return {
       background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
       backgroundImage: `
-        radial-gradient(circle at 20% 50%, rgba(${runRgb}, 0.15) 0%, transparent 60%),
-        radial-gradient(circle at 80% 80%, rgba(${runRgb}, 0.12) 0%, transparent 60%),
-        radial-gradient(circle at 50% 20%, rgba(${runRgb}, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 20% 50%, rgba(${sportRgb}, 0.15) 0%, transparent 60%),
+        radial-gradient(circle at 80% 80%, rgba(${sportRgb}, 0.12) 0%, transparent 60%),
+        radial-gradient(circle at 50% 20%, rgba(${sportRgb}, 0.08) 0%, transparent 50%),
         radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
         linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
         linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%)
-      `,
-      backgroundAttachment: 'fixed'
+      `
     };
   };
 
@@ -778,7 +785,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     <div 
       className="fixed inset-0 flex flex-col z-40"
       style={{ 
-        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)'
+        ...getSportGradientStyle()
       }}
     >
       <div 
@@ -1008,8 +1015,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         <div 
           className="flex-1 overflow-y-auto overscroll-contain pt-3"
           style={{ 
-            WebkitOverflowScrolling: 'touch',
-            ...(isRun && (activeTab === 'summary' || activeTab === 'completed') ? getRunGradientStyle() : {})
+            WebkitOverflowScrolling: 'touch'
           }}
         >
           {/* Planned Tab */}
