@@ -4,6 +4,13 @@ import { supabase } from '@/lib/supabase';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 
 interface GearItem {
   id: string;
@@ -186,11 +193,11 @@ export default function PostWorkoutFeedback({
             <SportIcon className="h-5 w-5" style={{ color: sportColor }} />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">
+            <h3 className="text-lg font-light text-white">
               {mode === 'popup' ? 'Nice work!' : 'Workout Feedback'}
             </h3>
             {workoutName && (
-              <p className="text-sm text-white/60">{workoutName}</p>
+              <p className="text-sm text-white/60 font-light">{workoutName}</p>
             )}
           </div>
         </div>
@@ -204,56 +211,59 @@ export default function PostWorkoutFeedback({
         )}
       </div>
 
-      {/* Gear Selection */}
+      {/* Gear Selection - Dropdown */}
       {gear.length > 0 && (
         <div>
-          <label className="text-sm font-medium text-white/70 mb-2 block">
+          <label className="text-sm font-light text-white/70 mb-2 block">
             {workoutType === 'run' ? 'Shoes Used' : 'Bike Used'}
           </label>
-          <div className="space-y-2">
-            {gear.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setSelectedGearId(item.id)}
-                className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 ${
-                  selectedGearId === item.id
-                    ? 'bg-white/[0.12] border-white/30'
-                    : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08]'
-                }`}
-                style={{
-                  borderColor: selectedGearId === item.id ? sportColor : undefined,
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-white font-medium">{item.name}</div>
+          <Select
+            value={selectedGearId || undefined}
+            onValueChange={(value) => setSelectedGearId(value)}
+          >
+            <SelectTrigger 
+              className="w-full bg-white/[0.04] border-white/10 text-white font-light hover:bg-white/[0.08] focus:border-white/30"
+              style={{
+                borderColor: selectedGearId ? sportColor : undefined,
+              }}
+            >
+              <SelectValue placeholder="Select gear">
+                {(() => {
+                  const selected = gear.find(g => g.id === selectedGearId);
+                  if (!selected) return 'Select gear';
+                  const details = [selected.brand, selected.model].filter(Boolean).join(' ');
+                  return details ? `${selected.name} • ${details}` : selected.name;
+                })()}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent className="bg-[#1a1a2e] border-white/10">
+              {gear.map((item) => (
+                <SelectItem
+                  key={item.id}
+                  value={item.id}
+                  className="text-white font-light focus:bg-white/[0.12] focus:text-white"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-light">{item.name}</span>
                     {(item.brand || item.model) && (
-                      <div className="text-sm text-white/50">
+                      <span className="text-xs text-white/50 font-light">
                         {[item.brand, item.model].filter(Boolean).join(' ')}
-                      </div>
+                      </span>
                     )}
                   </div>
-                  {selectedGearId === item.id && (
-                    <div 
-                      className="w-5 h-5 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: sportColor }}
-                    >
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
 
       {/* RPE Selection */}
       <div>
-        <label className="text-sm font-medium text-white/70 mb-2 block">
+        <label className="text-sm font-light text-white/70 mb-2 block">
           How Hard? (RPE)
           {selectedRpe && (
-            <span className="ml-2 text-white/50 font-normal">
+            <span className="ml-2 text-white/50 font-light">
               — {RPE_DESCRIPTIONS[selectedRpe]}
             </span>
           )}
@@ -263,7 +273,7 @@ export default function PostWorkoutFeedback({
             <button
               key={rpe}
               onClick={() => setSelectedRpe(rpe === selectedRpe ? null : rpe)}
-              className={`flex-1 py-2.5 text-sm font-medium rounded-lg border transition-all duration-200 ${
+              className={`flex-1 py-2.5 text-sm font-light rounded-lg border transition-all duration-200 ${
                 selectedRpe === rpe
                   ? 'bg-white/[0.15] border-white/30 text-white'
                   : 'bg-white/[0.04] border-white/10 text-white/60 hover:bg-white/[0.08] hover:text-white/80'
@@ -277,7 +287,7 @@ export default function PostWorkoutFeedback({
             </button>
           ))}
         </div>
-        <div className="flex justify-between mt-1 text-xs text-white/40">
+        <div className="flex justify-between mt-1 text-xs text-white/40 font-light">
           <span>Easy</span>
           <span>Max</span>
         </div>
@@ -285,7 +295,7 @@ export default function PostWorkoutFeedback({
 
       {/* Feeling Selection */}
       <div>
-        <label className="text-sm font-medium text-white/70 mb-2 block">
+        <label className="text-sm font-light text-white/70 mb-2 block">
           How Do You Feel?
         </label>
         <div className="flex gap-2">
@@ -293,7 +303,7 @@ export default function PostWorkoutFeedback({
             <button
               key={option.value}
               onClick={() => setSelectedFeeling(option.value === selectedFeeling ? null : option.value)}
-              className={`flex-1 py-2.5 px-2 text-xs font-medium rounded-lg border transition-all duration-200 ${
+              className={`flex-1 py-2.5 px-2 text-xs font-light rounded-lg border transition-all duration-200 ${
                 selectedFeeling === option.value
                   ? 'bg-white/[0.15] border-white/30 text-white'
                   : 'bg-white/[0.04] border-white/10 text-white/60 hover:bg-white/[0.08] hover:text-white/80'
@@ -316,7 +326,7 @@ export default function PostWorkoutFeedback({
           <Button
             onClick={handleSkip}
             variant="ghost"
-            className="flex-1 text-white/60 hover:text-white hover:bg-white/[0.08]"
+            className="flex-1 text-white/60 hover:text-white hover:bg-white/[0.08] font-light"
           >
             Skip
           </Button>
@@ -324,7 +334,7 @@ export default function PostWorkoutFeedback({
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 font-medium"
+          className="flex-1 font-light"
           style={{ 
             backgroundColor: sportColor,
             color: 'white',

@@ -1,6 +1,4 @@
 import React, { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 // No chart imports needed - using table only
 
 /**
@@ -216,73 +214,72 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
     return { zoneData, totalTime, avgHr, maxHr };
   }, [samples, zoneDurationsSeconds, zoneDefs, colors]);
 
+  const monospaceStyle = {
+    fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace",
+    letterSpacing: '0.02em'
+  };
+
   if (zoneData.length === 0) {
     return (
-      <Card className="w-full">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">
-            {title}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-8">No heart rate data available</p>
-        </CardContent>
-      </Card>
+      <div className="w-full p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
+        <h3 className="text-base font-light text-white mb-3">{title}</h3>
+        <p className="text-white/50 text-center py-8 font-light">No heart rate data available</p>
+      </div>
     );
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="w-full p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
+      <h3 className="text-base font-light text-white mb-4">{title}</h3>
+      <div className="space-y-6">
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{fmtTime(totalTime)}</div>
-            <div className="text-xs text-muted-foreground">Duration</div>
+            <div className="text-base font-light text-white mb-0.5" style={monospaceStyle}>{fmtTime(totalTime)}</div>
+            <div className="text-xs text-white/70 font-light">Duration</div>
           </div>
           <div>
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{Math.round(avgHr)}</div>
-            <div className="text-xs text-muted-foreground">Avg HR</div>
+            <div className="text-base font-light text-white mb-0.5" style={monospaceStyle}>{Math.round(avgHr)}</div>
+            <div className="text-xs text-white/70 font-light">Avg HR</div>
           </div>
           <div>
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{Math.round(maxHr)}</div>
-            <div className="text-xs text-muted-foreground">Max HR</div>
+            <div className="text-base font-light text-white mb-0.5" style={monospaceStyle}>{Math.round(maxHr)}</div>
+            <div className="text-xs text-white/70 font-light">Max HR</div>
           </div>
         </div>
 
-        <Separator />
+        <div className="border-t border-white/10"></div>
 
         {/* Zone Table */}
         <div>
-          <h3 className="text-xs font-medium mb-2 text-muted-foreground">Zone Details</h3>
+          <h3 className="text-xs font-light mb-2 text-white/70">Zone Details</h3>
           <div className="space-y-1">
-            {zoneData.filter(z => z.duration > 0).map((zone) => (
-              <div key={zone.zone} className="flex items-center justify-between p-2 rounded-lg border">
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: zone.color }}
-                  />
-                  <span className="text-sm font-medium">{zone.zone}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {zoneDefs[(zone as any).zoneIndex]?.min}-{zoneDefs[(zone as any).zoneIndex]?.max} bpm
-                  </span>
+            {zoneData.filter(z => z.duration > 0).map((zone) => {
+              const zoneDef = zoneDefs[(zone as any).zoneIndex];
+              const bpmRange = zoneDef ? `${zoneDef.min}-${zoneDef.max}` : '';
+              return (
+                <div key={zone.zone} className="flex items-center justify-between p-2 rounded-lg border border-white/10 bg-white/[0.02]">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: zone.color }}
+                    />
+                    <span className="text-sm font-light text-white">{zone.zone}</span>
+                    <span className="text-xs text-white/70 font-light" style={monospaceStyle}>
+                      {bpmRange} bpm
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-light text-white" style={monospaceStyle}>{fmtTime(zone.duration)}</div>
+                    <div className="text-xs text-white/60 font-light" style={monospaceStyle}>{pctFmt(zone.percentage)}</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium">{fmtTime(zone.duration)}</div>
-                  <div className="text-xs text-muted-foreground">{pctFmt(zone.percentage)}</div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
