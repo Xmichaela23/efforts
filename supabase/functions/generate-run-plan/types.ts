@@ -16,6 +16,7 @@ export interface GeneratePlanRequest {
   strength_frequency?: 0 | 2 | 3;
   strength_tier?: 'injury_prevention' | 'strength_power';
   equipment_type?: 'home_gym' | 'commercial_gym';
+  strength_protocol?: string; // Optional protocol ID (canonical: 'durability' | 'neural_speed' | 'upper_aesthetics'). Legacy IDs accepted and normalized. Note: 'minimum_dose' is deferred until frontend support.
   race_date?: string;
   race_name?: string;
   // User's current weekly mileage (for gating short plans)

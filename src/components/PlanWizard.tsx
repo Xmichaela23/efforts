@@ -38,6 +38,7 @@ type Approach = 'simple_completion' | 'balanced_build';
 type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
 type StrengthTier = 'injury_prevention' | 'strength_power';
 type EquipmentType = 'home_gym' | 'commercial_gym';
+type StrengthProtocol = 'durability' | 'neural_speed' | 'upper_aesthetics';
 
 type PaceInputMethod = 'race' | 'paces' | 'saved' | 'unknown' | null;
 
@@ -172,6 +173,7 @@ interface WizardState {
   strengthFrequency: 0 | 2 | 3;
   strengthTier: StrengthTier;
   equipmentType: EquipmentType;
+  strengthProtocol?: StrengthProtocol;
 }
 
 // ============================================================================
@@ -423,7 +425,8 @@ export default function PlanWizard() {
     daysPerWeek: null,
     strengthFrequency: 0,
     strengthTier: 'injury_prevention',
-    equipmentType: 'commercial_gym'
+    equipmentType: 'commercial_gym',
+    strengthProtocol: undefined // Will be set when user selects protocol
   });
 
   // Saved baselines (loaded from DB)
@@ -628,7 +631,12 @@ export default function PlanWizard() {
         // Must have valid duration
         return state.duration >= 4;
       case 'startDate': return state.startDate !== '';
-      case 'strength': return true; // Strength is optional
+      case 'strength': 
+        // Strength is optional, but if selected and using strength_power tier, protocol is required
+        if (state.strengthFrequency > 0 && state.strengthTier === 'strength_power') {
+          return state.strengthProtocol !== undefined;
+        }
+        return true; // Strength is optional
       case 'runningDays': return state.daysPerWeek !== null;
       default: return false;
     }
@@ -734,8 +742,13 @@ export default function PlanWizard() {
         days_per_week: state.daysPerWeek,
         strength_frequency: state.strengthFrequency,
         strength_tier: state.strengthTier,
-        equipment_type: state.equipmentType
+        equipment_type: state.equipmentType,
       };
+
+      // Only include strength_protocol if required (strength_power tier)
+      if (state.strengthFrequency > 0 && state.strengthTier === 'strength_power') {
+        requestBody.strength_protocol = state.strengthProtocol; // guaranteed by canProceed
+      }
 
       // Add Effort Score data for Balanced Build plans
       if (state.approach === 'balanced_build' && state.effortScore && state.effortPaces) {
@@ -2176,6 +2189,111 @@ export default function PlanWizard() {
                             {state.strengthFrequency === 3 
                               ? 'Rack for: Squats, inverted rows. Barbell for: Hip thrusts, RDL'
                               : 'Rack for: Squats. Barbell for: Hip thrusts, RDL'}
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+              
+              {/* Protocol selection - only show if Strength & Power tier */}
+              {state.strengthFrequency > 0 && state.strengthTier === 'strength_power' && (
+                <div className="pt-4 border-t border-white/10">
+                  <p className="text-sm text-gray-400 mb-3">What do you want strength training to do for your training?</p>
+                  <RadioGroup
+                    value={state.strengthProtocol || ''}
+                    onValueChange={(v) => {
+                      // Only set valid protocol IDs, never empty string
+                      const validProtocols: StrengthProtocol[] = ['durability', 'neural_speed', 'upper_aesthetics'];
+                      if (validProtocols.includes(v as StrengthProtocol)) {
+                        updateState('strengthProtocol', v as StrengthProtocol);
+                      }
+                    }}
+                    className="space-y-3"
+                  >
+                    {/* Durability */}
+                    <div className={`p-4 rounded-xl border transition-colors ${
+                      state.strengthProtocol === 'durability' 
+                        ? 'border-teal-500/60 bg-teal-500/15' 
+                        : 'border-teal-500/30 bg-black/40 hover:border-teal-500/50'
+                    }`}>
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="durability" id="durability" className="mt-1" />
+                        <Label htmlFor="durability" className="flex-1 cursor-pointer">
+                          <span className="font-medium text-white">Durability</span>
+                          <span className="block text-sm text-gray-400 mt-1">
+                            Classic runner-strength exercises to build muscular support so you can handle training volume more reliably.
+                          </span>
+                          <span className="block text-xs text-gray-500 mt-2">
+                            • Step-ups, lunges, calves, unilateral work
+                          </span>
+                          <span className="block text-xs text-gray-500">
+                            • Moderate effort, no heavy compounds
+                          </span>
+                          <span className="block text-xs text-amber-400/80 mt-2 font-medium">
+                            Tradeoff: no heavy compounds or strength PR focus.
+                          </span>
+                          <span className="block text-xs text-teal-400 mt-2">
+                            Best for: Distance runners, volume increases, injury-prone athletes
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
+                    
+                    {/* Neural Speed */}
+                    <div className={`p-4 rounded-xl border transition-colors ${
+                      state.strengthProtocol === 'neural_speed' 
+                        ? 'border-teal-500/60 bg-teal-500/15' 
+                        : 'border-teal-500/30 bg-black/40 hover:border-teal-500/50'
+                    }`}>
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="neural_speed" id="neural_speed" className="mt-1" />
+                        <Label htmlFor="neural_speed" className="flex-1 cursor-pointer">
+                          <span className="font-medium text-white">Neural Speed</span>
+                          <span className="block text-sm text-gray-400 mt-1">
+                            Heavy, low-rep compound lifts to support power and efficiency without interfering with run training.
+                          </span>
+                          <span className="block text-xs text-gray-500 mt-2">
+                            • Squats, trap bar deadlifts, bench, rows
+                          </span>
+                          <span className="block text-xs text-gray-500">
+                            • Very low reps, very low volume, strict RIR
+                          </span>
+                          <span className="block text-xs text-amber-400/80 mt-2 font-medium">
+                            Tradeoff: not for size; requires good technique/equipment.
+                          </span>
+                          <span className="block text-xs text-teal-400 mt-2">
+                            Best for: Performance-oriented runners, speed work, want strength without soreness
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
+                    
+                    {/* Upper Aesthetics */}
+                    <div className={`p-4 rounded-xl border transition-colors ${
+                      state.strengthProtocol === 'upper_aesthetics' 
+                        ? 'border-teal-500/60 bg-teal-500/15' 
+                        : 'border-teal-500/30 bg-black/40 hover:border-teal-500/50'
+                    }`}>
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="upper_aesthetics" id="upper_aesthetics" className="mt-1" />
+                        <Label htmlFor="upper_aesthetics" className="flex-1 cursor-pointer">
+                          <span className="font-medium text-white">Upper Aesthetics</span>
+                          <span className="block text-sm text-gray-400 mt-1">
+                            Prioritizes upper-body strength and posture while keeping lower-body work light so running stays the priority.
+                          </span>
+                          <span className="block text-xs text-gray-500 mt-2">
+                            • Higher-rep upper work with progressive overload
+                          </span>
+                          <span className="block text-xs text-gray-500">
+                            • Lower body kept light and supportive
+                          </span>
+                          <span className="block text-xs text-amber-400/80 mt-2 font-medium">
+                            Tradeoff: lower body is maintained, not pushed.
+                          </span>
+                          <span className="block text-xs text-teal-400 mt-2">
+                            Best for: Endurance athletes motivated by physique or upper-body weakness
                           </span>
                         </Label>
                       </div>

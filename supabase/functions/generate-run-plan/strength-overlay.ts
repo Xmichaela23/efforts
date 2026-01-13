@@ -1,27 +1,17 @@
 // ============================================================================
-// STRENGTH OVERLAY SYSTEM v2.1 - Equipment-aware dumbbell progression
+// STRENGTH OVERLAY SYSTEM v3.0 - Protocol-based architecture
 // 
-// PHILOSOPHY: Upper Body Gains + Lower Body Support
-// 
-// Traditional "strength for runners" treats lifting as maintenance. We flip it:
-// - Upper Body: Progressive overload, real strength gains, aesthetic improvements
-// - Lower Body: Injury prevention, power maintenance, running support
-//
-// WHY THIS WORKS:
-// - Upper body doesn't compete with running adaptations (different muscles)
-// - Users see strength gains throughout training (psychologically motivating)
-// - "Finish your marathon AND set PRs on bench press"
-//
-// TIERS:
-// - Tier 1 (Bodyweight): Progressive bodyweight exercises with clear level-ups
-// - Tier 2 (Barbell): Heavy compound lifts with % of 1RM
-//
-// FREQUENCY:
-// - 3x/week (Performance): Mon Lower + Wed Upper + Fri Lower (Fri optional in peak)
-// - 2x/week (Minimal): Mon Lower + Fri Lower (no upper body gains focus)
+// Uses shared strength-system module with protocol/placement/guardrails separation.
 // ============================================================================
 
 import { TrainingPlan, Session, StrengthExercise, Phase, PhaseStructure } from './types.ts';
+import { getProtocol } from '../shared/strength-system/protocols/selector.ts';
+import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
+import {
+  ProtocolContext,
+  StrengthPhase,
+  PlacedSession,
+} from '../shared/strength-system/protocols/types.ts';
 
 type StrengthTier = 'bodyweight' | 'barbell';
 type StrengthFrequency = 2 | 3;
@@ -34,34 +24,77 @@ export function overlayStrength(
   plan: TrainingPlan,
   frequency: StrengthFrequency,
   phaseStructure: PhaseStructure,
-  tier: StrengthTier = 'bodyweight'
+  tier: StrengthTier = 'bodyweight',
+  protocolId?: string
 ): TrainingPlan {
   const modifiedPlan = { ...plan };
   const modifiedSessions: Record<string, Session[]> = {};
   const totalWeeks = Object.keys(plan.sessions_by_week).length;
 
+  // Get protocol
+  // - If protocolId is undefined (PlanWizard case - not exposed yet): use default
+  // - If protocolId is provided: validate it exists, error if invalid (no fallback)
+  const protocol = getProtocol(protocolId);
+
+  // Extract primary sport schedule from plan (for placement/guardrails)
+  const primarySchedule = extractPrimarySchedule(plan);
+
   for (const [weekStr, sessions] of Object.entries(plan.sessions_by_week)) {
     const week = parseInt(weekStr, 10);
     const phase = getCurrentPhase(week, phaseStructure);
     const isRecovery = phaseStructure.recovery_weeks.includes(week);
-    const isTaper = phase.name === 'Taper';
     const weekInPhase = week - phase.start_week + 1;
     
-    let strengthSessions: Session[];
+    // Build protocol context
+    const context: ProtocolContext = {
+      weekIndex: week,
+      weekInPhase,
+      phase: convertPhase(phase),
+      totalWeeks,
+      isRecovery,
+      primarySchedule,
+      strengthFrequency: frequency,
+      userBaselines: {
+        // Will be populated during materialization
+        equipment: tier === 'barbell' ? 'commercial_gym' : 'home_gym',
+      },
+      constraints: {
+        maxSessionDuration: 60,
+      },
+    };
+
+    // Generate intent sessions (no day assignment)
+    const intentSessions = protocol.createWeekSessions(context);
+
+    // Filter sessions based on frequency and protocol
+    let filteredSessions = intentSessions;
     
-    if (isTaper) {
-      strengthSessions = createTaperSessions(tier, week, totalWeeks);
-    } else {
-      strengthSessions = createWeekSessions(
-        week,
-        weekInPhase,
-        phase,
-        frequency,
-        isRecovery,
-        tier,
-        totalWeeks
+    // Legacy behavior: upper_aesthetics doesn't handle frequency internally,
+    // so we filter out upper body when frequency = 2
+    if (protocol.id === 'upper_aesthetics' && frequency === 2) {
+      filteredSessions = intentSessions.filter(
+        s => s.intent !== 'UPPER_STRENGTH' && s.intent !== 'UPPER_MAINTENANCE'
       );
     }
+    
+    // Filter out optional sessions when frequency = 2
+    // (Optional sessions are only included when frequency = 3)
+    if (frequency === 2) {
+      filteredSessions = filteredSessions.filter(s => s.priority !== 'optional');
+    }
+
+    // Apply guardrails (for now, empty - will be implemented later)
+    const guardrails: any[] = [];
+
+    // Assign to days using placement policy
+    const placedSessions = simplePlacementPolicy.assignSessions(
+      filteredSessions,
+      primarySchedule,
+      guardrails
+    );
+
+    // Convert PlacedSession[] to Session[]
+    const strengthSessions = placedSessions.map(placed => convertToSession(placed, tier));
 
     modifiedSessions[weekStr] = [...sessions, ...strengthSessions];
   }
@@ -80,564 +113,70 @@ export function overlayStrength(
 }
 
 // ============================================================================
-// RIR (REPS IN RESERVE) GUIDANCE
-// ============================================================================
-// RIR helps users self-regulate intensity:
-// - RIR 1: Very hard, could do 1 more rep
-// - RIR 2: Hard, could do 2 more reps  
-// - RIR 3: Challenging but sustainable
-// - RIR 4: Moderate effort
-// - RIR 5: Easy, lots left in tank
-
-function getTargetRIR(
-  phase: Phase, 
-  isRecovery: boolean, 
-  isUpperBodyPeak: boolean = false,
-  isBodyweight: boolean = false
-): number {
-  // Recovery weeks: Easy effort
-  if (isRecovery) return 4;
-  
-  // Upper body peak test: Go hard
-  if (isUpperBodyPeak) return 1;
-  
-  // Phase-based targets
-  switch (phase.name) {
-    case 'Base':
-      // Building phase - challenging but sustainable
-      return isBodyweight ? 3 : 3;
-    case 'Speed':
-      // Harder training, closer to failure
-      return isBodyweight ? 2 : 2;
-    case 'Race Prep':
-      // Maintenance - don't grind
-      return 3;
-    case 'Taper':
-      // Light work only
-      return 4;
-    default:
-      return 3;
-  }
-}
-
-// Apply target RIR to all exercises in a session
-function applyTargetRIR(exercises: StrengthExercise[], targetRIR: number): StrengthExercise[] {
-  return exercises.map(ex => ({
-    ...ex,
-    target_rir: targetRIR
-  }));
-}
-
-// ============================================================================
-// SESSION CREATION
+// CONVERSION HELPERS
 // ============================================================================
 
-function createWeekSessions(
-  week: number,
-  weekInPhase: number,
-  phase: Phase,
-  frequency: StrengthFrequency,
-  isRecovery: boolean,
-  tier: StrengthTier,
-  totalWeeks: number
-): Session[] {
-  const sessions: Session[] = [];
-  const isSpeedOrRacePrep = phase.name === 'Speed' || phase.name === 'Race Prep';
-  
-  // Monday: Lower Body Power & Posterior Chain (ALWAYS)
-  sessions.push(createMondayLowerBody(phase, weekInPhase, isRecovery, tier));
-  
-  // Wednesday: Upper Body Progression (only for 3x frequency)
-  // This is THE gains session - never optional
-  if (frequency >= 3) {
-    sessions.push(createWednesdayUpperBody(phase, weekInPhase, isRecovery, tier, week, totalWeeks));
-  }
-  
-  // Friday: Lower Body Stability
-  // Optional in Speed phase (weeks 6+) and Race Prep
-  const fridayOptional = isSpeedOrRacePrep && !isRecovery;
-  sessions.push(createFridayLowerBody(phase, weekInPhase, isRecovery, tier, fridayOptional));
-  
-  return sessions;
-}
-
-// ============================================================================
-// MONDAY: LOWER BODY POWER & POSTERIOR CHAIN
-// Focus: Hip power, hamstring/glute strength, injury prevention
-// ============================================================================
-
-function createMondayLowerBody(
-  phase: Phase,
-  weekInPhase: number,
-  isRecovery: boolean,
-  tier: StrengthTier
-): Session {
-  const exercises: StrengthExercise[] = [];
-  let duration: number;
-  let description: string;
-  
-  if (tier === 'barbell') {
-    if (isRecovery) {
-      // Recovery: Same weight, reduced volume (3 sets → 2 sets)
-      exercises.push(
-        { name: 'Back Squat', sets: 2, reps: 8, weight: '65% 1RM' },
-        { name: 'Hip Thrusts', sets: 2, reps: 8, weight: '70% 1RM' },
-        { name: 'Romanian Deadlift', sets: 2, reps: 8, weight: '65% 1RM' },
-        { name: 'Box Jumps', sets: 2, reps: 3, weight: 'Bodyweight' }
-      );
-      duration = 35;
-      description = 'Recovery Week - Same weights, reduced volume. Let your body adapt to recent increases. Target: 2 sets, RIR 4-5.';
-    } else if (phase.name === 'Base') {
-      // Base: Build hip power foundation + squat strength
-      const load = 70 + (Math.min(4, weekInPhase) * 5); // 70%, 75%, 80%, 85%
-      exercises.push(
-        { name: 'Back Squat', sets: 3, reps: 8, weight: `${load}% 1RM` },
-        { name: 'Hip Thrusts', sets: 4, reps: 8, weight: `${load}% 1RM` },
-        { name: 'Romanian Deadlift', sets: 3, reps: 8, weight: `${Math.max(65, load - 5)}% 1RM` },
-        { name: 'Walking Lunges', sets: 3, reps: '8/leg', weight: `${load - 10}% 1RM` }
-      );
-      duration = 45;
-      description = `Week ${weekInPhase} Base - Building lower body foundation. Target: 3-4x8 @ ${load}% 1RM, RIR 2-3.`;
-    } else if (phase.name === 'Speed') {
-      // Speed: Explosive power, convert strength to speed
-      exercises.push(
-        { name: 'Box Jumps', sets: 4, reps: 4, weight: 'Explosive - full recovery' },
-        { name: 'Hip Thrusts', sets: 3, reps: 6, weight: '75% 1RM' },
-        { name: 'KB/DB Swings', sets: 3, reps: 12, weight: '25% deadlift 1RM' },
-        { name: 'Jump Squats', sets: 3, reps: 5, weight: 'Bodyweight' }
-      );
-      duration = 40;
-      description = `Week ${weekInPhase} Speed - Explosive power development. Focus on speed and technique, not max weight. Maintain hip thrust strength from Base phase.`;
-    } else {
-      // Race Prep: Minimal maintenance
-      exercises.push(
-        { name: 'Hip Thrusts', sets: 2, reps: 15, weight: '65% 1RM' },
-        { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: '20 lb each' },
-        { name: 'Box Step-ups', sets: 2, reps: '10/leg', weight: '15 lb each' }
-      );
-      duration = 30;
-      description = `Week ${weekInPhase} Race Prep - Minimal maintenance only. No heavy loading, no plyos. Running is the priority.`;
-    }
-  } else {
-    // TIER 1: BODYWEIGHT
-    if (isRecovery) {
-      exercises.push(
-        { name: 'Glute Bridges', sets: 2, reps: 20, weight: 'Bodyweight' },
-        { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: 'Bodyweight' },
-        { name: 'Walking Lunges', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
-        { name: 'Squat Jumps', sets: 2, reps: 5, weight: 'Bodyweight' }
-      );
-      duration = 30;
-      description = 'Recovery Week - Reduced volume, maintain movement patterns. Target: 2 sets, easy effort.';
-    } else if (phase.name === 'Base') {
-      exercises.push(
-        { name: 'Glute Bridges', sets: 3, reps: 20, weight: 'Bodyweight - progress to single leg' },
-        { name: 'Single Leg RDL', sets: 3, reps: '10/leg', weight: 'Bodyweight' },
-        { name: 'Reverse Lunges', sets: 3, reps: '12/leg', weight: 'Bodyweight' },
-        { name: 'Squat Jumps', sets: 3, reps: weekInPhase >= 3 ? 8 : 6, weight: 'Bodyweight' }
-      );
-      duration = 40;
-      description = `Week ${weekInPhase} Base - Building hip power with bodyweight progressions. When 3x20 glute bridges is easy, progress to single leg.`;
-    } else if (phase.name === 'Speed') {
-      exercises.push(
-        { name: 'Box Jumps or Broad Jumps', sets: 4, reps: 4, weight: 'Explosive - full recovery' },
-        { name: 'Single Leg Glute Bridge', sets: 3, reps: '12/leg', weight: 'Bodyweight' },
-        { name: 'Skater Hops', sets: 3, reps: '8/side', weight: 'Bodyweight' },
-        { name: 'Jump Lunges', sets: 3, reps: '6/leg', weight: 'Bodyweight' }
-      );
-      duration = 35;
-      description = `Week ${weekInPhase} Speed - Explosive power focus. Quality over quantity - full recovery between sets.`;
-    } else {
-      exercises.push(
-        { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
-        { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: 'Bodyweight' },
-        { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'Bodyweight' }
-      );
-      duration = 25;
-      description = `Week ${weekInPhase} Race Prep - Light maintenance only. No jumping, running is the priority.`;
-    }
-  }
-  
-  // Core work for all sessions
-  exercises.push({ name: 'Core Circuit', sets: 1, reps: '5 min', weight: 'Planks, dead bugs, bird dogs' });
-  
-  // Apply target RIR based on phase
-  const targetRIR = getTargetRIR(phase, isRecovery, false, tier === 'bodyweight');
-  const exercisesWithRIR = applyTargetRIR(exercises, targetRIR);
-  
+function convertPhase(phase: Phase): StrengthPhase {
   return {
-    day: 'Monday',
-    type: 'strength',
-    name: `Lower Body: Power & Posterior${isRecovery ? ' (Recovery)' : ''}`,
-    description,
-    duration,
-    strength_exercises: exercisesWithRIR,
-    tags: ['strength', 'lower_body', `tier:${tier}`, `phase:${phase.name.toLowerCase()}`, 'focus:posterior_chain']
+    name: phase.name,
+    start_week: phase.start_week,
+    end_week: phase.end_week,
+    weeks_in_phase: phase.end_week - phase.start_week + 1,
   };
 }
 
-// ============================================================================
-// WEDNESDAY: UPPER BODY PROGRESSION (THE GAINS SESSION)
-// Focus: Progressive overload, build strength and size
-// This is what differentiates us - upper body CAN progress during marathon training
-// ============================================================================
-
-function createWednesdayUpperBody(
-  phase: Phase,
-  weekInPhase: number,
-  isRecovery: boolean,
-  tier: StrengthTier,
-  absoluteWeek: number,
-  totalWeeks: number
-): Session {
-  const exercises: StrengthExercise[] = [];
-  let duration: number;
-  let description: string;
-  
-  // Calculate progression across entire plan (not just phase)
-  // Upper body progresses continuously, only pausing slightly in recovery weeks
-  const isUpperPeakWeek = phase.name === 'Race Prep' && weekInPhase === 1;
-  
-  if (tier === 'barbell') {
-    if (isRecovery) {
-      // Recovery: MAINTAIN weight, reduce volume (4 sets → 3 sets)
-      // Don't drop intensity - just fewer sets
-      exercises.push(
-        { name: 'Bench Press', sets: 3, reps: 8, weight: '75% 1RM' },
-        { name: 'Barbell Rows', sets: 3, reps: 8, weight: '70% 1RM' },
-        { name: 'Pull-ups', sets: 3, reps: 8, weight: 'Bodyweight' },
-        { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Light band/cable' }
-      );
-      duration = 35;
-      description = 'Recovery Week - Same weights as last week, fewer sets. Your muscles adapt during rest. Resume progression next week.';
-    } else if (phase.name === 'Base') {
-      // Base: Build strength foundation (4x10 → 4x8 as weights increase)
-      const baseLoad = 70 + (Math.min(4, weekInPhase) * 5); // Progress 70% → 85%
-      exercises.push(
-        { name: 'Bench Press', sets: 4, reps: 10, weight: `${baseLoad}% 1RM` },
-        { name: 'Barbell Rows', sets: 4, reps: 10, weight: `${baseLoad}% 1RM` },
-        { name: 'Pull-ups', sets: 4, reps: '8-10', weight: 'Bodyweight' },
-        { name: 'DB Shoulder Press', sets: 3, reps: 10, weight: `${baseLoad - 10}% 1RM` },
-        { name: 'Band Face Pulls', sets: 3, reps: 15, weight: 'Light band/cable' }
-      );
-      duration = 45;
-      description = `Week ${weekInPhase} Base - Building strength foundation. Target: 4x10 @ ${baseLoad}% 1RM.`;
-    } else if (phase.name === 'Speed') {
-      // Speed: KEEP BUILDING - upper body doesn't need to back off
-      const speedLoad = 78 + (Math.min(3, weekInPhase) * 3); // Progress 78% → 87%
-      exercises.push(
-        { name: 'Bench Press', sets: 4, reps: 8, weight: `${speedLoad}% 1RM` },
-        { name: 'Barbell Rows', sets: 4, reps: 8, weight: `${speedLoad}% 1RM` },
-        { name: 'Pull-ups', sets: 4, reps: '6-8', weight: 'Add weight if able' },
-        { name: 'DB Shoulder Press', sets: 3, reps: 8, weight: `${speedLoad - 10}% 1RM` },
-        { name: 'Band Face Pulls', sets: 3, reps: 15, weight: 'Moderate band/cable' }
-      );
-      duration = 45;
-      description = `Week ${weekInPhase} Speed - KEEP BUILDING upper body. Target: 4x8 @ ${speedLoad}% 1RM.`;
-    } else if (isUpperPeakWeek) {
-      // Race Prep Week 1: PEAK TEST - this is when you test your gains!
-      exercises.push(
-        { name: 'Bench Press', sets: 3, reps: 5, weight: '82-85% 1RM (HEAVY)' },
-        { name: 'Barbell Rows', sets: 3, reps: 5, weight: '82-85% 1RM (HEAVY)' },
-        { name: 'Pull-ups', sets: 3, reps: 'Max reps', weight: 'Max weight possible' },
-        { name: 'Shoulder Press', sets: 3, reps: 6, weight: 'Heavy DBs' },
-        { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Light' }
-      );
-      duration = 45;
-      description = `🏆 UPPER BODY PEAK WEEK - Test your gains! Running tapers = extra recovery for lifting. Go heavy on bench and rows. How much stronger are you than Week 1?`;
-    } else {
-      // Race Prep Week 2+: Back off before race
-      exercises.push(
-        { name: 'Bench Press', sets: 2, reps: 8, weight: '70% 1RM' },
-        { name: 'Rows', sets: 2, reps: 8, weight: '70% 1RM' },
-        { name: 'Pull-ups', sets: 2, reps: 8, weight: 'Bodyweight' },
-        { name: 'Shoulder Press', sets: 2, reps: 10, weight: 'Light DBs' }
-      );
-      duration = 30;
-      description = `Week ${weekInPhase} Race Prep - Maintain gains with minimal volume. You've already tested your strength - now just stay fresh for race day.`;
-    }
-  } else {
-    // TIER 1: BODYWEIGHT PROGRESSIONS
-    // Must have clear level-up paths to feel like "gains"
-    
-    if (isRecovery) {
-      exercises.push(
-        { name: 'Push-ups', sets: 3, reps: 12, weight: 'Standard' },
-        { name: 'Inverted Rows', sets: 3, reps: 10, weight: 'Standard angle' },
-        { name: 'Pike Push-ups', sets: 2, reps: 8, weight: 'Standard' },
-        { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Light band' }
-      );
-      duration = 30;
-      description = 'Recovery Week - Maintain current level, reduced volume. Resume progression next week.';
-    } else if (phase.name === 'Base') {
-      // Base: Build volume, master basic progressions
-      const pushProgression = weekInPhase <= 2 ? 'Standard push-ups' : weekInPhase <= 4 ? 'Diamond push-ups' : 'Decline push-ups';
-      exercises.push(
-        { name: 'Push-ups', sets: 4, reps: 12, weight: `Progress: ${pushProgression}` },
-        { name: 'Inverted Rows', sets: 4, reps: 12, weight: 'Feet elevated when easy' },
-        { name: 'Pike Push-ups', sets: 3, reps: 10, weight: 'Elevate feet to progress' },
-        { name: 'Pull-ups', sets: 3, reps: '5-8', weight: 'Assisted or negatives OK' },
-        { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Light band' }
-      );
-      duration = 40;
-      description = `Week ${weekInPhase} Base - Bodyweight progression. Current push-up level: ${pushProgression}. When you hit 4x12 cleanly, progress to next variation.`;
-    } else if (phase.name === 'Speed') {
-      const pushProgression = 'Decline or archer push-ups';
-      exercises.push(
-        { name: 'Push-ups', sets: 4, reps: 10, weight: `Advanced: ${pushProgression}` },
-        { name: 'Inverted Rows', sets: 4, reps: 10, weight: 'Feet elevated, slow tempo' },
-        { name: 'Pike Push-ups', sets: 3, reps: 10, weight: 'Elevated pike (near HSPU)' },
-        { name: 'Pull-ups', sets: 4, reps: 'Max reps', weight: 'Aim for +2 reps vs Week 1' },
-        { name: 'Face Pulls', sets: 3, reps: 15, weight: 'Moderate band' }
-      );
-      duration = 40;
-      description = `Week ${weekInPhase} Speed - Advanced progressions. Track your pull-up max - this is your upper body PR metric. How many more can you do than Week 1?`;
-    } else if (isUpperPeakWeek) {
-      exercises.push(
-        { name: 'Push-ups', sets: 3, reps: 'Max reps', weight: 'Your hardest variation' },
-        { name: 'Pull-ups', sets: 3, reps: 'Max reps', weight: 'Test your PR!' },
-        { name: 'Inverted Rows', sets: 3, reps: 'Max reps', weight: 'Feet elevated' },
-        { name: 'Pike Push-ups', sets: 3, reps: 'Max reps', weight: 'Your hardest variation' }
-      );
-      duration = 35;
-      description = `🏆 UPPER BODY PEAK WEEK - Test your gains! How many pull-ups can you do? What push-up variation can you master? Celebrate your progress!`;
-    } else {
-      exercises.push(
-        { name: 'Push-ups', sets: 2, reps: 15, weight: 'Standard' },
-        { name: 'Inverted Rows', sets: 2, reps: 12, weight: 'Standard' },
-        { name: 'Pike Push-ups', sets: 2, reps: 10, weight: 'Standard' }
-      );
-      duration = 25;
-      description = `Week ${weekInPhase} Race Prep - Maintain gains, minimal volume. Stay fresh for race day.`;
-    }
-  }
-  
-  // Core work
-  exercises.push({ name: 'Core Circuit', sets: 1, reps: '5 min', weight: 'Anti-rotation focus (Pallof press, dead bugs)' });
-  
-  // Apply target RIR - upper body peak week gets RIR 1 (go hard!)
-  const targetRIR = getTargetRIR(phase, isRecovery, isUpperPeakWeek, tier === 'bodyweight');
-  const exercisesWithRIR = applyTargetRIR(exercises, targetRIR);
-  
+function convertToSession(placed: PlacedSession, tier: StrengthTier): Session {
   return {
-    day: 'Wednesday',
+    day: placed.day,
     type: 'strength',
-    name: isUpperPeakWeek ? '🏆 Upper Body: Peak Test' : `Upper Body: Progression${isRecovery ? ' (Recovery)' : ''}`,
-    description,
-    duration,
-    strength_exercises: exercisesWithRIR,
-    tags: ['strength', 'upper_body', `tier:${tier}`, `phase:${phase.name.toLowerCase()}`, 'focus:gains', 'priority:high']
-  };
-}
-
-// ============================================================================
-// FRIDAY: LOWER BODY STABILITY & MAINTENANCE
-// Focus: Single-leg stability, movement quality
-// OPTIONAL in Speed phase (week 6+) and Race Prep when running volume is high
-// ============================================================================
-
-function createFridayLowerBody(
-  phase: Phase,
-  weekInPhase: number,
-  isRecovery: boolean,
-  tier: StrengthTier,
-  isOptional: boolean
-): Session {
-  const exercises: StrengthExercise[] = [];
-  let duration: number;
-  let description: string;
-  
-  const optionalNote = isOptional 
-    ? '\n\n⚠️ OPTIONAL: If your legs feel heavy from running or you have a long run this weekend, skip this session. Wednesday upper body is the priority.'
-    : '';
-  
-  if (tier === 'barbell') {
-    if (isRecovery) {
-      // Recovery: Reduced load and volume
-      exercises.push(
-        { name: 'Bulgarian Split Squat', sets: 2, reps: '8/leg', weight: '55% 1RM' },
-        { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: '50% 1RM' },
-        { name: 'Lateral Lunges', sets: 2, reps: '8/leg', weight: '50% 1RM' },
-        { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
-      );
-      duration = 30;
-      description = 'Recovery Week - Light single-leg work. Maintain patterns, no fatigue.';
-    } else if (phase.name === 'Base') {
-      // Use percentage-based progression - materializer will calculate from user's 1RM
-      const load = 60 + (Math.min(4, weekInPhase) * 5); // 65%, 70%, 75%, 80%
-      exercises.push(
-        { name: 'Bulgarian Split Squat', sets: 3, reps: '10/leg', weight: `${load}% 1RM` },
-        { name: 'Single Leg RDL', sets: 3, reps: '10/leg', weight: `${Math.max(55, load - 5)}% 1RM` },
-        { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: `${load}% 1RM` },
-        { name: 'Clamshells', sets: 2, reps: '20/side', weight: 'Light band' },
-        { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight' }
-      );
-      duration = 40;
-      description = `Week ${weekInPhase} Base - Single-leg stability development. Target: 3x10/leg @ ${load}% 1RM.`;
-    } else if (phase.name === 'Speed') {
-      // Speed: Maintain strength with reduced volume
-      const load = 65 + (Math.min(3, weekInPhase) * 3); // 68%, 71%, 74%
-      exercises.push(
-        { name: 'Bulgarian Split Squat', sets: 2, reps: '8/leg', weight: `${load}% 1RM` },
-        { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: `${Math.max(60, load - 5)}% 1RM` },
-        { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Moderate band' },
-        { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' }
-      );
-      duration = 30;
-      description = `Week ${weekInPhase} Speed - Reduced volume, maintain single-leg patterns.${optionalNote}`;
-    } else {
-      // Race Prep - skip entirely or very light
-      exercises.push(
-        { name: 'Walking Lunges', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
-        { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' }
-      );
-      duration = 20;
-      description = `Week ${weekInPhase} Race Prep - Minimal movement, stay loose. Skip if tired.${optionalNote}`;
-    }
-  } else {
-    // TIER 1: BODYWEIGHT
-    if (isRecovery) {
-      exercises.push(
-        { name: 'Walking Lunges', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
-        { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: 'Bodyweight' },
-        { name: 'Lateral Lunges', sets: 2, reps: '8/leg', weight: 'Bodyweight' },
-        { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
-      );
-      duration = 25;
-      description = 'Recovery Week - Light movement, maintain patterns.';
-    } else if (phase.name === 'Base') {
-      exercises.push(
-        { name: 'Bulgarian Split Squat', sets: 3, reps: '12/leg', weight: 'Bodyweight → add DBs' },
-        { name: 'Single Leg RDL', sets: 3, reps: '10/leg', weight: 'Bodyweight' },
-        { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: 'Bodyweight' },
-        { name: 'Clamshells', sets: 2, reps: '20/side', weight: 'Light band optional' },
-        { name: 'Calf Raises', sets: 3, reps: 20, weight: 'Single leg when easy' }
-      );
-      duration = 35;
-      description = `Week ${weekInPhase} Base - Build single-leg stability. Progress Bulgarian split squats by adding light dumbbells when bodyweight is easy.`;
-    } else if (phase.name === 'Speed') {
-      exercises.push(
-        { name: 'Bulgarian Split Squat', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
-        { name: 'Single Leg RDL', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
-        { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' },
-        { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' }
-      );
-      duration = 25;
-      description = `Week ${weekInPhase} Speed - Maintain patterns, reduced volume.${optionalNote}`;
-    } else {
-      exercises.push(
-        { name: 'Walking Lunges', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
-        { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' }
-      );
-      duration = 15;
-      description = `Week ${weekInPhase} Race Prep - Light movement only. Skip if tired.${optionalNote}`;
-    }
-  }
-  
-  // Core work
-  exercises.push({ name: 'Core Circuit', sets: 1, reps: '5 min', weight: 'Side planks, Copenhagen planks' });
-  
-  // Apply target RIR - Friday is stability work, can be slightly easier
-  const targetRIR = getTargetRIR(phase, isRecovery, false, tier === 'bodyweight');
-  const exercisesWithRIR = applyTargetRIR(exercises, targetRIR);
-  
-  return {
-    day: 'Friday',
-    type: 'strength',
-    name: `Lower Body: Stability${isRecovery ? ' (Recovery)' : ''}${isOptional ? ' (Optional)' : ''}`,
-    description,
-    duration,
-    strength_exercises: exercisesWithRIR,
+    name: placed.name,
+    description: placed.description,
+    duration: placed.duration,
+    strength_exercises: placed.exercises.map(ex => ({
+      name: ex.name,
+      sets: ex.sets,
+      reps: ex.reps,
+      weight: ex.weight,
+      target_rir: ex.target_rir,
+      notes: ex.notes,
+    })),
     tags: [
-      'strength', 
-      'lower_body', 
-      `tier:${tier}`, 
-      `phase:${phase.name.toLowerCase()}`, 
-      'focus:stability',
-      ...(isOptional ? ['optional'] : [])
-    ]
+      ...placed.tags,
+      `tier:${tier}`,
+      ...(placed.isOptional ? ['optional'] : []),
+    ],
   };
 }
 
-// ============================================================================
-// TAPER SESSIONS
-// ============================================================================
+/**
+ * Normalize schedule to ensure all fields are arrays (never undefined)
+ * This avoids ?. logic in placement/guardrails code
+ */
+function normalizePrimarySchedule(
+  schedule: Partial<ProtocolContext['primarySchedule']>
+): ProtocolContext['primarySchedule'] {
+  return {
+    longSessionDays: schedule.longSessionDays ?? [],
+    qualitySessionDays: schedule.qualitySessionDays ?? [],
+    easySessionDays: schedule.easySessionDays ?? [],
+  };
+}
 
-function createTaperSessions(
-  tier: StrengthTier,
-  week: number,
-  totalWeeks: number
-): Session[] {
-  const sessions: Session[] = [];
-  const isRaceWeek = week === totalWeeks;
-  const taperRIR = 4; // Easy effort for taper
+function extractPrimarySchedule(plan: TrainingPlan): ProtocolContext['primarySchedule'] {
+  // Extract primary sport schedule from plan sessions
+  // Normalized across disciplines (running, cycling, triathlon)
+  // For now, return default - will be enhanced later to parse actual sessions
+  // 
+  // Future: For multi-sport plans, this can be extended to return multiple schedules
+  // or a scheduleBlocks array with discipline tags
   
-  if (isRaceWeek) {
-    // Race week: Skip strength entirely or very minimal
-    sessions.push({
-      day: 'Monday',
-      type: 'strength',
-      name: 'Race Week: Light Movement (Optional)',
-      description: 'Race week - Skip entirely or just 10-15 min of light movement to stay loose. Nothing that will make you sore.',
-      duration: 15,
-      strength_exercises: [
-        { name: 'Bodyweight Squats', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
-        { name: 'Glute Bridges', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
-        { name: 'Push-ups', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR }
-      ],
-      tags: ['strength', 'full_body', 'phase:taper', 'optional', `tier:${tier}`]
-    });
-  } else {
-    // Taper week (not race week): Light maintenance
-    const mondayExercises: StrengthExercise[] = tier === 'barbell' 
-      ? [
-          { name: 'Hip Thrusts', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
-          { name: 'Bench Press', sets: 2, reps: 8, weight: '50% 1RM', target_rir: taperRIR },
-          { name: 'Rows', sets: 2, reps: 8, weight: '50% 1RM', target_rir: taperRIR },
-          { name: 'Glute Bridges', sets: 2, reps: 12, weight: 'Bodyweight', target_rir: taperRIR }
-        ]
-      : [
-          { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: taperRIR },
-          { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard', target_rir: taperRIR },
-          { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard', target_rir: taperRIR },
-          { name: 'Walking Lunges', sets: 2, reps: '8/leg', weight: 'Bodyweight', target_rir: taperRIR }
-        ];
-        
-    sessions.push({
-      day: 'Monday',
-      type: 'strength',
-      name: 'Taper: Light Full Body',
-      description: 'Taper week - Light movement to maintain patterns. 50-60% effort max. Save energy for race day.',
-      duration: 25,
-      strength_exercises: mondayExercises,
-      tags: ['strength', 'full_body', 'phase:taper', `tier:${tier}`]
-    });
-    
-    // Optional Wednesday for taper week - very light upper if user wants it
-    const wednesdayExercises: StrengthExercise[] = tier === 'barbell'
-      ? [
-          { name: 'Bench Press', sets: 2, reps: 10, weight: '50% 1RM', target_rir: taperRIR },
-          { name: 'Rows', sets: 2, reps: 10, weight: '50% 1RM', target_rir: taperRIR },
-          { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Light', target_rir: taperRIR }
-        ]
-      : [
-          { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard', target_rir: taperRIR },
-          { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard', target_rir: taperRIR },
-          { name: 'Pike Push-ups', sets: 2, reps: 8, weight: 'Standard', target_rir: taperRIR }
-        ];
-        
-    sessions.push({
-      day: 'Wednesday',
-      type: 'strength',
-      name: 'Taper: Upper Body Maintenance (Optional)',
-      description: 'Optional - Only if you feel good. Light upper body to stay sharp. Skip if any fatigue.',
-      duration: 20,
-      strength_exercises: wednesdayExercises,
-      tags: ['strength', 'upper_body', 'phase:taper', 'optional', `tier:${tier}`]
-    });
-  }
-  
-  return sessions;
+  // Always normalize to arrays (never undefined) to avoid ?. logic in placement/guardrails
+  return normalizePrimarySchedule({
+    longSessionDays: ['Sunday'], // Default assumption - longest/highest volume session(s)
+    // Future: Can add highFatigueDays: string[] for days with tempo + long-ish sessions
+    qualitySessionDays: ['Tuesday', 'Thursday'], // Default assumption - quality/speed work
+    easySessionDays: ['Monday', 'Wednesday', 'Friday', 'Saturday'], // Default assumption - easy/recovery sessions
+  });
 }
 
 // ============================================================================
@@ -662,9 +201,24 @@ export function overlayStrengthLegacy(
   frequency: 2 | 3,
   phaseStructure: PhaseStructure,
   tier: 'injury_prevention' | 'strength_power' = 'injury_prevention',
-  _equipment: 'home_gym' | 'commercial_gym' = 'home_gym'
+  _equipment: 'home_gym' | 'commercial_gym' = 'home_gym',
+  protocolId?: string
 ): TrainingPlan {
   // Map old tier names to new
   const newTier: StrengthTier = tier === 'injury_prevention' ? 'bodyweight' : 'barbell';
-  return overlayStrength(plan, frequency, phaseStructure, newTier);
+  return overlayStrength(plan, frequency, phaseStructure, newTier, protocolId);
 }
+
+// OLD FUNCTIONS REMOVED - Now in protocol system
+// The following functions have been moved to:
+// - supabase/functions/shared/strength-system/protocols/upper-priority-hybrid.ts
+//
+// Removed:
+// - createMondayLowerBody
+// - createWednesdayUpperBody
+// - createFridayLowerBody
+// - createTaperSessions
+// - getTargetRIR
+// - applyTargetRIR
+//
+// These are now handled by the protocol system.

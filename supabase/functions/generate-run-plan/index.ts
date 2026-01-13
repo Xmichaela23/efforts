@@ -54,6 +54,9 @@ Deno.serve(async (req: Request) => {
     // Validate request
     const requestValidation = validateRequest(request);
     if (!requestValidation.valid) {
+      // Log canonical protocol for 400 rejects (for debugging/analytics)
+      const protocolId = request.strength_protocol || 'none';
+      console.error(`[PlanGen] Validation failed (protocol: ${protocolId}):`, requestValidation.errors);
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -140,10 +143,35 @@ Deno.serve(async (req: Request) => {
 
     // Apply strength overlay if requested
     if (request.strength_frequency && request.strength_frequency > 0) {
-      const tier = request.strength_tier || 'injury_prevention';
-      const equipment = request.equipment_type || 'home_gym';
-      // Use legacy function to map old tier names ('injury_prevention', 'strength_power') to new ('bodyweight', 'barbell')
-      plan = overlayStrengthLegacy(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment);
+      try {
+        const tier = request.strength_tier || 'injury_prevention';
+        const equipment = request.equipment_type || 'home_gym';
+        
+        // Protocol ID is already normalized to canonical format by validation
+        // Only use protocol if tier is strength_power (validation ensures this)
+        const protocolId = (tier === 'strength_power' && request.strength_protocol) 
+          ? request.strength_protocol 
+          : undefined;
+        
+        // Log canonical protocol at generation (for analytics/debugging)
+        if (protocolId) {
+          console.log(`[PlanGen] Applying strength protocol: ${protocolId} (tier: ${tier}, frequency: ${request.strength_frequency})`);
+        }
+        
+        // Use legacy function to map old tier names ('injury_prevention', 'strength_power') to new ('bodyweight', 'barbell')
+        plan = overlayStrengthLegacy(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment, protocolId);
+      } catch (error: any) {
+        // Protocol validation error - log canonical protocol for debugging
+        const protocolId = request.strength_protocol || 'none';
+        console.error(`[PlanGen] Invalid strength_protocol: ${protocolId}`, error);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: error.message || 'Invalid strength_protocol'
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Validate generated plan
@@ -192,12 +220,15 @@ Deno.serve(async (req: Request) => {
         plan_type: 'generated',
         config: {
           source: 'generated',
+          plan_version: 'strength_protocols_v1', // Version stamp for plan structure
           approach: request.approach,
           distance: request.distance,
           fitness: request.fitness,
           goal: request.goal,
           days_per_week: request.days_per_week,
           strength_frequency: request.strength_frequency || 0,
+          strength_tier: request.strength_tier || null,
+          strength_protocol: request.strength_protocol || null, // Canonical protocol ID
           user_selected_start_date: startDate,
           race_date: request.race_date || null,
           race_name: request.race_name || null,

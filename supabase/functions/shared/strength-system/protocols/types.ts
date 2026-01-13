@@ -35,11 +35,17 @@ export interface ProtocolContext {
   totalWeeks: number;
   isRecovery: boolean; // Is this a recovery week?
   
-  // Run schedule (for placement/guardrails)
-  runSchedule: {
-    longRunDay?: string; // 'Sunday' | 'Saturday' | null
-    qualityRunDays: string[]; // Days with quality/speed work
-    easyRunDays: string[]; // Days with easy runs only
+  // Primary sport schedule (for placement/guardrails)
+  // Normalized across disciplines: long sessions, quality sessions, easy sessions
+  // 
+  // Future: For multi-sport (triathlon), extend to:
+  //   schedules: { primary: Schedule, secondary?: Schedule, tertiary?: Schedule }
+  //   or scheduleBlocks: Day[] with tags (LONG, QUALITY, EASY) and discipline field
+  primarySchedule: {
+    longSessionDays: string[]; // Days with longest/highest volume sessions (e.g., ['Sunday'])
+    // Future: Can extend to highFatigueDays: string[] for days with tempo + long-ish sessions
+    qualitySessionDays: string[]; // Days with quality/speed work (intervals, tempo, etc.)
+    easySessionDays: string[]; // Days with easy/recovery sessions only
   };
   
   // User baselines and preferences
@@ -50,6 +56,9 @@ export interface ProtocolContext {
     overhead1RM?: number;
     equipment: 'home_gym' | 'commercial_gym';
   };
+  
+  // Strength training configuration
+  strengthFrequency: 2 | 3; // How many strength sessions per week
   
   // Constraints
   constraints: {
@@ -113,9 +122,15 @@ export interface StrengthExercise {
  */
 export interface StrengthProtocol {
   /**
-   * Protocol identifier (used in routing)
+   * Protocol identifier (used in routing) - canonical ID
    */
   id: string;
+  
+  /**
+   * Legacy protocol IDs for backwards compatibility
+   * TODO: Remove after 2025-03-01
+   */
+  legacy_ids?: string[];
   
   /**
    * Human-readable protocol name
@@ -199,7 +214,7 @@ export interface PlacementPolicy {
    */
   assignSessions(
     intentSessions: IntentSession[],
-    runSchedule: ProtocolContext['runSchedule'],
+    primarySchedule: ProtocolContext['primarySchedule'],
     guardrails: GuardrailResult[]
   ): PlacedSession[];
 }

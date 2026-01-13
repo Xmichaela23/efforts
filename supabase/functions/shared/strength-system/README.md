@@ -24,16 +24,16 @@ const context: ProtocolContext = {
   weekIndex: 5,
   weekInPhase: 2,
   phase: { name: 'Speed', ... },
-  runSchedule: {
-    longRunDay: 'Sunday',
-    qualityRunDays: ['Tuesday', 'Thursday'],
-    easyRunDays: ['Monday', 'Wednesday', 'Friday']
+  primarySchedule: {
+    longSessionDays: ['Sunday'],
+    qualitySessionDays: ['Tuesday', 'Thursday'],
+    easySessionDays: ['Monday', 'Wednesday', 'Friday']
   },
   // ...
 };
 
-// Get protocol (from selector)
-const protocol = getProtocol('upper_priority_hybrid');
+// Get protocol (from selector) - uses canonical ID
+const protocol = getProtocol('upper_aesthetics');
 
 // Generate intent sessions
 const intentSessions = protocol.createWeekSessions(context);
@@ -41,7 +41,7 @@ const intentSessions = protocol.createWeekSessions(context);
 // Assign to days (placement policy)
 const placedSessions = placementPolicy.assignSessions(
   intentSessions,
-  context.runSchedule,
+  context.primarySchedule,
   guardrailResults
 );
 ```
@@ -80,4 +80,11 @@ This system works for:
 - **Cycling** - Long rides, quality rides
 - **Triathlon** - Long runs + rides + swims
 
-The `runSchedule` in `ProtocolContext` can be extended to support multiple sports.
+The `primarySchedule` in `ProtocolContext` is normalized across disciplines:
+- `longSessionDays: string[]` - Days with longest/highest volume sessions (e.g., ['Sunday'])
+- `qualitySessionDays: string[]` - Days with quality/speed work (intervals, tempo, etc.)
+- `easySessionDays: string[]` - Days with easy/recovery sessions
+
+**Future extensibility:**
+- For multi-sport (triathlon): Can extend to `schedules: { primary, secondary?, tertiary? }` or `scheduleBlocks: Day[]` with discipline tags
+- For high-fatigue days: Can add `highFatigueDays: string[]` for days with tempo + long-ish sessions

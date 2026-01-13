@@ -39,10 +39,10 @@ export interface IntentMetadata {
   // Session cost (helps guardrails auto-modify)
   sessionCost: SessionCost;
   
-  // Timing constraints (hours to avoid after run types)
+  // Timing constraints (hours to avoid after primary sport sessions)
   avoidWithinHoursOf?: {
-    LONG?: number; // Long run
-    QUALITY?: number; // Quality/speed work
+    LONG?: number; // Long/high-volume session (long run, long ride, etc.)
+    QUALITY?: number; // Quality/speed work (intervals, tempo, etc.)
   };
   
   // Volume caps (prevent overreaching)
@@ -88,7 +88,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['bilateral_compound'], // Back Squat, Trap Bar DL, Front Squat
     repRange: [2, 5],
     intensityRange: [75, 90],
-    allowedProtocols: ['performance_neural', 'upper_priority_hybrid'], // Only protocols that do heavy compounds
+    allowedProtocols: ['neural_speed', 'upper_aesthetics'], // Only protocols that do heavy compounds
   },
   
   LOWER_DURABILITY: {
@@ -107,7 +107,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['unilateral_stability'], // Bulgarian Split Squat, Single Leg RDL, Lateral Lunges
     repRange: [8, 15],
     intensityRange: [50, 70],
-    allowedProtocols: ['foundation_durability', 'upper_priority_hybrid'], // Foundation always, upper priority can include
+    allowedProtocols: ['durability', 'upper_aesthetics'], // Foundation always, upper priority can include
   },
   
   LOWER_POWER: {
@@ -126,7 +126,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['plyometric', 'explosive'], // Box Jumps, Jump Squats, KB Swings
     repRange: [3, 5],
     intensityRange: [30, 50], // Bodyweight or light load
-    allowedProtocols: ['performance_neural'], // Only performance protocol does power work
+    allowedProtocols: ['neural_speed'], // Only performance protocol does power work
   },
   
   LOWER_MAINTENANCE: {
@@ -142,7 +142,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['light_compound', 'bodyweight'], // Hip Thrusts @ 50%, Glute Bridges
     repRange: [10, 15],
     intensityRange: [50, 60],
-    allowedProtocols: ['upper_priority_hybrid', 'minimum_dose'], // Upper priority uses this, minimum dose can use it
+    allowedProtocols: ['upper_aesthetics', 'minimum_dose'], // Upper priority uses this, minimum dose can use it
   },
   
   // ============================================================================
@@ -162,7 +162,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['heavy_compound'], // Bench Press, Barbell Row, Overhead Press
     repRange: [4, 12], // 4-8 for strength, 8-12 for hypertrophy
     intensityRange: [65, 85],
-    allowedProtocols: ['upper_priority_hybrid', 'performance_neural', 'foundation_durability'], // Most protocols do upper strength
+    allowedProtocols: ['upper_aesthetics', 'neural_speed', 'durability'], // Most protocols do upper strength
   },
   
   UPPER_POSTURE: {
@@ -178,7 +178,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['rear_delt', 'upper_back'], // Face Pulls, Band Pulls, YTW Raises
     repRange: [12, 20],
     intensityRange: [40, 60], // Light bands or 50-60% 1RM
-    allowedProtocols: ['upper_priority_hybrid', 'foundation_durability'], // Upper priority and foundation include posture work
+    allowedProtocols: ['upper_aesthetics', 'durability'], // Upper priority and foundation include posture work
   },
   
   UPPER_MAINTENANCE: {
@@ -194,7 +194,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['light_compound'], // Bench 2x8 @ 50%, Rows 2x8 @ 50%
     repRange: [8, 12],
     intensityRange: [50, 60],
-    allowedProtocols: ['performance_neural', 'minimum_dose'], // Performance can use in taper, minimum dose uses it
+    allowedProtocols: ['neural_speed', 'minimum_dose'], // Performance can use in taper, minimum dose uses it
   },
   
   // ============================================================================
@@ -214,7 +214,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['minimal_compound'], // One squat, one bench, one row
     repRange: [5, 8],
     intensityRange: [65, 75],
-    allowedProtocols: ['minimum_dose'], // Only minimum dose uses full body
+    allowedProtocols: ['minimum_dose', 'durability', 'neural_speed'], // Minimum dose uses full body; foundation/performance use it for taper optional
   },
 };
 
@@ -260,15 +260,15 @@ export function getIntentsForProtocol(protocolId: string): StrengthIntent[] {
 }
 
 /**
- * Check if an intent requires spacing after long runs
+ * Check if an intent requires spacing after long/high-volume sessions
  */
-export function getMinHoursAfterLongRun(intent: StrengthIntent): number | undefined {
+export function getMinHoursAfterLongSession(intent: StrengthIntent): number | undefined {
   return INTENT_DEFS[intent].avoidWithinHoursOf?.LONG;
 }
 
 /**
- * Check if an intent requires spacing after quality runs
+ * Check if an intent requires spacing after quality/speed sessions
  */
-export function getMinHoursAfterQualityRun(intent: StrengthIntent): number | undefined {
+export function getMinHoursAfterQualitySession(intent: StrengthIntent): number | undefined {
   return INTENT_DEFS[intent].avoidWithinHoursOf?.QUALITY;
 }

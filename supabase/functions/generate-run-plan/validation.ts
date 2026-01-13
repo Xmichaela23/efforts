@@ -80,6 +80,47 @@ export function validateRequest(request: GeneratePlanRequest): ValidationResult 
     }
   }
 
+  // Strength protocol validation and normalization
+  // If strength_power tier is selected with frequency > 0, protocol is required
+  if (request.strength_tier === 'strength_power' && request.strength_frequency && request.strength_frequency > 0) {
+    if (!request.strength_protocol) {
+      errors.push('strength_protocol is required for strength_power tier');
+    } else {
+      // Supported protocols (runtime list - excludes minimum_dose until frontend supports it)
+      const validProtocols = new Set<string>(['durability', 'neural_speed', 'upper_aesthetics']);
+      // Also accept legacy IDs for temporary backward compatibility (will be normalized)
+      const legacyProtocols = new Set<string>(['foundation_durability', 'performance_neural', 'upper_priority_hybrid']);
+      
+      if (!validProtocols.has(request.strength_protocol) && !legacyProtocols.has(request.strength_protocol)) {
+        const validList = Array.from(validProtocols).join(', ');
+        const errorMsg = `Invalid strength_protocol: "${request.strength_protocol}". Must be one of: ${validList}`;
+        console.error(`[Validation] ${errorMsg}`);
+        errors.push(errorMsg);
+      }
+      
+      // Normalize legacy IDs to new canonical IDs (early normalization)
+      // Derive normalized value explicitly to avoid mutation side-effects
+      // TODO: Remove legacy support after 2025-03-01 - all clients should use new IDs
+      const legacyToNew: Record<string, string> = {
+        'foundation_durability': 'durability',
+        'performance_neural': 'neural_speed',
+        'upper_priority_hybrid': 'upper_aesthetics',
+      };
+      
+      // After this point, request.strength_protocol is guaranteed to be canonical
+      const normalizedProtocol = legacyProtocols.has(request.strength_protocol) 
+        ? legacyToNew[request.strength_protocol] 
+        : request.strength_protocol;
+      
+      // Set normalized value explicitly (not a mutation side-effect)
+      (request as any).strength_protocol = normalizedProtocol;
+    }
+  } else if (request.strength_protocol) {
+    // Guardrail: ignore protocol if tier isn't strength_power (log for debugging)
+    console.warn(`strength_protocol "${request.strength_protocol}" provided but tier is not strength_power. Ignoring.`);
+    delete (request as any).strength_protocol;
+  }
+
   // Race date validation
   if (request.race_date) {
     const raceDate = new Date(request.race_date);
