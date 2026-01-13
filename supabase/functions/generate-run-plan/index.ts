@@ -18,6 +18,7 @@ import { SimpleCompletionGenerator } from './generators/simple-completion.ts';
 import { BalancedBuildGenerator } from './generators/balanced-build.ts';
 import { overlayStrength, overlayStrengthLegacy } from './strength-overlay.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
+import { addTimingLogic } from './timing-logic.ts';
 import { 
   calculateEffortScore, 
   getPacesFromScore, 
@@ -177,6 +178,11 @@ Deno.serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+    }
+
+    // Add AM/PM timing logic for double days (run + strength on same day)
+    if (request.strength_frequency && request.strength_frequency > 0) {
+      plan = addTimingLogic(plan);
     }
 
     // Validate generated plan

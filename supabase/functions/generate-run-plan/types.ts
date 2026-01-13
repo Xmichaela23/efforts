@@ -116,6 +116,7 @@ export interface Session {
   strength_exercises?: StrengthExercise[];
   tags: string[];
   transition_s?: number;
+  timing?: string; // e.g., 'AM (Priority)' or 'PM (6hr+ gap recommended)'
 }
 
 export interface StrengthExercise {
@@ -133,6 +134,7 @@ export interface WeeklySummary {
   hard_sessions: number;
   total_miles?: number;
   notes: string;
+  timing_note?: string; // Note about AM/PM scheduling for double days
 }
 
 // ============================================================================
