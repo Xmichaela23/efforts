@@ -564,7 +564,7 @@ export default function PlanWizard() {
       }
       
       if (key === 'goal') {
-        newState.approach = null;
+        // Don't reset approach here - it's set immediately in the goal step's onValueChange
         newState.daysPerWeek = null;
       }
       
@@ -663,10 +663,8 @@ export default function PlanWizard() {
       return;
     }
     
-    // When moving past goal step, auto-select the methodology
-    if (step === 3 && !methodologyResult.locked && methodologyResult.approach) {
-      updateState('approach', methodologyResult.approach);
-    }
+    // Note: approach is now set immediately when goal is selected, not here
+    // This prevents layout shifts and timing issues
     
     // Check if we're on the last step (runningDays) - if so, generate
     const logicalStep = getLogicalStep(step);
@@ -679,7 +677,6 @@ export default function PlanWizard() {
         setStep(step + 1);
       } else {
         // Already at max step, try to generate
-        console.warn('[PlanWizard] Already at max step, attempting to generate');
         handleGenerate();
       }
     }
@@ -904,17 +901,15 @@ export default function PlanWizard() {
   const renderStep = () => {
     const logicalStep = getLogicalStep(step);
     
-    // Debug: Show error message if step is unknown
+    // Safety check: if step calculation fails, show error instead of black screen
     if (logicalStep === 'unknown') {
       return (
         <StepContainer title="Navigation Error">
           <div className="space-y-4">
-            <p className="text-red-400">Step calculation error. Please report this.</p>
+            <p className="text-red-400">Step calculation error.</p>
             <div className="text-xs text-gray-400 space-y-1">
               <p>Step: {step}</p>
               <p>Goal: {state.goal || 'null'}</p>
-              <p>Needs Effort Score: {needsEffortScore ? 'yes' : 'no'}</p>
-              <p>Approach: {state.approach || 'null'}</p>
             </div>
             <Button onClick={handleBack} variant="outline" className="w-full">Go Back</Button>
           </div>
@@ -1073,7 +1068,18 @@ export default function PlanWizard() {
           <StepContainer title="What's your goal?">
             <RadioGroup
               value={state.goal || ''}
-              onValueChange={(v) => updateState('goal', v as Goal)}
+              onValueChange={(v) => {
+                const newGoal = v as Goal;
+                updateState('goal', newGoal);
+                // Set approach immediately when goal is selected (not in handleNext)
+                // This prevents layout shifts when the strength step renders
+                const methodology = getMethodologyForGoal(newGoal, state.fitness, state.distance);
+                if (methodology.approach && !methodology.locked) {
+                  updateState('approach', methodology.approach);
+                } else {
+                  updateState('approach', null);
+                }
+              }}
               className="space-y-4"
             >
               {/* Complete Goal → Simple Completion */}
