@@ -171,10 +171,9 @@ export class BalancedBuildGenerator extends BaseGenerator {
       usedMiles += 4;
       
       // Thursday: Easy run (reduced volume, maintains 2Q structure)
-      if (runningDays >= 5) {
-        sessions.push(this.createEasyRunMiles(3, 'Thursday'));
-        usedMiles += 3;
-      }
+      // Always add Thursday run in recovery weeks, regardless of runningDays count
+      sessions.push(this.createEasyRunMiles(3, 'Thursday'));
+      usedMiles += 3;
     }
 
     // Fill with easy runs
@@ -681,10 +680,16 @@ export class BalancedBuildGenerator extends BaseGenerator {
     for (let week = 1; week <= planWeeks; week++) {
       const idx = week - 1;
       
-      // Handle recovery weeks: 75% of previous week
-      if (weekTypes[idx] === 'recovery') {
+      // CRITICAL: Handle recovery weeks FIRST - 75% of previous week (hard-coded step-back)
+      // This MUST override any linear progression logic
+      // Also check if week % 4 === 0 as a fallback (in case weekTypes wasn't set correctly)
+      if (weekTypes[idx] === 'recovery' || (week % 4 === 0 && week < peakWeek - 2 && weekTypes[idx] !== 'peak' && weekTypes[idx] !== 'taper' && weekTypes[idx] !== 'pre-peak' && weekTypes[idx] !== 'post-peak')) {
         const previousWeekMiles = idx > 0 ? progression[idx - 1] : startMiles;
-        progression[idx] = Math.round(previousWeekMiles * 0.75);
+        // Hard-code step-back: recovery weeks are always 75% of previous week
+        // Ensure minimum of 8 miles for safety
+        const recoveryMiles = Math.max(8, Math.round(previousWeekMiles * 0.75));
+        progression[idx] = recoveryMiles;
+        weekTypes[idx] = 'recovery'; // Ensure it's marked
         // Don't update lastBuildMiles - we'll resume from pre-recovery level
         continue;
       }
