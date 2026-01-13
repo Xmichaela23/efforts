@@ -3,6 +3,7 @@ import { normalizePlannedSession, Baselines as NormalizerBaselines, ExportHints 
 import { normalizeStructuredSession } from '@/services/plans/normalizer';
 import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type Baselines = NormalizerBaselines | Record<string, any> | null | undefined;
 
@@ -623,9 +624,72 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         {!hideLines && !isStrength && (
           <div className="text-sm text-gray-200 font-light tracking-normal mt-1">
             {stacked.length > 1 ? (
-              <span className="whitespace-pre-line">{stacked.join('\n')}</span>
+              <span className="whitespace-pre-line">
+                {stacked.map((line, idx) => {
+                  // Add tooltip for strides mentions
+                  if (/strides/i.test(line)) {
+                    const parts = line.split(/(strides)/i);
+                    return (
+                      <React.Fragment key={idx}>
+                        {parts.map((part, pIdx) => {
+                          if (/^strides$/i.test(part)) {
+                            return (
+                              <TooltipProvider key={pIdx}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="underline decoration-dotted cursor-help">{part}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">
+                                      <strong>What are Strides?</strong><br />
+                                      Short, controlled accelerations (approx. 100m) designed to wake up your legs. Reach 95% of max speed while staying completely relaxed. This is not a sprint.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          }
+                          return <span key={pIdx}>{part}</span>;
+                        })}
+                        {idx < stacked.length - 1 && '\n'}
+                      </React.Fragment>
+                    );
+                  }
+                  return <React.Fragment key={idx}>{line}{idx < stacked.length - 1 && '\n'}</React.Fragment>;
+                })}
+              </span>
             ) : (
-              <span>{lines}</span>
+              (() => {
+                // Single line - check if it contains strides
+                if (/strides/i.test(lines)) {
+                  const parts = String(lines).split(/(strides)/i);
+                  return (
+                    <span>
+                      {parts.map((part, idx) => {
+                        if (/^strides$/i.test(part)) {
+                          return (
+                            <TooltipProvider key={idx}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="underline decoration-dotted cursor-help">{part}</span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="max-w-xs">
+                                    <strong>What are Strides?</strong><br />
+                                    Short, controlled accelerations (approx. 100m) designed to wake up your legs. Reach 95% of max speed while staying completely relaxed. This is not a sprint.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        }
+                        return <span key={idx}>{part}</span>;
+                      })}
+                    </span>
+                  );
+                }
+                return <span>{lines}</span>;
+              })()
             )}
           </div>
         )}
