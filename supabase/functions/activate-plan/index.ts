@@ -260,6 +260,10 @@ Deno.serve(async (req) => {
     })();
     const defaultPoolLenM = swimUnit === 'yd' ? 22.86 : 25.0;
 
+    // Track inserted rows to prevent duplicates within the same activation
+    // Key format: `${weekNum}-${dow}-${date}-${type}` (matches unique constraint)
+    const insertedKeys = new Set<string>();
+    
     for (const wk of Object.keys(sessionsByWeek)) {
       const weekNum = parseInt(wk, 10)
       const sessions = Array.isArray(sessionsByWeek[wk]) ? sessionsByWeek[wk] : []
@@ -279,6 +283,15 @@ Deno.serve(async (req) => {
         const mapped = mapType((s as any)?.discipline || (s as any)?.type, hasMobility)
         // Skip unknown/blank types instead of defaulting to run
         if (!mapped) continue
+        
+        // Deduplication: Check if we've already processed this session
+        // (matches unique constraint: training_plan_id, week_number, day_number, date, type)
+        const dedupeKey = `${weekNum}-${dow}-${date}-${mapped}`
+        if (insertedKeys.has(dedupeKey)) {
+          console.warn(`[activate-plan] Skipping duplicate session: week ${weekNum}, day ${dow}, date ${date}, type ${mapped}`)
+          continue
+        }
+        insertedKeys.add(dedupeKey)
         const stepsTokens: string[] = Array.isArray(s?.steps_preset) ? s.steps_preset.map((t:any)=> String(t)) : []
         // Check multiple sources for the workout name: name, title, workout_structure.title
         const workoutStructure = (s as any)?.workout_structure && typeof (s as any).workout_structure === 'object' ? (s as any).workout_structure : null
@@ -290,7 +303,11 @@ Deno.serve(async (req) => {
         if (isBrick) {
           const bikeTokens = stepsTokens.filter(t => /^(warmup_bike|bike_|cooldown_bike)/i.test(String(t)))
           const runTokens = stepsTokens.filter(t => !/^(warmup_bike|bike_|cooldown_bike)/i.test(String(t)))
-          if (bikeTokens.length) rows.push({
+          if (bikeTokens.length) {
+            const bikeKey = `${weekNum}-${dow}-${date}-ride`
+            if (insertedKeys.has(bikeKey)) continue
+            insertedKeys.add(bikeKey)
+            rows.push({
             user_id: userId,
             training_plan_id: planId,
             template_id: String(planId),
@@ -309,7 +326,12 @@ Deno.serve(async (req) => {
             units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
             tags: Array.isArray(s?.tags) ? s.tags : [],
           })
-          if (runTokens.length) rows.push({
+          }
+          if (runTokens.length) {
+            const runKey = `${weekNum}-${dow}-${date}-run`
+            if (insertedKeys.has(runKey)) continue
+            insertedKeys.add(runKey)
+            rows.push({
             user_id: userId,
             training_plan_id: planId,
             template_id: String(planId),
