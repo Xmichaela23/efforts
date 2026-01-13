@@ -227,6 +227,22 @@ Deno.serve(async (req) => {
       || todayISO
     const anchorMonday: string = mondayOf(startDate)
 
+    // Idempotency: Delete existing planned workouts for this plan before inserting new ones
+    // This prevents duplicates if activate-plan is called multiple times
+    try {
+      const { error: deleteError } = await supabase
+        .from('planned_workouts')
+        .delete()
+        .eq('training_plan_id', planId);
+      if (deleteError) {
+        console.warn('[activate-plan] Failed to delete existing workouts (may not exist):', deleteError);
+      } else {
+        console.log('[activate-plan] Cleared existing planned workouts for plan:', planId);
+      }
+    } catch (e) {
+      console.warn('[activate-plan] Error during cleanup (non-fatal):', e);
+    }
+
     const rows: any[] = []
     try { console.log('[activate-plan] using start_date:', startDate, 'anchorMonday:', anchorMonday, 'planId:', planId) } catch {}
     // Load baselines for strength exercise loads

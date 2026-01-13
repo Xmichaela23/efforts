@@ -594,8 +594,17 @@ export abstract class BaseGenerator {
     // Saturday is always a rest day (don't add it to usedDays, just never use it)
     const restDays = new Set(['Saturday']);
 
-    // Long run on Sunday
+    // First pass: respect sessions that already have a day assigned (e.g., recovery week sessions)
+    for (const session of sessions) {
+      if (session.day && !restDays.has(session.day)) {
+        usedDays.add(session.day);
+        assignedSessions.push(session);
+      }
+    }
+
+    // Long run on Sunday (only if not already assigned)
     for (const longRun of longRuns) {
+      if (assignedSessions.includes(longRun)) continue; // Already assigned
       const preferredDay = 'Sunday';
       if (!usedDays.has(preferredDay) && !restDays.has(preferredDay)) {
         longRun.day = preferredDay;
@@ -604,8 +613,9 @@ export abstract class BaseGenerator {
       }
     }
 
-    // Hard sessions on Tuesday and Thursday (2Q system)
+    // Hard sessions on Tuesday and Thursday (2Q system) - only if not already assigned
     for (const hardSession of hardSessions) {
+      if (assignedSessions.includes(hardSession)) continue; // Already assigned
       for (const day of qualityDays) {
         if (!usedDays.has(day) && !restDays.has(day)) {
           hardSession.day = day;
@@ -616,8 +626,9 @@ export abstract class BaseGenerator {
       }
     }
 
-    // Easy sessions on Monday, Wednesday, Friday (in that order)
+    // Easy sessions on Monday, Wednesday, Friday (in that order) - only if not already assigned
     for (const easySession of easySessions) {
+      if (assignedSessions.includes(easySession)) continue; // Already assigned
       for (const day of easyDayOrder) {
         if (!usedDays.has(day) && !restDays.has(day)) {
           easySession.day = day;
