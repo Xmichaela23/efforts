@@ -305,51 +305,54 @@ Deno.serve(async (req) => {
           const runTokens = stepsTokens.filter(t => !/^(warmup_bike|bike_|cooldown_bike)/i.test(String(t)))
           if (bikeTokens.length) {
             const bikeKey = `${weekNum}-${dow}-${date}-ride`
-            if (insertedKeys.has(bikeKey)) continue
-            insertedKeys.add(bikeKey)
-            rows.push({
-            user_id: userId,
-            training_plan_id: planId,
-            template_id: String(planId),
-            week_number: weekNum,
-            day_number: dow,
-            date,
-            type: 'ride',
-            name: s.name ? `${s.name} — Bike` : 'Ride',
-            description: s.description || '',
-            duration: durationVal,
-            workout_status: 'planned',
-            source: 'training_plan',
-            steps_preset: bikeTokens,
-            rendered_description: s.description || '',
-            computed: null,
-            units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
-            tags: Array.isArray(s?.tags) ? s.tags : [],
-          })
+            if (!insertedKeys.has(bikeKey)) {
+              insertedKeys.add(bikeKey)
+              rows.push({
+                user_id: userId,
+                training_plan_id: planId,
+                template_id: String(planId),
+                week_number: weekNum,
+                day_number: dow,
+                date,
+                type: 'ride',
+                name: s.name ? `${s.name} — Bike` : 'Ride',
+                description: s.description || '',
+                duration: durationVal,
+                workout_status: 'planned',
+                source: 'training_plan',
+                steps_preset: bikeTokens,
+                rendered_description: s.description || '',
+                computed: null,
+                units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
+                tags: Array.isArray(s?.tags) ? s.tags : [],
+              })
+            }
           }
           if (runTokens.length) {
             const runKey = `${weekNum}-${dow}-${date}-run`
-            if (insertedKeys.has(runKey)) continue
-            insertedKeys.add(runKey)
-            rows.push({
-            user_id: userId,
-            training_plan_id: planId,
-            template_id: String(planId),
-            week_number: weekNum,
-            day_number: dow,
-            date,
-            type: 'run',
-            name: s.name ? `${s.name} — Run` : 'Run',
-            description: s.description || '',
-            duration: durationVal,
-            workout_status: 'planned',
-            source: 'training_plan',
-            steps_preset: runTokens,
-            rendered_description: s.description || '',
-            computed: null,
-            units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
-            tags: Array.isArray(s?.tags) ? s.tags : [],
-          })
+            if (!insertedKeys.has(runKey)) {
+              insertedKeys.add(runKey)
+              rows.push({
+                user_id: userId,
+                training_plan_id: planId,
+                template_id: String(planId),
+                week_number: weekNum,
+                day_number: dow,
+                date,
+                type: 'run',
+                name: s.name ? `${s.name} — Run` : 'Run',
+                description: s.description || '',
+                duration: durationVal,
+                workout_status: 'planned',
+                source: 'training_plan',
+                steps_preset: runTokens,
+                rendered_description: s.description || '',
+                computed: null,
+                units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
+                tags: Array.isArray(s?.tags) ? s.tags : [],
+              })
+            }
+          }
           continue
         }
 
