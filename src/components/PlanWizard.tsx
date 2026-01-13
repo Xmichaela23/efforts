@@ -904,6 +904,17 @@ export default function PlanWizard() {
   const renderStep = () => {
     const logicalStep = getLogicalStep(step);
     
+    // Debug logging to identify black screen issues
+    if (logicalStep === 'runningDays' || logicalStep === 'unknown') {
+      console.log('[PlanWizard] renderStep:', {
+        step,
+        logicalStep,
+        needsEffortScore,
+        goal: state.goal,
+        approach: state.approach
+      });
+    }
+    
     switch (logicalStep) {
       case 'discipline':
         return (
@@ -2310,19 +2321,8 @@ export default function PlanWizard() {
 
       case 'runningDays':
         // RUNNING DAYS STEP (now after strength, with recommendations)
-        // Defensive guard: ensure approach is set before rendering
-        // If approach is missing, try to derive it from goal/fitness/distance
-        let currentApproach = state.approach;
-        if (!currentApproach) {
-          const methodologyResult = getMethodologyForGoal(state.goal, state.fitness, state.distance);
-          if (methodologyResult.approach && !methodologyResult.locked) {
-            currentApproach = methodologyResult.approach;
-            // Update state synchronously if possible, but don't block rendering
-            updateState('approach', methodologyResult.approach);
-          }
-        }
-        
-        const availableDays = getAvailableDays(currentApproach);
+        try {
+          const availableDays = getAvailableDays(state.approach);
         
         // Get recommended running days based on strength selection
         const getRunDaysRecommendation = () => {
@@ -2481,6 +2481,15 @@ export default function PlanWizard() {
             )}
           </StepContainer>
         );
+        } catch (error) {
+          console.error('[PlanWizard] Error rendering runningDays step:', error);
+          return (
+            <StepContainer title="Error">
+              <p className="text-red-400">An error occurred. Please go back and try again.</p>
+              <Button onClick={handleBack} variant="outline" className="mt-4">Go Back</Button>
+            </StepContainer>
+          );
+        }
 
       default:
         // Fallback: if we get an unknown step, show an error and allow navigation back
