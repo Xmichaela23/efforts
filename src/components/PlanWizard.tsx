@@ -582,11 +582,17 @@ export default function PlanWizard() {
     if (!needsEffortScore) {
       // Complete goal: no effort score step
       const steps = ['discipline', 'distance', 'fitness', 'goal', 'duration', 'startDate', 'strength', 'runningDays'];
-      return steps[physicalStep] || 'unknown';
+      // Bounds check: if out of bounds, clamp to last valid step
+      if (physicalStep < 0) return steps[0];
+      if (physicalStep >= steps.length) return steps[steps.length - 1];
+      return steps[physicalStep] || steps[steps.length - 1];
     } else {
       // Speed goal: includes effort score step
       const steps = ['discipline', 'distance', 'fitness', 'goal', 'effortScore', 'duration', 'startDate', 'strength', 'runningDays'];
-      return steps[physicalStep] || 'unknown';
+      // Bounds check: if out of bounds, clamp to last valid step
+      if (physicalStep < 0) return steps[0];
+      if (physicalStep >= steps.length) return steps[steps.length - 1];
+      return steps[physicalStep] || steps[steps.length - 1];
     }
   };
 
@@ -662,7 +668,15 @@ export default function PlanWizard() {
     if (logicalStep === 'runningDays') {
       handleGenerate();
     } else {
-      setStep(step + 1);
+      // Safeguard: don't increment beyond valid step range
+      const maxStep = getStepCount() - 1;
+      if (step < maxStep) {
+        setStep(step + 1);
+      } else {
+        // Already at max step, try to generate
+        console.warn('[PlanWizard] Already at max step, attempting to generate');
+        handleGenerate();
+      }
     }
   };
 
@@ -2095,9 +2109,12 @@ export default function PlanWizard() {
                       // Only set valid protocol IDs, never empty string
                       const validProtocols: StrengthProtocol[] = ['durability', 'neural_speed', 'upper_aesthetics'];
                       if (validProtocols.includes(v as StrengthProtocol)) {
-                        updateState('strengthProtocol', v as StrengthProtocol);
-                        // Auto-set tier to strength_power when protocol is selected
-                        updateState('strengthTier', 'strength_power');
+                        // Batch both updates in a single state update to avoid multiple re-renders
+                        setState(prev => ({
+                          ...prev,
+                          strengthProtocol: v as StrengthProtocol,
+                          strengthTier: 'strength_power'
+                        }));
                       }
                     }}
                     className="space-y-3"
@@ -2449,7 +2466,28 @@ export default function PlanWizard() {
         );
 
       default:
-        return null;
+        // Fallback: if we get an unknown step, show an error and allow navigation back
+        console.error('[PlanWizard] Unknown logical step:', logicalStep, 'at physical step:', step, 'needsEffortScore:', needsEffortScore);
+        return (
+          <StepContainer title="Navigation Error">
+            <div className="space-y-4">
+              <p className="text-red-400">
+                An error occurred while navigating. Please go back and try again.
+              </p>
+              <Button
+                onClick={() => {
+                  // Reset to a safe step (strength step, which is always valid)
+                  const safeStep = needsEffortScore ? 7 : 6;
+                  setStep(safeStep);
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                Go Back to Strength Step
+              </Button>
+            </div>
+          </StepContainer>
+        );
     }
   };
 
