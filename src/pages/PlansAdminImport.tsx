@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { MobileHeader } from '@/components/MobileHeader';
 import PlanJSONImport from '@/components/PlanJSONImport';
 import WorkloadAdmin from '@/components/WorkloadAdmin';
+import PlanGeneratorTest from '@/components/PlanGeneratorTest';
 
 export default function PlansAdminImport() {
   const navigate = useNavigate();
@@ -34,6 +35,7 @@ export default function PlansAdminImport() {
         <div className="w-full max-w-3xl mx-auto px-4 py-4 space-y-8">
           <WorkloadAdmin />
           <PlanJSONImport />
+          <PlanGeneratorTest />
         </div>
       </main>
     </div>
