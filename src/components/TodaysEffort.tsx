@@ -14,6 +14,7 @@ import { WorkoutExecutionContainer } from './workout-execution';
 import { mapUnifiedItemToPlanned, mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
 import { useToast } from '@/components/ui/use-toast';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { isWatchConnectivityAvailable, sendWorkoutToWatch, convertToWatchWorkout } from '@/services/watchConnectivity';
 
 interface TodaysEffortProps {
@@ -1191,7 +1192,35 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               })()}
             </DrawerTitle>
             <DrawerDescription className="text-white/60 font-light">
-              {selectedPlannedWorkout?.rendered_description || selectedPlannedWorkout?.description || 'No description available'}
+              {(() => {
+                const desc = selectedPlannedWorkout?.rendered_description || selectedPlannedWorkout?.description || 'No description available';
+                if (/strides/i.test(desc)) {
+                  const parts = desc.split(/(strides)/i);
+                  return (
+                    <span>
+                      {parts.map((part, idx) => {
+                        if (/^strides$/i.test(part)) {
+                          return (
+                            <TooltipProvider key={idx}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="underline decoration-dotted cursor-help">{part}</span>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs text-sm p-3 bg-gray-800 text-white border border-gray-700 rounded-lg shadow-lg">
+                                  <p className="font-semibold mb-1">What are Strides?</p>
+                                  <p>Short, controlled accelerations (approx. 100m) designed to wake up your legs. Reach 95% of max speed while staying completely relaxed. This is not a sprint.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        }
+                        return <span key={idx}>{part}</span>;
+                      })}
+                    </span>
+                  );
+                }
+                return desc;
+              })()}
             </DrawerDescription>
           </DrawerHeader>
           

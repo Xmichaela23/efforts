@@ -544,8 +544,28 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           i += 1; continue;
         }
         if (isWork(st)) {
+          // Check for stride label - strides should show as "100m Stride" not just "0.06 mi"
+          const strideLabel = String(st?.label || '').trim();
+          const isStride = /stride/i.test(strideLabel);
           const workLabel = (()=>{
-            if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) return fmtDist(st.distanceMeters);
+            // For strides, show distance in meters/yards for clarity (100m is clearer than 0.06 mi)
+            if (isStride && typeof st?.distance_m==='number' && st.distance_m>0) {
+              const distM = Math.round(st.distance_m);
+              if (distM < 1000) return `${distM}m Stride`;
+            }
+            if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) {
+              // For very short distances (< 200m), show in meters for clarity
+              if (st.distanceMeters < 200 && !isStride) {
+                return `${Math.round(st.distanceMeters)}m`;
+              }
+              return fmtDist(st.distanceMeters);
+            }
+            if (typeof st?.distance_m==='number' && st.distance_m>0) {
+              if (st.distance_m < 200 && !isStride) {
+                return `${Math.round(st.distance_m)}m`;
+              }
+              return fmtDist(st.distance_m);
+            }
             if (typeof st?.seconds==='number' && st.seconds>0) return fmtTime(st.seconds);
             return 'interval';
           })();
@@ -556,6 +576,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           const restLabel = hasRec ? (()=>{
             if (typeof next?.seconds==='number' && next.seconds>0) return fmtTime(next.seconds);
             if (typeof next?.distanceMeters==='number' && next.distanceMeters>0) return fmtDist(next.distanceMeters);
+            if (typeof next?.distance_m==='number' && next.distance_m>0) return fmtDist(next.distance_m);
             return 'rest';
           })() : undefined;
           const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery', next?.pace_range) : undefined;
@@ -564,10 +585,26 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           while (j < steps.length) {
             const a = steps[j]; const b = steps[j+1];
             if (!isWork(a)) break;
-            const aLabel = (typeof a?.distanceMeters==='number' && a.distanceMeters>0) ? fmtDist(a.distanceMeters) : (typeof a?.seconds==='number' ? fmtTime(a.seconds) : 'interval');
+            const aStrideLabel = String(a?.label || '').trim();
+            const aIsStride = /stride/i.test(aStrideLabel);
+            const aLabel = (()=>{
+              if (aIsStride && typeof a?.distance_m==='number' && a.distance_m>0) {
+                return `${Math.round(a.distance_m)}m Stride`;
+              }
+              if (typeof a?.distanceMeters==='number' && a.distanceMeters>0) {
+                if (a.distanceMeters < 200 && !aIsStride) return `${Math.round(a.distanceMeters)}m`;
+                return fmtDist(a.distanceMeters);
+              }
+              if (typeof a?.distance_m==='number' && a.distance_m>0) {
+                if (a.distance_m < 200 && !aIsStride) return `${Math.round(a.distance_m)}m`;
+                return fmtDist(a.distance_m);
+              }
+              if (typeof a?.seconds==='number') return fmtTime(a.seconds);
+              return 'interval';
+            })();
             const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind, a?.pace_range);
             const aPow = powerStr(a);
-            const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? fmtDist(b.distanceMeters) : 'rest')) : undefined;
+            const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? fmtDist(b.distanceMeters) : (typeof b?.distance_m==='number' && b.distance_m>0 ? fmtDist(b.distance_m) : 'rest'))) : undefined;
             const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery', b?.pace_range) : undefined;
             const bPow = (b && isRec(b)) ? powerStr(b) : undefined;
             const sameWork = (aLabel===workLabel) && (aPace===workPace) && (aPow===workPower);

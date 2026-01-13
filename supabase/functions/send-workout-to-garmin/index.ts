@@ -694,7 +694,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               }
               coolArr.push(cool)
             } else {
-              const main: any = { effortLabel: (label || (isSwim ? 'interval' : 'interval')) }
+              // For strides, preserve the label so Garmin shows "Stride" not just "interval"
+              const isStride = /stride/i.test(label)
+              const effortLabel = isStride ? 'Stride' : (label || (isSwim ? 'interval' : 'interval'))
+              const main: any = { effortLabel }
               if (typeof meters === 'number' && meters > 0) main.distanceMeters = Math.round(meters)
               if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {
                 main.duration = Math.floor(seconds)
@@ -1006,6 +1009,8 @@ function mapEffortToIntensity(label: string): string {
     'warm up': 'WARMUP',
     'easy': 'ACTIVE',
     'steady': 'ACTIVE',
+    'stride': 'ACTIVE', // Strides are aerobic/recovery work, not high intensity
+    'strides': 'ACTIVE', // Plural form
     'tempo': 'INTERVAL',
     'threshold': 'INTERVAL',
     'hard': 'INTERVAL',

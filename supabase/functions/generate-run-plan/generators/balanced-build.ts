@@ -1000,12 +1000,12 @@ export class BalancedBuildGenerator extends BaseGenerator {
   private createEasyWithStrides(miles: number, day: string): Session {
     return this.createSession(
       day,
-      'Easy + Strides',
+      'Easy Run + Strides',
       `${miles} miles at E pace, then 4×100m strides (fast but relaxed, full recovery). ` +
       `Strides maintain leg turnover and neuromuscular coordination.`,
       this.milesToMinutes(miles) + 10,
       [TOKEN_PATTERNS.easy_run_miles(miles), TOKEN_PATTERNS.strides_4x100m],
-      ['easy_run', 'strides']
+      ['easy_run', 'strides', 'recovery'] // Explicitly tag as recovery/aerobic, not quality
     );
   }
 
