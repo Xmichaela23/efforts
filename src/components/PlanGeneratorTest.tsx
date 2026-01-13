@@ -220,6 +220,22 @@ export default function PlanGeneratorTest() {
             race_name: 'Test Marathon',
           };
 
+          // For balanced_build + speed, add effort data (required for pace calculations)
+          if (combo.approach === 'balanced_build' && combo.goal === 'speed') {
+            // Use a reasonable effort score for testing (equivalent to ~20 min 5K)
+            requestBody.effort_score = 45;
+            requestBody.effort_score_status = 'estimated';
+            // Or provide effort_paces directly
+            requestBody.effort_paces = {
+              base: 600,    // 10:00/mi easy pace
+              race: 480,    // 8:00/mi marathon pace
+              steady: 540,  // 9:00/mi threshold
+              power: 420,   // 7:00/mi interval
+              speed: 360    // 6:00/mi repetition
+            };
+            requestBody.effort_paces_source = 'calculated';
+          }
+
           if (combo.strength_frequency) {
             requestBody.strength_frequency = combo.strength_frequency;
             requestBody.strength_tier = 'strength_power';
@@ -233,35 +249,67 @@ export default function PlanGeneratorTest() {
           });
 
           if (error) {
-            allErrors.push(`${combo.label}: ${error.message}`);
+            const errorMsg = error.message || JSON.stringify(error);
+            allErrors.push(`${combo.label}: ${errorMsg}`);
             newResults.set(combo.id, {
               plan: null,
-              validation: { comboId: combo.id, success: false, errors: [error.message], warnings: [] }
+              validation: { comboId: combo.id, success: false, errors: [errorMsg], warnings: [] }
             });
             continue;
           }
 
-          if (!data?.success || !data?.plan_id) {
-            allErrors.push(`${combo.label}: Generation failed`);
+          if (!data?.success) {
+            const errorMsg = data?.error || data?.validation_errors?.join(', ') || 'Generation failed';
+            allErrors.push(`${combo.label}: ${errorMsg}`);
             newResults.set(combo.id, {
               plan: null,
-              validation: { comboId: combo.id, success: false, errors: ['Generation failed'], warnings: [] }
+              validation: { comboId: combo.id, success: false, errors: [errorMsg], warnings: [] }
             });
             continue;
           }
 
-          // Fetch the generated plan
+          if (!data?.plan_id) {
+            allErrors.push(`${combo.label}: No plan_id returned`);
+            newResults.set(combo.id, {
+              plan: null,
+              validation: { comboId: combo.id, success: false, errors: ['No plan_id returned'], warnings: [] }
+            });
+            continue;
+          }
+
+          // Fetch the generated plan - use RPC or direct query with proper error handling
           const { data: planData, error: planError } = await supabase
             .from('training_plans')
             .select('*')
             .eq('id', data.plan_id)
+            .eq('user_id', user.id) // Ensure we're fetching our own plan
             .single();
 
-          if (planError || !planData) {
-            allErrors.push(`${combo.label}: Failed to fetch plan`);
+          if (planError) {
+            // If RLS blocks, try to get plan data from the response if available
+            if (data?.plan) {
+              // Use plan data from response if available
+              const validation = validatePlan(data.plan, combo);
+              newResults.set(combo.id, { plan: data.plan, validation });
+              if (!validation.success) {
+                allErrors.push(`${combo.label}: ${validation.errors.join(', ')}`);
+              }
+              continue;
+            }
+            const errorMsg = planError.message || 'Failed to fetch plan (RLS may be blocking)';
+            allErrors.push(`${combo.label}: ${errorMsg}`);
             newResults.set(combo.id, {
               plan: null,
-              validation: { comboId: combo.id, success: false, errors: ['Failed to fetch plan'], warnings: [] }
+              validation: { comboId: combo.id, success: false, errors: [errorMsg], warnings: [] }
+            });
+            continue;
+          }
+
+          if (!planData) {
+            allErrors.push(`${combo.label}: Plan data is null`);
+            newResults.set(combo.id, {
+              plan: null,
+              validation: { comboId: combo.id, success: false, errors: ['Plan data is null'], warnings: [] }
             });
             continue;
           }
