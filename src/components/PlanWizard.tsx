@@ -904,15 +904,22 @@ export default function PlanWizard() {
   const renderStep = () => {
     const logicalStep = getLogicalStep(step);
     
-    // Debug logging to identify black screen issues
-    if (logicalStep === 'runningDays' || logicalStep === 'unknown') {
-      console.log('[PlanWizard] renderStep:', {
-        step,
-        logicalStep,
-        needsEffortScore,
-        goal: state.goal,
-        approach: state.approach
-      });
+    // Debug: Show error message if step is unknown
+    if (logicalStep === 'unknown') {
+      return (
+        <StepContainer title="Navigation Error">
+          <div className="space-y-4">
+            <p className="text-red-400">Step calculation error. Please report this.</p>
+            <div className="text-xs text-gray-400 space-y-1">
+              <p>Step: {step}</p>
+              <p>Goal: {state.goal || 'null'}</p>
+              <p>Needs Effort Score: {needsEffortScore ? 'yes' : 'no'}</p>
+              <p>Approach: {state.approach || 'null'}</p>
+            </div>
+            <Button onClick={handleBack} variant="outline" className="w-full">Go Back</Button>
+          </div>
+        </StepContainer>
+      );
     }
     
     switch (logicalStep) {
@@ -2482,11 +2489,19 @@ export default function PlanWizard() {
           </StepContainer>
         );
         } catch (error) {
-          console.error('[PlanWizard] Error rendering runningDays step:', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
           return (
-            <StepContainer title="Error">
-              <p className="text-red-400">An error occurred. Please go back and try again.</p>
-              <Button onClick={handleBack} variant="outline" className="mt-4">Go Back</Button>
+            <StepContainer title="Error Rendering Step">
+              <div className="space-y-4">
+                <p className="text-red-400">An error occurred while rendering this step.</p>
+                <div className="text-xs text-gray-400 space-y-1">
+                  <p>Error: {errorMessage}</p>
+                  <p>Step: {step}</p>
+                  <p>Approach: {state.approach || 'null'}</p>
+                  <p>Goal: {state.goal || 'null'}</p>
+                </div>
+                <Button onClick={handleBack} variant="outline" className="w-full">Go Back</Button>
+              </div>
             </StepContainer>
           );
         }
