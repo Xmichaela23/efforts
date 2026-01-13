@@ -632,8 +632,8 @@ export default function PlanWizard() {
         return state.duration >= 4;
       case 'startDate': return state.startDate !== '';
       case 'strength': 
-        // Strength is optional, but if selected and using strength_power tier, protocol is required
-        if (state.strengthFrequency > 0 && state.strengthTier === 'strength_power') {
+        // Strength is optional, but if frequency > 0, protocol is required
+        if (state.strengthFrequency > 0) {
           return state.strengthProtocol !== undefined;
         }
         return true; // Strength is optional
@@ -696,7 +696,7 @@ export default function PlanWizard() {
       setGenerateProgress(20);
 
       // Save equipment selection to baselines if not already saved
-      if (state.strengthFrequency > 0 && state.strengthTier === 'strength_power' && !savedBaselines?.equipment?.length) {
+      if (state.strengthFrequency > 0 && state.strengthProtocol && !savedBaselines?.equipment?.length) {
         const equipmentToSave = state.equipmentType === 'commercial_gym' 
           ? ['Commercial gym'] 
           : ['Home gym', 'Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)'];
@@ -745,9 +745,13 @@ export default function PlanWizard() {
         equipment_type: state.equipmentType,
       };
 
-      // Only include strength_protocol if required (strength_power tier)
-      if (state.strengthFrequency > 0 && state.strengthTier === 'strength_power') {
+      // Only include strength_protocol if frequency > 0 (protocol is required when strength is selected)
+      if (state.strengthFrequency > 0) {
         requestBody.strength_protocol = state.strengthProtocol; // guaranteed by canProceed
+        // Auto-set tier to strength_power when protocol is selected
+        requestBody.strength_tier = 'strength_power';
+      } else {
+        requestBody.strength_tier = state.strengthTier;
       }
 
       // Add Effort Score data for Balanced Build plans
@@ -2050,7 +2054,15 @@ export default function PlanWizard() {
                 <p className="text-sm text-gray-500 mb-3">How often?</p>
                 <RadioGroup
                   value={state.strengthFrequency.toString()}
-                  onValueChange={(v) => updateState('strengthFrequency', parseInt(v) as 0 | 2 | 3)}
+                  onValueChange={(v) => {
+                    const freq = parseInt(v) as 0 | 2 | 3;
+                    updateState('strengthFrequency', freq);
+                    // Clear protocol and reset tier if frequency is 0
+                    if (freq === 0) {
+                      updateState('strengthProtocol', undefined);
+                      updateState('strengthTier', 'injury_prevention');
+                    }
+                  }}
                   className="space-y-2"
                 >
                   <RadioOption value="0" label="No strength" />
@@ -2067,138 +2079,8 @@ export default function PlanWizard() {
                 </RadioGroup>
               </div>
               
-              {/* Tier selection - only show if frequency > 0 */}
+              {/* Protocol selection - show directly when frequency > 0 */}
               {state.strengthFrequency > 0 && (
-                <div className="pt-4 border-t border-white/10">
-                  <p className="text-sm text-gray-400 mb-3">What type?</p>
-                  <RadioGroup
-                    value={state.strengthTier}
-                    onValueChange={(v) => updateState('strengthTier', v as StrengthTier)}
-                    className="space-y-3"
-                  >
-                    <div className={`p-4 rounded-xl border transition-colors ${
-                      state.strengthTier === 'injury_prevention' 
-                        ? 'border-amber-500/60 bg-amber-500/15' 
-                        : 'border-amber-500/30 bg-black/40 hover:border-amber-500/50'
-                    }`}>
-                      <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="injury_prevention" id="injury_prevention" className="mt-1" />
-                        <Label htmlFor="injury_prevention" className="flex-1 cursor-pointer">
-                          <span className="flex items-center gap-2">
-                            <span className="font-medium text-white">Functional Strength</span>
-                            <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full border border-green-500/30">Recommended</span>
-                          </span>
-                          <span className="block text-sm text-gray-400 mt-1">
-                            Bodyweight progressions with clear level-ups
-                          </span>
-                          <span className="block text-xs text-gray-500 mt-1">
-                            Push-ups, lunges, single-leg work, core stability
-                          </span>
-                          <span className="block text-xs text-amber-400 mt-2">
-                            → No setup needed, start immediately
-                          </span>
-                        </Label>
-                      </div>
-                    </div>
-                    <div className={`p-4 rounded-xl border transition-colors ${
-                      state.strengthTier === 'strength_power' 
-                        ? 'border-amber-500/60 bg-amber-500/15' 
-                        : 'border-amber-500/30 bg-black/40 hover:border-amber-500/50'
-                    }`}>
-                      <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="strength_power" id="strength_power" className="mt-1" />
-                        <Label htmlFor="strength_power" className="flex-1 cursor-pointer">
-                          <span className="flex items-center gap-2">
-                            <span className="font-medium text-white">Strength & Power</span>
-                            <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">Advanced</span>
-                          </span>
-                          <span className="block text-sm text-gray-400 mt-1">
-                            Barbell lifts with calculated weights based on your 1RMs
-                          </span>
-                          <span className="block text-xs text-gray-500 mt-1">
-                            Hip thrusts, RDL, squats, bench, rows + plyometrics
-                          </span>
-                          <span className="block text-xs text-amber-400 mt-2">
-                            → You'll set up your 1RM baselines after creating the plan
-                          </span>
-                        </Label>
-                      </div>
-                    </div>
-                  </RadioGroup>
-                </div>
-              )}
-              
-              {/* Equipment selection - only show if Strength & Power tier */}
-              {state.strengthFrequency > 0 && state.strengthTier === 'strength_power' && (
-                <div className="pt-4 border-t border-white/10">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm text-gray-400">Where will you train?</p>
-                    {savedBaselines?.equipment?.length ? (
-                      <a 
-                        href="/baselines" 
-                        className="text-xs text-amber-400 hover:text-amber-300"
-                      >
-                        Edit equipment →
-                      </a>
-                    ) : null}
-                  </div>
-                  {savedBaselines?.equipment?.length ? (
-                    <p className="text-xs text-amber-400/70 mb-3">
-                      Using your saved equipment: {savedBaselines.equipment.slice(0, 3).join(', ')}
-                      {savedBaselines.equipment.length > 3 ? ` +${savedBaselines.equipment.length - 3} more` : ''}
-                    </p>
-                  ) : null}
-                  <RadioGroup
-                    value={state.equipmentType}
-                    onValueChange={(v) => updateState('equipmentType', v as EquipmentType)}
-                    className="space-y-3"
-                  >
-                    <div className={`p-4 rounded-xl border transition-colors ${
-                      state.equipmentType === 'commercial_gym' 
-                        ? 'border-amber-500/60 bg-amber-500/15' 
-                        : 'border-amber-500/30 bg-black/40 hover:border-amber-500/50'
-                    }`}>
-                      <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="commercial_gym" id="commercial_gym" className="mt-1" />
-                        <Label htmlFor="commercial_gym" className="flex-1 cursor-pointer">
-                          <span className="font-medium text-white">Commercial Gym</span>
-                          <span className="block text-sm text-gray-400 mt-1">
-                            Full gym with rack, cables, machines
-                          </span>
-                          <span className="block text-xs text-gray-500 mt-1">
-                            {state.strengthFrequency === 3 
-                              ? 'Squats, hip thrusts, lat pulldowns, box jumps'
-                              : 'Squats, hip thrusts, RDL, box jumps'}
-                          </span>
-                        </Label>
-                      </div>
-                    </div>
-                    <div className={`p-4 rounded-xl border transition-colors ${
-                      state.equipmentType === 'home_gym' 
-                        ? 'border-amber-500/60 bg-amber-500/15' 
-                        : 'border-amber-500/30 bg-black/40 hover:border-amber-500/50'
-                    }`}>
-                      <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="home_gym" id="home_gym" className="mt-1" />
-                        <Label htmlFor="home_gym" className="flex-1 cursor-pointer">
-                          <span className="font-medium text-white">Home Gym</span>
-                          <span className="block text-sm text-gray-400 mt-1">
-                            Rack, bench, barbell, dumbbells, bands
-                          </span>
-                          <span className="block text-xs text-gray-500 mt-1">
-                            {state.strengthFrequency === 3 
-                              ? 'Rack for: Squats, inverted rows. Barbell for: Hip thrusts, RDL'
-                              : 'Rack for: Squats. Barbell for: Hip thrusts, RDL'}
-                          </span>
-                        </Label>
-                      </div>
-                    </div>
-                  </RadioGroup>
-                </div>
-              )}
-              
-              {/* Protocol selection - only show if Strength & Power tier */}
-              {state.strengthFrequency > 0 && state.strengthTier === 'strength_power' && (
                 <div className="pt-4 border-t border-white/10">
                   <p className="text-sm text-gray-400 mb-3">What do you want strength training to do for your training?</p>
                   <RadioGroup
@@ -2208,6 +2090,8 @@ export default function PlanWizard() {
                       const validProtocols: StrengthProtocol[] = ['durability', 'neural_speed', 'upper_aesthetics'];
                       if (validProtocols.includes(v as StrengthProtocol)) {
                         updateState('strengthProtocol', v as StrengthProtocol);
+                        // Auto-set tier to strength_power when protocol is selected
+                        updateState('strengthTier', 'strength_power');
                       }
                     }}
                     className="space-y-3"
@@ -2301,6 +2185,76 @@ export default function PlanWizard() {
                   </RadioGroup>
                 </div>
               )}
+              
+              {/* Equipment selection - show when protocol is selected */}
+              {state.strengthFrequency > 0 && state.strengthProtocol && (
+                <div className="pt-4 border-t border-white/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm text-gray-400">Where will you train?</p>
+                    {savedBaselines?.equipment?.length ? (
+                      <a 
+                        href="/baselines" 
+                        className="text-xs text-amber-400 hover:text-amber-300"
+                      >
+                        Edit equipment →
+                      </a>
+                    ) : null}
+                  </div>
+                  {savedBaselines?.equipment?.length ? (
+                    <p className="text-xs text-amber-400/70 mb-3">
+                      Using your saved equipment: {savedBaselines.equipment.slice(0, 3).join(', ')}
+                      {savedBaselines.equipment.length > 3 ? ` +${savedBaselines.equipment.length - 3} more` : ''}
+                    </p>
+                  ) : null}
+                  <RadioGroup
+                    value={state.equipmentType}
+                    onValueChange={(v) => updateState('equipmentType', v as EquipmentType)}
+                    className="space-y-3"
+                  >
+                    <div className={`p-4 rounded-xl border transition-colors ${
+                      state.equipmentType === 'commercial_gym' 
+                        ? 'border-amber-500/60 bg-amber-500/15' 
+                        : 'border-amber-500/30 bg-black/40 hover:border-amber-500/50'
+                    }`}>
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="commercial_gym" id="commercial_gym" className="mt-1" />
+                        <Label htmlFor="commercial_gym" className="flex-1 cursor-pointer">
+                          <span className="font-medium text-white">Commercial Gym</span>
+                          <span className="block text-sm text-gray-400 mt-1">
+                            Full gym with rack, cables, machines
+                          </span>
+                          <span className="block text-xs text-gray-500 mt-1">
+                            {state.strengthFrequency === 3 
+                              ? 'Squats, hip thrusts, lat pulldowns, box jumps'
+                              : 'Squats, hip thrusts, RDL, box jumps'}
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
+                    <div className={`p-4 rounded-xl border transition-colors ${
+                      state.equipmentType === 'home_gym' 
+                        ? 'border-amber-500/60 bg-amber-500/15' 
+                        : 'border-amber-500/30 bg-black/40 hover:border-amber-500/50'
+                    }`}>
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="home_gym" id="home_gym" className="mt-1" />
+                        <Label htmlFor="home_gym" className="flex-1 cursor-pointer">
+                          <span className="font-medium text-white">Home Gym</span>
+                          <span className="block text-sm text-gray-400 mt-1">
+                            Rack, bench, barbell, dumbbells, bands
+                          </span>
+                          <span className="block text-xs text-gray-500 mt-1">
+                            {state.strengthFrequency === 3 
+                              ? 'Rack for: Squats, inverted rows. Barbell for: Hip thrusts, RDL'
+                              : 'Rack for: Squats. Barbell for: Hip thrusts, RDL'}
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+              
             </div>
           </StepContainer>
         );
