@@ -356,6 +356,11 @@ function getMethodologyForGoal(goal: Goal | null, fitness: Fitness | null, dista
 
 function getAvailableDays(approach: Approach | null): DaysPerWeek[] {
   if (!approach) return ['3-4', '4-5', '5-6', '6-7'];
+  // Defensive guard: if approach is not in METHODOLOGIES, return default
+  if (!METHODOLOGIES[approach]) {
+    console.warn('[PlanWizard] Invalid approach:', approach, 'using default available days');
+    return ['3-4', '4-5', '5-6', '6-7'];
+  }
   return METHODOLOGIES[approach].supported_days;
 }
 
@@ -2305,7 +2310,19 @@ export default function PlanWizard() {
 
       case 'runningDays':
         // RUNNING DAYS STEP (now after strength, with recommendations)
-        const availableDays = getAvailableDays(state.approach);
+        // Defensive guard: ensure approach is set before rendering
+        // If approach is missing, try to derive it from goal/fitness/distance
+        let currentApproach = state.approach;
+        if (!currentApproach) {
+          const methodologyResult = getMethodologyForGoal(state.goal, state.fitness, state.distance);
+          if (methodologyResult.approach && !methodologyResult.locked) {
+            currentApproach = methodologyResult.approach;
+            // Update state synchronously if possible, but don't block rendering
+            updateState('approach', methodologyResult.approach);
+          }
+        }
+        
+        const availableDays = getAvailableDays(currentApproach);
         
         // Get recommended running days based on strength selection
         const getRunDaysRecommendation = () => {
