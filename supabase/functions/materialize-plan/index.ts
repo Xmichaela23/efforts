@@ -721,6 +721,57 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
       return out;
     }
   }
+  
+  // Strides: strides_4x100m or strides_6x20s
+  // Strides are fast accelerations done AFTER the main run (warm-up)
+  // For "Easy + Strides" workouts, strides come at the END
+  if (/strides_\d+x/.test(lower)) {
+    const m = lower.match(/strides_(\d+)x(\d+)(m|s)/);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const val = parseInt(m[2], 10);
+      const unit = m[3];
+      const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
+      
+      // Strides are fast but relaxed - no specific pace target, just "fast"
+      // They're done at ~95% max speed but staying relaxed
+      // Recovery is walk/jog (90s is standard)
+      const rest_s = 90;
+      
+      for (let i = 0; i < reps; i++) {
+        if (unit === 'm') {
+          // Distance-based: 100m strides
+          out.push({ 
+            id: uid(), 
+            kind: 'work', 
+            distance_m: val,
+            // No pace target - strides are "fast but relaxed", not a specific pace
+            label: 'Stride'
+          });
+        } else {
+          // Time-based: 20s strides
+          out.push({ 
+            id: uid(), 
+            kind: 'work', 
+            duration_s: val,
+            label: 'Stride'
+          });
+        }
+        // Recovery between strides: walk/jog (except after last one)
+        if (i < reps - 1) {
+          out.push({ 
+            id: uid(), 
+            kind: 'recovery', 
+            duration_s: rest_s, 
+            pace_sec_per_mi: easyPace,
+            label: 'Walk/Jog'
+          });
+        }
+      }
+      return out;
+    }
+  }
+  
   return out;
 }
 
