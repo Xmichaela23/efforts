@@ -211,11 +211,19 @@ export interface PlacementPolicy {
    * Assign intent sessions to days
    * 
    * Returns day-specific sessions with guardrail annotations
+   * 
+   * @param placementContext - Optional methodology-aware placement context
    */
   assignSessions(
     intentSessions: IntentSession[],
     primarySchedule: ProtocolContext['primarySchedule'],
-    guardrails: GuardrailResult[]
+    guardrails: GuardrailResult[],
+    placementContext?: {
+      methodology?: 'hal_higdon_complete' | 'jack_daniels_performance';
+      protocol?: string;
+      strengthFrequency?: number;
+      noDoubles?: boolean;
+    }
   ): PlacedSession[];
 }
 

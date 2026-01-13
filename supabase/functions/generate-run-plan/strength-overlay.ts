@@ -7,6 +7,7 @@
 import { TrainingPlan, Session, StrengthExercise, Phase, PhaseStructure } from './types.ts';
 import { getProtocol } from '../shared/strength-system/protocols/selector.ts';
 import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
+import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import {
   ProtocolContext,
   StrengthPhase,
@@ -25,7 +26,9 @@ export function overlayStrength(
   frequency: StrengthFrequency,
   phaseStructure: PhaseStructure,
   tier: StrengthTier = 'bodyweight',
-  protocolId?: string
+  protocolId?: string,
+  methodology?: 'hal_higdon_complete' | 'jack_daniels_performance',
+  noDoubles?: boolean
 ): TrainingPlan {
   const modifiedPlan = { ...plan };
   const modifiedSessions: Record<string, Session[]> = {};
@@ -86,11 +89,17 @@ export function overlayStrength(
     // Apply guardrails (for now, empty - will be implemented later)
     const guardrails: any[] = [];
 
-    // Assign to days using placement policy
+    // Assign to days using placement policy (with methodology-aware context if available)
     const placedSessions = simplePlacementPolicy.assignSessions(
       filteredSessions,
       primarySchedule,
-      guardrails
+      guardrails,
+      methodology ? {
+        methodology,
+        protocol: protocolId,
+        strengthFrequency: frequency,
+        noDoubles: noDoubles || false,
+      } : undefined
     );
 
     // Convert PlacedSession[] to Session[]
@@ -202,11 +211,13 @@ export function overlayStrengthLegacy(
   phaseStructure: PhaseStructure,
   tier: 'injury_prevention' | 'strength_power' = 'injury_prevention',
   _equipment: 'home_gym' | 'commercial_gym' = 'home_gym',
-  protocolId?: string
+  protocolId?: string,
+  methodology?: 'hal_higdon_complete' | 'jack_daniels_performance',
+  noDoubles?: boolean
 ): TrainingPlan {
   // Map old tier names to new
   const newTier: StrengthTier = tier === 'injury_prevention' ? 'bodyweight' : 'barbell';
-  return overlayStrength(plan, frequency, phaseStructure, newTier, protocolId);
+  return overlayStrength(plan, frequency, phaseStructure, newTier, protocolId, methodology, noDoubles);
 }
 
 // OLD FUNCTIONS REMOVED - Now in protocol system

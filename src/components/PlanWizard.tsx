@@ -174,6 +174,7 @@ interface WizardState {
   strengthTier: StrengthTier;
   equipmentType: EquipmentType;
   strengthProtocol?: StrengthProtocol;
+  noDoubles?: boolean; // If true, cannot stack strength on same day as quality runs
 }
 
 // ============================================================================
@@ -426,7 +427,8 @@ export default function PlanWizard() {
     strengthFrequency: 0,
     strengthTier: 'injury_prevention',
     equipmentType: 'commercial_gym',
-    strengthProtocol: undefined // Will be set when user selects protocol
+    strengthProtocol: undefined, // Will be set when user selects protocol
+    noDoubles: false // Default to allowing doubles (stacking strength on quality days)
   });
 
   // Saved baselines (loaded from DB)
@@ -750,6 +752,10 @@ export default function PlanWizard() {
         requestBody.strength_protocol = state.strengthProtocol; // guaranteed by canProceed
         // Auto-set tier to strength_power when protocol is selected
         requestBody.strength_tier = 'strength_power';
+        // Include noDoubles if set (only relevant for Balanced Build)
+        if (state.approach === 'balanced_build' && state.noDoubles) {
+          requestBody.no_doubles = true;
+        }
       } else {
         requestBody.strength_tier = state.strengthTier;
       }
@@ -2252,6 +2258,27 @@ export default function PlanWizard() {
                       </div>
                     </div>
                   </RadioGroup>
+                </div>
+              )}
+              
+              {/* No Doubles option - only for Balanced Build (Jack Daniels) */}
+              {state.strengthFrequency > 0 && state.strengthProtocol && state.approach === 'balanced_build' && (
+                <div className="pt-4 border-t border-white/10">
+                  <div className="flex items-start space-x-3">
+                    <input
+                      type="checkbox"
+                      id="noDoubles"
+                      checked={state.noDoubles || false}
+                      onChange={(e) => updateState('noDoubles', e.target.checked)}
+                      className="mt-1 w-4 h-4 rounded border-white/30 bg-black/40 text-teal-500 focus:ring-teal-500 focus:ring-offset-0"
+                    />
+                    <Label htmlFor="noDoubles" className="flex-1 cursor-pointer">
+                      <span className="font-medium text-white">Avoid stacking strength on quality run days</span>
+                      <span className="block text-sm text-gray-400 mt-1">
+                        If checked, strength sessions won't be scheduled on the same day as your quality runs (intervals, tempo). This may move lower body work to Wednesday or Saturday depending on your protocol.
+                      </span>
+                    </Label>
+                  </div>
                 </div>
               )}
               

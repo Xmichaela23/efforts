@@ -17,6 +17,7 @@ import { validateRequest, validatePlanSchema, validateTokens, detectScheduleConf
 import { SimpleCompletionGenerator } from './generators/simple-completion.ts';
 import { BalancedBuildGenerator } from './generators/balanced-build.ts';
 import { overlayStrength, overlayStrengthLegacy } from './strength-overlay.ts';
+import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import { 
   calculateEffortScore, 
   getPacesFromScore, 
@@ -158,8 +159,12 @@ Deno.serve(async (req: Request) => {
           console.log(`[PlanGen] Applying strength protocol: ${protocolId} (tier: ${tier}, frequency: ${request.strength_frequency})`);
         }
         
+        // Map approach to methodology for placement strategy
+        const methodology = request.approach ? mapApproachToMethodology(request.approach) : undefined;
+        const noDoubles = request.no_doubles || false; // Default to allowing doubles
+        
         // Use legacy function to map old tier names ('injury_prevention', 'strength_power') to new ('bodyweight', 'barbell')
-        plan = overlayStrengthLegacy(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment, protocolId);
+        plan = overlayStrengthLegacy(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment, protocolId, methodology, noDoubles);
       } catch (error: any) {
         // Protocol validation error - log canonical protocol for debugging
         const protocolId = request.strength_protocol || 'none';
