@@ -59,9 +59,11 @@ const TEST_COMBINATIONS: TestCombo[] = [
 export default function PlanGeneratorTest() {
   const [selectedCombos, setSelectedCombos] = useState<Set<string>>(new Set(TEST_COMBINATIONS.map(c => c.id)));
   const [generating, setGenerating] = useState(false);
-  const [progress, setProgress] = useState<{ current: number; total: number; combo?: string } | null>(null);
+  const [progress, setProgress] = useState<{ current: number; total: number; combo?: string; status?: string } | null>(null);
   const [results, setResults] = useState<Map<string, { plan: any; validation: ValidationResult }>>(new Map());
   const [summary, setSummary] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
+  const [batchSize, setBatchSize] = useState<number>(5); // Limit concurrent generations
+  const [delayMs, setDelayMs] = useState<number>(2000); // 2 second delay between plans
 
   const toggleCombo = (id: string) => {
     const newSet = new Set(selectedCombos);
@@ -204,9 +206,31 @@ export default function PlanGeneratorTest() {
 
       for (let i = 0; i < selected.length; i++) {
         const combo = selected[i];
-        setProgress({ current: i + 1, total: selected.length, combo: combo.label });
+        setProgress({ 
+          current: i + 1, 
+          total: selected.length, 
+          combo: combo.label,
+          status: 'Generating...'
+        });
+
+        // Rate limiting: add delay between requests to avoid overwhelming the system
+        if (i > 0 && delayMs > 0) {
+          setProgress({ 
+            current: i, 
+            total: selected.length, 
+            combo: combo.label,
+            status: `Waiting ${delayMs/1000}s before next plan...`
+          });
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
 
         try {
+          setProgress({ 
+            current: i + 1, 
+            total: selected.length, 
+            combo: combo.label,
+            status: 'Calling edge function...'
+          });
           const requestBody: any = {
             user_id: user.id,
             distance: 'marathon',
@@ -277,6 +301,13 @@ export default function PlanGeneratorTest() {
             continue;
           }
 
+          setProgress({ 
+            current: i + 1, 
+            total: selected.length, 
+            combo: combo.label,
+            status: 'Fetching plan from database...'
+          });
+
           // Fetch the generated plan - use RPC or direct query with proper error handling
           const { data: planData, error: planError } = await supabase
             .from('training_plans')
@@ -314,12 +345,26 @@ export default function PlanGeneratorTest() {
             continue;
           }
 
+          setProgress({ 
+            current: i + 1, 
+            total: selected.length, 
+            combo: combo.label,
+            status: 'Validating plan...'
+          });
+
           const validation = validatePlan(planData, combo);
           newResults.set(combo.id, { plan: planData, validation });
 
           if (!validation.success) {
             allErrors.push(`${combo.label}: ${validation.errors.join(', ')}`);
           }
+
+          setProgress({ 
+            current: i + 1, 
+            total: selected.length, 
+            combo: combo.label,
+            status: validation.success ? '✅ Valid' : '❌ Failed validation'
+          });
         } catch (err: any) {
           allErrors.push(`${combo.label}: ${err.message || 'Unknown error'}`);
           newResults.set(combo.id, {
@@ -474,6 +519,24 @@ export default function PlanGeneratorTest() {
         <CardDescription className="text-white/60">
           Generate multiple plans with different combinations to test the generator
         </CardDescription>
+        <div className="mt-3 p-3 rounded bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-200/80">
+          <p className="font-medium mb-1">⚠️ System Load:</p>
+          <p className="mb-1">Each plan generation performs:</p>
+          <ul className="list-disc list-inside space-y-0.5 ml-2">
+            <li>VDOT/Effort Score calculations (lookup tables)</li>
+            <li>5 pace zone calculations per plan</li>
+            <li>8-20 weeks of session generation</li>
+            <li>Long run step-back calculations</li>
+            <li>Strength session generation (if applicable)</li>
+            <li>Database writes (plan + baselines)</li>
+          </ul>
+          <p className="mt-2 text-yellow-200/70">
+            <strong>For {selectedCombos.size} plans:</strong> ~{selectedCombos.size * 2}s per plan = ~{Math.round(selectedCombos.size * 2 / 60)} minutes total
+          </p>
+          <p className="mt-1 text-yellow-200/70">
+            <strong>Baselines:</strong> Uses estimated effort scores (not admin baselines). Paces calculated from fitness level or provided effort_score.
+          </p>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -520,37 +583,83 @@ export default function PlanGeneratorTest() {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <Button
-            onClick={generatePlans}
-            disabled={generating || selectedCombos.size === 0}
-            className="flex-1"
-          >
-            {generating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              'Generate Test Plans'
-            )}
-          </Button>
-          {results.size > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-4 text-sm text-white/70">
+            <label className="flex items-center gap-2">
+              <span>Batch Size:</span>
+              <input
+                type="number"
+                min="1"
+                max="15"
+                value={batchSize}
+                onChange={(e) => setBatchSize(Math.max(1, Math.min(15, parseInt(e.target.value) || 5)))}
+                className="w-16 px-2 py-1 rounded bg-white/10 border border-white/20 text-white"
+                disabled={generating}
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              <span>Delay (ms):</span>
+              <input
+                type="number"
+                min="0"
+                max="10000"
+                step="500"
+                value={delayMs}
+                onChange={(e) => setDelayMs(Math.max(0, parseInt(e.target.value) || 2000))}
+                className="w-20 px-2 py-1 rounded bg-white/10 border border-white/20 text-white"
+                disabled={generating}
+              />
+            </label>
+          </div>
+          <div className="flex gap-2">
             <Button
-              onClick={downloadPlans}
-              variant="outline"
+              onClick={generatePlans}
+              disabled={generating || selectedCombos.size === 0}
               className="flex-1"
             >
-              <Download className="mr-2 h-4 w-4" />
-              Download ZIP
+              {generating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                'Generate Test Plans'
+              )}
             </Button>
-          )}
+            {results.size > 0 && (
+              <Button
+                onClick={downloadPlans}
+                variant="outline"
+                className="flex-1"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download ZIP
+              </Button>
+            )}
+          </div>
         </div>
 
         {progress && (
-          <div className="text-sm text-white/80">
-            Progress: {progress.current} / {progress.total}
-            {progress.combo && ` - ${progress.combo}`}
+          <div className="p-3 rounded bg-white/5 border border-white/10">
+            <div className="text-sm text-white/90 font-medium mb-1">
+              Progress: {progress.current} / {progress.total}
+            </div>
+            {progress.combo && (
+              <div className="text-xs text-white/70 mb-1">
+                {progress.combo}
+              </div>
+            )}
+            {progress.status && (
+              <div className="text-xs text-white/60 italic">
+                {progress.status}
+              </div>
+            )}
+            <div className="mt-2 w-full bg-white/10 rounded-full h-2">
+              <div 
+                className="bg-blue-500 h-2 rounded-full transition-all"
+                style={{ width: `${(progress.current / progress.total) * 100}%` }}
+              />
+            </div>
           </div>
         )}
 
