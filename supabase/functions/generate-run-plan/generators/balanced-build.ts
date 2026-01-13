@@ -226,8 +226,20 @@ export class BalancedBuildGenerator extends BaseGenerator {
 
       switch (proximity) {
         case 'race':
-          // Race day - don't add a training session
-          // (The race itself would be handled separately or not included in plan)
+          // Race day - THE MARATHON
+          // Only add if this is the final week and Sunday
+          if (weekNumber === this.params.duration_weeks && day === 'Sunday') {
+            const raceName = this.params.race_name || 'MARATHON';
+            const raceYear = this.params.race_date ? new Date(this.params.race_date + 'T00:00:00').getFullYear() : new Date().getFullYear();
+            sessions.push(this.createSession(
+              day,
+              'RACE DAY',
+              `${raceName} ${raceYear}. Trust your training. Go crush it.`,
+              this.milesToMinutes(26.2),
+              [TOKEN_PATTERNS.long_run(this.milesToMinutes(26.2))],
+              ['race', 'marathon']
+            ));
+          }
           break;
           
         case 'shakeout':
@@ -653,14 +665,14 @@ export class BalancedBuildGenerator extends BaseGenerator {
         }
         weekTypes[idx] = 'post-peak';
       }
-      // Recovery weeks (every 4th week, but not too close to peak)
+      // Recovery weeks (every 4th week, but not too close to peak) - will be calculated in Pass 2
       else if (week % 4 === 0 && week < peakWeek - 2) {
-        progression[idx] = this.getRecoveryWeekMiles(week, startMiles);
         weekTypes[idx] = 'recovery';
+        // Don't set progression yet - will calculate as 75% of previous week in Pass 2
       }
     }
     
-    // Pass 2: Fill in build weeks with smooth progression
+    // Pass 2: Fill in build weeks with smooth progression, then calculate recovery weeks
     // Work forward, ensuring each build week increases by 1-2 miles
     // Build weeks cap at peakMiles - 3, only pre-peak gets peakMiles - 2
     let lastBuildMiles = startMiles - 1; // So first week starts at startMiles
@@ -669,12 +681,17 @@ export class BalancedBuildGenerator extends BaseGenerator {
     for (let week = 1; week <= planWeeks; week++) {
       const idx = week - 1;
       
-      // Skip already-filled weeks
+      // Handle recovery weeks: 75% of previous week
+      if (weekTypes[idx] === 'recovery') {
+        const previousWeekMiles = idx > 0 ? progression[idx - 1] : startMiles;
+        progression[idx] = Math.round(previousWeekMiles * 0.75);
+        // Don't update lastBuildMiles - we'll resume from pre-recovery level
+        continue;
+      }
+      
+      // Skip already-filled weeks (peak, taper, pre-peak, post-peak)
       if (progression[idx] > 0) {
-        // After recovery, don't reset lastBuildMiles - keep building
-        if (weekTypes[idx] !== 'recovery') {
-          lastBuildMiles = progression[idx];
-        }
+        lastBuildMiles = progression[idx];
         continue;
       }
       
@@ -764,7 +781,8 @@ export class BalancedBuildGenerator extends BaseGenerator {
 
   /**
    * Get recovery week long run miles
-   * Scales slightly with progress through the plan
+   * DEPRECATED: Recovery weeks now calculated as 75% of previous week in calculateLongRunProgression
+   * This method kept for backwards compatibility but not used
    */
   private getRecoveryWeekMiles(week: number, startMiles: number): number {
     // Recovery weeks: start at 10, can go up to 12 later in plan

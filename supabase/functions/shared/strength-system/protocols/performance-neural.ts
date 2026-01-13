@@ -269,10 +269,11 @@ function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 2, reps: 6, weight: '70% 1RM' },
         { name: 'Barbell Rows', sets: 2, reps: 6, weight: '70% 1RM' },
-        { name: 'Pull-ups', sets: 2, reps: '6-8', weight: 'Bodyweight' }
+        { name: 'Pull-ups', sets: 2, reps: '6-8', weight: 'Bodyweight' },
+        { name: 'Overhead Press', sets: 2, reps: 5, weight: '60% 1RM', notes: 'Light - Focus on crisp technique' }
       );
       duration = 25;
-      description = 'Recovery Week - Reduced volume.';
+      description = 'Recovery Week - Reduced volume. OHP maintained for posture.';
       repProfile = 'maintenance';
     } else if (phase.name === 'Base') {
       // Upper supportive work: moderate intensity, RIR 3 to match neural intent
@@ -305,10 +306,11 @@ function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 2, reps: 5, weight: '65% 1RM' },
         { name: 'Barbell Rows', sets: 2, reps: 5, weight: '65% 1RM' },
-        { name: 'Pull-ups', sets: 2, reps: '6-8', weight: 'Bodyweight' }
+        { name: 'Pull-ups', sets: 2, reps: '6-8', weight: 'Bodyweight' },
+        { name: 'Overhead Press', sets: 2, reps: 5, weight: 'Light', notes: 'Activation - Mobility focus' }
       );
       duration = 20;
-      description = `Week ${displayWeek} Race Prep - Minimal upper body work. Maintain strength, no fatigue.`;
+      description = `Week ${displayWeek} Race Prep - Minimal upper body work. Maintain strength, no fatigue. OHP for activation.`;
       repProfile = 'maintenance';
     }
   } else {

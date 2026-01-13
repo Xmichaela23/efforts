@@ -231,10 +231,11 @@ function createUpperStrengthSession(
         { name: 'Bench Press', sets: 3, reps: 8, weight: '75% 1RM' },
         { name: 'Barbell Rows', sets: 3, reps: 8, weight: '70% 1RM' },
         { name: 'Pull-ups', sets: 3, reps: 8, weight: 'Bodyweight' },
+        { name: 'Overhead Press', sets: 2, reps: 5, weight: '60% 1RM', notes: 'Light - Focus on crisp technique' },
         { name: 'Cable Face Pulls', sets: 3, reps: 15, weight: 'Light cable' }
       );
       duration = 35;
-      description = 'Recovery Week - Same weights as last week, fewer sets. Your muscles adapt during rest. Resume progression next week.';
+      description = 'Recovery Week - Same weights as last week, fewer sets. OHP maintained for posture. Your muscles adapt during rest. Resume progression next week.';
       repProfile = 'maintenance';
     } else if (phase.name === 'Base') {
       // wip is 1-based, so subtract 1 to get progression step (0,1,2,3...)
@@ -280,10 +281,10 @@ function createUpperStrengthSession(
         { name: 'Bench Press', sets: 2, reps: 8, weight: '70% 1RM' },
         { name: 'Barbell Rows', sets: 2, reps: 8, weight: '70% 1RM' },
         { name: 'Pull-ups', sets: 2, reps: 8, weight: 'Bodyweight' },
-        { name: 'Shoulder Press', sets: 2, reps: 10, weight: 'Light DBs' }
+        { name: 'Overhead Press', sets: 2, reps: 5, weight: 'Light', notes: 'Activation - Mobility focus' }
       );
       duration = 30;
-      description = `Week ${displayWeek} Race Prep - Maintain gains with minimal volume. You've already tested your strength - now just stay fresh for race day.`;
+      description = `Week ${displayWeek} Race Prep - Maintain gains with minimal volume. OHP for activation. You've already tested your strength - now just stay fresh for race day.`;
       repProfile = 'maintenance';
     }
   } else {
