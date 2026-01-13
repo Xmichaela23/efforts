@@ -90,12 +90,13 @@ export default function PlanGeneratorTest() {
         return;
       }
 
-      // Find all test plans (identified by race_name = "Test Marathon")
+      // Find all test plans (identified by config->>'race_name' = "Test Marathon")
+      // race_name is stored in the config JSONB column, not as a direct column
       const { data: testPlans, error: findError } = await supabase
-        .from('training_plans')
+        .from('plans')
         .select('id')
         .eq('user_id', user.id)
-        .eq('race_name', 'Test Marathon');
+        .eq('config->>race_name', 'Test Marathon');
 
       if (findError) {
         alert(`Error finding test plans: ${findError.message}`);
@@ -111,7 +112,7 @@ export default function PlanGeneratorTest() {
 
       const planIds = testPlans.map(p => p.id);
 
-      // Delete planned_workouts first (they reference training_plans)
+      // Delete planned_workouts first (they reference plans)
       const { error: workoutsError } = await supabase
         .from('planned_workouts')
         .delete()
@@ -121,9 +122,9 @@ export default function PlanGeneratorTest() {
         console.warn('Error deleting planned_workouts:', workoutsError);
       }
 
-      // Delete the training_plans
+      // Delete the plans
       const { error: plansError } = await supabase
-        .from('training_plans')
+        .from('plans')
         .delete()
         .in('id', planIds)
         .eq('user_id', user.id);
@@ -388,7 +389,7 @@ export default function PlanGeneratorTest() {
 
           // Fetch the generated plan - use RPC or direct query with proper error handling
           const { data: planData, error: planError } = await supabase
-            .from('training_plans')
+            .from('plans')
             .select('*')
             .eq('id', data.plan_id)
             .eq('user_id', user.id) // Ensure we're fetching our own plan
@@ -470,7 +471,7 @@ export default function PlanGeneratorTest() {
         });
 
         try {
-          // First delete planned_workouts (they reference training_plans)
+          // First delete planned_workouts (they reference plans)
           const { error: workoutsError } = await supabase
             .from('planned_workouts')
             .delete()
@@ -482,9 +483,9 @@ export default function PlanGeneratorTest() {
             console.log(`Cleaned up planned_workouts for ${generatedPlanIds.length} test plans`);
           }
 
-          // Then delete the training_plans
+          // Then delete the plans
           const { error: plansError } = await supabase
-            .from('training_plans')
+            .from('plans')
             .delete()
             .in('id', generatedPlanIds)
             .eq('user_id', user.id);
