@@ -165,9 +165,16 @@ export class BalancedBuildGenerator extends BaseGenerator {
       const quality = this.addQualitySessions(sessions, weekNumber, phase, runningDays);
       usedMiles += quality;
     } else {
-      // Recovery week: just strides
+      // Recovery week: reduced quality on both Tuesday and Thursday
+      // Tuesday: Easy + Strides (maintains leg turnover)
       sessions.push(this.createEasyWithStrides(4, 'Tuesday'));
       usedMiles += 4;
+      
+      // Thursday: Easy run (reduced volume, maintains 2Q structure)
+      if (runningDays >= 5) {
+        sessions.push(this.createEasyRunMiles(3, 'Thursday'));
+        usedMiles += 3;
+      }
     }
 
     // Fill with easy runs
