@@ -64,6 +64,7 @@ export default function PlanGeneratorTest() {
   const [summary, setSummary] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
   const [batchSize, setBatchSize] = useState<number>(5); // Limit concurrent generations
   const [delayMs, setDelayMs] = useState<number>(2000); // 2 second delay between plans
+  const [cleaning, setCleaning] = useState(false);
 
   const toggleCombo = (id: string) => {
     const newSet = new Set(selectedCombos);
@@ -73,6 +74,79 @@ export default function PlanGeneratorTest() {
       newSet.add(id);
     }
     setSelectedCombos(newSet);
+  };
+
+  const cleanupTestPlans = async () => {
+    if (!confirm('This will delete all test plans (plans with "Test Marathon" as race name) and their workouts from your calendar. Continue?')) {
+      return;
+    }
+
+    setCleaning(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('Please log in to clean up test plans');
+        setCleaning(false);
+        return;
+      }
+
+      // Find all test plans (identified by race_name = "Test Marathon")
+      const { data: testPlans, error: findError } = await supabase
+        .from('training_plans')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('race_name', 'Test Marathon');
+
+      if (findError) {
+        alert(`Error finding test plans: ${findError.message}`);
+        setCleaning(false);
+        return;
+      }
+
+      if (!testPlans || testPlans.length === 0) {
+        alert('No test plans found to clean up.');
+        setCleaning(false);
+        return;
+      }
+
+      const planIds = testPlans.map(p => p.id);
+
+      // Delete planned_workouts first (they reference training_plans)
+      const { error: workoutsError } = await supabase
+        .from('planned_workouts')
+        .delete()
+        .in('training_plan_id', planIds);
+
+      if (workoutsError) {
+        console.warn('Error deleting planned_workouts:', workoutsError);
+      }
+
+      // Delete the training_plans
+      const { error: plansError } = await supabase
+        .from('training_plans')
+        .delete()
+        .in('id', planIds)
+        .eq('user_id', user.id);
+
+      if (plansError) {
+        alert(`Error deleting test plans: ${plansError.message}`);
+        setCleaning(false);
+        return;
+      }
+
+      // Trigger refresh
+      try {
+        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+        window.dispatchEvent(new CustomEvent('week:invalidate'));
+        window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+      } catch {}
+
+      alert(`Successfully deleted ${planIds.length} test plan(s) and their workouts.`);
+    } catch (err: any) {
+      alert(`Error: ${err.message || 'Unknown error'}`);
+    } finally {
+      setCleaning(false);
+    }
   };
 
   const validatePlan = (plan: any, combo: TestCombo): ValidationResult => {
@@ -195,6 +269,7 @@ export default function PlanGeneratorTest() {
     const selected = TEST_COMBINATIONS.filter(c => selectedCombos.has(c.id));
     const newResults = new Map<string, { plan: any; validation: ValidationResult }>();
     const allErrors: string[] = [];
+    const generatedPlanIds: string[] = []; // Track plan IDs for cleanup
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -301,6 +376,9 @@ export default function PlanGeneratorTest() {
             continue;
           }
 
+          // Track plan ID for cleanup
+          generatedPlanIds.push(data.plan_id);
+
           setProgress({ 
             current: i + 1, 
             total: selected.length, 
@@ -353,7 +431,9 @@ export default function PlanGeneratorTest() {
           });
 
           const validation = validatePlan(planData, combo);
-          newResults.set(combo.id, { plan: planData, validation });
+          // Store plan_id for cleanup
+          const planWithId = { ...planData, _test_plan_id: data.plan_id };
+          newResults.set(combo.id, { plan: planWithId, validation });
 
           if (!validation.success) {
             allErrors.push(`${combo.label}: ${validation.errors.join(', ')}`);
@@ -379,6 +459,50 @@ export default function PlanGeneratorTest() {
 
       setResults(newResults);
       setSummary({ success: successCount, failed: failedCount, errors: allErrors });
+
+      // Cleanup: Delete all test plans and their planned_workouts from database after validation
+      if (generatedPlanIds.length > 0) {
+        setProgress({ 
+          current: selected.length, 
+          total: selected.length, 
+          combo: 'Cleaning up...',
+          status: 'Deleting test plans from database...'
+        });
+
+        try {
+          // First delete planned_workouts (they reference training_plans)
+          const { error: workoutsError } = await supabase
+            .from('planned_workouts')
+            .delete()
+            .in('training_plan_id', generatedPlanIds);
+
+          if (workoutsError) {
+            console.warn('Failed to delete test planned_workouts:', workoutsError);
+          } else {
+            console.log(`Cleaned up planned_workouts for ${generatedPlanIds.length} test plans`);
+          }
+
+          // Then delete the training_plans
+          const { error: plansError } = await supabase
+            .from('training_plans')
+            .delete()
+            .in('id', generatedPlanIds)
+            .eq('user_id', user.id);
+
+          if (plansError) {
+            console.warn('Failed to delete some test plans:', plansError);
+          } else {
+            console.log(`Cleaned up ${generatedPlanIds.length} test plans`);
+            // Trigger refresh of calendar/plans
+            try {
+              window.dispatchEvent(new CustomEvent('planned:invalidate'));
+              window.dispatchEvent(new CustomEvent('week:invalidate'));
+            } catch {}
+          }
+        } catch (err) {
+          console.warn('Error during test plan cleanup:', err);
+        }
+      }
     } catch (err: any) {
       alert(`Error: ${err.message}`);
     } finally {
@@ -636,6 +760,26 @@ export default function PlanGeneratorTest() {
                 Download ZIP
               </Button>
             )}
+          </div>
+          <div className="pt-2 border-t border-white/10">
+            <Button
+              onClick={cleanupTestPlans}
+              disabled={cleaning || generating}
+              variant="destructive"
+              className="w-full"
+            >
+              {cleaning ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cleaning up...
+                </>
+              ) : (
+                '🧹 Clean Up Existing Test Plans'
+              )}
+            </Button>
+            <p className="text-xs text-white/60 mt-1 text-center">
+              Deletes all plans with "Test Marathon" race name and their workouts
+            </p>
           </div>
         </div>
 
