@@ -392,9 +392,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           console.log('🔍 [Feedback Check] Querying database for workout:', workoutId);
 
           // Check if this specific workout is dismissed or has RPE (authoritative DB state)
+          // Check both rpe column and workout_metadata.session_rpe (normalized field)
           const { data: workout, error } = await supabase
             .from('workouts')
-            .select('id, type, name, gear_id, rpe, feedback_dismissed_at, date')
+            .select('id, type, name, gear_id, rpe, feedback_dismissed_at, date, workout_metadata')
             .eq('id', workoutId)
             .eq('user_id', user.id)
             .single();
@@ -409,10 +410,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             return;
           }
 
+          // Check both rpe column and workout_metadata.session_rpe (for run/ride, RPE is in rpe column)
+          const workoutMetadata = typeof workout.workout_metadata === 'string' 
+            ? JSON.parse(workout.workout_metadata) 
+            : (workout.workout_metadata || {});
+          const hasRpe = workout.rpe != null || workoutMetadata.session_rpe != null;
+
           console.log('🔍 [Feedback Check] Workout from DB:', {
             id: workout.id,
             type: workout.type,
             rpe: workout.rpe,
+            workout_metadata_session_rpe: workoutMetadata.session_rpe,
+            hasRpe,
             feedback_dismissed_at: workout.feedback_dismissed_at,
             date: workout.date
           });
@@ -428,7 +437,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             isWithin7Days
           });
 
-          if (!workout.rpe && 
+          if (!hasRpe && 
               !workout.feedback_dismissed_at && 
               isWithin7Days &&
               !feedbackShownIdsRef.current.has(workoutId)) {
@@ -443,7 +452,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             });
           } else {
             console.log('⏭️ [Feedback Check] Not showing popup - conditions not met:', {
-              hasRpe: !!workout.rpe,
+              hasRpe,
+              rpeColumn: workout.rpe,
+              metadataRpe: workoutMetadata.session_rpe,
               isDismissed: !!workout.feedback_dismissed_at,
               isWithin7Days,
               alreadyShown: feedbackShownIdsRef.current.has(workoutId)
