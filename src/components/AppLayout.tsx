@@ -390,11 +390,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         !feedbackWorkout) {
       const workoutId = String(selectedWorkout.id);
       
-      // Skip if already shown or dismissed in this session
-      if (feedbackShownIdsRef.current.has(workoutId) || feedbackDismissedRef.current.has(workoutId)) {
-        console.log('⏭️ [Feedback Check] Skipping - already shown or dismissed:', workoutId);
-        return;
-      }
+      // For selected workouts, only check server-side dismissal (don't use client-side cache)
+      // Client-side cache is only for general checkForFeedbackNeeded to prevent duplicate popups
+      // When user explicitly selects a workout, always check server state
 
       // Always check database for authoritative state (local state may be stale)
       const checkSpecificWorkout = async () => {
@@ -469,8 +467,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               return;
             }
 
-            console.log('✅ [Feedback Check] Showing popup for workout:', workoutId);
-            feedbackShownIdsRef.current.add(workoutId);
+            console.log('✅ [Feedback Check] Showing popup for selected workout:', workoutId);
+            // Don't add to feedbackShownIdsRef for selected workouts - we always check server state
+            // feedbackShownIdsRef is only for general checkForFeedbackNeeded to prevent duplicate popups
             setFeedbackWorkout({
               id: workoutId,
               type: workout.type as 'run' | 'ride',
