@@ -68,7 +68,6 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const norm = useWorkoutData(hydrated||workoutData);
   
   // Trigger processing once and poll for completion when series is missing
-  const checkedDbRef = useRef<Set<string>>(new Set());
   
   useEffect(() => {
     const workoutId = (hydrated||workoutData)?.id;
@@ -136,7 +135,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
           processingTriggeredRef.current.delete(workoutId);
         });
       }
-    })();
+      })();
+    }
     
     // Poll for completion (whether we just triggered or were already polling)
     let attempt = 0;
@@ -204,8 +204,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
         clearTimeout(pollingTimeoutRef.current);
         pollingTimeoutRef.current = null;
       }
-      };
-    }, [(hydrated||workoutData)?.id]); // Only depend on workout ID to prevent re-render loops
+    };
+  }, [(hydrated||workoutData)?.id]); // Only depend on workout ID to prevent re-render loops
   
   useEffect(() => {
     setHydrated((prev: any) => {
