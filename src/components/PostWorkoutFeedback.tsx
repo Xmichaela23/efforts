@@ -352,9 +352,9 @@ export default function PostWorkoutFeedback({
         )}
       </div>
 
-      {/* Map Preview */}
+      {/* Map Preview - Bigger to see the route */}
       {hasMapData && (
-        <div className="rounded-lg overflow-hidden" style={{ height: '160px' }}>
+        <div className="rounded-lg overflow-hidden" style={{ height: '280px' }}>
           <EffortsViewerMapbox
             samples={seriesData || []}
             trackLngLat={gpsTrack}
@@ -363,72 +363,6 @@ export default function PostWorkoutFeedback({
             compact={true}
             workoutData={{ type: workoutType, ...workoutData }}
           />
-        </div>
-      )}
-
-      {/* Gear Selection - Dropdown (optional if gear already set, but still allow changes) */}
-      {gear.length > 0 && (
-        <div>
-          <label className="text-sm font-light text-white/70 mb-2 block">
-            {workoutType === 'run' ? 'Shoes Used' : 'Bike Used'}
-            {existingGearId && (
-              <span className="ml-2 text-xs text-white/40 font-light">(optional to change)</span>
-            )}
-          </label>
-          <Select
-            value={selectedGearId || undefined}
-            onValueChange={(value) => setSelectedGearId(value)}
-          >
-            <SelectTrigger 
-              className="w-full bg-white/[0.08] backdrop-blur-md border-2 text-white font-light hover:bg-white/[0.12] transition-all duration-300"
-              style={{
-                borderColor: selectedGearId ? `rgba(${getRgbFromColor(sportColor)}, 0.4)` : 'rgba(255, 255, 255, 0.2)',
-              }}
-            >
-              <SelectValue placeholder="Select gear">
-                {(() => {
-                  const selected = gear.find(g => g.id === selectedGearId);
-                  if (!selected) return 'Select gear';
-                  const details = [selected.brand, selected.model].filter(Boolean).join(' ');
-                  return details ? `${selected.name} • ${details}` : selected.name;
-                })()}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
-              {gear.map((item) => (
-                <SelectItem
-                  key={item.id}
-                  value={item.id}
-                  className="text-white font-light focus:bg-white/[0.12] focus:text-white"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-light">{item.name}</span>
-                    {(item.brand || item.model) && (
-                      <span className="text-xs text-white/50 font-light">
-                        {[item.brand, item.model].filter(Boolean).join(' ')}
-                      </span>
-                    )}
-                  </div>
-                </SelectItem>
-              ))}
-              {onAddGear && (
-                <div className="border-t border-white/10 mt-1 pt-1">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onAddGear();
-                    }}
-                    className="w-full flex items-center gap-2 px-2 py-2 text-sm font-light text-white/70 hover:text-white hover:bg-white/[0.08] rounded transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>Add New {workoutType === 'run' ? 'Shoes' : 'Bike'}</span>
-                  </button>
-                </div>
-              )}
-            </SelectContent>
-          </Select>
         </div>
       )}
 
@@ -493,6 +427,72 @@ export default function PostWorkoutFeedback({
           ))}
         </div>
       </div>
+
+      {/* Gear Selection - Dropdown (moved to bottom) */}
+      {gear.length > 0 && (
+        <div>
+          <label className="text-sm font-light text-white/70 mb-2 block">
+            {workoutType === 'run' ? 'Shoes Used' : 'Bike Used'}
+            {existingGearId && (
+              <span className="ml-2 text-xs text-white/40 font-light">(optional to change)</span>
+            )}
+          </label>
+          <Select
+            value={selectedGearId || undefined}
+            onValueChange={(value) => setSelectedGearId(value)}
+          >
+            <SelectTrigger 
+              className="w-full bg-white/[0.08] backdrop-blur-md border-2 text-white font-light hover:bg-white/[0.12] transition-all duration-300"
+              style={{
+                borderColor: selectedGearId ? `rgba(${getRgbFromColor(sportColor)}, 0.4)` : 'rgba(255, 255, 255, 0.2)',
+              }}
+            >
+              <SelectValue placeholder="Select gear">
+                {(() => {
+                  const selected = gear.find(g => g.id === selectedGearId);
+                  if (!selected) return 'Select gear';
+                  const details = [selected.brand, selected.model].filter(Boolean).join(' ');
+                  return details ? `${selected.name} • ${details}` : selected.name;
+                })()}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
+              {gear.map((item) => (
+                <SelectItem
+                  key={item.id}
+                  value={item.id}
+                  className="text-white font-light focus:bg-white/[0.12] focus:text-white"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-light">{item.name}</span>
+                    {(item.brand || item.model) && (
+                      <span className="text-xs text-white/50 font-light">
+                        {[item.brand, item.model].filter(Boolean).join(' ')}
+                      </span>
+                    )}
+                  </div>
+                </SelectItem>
+              ))}
+              {onAddGear && (
+                <div className="border-t border-white/10 mt-1 pt-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onAddGear();
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-2 text-sm font-light text-white/70 hover:text-white hover:bg-white/[0.08] rounded transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Add New {workoutType === 'run' ? 'Shoes' : 'Bike'}</span>
+                  </button>
+                </div>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div className="flex gap-3 pt-2">
