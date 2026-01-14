@@ -438,6 +438,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             workout_metadata_session_rpe: workoutMetadata.session_rpe,
             hasRpe,
             feedback_dismissed_at: workout.feedback_dismissed_at,
+            feedback_dismissed_at_raw: workout.feedback_dismissed_at,
             date: workout.date
           });
 
