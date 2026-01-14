@@ -729,8 +729,8 @@ export default function MapEffort({
             });
           }
         } else {
-          // COLLAPSED: Tight padding to fill small container
-          const paddingPercent = 0.08;
+          // COLLAPSED: Tight padding to fill small container (reduced padding for more zoom)
+          const paddingPercent = 0.04; // Reduced from 0.08 to zoom in more
           map.fitBounds(b, { 
             padding: {
               top: Math.max(10, containerHeight * paddingPercent),
@@ -738,7 +738,7 @@ export default function MapEffort({
               left: Math.max(10, containerWidth * paddingPercent),
               right: Math.max(10, containerWidth * paddingPercent)
             },
-            maxZoom: 14.5,
+            maxZoom: 15.5, // Increased from 14.5 to allow more zoom
             duration: 300
           });
         }
