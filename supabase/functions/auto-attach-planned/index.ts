@@ -545,6 +545,19 @@ Deno.serve(async (req) => {
         .update(updates)
         .eq('id', w.id)
         .eq('user_id', w.user_id);
+      
+      // Clear intervals and planned_steps_light using RPC merge (preserves analysis.series)
+      // This ensures computed.analysis.series from compute-workout-analysis is not lost
+      const { error: rpcError } = await supabase.rpc('merge_computed', {
+        p_workout_id: w.id,
+        p_partial_computed: {
+          intervals: [],
+          planned_steps_light: null
+        }
+      });
+      if (rpcError) {
+        console.error('[auto-attach-planned] Failed to merge computed (heuristic):', rpcError);
+      }
     } catch {
       // fallback to minimal link
       await supabase
@@ -552,6 +565,17 @@ Deno.serve(async (req) => {
         .update({ planned_id: best.id })
         .eq('id', w.id)
         .eq('user_id', w.user_id);
+      
+      // Still try to clear intervals/planned_steps_light via RPC
+      try {
+        await supabase.rpc('merge_computed', {
+          p_workout_id: w.id,
+          p_partial_computed: {
+            intervals: [],
+            planned_steps_light: null
+          }
+        });
+      } catch {}
     }
 
     // Wait for database transaction to commit before calling analysis functions
