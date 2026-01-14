@@ -499,7 +499,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         noFeedbackWorkout: !feedbackWorkout
       });
     }
-  }, [selectedWorkout]);
+  }, [selectedWorkout, feedbackWorkout]);
+
+  // Debug: Log when feedbackWorkout state changes
+  useEffect(() => {
+    if (feedbackWorkout) {
+      console.log('🎯 [Feedback State] feedbackWorkout SET:', feedbackWorkout);
+    } else {
+      console.log('🎯 [Feedback State] feedbackWorkout CLEARED');
+    }
+  }, [feedbackWorkout]);
 
   // Realtime subscription (fast-path optimization, not source of truth)
   useEffect(() => {
@@ -1686,14 +1695,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       )}
       
       {/* Post-Workout Feedback Popup */}
-      {feedbackWorkout && (
-        <PostWorkoutFeedback
-          workoutId={feedbackWorkout.id}
-          workoutType={feedbackWorkout.type}
-          workoutName={feedbackWorkout.name}
-          existingGearId={feedbackWorkout.existingGearId}
-          existingRpe={feedbackWorkout.existingRpe}
-          mode="popup"
+      {feedbackWorkout && (() => {
+        console.log('🎯 [Render] Rendering PostWorkoutFeedback for:', feedbackWorkout.id, feedbackWorkout);
+        return (
+          <PostWorkoutFeedback
+            workoutId={feedbackWorkout.id}
+            workoutType={feedbackWorkout.type}
+            workoutName={feedbackWorkout.name}
+            existingGearId={feedbackWorkout.existingGearId}
+            existingRpe={feedbackWorkout.existingRpe}
+            mode="popup"
           onAddGear={() => {
             // Open gear management, temporarily hide feedback popup
             setShowGear(true);
@@ -1734,8 +1745,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               setTimeout(() => checkForFeedbackNeeded(), 1000);
             }
           }}
-        />
-      )}
+          />
+        );
+      })()}
     </div>
   );
 };
