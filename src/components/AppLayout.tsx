@@ -352,24 +352,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   // Check when viewing a completed workout (post-workout summary)
   // For specific workouts, check if THAT workout needs feedback (not the most recent)
+  // Always check database for authoritative state (local state may be stale)
   useEffect(() => {
     if (!selectedWorkout) return;
     
     const workoutStatus = String(selectedWorkout.workout_status || '').toLowerCase();
     const workoutType = selectedWorkout.type;
-    const workoutRpe = selectedWorkout.rpe;
     
     console.log('🔍 [Feedback Check] selectedWorkout:', {
       id: selectedWorkout.id,
       status: workoutStatus,
       type: workoutType,
-      rpe: workoutRpe,
+      localRpe: selectedWorkout.rpe,
       hasFeedbackWorkout: !!feedbackWorkout
     });
 
+    // Only check completed run/ride workouts (don't check RPE locally - check DB)
     if (workoutStatus === 'completed' &&
         (workoutType === 'run' || workoutType === 'ride') &&
-        !workoutRpe &&
         !feedbackWorkout) {
       const workoutId = String(selectedWorkout.id);
       
@@ -379,7 +379,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         return;
       }
 
-      // Check if this specific workout is dismissed in the database
+      // Always check database for authoritative state (local state may be stale)
       const checkSpecificWorkout = async () => {
         try {
           const { data: { user } } = await supabase.auth.getUser();
@@ -390,7 +390,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
           console.log('🔍 [Feedback Check] Querying database for workout:', workoutId);
 
-          // Check if this specific workout is dismissed or has RPE
+          // Check if this specific workout is dismissed or has RPE (authoritative DB state)
           const { data: workout, error } = await supabase
             .from('workouts')
             .select('id, type, name, gear_id, rpe, feedback_dismissed_at, date')
@@ -458,7 +458,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       console.log('⏭️ [Feedback Check] Initial conditions not met:', {
         isCompleted: workoutStatus === 'completed',
         isRunOrRide: workoutType === 'run' || workoutType === 'ride',
-        hasNoRpe: !workoutRpe,
         noFeedbackWorkout: !feedbackWorkout
       });
     }
