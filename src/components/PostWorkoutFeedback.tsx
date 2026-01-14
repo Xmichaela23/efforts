@@ -135,7 +135,7 @@ export default function PostWorkoutFeedback({
 
       const { data, error } = await supabase
         .from('workouts')
-        .select('distance, gps_track, computed')
+        .select('distance, gps_track, computed, date')
         .eq('id', workoutId)
         .eq('user_id', user.id)
         .single();
@@ -309,7 +309,32 @@ export default function PostWorkoutFeedback({
     return workoutData.computed.analysis.series;
   };
 
+  // Format date for display
+  const formatDate = (dateString: string | null | undefined): string | null => {
+    if (!dateString) return null;
+    try {
+      const date = new Date(dateString);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // Check if it's today
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      }
+      // Check if it's yesterday
+      if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      }
+      // Otherwise format as "Mon Jan 13" or similar
+      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    } catch {
+      return null;
+    }
+  };
+
   const distanceText = formatDistance(workoutData?.distance);
+  const dateText = formatDate(workoutData?.date);
   const gpsTrack = getGpsTrack();
   const seriesData = getSeriesData();
   const hasMapData = (gpsTrack.length > 1) || (seriesData?.distance_m && Array.isArray(seriesData.distance_m) && seriesData.distance_m.length > 1);
@@ -329,13 +354,19 @@ export default function PostWorkoutFeedback({
             <h3 className="text-lg font-light text-white">
               {mode === 'popup' ? 'Nice work!' : 'Workout Feedback'}
             </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {workoutName && (
                 <p className="text-sm text-white/60 font-light">{workoutName}</p>
               )}
-              {distanceText && (
+              {dateText && (
                 <>
                   {workoutName && <span className="text-white/40">•</span>}
+                  <p className="text-sm text-white/60 font-light">{dateText}</p>
+                </>
+              )}
+              {distanceText && (
+                <>
+                  {(workoutName || dateText) && <span className="text-white/40">•</span>}
                   <p className="text-sm text-white/60 font-light">{distanceText}</p>
                 </>
               )}
