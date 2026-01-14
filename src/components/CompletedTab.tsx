@@ -171,8 +171,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
         clearTimeout(pollingTimeoutRef.current);
         pollingTimeoutRef.current = null;
       }
-    };
-  }, [(hydrated||workoutData)?.id, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);
+      };
+    }, [(hydrated||workoutData)?.id, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);
   
   useEffect(() => {
     setHydrated((prev: any) => {
