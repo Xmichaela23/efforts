@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 
 import { useAppContext } from '@/contexts/AppContext';
@@ -65,6 +65,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const processingTriggeredRef = useRef<Set<string>>(new Set()); // Track which workouts we've triggered
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const checkedDbRef = useRef<Set<string>>(new Set()); // Track which workouts we've checked DB for
+  const initializedRef = useRef<Set<string>>(new Set()); // Track which workouts have been initialized to prevent initial blink
   const norm = useWorkoutData(hydrated||workoutData);
   
   // Trigger processing once and poll for completion when series is missing
@@ -82,16 +83,20 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
     
     if (hasSeriesInState) {
       // Already have data, no need to check DB or process
-      // Sync hydrated with workoutData if needed (only if different to prevent re-render)
-      if (!hydratedSeries && propsSeries) {
-        // workoutData has it but hydrated doesn't - update once
-        setHydrated((prev: any) => {
-          // Only update if computed is actually different
-          if (prev?.computed !== workoutData.computed) {
-            return { ...prev, computed: workoutData.computed };
-          }
-          return prev;
-        });
+      // Only sync on initial mount to prevent re-renders
+      if (!initializedRef.current.has(workoutId)) {
+        initializedRef.current.add(workoutId);
+        // Sync hydrated with workoutData on first render only (if different)
+        if (!hydratedSeries && propsSeries) {
+          // workoutData has it but hydrated doesn't - update once on mount
+          setHydrated((prev: any) => {
+            // Only update if computed is actually different
+            if (prev?.computed !== workoutData.computed) {
+              return { ...prev, computed: workoutData.computed };
+            }
+            return prev;
+          });
+        }
       }
       return;
     }
@@ -130,14 +135,17 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
                       prevSeries.distance_m[prevSeries.distance_m.length - 1] === 
                       series.distance_m[series.distance_m.length - 1]) {
                     // Likely the same data, don't update to prevent re-render
+                    initializedRef.current.add(workoutId);
                     return prev;
                   }
                 }
                 
                 // Only update if series is actually different to prevent re-render loops
                 if (JSON.stringify(prevSeries) !== JSON.stringify(series)) {
+                  initializedRef.current.add(workoutId);
                   return { ...prev, computed };
                 }
+                initializedRef.current.add(workoutId);
                 return prev;
               });
               return;
@@ -1513,23 +1521,41 @@ const formatMovingTime = () => {
          })();
          // Build GPS-derived track once (for route and optional elevation fallback)
          const gpsRaw = (hydrated||workoutData)?.gps_track;
-         const gps = Array.isArray(gpsRaw)
-           ? gpsRaw
-           : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
-         const track = gps
-           .map((p:any)=>{
-             const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
-             const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
-             if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
-             return null;
-           })
-           .filter(Boolean) as [number,number][];
+        const gps = Array.isArray(gpsRaw)
+          ? gpsRaw
+          : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
+        const track = gps
+          .map((p:any)=>{
+            const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
+            const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
+            if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
+            return null;
+          })
+          .filter(Boolean) as [number,number][];
+        
+        // Memoize series and track to prevent map re-renders
+        const finalSeries = (memo?.series || series) as any;
+        const finalTrack = (memo?.track || track) as any;
+        
+        // Only render map if we have valid data (prevents initial blink)
+        const hasValidSeries = finalSeries && 
+          Array.isArray(finalSeries?.distance_m) && 
+          finalSeries.distance_m.length > 1;
+        const hasValidTrack = finalTrack && 
+          Array.isArray(finalTrack) && 
+          finalTrack.length > 1;
+        
+        if (!hasValidSeries && !hasValidTrack) {
+          // Don't render map if no data - prevents blink
+          return null;
+        }
+        
         // No client-side series transformation; use server-provided series as-is
         return (
           <div className="mt-6 mb-6 mx-[-16px]">
               <EffortsViewerMapbox
-              samples={(memo?.series || series) as any}
-              trackLngLat={(memo?.track || track) as any}
+              samples={finalSeries}
+              trackLngLat={finalTrack}
               useMiles={!!useImperial}
               useFeet={!!useImperial}
               compact={compact}
