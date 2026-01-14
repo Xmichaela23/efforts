@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Activity, Bike } from 'lucide-react';
+import { X, Activity, Bike, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { Button } from './ui/button';
