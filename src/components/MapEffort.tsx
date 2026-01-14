@@ -479,11 +479,20 @@ export default function MapEffort({
       // Normal padding for initial fit
       map.fitBounds(b, { padding: 60, maxZoom: 16, duration: 0 });
       map.once('idle', () => {
-        try { const c = map.getCenter(); savedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any; } catch {}
+        try { 
+          const c = map.getCenter(); 
+          savedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any; 
+        } catch {}
         fittedRef.current = true;
         // Fade in after first stable frame
         requestAnimationFrame(() => setVisible(true));
       });
+    } else if (fittedRef.current && savedCameraRef.current && !expanded) {
+      // If already fitted, restore saved camera position instead of re-fitting
+      // This prevents zoom-out when data updates
+      try {
+        map.jumpTo(savedCameraRef.current as any);
+      } catch {}
     }
   }, [coords, ready, theme]);
 

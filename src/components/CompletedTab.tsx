@@ -54,7 +54,13 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const [editingPool, setEditingPool] = useState(false);
   const [poolLengthMeters, setPoolLengthMeters] = useState<number | null>(null);
   const [rememberDefault, setRememberDefault] = useState(false);
-  const [hydrated, setHydrated] = useState<any>(workoutData);
+  // Initialize hydrated with workoutData, but use a ref to track if we've synced
+  // This prevents the initial state update that causes the blink
+  const [hydrated, setHydrated] = useState<any>(() => {
+    // Initialize with workoutData if it has computed data, otherwise empty object
+    // This prevents unnecessary re-renders
+    return workoutData?.computed?.analysis?.series ? workoutData : { ...workoutData, computed: null };
+  });
   const [analysisInvoked, setAnalysisInvoked] = useState(false);
   const [showAdvancedRunDyn, setShowAdvancedRunDyn] = useState(false);
   const [showPower, setShowPower] = useState(false);
@@ -1550,16 +1556,58 @@ const formatMovingTime = () => {
           return null;
         }
         
+        // Memoize map props with stable references to prevent re-renders
+        // Use refs to track previous values and only update if actually changed
+        const mapPropsRef = useRef<{
+          samples: any;
+          trackLngLat: any;
+          useMiles: boolean;
+          useFeet: boolean;
+          compact: boolean;
+          workoutData: any;
+        } | null>(null);
+        
+        const mapProps = useMemo(() => {
+          // Check if data actually changed by comparing array lengths and first/last values
+          const trackChanged = !mapPropsRef.current?.trackLngLat || 
+            !Array.isArray(finalTrack) ||
+            mapPropsRef.current.trackLngLat.length !== finalTrack.length ||
+            (finalTrack.length > 0 && (
+              mapPropsRef.current.trackLngLat[0]?.[0] !== finalTrack[0]?.[0] ||
+              mapPropsRef.current.trackLngLat[0]?.[1] !== finalTrack[0]?.[1]
+            ));
+          
+          const seriesChanged = !mapPropsRef.current?.samples ||
+            (finalSeries?.distance_m?.length !== mapPropsRef.current.samples?.distance_m?.length);
+          
+          // Only create new object if data actually changed
+          if (trackChanged || seriesChanged || 
+              mapPropsRef.current?.useMiles !== !!useImperial ||
+              mapPropsRef.current?.compact !== compact ||
+              mapPropsRef.current?.workoutData?.id !== workoutData?.id) {
+            mapPropsRef.current = {
+              samples: finalSeries,
+              trackLngLat: finalTrack,
+              useMiles: !!useImperial,
+              useFeet: !!useImperial,
+              compact,
+              workoutData
+            };
+          }
+          
+          return mapPropsRef.current;
+        }, [finalSeries, finalTrack, useImperial, compact, workoutData?.id]);
+        
         // No client-side series transformation; use server-provided series as-is
         return (
           <div className="mt-6 mb-6 mx-[-16px]">
               <EffortsViewerMapbox
-              samples={finalSeries}
-              trackLngLat={finalTrack}
-              useMiles={!!useImperial}
-              useFeet={!!useImperial}
-              compact={compact}
-              workoutData={workoutData}
+              samples={mapProps.samples}
+              trackLngLat={mapProps.trackLngLat}
+              useMiles={mapProps.useMiles}
+              useFeet={mapProps.useFeet}
+              compact={mapProps.compact}
+              workoutData={mapProps.workoutData}
               />
           </div>
         );
