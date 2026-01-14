@@ -1,5 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Settings } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 import { useAppContext } from '@/contexts/AppContext';
 import { useWorkouts } from '@/hooks/useWorkouts';
@@ -7,7 +15,6 @@ import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
 import PowerZoneChart from './PowerZoneChart';
-import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 import { computeDistanceKm } from '@/utils/workoutDataDerivation';
@@ -43,6 +50,23 @@ interface CompletedTabProps {
   workoutData: any;
 }
 
+const FEELING_OPTIONS = [
+  { value: 'great', label: 'Great' },
+  { value: 'good', label: 'Good' },
+  { value: 'ok', label: 'OK' },
+  { value: 'tired', label: 'Tired' },
+  { value: 'exhausted', label: 'Exhausted' },
+];
+
+interface GearItem {
+  id: string;
+  type: 'shoe' | 'bike';
+  name: string;
+  brand?: string;
+  model?: string;
+  is_default: boolean;
+}
+
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const { useImperial } = useAppContext();
   const compact = useCompact();
@@ -53,6 +77,11 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [editingPool, setEditingPool] = useState(false);
   const [poolLengthMeters, setPoolLengthMeters] = useState<number | null>(null);
+  
+  // Gear, RPE, and Feeling state
+  const [gear, setGear] = useState<GearItem[]>([]);
+  const [gearLoading, setGearLoading] = useState(false);
+  const [savingFeedback, setSavingFeedback] = useState(false);
   const [rememberDefault, setRememberDefault] = useState(false);
   // Initialize hydrated with workoutData, but use a ref to track if we've synced
   // This prevents the initial state update that causes the blink
@@ -81,6 +110,68 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
     workoutData: any;
   } | null>(null); // Track previous map props to prevent unnecessary re-renders
   const norm = useWorkoutData(hydrated||workoutData);
+  
+  // Load gear for runs and rides
+  useEffect(() => {
+    if (workoutData.type === 'run' || workoutData.type === 'ride') {
+      loadGear();
+    }
+  }, [workoutData.type, workoutData.id]);
+
+  const loadGear = async () => {
+    try {
+      setGearLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const gearType = workoutData.type === 'run' ? 'shoe' : 'bike';
+      const { data, error } = await supabase
+        .from('gear')
+        .select('id, type, name, brand, model, is_default')
+        .eq('user_id', user.id)
+        .eq('type', gearType)
+        .eq('retired', false)
+        .order('is_default', { ascending: false })
+        .order('name');
+
+      if (error) {
+        console.error('Error loading gear:', error);
+        return;
+      }
+
+      setGear(data || []);
+    } catch (e) {
+      console.error('Error loading gear:', e);
+    } finally {
+      setGearLoading(false);
+    }
+  };
+
+  const handleFeedbackChange = async (field: 'gear_id' | 'rpe' | 'feeling', value: string | number | null) => {
+    try {
+      setSavingFeedback(true);
+      const updateData: any = { [field]: value };
+
+      const { error } = await supabase
+        .from('workouts')
+        .update(updateData)
+        .eq('id', workoutData.id);
+
+      if (error) {
+        console.error('Error saving feedback:', error);
+        return;
+      }
+
+      // Update local workoutData to reflect changes
+      if (updateWorkout) {
+        await updateWorkout(workoutData.id, updateData);
+      }
+    } catch (e) {
+      console.error('Error saving feedback:', e);
+    } finally {
+      setSavingFeedback(false);
+    }
+  };
   
   // Trigger processing once and poll for completion when series is missing
   
@@ -1353,12 +1444,128 @@ const formatMovingTime = () => {
             </div>
           </div>
 
+          {/* Row 5: IF, RPE, Feel */}
           <div className="px-2 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(workoutData as any)?.intensity_factor ? (workoutData as any).intensity_factor.toFixed(2) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
               <div className="text-xs text-white/70 font-light">IF</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              <Select
+                value={(workoutData as any)?.rpe ? String((workoutData as any).rpe) : undefined}
+                onValueChange={(value) => handleFeedbackChange('rpe', parseInt(value))}
+                disabled={savingFeedback}
+              >
+                <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full justify-start p-0">
+                  <SelectValue placeholder="N/A">
+                    {(workoutData as any)?.rpe ? String((workoutData as any).rpe) : 'N/A'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a2e] border-white/10">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rpe) => (
+                    <SelectItem
+                      key={rpe}
+                      value={String(rpe)}
+                      className="text-white font-light focus:bg-white/[0.12] focus:text-white"
+                    >
+                      {rpe}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-xs text-muted-foreground font-normal">
+              <div className="text-xs text-white/70 font-light">RPE</div>
+            </div>
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              <Select
+                value={(workoutData as any)?.feeling || undefined}
+                onValueChange={(value) => handleFeedbackChange('feeling', value)}
+                disabled={savingFeedback}
+              >
+                <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full justify-start p-0">
+                  <SelectValue placeholder="N/A">
+                    {(() => {
+                      const feeling = (workoutData as any)?.feeling;
+                      if (!feeling) return 'N/A';
+                      const option = FEELING_OPTIONS.find(o => o.value === feeling);
+                      return option ? option.label : feeling;
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a2e] border-white/10">
+                  {FEELING_OPTIONS.map((option) => (
+                    <SelectItem
+                      key={option.value}
+                      value={option.value}
+                      className="text-white font-light focus:bg-white/[0.12] focus:text-white"
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-xs text-muted-foreground font-normal">
+              <div className="text-xs text-white/70 font-light">Feel</div>
+            </div>
+          </div>
+
+          {/* Row 6: Empty columns 1 and 2, Gear at bottom of Column 3 */}
+          <div className="px-2 py-1">
+          </div>
+
+          <div className="px-2 py-1">
+          </div>
+
+          <div className="px-2 py-1">
+            <div className="text-base font-light text-foreground mb-0.5 flex items-center gap-1.5" style={{fontFeatureSettings: '"tnum"'}}>
+              <Settings className="h-4 w-4 text-white/50 flex-shrink-0" />
+              <Select
+                value={(workoutData as any)?.gear_id || undefined}
+                onValueChange={(value) => handleFeedbackChange('gear_id', value)}
+                disabled={savingFeedback || gearLoading}
+              >
+                <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 flex-1 justify-start p-0">
+                  <SelectValue placeholder="N/A">
+                    {(() => {
+                      const selected = gear.find(g => g.id === (workoutData as any)?.gear_id);
+                      if (!selected) return 'N/A';
+                      const details = [selected.brand, selected.model].filter(Boolean).join(' ');
+                      return details ? `${selected.name} • ${details}` : selected.name;
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a2e] border-white/10">
+                  {gear.map((item) => (
+                    <SelectItem
+                      key={item.id}
+                      value={item.id}
+                      className="text-white font-light focus:bg-white/[0.12] focus:text-white"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-light">{item.name}</span>
+                        {(item.brand || item.model) && (
+                          <span className="text-xs text-white/50 font-light">
+                            {[item.brand, item.model].filter(Boolean).join(' ')}
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-xs text-muted-foreground font-normal">
+              <div className="text-xs text-white/70 font-light">Gear</div>
             </div>
           </div>
          </>
@@ -1744,24 +1951,6 @@ const formatMovingTime = () => {
       })()}
       {/* (Removed old mini zones histograms to avoid duplicate zones under splits) */}
       
-      {/* Post-Workout Feedback Section - Only for runs and rides */}
-      {(workoutData.type === 'run' || workoutData.type === 'ride') && (
-        <div className="mx-[-16px] px-3 pt-4 pb-2">
-          <PostWorkoutFeedback
-            workoutId={workoutData.id}
-            workoutType={workoutData.type as 'run' | 'ride'}
-            workoutName={workoutData.name}
-            existingGearId={(workoutData as any)?.gear_id}
-            existingRpe={(workoutData as any)?.rpe}
-            existingFeeling={(workoutData as any)?.feeling}
-            mode="inline"
-            onSave={(data) => {
-              // Update local state to reflect changes without reloading
-              console.log('Feedback saved:', data);
-            }}
-          />
-        </div>
-      )}
       
       {/* Single page-level attribution for map tiles */}
       <div className="mx-[-16px] px-3 pt-2 pb-6">
