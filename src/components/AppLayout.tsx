@@ -350,18 +350,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   };
 
   // Check on app load and key navigation points
+  // Only check if no workout is currently selected (don't interfere with workout-specific checks)
   useEffect(() => {
-    checkForFeedbackNeeded();
+    if (!selectedWorkout) {
+      checkForFeedbackNeeded();
+    }
   }, []);
 
   // Check when navigating to calendar/home
+  // Only check if no workout is currently selected
   useEffect(() => {
-    if (activeBottomNav === 'home' && !feedbackWorkout) {
+    if (activeBottomNav === 'home' && !feedbackWorkout && !selectedWorkout) {
       // Small delay to let calendar load first
       const timer = setTimeout(() => checkForFeedbackNeeded(), 500);
       return () => clearTimeout(timer);
     }
-  }, [activeBottomNav]);
+  }, [activeBottomNav, selectedWorkout]);
 
   // Check when viewing a completed workout (post-workout summary)
   // For specific workouts, check if THAT workout needs feedback (not the most recent)
@@ -1727,8 +1731,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           onSave={() => {
             // Don't mark as dismissed on save - user completed the action
             setFeedbackWorkout(null);
-            // Check for next workout needing feedback
-            setTimeout(() => checkForFeedbackNeeded(), 1000);
+            // Only check for next workout if no workout is selected (don't interfere with workout-specific checks)
+            if (!selectedWorkout) {
+              setTimeout(() => checkForFeedbackNeeded(), 1000);
+            }
           }}
         />
       )}
