@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
+import { useAppContext } from '@/lib/AppContext';
+import EffortsViewerMapbox from './EffortsViewerMapbox';
 import {
   Select,
   SelectContent,
@@ -73,9 +75,11 @@ export default function PostWorkoutFeedback({
   mode = 'popup',
 }: PostWorkoutFeedbackProps) {
   const { toast } = useToast();
+  const { useImperial } = useAppContext();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [gear, setGear] = useState<GearItem[]>([]);
+  const [workoutData, setWorkoutData] = useState<any>(null); // Distance, GPS track, etc.
   
   // Form state - pre-select default gear if no existing gear_id
   const [selectedGearId, setSelectedGearId] = useState<string | null>(existingGearId || null);
@@ -103,12 +107,14 @@ export default function PostWorkoutFeedback({
 
   useEffect(() => {
     loadGear();
+    loadWorkoutData();
   }, []);
 
   // Reload gear when workoutId changes (popup shown for different workout)
   // This also handles the case where gear was added and popup is re-shown
   useEffect(() => {
     loadGear();
+    loadWorkoutData();
   }, [workoutId]);
 
   // Update selectedGearId when gear loads and default is available
@@ -121,6 +127,29 @@ export default function PostWorkoutFeedback({
       }
     }
   }, [gear, existingGearId, selectedGearId]);
+
+  const loadWorkoutData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !workoutId) return;
+
+      const { data, error } = await supabase
+        .from('workouts')
+        .select('distance, gps_track, computed')
+        .eq('id', workoutId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error loading workout data:', error);
+        return;
+      }
+
+      setWorkoutData(data);
+    } catch (e) {
+      console.error('Error loading workout data:', e);
+    }
+  };
 
   const loadGear = async () => {
     try {
@@ -235,6 +264,56 @@ export default function PostWorkoutFeedback({
     onClose?.();
   };
 
+  // Format distance for display
+  const formatDistance = (distanceKm: number | null | undefined): string | null => {
+    if (!distanceKm || !Number.isFinite(distanceKm)) return null;
+    const km = Number(distanceKm);
+    if (useImperial) {
+      const miles = km / 1.60934;
+      return miles >= 0.1 ? `${miles.toFixed(1)} mi` : `${Math.round(km * 1000)} m`;
+    } else {
+      return km >= 1 ? `${km.toFixed(1)} km` : `${Math.round(km * 1000)} m`;
+    }
+  };
+
+  // Parse GPS track for map
+  const getGpsTrack = (): [number, number][] => {
+    if (!workoutData?.gps_track) return [];
+    const gpsRaw = workoutData.gps_track;
+    const gps = Array.isArray(gpsRaw)
+      ? gpsRaw
+      : (typeof gpsRaw === 'string' ? (() => {
+          try {
+            const v = JSON.parse(gpsRaw);
+            return Array.isArray(v) ? v : [];
+          } catch {
+            return [];
+          }
+        })() : []);
+    
+    return gps
+      .map((p: any) => {
+        const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
+        const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
+        if ([lng, lat].every((v) => Number.isFinite(v))) {
+          return [Number(lng), Number(lat)] as [number, number];
+        }
+        return null;
+      })
+      .filter(Boolean) as [number, number][];
+  };
+
+  // Get series data for map (from computed.analysis.series)
+  const getSeriesData = () => {
+    if (!workoutData?.computed?.analysis?.series) return null;
+    return workoutData.computed.analysis.series;
+  };
+
+  const distanceText = formatDistance(workoutData?.distance);
+  const gpsTrack = getGpsTrack();
+  const seriesData = getSeriesData();
+  const hasMapData = (gpsTrack.length > 1) || (seriesData?.distance_m && Array.isArray(seriesData.distance_m) && seriesData.distance_m.length > 1);
+
   const content = (
     <div className="space-y-6">
       {/* Header */}
@@ -250,9 +329,17 @@ export default function PostWorkoutFeedback({
             <h3 className="text-lg font-light text-white">
               {mode === 'popup' ? 'Nice work!' : 'Workout Feedback'}
             </h3>
-            {workoutName && (
-              <p className="text-sm text-white/60 font-light">{workoutName}</p>
-            )}
+            <div className="flex items-center gap-2">
+              {workoutName && (
+                <p className="text-sm text-white/60 font-light">{workoutName}</p>
+              )}
+              {distanceText && (
+                <>
+                  {workoutName && <span className="text-white/40">•</span>}
+                  <p className="text-sm text-white/60 font-light">{distanceText}</p>
+                </>
+              )}
+            </div>
           </div>
         </div>
         {mode === 'popup' && onClose && (
@@ -264,6 +351,20 @@ export default function PostWorkoutFeedback({
           </button>
         )}
       </div>
+
+      {/* Map Preview */}
+      {hasMapData && (
+        <div className="rounded-lg overflow-hidden" style={{ height: '160px' }}>
+          <EffortsViewerMapbox
+            samples={seriesData || []}
+            trackLngLat={gpsTrack}
+            useMiles={useImperial}
+            useFeet={useImperial}
+            compact={true}
+            workoutData={{ type: workoutType, ...workoutData }}
+          />
+        </div>
+      )}
 
       {/* Gear Selection - Dropdown (optional if gear already set, but still allow changes) */}
       {gear.length > 0 && (
