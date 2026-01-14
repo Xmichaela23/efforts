@@ -353,15 +353,29 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // Check when viewing a completed workout (post-workout summary)
   // For specific workouts, check if THAT workout needs feedback (not the most recent)
   useEffect(() => {
-    if (selectedWorkout && 
-        String(selectedWorkout.workout_status || '').toLowerCase() === 'completed' &&
-        (selectedWorkout.type === 'run' || selectedWorkout.type === 'ride') &&
-        !selectedWorkout.rpe &&
+    if (!selectedWorkout) return;
+    
+    const workoutStatus = String(selectedWorkout.workout_status || '').toLowerCase();
+    const workoutType = selectedWorkout.type;
+    const workoutRpe = selectedWorkout.rpe;
+    
+    console.log('🔍 [Feedback Check] selectedWorkout:', {
+      id: selectedWorkout.id,
+      status: workoutStatus,
+      type: workoutType,
+      rpe: workoutRpe,
+      hasFeedbackWorkout: !!feedbackWorkout
+    });
+
+    if (workoutStatus === 'completed' &&
+        (workoutType === 'run' || workoutType === 'ride') &&
+        !workoutRpe &&
         !feedbackWorkout) {
       const workoutId = String(selectedWorkout.id);
       
       // Skip if already shown or dismissed in this session
       if (feedbackShownIdsRef.current.has(workoutId) || feedbackDismissedRef.current.has(workoutId)) {
+        console.log('⏭️ [Feedback Check] Skipping - already shown or dismissed:', workoutId);
         return;
       }
 
@@ -369,7 +383,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       const checkSpecificWorkout = async () => {
         try {
           const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
+          if (!user) {
+            console.log('⏭️ [Feedback Check] No user');
+            return;
+          }
+
+          console.log('🔍 [Feedback Check] Querying database for workout:', workoutId);
 
           // Check if this specific workout is dismissed or has RPE
           const { data: workout, error } = await supabase
@@ -379,18 +398,40 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             .eq('user_id', user.id)
             .single();
 
-          if (error || !workout) return;
+          if (error) {
+            console.error('❌ [Feedback Check] Database error:', error);
+            return;
+          }
+          
+          if (!workout) {
+            console.log('⏭️ [Feedback Check] Workout not found');
+            return;
+          }
+
+          console.log('🔍 [Feedback Check] Workout from DB:', {
+            id: workout.id,
+            type: workout.type,
+            rpe: workout.rpe,
+            feedback_dismissed_at: workout.feedback_dismissed_at,
+            date: workout.date
+          });
 
           // Only show if: no RPE, not dismissed, and within last 7 days
           const workoutDate = new Date(workout.date);
           const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
           const isWithin7Days = workoutDate >= sevenDaysAgo;
 
+          console.log('🔍 [Feedback Check] Date check:', {
+            workoutDate: workoutDate.toISOString(),
+            sevenDaysAgo: sevenDaysAgo.toISOString(),
+            isWithin7Days
+          });
+
           if (!workout.rpe && 
               !workout.feedback_dismissed_at && 
               isWithin7Days &&
               !feedbackShownIdsRef.current.has(workoutId)) {
-            console.log('🎯 Selected workout needs feedback:', workoutId);
+            console.log('✅ [Feedback Check] Showing popup for workout:', workoutId);
             feedbackShownIdsRef.current.add(workoutId);
             setFeedbackWorkout({
               id: workoutId,
@@ -399,13 +440,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               existingGearId: workout.gear_id || null,
               existingRpe: workout.rpe || null,
             });
+          } else {
+            console.log('⏭️ [Feedback Check] Not showing popup - conditions not met:', {
+              hasRpe: !!workout.rpe,
+              isDismissed: !!workout.feedback_dismissed_at,
+              isWithin7Days,
+              alreadyShown: feedbackShownIdsRef.current.has(workoutId)
+            });
           }
         } catch (e) {
-          console.error('Error checking specific workout for feedback:', e);
+          console.error('❌ [Feedback Check] Error:', e);
         }
       };
 
       checkSpecificWorkout();
+    } else {
+      console.log('⏭️ [Feedback Check] Initial conditions not met:', {
+        isCompleted: workoutStatus === 'completed',
+        isRunOrRide: workoutType === 'run' || workoutType === 'ride',
+        hasNoRpe: !workoutRpe,
+        noFeedbackWorkout: !feedbackWorkout
+      });
     }
   }, [selectedWorkout]);
 
