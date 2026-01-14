@@ -1734,29 +1734,26 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Write under workouts.computed with updated overall, analysis, and peak performance
-    const computed = (() => {
-      const c = parseJson(w.computed) || {};
-      return { 
-        ...c, 
-        overall, 
-        analysis,
-        // Peak performance metrics (null if not calculated/applicable)
-        power_curve: powerCurve,
-        best_efforts: bestEfforts
-      };
-    })();
+    // Build partial computed data (only what this function writes)
+    // Database will merge this with existing computed data atomically
+    const partialComputed = {
+      overall, 
+      analysis,
+      // Peak performance metrics (null if not calculated/applicable)
+      power_curve: powerCurve,
+      best_efforts: bestEfforts
+    };
 
     console.log('📝 About to UPDATE:', {
       workout_id,
       type: String(w.type),
-      has_overall: !!computed.overall,
-      has_analysis: !!computed.analysis,
-      analysis_version: computed.analysis?.version,
-      swim_in_analysis: !!computed.analysis?.swim,
-      power_in_analysis: !!computed.analysis?.power,
-      power_curve: computed.power_curve ? Object.keys(computed.power_curve).join(',') : null,
-      best_efforts: computed.best_efforts ? Object.keys(computed.best_efforts).join(',') : null
+      has_overall: !!partialComputed.overall,
+      has_analysis: !!partialComputed.analysis,
+      analysis_version: partialComputed.analysis?.version,
+      swim_in_analysis: !!partialComputed.analysis?.swim,
+      power_in_analysis: !!partialComputed.analysis?.power,
+      power_curve: partialComputed.power_curve ? Object.keys(partialComputed.power_curve).join(',') : null,
+      best_efforts: partialComputed.best_efforts ? Object.keys(partialComputed.best_efforts).join(',') : null
     });
 
     // Trigger granular analysis for running workouts
@@ -1809,18 +1806,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update workout with computed data only
-    // NOTE: analyze-running-workout handles workout_analysis separately
-    const updateData = { computed };
+    // Use database RPC for atomic JSONB merge - REQUIRED, no fallbacks
+    console.log('[compute-workout-analysis] Calling merge_computed RPC with:', {
+      workout_id,
+      partial_computed_keys: Object.keys(partialComputed),
+      has_analysis: !!partialComputed.analysis,
+      has_overall: !!partialComputed.overall
+    });
     
-    const { error: upErr } = await supabase
-      .from('workouts')
-      .update(updateData)
-      .eq('id', workout_id);
+    const { error: rpcError, data: rpcData } = await supabase.rpc('merge_computed', {
+      p_workout_id: workout_id,
+      p_partial_computed: partialComputed
+    });
     
-    console.log('✅ UPDATE result:', { error: upErr ? String(upErr) : null });
+    if (rpcError) {
+      console.error('[compute-workout-analysis] RPC merge_computed failed:', {
+        error: rpcError,
+        message: rpcError.message,
+        details: rpcError.details,
+        hint: rpcError.hint,
+        code: rpcError.code
+      });
+      throw new Error(`Failed to merge computed data: ${rpcError.message || JSON.stringify(rpcError)}. RPC function merge_computed is required.`);
+    }
     
-    if (upErr) throw upErr;
+    console.log('✅ UPDATE result: merged via RPC', rpcData);
 
     return new Response(JSON.stringify({ 
       success: true, 

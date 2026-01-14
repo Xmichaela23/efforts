@@ -59,10 +59,13 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     const avg_cycling_cadence_rpm = Number.isFinite((workoutData as any)?.avg_cadence) ? Number((workoutData as any).avg_cadence) : (Number.isFinite((workoutData as any)?.avg_bike_cadence) ? Number((workoutData as any).avg_bike_cadence) : (Number.isFinite((workoutData as any)?.metrics?.avg_bike_cadence) ? Number((workoutData as any).metrics.avg_bike_cadence) : null));
     const calories = Number.isFinite(workoutData?.calories) ? Number(workoutData.calories) : (Number.isFinite(workoutData?.metrics?.calories) ? Number(workoutData.metrics.calories) : null);
     
-    // New fields for cycling metrics
-    // max_speed is stored in km/h, convert to m/s
-    const max_speed_kmh = Number.isFinite(workoutData?.max_speed) ? Number(workoutData.max_speed) : (Number.isFinite(workoutData?.metrics?.max_speed) ? Number(workoutData.metrics.max_speed) : null);
-    const max_speed_mps = max_speed_kmh ? max_speed_kmh / 3.6 : null;
+    // max_speed: use computed.overall.max_speed_mps (calculated from normalized samples)
+    // Fallback to direct field/metrics for backwards compatibility
+    const max_speed_mps = Number.isFinite(workoutData?.computed?.overall?.max_speed_mps)
+      ? Number(workoutData.computed.overall.max_speed_mps)
+      : (Number.isFinite(workoutData?.max_speed) ? Number(workoutData.max_speed) / 3.6  // Convert km/h to m/s
+      : (Number.isFinite(workoutData?.metrics?.max_speed) ? Number(workoutData.metrics.max_speed) / 3.6  // Convert km/h to m/s
+      : null));
     const max_cadence_rpm = Number.isFinite(workoutData?.max_cadence) ? Number(workoutData.max_cadence) : (Number.isFinite(workoutData?.max_cycling_cadence) ? Number(workoutData.max_cycling_cadence) : (Number.isFinite(workoutData?.max_running_cadence) ? Number(workoutData.max_running_cadence) : null));
     // Use server-calculated max_pace from computed.analysis.bests (most accurate - from series data)
     const max_pace_s_per_km = Number.isFinite(workoutData?.computed?.analysis?.bests?.max_pace_s_per_km) 

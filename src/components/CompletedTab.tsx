@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Settings } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -50,13 +49,6 @@ interface CompletedTabProps {
   workoutData: any;
 }
 
-const FEELING_OPTIONS = [
-  { value: 'great', label: 'Great' },
-  { value: 'good', label: 'Good' },
-  { value: 'ok', label: 'OK' },
-  { value: 'tired', label: 'Tired' },
-  { value: 'exhausted', label: 'Exhausted' },
-];
 
 interface GearItem {
   id: string;
@@ -65,6 +57,7 @@ interface GearItem {
   brand?: string;
   model?: string;
   is_default: boolean;
+  total_distance?: number; // in meters
 }
 
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
@@ -127,7 +120,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
       const gearType = workoutData.type === 'run' ? 'shoe' : 'bike';
       const { data, error } = await supabase
         .from('gear')
-        .select('id, type, name, brand, model, is_default')
+        .select('id, type, name, brand, model, is_default, total_distance')
         .eq('user_id', user.id)
         .eq('type', gearType)
         .eq('retired', false)
@@ -147,7 +140,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
     }
   };
 
-  const handleFeedbackChange = async (field: 'gear_id' | 'rpe' | 'feeling', value: string | number | null) => {
+  const handleFeedbackChange = async (field: 'gear_id' | 'rpe', value: string | number | null) => {
     try {
       setSavingFeedback(true);
       const updateData: any = { [field]: value };
@@ -165,6 +158,11 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
       // Update local workoutData to reflect changes
       if (updateWorkout) {
         await updateWorkout(workoutData.id, updateData);
+      }
+
+      // If gear_id was changed, reload gear to get updated miles (trigger updates gear.total_distance)
+      if (field === 'gear_id') {
+        await loadGear();
       }
     } catch (e) {
       console.error('Error saving feedback:', e);
@@ -1444,7 +1442,7 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          {/* Row 5: IF, RPE, Feel */}
+          {/* Row 5: IF, RPE, Gear */}
           <div className="px-2 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(workoutData as any)?.intensity_factor ? (workoutData as any).intensity_factor.toFixed(2) : 'N/A'}
@@ -1487,80 +1485,50 @@ const formatMovingTime = () => {
           <div className="px-2 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               <Select
-                value={(workoutData as any)?.feeling || undefined}
-                onValueChange={(value) => handleFeedbackChange('feeling', value)}
-                disabled={savingFeedback}
-              >
-                <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full justify-start p-0">
-                  <SelectValue placeholder="N/A">
-                    {(() => {
-                      const feeling = (workoutData as any)?.feeling;
-                      if (!feeling) return 'N/A';
-                      const option = FEELING_OPTIONS.find(o => o.value === feeling);
-                      return option ? option.label : feeling;
-                    })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a1a2e] border-white/10">
-                  {FEELING_OPTIONS.map((option) => (
-                    <SelectItem
-                      key={option.value}
-                      value={option.value}
-                      className="text-white font-light focus:bg-white/[0.12] focus:text-white"
-                    >
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Feel</div>
-            </div>
-          </div>
-
-          {/* Row 6: Empty columns 1 and 2, Gear at bottom of Column 3 */}
-          <div className="px-2 py-1">
-          </div>
-
-          <div className="px-2 py-1">
-          </div>
-
-          <div className="px-2 py-1">
-            <div className="text-base font-light text-foreground mb-0.5 flex items-center gap-1.5" style={{fontFeatureSettings: '"tnum"'}}>
-              <Settings className="h-4 w-4 text-white/50 flex-shrink-0" />
-              <Select
-                value={(workoutData as any)?.gear_id || undefined}
+                value={(() => {
+                  // If gear_id is set, use it; otherwise default to user's default gear
+                  const existingGearId = (workoutData as any)?.gear_id;
+                  if (existingGearId) return existingGearId;
+                  const defaultGear = gear.find(g => g.is_default);
+                  return defaultGear?.id || undefined;
+                })()}
                 onValueChange={(value) => handleFeedbackChange('gear_id', value)}
                 disabled={savingFeedback || gearLoading}
               >
-                <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 flex-1 justify-start p-0">
+                <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full p-0 [&>svg]:hidden [&>span]:text-center [&>span]:block">
                   <SelectValue placeholder="N/A">
                     {(() => {
-                      const selected = gear.find(g => g.id === (workoutData as any)?.gear_id);
-                      if (!selected) return 'N/A';
-                      const details = [selected.brand, selected.model].filter(Boolean).join(' ');
-                      return details ? `${selected.name} • ${details}` : selected.name;
+                      const existingGearId = (workoutData as any)?.gear_id;
+                      const selectedId = existingGearId || gear.find(g => g.is_default)?.id;
+                      const selected = gear.find(g => g.id === selectedId);
+                      return selected?.name || 'N/A';
                     })()}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1a2e] border-white/10">
-                  {gear.map((item) => (
-                    <SelectItem
-                      key={item.id}
-                      value={item.id}
-                      className="text-white font-light focus:bg-white/[0.12] focus:text-white"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-light">{item.name}</span>
-                        {(item.brand || item.model) && (
-                          <span className="text-xs text-white/50 font-light">
-                            {[item.brand, item.model].filter(Boolean).join(' ')}
-                          </span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {gear.map((item) => {
+                    const distanceMeters = item.total_distance || 0;
+                    const distanceMi = distanceMeters / 1609.34;
+                    const distanceText = useImperial 
+                      ? (distanceMi < 1 ? `${Math.round(distanceMeters)} m` : `${distanceMi.toFixed(1)} mi`)
+                      : `${(distanceMeters / 1000).toFixed(1)} km`;
+                    return (
+                      <SelectItem
+                        key={item.id}
+                        value={item.id}
+                        className="text-white font-light focus:bg-white/[0.12] focus:text-white"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-light">{item.name}</span>
+                          {distanceMeters > 0 && (
+                            <span className="text-xs text-white/50 font-light" style={{fontFeatureSettings: '"tnum"'}}>
+                              {distanceText}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

@@ -1,5 +1,5 @@
 import React from "react";
-import { EffortsButton, EffortsButtonPill, EffortsWordmark } from "./EffortsButton";
+import { EffortsButton, EffortsButtonPill, EffortsWordmark, EffortsCascadingE } from "./EffortsButton";
 
 /**
  * Demo page - Tron / Bang & Olufsen aesthetic
@@ -21,13 +21,40 @@ export function EffortsButtonDemo() {
           Tron / Bang & Olufsen aesthetic
         </p>
         
+        {/* Cascading "e" Logo (NEW) */}
+        <section className="mb-20">
+          <h2 
+            className="text-xs uppercase tracking-[0.2em] text-white/30 mb-8"
+            style={{ fontFamily: "'SF Pro Display', system-ui, sans-serif", fontWeight: 500 }}
+          >
+            Cascading "e" Logo (Button)
+          </h2>
+          <div className="flex items-center gap-12 flex-wrap">
+            <EffortsCascadingE size={120} onClick={() => console.log('clicked 120!')} />
+            <EffortsCascadingE size={80} onClick={() => console.log('clicked 80!')} />
+            <EffortsCascadingE size={56} onClick={() => console.log('clicked 56!')} />
+            <EffortsCascadingE size={36} onClick={() => console.log('clicked 36!')} />
+          </div>
+          <div className="mt-8 flex items-center gap-8">
+            <div className="bg-white/[0.02] p-4 rounded-lg">
+              <EffortsCascadingE size={48} />
+            </div>
+            <div className="bg-white/[0.05] p-4 rounded-lg">
+              <EffortsCascadingE size={48} />
+            </div>
+            <div className="bg-white/[0.10] p-4 rounded-lg">
+              <EffortsCascadingE size={48} />
+            </div>
+          </div>
+        </section>
+
         {/* Wordmark */}
         <section className="mb-20">
           <h2 
             className="text-xs uppercase tracking-[0.2em] text-white/30 mb-8"
             style={{ fontFamily: "'SF Pro Display', system-ui, sans-serif", fontWeight: 500 }}
           >
-            Wordmark
+            Wordmark (Full "efforts")
           </h2>
           <div className="flex flex-col gap-8">
             <EffortsWordmark size={72} />
@@ -111,7 +138,11 @@ export function EffortsButtonDemo() {
             className="text-sm text-teal-400/80 font-mono overflow-x-auto"
             style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}
           >
-{`import { EffortsButton, EffortsButtonPill } from './EffortsButton';
+{`import { EffortsButton, EffortsButtonPill, EffortsCascadingE } from './EffortsButton';
+
+// Cascading "e" logo (just the "e"s, no text)
+<EffortsCascadingE size={48} />
+<EffortsCascadingE size={48} onClick={() => handleClick()} />
 
 // Tron style (default)
 <EffortsButton size={120} />

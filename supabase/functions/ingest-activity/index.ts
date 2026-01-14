@@ -1286,10 +1286,40 @@ Deno.serve(async (req)=>{
     try {
       const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/auto-attach-planned`;
       const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-      const { data: justUpserted2 } = await supabase.from('workouts').select('id').eq('user_id', row.user_id).eq(onConflict.includes('garmin') ? 'garmin_activity_id' : 'strava_activity_id', onConflict.includes('garmin') ? row.garmin_activity_id : row.strava_activity_id).maybeSingle();
+      const { data: justUpserted2 } = await supabase.from('workouts').select('id,type,workout_status,gear_id').eq('user_id', row.user_id).eq(onConflict.includes('garmin') ? 'garmin_activity_id' : 'strava_activity_id', onConflict.includes('garmin') ? row.garmin_activity_id : row.strava_activity_id).maybeSingle();
       const wid = justUpserted2?.id;
+      const workoutType = justUpserted2?.type;
+      const workoutStatus = justUpserted2?.workout_status;
+      const existingGearId = justUpserted2?.gear_id;
+      
+      // Auto-set default gear if workout is completed and no gear_id is set
+      if (wid && workoutStatus === 'completed' && !existingGearId && (workoutType === 'run' || workoutType === 'ride')) {
+        try {
+          const gearType = workoutType === 'run' ? 'shoe' : 'bike';
+          const { data: defaultGear } = await supabase
+            .from('gear')
+            .select('id')
+            .eq('user_id', row.user_id)
+            .eq('type', gearType)
+            .eq('is_default', true)
+            .eq('retired', false)
+            .maybeSingle();
+          
+          if (defaultGear?.id) {
+            await supabase
+              .from('workouts')
+              .update({ gear_id: defaultGear.id })
+              .eq('id', wid);
+            console.log(`[ingest-activity] Auto-set default gear ${defaultGear.id} for workout ${wid}`);
+          }
+        } catch (gearErr) {
+          console.error('[ingest-activity] Failed to auto-set default gear:', gearErr);
+        }
+      }
+      
       if (wid) {
-        await fetch(fnUrl, {
+        // Auto-attach (fire-and-forget, don't await)
+        fetch(fnUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1299,7 +1329,7 @@ Deno.serve(async (req)=>{
           body: JSON.stringify({
             workout_id: wid
           })
-        });
+        }).catch(err => console.error('[ingest-activity] auto-attach-planned failed:', err));
         // Ensure computed summary (GAP, cadence, intervals) is generated with latest server logic
         try {
           const sumUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
@@ -1385,6 +1415,48 @@ Deno.serve(async (req)=>{
           }
         } catch (workloadErr) {
           console.error('[ingest-activity] calculate-workload failed:', workloadErr);
+        }
+        // Generate details chat/context for completed workouts (fire-and-forget background processing)
+        if (workoutStatus === 'completed' && workoutType) {
+          try {
+            // Route to appropriate analyzer based on workout type
+            let analyzerFunction = null;
+            const typeLower = String(workoutType).toLowerCase();
+            if (typeLower === 'run' || typeLower === 'running') {
+              analyzerFunction = 'analyze-running-workout';
+            } else if (typeLower === 'ride' || typeLower === 'cycling' || typeLower === 'bike') {
+              analyzerFunction = 'analyze-cycling-workout';
+            } else if (typeLower === 'strength' || typeLower === 'strength_training') {
+              analyzerFunction = 'analyze-strength-workout';
+            } else if (typeLower === 'swim' || typeLower === 'swimming') {
+              analyzerFunction = 'analyze-swim-workout';
+            }
+            
+            if (analyzerFunction) {
+              const analyzeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${analyzerFunction}`;
+              fetch(analyzeUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${key}`,
+                  'apikey': key
+                },
+                body: JSON.stringify({
+                  workout_id: wid
+                })
+              }).then(resp => {
+                if (!resp.ok) {
+                  console.error(`[ingest-activity] ${analyzerFunction} returned non-OK status:`, resp.status);
+                } else {
+                  console.log(`[ingest-activity] ${analyzerFunction} succeeded for workout:`, wid);
+                }
+              }).catch(analyzeErr => {
+                console.error(`[ingest-activity] ${analyzerFunction} failed:`, analyzeErr);
+              });
+            }
+          } catch (analyzeErr) {
+            console.error('[ingest-activity] Failed to trigger details chat processing:', analyzeErr);
+          }
         }
       }
     } catch  {}

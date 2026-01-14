@@ -1635,8 +1635,20 @@ Deno.serve(async (req) => {
     const scoreExplanation = generateScoreExplanation(performance, detailedAnalysis, plannedWorkout);
     console.log('📝 [SCORE EXPLANATION] Generated:', scoreExplanation);
     
+    // Use RPC to merge computed (preserves analysis.series from compute-workout-analysis)
+    // RPC is required - no fallbacks to prevent data loss
+    const { error: rpcError } = await supabase.rpc('merge_computed', {
+      p_workout_id: workout_id,
+      p_partial_computed: minimalComputed
+    });
+    
+    if (rpcError) {
+      console.error('[analyze-running-workout] RPC merge_computed failed:', rpcError);
+      throw new Error(`Failed to merge computed data: ${rpcError.message}. RPC function merge_computed is required.`);
+    }
+    
+    // Update workout_analysis separately (doesn't conflict with computed)
     const updatePayload = {
-      computed: minimalComputed,  // Lightweight update (no sensor data)
       workout_analysis: {
         // DON'T spread existingAnalysis - replace entirely with new structure
         granular_analysis: enhancedAnalysis,
@@ -1653,7 +1665,7 @@ Deno.serve(async (req) => {
     console.log('🔍 [PRE-UPDATE DEBUG] Full update payload workout_analysis keys:', 
       Object.keys(updatePayload.workout_analysis));
     
-    // Single update with computed, workout_analysis, and status
+    // Update workout_analysis and status
     const { error: updateError } = await supabase
       .from('workouts')
       .update(updatePayload)

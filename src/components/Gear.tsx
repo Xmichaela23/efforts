@@ -103,6 +103,40 @@ export default function Gear({ onClose }: GearProps) {
 
   useEffect(() => {
     loadGear();
+
+    // Subscribe to gear table changes to update miles in real-time
+    let channel: any = null;
+    
+    const setupSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      channel = supabase
+        .channel('gear-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'gear',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            // Reload gear when total_distance is updated (trigger fires)
+            console.log('🔄 Gear updated, refreshing list:', payload.new);
+            loadGear();
+          }
+        )
+        .subscribe();
+    };
+
+    setupSubscription();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   const loadGear = async () => {

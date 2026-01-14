@@ -49,6 +49,7 @@ CREATE POLICY "Users can delete their own gear"
 ALTER TABLE workouts ADD COLUMN IF NOT EXISTS gear_id UUID REFERENCES gear(id) ON DELETE SET NULL;
 
 -- Function to update gear total_distance when workout is logged
+-- Note: workouts.distance is in kilometers, gear.total_distance is in meters
 CREATE OR REPLACE FUNCTION update_gear_distance()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -56,7 +57,7 @@ BEGIN
   IF NEW.gear_id IS NOT NULL AND NEW.distance IS NOT NULL THEN
     UPDATE gear 
     SET total_distance = starting_distance + (
-      SELECT COALESCE(SUM(distance), 0) 
+      SELECT COALESCE(SUM(distance * 1000), 0)  -- Convert KM to meters
       FROM workouts 
       WHERE gear_id = NEW.gear_id AND workout_status = 'completed'
     ),
@@ -68,7 +69,7 @@ BEGIN
   IF TG_OP = 'UPDATE' AND OLD.gear_id IS NOT NULL AND OLD.gear_id != COALESCE(NEW.gear_id, '00000000-0000-0000-0000-000000000000'::uuid) THEN
     UPDATE gear 
     SET total_distance = starting_distance + (
-      SELECT COALESCE(SUM(distance), 0) 
+      SELECT COALESCE(SUM(distance * 1000), 0)  -- Convert KM to meters
       FROM workouts 
       WHERE gear_id = OLD.gear_id AND workout_status = 'completed'
     ),

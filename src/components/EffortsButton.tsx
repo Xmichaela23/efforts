@@ -9,6 +9,221 @@ interface EffortsWordmarkProps {
   className?: string;
 }
 
+/**
+ * Cascading "e" Logo - Just the cascading colored "e"s, no text
+ * Can be used as a button or standalone logo
+ */
+interface EffortsCascadingEProps {
+  size?: number;
+  className?: string;
+  onClick?: () => void;
+  /** Center the "e"s in the viewBox (default: true) */
+  centered?: boolean;
+}
+
+export function EffortsCascadingE({ 
+  size = 48, 
+  className = "", 
+  onClick,
+  centered = true 
+}: EffortsCascadingEProps) {
+  const uniqueId = React.useId().replace(/:/g, '');
+  const fontFamily = "'Rajdhani', 'Orbitron', system-ui, sans-serif";
+  const svgSize = size * 2.4; // SVG viewBox size
+  const containerRef = React.useRef<HTMLDivElement | HTMLButtonElement>(null);
+  
+  // Parallax state
+  const [parallax, setParallax] = React.useState({ x: 0, y: 0 });
+  
+  // Discipline colors - vibrant, distinct colors
+  const colors = {
+    run: '#00FFC8',      // Bright cyan/teal
+    strength: '#FF8C00', // Bright orange
+    ride: '#22c55e',     // Green
+    pilates: '#B464FF',  // Bright purple
+    swim: '#2B5A8C',     // Deep blue
+  };
+  
+  // Parallax effect - device orientation for mobile, mouse for desktop
+  React.useEffect(() => {
+    const handleDeviceOrientation = (e: DeviceOrientationEvent) => {
+      if (e.gamma !== null && e.beta !== null) {
+        const x = (e.gamma / 30) * 3;
+        const y = (e.beta / 30) * 3;
+        setParallax({ x: Math.max(-3, Math.min(3, x)), y: Math.max(-3, Math.min(3, y)) });
+      }
+    };
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const x = ((e.clientX - centerX) / rect.width) * 6;
+      const y = ((e.clientY - centerY) / rect.height) * 6;
+      setParallax({ x: Math.max(-3, Math.min(3, x)), y: Math.max(-3, Math.min(3, y)) });
+    };
+    
+    const handleMouseLeave = () => {
+      setParallax({ x: 0, y: 0 });
+    };
+    
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', handleDeviceOrientation as EventListener);
+    }
+    
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('mousemove', handleMouseMove);
+      container.addEventListener('mouseleave', handleMouseLeave);
+    }
+    
+    return () => {
+      window.removeEventListener('deviceorientation', handleDeviceOrientation as EventListener);
+      if (container) {
+        container.removeEventListener('mousemove', handleMouseMove);
+        container.removeEventListener('mouseleave', handleMouseLeave);
+      }
+    };
+  }, []);
+  
+  // Parallax multipliers for each cascade layer
+  const parallaxLayers = [
+    0,      // white e - no parallax
+    1.5,    // teal
+    2.5,    // orange
+    3.5,    // green
+    4.5,    // purple
+    5.5,    // swim blue - furthest
+  ];
+  
+  // Use the same positioning as the wordmark for consistency
+  // White "e" positioned top-left, cascading "e"s trail diagonally down-right
+  const whiteEX = 42;
+  const whiteEY = 42;
+  
+  const Component = onClick ? 'button' : 'div';
+  
+  return (
+    <Component
+      ref={containerRef as any}
+      onClick={onClick}
+      className={`relative inline-flex items-center justify-center ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      style={onClick ? { 
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        margin: 0
+      } : {}}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 100 100"
+        style={{ 
+          display: 'block',
+        }}
+      >
+        {/* WHITE "e" - main, front - same position as wordmark */}
+        <text
+          x={whiteEX}
+          y={whiteEY}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="#FFFFFF"
+          fontSize={75}
+          fontWeight={300}
+          fontFamily={fontFamily}
+          transform={`translate(${parallax.x * parallaxLayers[0]}, ${parallax.y * parallaxLayers[0]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
+        >
+          e
+        </text>
+        
+        {/* Teal - layer 1 - cascading behind white "e" */}
+        <text
+          x={whiteEX + 16}
+          y={whiteEY + 16}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={colors.run}
+          fontSize={52}
+          fontWeight={300}
+          fontFamily={fontFamily}
+          transform={`translate(${parallax.x * parallaxLayers[1]}, ${parallax.y * parallaxLayers[1]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
+        >
+          e
+        </text>
+
+        {/* Orange - layer 2 */}
+        <text
+          x={whiteEX + 28}
+          y={whiteEY + 28}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={colors.strength}
+          fontSize={38}
+          fontWeight={300}
+          fontFamily={fontFamily}
+          transform={`translate(${parallax.x * parallaxLayers[2]}, ${parallax.y * parallaxLayers[2]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
+        >
+          e
+        </text>
+
+        {/* Green - layer 3 */}
+        <text
+          x={whiteEX + 38}
+          y={whiteEY + 38}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={colors.ride}
+          fontSize={28}
+          fontWeight={300}
+          fontFamily={fontFamily}
+          transform={`translate(${parallax.x * parallaxLayers[3]}, ${parallax.y * parallaxLayers[3]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
+        >
+          e
+        </text>
+
+        {/* Purple - layer 4 */}
+        <text
+          x={whiteEX + 46}
+          y={whiteEY + 46}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={colors.pilates}
+          fontSize={20}
+          fontWeight={300}
+          fontFamily={fontFamily}
+          transform={`translate(${parallax.x * parallaxLayers[4]}, ${parallax.y * parallaxLayers[4]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
+        >
+          e
+        </text>
+
+        {/* Swim blue - layer 5, deepest */}
+        <text
+          x={whiteEX + 53}
+          y={whiteEY + 53}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={colors.swim}
+          fontSize={14}
+          fontWeight={300}
+          fontFamily={fontFamily}
+          transform={`translate(${parallax.x * parallaxLayers[5]}, ${parallax.y * parallaxLayers[5]})`}
+          style={{ transition: 'transform 0.1s ease-out' }}
+        >
+          e
+        </text>
+      </svg>
+    </Component>
+  );
+}
+
 export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkProps) {
   const uniqueId = React.useId().replace(/:/g, '');
   const fontFamily = "'Rajdhani', 'Orbitron', system-ui, sans-serif";

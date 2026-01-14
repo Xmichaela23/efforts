@@ -228,6 +228,31 @@ serve(async (req) => {
 
     console.log(`[ingest-phone-workout] Created workout ${workout.id}`);
 
+    // Auto-set default gear if workout is completed and no gear_id is set
+    if (workout.id && workoutData.workout_status === 'completed' && (workout_type === 'run' || workout_type === 'ride')) {
+      try {
+        const gearType = workout_type === 'run' ? 'shoe' : 'bike';
+        const { data: defaultGear } = await supabase
+          .from('gear')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('type', gearType)
+          .eq('is_default', true)
+          .eq('retired', false)
+          .maybeSingle();
+        
+        if (defaultGear?.id) {
+          await supabase
+            .from('workouts')
+            .update({ gear_id: defaultGear.id })
+            .eq('id', workout.id);
+          console.log(`[ingest-phone-workout] Auto-set default gear ${defaultGear.id} for workout ${workout.id}`);
+        }
+      } catch (gearErr) {
+        console.error('[ingest-phone-workout] Failed to auto-set default gear:', gearErr);
+      }
+    }
+
     // Update planned workout if linked
     if (planned_workout_id) {
       const { error: updateError } = await supabase

@@ -796,21 +796,34 @@ Deno.serve(async (req) => {
       rows = [] as any[];
     }
     // Helper: robust writer that tolerates schemas without computed_version/computed_at
+    // Write computed data using database-level JSONB merge (prevents race conditions)
+    // RPC is required - no fallbacks to prevent data loss
     async function writeComputed(computedPayload: any): Promise<void> {
       const stamp = new Date().toISOString();
       const normalized = normalizeComputedPaces(computedPayload);
-      // First try with version + timestamp (preferred)
-      const { error: upErr1 } = await supabase
-        .from('workouts')
-        .update({ computed: normalized, computed_version: COMPUTED_VERSION_INT, computed_at: stamp, normalization_version: 'v1' })
-        .eq('id', workout_id);
-      if (!upErr1) return;
-      // Fallback: write computed only (for schemas missing these columns)
-      const { error: upErr2 } = await supabase
-        .from('workouts')
-        .update({ computed: normalized })
-        .eq('id', workout_id);
-      if (upErr2) throw upErr2;
+      
+      // Use database RPC for atomic JSONB merge - REQUIRED, no fallbacks
+      const { error: rpcError } = await supabase.rpc('merge_computed', {
+        p_workout_id: workout_id,
+        p_partial_computed: normalized,
+        p_computed_version_int: COMPUTED_VERSION_INT,
+        p_computed_at: stamp
+      });
+      
+      if (rpcError) {
+        console.error('[compute-workout-summary] RPC merge_computed failed:', rpcError);
+        throw new Error(`Failed to merge computed data: ${rpcError.message}. RPC function merge_computed is required.`);
+      }
+      
+      // Also update normalization_version if column exists (non-critical, ignore errors)
+      try {
+        await supabase
+          .from('workouts')
+          .update({ normalization_version: 'v1' })
+          .eq('id', workout_id);
+      } catch {
+        // Column might not exist, ignore
+      }
     }
 
 
@@ -1915,6 +1928,25 @@ Deno.serve(async (req) => {
       overallKeys: ['duration_s_moving', 'distance_m', 'avg_pace_s_per_mi', 'gap_pace_s_per_mi', 'execution_score']
     });
 
+    // Preserve existing computed.analysis (series data from compute-workout-analysis)
+    const existingComputed = (() => {
+      try {
+        return typeof w.computed === 'string' ? JSON.parse(w.computed) : (w.computed || {});
+      } catch {
+        return {};
+      }
+    })();
+
+    // Calculate max_speed_mps from normalized speed data (v field)
+    const max_speed_mps = ((): number | null => {
+      if (!rows || rows.length === 0) return null;
+      const validSpeeds = rows
+        .map(r => r.v)
+        .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+      if (validSpeeds.length === 0) return null;
+      return Math.max(...validSpeeds);
+    })();
+
     const computed = {
       version: COMPUTED_VERSION,
       intervals: outIntervals,
@@ -1924,6 +1956,7 @@ Deno.serve(async (req) => {
         distance_m: Math.round(overallMeters),
         avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
         gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null,
+        max_speed_mps: max_speed_mps != null ? Number(max_speed_mps.toFixed(2)) : null,
         execution_score: overallExecutionScore
       }
     };
@@ -1979,8 +2012,7 @@ Deno.serve(async (req) => {
         const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv>0) secs = Math.round(mv*60);
       }
       const computed = { version: COMPUTED_VERSION, intervals: [], overall: { duration_s_moving: secs>0?secs:null, distance_m: meters>0?meters:0, avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(meters, secs), gap_pace_s_per_mi: null } } as any;
-      const stamp = new Date().toISOString();
-      await supabase.from('workouts').update({ computed, computed_version: COMPUTED_VERSION_INT, computed_at: stamp }).eq('id', (w as any)?.id);
+      await writeComputed(computed);
       console.error('[compute-summary:error]', { code: e?.code||e?.name||'Error', msg: e?.message||String(e) });
       return new Response(JSON.stringify({ success:true, mode:'fallback', note:'wrote minimal overall due to error' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     } catch {
