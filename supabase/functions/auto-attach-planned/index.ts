@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     console.log('[auto-attach-planned] Loading workout with ID:', workout_id);
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id,user_id,type,provider_sport,date,timestamp,distance,moving_time,avg_heart_rate,tss,intensity_factor,metrics,computed,planned_id,strength_exercises,mobility_exercises')
+      .select('id,user_id,type,provider_sport,date,timestamp,distance,moving_time,avg_heart_rate,tss,intensity_factor,metrics,computed,planned_id,strength_exercises,mobility_exercises,workout_analysis,analysis_status')
       .eq('id', workout_id)
       .maybeSingle();
     console.log('[auto-attach-planned] Query result - data:', w, 'error:', wErr);
@@ -175,12 +175,24 @@ Deno.serve(async (req) => {
         
         // Update planned_id and clear old analysis to force fresh recalculation
         // compute-workout-summary will detect the new planned_id and regenerate intervals
+        // Only clear analysis if it's not already complete with new format (avoid race condition)
+        const hasNewFormatAnalysis = w.workout_analysis && 
+          w.workout_analysis.performance && 
+          w.workout_analysis.granular_analysis &&
+          w.analysis_status === 'complete';
+        
         const updates: any = { 
-          planned_id: String(plannedRow.id),
-          workout_analysis: null,  // Clear old analysis to force fresh calculation
-          analysis_status: null,   // Clear analysis status
-          analysis_error: null     // Clear any previous errors
+          planned_id: String(plannedRow.id)
         };
+        
+        // Only clear analysis if it's old/incomplete format (not if already complete)
+        if (!hasNewFormatAnalysis) {
+          updates.workout_analysis = null;  // Clear old analysis to force fresh calculation
+          updates.analysis_status = null;   // Clear analysis status
+          updates.analysis_error = null;    // Clear any previous errors
+        } else {
+          console.log('[auto-attach-planned] Keeping existing complete analysis, will regenerate with new planned_id');
+        }
         
         // Add swim context if needed
         if (String((plannedRow as any)?.type||'').toLowerCase()==='swim') {
@@ -265,12 +277,40 @@ Deno.serve(async (req) => {
     }
 
     // ===== AUTO-ATTACH PATH (heuristic matching) =====
-    // Already linked → recompute summary and return
+    // Already linked → recompute summary and trigger analysis if missing
     if (currentPlannedId) {
       try {
         const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
         await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+        
+        // Wait for summary to complete before checking analysis
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if analysis is missing or incomplete, and trigger if needed
+        const hasCompleteAnalysis = w.workout_analysis && 
+          w.workout_analysis.performance && 
+          w.workout_analysis.granular_analysis &&
+          w.analysis_status === 'complete';
+        
+        if (!hasCompleteAnalysis && w.workout_status === 'completed') {
+          // Trigger analysis in background (fire-and-forget)
+          try {
+            if (w.type === 'run' || w.type === 'running') {
+              fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key },
+                body: JSON.stringify({ workout_id: w.id })
+              }).catch(err => console.error('[auto-attach-planned] Failed to trigger analysis for already-attached workout:', err));
+            } else if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
+              fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-cycling-workout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key },
+                body: JSON.stringify({ workout_id: w.id })
+              }).catch(err => console.error('[auto-attach-planned] Failed to trigger analysis for already-attached workout:', err));
+            }
+          } catch {}
+        }
       } catch {}
       return new Response(JSON.stringify({ success: true, attached: false, recomputed: true, reason: 'already_linked' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
@@ -326,15 +366,28 @@ Deno.serve(async (req) => {
         .eq('id', best.id)
         .eq('user_id', w.user_id);
       
+      // Update planned_id first
       const updates: any = { 
-        planned_id: best.id,
-        computed: w.computed ? { ...w.computed, planned_steps_light: null, intervals: [] } : null
+        planned_id: best.id
       };
       await supabase
         .from('workouts')
         .update(updates)
         .eq('id', w.id)
         .eq('user_id', w.user_id);
+      
+      // Clear intervals and planned_steps_light using RPC merge (preserves analysis.series)
+      // This ensures computed.analysis.series from compute-workout-analysis is not lost
+      const { error: rpcError } = await supabase.rpc('merge_computed', {
+        p_workout_id: w.id,
+        p_partial_computed: {
+          intervals: [],
+          planned_steps_light: null
+        }
+      });
+      if (rpcError) {
+        console.error('[auto-attach-planned] Failed to merge computed (strength/mobility):', rpcError);
+      }
 
       // Wait for database transaction to commit before calling analysis functions
       // This ensures planned_id is visible to subsequent function calls
@@ -467,10 +520,9 @@ Deno.serve(async (req) => {
       const poolLenM = (best as any)?.pool_length_m as number | undefined;
       const poolUnit = (best as any)?.pool_unit as string | undefined;
       const poolLabel = (best as any)?.pool_label as string | undefined;
-      // Clear planned_steps_light and intervals to force regeneration with new planned workout IDs
+      // Update planned_id first
       const updates: any = { 
-        planned_id: best.id,
-        computed: w.computed ? { ...w.computed, planned_steps_light: null, intervals: [] } : null
+        planned_id: best.id
       };
       if (String((best as any)?.type||'').toLowerCase()==='swim') {
         if (env === 'open_water') {
