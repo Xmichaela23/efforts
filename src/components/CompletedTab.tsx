@@ -72,6 +72,14 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const checkedDbRef = useRef<Set<string>>(new Set()); // Track which workouts we've checked DB for
   const initializedRef = useRef<Set<string>>(new Set()); // Track which workouts have been initialized to prevent initial blink
+  const mapPropsRef = useRef<{
+    samples: any;
+    trackLngLat: any;
+    useMiles: boolean;
+    useFeet: boolean;
+    compact: boolean;
+    workoutData: any;
+  } | null>(null); // Track previous map props to prevent unnecessary re-renders
   const norm = useWorkoutData(hydrated||workoutData);
   
   // Trigger processing once and poll for completion when series is missing
@@ -1556,17 +1564,7 @@ const formatMovingTime = () => {
           return null;
         }
         
-        // Memoize map props with stable references to prevent re-renders
-        // Use refs to track previous values and only update if actually changed
-        const mapPropsRef = useRef<{
-          samples: any;
-          trackLngLat: any;
-          useMiles: boolean;
-          useFeet: boolean;
-          compact: boolean;
-          workoutData: any;
-        } | null>(null);
-        
+        // Use memoized props - create stable reference to prevent map re-renders
         const mapProps = useMemo(() => {
           // Check if data actually changed by comparing array lengths and first/last values
           const trackChanged = !mapPropsRef.current?.trackLngLat || 
