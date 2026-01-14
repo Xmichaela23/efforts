@@ -66,11 +66,16 @@ const WEEKLY_MILEAGE: Record<string, Record<string, { start: number; peak: numbe
 export class BalancedBuildGenerator extends BaseGenerator {
   // Cache for dynamically calculated long run progression
   private longRunProgressionCache?: number[];
+  // Track long run distances as we generate weeks (for state-aware calculation)
+  private longRunHistory: number[] = [];
 
   generatePlan(): TrainingPlan {
     const phaseStructure = this.determinePhaseStructure();
     const sessions_by_week: Record<string, Session[]> = {};
     const weekly_summaries: Record<string, any> = {};
+    
+    // Initialize long run history for state-aware calculation
+    this.longRunHistory = [];
 
     for (let week = 1; week <= this.params.duration_weeks; week++) {
       const phase = this.getCurrentPhase(week, phaseStructure);
@@ -132,7 +137,6 @@ export class BalancedBuildGenerator extends BaseGenerator {
 
     // Get targets
     const weeklyMiles = this.calculateWeeklyMileage(weekNumber, phase, isRecovery, phaseStructure);
-    const longRunMiles = this.getLongRunMiles(weekNumber, isRecovery);
     
     // Check race proximity for each day - this enables smart tapering
     const raceProximity = this.checkWeekRaceProximity(weekNumber);
@@ -148,16 +152,46 @@ export class BalancedBuildGenerator extends BaseGenerator {
       this.getDaysUntilRace(weekNumber, 'Sunday', this.params.start_date, this.params.race_date)
     );
     
+    // Always calculate long run distance for history tracking (even if session isn't created)
+    let longRunMiles: number;
+    if (this.params.distance === 'marathon') {
+      longRunMiles = this.calculateStateAwareLongRun(weekNumber, isRecovery, phaseStructure);
+    } else {
+      // For non-marathon distances, use static progression
+      longRunMiles = this.getLongRunMiles(weekNumber, isRecovery);
+    }
+    
+    // Track this week's long run distance in history (always, for state-aware calculation)
+    this.longRunHistory[weekNumber - 1] = longRunMiles;
+    
     if (sundayProximity === 'normal' || sundayProximity === 'reduced_quality') {
+      // PRIORITY 1: Check for race day (final week, Sunday, marathon distance)
+      // Always create race day on final Sunday for marathon plans, regardless of proximity
+      if (weekNumber === this.params.duration_weeks && 
+          this.params.distance === 'marathon') {
+        // Race day - create race session
+        const raceName = this.params.race_name || 'MARATHON';
+        const raceYear = this.params.race_date ? new Date(this.params.race_date).getFullYear() : new Date().getFullYear();
+        sessions.push(this.createSession(
+          'Sunday',
+          `${raceName} RACE DAY`,
+          `${raceName} ${raceYear}. Trust your training. Go crush it.`,
+          this.milesToMinutes(26.2),
+          [],
+          ['race_day', 'marathon']
+        ));
+        // Update history with race day distance
+        this.longRunHistory[weekNumber - 1] = 26.2;
+      } else {
       const withMP = phase.name === 'Race Prep' && !isRecovery && 
                      (this.params.distance === 'marathon' || this.params.distance === 'half');
       const mpMiles = withMP ? this.getMPSegmentMiles(weekNumber, phase) : 0;
       
-      // Long run uses dynamic progression which already handles tapering
-      // No need for race proximity caps - progression positions peak correctly
       sessions.push(this.createVDOTLongRun(longRunMiles, mpMiles));
+      }
     }
 
+    // Use the calculated long run miles for usedMiles calculation
     let usedMiles = sessions.length > 0 ? longRunMiles : 0;
 
     // Two Quality Days (2Q System) - not in recovery or taper
@@ -220,14 +254,36 @@ export class BalancedBuildGenerator extends BaseGenerator {
     const sessions: Session[] = [];
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+    // PRIORITY: Always create race day session on final Sunday for marathon plans
+    // This ensures race day is never missed, even if proximity calculation is slightly off
+    const isFinalWeek = weekNumber === this.params.duration_weeks;
+    const isMarathon = this.params.distance === 'marathon';
+    if (isFinalWeek && isMarathon) {
+      const raceName = this.params.race_name || 'MARATHON';
+      const raceYear = this.params.race_date ? new Date(this.params.race_date + 'T00:00:00').getFullYear() : new Date().getFullYear();
+      sessions.push(this.createSession(
+        'Sunday',
+        'RACE DAY',
+        `${raceName} ${raceYear}. Trust your training. Go crush it.`,
+        this.milesToMinutes(26.2),
+        [TOKEN_PATTERNS.long_run(this.milesToMinutes(26.2))],
+        ['race', 'marathon']
+      ));
+    }
+
     for (const day of days) {
+      // Skip Sunday if we already added race day session
+      if (day === 'Sunday' && isFinalWeek && isMarathon) {
+        continue;
+      }
+
       const proximity = raceProximity.dayProximity[day];
 
       switch (proximity) {
         case 'race':
           // Race day - THE MARATHON
-          // Only add if this is the final week and Sunday
-          if (weekNumber === this.params.duration_weeks && day === 'Sunday') {
+          // Only add if this is the final week and Sunday (fallback if above check didn't catch it)
+          if (isFinalWeek && day === 'Sunday' && isMarathon) {
             const raceName = this.params.race_name || 'MARATHON';
             const raceYear = this.params.race_date ? new Date(this.params.race_date + 'T00:00:00').getFullYear() : new Date().getFullYear();
             sessions.push(this.createSession(
@@ -572,6 +628,7 @@ export class BalancedBuildGenerator extends BaseGenerator {
   /**
    * Get long run miles for a given week using dynamic progression
    * Calculates progression once and caches it for the plan duration
+   * DEPRECATED: Use calculateStateAwareLongRun instead for state-aware logic
    */
   private getLongRunMiles(weekNumber: number, _isRecovery: boolean): number {
     // For non-marathon distances, use the static progression
@@ -589,6 +646,118 @@ export class BalancedBuildGenerator extends BaseGenerator {
     
     const index = weekNumber - 1;
     return this.longRunProgressionCache[index] || 14;
+  }
+
+  /**
+   * Calculate state-aware long run distance using 4-state machine
+   * Handles: Week 1, Recovery Week, Post-Recovery Resume, Standard Build
+   */
+  private calculateStateAwareLongRun(
+    weekNumber: number,
+    isRecovery: boolean,
+    phaseStructure: PhaseStructure
+  ): number {
+    const weekIdx = weekNumber - 1; // 0-based index
+    const totalWeeks = this.params.duration_weeks;
+    
+    // Safety: Week 1 or invalid index
+    if (weekIdx < 0) {
+      return this.getBaseLongRunDistance();
+    }
+    
+    // Get base distance and mileage increase
+    const baseDistance = this.getBaseLongRunDistance();
+    const mileageIncrease = this.getMileageIncrease();
+    
+    // STATE 1: Week 1
+    if (weekIdx === 0) {
+      return baseDistance;
+    }
+    
+    // Safety: Ensure previous week exists and has a valid distance
+    if (weekIdx - 1 < 0 || this.longRunHistory[weekIdx - 1] === undefined || this.longRunHistory[weekIdx - 1] === null) {
+      return baseDistance;
+    }
+    
+    const prevWeekDist = this.longRunHistory[weekIdx - 1];
+    
+    // Safety: Ensure previous week distance is a valid number
+    if (!Number.isFinite(prevWeekDist) || prevWeekDist <= 0) {
+      return baseDistance;
+    }
+    
+    // STATE 2: Recovery Week (75% of previous week)
+    if (isRecovery) {
+      const recoveryDist = Math.floor(prevWeekDist * 0.75);
+      // Ensure minimum of 8 miles for safety
+      return Math.max(8, recoveryDist);
+    }
+    
+    // STATE 3: Post-Recovery Resume (look back 2 weeks, skip recovery week)
+    // Check if the PREVIOUS week was a recovery week by examining history directly
+    // This is more robust than relying on phase structure or modulo checks
+    if (weekIdx >= 2) {
+      const prevDist = this.longRunHistory[weekIdx - 1];
+      const twoWeeksAgoDist = this.longRunHistory[weekIdx - 2];
+      
+      // Safety: Ensure both values exist and are valid
+      if (prevDist !== undefined && twoWeeksAgoDist !== undefined && 
+          Number.isFinite(prevDist) && Number.isFinite(twoWeeksAgoDist) &&
+          prevDist > 0 && twoWeeksAgoDist > 0) {
+        
+        // If previous week was significantly smaller (< 80% of two weeks ago), it was a recovery drop
+        // This catches recovery weeks even if phase structure is out of sync
+        const isRecoveryWeekPrev = prevDist < twoWeeksAgoDist * 0.8;
+        
+        if (isRecoveryWeekPrev) {
+          // Resume from the "High" week (Week n-2) + standard increase
+          // Example: Week 3 (14) -> Week 4 (10) -> Week 5 (14 + 1 = 15)
+          return twoWeeksAgoDist + mileageIncrease;
+        }
+      }
+    }
+    
+    // STATE 4: Standard Build (previous week + increase)
+    const standardDist = prevWeekDist + mileageIncrease;
+    
+    // Cap at peak distance (but allow taper to reduce it)
+    const peakMiles = this.getMaxLongRunMiles();
+    const taperStart = phaseStructure.phases.find(p => p.name === 'Taper')?.start_week || totalWeeks;
+    
+    // If we're in taper, allow reduction
+    if (weekNumber >= taperStart) {
+      return standardDist; // Taper logic will handle reduction
+    }
+    
+    // During build, cap at peak
+    return Math.min(standardDist, peakMiles);
+  }
+
+  /**
+   * Get base long run distance for the plan
+   */
+  private getBaseLongRunDistance(): number {
+    const durationReqs = getMarathonDurationRequirements(this.params.duration_weeks);
+    return this.calculateStartingLongRun(durationReqs.startingLongRun);
+  }
+
+  /**
+   * Get standard mileage increase per week (1-2 miles)
+   */
+  private getMileageIncrease(): number {
+    // Shorter plans: +1 mile/week, longer plans: +1-2 miles/week
+    if (this.params.duration_weeks <= 12) {
+      return 1;
+    }
+    return 2;
+  }
+
+  /**
+   * Get number of taper weeks
+   */
+  private getTaperWeeks(): number {
+    const durationReqs = getMarathonDurationRequirements(this.params.duration_weeks);
+    return durationReqs.taperWeeks;
   }
 
   /**
@@ -657,7 +826,7 @@ export class BalancedBuildGenerator extends BaseGenerator {
         
         if (postPeakWeeks <= 1) {
           progression[idx] = postPeakStart;
-        } else {
+      } else {
           // Linear decline from postPeakStart to postPeakEnd
           const step = (postPeakStart - postPeakEnd) / (postPeakWeeks - 1);
           progression[idx] = Math.round(postPeakStart - step * (weeksAfterPeak - 1));

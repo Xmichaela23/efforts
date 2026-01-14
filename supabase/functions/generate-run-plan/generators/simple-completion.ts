@@ -25,20 +25,24 @@ const LONG_RUN_PROGRESSION: Record<string, Record<string, number[]>> = {
       8, 9, 10, 8,
       // Weeks 9-12: Resume 10→13, recovery drops to 10
       10, 11, 12, 10,
-      // Weeks 13-16: Peak at 18, taper
-      14, 16, 18, 10
+      // Weeks 13-16: Peak at 18, recovery drops to 13
+      14, 16, 18, 13,
+      // Weeks 17-20: Final build and taper
+      15, 17, 12, 8    // Week 17 resume, 18 peak, 19 taper, 20 race week
     ],
     'intermediate': [
       8, 9, 10, 8,      // Weeks 1-4
       10, 11, 12, 10,   // Weeks 5-8
       12, 14, 16, 12,   // Weeks 9-12
-      16, 18, 20, 12    // Weeks 13-16
+      16, 18, 20, 14,   // Weeks 13-16
+      16, 18, 14, 10   // Weeks 17-20: Final build and taper
     ],
     'advanced': [
       10, 11, 12, 10,   // Weeks 1-4
       12, 14, 16, 12,   // Weeks 5-8
       16, 18, 20, 14,   // Weeks 9-12
-      18, 20, 20, 14    // Weeks 13-16
+      18, 20, 20, 16,   // Weeks 13-16
+      18, 20, 16, 12    // Weeks 17-20: Final build and taper
     ]
   },
   'half': {
@@ -342,8 +346,18 @@ export class SimpleCompletionGenerator extends BaseGenerator {
     const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
     if (!progression) return 10;
     
-    const index = Math.min(weekNumber - 1, progression.length - 1);
-    return progression[index] || 10;
+    // If within the progression array, use it directly
+    if (weekNumber <= progression.length) {
+      return progression[weekNumber - 1] || 10;
+    }
+    
+    // For plans longer than the progression array (rare, but handle gracefully)
+    // Use the last value and apply a simple taper pattern
+    const lastValue = progression[progression.length - 1];
+    const weeksBeyond = weekNumber - progression.length;
+    
+    // Taper pattern: reduce by ~2 miles per week for final weeks
+    return Math.max(8, lastValue - (weeksBeyond * 2));
   }
 
   // ============================================================================
