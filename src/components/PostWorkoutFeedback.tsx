@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
-import { useAppContext } from '@/lib/AppContext';
+import { useAppContext } from '@/contexts/AppContext';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import {
   Select,
