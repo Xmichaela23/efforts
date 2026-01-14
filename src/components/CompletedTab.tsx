@@ -64,36 +64,61 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   const [plannedLabel, setPlannedLabel] = useState<string | null>(null);
   const processingTriggeredRef = useRef<Set<string>>(new Set()); // Track which workouts we've triggered
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const checkedDbRef = useRef<Set<string>>(new Set()); // Track which workouts we've checked DB for
   const norm = useWorkoutData(hydrated||workoutData);
   
   // Trigger processing once and poll for completion when series is missing
+  const checkedDbRef = useRef<Set<string>>(new Set());
+  
   useEffect(() => {
     const workoutId = (hydrated||workoutData)?.id;
     if (!workoutId) return;
     
+    // Check if we already have series in state (avoid unnecessary DB check)
+    const currentSeries = (hydrated||workoutData)?.computed?.analysis?.series || null;
+    const hasSeriesInState = currentSeries && Array.isArray(currentSeries?.distance_m) && currentSeries.distance_m.length > 1;
+    
+    if (hasSeriesInState) {
+      // Already have data, no need to check DB or process
+      return;
+    }
+    
     // Check database first (might have data even if component state is stale)
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('workouts')
-          .select('computed')
-          .eq('id', workoutId)
-          .single();
-        
-        if (!error && data) {
-          const computed = typeof data.computed === 'string' ? JSON.parse(data.computed) : data.computed;
-          const series = computed?.analysis?.series || null;
-          const hasSeries = series && Array.isArray(series?.distance_m) && series.distance_m.length > 1;
+    // Only check once per workout to avoid excessive re-renders
+    if (!checkedDbRef.current.has(workoutId)) {
+      checkedDbRef.current.add(workoutId);
+      
+      (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('workouts')
+            .select('computed')
+            .eq('id', workoutId)
+            .single();
           
-          if (hasSeries) {
-            // Data exists in DB, update component state and return
-            setHydrated((prev: any) => ({ ...prev, computed }));
-            return;
+          if (!error && data) {
+            const computed = typeof data.computed === 'string' ? JSON.parse(data.computed) : data.computed;
+            const series = computed?.analysis?.series || null;
+            const hasSeries = series && Array.isArray(series?.distance_m) && series.distance_m.length > 1;
+            
+            if (hasSeries) {
+              // Data exists in DB, update component state only if different
+              setHydrated((prev: any) => {
+                const prevComputed = prev?.computed;
+                const prevSeries = prevComputed?.analysis?.series;
+                // Only update if series is actually different to prevent re-render loops
+                if (JSON.stringify(prevSeries) !== JSON.stringify(series)) {
+                  return { ...prev, computed };
+                }
+                return prev;
+              });
+              return;
+            }
           }
+        } catch (err) {
+          console.warn('Failed to check database for series:', err);
+          checkedDbRef.current.delete(workoutId); // Allow retry on error
         }
-      } catch (err) {
-        console.warn('Failed to check database for series:', err);
-      }
       
       // Data doesn't exist, check if we already triggered
       const alreadyTriggered = processingTriggeredRef.current.has(workoutId);
@@ -148,8 +173,16 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
               clearTimeout(pollingTimeoutRef.current);
               pollingTimeoutRef.current = null;
             }
-            // Trigger a refetch by updating hydrated state
-            setHydrated((prev: any) => ({ ...prev, computed }));
+            // Trigger a refetch by updating hydrated state (only if different)
+            setHydrated((prev: any) => {
+              const prevComputed = prev?.computed;
+              const prevSeries = prevComputed?.analysis?.series;
+              // Only update if series is actually different to prevent re-render loops
+              if (JSON.stringify(prevSeries) !== JSON.stringify(s)) {
+                return { ...prev, computed };
+              }
+              return prev;
+            });
             return;
           }
         }
@@ -172,7 +205,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
         pollingTimeoutRef.current = null;
       }
       };
-    }, [(hydrated||workoutData)?.id, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);
+    }, [(hydrated||workoutData)?.id]); // Only depend on workout ID to prevent re-render loops
   
   useEffect(() => {
     setHydrated((prev: any) => {
