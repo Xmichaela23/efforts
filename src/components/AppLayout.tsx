@@ -376,12 +376,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     const workoutStatus = String(selectedWorkout.workout_status || '').toLowerCase();
     const workoutType = selectedWorkout.type;
     
-    console.log('🔍 [Feedback Check] selectedWorkout:', {
+    console.log('🔍 [Feedback Check] selectedWorkout changed:', {
       id: selectedWorkout.id,
       status: workoutStatus,
       type: workoutType,
       localRpe: selectedWorkout.rpe,
-      hasFeedbackWorkout: !!feedbackWorkout
+      hasFeedbackWorkout: !!feedbackWorkout,
+      willCheck: workoutStatus === 'completed' && (workoutType === 'run' || workoutType === 'ride') && !feedbackWorkout
     });
 
     // Only check completed run/ride workouts (don't check RPE locally - check DB)
@@ -453,8 +454,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
           if (!hasRpe && 
               !workout.feedback_dismissed_at && 
-              isWithin7Days &&
-              !feedbackShownIdsRef.current.has(workoutId)) {
+              isWithin7Days) {
             // Double-check workout still exists before showing popup
             const { data: workoutVerify, error: verifyError } = await supabase
               .from('workouts')
@@ -483,8 +483,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               rpeColumn: workout.rpe,
               metadataRpe: workoutMetadata.session_rpe,
               isDismissed: !!workout.feedback_dismissed_at,
-              isWithin7Days,
-              alreadyShown: feedbackShownIdsRef.current.has(workoutId)
+              isWithin7Days
             });
           }
         } catch (e) {
