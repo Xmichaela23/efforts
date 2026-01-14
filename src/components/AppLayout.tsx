@@ -500,9 +500,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         noFeedbackWorkout: !feedbackWorkout
       });
     }
-    // Only depend on selectedWorkout - don't re-run when feedbackWorkout changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedWorkout?.id]);
+    // Depend on selectedWorkout ID and feedbackWorkout state
+    // When feedbackWorkout is cleared (null), we should check the selected workout again
+  }, [selectedWorkout?.id, feedbackWorkout === null ? 'cleared' : 'set']);
 
   // Debug: Log when feedbackWorkout state changes
   useEffect(() => {
