@@ -80,6 +80,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     existingRpe?: number | null;
   } | null>(null);
   const feedbackShownIdsRef = useRef<Set<string>>(new Set()); // Track which workouts we've shown popup for (UI state only)
+  const feedbackDismissedRef = useRef<Set<string>>(new Set()); // Client-side cache of dismissed IDs (server is source of truth)
   const checkingFeedbackRef = useRef(false); // Prevent concurrent checks
   const [plansMenuOpen, setPlansMenuOpen] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
