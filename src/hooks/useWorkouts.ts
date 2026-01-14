@@ -1582,24 +1582,30 @@ export const useWorkouts = () => {
 
       setWorkouts((prev) => [newWorkout, ...prev]);
 
-      // Auto‑attach to planned session per rules
+      // Auto‑attach to planned session per rules (fire-and-forget background processing)
       try {
         // Only for completed sessions
         if ((newWorkout.workout_status === 'completed') && newWorkout.date && newWorkout.type) {
-          await autoAttachPlannedSession(newWorkout);
+          autoAttachPlannedSession(newWorkout)
+            .then(() => console.log('✅ Auto-attach completed for workout:', newWorkout.id))
+            .catch((e) => console.log('ℹ️ Auto-attach skipped:', e));
         }
       } catch (e) {
         console.log('ℹ️ Auto-attach skipped:', e);
       }
 
-      // Generate context for completed workouts using routing service
+      // Generate context for completed workouts using routing service (fire-and-forget background processing)
       try {
         if (newWorkout.workout_status === 'completed') {
-          await analyzeWorkoutWithRetry(newWorkout.id, newWorkout.type);
-          console.log('✅ Context generated for workout:', newWorkout.id);
+          analyzeWorkoutWithRetry(newWorkout.id, newWorkout.type)
+            .then(() => console.log('✅ Context generated for workout:', newWorkout.id))
+            .catch((contextError) => {
+              console.error('❌ Failed to generate context:', contextError);
+              // Don't throw - context generation is not critical
+            });
         }
       } catch (contextError) {
-        console.error('❌ Failed to generate context:', contextError);
+        console.error('❌ Failed to trigger context generation:', contextError);
         // Don't throw - context generation is not critical
       }
 
