@@ -47,6 +47,7 @@ const sliderStyles = `
 
 interface CompletedTabProps {
   workoutData: any;
+  onAddGear?: () => void; // Callback to open gear management
 }
 
 
@@ -60,7 +61,7 @@ interface GearItem {
   total_distance?: number; // in meters
 }
 
-const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
+const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) => {
   const { useImperial } = useAppContext();
   const compact = useCompact();
   
@@ -1529,6 +1530,22 @@ const formatMovingTime = () => {
                       </SelectItem>
                     );
                   })}
+                  {onAddGear && (
+                    <div className="border-t border-white/10 mt-1 pt-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onAddGear();
+                        }}
+                        className="w-full flex items-center gap-2 px-2 py-2 text-sm font-light text-white/70 hover:text-white hover:bg-white/[0.08] rounded transition-colors"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Add New {workoutData.type === 'run' ? 'Shoes' : 'Bike'}</span>
+                      </button>
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>

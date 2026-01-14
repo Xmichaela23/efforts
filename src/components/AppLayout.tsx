@@ -76,8 +76,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     id: string;
     type: 'run' | 'ride';
     name: string;
+    existingGearId?: string | null;
+    existingRpe?: number | null;
   } | null>(null);
-  const feedbackShownIdsRef = useRef<Set<string>>(new Set()); // Track which workouts we've shown popup for
+  const feedbackShownIdsRef = useRef<Set<string>>(new Set()); // Track which workouts we've shown popup for (UI state only)
+  const checkingFeedbackRef = useRef(false); // Prevent concurrent checks
   const [plansMenuOpen, setPlansMenuOpen] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
@@ -285,6 +288,83 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   }, [activeTab, loadProviderData, selectedWorkout]);
 
   // Listen for new workouts via realtime subscription to trigger feedback popup
+  // No localStorage - server is single source of truth for dismissals
+
+  // Check for workouts needing feedback (smart server, dumb client)
+  // Server is single source of truth - checks database for dismissals
+  const checkForFeedbackNeeded = async () => {
+    if (checkingFeedbackRef.current) return; // Prevent concurrent checks
+    if (feedbackWorkout) return; // Don't check if popup already showing
+    
+    checkingFeedbackRef.current = true;
+    try {
+      // Call server to determine if feedback is needed (smart server)
+      // Server checks database for dismissals - single source of truth
+      const { data, error } = await supabase.functions.invoke('check-feedback-needed', {
+        body: {}
+      });
+
+      if (error) {
+        console.error('Error checking for feedback needed:', error);
+        return;
+      }
+
+      // Dumb client: just display what server tells us
+      if (data?.needs_feedback && data?.workout) {
+        const workout = data.workout;
+        const workoutId = String(workout.id);
+        
+        // Skip if already shown in this session (UI state only, not persisted)
+        if (feedbackShownIdsRef.current.has(workoutId)) {
+          return;
+        }
+
+        console.log('🎯 Server says workout needs feedback:', workoutId);
+        feedbackShownIdsRef.current.add(workoutId);
+        setFeedbackWorkout({
+          id: workoutId,
+          type: workout.type as 'run' | 'ride',
+          name: workout.name || `${workout.type} workout`,
+          existingGearId: workout.existing_gear_id || null,
+          existingRpe: workout.existing_rpe || null,
+        });
+      }
+    } catch (e) {
+      console.error('Error in checkForFeedbackNeeded:', e);
+    } finally {
+      checkingFeedbackRef.current = false;
+    }
+  };
+
+  // Check on app load and key navigation points
+  useEffect(() => {
+    checkForFeedbackNeeded();
+  }, []);
+
+  // Check when navigating to calendar/home
+  useEffect(() => {
+    if (activeBottomNav === 'home' && !feedbackWorkout) {
+      // Small delay to let calendar load first
+      const timer = setTimeout(() => checkForFeedbackNeeded(), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [activeBottomNav]);
+
+  // Check when viewing a completed workout (post-workout summary)
+  useEffect(() => {
+    if (selectedWorkout && 
+        String(selectedWorkout.workout_status || '').toLowerCase() === 'completed' &&
+        (selectedWorkout.type === 'run' || selectedWorkout.type === 'ride') &&
+        !selectedWorkout.rpe &&
+        !feedbackWorkout) {
+      const workoutId = String(selectedWorkout.id);
+      if (!feedbackShownIdsRef.current.has(workoutId) && !feedbackDismissedRef.current.has(workoutId)) {
+        checkForFeedbackNeeded();
+      }
+    }
+  }, [selectedWorkout]);
+
+  // Realtime subscription (fast-path optimization, not source of truth)
   useEffect(() => {
     let channel: any = null;
     
@@ -306,19 +386,62 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             const newWorkout = payload.new;
             const workoutType = String(newWorkout?.type || '').toLowerCase();
             const workoutId = String(newWorkout?.id || '');
+            const workoutStatus = String(newWorkout?.workout_status || '').toLowerCase();
             
-            // Only show popup for runs and rides that we haven't shown before
+            // Only show popup for completed runs/rides without RPE
+            // Note: Server is source of truth for dismissals, but realtime is fast-path optimization
             if ((workoutType === 'run' || workoutType === 'ride') && 
+                workoutStatus === 'completed' &&
                 workoutId && 
                 !feedbackShownIdsRef.current.has(workoutId) &&
-                // Only show if no gear/rpe/feeling set yet
-                !newWorkout.gear_id && !newWorkout.rpe && !newWorkout.feeling) {
-              console.log('🎯 New run/ride detected, showing feedback popup:', workoutId);
+                !newWorkout.rpe && // Only check RPE, not gear_id
+                !newWorkout.feedback_dismissed_at) { // Server tracks dismissals
+              console.log('🎯 Realtime: New completed run/ride detected, showing feedback popup:', workoutId);
               feedbackShownIdsRef.current.add(workoutId);
               setFeedbackWorkout({
                 id: workoutId,
                 type: workoutType as 'run' | 'ride',
                 name: newWorkout.name || `${workoutType} workout`,
+                existingGearId: newWorkout.gear_id || null,
+                existingRpe: newWorkout.rpe || null,
+              });
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'workouts',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload: any) => {
+            const updatedWorkout = payload.new;
+            const oldWorkout = payload.old;
+            const workoutType = String(updatedWorkout?.type || '').toLowerCase();
+            const workoutId = String(updatedWorkout?.id || '');
+            const workoutStatus = String(updatedWorkout?.workout_status || '').toLowerCase();
+            const oldStatus = String(oldWorkout?.workout_status || '').toLowerCase();
+            
+            // Trigger when workout_status transitions to 'completed' OR rpe becomes null
+            const justCompleted = workoutStatus === 'completed' && oldStatus !== 'completed';
+            const rpeBecameNull = !updatedWorkout.rpe && oldWorkout.rpe !== null;
+            
+            if ((justCompleted || rpeBecameNull) &&
+                (workoutType === 'run' || workoutType === 'ride') &&
+                workoutId && 
+                !feedbackShownIdsRef.current.has(workoutId) &&
+                !updatedWorkout.rpe &&
+                !updatedWorkout.feedback_dismissed_at) { // Server tracks dismissals
+              console.log('🎯 Realtime: Workout completed/updated, showing feedback popup:', workoutId);
+              feedbackShownIdsRef.current.add(workoutId);
+              setFeedbackWorkout({
+                id: workoutId,
+                type: workoutType as 'run' | 'ride',
+                name: updatedWorkout.name || `${workoutType} workout`,
+                existingGearId: updatedWorkout.gear_id || null,
+                existingRpe: updatedWorkout.rpe || null,
               });
             }
           }
@@ -1175,6 +1298,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           onClose={handleBackToDashboard}
           onDelete={handleDeleteWorkout}
           onNavigateToContext={handleNavigateToContext}
+          onAddGear={() => setShowGear(true)}
           origin="today"
           initialTab={activeTab as any}
         />
@@ -1270,7 +1394,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             </div>
           ) : showGear ? (
             <div className="pt-4 h-full" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
-              <Gear onClose={handleBackToDashboard} />
+              <Gear onClose={() => {
+                handleBackToDashboard();
+                // After closing gear, reload gear in feedback popup if it's open
+                // This will be handled by PostWorkoutFeedback's useEffect when it re-renders
+              }} />
             </div>
           ) : showBuilder ? (
             <div className="pt-4">
@@ -1426,10 +1554,47 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           workoutId={feedbackWorkout.id}
           workoutType={feedbackWorkout.type}
           workoutName={feedbackWorkout.name}
+          existingGearId={feedbackWorkout.existingGearId}
+          existingRpe={feedbackWorkout.existingRpe}
           mode="popup"
-          onClose={() => setFeedbackWorkout(null)}
-          onSkip={() => setFeedbackWorkout(null)}
-          onSave={() => setFeedbackWorkout(null)}
+          onAddGear={() => {
+            // Open gear management, temporarily hide feedback popup
+            setShowGear(true);
+            // Store feedback state so we can restore it when gear closes
+            // The feedback popup will be restored when gear closes via handleBackToDashboard
+          }}
+          onClose={async () => {
+            // Server is single source of truth - mark as dismissed in database
+            if (feedbackWorkout) {
+              try {
+                await supabase.functions.invoke('dismiss-feedback', {
+                  body: { workout_id: feedbackWorkout.id }
+                });
+              } catch (e) {
+                console.error('Error dismissing feedback:', e);
+              }
+            }
+            setFeedbackWorkout(null);
+          }}
+          onSkip={async () => {
+            // Server is single source of truth - mark as dismissed in database
+            if (feedbackWorkout) {
+              try {
+                await supabase.functions.invoke('dismiss-feedback', {
+                  body: { workout_id: feedbackWorkout.id }
+                });
+              } catch (e) {
+                console.error('Error dismissing feedback:', e);
+              }
+            }
+            setFeedbackWorkout(null);
+          }}
+          onSave={() => {
+            // Don't mark as dismissed on save - user completed the action
+            setFeedbackWorkout(null);
+            // Check for next workout needing feedback
+            setTimeout(() => checkForFeedbackNeeded(), 1000);
+          }}
         />
       )}
     </div>

@@ -38,6 +38,7 @@ interface UnifiedWorkoutViewProps {
   onUpdateWorkout?: (workoutId: string, updates: any) => void;
   onDelete?: (workoutId: string) => void;
   onNavigateToContext?: (workoutId: string) => void;
+  onAddGear?: () => void; // Callback to open gear management
   initialTab?: 'planned' | 'summary' | 'completed';
   origin?: 'today' | 'weekly' | 'other';
 }
@@ -48,6 +49,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   onUpdateWorkout,
   onDelete,
   onNavigateToContext,
+  onAddGear,
   initialTab,
   origin = 'other'
 }) => {
@@ -1161,6 +1163,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                           <CompletedTab 
                             workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
                             workoutData={completedData}
+                            onAddGear={onAddGear}
                           />
                         </div>
                       ) : (workout.type === 'strength' || workout.type === 'mobility' || workout.type === 'pilates_yoga') ? (
