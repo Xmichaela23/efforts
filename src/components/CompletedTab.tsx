@@ -352,6 +352,61 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
     return { track, series } as const;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workoutIdKey, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);
+
+  // Memoize map props at component level (outside IIFE) to prevent re-renders
+  const finalSeries = useMemo(() => 
+    (memo?.series || (hydrated||workoutData)?.computed?.analysis?.series) as any,
+    [memo?.series, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]
+  );
+  
+  const finalTrack = useMemo(() => {
+    const trackFromMemo = memo?.track;
+    if (trackFromMemo) return trackFromMemo;
+    
+    const gpsRaw = (hydrated||workoutData)?.gps_track;
+    const gps = Array.isArray(gpsRaw)
+      ? gpsRaw
+      : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
+    return gps
+      .map((p:any)=>{
+        const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
+        const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
+        if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
+        return null;
+      })
+      .filter(Boolean) as [number,number][];
+  }, [memo?.track, hydrated?.gps_track, workoutData?.gps_track]);
+
+  const mapProps = useMemo(() => {
+    // Check if data actually changed by comparing array lengths and first/last values
+    const trackChanged = !mapPropsRef.current?.trackLngLat || 
+      !Array.isArray(finalTrack) ||
+      mapPropsRef.current.trackLngLat.length !== finalTrack.length ||
+      (finalTrack.length > 0 && (
+        mapPropsRef.current.trackLngLat[0]?.[0] !== finalTrack[0]?.[0] ||
+        mapPropsRef.current.trackLngLat[0]?.[1] !== finalTrack[0]?.[1]
+      ));
+    
+    const seriesChanged = !mapPropsRef.current?.samples ||
+      (finalSeries?.distance_m?.length !== mapPropsRef.current.samples?.distance_m?.length);
+    
+    // Only create new object if data actually changed
+    if (trackChanged || seriesChanged || 
+        mapPropsRef.current?.useMiles !== !!useImperial ||
+        mapPropsRef.current?.compact !== compact ||
+        mapPropsRef.current?.workoutData?.id !== workoutData?.id) {
+      mapPropsRef.current = {
+        samples: finalSeries,
+        trackLngLat: finalTrack,
+        useMiles: !!useImperial,
+        useFeet: !!useImperial,
+        compact,
+        workoutData
+      };
+    }
+    
+    return mapPropsRef.current;
+  }, [finalSeries, finalTrack, useImperial, compact, workoutData?.id]);
   // Initialize pool length state from explicit, inferred, or default
   useEffect(() => {
     if (workoutData && workoutData.swim_data) {
@@ -1547,10 +1602,6 @@ const formatMovingTime = () => {
           })
           .filter(Boolean) as [number,number][];
         
-        // Memoize series and track to prevent map re-renders
-        const finalSeries = (memo?.series || series) as any;
-        const finalTrack = (memo?.track || track) as any;
-        
         // Only render map if we have valid data (prevents initial blink)
         const hasValidSeries = finalSeries && 
           Array.isArray(finalSeries?.distance_m) && 
@@ -1564,38 +1615,7 @@ const formatMovingTime = () => {
           return null;
         }
         
-        // Use memoized props - create stable reference to prevent map re-renders
-        const mapProps = useMemo(() => {
-          // Check if data actually changed by comparing array lengths and first/last values
-          const trackChanged = !mapPropsRef.current?.trackLngLat || 
-            !Array.isArray(finalTrack) ||
-            mapPropsRef.current.trackLngLat.length !== finalTrack.length ||
-            (finalTrack.length > 0 && (
-              mapPropsRef.current.trackLngLat[0]?.[0] !== finalTrack[0]?.[0] ||
-              mapPropsRef.current.trackLngLat[0]?.[1] !== finalTrack[0]?.[1]
-            ));
-          
-          const seriesChanged = !mapPropsRef.current?.samples ||
-            (finalSeries?.distance_m?.length !== mapPropsRef.current.samples?.distance_m?.length);
-          
-          // Only create new object if data actually changed
-          if (trackChanged || seriesChanged || 
-              mapPropsRef.current?.useMiles !== !!useImperial ||
-              mapPropsRef.current?.compact !== compact ||
-              mapPropsRef.current?.workoutData?.id !== workoutData?.id) {
-            mapPropsRef.current = {
-              samples: finalSeries,
-              trackLngLat: finalTrack,
-              useMiles: !!useImperial,
-              useFeet: !!useImperial,
-              compact,
-              workoutData
-            };
-          }
-          
-          return mapPropsRef.current;
-        }, [finalSeries, finalTrack, useImperial, compact, workoutData?.id]);
-        
+        // Use memoized props computed at component level (prevents re-renders)
         // No client-side series transformation; use server-provided series as-is
         return (
           <div className="mt-6 mb-6 mx-[-16px]">
