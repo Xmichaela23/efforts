@@ -68,18 +68,12 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
       : null));
     const max_cadence_rpm = Number.isFinite(workoutData?.max_cadence) ? Number(workoutData.max_cadence) : (Number.isFinite(workoutData?.max_cycling_cadence) ? Number(workoutData.max_cycling_cadence) : (Number.isFinite(workoutData?.max_running_cadence) ? Number(workoutData.max_running_cadence) : null));
     // Use server-calculated max_pace from computed.analysis.bests (most accurate - from series data)
-    // Fallback: calculate from max_speed_mps if available
-    let max_pace_s_per_km = Number.isFinite(workoutData?.computed?.analysis?.bests?.max_pace_s_per_km) 
+    // Fallback to direct fields, then calculate from max_speed_mps (similar to avg_pace pattern)
+    const max_pace_s_per_km = Number.isFinite(workoutData?.computed?.analysis?.bests?.max_pace_s_per_km) 
       ? Number(workoutData.computed.analysis.bests.max_pace_s_per_km)
-      : (Number.isFinite(workoutData?.calculated_metrics?.max_pace_s_per_km) 
-      ? Number(workoutData.calculated_metrics.max_pace_s_per_km) 
-      : (Number.isFinite(workoutData?.metrics?.max_pace) ? Number(workoutData.metrics.max_pace) : 
-      (Number.isFinite(workoutData?.max_pace) ? Number(workoutData.max_pace) : null)));
-    
-    // Fallback: calculate max pace from max_speed_mps if max_pace not available
-    if (!max_pace_s_per_km && max_speed_mps && max_speed_mps > 0) {
-      max_pace_s_per_km = 1000 / max_speed_mps; // Convert m/s to s/km
-    }
+      : (Number.isFinite(workoutData?.metrics?.max_pace) ? Number(workoutData.metrics.max_pace) 
+      : (Number.isFinite(workoutData?.max_pace) ? Number(workoutData.max_pace) 
+      : (max_speed_mps && max_speed_mps > 0 ? (1000 / max_speed_mps) : null))); // Calculate from max_speed_mps
     const work_kj = Number.isFinite(workoutData?.total_work) ? Number(workoutData.total_work) : null;
     // Read from computed.analysis.power (server-calculated)
     const powerMetrics = workoutData?.computed?.analysis?.power;
