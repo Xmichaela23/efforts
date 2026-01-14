@@ -81,9 +81,9 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
   // Initialize hydrated with workoutData, but use a ref to track if we've synced
   // This prevents the initial state update that causes the blink
   const [hydrated, setHydrated] = useState<any>(() => {
-    // Initialize with workoutData if it has computed data, otherwise empty object
-    // This prevents unnecessary re-renders
-    return workoutData?.computed?.analysis?.series ? workoutData : { ...workoutData, computed: null };
+    // Initialize with workoutData, preserving computed even if series doesn't exist yet
+    // This prevents unnecessary re-renders and preserves existing computed data
+    return workoutData || {};
   });
   const [analysisInvoked, setAnalysisInvoked] = useState(false);
   const [showAdvancedRunDyn, setShowAdvancedRunDyn] = useState(false);
@@ -213,6 +213,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
       
       (async () => {
         try {
+          console.log('🔍 [CompletedTab] Checking DB for series data:', workoutId);
           const { data, error } = await supabase
             .from('workouts')
             .select('computed')
@@ -223,6 +224,13 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
             const computed = typeof data.computed === 'string' ? JSON.parse(data.computed) : data.computed;
             const series = computed?.analysis?.series || null;
             const hasSeries = series && Array.isArray(series?.distance_m) && series.distance_m.length > 1;
+            
+            console.log('🔍 [CompletedTab] DB check result:', {
+              workoutId,
+              hasComputed: !!computed,
+              hasSeries,
+              seriesLength: hasSeries ? series.distance_m.length : 0
+            });
             
             if (hasSeries) {
               // Data exists in DB, update component state only if different
@@ -240,6 +248,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
                       prevSeries.distance_m[prevSeries.distance_m.length - 1] === 
                       series.distance_m[series.distance_m.length - 1]) {
                     // Likely the same data, don't update to prevent re-render
+                    console.log('✅ [CompletedTab] Series already in state, skipping update');
                     initializedRef.current.add(workoutId);
                     return prev;
                   }
@@ -247,17 +256,23 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
                 
                 // Only update if series is actually different to prevent re-render loops
                 if (JSON.stringify(prevSeries) !== JSON.stringify(series)) {
+                  console.log('✅ [CompletedTab] Updating hydrated state with series data from DB');
                   initializedRef.current.add(workoutId);
                   return { ...prev, computed };
                 }
+                console.log('⏭️ [CompletedTab] Series unchanged, skipping update');
                 initializedRef.current.add(workoutId);
                 return prev;
               });
               return;
+            } else {
+              console.log('⏭️ [CompletedTab] No series data in DB yet');
             }
+          } else {
+            console.warn('⚠️ [CompletedTab] DB query error or no data:', error);
           }
         } catch (err) {
-          console.warn('Failed to check database for series:', err);
+          console.warn('❌ [CompletedTab] Failed to check database for series:', err);
           checkedDbRef.current.delete(workoutId); // Allow retry on error
         }
       
@@ -1803,8 +1818,19 @@ const formatMovingTime = () => {
           Array.isArray(finalTrack) && 
           finalTrack.length > 1;
         
+        console.log('🗺️ [CompletedTab] Map render check:', {
+          workoutId: (hydrated||workoutData)?.id,
+          hasValidSeries,
+          hasValidTrack,
+          finalSeriesLength: finalSeries?.distance_m?.length || 0,
+          finalTrackLength: finalTrack?.length || 0,
+          hydratedHasSeries: !!hydrated?.computed?.analysis?.series,
+          workoutDataHasSeries: !!workoutData?.computed?.analysis?.series
+        });
+        
         if (!hasValidSeries && !hasValidTrack) {
           // Don't render map if no data - prevents blink
+          console.log('⏭️ [CompletedTab] Skipping map render - no valid data');
           return null;
         }
         
