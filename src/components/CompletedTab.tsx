@@ -74,11 +74,25 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
     if (!workoutId) return;
     
     // Check if we already have series in state (avoid unnecessary DB check)
-    const currentSeries = (hydrated||workoutData)?.computed?.analysis?.series || null;
+    // Check both hydrated and workoutData props to avoid unnecessary updates
+    const hydratedSeries = hydrated?.computed?.analysis?.series;
+    const propsSeries = workoutData?.computed?.analysis?.series;
+    const currentSeries = hydratedSeries || propsSeries || null;
     const hasSeriesInState = currentSeries && Array.isArray(currentSeries?.distance_m) && currentSeries.distance_m.length > 1;
     
     if (hasSeriesInState) {
       // Already have data, no need to check DB or process
+      // Sync hydrated with workoutData if needed (only if different to prevent re-render)
+      if (!hydratedSeries && propsSeries) {
+        // workoutData has it but hydrated doesn't - update once
+        setHydrated((prev: any) => {
+          // Only update if computed is actually different
+          if (prev?.computed !== workoutData.computed) {
+            return { ...prev, computed: workoutData.computed };
+          }
+          return prev;
+        });
+      }
       return;
     }
     
@@ -102,9 +116,24 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
             
             if (hasSeries) {
               // Data exists in DB, update component state only if different
+              // Use a more efficient comparison - check if prev already has the same series
               setHydrated((prev: any) => {
                 const prevComputed = prev?.computed;
                 const prevSeries = prevComputed?.analysis?.series;
+                
+                // Quick check: if prevSeries exists and has same length, likely same data
+                if (prevSeries && Array.isArray(prevSeries?.distance_m) && 
+                    prevSeries.distance_m.length === series.distance_m.length &&
+                    prevSeries.distance_m.length > 0) {
+                  // Compare first and last values as quick check
+                  if (prevSeries.distance_m[0] === series.distance_m[0] &&
+                      prevSeries.distance_m[prevSeries.distance_m.length - 1] === 
+                      series.distance_m[series.distance_m.length - 1]) {
+                    // Likely the same data, don't update to prevent re-render
+                    return prev;
+                  }
+                }
+                
                 // Only update if series is actually different to prevent re-render loops
                 if (JSON.stringify(prevSeries) !== JSON.stringify(series)) {
                   return { ...prev, computed };
@@ -177,6 +206,20 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
             setHydrated((prev: any) => {
               const prevComputed = prev?.computed;
               const prevSeries = prevComputed?.analysis?.series;
+              
+              // Quick check: if prevSeries exists and has same length, likely same data
+              if (prevSeries && Array.isArray(prevSeries?.distance_m) && 
+                  prevSeries.distance_m.length === s.distance_m.length &&
+                  prevSeries.distance_m.length > 0) {
+                // Compare first and last values as quick check
+                if (prevSeries.distance_m[0] === s.distance_m[0] &&
+                    prevSeries.distance_m[prevSeries.distance_m.length - 1] === 
+                    s.distance_m[s.distance_m.length - 1]) {
+                  // Likely the same data, don't update to prevent re-render
+                  return prev;
+                }
+              }
+              
               // Only update if series is actually different to prevent re-render loops
               if (JSON.stringify(prevSeries) !== JSON.stringify(s)) {
                 return { ...prev, computed };
