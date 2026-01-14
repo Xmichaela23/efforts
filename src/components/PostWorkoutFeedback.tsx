@@ -163,6 +163,24 @@ export default function PostWorkoutFeedback({
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Verify workout exists before saving
+      const { data: workoutCheck, error: checkError } = await supabase
+        .from('workouts')
+        .select('id')
+        .eq('id', workoutId)
+        .single();
+
+      if (checkError || !workoutCheck) {
+        console.error('❌ [PostWorkoutFeedback] Workout not found:', workoutId, checkError);
+        toast({
+          title: 'Error',
+          description: 'Workout not found. It may have been deleted.',
+          variant: 'destructive',
+        });
+        onClose?.();
+        return;
+      }
+
       const updateData: any = {};
       
       if (selectedGearId) {

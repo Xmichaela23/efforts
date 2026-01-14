@@ -320,6 +320,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           return;
         }
 
+        // Verify workout exists before showing popup
+        const { data: workoutCheck, error: checkError } = await supabase
+          .from('workouts')
+          .select('id, type, name, gear_id, rpe')
+          .eq('id', workoutId)
+          .single();
+
+        if (checkError || !workoutCheck) {
+          console.error('❌ [Feedback Check] Workout not found:', workoutId, checkError);
+          return;
+        }
+
         console.log('🎯 Server says workout needs feedback:', workoutId);
         feedbackShownIdsRef.current.add(workoutId);
         setFeedbackWorkout({
@@ -441,6 +453,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               !workout.feedback_dismissed_at && 
               isWithin7Days &&
               !feedbackShownIdsRef.current.has(workoutId)) {
+            // Double-check workout still exists before showing popup
+            const { data: workoutVerify, error: verifyError } = await supabase
+              .from('workouts')
+              .select('id, type, name, gear_id, rpe')
+              .eq('id', workoutId)
+              .single();
+
+            if (verifyError || !workoutVerify) {
+              console.error('❌ [Feedback Check] Workout not found when trying to show popup:', workoutId, verifyError);
+              return;
+            }
+
             console.log('✅ [Feedback Check] Showing popup for workout:', workoutId);
             feedbackShownIdsRef.current.add(workoutId);
             setFeedbackWorkout({
