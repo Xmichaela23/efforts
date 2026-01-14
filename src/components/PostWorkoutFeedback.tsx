@@ -5,7 +5,7 @@ import { SPORT_COLORS } from '@/lib/context-utils';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
 import { useAppContext } from '@/contexts/AppContext';
-import EffortsViewerMapbox from './EffortsViewerMapbox';
+import MapEffort from './MapEffort';
 import {
   Select,
   SelectContent,
@@ -383,16 +383,16 @@ export default function PostWorkoutFeedback({
         )}
       </div>
 
-      {/* Map Preview - Bigger to see the route */}
+      {/* Map Preview - Bigger to see the route (map only, no charts/metrics) */}
       {hasMapData && (
         <div className="rounded-lg overflow-hidden" style={{ height: '280px' }}>
-          <EffortsViewerMapbox
-            samples={seriesData || []}
+          <MapEffort
             trackLngLat={gpsTrack}
+            cursorDist_m={null}
+            totalDist_m={seriesData?.distance_m?.[seriesData.distance_m.length - 1] || null}
+            theme="topo"
+            height={280}
             useMiles={useImperial}
-            useFeet={useImperial}
-            compact={true}
-            workoutData={{ type: workoutType, ...workoutData }}
           />
         </div>
       )}
