@@ -351,6 +351,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   }, [activeBottomNav]);
 
   // Check when viewing a completed workout (post-workout summary)
+  // For specific workouts, check if THAT workout needs feedback (not the most recent)
   useEffect(() => {
     if (selectedWorkout && 
         String(selectedWorkout.workout_status || '').toLowerCase() === 'completed' &&
@@ -358,9 +359,53 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         !selectedWorkout.rpe &&
         !feedbackWorkout) {
       const workoutId = String(selectedWorkout.id);
-      if (!feedbackShownIdsRef.current.has(workoutId) && !feedbackDismissedRef.current.has(workoutId)) {
-        checkForFeedbackNeeded();
+      
+      // Skip if already shown or dismissed in this session
+      if (feedbackShownIdsRef.current.has(workoutId) || feedbackDismissedRef.current.has(workoutId)) {
+        return;
       }
+
+      // Check if this specific workout is dismissed in the database
+      const checkSpecificWorkout = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          // Check if this specific workout is dismissed or has RPE
+          const { data: workout, error } = await supabase
+            .from('workouts')
+            .select('id, type, name, gear_id, rpe, feedback_dismissed_at, date')
+            .eq('id', workoutId)
+            .eq('user_id', user.id)
+            .single();
+
+          if (error || !workout) return;
+
+          // Only show if: no RPE, not dismissed, and within last 7 days
+          const workoutDate = new Date(workout.date);
+          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          const isWithin7Days = workoutDate >= sevenDaysAgo;
+
+          if (!workout.rpe && 
+              !workout.feedback_dismissed_at && 
+              isWithin7Days &&
+              !feedbackShownIdsRef.current.has(workoutId)) {
+            console.log('🎯 Selected workout needs feedback:', workoutId);
+            feedbackShownIdsRef.current.add(workoutId);
+            setFeedbackWorkout({
+              id: workoutId,
+              type: workout.type as 'run' | 'ride',
+              name: workout.name || `${workout.type} workout`,
+              existingGearId: workout.gear_id || null,
+              existingRpe: workout.rpe || null,
+            });
+          }
+        } catch (e) {
+          console.error('Error checking specific workout for feedback:', e);
+        }
+      };
+
+      checkSpecificWorkout();
     }
   }, [selectedWorkout]);
 
