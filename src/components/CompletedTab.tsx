@@ -68,31 +68,50 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
   
   // Trigger processing once and poll for completion when series is missing
   useEffect(() => {
-    const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
-    const hasSeries = series && Array.isArray(series?.distance_m) && series.distance_m.length > 1;
     const workoutId = (hydrated||workoutData)?.id;
+    if (!workoutId) return;
     
-    // If we have series or no workout ID, do nothing
-    if (hasSeries || !workoutId) {
-      return;
-    }
-    
-    // If we already triggered processing for this workout, just poll (don't trigger again)
-    const alreadyTriggered = processingTriggeredRef.current.has(workoutId);
-    
-    if (!alreadyTriggered) {
-      // Mark as triggered immediately to prevent duplicate triggers
-      processingTriggeredRef.current.add(workoutId);
+    // Check database first (might have data even if component state is stale)
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('workouts')
+          .select('computed')
+          .eq('id', workoutId)
+          .single();
+        
+        if (!error && data) {
+          const computed = typeof data.computed === 'string' ? JSON.parse(data.computed) : data.computed;
+          const series = computed?.analysis?.series || null;
+          const hasSeries = series && Array.isArray(series?.distance_m) && series.distance_m.length > 1;
+          
+          if (hasSeries) {
+            // Data exists in DB, update component state and return
+            setHydrated((prev: any) => ({ ...prev, computed }));
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to check database for series:', err);
+      }
       
-      // Trigger processing once (fire-and-forget)
-      supabase.functions.invoke('compute-workout-analysis', {
-        body: { workout_id: workoutId }
-      }).catch(err => {
-        console.warn('Failed to trigger processing:', err);
-        // Remove from set on error so it can retry
-        processingTriggeredRef.current.delete(workoutId);
-      });
-    }
+      // Data doesn't exist, check if we already triggered
+      const alreadyTriggered = processingTriggeredRef.current.has(workoutId);
+      
+      if (!alreadyTriggered) {
+        // Mark as triggered immediately to prevent duplicate triggers
+        processingTriggeredRef.current.add(workoutId);
+        
+        // Trigger processing once (fire-and-forget)
+        supabase.functions.invoke('compute-workout-analysis', {
+          body: { workout_id: workoutId }
+        }).catch(err => {
+          console.warn('Failed to trigger processing:', err);
+          // Remove from set on error so it can retry
+          processingTriggeredRef.current.delete(workoutId);
+        });
+      }
+    })();
     
     // Poll for completion (whether we just triggered or were already polling)
     let attempt = 0;
@@ -153,7 +172,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData }) => {
         pollingTimeoutRef.current = null;
       }
     };
-  }, [hydrated, workoutData]);
+  }, [(hydrated||workoutData)?.id, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);
   
   useEffect(() => {
     setHydrated((prev: any) => {
