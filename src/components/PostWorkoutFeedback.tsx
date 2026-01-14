@@ -145,6 +145,7 @@ export default function PostWorkoutFeedback({
         return;
       }
 
+      console.log('📅 [PostWorkoutFeedback] Loaded workout data:', { date: data?.date, distance: data?.distance });
       setWorkoutData(data);
     } catch (e) {
       console.error('Error loading workout data:', e);
@@ -335,6 +336,11 @@ export default function PostWorkoutFeedback({
 
   const distanceText = formatDistance(workoutData?.distance);
   const dateText = formatDate(workoutData?.date);
+  console.log('📅 [PostWorkoutFeedback] Date formatting:', { 
+    rawDate: workoutData?.date, 
+    formattedDate: dateText,
+    hasWorkoutData: !!workoutData 
+  });
   const gpsTrack = getGpsTrack();
   const seriesData = getSeriesData();
   const hasMapData = (gpsTrack.length > 1) || (seriesData?.distance_m && Array.isArray(seriesData.distance_m) && seriesData.distance_m.length > 1);
