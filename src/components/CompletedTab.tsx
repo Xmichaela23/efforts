@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
