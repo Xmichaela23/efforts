@@ -118,6 +118,8 @@ Deno.serve(async (req) => {
       'achievements',
       // Workload data (single source of truth from calculate-workload)
       'workload_actual','workload_planned','intensity_factor',
+      // GPS trackpoints (polyline) for fallback when gps_track is missing
+      'gps_trackpoints',
       // Timestamp for processing trigger deduplication
       'updated_at'
     ].join(',');
