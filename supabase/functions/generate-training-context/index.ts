@@ -709,7 +709,10 @@ function calculateSportBreakdown(
 
     // Debug logging for strength workouts
     if (w.type && (w.type.toLowerCase().includes('strength') || w.type.toLowerCase().includes('weight'))) {
-      console.log(`💪 Strength workout found: type="${w.type}" -> normalized="${type}", workload=${workload}, date=${w.date}`);
+      console.log(`💪 Strength workout found: type="${w.type}" -> normalized="${type}", workload=${workload}, date=${w.date}, id=${w.id}`);
+      if (workload === 0) {
+        console.log(`⚠️  Strength workout has workload=0 - may need recalculation. Check if it has strength_exercises data.`);
+      }
     }
 
     if (type in breakdown && type !== 'total_workload') {

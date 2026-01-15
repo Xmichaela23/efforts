@@ -925,6 +925,61 @@ serve(async (req) => {
       workoutStatus = workoutStatus || workout_data.workout_status || 'completed';
     }
     
+    // Parse strength_exercises if it's a string (JSONB from database can be stringified)
+    // This MUST happen before any debug logging or calculation
+    // Handle multiple cases: string, double-encoded string, or already an array
+    if (finalWorkoutData.strength_exercises !== null && finalWorkoutData.strength_exercises !== undefined) {
+      let exercises = finalWorkoutData.strength_exercises;
+      
+      // If it's a string, try to parse it (may need multiple passes for double-encoded JSONB)
+      if (typeof exercises === 'string') {
+        try {
+          // First parse attempt
+          exercises = JSON.parse(exercises);
+          console.log(`[calculate-workload] ✅ First parse: ${typeof exercises}, isArray: ${Array.isArray(exercises)}`);
+          
+          // If result is still a string, parse again (double-encoded JSONB)
+          if (typeof exercises === 'string') {
+            exercises = JSON.parse(exercises);
+            console.log(`[calculate-workload] ✅ Second parse (double-encoded): ${typeof exercises}, isArray: ${Array.isArray(exercises)}`);
+          }
+          
+          // Final check - must be an array
+          if (Array.isArray(exercises)) {
+            finalWorkoutData.strength_exercises = exercises;
+            console.log(`[calculate-workload] ✅ Parsed strength_exercises from string to array (${exercises.length} items)`);
+          } else {
+            console.error(`[calculate-workload] ❌ Parsed string but result is not an array: ${typeof exercises}`);
+            finalWorkoutData.strength_exercises = [];
+          }
+        } catch (e) {
+          console.error(`[calculate-workload] ❌ Failed to parse strength_exercises string:`, e);
+          console.error(`[calculate-workload] String value (first 200 chars): ${exercises.substring(0, 200)}`);
+          finalWorkoutData.strength_exercises = [];
+        }
+      } else if (!Array.isArray(exercises)) {
+        console.warn(`[calculate-workload] ⚠️  strength_exercises is neither string nor array: ${typeof exercises}`);
+        finalWorkoutData.strength_exercises = [];
+      }
+      // If it's already an array, leave it as-is
+    }
+    
+    // Parse mobility_exercises if it's a string
+    if (finalWorkoutData.mobility_exercises) {
+      if (typeof finalWorkoutData.mobility_exercises === 'string') {
+        try {
+          const parsed = JSON.parse(finalWorkoutData.mobility_exercises);
+          finalWorkoutData.mobility_exercises = parsed;
+          console.log(`[calculate-workload] ✅ Parsed mobility_exercises from string to array`);
+        } catch (e) {
+          console.error(`[calculate-workload] ❌ Failed to parse mobility_exercises string:`, e);
+          finalWorkoutData.mobility_exercises = [];
+        }
+      } else if (!Array.isArray(finalWorkoutData.mobility_exercises)) {
+        finalWorkoutData.mobility_exercises = [];
+      }
+    }
+    
     // Inject user's FTP and threshold HR into workout data if not already present
     // This allows power/HR-based intensity calculation for Strava/Garmin imports
     // Use sport-specific learned thresholds when available

@@ -1330,9 +1330,11 @@ export const useWorkouts = () => {
         usercomments: workoutData.userComments ?? "",
         completedmanually: workoutData.completedManually ?? false,
         workout_status: workoutData.workout_status ?? "planned",
-        intervals: workoutData.intervals ? JSON.stringify(workoutData.intervals) : JSON.stringify([]),
-        strength_exercises: workoutData.strength_exercises ? JSON.stringify(workoutData.strength_exercises) : JSON.stringify([]),
-        mobility_exercises: (workoutData as any).mobility_exercises ? JSON.stringify((workoutData as any).mobility_exercises) : JSON.stringify([]),
+        // JSONB columns: pass raw arrays/objects, Supabase handles conversion
+        // DO NOT stringify JSONB columns - PostgREST will convert automatically
+        intervals: workoutData.intervals || [],
+        strength_exercises: workoutData.strength_exercises || [],
+        mobility_exercises: (workoutData as any).mobility_exercises || [],
         user_id: user.id,
         avg_heart_rate: workoutData.avg_heart_rate,
         max_heart_rate: workoutData.max_heart_rate,
@@ -1656,9 +1658,11 @@ export const useWorkouts = () => {
       if (updates.userComments !== undefined) updateObject.usercomments = updates.userComments;
       if (updates.completedManually !== undefined) updateObject.completedmanually = updates.completedManually;
       if (updates.workout_status !== undefined) updateObject.workout_status = updates.workout_status;
-      if (updates.intervals !== undefined) updateObject.intervals = JSON.stringify(updates.intervals);
-      if (updates.strength_exercises !== undefined) updateObject.strength_exercises = JSON.stringify(updates.strength_exercises);
-      if ((updates as any).mobility_exercises !== undefined) updateObject.mobility_exercises = JSON.stringify((updates as any).mobility_exercises);
+      // JSONB columns: pass raw arrays/objects, Supabase handles conversion
+      // DO NOT stringify JSONB columns - PostgREST will convert automatically
+      if (updates.intervals !== undefined) updateObject.intervals = updates.intervals;
+      if (updates.strength_exercises !== undefined) updateObject.strength_exercises = updates.strength_exercises;
+      if ((updates as any).mobility_exercises !== undefined) updateObject.mobility_exercises = (updates as any).mobility_exercises;
       if (updates.avg_heart_rate !== undefined) updateObject.avg_heart_rate = updates.avg_heart_rate;
       if (updates.max_heart_rate !== undefined) updateObject.max_heart_rate = updates.max_heart_rate;
       if (updates.avg_power !== undefined) updateObject.avg_power = updates.avg_power;
