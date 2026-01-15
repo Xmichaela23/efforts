@@ -1812,6 +1812,18 @@ const formatMovingTime = () => {
           })
           .filter(Boolean) as [number,number][];
         
+        // Check if this is an indoor/treadmill workout (no GPS expected)
+        const workout = hydrated || workoutData;
+        const isTrainer = (workout as any)?.strava_data?.original_activity?.trainer === true;
+        const providerSport = String((workout as any)?.provider_sport || (workout as any)?.activity_type || '').toLowerCase();
+        const isTreadmill = providerSport.includes('treadmill') || isTrainer;
+        const hasStartPosition = Number.isFinite((workout as any)?.start_position_lat) && 
+                                 (workout as any)?.start_position_lat !== 0;
+        // Only classify as indoor if we're sure: trainer flag OR (gps_track explicitly empty AND no start position)
+        const isConfirmedIndoor = isTrainer || 
+                                  (Array.isArray(finalTrack) && finalTrack.length === 0 && !hasStartPosition);
+        const isIndoorRun = ((workoutData.type === 'run' || workoutData.type === 'walk') && isConfirmedIndoor) || isTreadmill;
+        
         // Only render map if we have valid data (prevents initial blink)
         const hasValidSeries = finalSeries && 
           Array.isArray(finalSeries?.distance_m) && 
@@ -1827,8 +1839,17 @@ const formatMovingTime = () => {
           finalSeriesLength: finalSeries?.distance_m?.length || 0,
           finalTrackLength: finalTrack?.length || 0,
           hydratedHasSeries: !!hydrated?.computed?.analysis?.series,
-          workoutDataHasSeries: !!workoutData?.computed?.analysis?.series
+          workoutDataHasSeries: !!workoutData?.computed?.analysis?.series,
+          isIndoorRun,
+          isTreadmill,
+          isTrainer
         });
+        
+        // Skip map for indoor/treadmill workouts (no GPS data expected)
+        if (isIndoorRun) {
+          console.log('⏭️ [CompletedTab] Skipping map render - indoor/treadmill workout');
+          return null;
+        }
         
         if (!hasValidSeries && !hasValidTrack) {
           // Don't render map if no data - prevents blink
