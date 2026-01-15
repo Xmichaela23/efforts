@@ -18,6 +18,7 @@ import PowerZoneChart from './PowerZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 import { computeDistanceKm } from '@/utils/workoutDataDerivation';
+import { isVirtualActivity } from '@/utils/workoutNames';
 import { formatDuration, formatPace, formatElevation, formatDistance, formatSwimPace } from '@/utils/workoutFormatting';
 import { useWorkoutData } from '@/hooks/useWorkoutData';
 // keeping local logic for now; Today's view uses shared resolver
@@ -1812,19 +1813,11 @@ const formatMovingTime = () => {
           })
           .filter(Boolean) as [number,number][];
         
-        // Check if this is an indoor/treadmill workout (no GPS expected)
+        // Check if this is an indoor/treadmill workout (EffortsViewerMapbox will show placeholder)
         const workout = hydrated || workoutData;
-        const isTrainer = (workout as any)?.strava_data?.original_activity?.trainer === true;
-        const providerSport = String((workout as any)?.provider_sport || (workout as any)?.activity_type || '').toLowerCase();
-        const isTreadmill = providerSport.includes('treadmill') || isTrainer;
-        const hasStartPosition = Number.isFinite((workout as any)?.start_position_lat) && 
-                                 (workout as any)?.start_position_lat !== 0;
-        // Only classify as indoor if we're sure: trainer flag OR (gps_track explicitly empty AND no start position)
-        const isConfirmedIndoor = isTrainer || 
-                                  (Array.isArray(finalTrack) && finalTrack.length === 0 && !hasStartPosition);
-        const isIndoorRun = ((workoutData.type === 'run' || workoutData.type === 'walk') && isConfirmedIndoor) || isTreadmill;
+        const isVirtual = isVirtualActivity(workout);
         
-        // Only render map if we have valid data (prevents initial blink)
+        // Only render map if we have valid data OR if it's a virtual/indoor workout (which shows placeholder)
         const hasValidSeries = finalSeries && 
           Array.isArray(finalSeries?.distance_m) && 
           finalSeries.distance_m.length > 1;
@@ -1840,18 +1833,12 @@ const formatMovingTime = () => {
           finalTrackLength: finalTrack?.length || 0,
           hydratedHasSeries: !!hydrated?.computed?.analysis?.series,
           workoutDataHasSeries: !!workoutData?.computed?.analysis?.series,
-          isIndoorRun,
-          isTreadmill,
-          isTrainer
+          isVirtual
         });
         
-        // Skip map for indoor/treadmill workouts (no GPS data expected)
-        if (isIndoorRun) {
-          console.log('⏭️ [CompletedTab] Skipping map render - indoor/treadmill workout');
-          return null;
-        }
-        
-        if (!hasValidSeries && !hasValidTrack) {
+        // Render map component for all workouts - it will show placeholder for indoor/treadmill
+        // Only skip if we have no data AND it's not a virtual activity
+        if (!isVirtual && !hasValidSeries && !hasValidTrack) {
           // Don't render map if no data - prevents blink
           console.log('⏭️ [CompletedTab] Skipping map render - no valid data');
           return null;
