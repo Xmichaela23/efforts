@@ -320,6 +320,7 @@ Deno.serve(async (req) => {
       }
       
       (detail as any).gps_track = gpsTrack;
+      console.log(`[workout-detail] Final gps_track for workout ${id}: ${gpsTrack ? (Array.isArray(gpsTrack) ? `${gpsTrack.length} points` : 'non-array') : 'null'}`);
     }
     if (opts.include_sensors) {
       try { (detail as any).sensor_data = typeof row.sensor_data === 'string' ? JSON.parse(row.sensor_data) : (row.sensor_data || null); } catch { (detail as any).sensor_data = row.sensor_data || null; }
