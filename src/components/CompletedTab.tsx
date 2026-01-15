@@ -1509,8 +1509,8 @@ const formatMovingTime = () => {
           <div className="px-2 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               <Select
-                value={((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : undefined}
-                onValueChange={(value) => handleFeedbackChange('rpe', parseInt(value))}
+                value={((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : ""}
+                onValueChange={(value) => handleFeedbackChange('rpe', value ? parseInt(value) : null)}
                 disabled={savingFeedback}
               >
                 <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full justify-start p-0">
@@ -1540,14 +1540,12 @@ const formatMovingTime = () => {
             <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               <Select
                 value={(() => {
-                  // If gear_id is set, use it; otherwise default to user's default gear
+                  // Only use actual gear_id from workout, not default gear (for controlled component)
                   const currentData = hydrated || workoutData;
                   const existingGearId = (currentData as any)?.gear_id;
-                  if (existingGearId) return existingGearId;
-                  const defaultGear = gear.find(g => g.is_default);
-                  return defaultGear?.id || undefined;
+                  return existingGearId || "";
                 })()}
-                onValueChange={(value) => handleFeedbackChange('gear_id', value)}
+                onValueChange={(value) => handleFeedbackChange('gear_id', value || null)}
                 disabled={savingFeedback || gearLoading}
               >
                 <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full p-0 [&>svg]:hidden [&>span]:text-center [&>span]:block">
