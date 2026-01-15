@@ -88,10 +88,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       console.log('🔄 [UnifiedWorkoutView] Refreshing workout data after auto-attach or realtime update...');
       try {
         // Fetch the updated workout data from the database
-        // Explicitly select workout_analysis to ensure it's included
+        // Explicitly select workout_analysis, rpe, and gear_id to ensure they're included
         const { data: refreshedWorkout, error } = await supabase
           .from('workouts')
-          .select('*, workout_analysis')
+          .select('*, workout_analysis, rpe, gear_id')
           .eq('id', workout.id)
           .single();
         
