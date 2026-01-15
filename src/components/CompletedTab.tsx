@@ -163,6 +163,12 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         await updateWorkout(workoutData.id, updateData);
       }
 
+      // Update local hydrated state immediately so UI reflects the change
+      setHydrated((prev: any) => {
+        if (!prev || prev.id !== workoutData.id) return prev;
+        return { ...prev, [field]: value };
+      });
+
       // If gear_id was changed, reload gear to get updated miles (trigger updates gear.total_distance)
       if (field === 'gear_id') {
         await loadGear();
