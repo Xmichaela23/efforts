@@ -406,12 +406,16 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         next.max_speed = (prev as any).max_speed;
       }
       
-      // Preserve RPE and gear_id from prev if they exist (user may have just changed them)
-      // Only overwrite if workoutData has a new value (not null/undefined)
-      if ((prev as any)?.rpe != null && ((workoutData as any)?.rpe == null || (workoutData as any)?.rpe === undefined)) {
+      // For RPE and gear_id: prefer workoutData (from database) if it exists, otherwise preserve prev (local changes)
+      // This ensures that when workoutData refetches with fresh data, we use that instead of stale local state
+      if ((workoutData as any)?.rpe != null && (workoutData as any)?.rpe !== undefined) {
+        next.rpe = (workoutData as any).rpe;
+      } else if ((prev as any)?.rpe != null) {
         next.rpe = (prev as any).rpe;
       }
-      if ((prev as any)?.gear_id != null && ((workoutData as any)?.gear_id == null || (workoutData as any)?.gear_id === undefined)) {
+      if ((workoutData as any)?.gear_id != null && (workoutData as any)?.gear_id !== undefined) {
+        next.gear_id = (workoutData as any).gear_id;
+      } else if ((prev as any)?.gear_id != null) {
         next.gear_id = (prev as any).gear_id;
       }
       
