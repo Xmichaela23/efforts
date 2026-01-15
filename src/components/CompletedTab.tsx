@@ -176,8 +176,10 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
       await queryClient.invalidateQueries({ queryKey: ['workout-detail', workoutData.id] });
       await queryClient.refetchQueries({ queryKey: ['workout-detail', workoutData.id] });
       
-      // Also dispatch event to trigger refresh in parent components (AppLayout's refreshSelectedWorkout)
+      // Also dispatch events to trigger refresh in parent components
+      // UnifiedWorkoutView listens to both workout:invalidate and workouts:invalidate
       window.dispatchEvent(new CustomEvent('workout-detail:invalidate'));
+      window.dispatchEvent(new CustomEvent('workout:invalidate'));
       window.dispatchEvent(new CustomEvent('workouts:invalidate'));
 
       // If gear_id was changed, reload gear to get updated miles (trigger updates gear.total_distance)
