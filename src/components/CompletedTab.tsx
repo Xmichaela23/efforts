@@ -1860,14 +1860,9 @@ const formatMovingTime = () => {
           return null;
         }
         
-        // If we should show placeholder, ensure workoutData is marked as virtual for EffortsViewerMapbox
-        const workoutDataForMap = shouldShowPlaceholder && !isVirtual
-          ? { ...workout, gps_track: [] } // Force empty array to trigger placeholder
-          : workout;
-        
         // Use memoized props computed at component level (prevents re-renders)
         // No client-side series transformation; use server-provided series as-is
-        // Pass workoutDataForMap to ensure treadmill detection works
+        // If we should show placeholder, ensure workoutData is marked as virtual for EffortsViewerMapbox
         const mapWorkoutData = shouldShowPlaceholder && !isVirtual
           ? { ...mapProps.workoutData, gps_track: [] } // Force empty array to trigger placeholder
           : mapProps.workoutData;
