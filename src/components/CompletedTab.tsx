@@ -140,6 +140,10 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
       }
 
       setGear(data || []);
+      // Debug: log gear with total_distance
+      if (data && data.length > 0) {
+        console.log('🔧 [Gear] Loaded gear:', data.map(g => ({ name: g.name, total_distance: g.total_distance })));
+      }
     } catch (e) {
       console.error('Error loading gear:', e);
     } finally {
@@ -183,7 +187,9 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
       window.dispatchEvent(new CustomEvent('workouts:invalidate'));
 
       // If gear_id was changed, reload gear to get updated miles (trigger updates gear.total_distance)
+      // Add a small delay to ensure the database trigger has completed
       if (field === 'gear_id') {
+        await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms for trigger to complete
         await loadGear();
       }
     } catch (e: any) {
