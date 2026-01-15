@@ -229,6 +229,25 @@
     padding-left: 1rem; /* Add some spacing between panels */
   }
 
+  /* Vertical dots menu icon - analog hardware utility control aesthetic */
+  .vertical-dots-icon {
+    transition: all 0.2s ease;
+  }
+
+  /* Hover state: increase opacity */
+  button:hover .vertical-dots-icon circle {
+    fill: rgba(255, 255, 255, 0.9);
+  }
+
+  /* Active/press state: teal glow */
+  button:active .vertical-dots-icon circle {
+    fill: rgba(255, 255, 255, 0.9);
+  }
+
+  button:active .vertical-dots-icon {
+    filter: drop-shadow(0 0 8px rgba(20, 184, 166, 0.4));
+  }
+
   /* 🚨 MOBILE TAB BAR - fixed with glassmorphism blur effect */
   .mobile-tabbar {
     position: fixed;

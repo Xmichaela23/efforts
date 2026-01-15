@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Menu, User, Upload, Download, Settings, Activity, Link, Package } from 'lucide-react';
+import { User, Upload, Download, Settings, Activity, Link, Package } from 'lucide-react';
 import { EffortsWordmark } from './EffortsButton';
 
 interface MobileHeaderProps {
@@ -89,8 +89,34 @@ export function MobileHeader({
           <div className="flex items-center pl-4 w-12">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="p-0.5 text-white/80 hover:text-white hover:bg-white/10">
-                  <Menu className="h-5 w-5" />
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="p-0 text-white/70 hover:text-white/90 hover:bg-white/10 transition-all duration-200"
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  aria-label="Menu"
+                >
+                  <svg 
+                    width="3" 
+                    height="16" 
+                    viewBox="0 0 3 16" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="vertical-dots-icon"
+                    style={{
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <circle cx="1.5" cy="1.5" r="1.5" fill="rgba(255, 255, 255, 0.7)"/>
+                    <circle cx="1.5" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.7)"/>
+                    <circle cx="1.5" cy="14.5" r="1.5" fill="rgba(255, 255, 255, 0.7)"/>
+                  </svg>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 bg-white/[0.12] backdrop-blur-xl border border-white/25">
