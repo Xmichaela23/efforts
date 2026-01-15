@@ -1001,6 +1001,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const handleBackToDashboard = () => {
     const comingFromPlanBuilder = showPlanBuilder;
     const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
+    const wasViewingWorkout = !!selectedWorkout; // Track if we were viewing a workout
 
     setShowStrengthLogger(false);
     setShowPilatesYogaLogger(false);
@@ -1018,6 +1019,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
     setActiveTab('summary');
+
+    // If we were viewing a workout (not from builder), reset date to today and sync calendar
+    if (wasViewingWorkout && !shouldReturnToSummary) {
+      const today = new Date().toLocaleDateString('en-CA');
+      setSelectedDate(today);
+      // Sync calendar to current week
+      window.dispatchEvent(new CustomEvent('week:navigate', { 
+        detail: { date: today } 
+      }));
+    }
 
     if (shouldReturnToSummary) {
       const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
