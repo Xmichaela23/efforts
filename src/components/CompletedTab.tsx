@@ -21,6 +21,7 @@ import { computeDistanceKm } from '@/utils/workoutDataDerivation';
 import { isVirtualActivity } from '@/utils/workoutNames';
 import { formatDuration, formatPace, formatElevation, formatDistance, formatSwimPace } from '@/utils/workoutFormatting';
 import { useWorkoutData } from '@/hooks/useWorkoutData';
+import { useQueryClient } from '@tanstack/react-query';
 // keeping local logic for now; Today's view uses shared resolver
 
 // Custom styles for range sliders
@@ -66,6 +67,7 @@ interface GearItem {
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) => {
   const { useImperial } = useAppContext();
   const compact = useCompact();
+  const queryClient = useQueryClient();
   
   const { updateWorkout } = useWorkouts();
   const [selectedMetric, setSelectedMetric] = useState('speed'); // Start with pace/speed
@@ -168,6 +170,9 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         if (!prev || prev.id !== workoutData.id) return prev;
         return { ...prev, [field]: value };
       });
+
+      // Invalidate workout-detail query cache so useWorkoutDetail refetches
+      queryClient.invalidateQueries({ queryKey: ['workout-detail', workoutData.id] });
 
       // If gear_id was changed, reload gear to get updated miles (trigger updates gear.total_distance)
       if (field === 'gear_id') {
