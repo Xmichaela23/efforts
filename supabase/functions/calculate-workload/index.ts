@@ -248,36 +248,50 @@ function calculateWorkload(workout: WorkoutData, sessionRPE?: number): number {
  */
 function calculateStrengthWorkload(exercises: any[], sessionRPE?: number): number {
   if (!Array.isArray(exercises) || exercises.length === 0) {
+    console.log('[Strength Workload] No exercises array or empty array');
     return 0;
   }
+  
+  console.log(`[Strength Workload] Processing ${exercises.length} exercises`);
   
   let totalVolume = 0; // Total weight × reps across all exercises
   let totalSets = 0;
   let totalRIR = 0;
   let rirCount = 0;
   
-  exercises.forEach(ex => {
+  exercises.forEach((ex, exIdx) => {
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {
-      ex.sets.forEach((set: any) => {
+      console.log(`[Strength Workload] Exercise ${exIdx + 1} (${ex.name || 'unnamed'}): ${ex.sets.length} sets`);
+      ex.sets.forEach((set: any, setIdx: number) => {
         // Only count completed sets
         if (set.completed !== false) {
           const weight = Number(set.weight) || 0;
           const reps = Number(set.reps) || 0;
-          totalVolume += weight * reps;
+          const setVolume = weight * reps;
+          totalVolume += setVolume;
           totalSets += 1;
+          
+          console.log(`[Strength Workload]   Set ${setIdx + 1}: weight=${weight}, reps=${reps}, volume=${setVolume}`);
           
           // Collect RIR data
           if (typeof set.rir === 'number' && set.rir >= 0) {
             totalRIR += set.rir;
             rirCount += 1;
           }
+        } else {
+          console.log(`[Strength Workload]   Set ${setIdx + 1}: skipped (not completed)`);
         }
       });
+    } else {
+      console.log(`[Strength Workload] Exercise ${exIdx + 1} (${ex.name || 'unnamed'}): no sets array or empty sets`);
     }
   });
   
+  console.log(`[Strength Workload] Total volume: ${totalVolume} lbs, total sets: ${totalSets}, avg RIR: ${rirCount > 0 ? (totalRIR / rirCount).toFixed(1) : 'N/A'}`);
+  
   // Calculate intensity from Session RPE (primary) or RIR (secondary) and exercise characteristics
   const intensity = getStrengthIntensity(exercises, sessionRPE);
+  console.log(`[Strength Workload] Intensity: ${intensity.toFixed(2)} (sessionRPE: ${sessionRPE || 'N/A'})`);
   
   // Volume factor: normalize total volume to a reasonable scale
   // 10,000 lbs = factor of 1.0, scales linearly
@@ -287,8 +301,12 @@ function calculateStrengthWorkload(exercises: any[], sessionRPE?: number): numbe
   // Minimum volume factor to avoid zero workload for very light sessions
   const effectiveVolumeFactor = Math.max(volumeFactor, 0.1);
   
+  console.log(`[Strength Workload] Volume factor: ${volumeFactor.toFixed(3)}, effective: ${effectiveVolumeFactor.toFixed(3)}`);
+  
   // Calculate workload: volume_factor × intensity² × 100
   const workload = Math.round(effectiveVolumeFactor * Math.pow(intensity, 2) * 100);
+  
+  console.log(`[Strength Workload] Final workload: ${workload} (${effectiveVolumeFactor.toFixed(3)} × ${intensity.toFixed(2)}² × 100)`);
   
   return workload;
 }
@@ -981,9 +999,23 @@ serve(async (req) => {
       ? parsedMetadata.session_rpe 
       : undefined;
     
+    // Debug logging for strength workouts
+    if (finalWorkoutData.type === 'strength') {
+      console.log(`[calculate-workload] Strength workout detected`);
+      console.log(`[calculate-workload] Has strength_exercises: ${!!finalWorkoutData.strength_exercises}`);
+      console.log(`[calculate-workload] strength_exercises type: ${Array.isArray(finalWorkoutData.strength_exercises) ? 'array' : typeof finalWorkoutData.strength_exercises}`);
+      console.log(`[calculate-workload] strength_exercises length: ${Array.isArray(finalWorkoutData.strength_exercises) ? finalWorkoutData.strength_exercises.length : 'N/A'}`);
+      if (Array.isArray(finalWorkoutData.strength_exercises) && finalWorkoutData.strength_exercises.length > 0) {
+        console.log(`[calculate-workload] First exercise: ${JSON.stringify(finalWorkoutData.strength_exercises[0])}`);
+      }
+      console.log(`[calculate-workload] Session RPE: ${sessionRPE || 'N/A'}`);
+    }
+    
     // Calculate workload (all math happens server-side)
     const workload = calculateWorkload(finalWorkoutData, sessionRPE)
     const intensity = getSessionIntensity(finalWorkoutData, sessionRPE)
+    
+    console.log(`[calculate-workload] Calculated workload: ${workload}, intensity: ${intensity.toFixed(2)}`);
     
     // If workout is attached to a planned workout, fetch planned workload for comparison
     let plannedWorkload = null;

@@ -2425,9 +2425,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
       // Calculate workload for completed workout
       try {
-        await supabase.functions.invoke('calculate-workload', {
+        const workoutId = saved?.id || completedWorkout.id;
+        console.log('💪 Calling calculate-workload for strength workout:', workoutId);
+        console.log('💪 Strength exercises count:', completedWorkout.strength_exercises?.length || 0);
+        
+        const result = await supabase.functions.invoke('calculate-workload', {
           body: {
-            workout_id: saved?.id || completedWorkout.id,
+            workout_id: workoutId,
             workout_data: {
               type: completedWorkout.type,
               duration: completedWorkout.duration,
@@ -2438,9 +2442,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             }
           }
         });
-        console.log('✅ Workload calculated for completed workout');
+        
+        console.log('✅ Workload calculated for completed workout:', result);
+        if (result?.data) {
+          console.log('✅ Workload result:', {
+            workload_actual: result.data.workload_actual,
+            workload_method: result.data.workload_method
+          });
+        }
       } catch (workloadError) {
         console.error('❌ Failed to calculate workload:', workloadError);
+        console.error('❌ Workload error details:', JSON.stringify(workloadError, null, 2));
       }
 
       // Auto-attach to planned workout if possible
