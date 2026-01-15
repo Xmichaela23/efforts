@@ -171,8 +171,13 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         return { ...prev, [field]: value };
       });
 
-      // Invalidate workout-detail query cache so useWorkoutDetail refetches
+      // Invalidate and refetch workout-detail query cache so useWorkoutDetail gets fresh data
       queryClient.invalidateQueries({ queryKey: ['workout-detail', workoutData.id] });
+      queryClient.refetchQueries({ queryKey: ['workout-detail', workoutData.id] });
+      
+      // Also dispatch event to trigger refresh in parent components
+      window.dispatchEvent(new CustomEvent('workout-detail:invalidate'));
+      window.dispatchEvent(new CustomEvent('workouts:invalidate'));
 
       // If gear_id was changed, reload gear to get updated miles (trigger updates gear.total_distance)
       if (field === 'gear_id') {
@@ -398,6 +403,15 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         next.max_speed = (prev as any).max_speed;
       }
       
+      // Preserve RPE and gear_id from prev if they exist (user may have just changed them)
+      // Only overwrite if workoutData has a new value (not null/undefined)
+      if ((prev as any)?.rpe != null && ((workoutData as any)?.rpe == null || (workoutData as any)?.rpe === undefined)) {
+        next.rpe = (prev as any).rpe;
+      }
+      if ((prev as any)?.gear_id != null && ((workoutData as any)?.gear_id == null || (workoutData as any)?.gear_id === undefined)) {
+        next.gear_id = (prev as any).gear_id;
+      }
+      
       // CRITICAL: Only update if something actually changed (prevent infinite loop)
       // Compare key fields to avoid unnecessary re-renders
       if (prev && 
@@ -405,7 +419,9 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
           prev.avg_speed === next.avg_speed &&
           prev.max_speed === next.max_speed &&
           prev.distance === next.distance &&
-          prev.computed === next.computed) {
+          prev.computed === next.computed &&
+          prev.rpe === next.rpe &&
+          prev.gear_id === next.gear_id) {
         return prev; // No change, return previous reference
       }
       
