@@ -1817,13 +1817,27 @@ const formatMovingTime = () => {
         const workout = hydrated || workoutData;
         const isVirtual = isVirtualActivity(workout);
         
-        // Only render map if we have valid data OR if it's a virtual/indoor workout (which shows placeholder)
+        // Additional check: if we have series data (sensor data) but no GPS track, it's likely a treadmill
         const hasValidSeries = finalSeries && 
           Array.isArray(finalSeries?.distance_m) && 
           finalSeries.distance_m.length > 1;
         const hasValidTrack = finalTrack && 
           Array.isArray(finalTrack) && 
           finalTrack.length > 1;
+        
+        // Strong indicator of treadmill: has sensor data (series) but no GPS track
+        const isLikelyTreadmill = hasValidSeries && !hasValidTrack && 
+          (workoutData.type === 'run' || workoutData.type === 'walk');
+        
+        // Check for explicit treadmill indicators
+        const isTrainer = (workout as any)?.strava_data?.original_activity?.trainer === true;
+        const providerSport = String((workout as any)?.provider_sport || (workout as any)?.activity_type || '').toLowerCase();
+        const hasTreadmillIndicator = providerSport.includes('treadmill') || isTrainer;
+        const hasStartPosition = Number.isFinite((workout as any)?.start_position_lat) && 
+                                 (workout as any)?.start_position_lat !== 0;
+        
+        // Consider it virtual if: explicit indicators OR (likely treadmill AND no start position)
+        const shouldShowPlaceholder = isVirtual || hasTreadmillIndicator || (isLikelyTreadmill && !hasStartPosition);
         
         console.log('🗺️ [CompletedTab] Map render check:', {
           workoutId: (hydrated||workoutData)?.id,
@@ -1833,16 +1847,23 @@ const formatMovingTime = () => {
           finalTrackLength: finalTrack?.length || 0,
           hydratedHasSeries: !!hydrated?.computed?.analysis?.series,
           workoutDataHasSeries: !!workoutData?.computed?.analysis?.series,
-          isVirtual
+          isVirtual,
+          isLikelyTreadmill,
+          shouldShowPlaceholder
         });
         
         // Render map component for all workouts - it will show placeholder for indoor/treadmill
         // Only skip if we have no data AND it's not a virtual activity
-        if (!isVirtual && !hasValidSeries && !hasValidTrack) {
+        if (!shouldShowPlaceholder && !hasValidSeries && !hasValidTrack) {
           // Don't render map if no data - prevents blink
           console.log('⏭️ [CompletedTab] Skipping map render - no valid data');
           return null;
         }
+        
+        // If we should show placeholder, ensure workoutData is marked as virtual for EffortsViewerMapbox
+        const workoutDataForMap = shouldShowPlaceholder && !isVirtual
+          ? { ...workout, gps_track: [] } // Force empty array to trigger placeholder
+          : workout;
         
         // Use memoized props computed at component level (prevents re-renders)
         // No client-side series transformation; use server-provided series as-is
