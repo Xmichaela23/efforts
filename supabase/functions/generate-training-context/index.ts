@@ -707,6 +707,11 @@ function calculateSportBreakdown(
     const type = normalizeSportType(w.type);
     const workload = w.workload_actual || 0;
 
+    // Debug logging for strength workouts
+    if (w.type && (w.type.toLowerCase().includes('strength') || w.type.toLowerCase().includes('weight'))) {
+      console.log(`💪 Strength workout found: type="${w.type}" -> normalized="${type}", workload=${workload}, date=${w.date}`);
+    }
+
     if (type in breakdown && type !== 'total_workload') {
       const sport = breakdown[type as keyof Omit<SportBreakdown, 'total_workload'>];
       sport.workload += workload;
@@ -725,7 +730,7 @@ function calculateSportBreakdown(
     breakdown.mobility.percent = Math.round((breakdown.mobility.workload / breakdown.total_workload) * 100);
   }
 
-  console.log(`🏃 Sport breakdown: run=${breakdown.run.workload}, bike=${breakdown.bike.workload}, total=${breakdown.total_workload}`);
+  console.log(`🏃 Sport breakdown: run=${breakdown.run.workload}, bike=${breakdown.bike.workload}, swim=${breakdown.swim.workload}, strength=${breakdown.strength.workload}, mobility=${breakdown.mobility.workload}, total=${breakdown.total_workload}`);
 
   return breakdown;
 }

@@ -27,6 +27,9 @@ export const SPORT_COLORS = {
   swim: '#3b82f6',     // blue-500
   swimming: '#3b82f6', // alias
   strength: '#f97316', // orange-500
+  strength_training: '#f97316', // alias
+  weight: '#f97316',   // alias
+  weights: '#f97316',  // alias
   mobility: '#a855f7', // purple-500
   pilates_yoga: '#a855f7', // alias
 } as const;
