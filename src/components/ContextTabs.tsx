@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, CalendarDays } from 'lucide-react';
 import TrainingContextTab from './context/TrainingContextTab';
 import BlockSummaryTab from './context/BlockSummaryTab';
 
@@ -30,8 +29,7 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, onSelectWorkout }) =
                 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/50
                 hover:bg-white/[0.08] border border-transparent data-[state=active]:border-white/20"
             >
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Context
+              Week
             </TabsTrigger>
             <TabsTrigger 
               value="block" 
@@ -40,7 +38,6 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, onSelectWorkout }) =
                 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/50
                 hover:bg-white/[0.08] border border-transparent data-[state=active]:border-white/20"
             >
-              <CalendarDays className="h-4 w-4 mr-2" />
               Block
             </TabsTrigger>
           </TabsList>
