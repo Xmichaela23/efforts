@@ -152,6 +152,8 @@ Deno.serve(async (req) => {
     try { (detail as any).device_info = (()=>{ try { return typeof row.device_info === 'string' ? JSON.parse(row.device_info) : (row.device_info || null); } catch { return row.device_info || null; } })(); } catch {}
     if (opts.include_gps) {
       try { (detail as any).gps_track = typeof row.gps_track === 'string' ? JSON.parse(row.gps_track) : (row.gps_track || null); } catch { (detail as any).gps_track = row.gps_track || null; }
+      // Include gps_trackpoints (polyline) for fallback when gps_track is missing
+      (detail as any).gps_trackpoints = row.gps_trackpoints || null;
     }
     if (opts.include_sensors) {
       try { (detail as any).sensor_data = typeof row.sensor_data === 'string' ? JSON.parse(row.sensor_data) : (row.sensor_data || null); } catch { (detail as any).sensor_data = row.sensor_data || null; }
