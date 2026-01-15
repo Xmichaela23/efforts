@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Test script for marathon long run progression algorithm
- * Validates the balanced-build generator produces correct progressions
+ * Validates the performance-build generator produces correct progressions
  * 
  * Run: node scripts/test-marathon-progressions.mjs
  */
@@ -30,7 +30,7 @@ function getMarathonDurationRequirements(weeks) {
 }
 
 // ============================================================================
-// PROGRESSION ALGORITHM (copied from balanced-build.ts)
+// PROGRESSION ALGORITHM (copied from performance-build.ts)
 // ============================================================================
 
 function calculatePeakWeek(planWeeks, _taperWeeks) {
@@ -103,7 +103,7 @@ function calculateLongRunProgression(planWeeks, currentWeeklyMiles = 25) {
   
   const peakWeek = calculatePeakWeek(planWeeks, taperWeeks);
   
-  // Two-pass algorithm matching balanced-build.ts
+  // Two-pass algorithm matching performance-build.ts
   const progression = new Array(planWeeks).fill(0);
   const weekTypes = new Array(planWeeks).fill('build');
   

@@ -158,7 +158,7 @@ function getDanielsFallbackStrategy(ctx: PlacementContext): PlacementStrategy {
 export function mapApproachToMethodology(approach: string): MethodologyId {
   if (approach === 'simple_completion') {
     return 'hal_higdon_complete';
-  } else if (approach === 'balanced_build') {
+  } else if (approach === 'performance_build') {
     return 'jack_daniels_performance';
   }
   // Default fallback

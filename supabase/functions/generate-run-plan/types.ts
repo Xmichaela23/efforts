@@ -11,7 +11,7 @@ export interface GeneratePlanRequest {
   goal: 'complete' | 'speed';
   duration_weeks: number;
   start_date?: string; // ISO date string (YYYY-MM-DD)
-  approach: 'simple_completion' | 'balanced_build';
+  approach: 'simple_completion' | 'performance_build';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
   strength_frequency?: 0 | 2 | 3;
   strength_tier?: 'injury_prevention' | 'strength_power';
@@ -22,7 +22,7 @@ export interface GeneratePlanRequest {
   race_name?: string;
   // User's current weekly mileage (for gating short plans)
   current_weekly_miles?: number;
-  // Effort Score (for Balanced Build / speed goal)
+  // Effort Score (for Performance Build / speed goal)
   effort_score?: number;
   effort_source_distance?: number; // meters
   effort_source_time?: number; // seconds
@@ -190,9 +190,9 @@ export const METHODOLOGIES: Record<string, MethodologyDefinition> = {
       'Completion-focused'
     ]
   },
-  'balanced_build': {
-    id: 'balanced_build',
-    name: 'Balanced Build',
+  'performance_build': {
+    id: 'performance_build',
+    name: 'Performance Build',
     shortDescription: 'Structured quality with personalized pace zones',
     longDescription: 'Science-based training with precise pace zones (Easy, Marathon, Threshold, Interval) calculated from your 5K time. Two quality days per week with structured intervals and tempo runs.',
     basedOn: 'Adapted from established running science principles',
@@ -226,7 +226,7 @@ export const APPROACH_CONSTRAINTS: Record<string, ApproachConstraints> = {
     description: 'Easy-to-follow plan focused on finishing healthy',
     philosophy: 'Effort-based pacing, minimal speedwork, conservative progression. Based on progressive training principles.'
   },
-  'balanced_build': {
+  'performance_build': {
     min_days: '4-5',
     max_days: '6-7',
     supported_days: ['4-5', '5-6', '6-7'],

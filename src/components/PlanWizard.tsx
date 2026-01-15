@@ -34,7 +34,7 @@ type Distance = '5k' | '10k' | 'half' | 'marathon';
 type Fitness = 'novice' | 'beginner' | 'intermediate' | 'advanced';
 type MpwRange = '12-15' | '16-19' | '20-25' | '25-35' | '35-45' | '45+';
 type Goal = 'complete' | 'speed';
-type Approach = 'simple_completion' | 'balanced_build';
+type Approach = 'simple_completion' | 'performance_build';
 type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
 type StrengthTier = 'injury_prevention' | 'strength_power';
 type EquipmentType = 'home_gym' | 'commercial_gym';
@@ -148,7 +148,7 @@ interface WizardState {
   fitness: Fitness | null;
   currentMpw: MpwRange | null; // Actual weekly mileage for precise gating
   goal: Goal | null;
-  // Effort Score (for Balanced Build / speed goal only)
+  // Effort Score (for Performance Build / speed goal only)
   paceInputMethod: PaceInputMethod; // How user wants to input their fitness
   hasRecentRace: boolean | null; // null = not answered (legacy, kept for compatibility)
   effortRaceDistance: RaceDistance | null;
@@ -305,8 +305,8 @@ const METHODOLOGIES: Record<Approach, {
     basedOn: 'Based on Hal Higdon\'s progressive training principles',
     supported_days: ['3-4', '4-5', '5-6']
   },
-  'balanced_build': {
-    name: 'Balanced Build',
+  'performance_build': {
+    name: 'Performance Build',
     shortDescription: 'Structured quality with personalized pacing',
     longDescription: 'Two quality workouts per week with structured intervals and tempo runs. All paces calculated from your 5K time.',
     basedOn: 'Based on established running science',
@@ -321,9 +321,9 @@ const METHODOLOGIES: Record<Approach, {
 /**
  * Get the available methodology based on goal, fitness, and distance
  * - complete goal → Simple Completion only
- * - speed goal + beginner + marathon → Balanced Build locked
- * - speed goal + beginner + shorter distances → Balanced Build unlocked
- * - speed goal + intermediate/advanced → Balanced Build only
+ * - speed goal + beginner + marathon → Performance Build locked
+ * - speed goal + beginner + shorter distances → Performance Build unlocked
+ * - speed goal + intermediate/advanced → Performance Build only
  */
 function getMethodologyForGoal(goal: Goal | null, fitness: Fitness | null, distance: Distance | null): {
   approach: Approach | null;
@@ -340,15 +340,15 @@ function getMethodologyForGoal(goal: Goal | null, fitness: Fitness | null, dista
   }
 
   if (goal === 'speed') {
-    // Speed goal → Balanced Build, but locked for beginners doing marathon only
+    // Speed goal → Performance Build, but locked for beginners doing marathon only
     if (fitness === 'beginner' && distance === 'marathon') {
       return {
-        approach: 'balanced_build',
+        approach: 'performance_build',
         locked: true,
         lockedReason: 'Speed-focused marathon training requires Intermediate+ fitness (25+ mpw). Consider selecting "Complete" goal, or build your base first.'
       };
     }
-    return { approach: 'balanced_build', locked: false, lockedReason: '' };
+    return { approach: 'performance_build', locked: false, lockedReason: '' };
   }
 
   return { approach: null, locked: true, lockedReason: '' };
@@ -768,16 +768,16 @@ export default function PlanWizard() {
         requestBody.strength_protocol = state.strengthProtocol; // guaranteed by canProceed
         // Auto-set tier to strength_power when protocol is selected
         requestBody.strength_tier = 'strength_power';
-        // Include noDoubles if set (only relevant for Balanced Build)
-        if (state.approach === 'balanced_build' && state.noDoubles) {
+        // Include noDoubles if set (only relevant for Performance Build)
+        if (state.approach === 'performance_build' && state.noDoubles) {
           requestBody.no_doubles = true;
         }
       } else {
         requestBody.strength_tier = state.strengthTier;
       }
 
-      // Add Effort Score data for Balanced Build plans
-      if (state.approach === 'balanced_build' && state.effortScore && state.effortPaces) {
+      // Add Effort Score data for Performance Build plans
+      if (state.approach === 'performance_build' && state.effortScore && state.effortPaces) {
         requestBody.effort_score = state.effortScore;
         requestBody.effort_score_status = state.effortScoreStatus;
         requestBody.effort_paces = state.effortPaces;
@@ -1096,7 +1096,7 @@ export default function PlanWizard() {
                 </div>
               </div>
               
-              {/* Speed Goal → Balanced Build (locked only for beginners doing marathon) */}
+              {/* Speed Goal → Performance Build (locked only for beginners doing marathon) */}
               {(() => {
                 const isSpeedLocked = state.fitness === 'beginner' && state.distance === 'marathon';
                 return (
@@ -1142,7 +1142,7 @@ export default function PlanWizard() {
         );
 
       case 'effortScore':
-        // EFFORT SCORE STEP (only for speed/Balanced Build goal)
+        // EFFORT SCORE STEP (only for speed/Performance Build goal)
         // Calculate score when user enters race time
         const handleRaceTimeChange = (timeStr: string) => {
           setState(prev => {
@@ -2307,8 +2307,8 @@ export default function PlanWizard() {
                 </div>
               )}
               
-              {/* No Doubles option - only for Balanced Build (Jack Daniels) */}
-              {state.strengthFrequency > 0 && state.strengthProtocol && state.approach === 'balanced_build' && (
+              {/* No Doubles option - only for Performance Build (Jack Daniels) */}
+              {state.strengthFrequency > 0 && state.strengthProtocol && state.approach === 'performance_build' && (
                 <div className="pt-4 border-t border-white/10">
                   <div className="flex items-start space-x-3">
                     <input

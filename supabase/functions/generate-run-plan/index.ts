@@ -3,7 +3,7 @@
 // Purpose: Generate personalized run training plans based on user parameters
 // Supports 2 training approaches:
 // - Simple Completion (Hal Higdon inspired) - for completion goals
-// - Balanced Build (Jack Daniels inspired) - for time/speed goals
+// - Performance Build (Jack Daniels inspired) - for time/speed goals
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { 
@@ -15,7 +15,7 @@ import {
 } from './types.ts';
 import { validateRequest, validatePlanSchema, validateTokens, detectScheduleConflicts } from './validation.ts';
 import { SimpleCompletionGenerator } from './generators/simple-completion.ts';
-import { BalancedBuildGenerator } from './generators/balanced-build.ts';
+import { PerformanceBuildGenerator } from './generators/performance-build.ts';
 import { overlayStrength, overlayStrengthLegacy } from './strength-overlay.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import { addTimingLogic } from './timing-logic.ts';
@@ -69,11 +69,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Calculate Effort Score for Balanced Build plans
+    // Calculate Effort Score for Performance Build plans
     let effortScore: number | undefined;
     let effortPaces: TrainingPaces | undefined;
     
-    if (request.approach === 'balanced_build') {
+    if (request.approach === 'performance_build') {
       // Use provided score (from wizard) or calculate from race data
       if (request.effort_score) {
         effortScore = request.effort_score;
@@ -130,8 +130,8 @@ Deno.serve(async (req: Request) => {
         phaseStructure = generator['determinePhaseStructure']();
         break;
       }
-      case 'balanced_build': {
-        const generator = new BalancedBuildGenerator(generatorParams);
+      case 'performance_build': {
+        const generator = new PerformanceBuildGenerator(generatorParams);
         plan = generator.generatePlan();
         phaseStructure = generator['determinePhaseStructure']();
         break;
@@ -264,8 +264,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Save Effort Score and paces to user_baselines (for Balanced Build plans)
-    if (request.approach === 'balanced_build' && effortScore && effortPaces) {
+    // Save Effort Score and paces to user_baselines (for Performance Build plans)
+    if (request.approach === 'performance_build' && effortScore && effortPaces) {
       const { error: baselinesError } = await supabase
         .from('user_baselines')
         .upsert({

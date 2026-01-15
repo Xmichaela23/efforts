@@ -9,7 +9,7 @@ import JSZip from 'jszip';
 interface TestCombo {
   id: string;
   duration_weeks: number;
-  approach: 'simple_completion' | 'balanced_build';
+  approach: 'simple_completion' | 'performance_build';
   fitness: 'beginner' | 'intermediate' | 'advanced';
   goal: 'complete' | 'speed';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
@@ -27,23 +27,23 @@ interface ValidationResult {
 
 const TEST_COMBINATIONS: TestCombo[] = [
   // Critical paths - most common user journeys
-  { id: '1', duration_weeks: 11, approach: 'balanced_build', fitness: 'intermediate', goal: 'speed', days_per_week: '4-5', label: '11w Balanced Speed (4-5d)' },
-  { id: '2', duration_weeks: 11, approach: 'balanced_build', fitness: 'intermediate', goal: 'speed', days_per_week: '4-5', strength_frequency: 3, strength_protocol: 'neural_speed', label: '11w Balanced Speed + Neural (3x)' },
-  { id: '3', duration_weeks: 16, approach: 'balanced_build', fitness: 'intermediate', goal: 'speed', days_per_week: '5-6', label: '16w Balanced Speed (5-6d)' },
-  { id: '5', duration_weeks: 20, approach: 'balanced_build', fitness: 'advanced', goal: 'speed', days_per_week: '6-7', label: '20w Balanced Speed Advanced (6-7d)' },
+  { id: '1', duration_weeks: 11, approach: 'performance_build', fitness: 'intermediate', goal: 'speed', days_per_week: '4-5', label: '11w Performance Speed (4-5d)' },
+  { id: '2', duration_weeks: 11, approach: 'performance_build', fitness: 'intermediate', goal: 'speed', days_per_week: '4-5', strength_frequency: 3, strength_protocol: 'neural_speed', label: '11w Performance Speed + Neural (3x)' },
+  { id: '3', duration_weeks: 16, approach: 'performance_build', fitness: 'intermediate', goal: 'speed', days_per_week: '5-6', label: '16w Performance Speed (5-6d)' },
+  { id: '5', duration_weeks: 20, approach: 'performance_build', fitness: 'advanced', goal: 'speed', days_per_week: '6-7', label: '20w Performance Speed Advanced (6-7d)' },
   
   // Edge cases - long plans (removed 8w plans - validation requires min 10 weeks for marathon)
   { id: '7', duration_weeks: 20, approach: 'simple_completion', fitness: 'beginner', goal: 'complete', days_per_week: '3-4', label: '20w Simple Complete Long' },
   
   // Strength protocol variations
-  { id: '8', duration_weeks: 11, approach: 'balanced_build', fitness: 'intermediate', goal: 'speed', days_per_week: '4-5', strength_frequency: 2, strength_protocol: 'durability', label: '11w + Durability (2x)' },
-  { id: '9', duration_weeks: 11, approach: 'balanced_build', fitness: 'intermediate', goal: 'speed', days_per_week: '4-5', strength_frequency: 3, strength_protocol: 'upper_aesthetics', label: '11w + Upper Aesthetics (3x)' },
+  { id: '8', duration_weeks: 11, approach: 'performance_build', fitness: 'intermediate', goal: 'speed', days_per_week: '4-5', strength_frequency: 2, strength_protocol: 'durability', label: '11w + Durability (2x)' },
+  { id: '9', duration_weeks: 11, approach: 'performance_build', fitness: 'intermediate', goal: 'speed', days_per_week: '4-5', strength_frequency: 3, strength_protocol: 'upper_aesthetics', label: '11w + Upper Aesthetics (3x)' },
   
   // Fitness level variations (removed beginner + 11w - validation requires 14+ weeks for beginners)
-  { id: '11', duration_weeks: 11, approach: 'balanced_build', fitness: 'advanced', goal: 'speed', days_per_week: '5-6', label: '11w Balanced Advanced' },
+  { id: '11', duration_weeks: 11, approach: 'performance_build', fitness: 'advanced', goal: 'speed', days_per_week: '5-6', label: '11w Performance Advanced' },
   
-  // Days per week variations (removed 3-4d for balanced_build - not supported)
-  { id: '13', duration_weeks: 11, approach: 'balanced_build', fitness: 'intermediate', goal: 'speed', days_per_week: '6-7', label: '11w Balanced (6-7d)' },
+  // Days per week variations (removed 3-4d for performance_build - not supported)
+  { id: '13', duration_weeks: 11, approach: 'performance_build', fitness: 'intermediate', goal: 'speed', days_per_week: '6-7', label: '11w Performance (6-7d)' },
   
   // Simple completion variations
   { id: '14', duration_weeks: 11, approach: 'simple_completion', fitness: 'intermediate', goal: 'complete', days_per_week: '4-5', label: '11w Simple Complete' },
@@ -174,7 +174,7 @@ export default function PlanGeneratorTest() {
       );
       
       // Recovery week should have Easy + Strides on Tuesday
-      if (!hasStrides && combo.approach === 'balanced_build') {
+      if (!hasStrides && combo.approach === 'performance_build') {
         warnings.push(`Week ${week}: Recovery week missing strides`);
       }
 
@@ -220,7 +220,7 @@ export default function PlanGeneratorTest() {
     }
 
     // Check race day (final week Sunday)
-    if (combo.approach === 'balanced_build') {
+    if (combo.approach === 'performance_build') {
       const finalWeek = weeks[weeks.length - 1];
       const finalSessions = plan.sessions_by_week[String(finalWeek)] || [];
       const raceDay = finalSessions.find((s: any) => 
@@ -314,8 +314,8 @@ export default function PlanGeneratorTest() {
             race_name: 'Test Marathon',
           };
 
-          // For balanced_build + speed, add effort data (required for pace calculations)
-          if (combo.approach === 'balanced_build' && combo.goal === 'speed') {
+          // For performance_build + speed, add effort data (required for pace calculations)
+          if (combo.approach === 'performance_build' && combo.goal === 'speed') {
             // Use a reasonable effort score for testing (equivalent to ~20 min 5K)
             requestBody.effort_score = 45;
             requestBody.effort_score_status = 'estimated';
