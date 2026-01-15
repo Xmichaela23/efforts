@@ -151,8 +151,10 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
           const distanceMeters = g.total_distance || 0;
           const distanceMi = distanceMeters / 1609.34;
           const distanceKm = distanceMeters / 1000;
-          console.log(`  - ${g.name}: ${distanceMeters.toFixed(0)}m (${distanceMi.toFixed(1)} mi / ${distanceKm.toFixed(1)} km)`);
+          console.log(`  - ${g.name}: ${distanceMeters.toFixed(0)}m (${distanceMi.toFixed(1)} mi / ${distanceKm.toFixed(1)} km)`, g);
         });
+        // Also log the full array for inspection
+        console.log('🔧 [Gear] Full gear array:', JSON.stringify(data, null, 2));
       } else {
         console.log('🔧 [Gear] No gear items found');
       }
