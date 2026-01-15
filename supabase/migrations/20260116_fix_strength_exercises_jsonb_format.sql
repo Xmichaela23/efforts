@@ -24,12 +24,26 @@ END $$;
 
 -- Fix all strength workouts with string-format exercises
 -- Convert JSONB string to JSONB array by parsing it
+-- Handle edge cases: empty strings, null, malformed JSON
 UPDATE workouts
 SET strength_exercises = 
   CASE 
     WHEN jsonb_typeof(strength_exercises) = 'string' THEN
-      -- Parse the string to get the actual JSONB value
-      strength_exercises::jsonb
+      -- Try to parse the string to get the actual JSONB value
+      CASE
+        WHEN strength_exercises::text = 'null' OR strength_exercises::text = '' THEN
+          '[]'::jsonb  -- Empty/null becomes empty array
+        WHEN strength_exercises::text = '[]' OR strength_exercises::text = '"[]"' THEN
+          '[]'::jsonb  -- Already empty array format
+        ELSE
+          -- Try to parse as JSONB
+          CASE
+            WHEN jsonb_typeof(strength_exercises::jsonb) = 'array' THEN
+              strength_exercises::jsonb  -- Successfully parsed to array
+            ELSE
+              '[]'::jsonb  -- Failed to parse, set to empty array
+          END
+      END
     ELSE
       -- Already correct format, keep as-is
       strength_exercises
