@@ -77,6 +77,7 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       if (!session) throw new Error('Session expired - please log in again');
       
       const body = { id, ...normalized } as any;
+      console.log('[useWorkoutDetail] Calling workout-detail for:', id, 'with options:', normalized);
       const { data, error } = await supabase.functions.invoke('workout-detail', {
         body,
         headers: {
@@ -87,6 +88,13 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       const remote = (data as any)?.workout || null;
 
       if (!remote) throw new Error('Workout not found');
+      
+      console.log('[useWorkoutDetail] Received workout data:', {
+        id: remote.id,
+        hasGpsTrack: !!remote.gps_track,
+        gpsTrackLength: Array.isArray(remote.gps_track) ? remote.gps_track.length : 0,
+        hasGpsTrackpoints: !!remote.gps_trackpoints
+      });
 
       // Merge with base row from context to preserve scalars
       try {

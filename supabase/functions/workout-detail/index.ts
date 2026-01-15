@@ -199,8 +199,10 @@ Deno.serve(async (req) => {
       
       // If gps_track is missing but gps_trackpoints (polyline) exists, decode it server-side
       if ((!gpsTrack || (Array.isArray(gpsTrack) && gpsTrack.length === 0)) && row.gps_trackpoints) {
+        console.log(`[workout-detail] Decoding polyline for workout ${id}, polyline length: ${row.gps_trackpoints.length}`);
         try {
           const decoded = decodePolyline(row.gps_trackpoints);
+          console.log(`[workout-detail] Decoded ${decoded.length} coordinates from polyline`);
           if (decoded.length > 0) {
             // Convert [lat, lng] to gps_track format: [{lat, lng, timestamp, startTimeInSeconds}]
             const workoutTimestamp = row.timestamp 
@@ -213,10 +215,13 @@ Deno.serve(async (req) => {
               timestamp: (workoutTimestamp + index) * 1000,
               startTimeInSeconds: workoutTimestamp + index
             }));
+            console.log(`[workout-detail] Created gps_track with ${gpsTrack.length} points`);
           }
         } catch (decodeErr) {
-          console.warn('Failed to decode polyline:', decodeErr);
+          console.error('[workout-detail] Failed to decode polyline:', decodeErr);
         }
+      } else if (!gpsTrack && !row.gps_trackpoints) {
+        console.log(`[workout-detail] No gps_track and no gps_trackpoints for workout ${id}`);
       }
       
       (detail as any).gps_track = gpsTrack;
