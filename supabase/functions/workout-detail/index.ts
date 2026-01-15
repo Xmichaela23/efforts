@@ -225,14 +225,22 @@ Deno.serve(async (req) => {
         // If we have strava_activity_id, try to fetch GPS from Strava
         if (row.strava_activity_id && userId) {
           try {
-            console.log(`[workout-detail] Attempting to fetch GPS from Strava for activity ${row.strava_activity_id}`);
+            console.log(`[workout-detail] Attempting to fetch GPS from Strava for activity ${row.strava_activity_id}, userId: ${userId}`);
             // Get Strava access token
-            const { data: conn } = await supabase
+            const { data: conn, error: connError } = await supabase
               .from('device_connections')
               .select('connection_data, access_token, refresh_token')
               .eq('user_id', userId)
               .eq('provider', 'strava')
               .maybeSingle();
+            
+            if (connError) {
+              console.error(`[workout-detail] Error fetching Strava connection:`, connError);
+            }
+            
+            if (!conn) {
+              console.log(`[workout-detail] No Strava connection found for user ${userId}`);
+            }
             
             let accessToken = conn?.connection_data?.access_token || conn?.access_token;
             
@@ -259,14 +267,19 @@ Deno.serve(async (req) => {
             }
             
             if (accessToken) {
+              console.log(`[workout-detail] Got Strava access token, fetching streams for activity ${row.strava_activity_id}`);
               // Fetch latlng streams from Strava
               const streamsResp = await fetch(`https://www.strava.com/api/v3/activities/${row.strava_activity_id}/streams?keys=latlng`, {
                 headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
               });
               
+              console.log(`[workout-detail] Strava streams response status: ${streamsResp.status}`);
+              
               if (streamsResp.ok) {
                 const streams = await streamsResp.json();
                 const latlngStream = streams.find((s: any) => s.type === 'latlng');
+                
+                console.log(`[workout-detail] Found latlng stream: ${!!latlngStream}, data length: ${latlngStream?.data?.length || 0}`);
                 
                 if (latlngStream && Array.isArray(latlngStream.data) && latlngStream.data.length > 0) {
                   const workoutTimestamp = row.timestamp 
@@ -290,8 +303,15 @@ Deno.serve(async (req) => {
                     .eq('id', id)
                     .then(() => console.log(`[workout-detail] Saved GPS track to database`))
                     .catch((err) => console.warn(`[workout-detail] Failed to save GPS track:`, err));
+                } else {
+                  console.log(`[workout-detail] No valid latlng stream data found`);
                 }
+              } else {
+                const errorText = await streamsResp.text();
+                console.error(`[workout-detail] Strava streams fetch failed: ${streamsResp.status} ${errorText}`);
               }
+            } else {
+              console.log(`[workout-detail] No Strava access token available`);
             }
           } catch (fetchErr) {
             console.warn(`[workout-detail] Failed to fetch GPS from Strava:`, fetchErr);
