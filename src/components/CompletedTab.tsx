@@ -1486,13 +1486,13 @@ const formatMovingTime = () => {
           <div className="px-2 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               <Select
-                value={(workoutData as any)?.rpe ? String((workoutData as any).rpe) : undefined}
+                value={((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : undefined}
                 onValueChange={(value) => handleFeedbackChange('rpe', parseInt(value))}
                 disabled={savingFeedback}
               >
                 <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full justify-start p-0">
                   <SelectValue placeholder="N/A">
-                    {(workoutData as any)?.rpe ? String((workoutData as any).rpe) : 'N/A'}
+                    {((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : 'N/A'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1a2e] border-white/10">
@@ -1518,7 +1518,8 @@ const formatMovingTime = () => {
               <Select
                 value={(() => {
                   // If gear_id is set, use it; otherwise default to user's default gear
-                  const existingGearId = (workoutData as any)?.gear_id;
+                  const currentData = hydrated || workoutData;
+                  const existingGearId = (currentData as any)?.gear_id;
                   if (existingGearId) return existingGearId;
                   const defaultGear = gear.find(g => g.is_default);
                   return defaultGear?.id || undefined;
@@ -1529,7 +1530,8 @@ const formatMovingTime = () => {
                 <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full p-0 [&>svg]:hidden [&>span]:text-center [&>span]:block">
                   <SelectValue placeholder="N/A">
                     {(() => {
-                      const existingGearId = (workoutData as any)?.gear_id;
+                      const currentData = hydrated || workoutData;
+                      const existingGearId = (currentData as any)?.gear_id;
                       const selectedId = existingGearId || gear.find(g => g.is_default)?.id;
                       const selected = gear.find(g => g.id === selectedId);
                       return selected?.name || 'N/A';
