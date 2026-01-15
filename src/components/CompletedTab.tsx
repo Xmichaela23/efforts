@@ -170,6 +170,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
       setSavingFeedback(true);
       const updateData: any = { [field]: value };
 
+      console.log(`💾 [Feedback] Saving ${field}:`, value);
+
       // Use updateWorkout hook which handles user_id check and proper error handling
       if (!updateWorkout) {
         console.error('updateWorkout function not available');
@@ -181,16 +183,20 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         return;
       }
 
-      await updateWorkout(workoutData.id, updateData);
+      const updated = await updateWorkout(workoutData.id, updateData);
+      console.log(`✅ [Feedback] Successfully saved ${field}:`, updated);
 
       // Update local hydrated state immediately so UI reflects the change
+      // Use the returned data from updateWorkout to ensure consistency
       setHydrated((prev: any) => {
         if (!prev || prev.id !== workoutData.id) return prev;
-        return { ...prev, [field]: value };
+        return { ...prev, [field]: (updated as any)?.[field] ?? value };
       });
 
       // Invalidate and refetch workout-detail query cache so useWorkoutDetail gets fresh data
       // This ensures when user navigates away and comes back, the data is fresh
+      // Add a small delay to ensure the database has committed the change
+      await new Promise(resolve => setTimeout(resolve, 100));
       await queryClient.invalidateQueries({ queryKey: ['workout-detail', workoutData.id] });
       await queryClient.refetchQueries({ queryKey: ['workout-detail', workoutData.id] });
       
@@ -206,8 +212,13 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms for trigger to complete
         await loadGear();
       }
+
+      toast({
+        title: 'Saved',
+        description: `${field === 'rpe' ? 'RPE' : 'Gear'} updated successfully`,
+      });
     } catch (e: any) {
-      console.error('Error saving feedback:', e);
+      console.error('❌ [Feedback] Error saving feedback:', e);
       toast({
         title: 'Error saving',
         description: e.message || 'Failed to save changes. Please try again.',
@@ -1534,7 +1545,7 @@ const formatMovingTime = () => {
           <div className="px-2 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               <Select
-                value={((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : undefined}
+                value={((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : ""}
                 onValueChange={(value) => handleFeedbackChange('rpe', value ? parseInt(value) : null)}
                 disabled={savingFeedback}
               >
@@ -1568,7 +1579,7 @@ const formatMovingTime = () => {
                   // Only use actual gear_id from workout, not default gear (for controlled component)
                   const currentData = hydrated || workoutData;
                   const existingGearId = (currentData as any)?.gear_id;
-                  return existingGearId || undefined;
+                  return existingGearId || "";
                 })()}
                 onValueChange={(value) => handleFeedbackChange('gear_id', value || null)}
                 disabled={savingFeedback || gearLoading}
