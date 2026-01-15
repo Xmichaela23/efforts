@@ -122,9 +122,13 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
     try {
       setGearLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('🔧 [Gear] No user, skipping load');
+        return;
+      }
 
       const gearType = workoutData.type === 'run' ? 'shoe' : 'bike';
+      console.log('🔧 [Gear] Loading gear for type:', gearType);
       const { data, error } = await supabase
         .from('gear')
         .select('id, type, name, brand, model, is_default, total_distance')
@@ -135,17 +139,20 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         .order('name');
 
       if (error) {
-        console.error('Error loading gear:', error);
+        console.error('🔧 [Gear] Error loading gear:', error);
         return;
       }
 
+      console.log('🔧 [Gear] Raw data from DB:', data);
       setGear(data || []);
       // Debug: log gear with total_distance
       if (data && data.length > 0) {
-        console.log('🔧 [Gear] Loaded gear:', data.map(g => ({ name: g.name, total_distance: g.total_distance })));
+        console.log('🔧 [Gear] Loaded gear:', data.map(g => ({ name: g.name, total_distance: g.total_distance, id: g.id })));
+      } else {
+        console.log('🔧 [Gear] No gear items found');
       }
     } catch (e) {
-      console.error('Error loading gear:', e);
+      console.error('🔧 [Gear] Exception loading gear:', e);
     } finally {
       setGearLoading(false);
     }
