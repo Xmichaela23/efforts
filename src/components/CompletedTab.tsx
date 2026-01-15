@@ -469,13 +469,13 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
     const trackFromMemo = memo?.track;
     if (trackFromMemo && trackFromMemo.length > 0) return trackFromMemo;
     
-    // Try to get GPS track from workout data
+    // Get GPS track from workout data (server should have decoded polyline if needed)
     const gpsRaw = (hydrated||workoutData)?.gps_track;
     const gps = Array.isArray(gpsRaw)
       ? gpsRaw
       : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
     
-    const trackFromGps = gps
+    return gps
       .map((p:any)=>{
         const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
         const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
@@ -483,26 +483,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         return null;
       })
       .filter(Boolean) as [number,number][];
-    
-    // If we have GPS track, return it
-    if (trackFromGps.length > 0) return trackFromGps;
-    
-    // Fallback: try to decode polyline if gps_track is missing
-    const polyline = (hydrated||workoutData)?.gps_trackpoints;
-    if (polyline && typeof polyline === 'string' && polyline.trim().length > 0) {
-      try {
-        const decoded = decodePolyline(polyline);
-        if (decoded.length > 0) {
-          // Convert [lat, lng] to [lng, lat] format expected by map
-          return decoded.map(([lat, lng]) => [lng, lat] as [number, number]);
-        }
-      } catch (err) {
-        console.warn('Failed to decode polyline:', err);
-      }
-    }
-    
-    return [];
-  }, [memo?.track, hydrated?.gps_track, workoutData?.gps_track, hydrated?.gps_trackpoints, workoutData?.gps_trackpoints]);
+  }, [memo?.track, hydrated?.gps_track, workoutData?.gps_track]);
 
   const mapProps = useMemo(() => {
     // Check if data actually changed by comparing array lengths and first/last values

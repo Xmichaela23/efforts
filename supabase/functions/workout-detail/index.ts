@@ -22,6 +22,45 @@ const corsHeaders: Record<string, string> = {
 
 function isUuid(v?: string | null): boolean { return !!v && /[0-9a-fA-F-]{36}/.test(v); }
 
+// Decode Google/Strava encoded polylines (precision 1e5)
+function decodePolyline(encoded: string, precision = 5): [number, number][] {
+  const coordinates: [number, number][] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  const factor = Math.pow(10, precision);
+
+  while (index < encoded.length) {
+    let result = 0;
+    let shift = 0;
+    let byte: number;
+
+    // latitude
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const deltaLat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += deltaLat;
+
+    // longitude
+    result = 0;
+    shift = 0;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const deltaLng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += deltaLng;
+
+    coordinates.push([lat / factor, lng / factor]);
+  }
+
+  return coordinates;
+}
+
 function normalizeBasic(w: any) {
   const type = String(w?.type || '').toLowerCase();
   return {
@@ -151,9 +190,36 @@ Deno.serve(async (req) => {
     try { (detail as any).achievements = (()=>{ try { return typeof row.achievements === 'string' ? JSON.parse(row.achievements) : (row.achievements || null); } catch { return row.achievements || null; } })(); } catch {}
     try { (detail as any).device_info = (()=>{ try { return typeof row.device_info === 'string' ? JSON.parse(row.device_info) : (row.device_info || null); } catch { return row.device_info || null; } })(); } catch {}
     if (opts.include_gps) {
-      try { (detail as any).gps_track = typeof row.gps_track === 'string' ? JSON.parse(row.gps_track) : (row.gps_track || null); } catch { (detail as any).gps_track = row.gps_track || null; }
-      // Include gps_trackpoints (polyline) for fallback when gps_track is missing
-      (detail as any).gps_trackpoints = row.gps_trackpoints || null;
+      let gpsTrack = null;
+      try { 
+        gpsTrack = typeof row.gps_track === 'string' ? JSON.parse(row.gps_track) : (row.gps_track || null);
+      } catch { 
+        gpsTrack = row.gps_track || null;
+      }
+      
+      // If gps_track is missing but gps_trackpoints (polyline) exists, decode it server-side
+      if ((!gpsTrack || (Array.isArray(gpsTrack) && gpsTrack.length === 0)) && row.gps_trackpoints) {
+        try {
+          const decoded = decodePolyline(row.gps_trackpoints);
+          if (decoded.length > 0) {
+            // Convert [lat, lng] to gps_track format: [{lat, lng, timestamp, startTimeInSeconds}]
+            const workoutTimestamp = row.timestamp 
+              ? Math.floor(new Date(row.timestamp).getTime() / 1000)
+              : Math.floor(Date.now() / 1000);
+            
+            gpsTrack = decoded.map(([lat, lng], index) => ({
+              lat,
+              lng,
+              timestamp: (workoutTimestamp + index) * 1000,
+              startTimeInSeconds: workoutTimestamp + index
+            }));
+          }
+        } catch (decodeErr) {
+          console.warn('Failed to decode polyline:', decodeErr);
+        }
+      }
+      
+      (detail as any).gps_track = gpsTrack;
     }
     if (opts.include_sensors) {
       try { (detail as any).sensor_data = typeof row.sensor_data === 'string' ? JSON.parse(row.sensor_data) : (row.sensor_data || null); } catch { (detail as any).sensor_data = row.sensor_data || null; }
