@@ -224,6 +224,16 @@ export function EffortsCascadingE({
   );
 }
 
+// Fisher-Yates shuffle for unbiased randomization
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkProps) {
   const uniqueId = React.useId().replace(/:/g, '');
   const fontFamily = "'Rajdhani', 'Orbitron', system-ui, sans-serif";
@@ -234,13 +244,20 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
   const [parallax, setParallax] = React.useState({ x: 0, y: 0 });
   
   // Discipline colors for gradient ring - vibrant, distinct colors
-  const colors = {
+  const colorDefinitions = {
     run: '#00FFC8',      // Bright cyan/teal
     strength: '#FF8C00', // Bright orange
     ride: '#22c55e',     // Green (keep as is)
     pilates: '#B464FF',  // Bright purple
     swim: '#2B5A8C',     // Deep blue (keep as is)
   };
+
+  // Shuffle color order once on component mount (app launch)
+  // This creates a different cascade order each session while maintaining equality over time
+  const [layerColors] = React.useState(() => {
+    const colorKeys: Array<keyof typeof colorDefinitions> = ['run', 'strength', 'ride', 'pilates', 'swim'];
+    return shuffleArray(colorKeys);
+  });
   
   // Parallax effect - device orientation for mobile, mouse for desktop
   React.useEffect(() => {
@@ -327,14 +344,14 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
         }}
       >
         <defs>
-          {/* Gradient for ring - equal 5 colors */}
+          {/* Gradient for ring - equal 5 colors (using shuffled order) */}
           <linearGradient id={`ringGrad-${uniqueId}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={colors.pilates}/>
-            <stop offset="20%" stopColor={colors.swim}/>
-            <stop offset="40%" stopColor={colors.run}/>
-            <stop offset="60%" stopColor={colors.ride}/>
-            <stop offset="80%" stopColor={colors.strength}/>
-            <stop offset="100%" stopColor={colors.pilates}/>
+            <stop offset="0%" stopColor={colorDefinitions[layerColors[3]]}/>
+            <stop offset="20%" stopColor={colorDefinitions[layerColors[4]]}/>
+            <stop offset="40%" stopColor={colorDefinitions[layerColors[0]]}/>
+            <stop offset="60%" stopColor={colorDefinitions[layerColors[2]]}/>
+            <stop offset="80%" stopColor={colorDefinitions[layerColors[1]]}/>
+            <stop offset="100%" stopColor={colorDefinitions[layerColors[3]]}/>
           </linearGradient>
           
           <filter id={`ringGlow-${uniqueId}`} x="-50%" y="-50%" width="200%" height="200%">
@@ -378,13 +395,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           e
         </text>
         
-        {/* Teal - layer 1 - vibrant cyan, sharp, static */}
+        {/* Layer 1 - shuffled color, vibrant, sharp, static */}
         <text
           x={58}
           y={58}
           textAnchor="middle"
           dominantBaseline="central"
-          fill={colors.run}
+          fill={colorDefinitions[layerColors[0]]}
           fontSize={38}
           fontWeight={300}
           fontFamily={fontFamily}
@@ -394,13 +411,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           e
         </text>
 
-        {/* Orange - layer 2 - vibrant orange, sharp, static */}
+        {/* Layer 2 - shuffled color, vibrant, sharp, static */}
         <text
           x={70}
           y={70}
           textAnchor="middle"
           dominantBaseline="central"
-          fill={colors.strength}
+          fill={colorDefinitions[layerColors[1]]}
           fontSize={28}
           fontWeight={300}
           fontFamily={fontFamily}
@@ -410,13 +427,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           e
         </text>
 
-        {/* Green - layer 3 - sharp, static */}
+        {/* Layer 3 - shuffled color, sharp, static */}
         <text
           x={80}
           y={80}
           textAnchor="middle"
           dominantBaseline="central"
-          fill={colors.ride}
+          fill={colorDefinitions[layerColors[2]]}
           fontSize={20}
           fontWeight={300}
           fontFamily={fontFamily}
@@ -426,13 +443,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           e
         </text>
 
-        {/* Purple - layer 4 - vibrant purple, sharp, static */}
+        {/* Layer 4 - shuffled color, vibrant, sharp, static */}
         <text
           x={88}
           y={88}
           textAnchor="middle"
           dominantBaseline="central"
-          fill={colors.pilates}
+          fill={colorDefinitions[layerColors[3]]}
           fontSize={14}
           fontWeight={300}
           fontFamily={fontFamily}
@@ -442,13 +459,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           e
         </text>
 
-        {/* Swim blue - layer 5, deepest - sharp, static */}
+        {/* Layer 5, deepest - shuffled color, sharp, static */}
         <text
           x={95}
           y={95}
           textAnchor="middle"
           dominantBaseline="central"
-          fill={colors.swim}
+          fill={colorDefinitions[layerColors[4]]}
           fontSize={10}
           fontWeight={300}
           fontFamily={fontFamily}
