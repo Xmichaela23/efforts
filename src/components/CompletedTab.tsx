@@ -143,11 +143,16 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         return;
       }
 
-      console.log('🔧 [Gear] Raw data from DB:', data);
       setGear(data || []);
-      // Debug: log gear with total_distance
+      // Debug: log gear with total_distance - expand objects to see values
       if (data && data.length > 0) {
-        console.log('🔧 [Gear] Loaded gear:', data.map(g => ({ name: g.name, total_distance: g.total_distance, id: g.id })));
+        console.log('🔧 [Gear] Loaded gear with distances:');
+        data.forEach(g => {
+          const distanceMeters = g.total_distance || 0;
+          const distanceMi = distanceMeters / 1609.34;
+          const distanceKm = distanceMeters / 1000;
+          console.log(`  - ${g.name}: ${distanceMeters.toFixed(0)}m (${distanceMi.toFixed(1)} mi / ${distanceKm.toFixed(1)} km)`);
+        });
       } else {
         console.log('🔧 [Gear] No gear items found');
       }
