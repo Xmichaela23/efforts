@@ -125,8 +125,8 @@ export function MobileHeader({
             </DropdownMenu>
           </div>
 
-          {/* Center: Wordmark - centered */}
-          <div className="flex-1 flex justify-center items-center">
+          {/* Center: Wordmark - centered, lowered 6px for optical alignment with vertical dots */}
+          <div className="flex-1 flex justify-center items-center" style={{ marginTop: '6px' }}>
             <EffortsWordmark size={wordmarkSize} />
           </div>
 
