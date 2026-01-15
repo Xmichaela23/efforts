@@ -1867,6 +1867,11 @@ const formatMovingTime = () => {
         
         // Use memoized props computed at component level (prevents re-renders)
         // No client-side series transformation; use server-provided series as-is
+        // Pass workoutDataForMap to ensure treadmill detection works
+        const mapWorkoutData = shouldShowPlaceholder && !isVirtual
+          ? { ...mapProps.workoutData, gps_track: [] } // Force empty array to trigger placeholder
+          : mapProps.workoutData;
+        
         return (
           <div className="mt-6 mb-6 mx-[-16px]">
               <EffortsViewerMapbox
@@ -1875,7 +1880,7 @@ const formatMovingTime = () => {
               useMiles={mapProps.useMiles}
               useFeet={mapProps.useFeet}
               compact={mapProps.compact}
-              workoutData={mapProps.workoutData}
+              workoutData={mapWorkoutData}
               />
           </div>
         );
