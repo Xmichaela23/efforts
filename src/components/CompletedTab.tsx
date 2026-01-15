@@ -22,6 +22,7 @@ import { isVirtualActivity } from '@/utils/workoutNames';
 import { formatDuration, formatPace, formatElevation, formatDistance, formatSwimPace } from '@/utils/workoutFormatting';
 import { useWorkoutData } from '@/hooks/useWorkoutData';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/components/ui/use-toast';
 // keeping local logic for now; Today's view uses shared resolver
 
 // Custom styles for range sliders
@@ -68,6 +69,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
   const { useImperial } = useAppContext();
   const compact = useCompact();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   const { updateWorkout } = useWorkouts();
   const [selectedMetric, setSelectedMetric] = useState('speed'); // Start with pace/speed
@@ -150,20 +152,18 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
       setSavingFeedback(true);
       const updateData: any = { [field]: value };
 
-      const { error } = await supabase
-        .from('workouts')
-        .update(updateData)
-        .eq('id', workoutData.id);
-
-      if (error) {
-        console.error('Error saving feedback:', error);
+      // Use updateWorkout hook which handles user_id check and proper error handling
+      if (!updateWorkout) {
+        console.error('updateWorkout function not available');
+        toast({
+          title: 'Error',
+          description: 'Unable to save changes. Please try again.',
+          variant: 'destructive',
+        });
         return;
       }
 
-      // Update local workoutData to reflect changes
-      if (updateWorkout) {
-        await updateWorkout(workoutData.id, updateData);
-      }
+      await updateWorkout(workoutData.id, updateData);
 
       // Update local hydrated state immediately so UI reflects the change
       setHydrated((prev: any) => {
@@ -186,8 +186,13 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
       if (field === 'gear_id') {
         await loadGear();
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error saving feedback:', e);
+      toast({
+        title: 'Error saving',
+        description: e.message || 'Failed to save changes. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSavingFeedback(false);
     }
@@ -1509,7 +1514,7 @@ const formatMovingTime = () => {
           <div className="px-2 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               <Select
-                value={((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : ""}
+                value={((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : undefined}
                 onValueChange={(value) => handleFeedbackChange('rpe', value ? parseInt(value) : null)}
                 disabled={savingFeedback}
               >
@@ -1543,7 +1548,7 @@ const formatMovingTime = () => {
                   // Only use actual gear_id from workout, not default gear (for controlled component)
                   const currentData = hydrated || workoutData;
                   const existingGearId = (currentData as any)?.gear_id;
-                  return existingGearId || "";
+                  return existingGearId || undefined;
                 })()}
                 onValueChange={(value) => handleFeedbackChange('gear_id', value || null)}
                 disabled={savingFeedback || gearLoading}
