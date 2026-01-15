@@ -1771,7 +1771,7 @@ function EffortsViewerMapbox({
               
               {/* Content */}
               <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
-                {/* Icon - monitor/screen for all indoor activities */}
+                {/* Icon - treadmill for runs/walks, monitor for cycling */}
                 <div style={{
                   width: 48,
                   height: 48,
@@ -1785,11 +1785,30 @@ function EffortsViewerMapbox({
                   justifyContent: 'center',
                   boxShadow: `0 4px 12px rgba(${primaryColorRgb},0.3)`,
                 }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                    <line x1="8" y1="21" x2="16" y2="21" />
-                    <line x1="12" y1="17" x2="12" y2="21" />
-                  </svg>
+                  {isRunOrWalk ? (
+                    // Treadmill icon
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      {/* Treadmill base/platform */}
+                      <rect x="3" y="16" width="18" height="4" rx="1" />
+                      {/* Running belt lines */}
+                      <line x1="4" y1="17.5" x2="20" y2="17.5" />
+                      <line x1="4" y1="18.5" x2="20" y2="18.5" />
+                      {/* Control panel */}
+                      <rect x="8" y="12" width="8" height="4" rx="0.5" />
+                      {/* Display/screen on control panel */}
+                      <rect x="9" y="13" width="6" height="2" rx="0.3" />
+                      {/* Support legs */}
+                      <line x1="5" y1="16" x2="5" y2="20" />
+                      <line x1="19" y1="16" x2="19" y2="20" />
+                    </svg>
+                  ) : (
+                    // Monitor/screen for indoor cycling
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                      <line x1="8" y1="21" x2="16" y2="21" />
+                      <line x1="12" y1="17" x2="12" y2="21" />
+                    </svg>
+                  )}
                 </div>
                 
                 {/* Label */}
