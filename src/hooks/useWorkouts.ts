@@ -1710,13 +1710,16 @@ export const useWorkouts = () => {
       if (updates.total_cycles !== undefined) updateObject.total_cycles = updates.total_cycles;
       if (updates.deviceInfo !== undefined) updateObject.device_info = updates.deviceInfo;
       if ((updates as any).workout_metadata !== undefined) updateObject.workout_metadata = JSON.stringify((updates as any).workout_metadata);
+      // Handle RPE and gear_id (used in CompletedTab feedback)
+      if ((updates as any).rpe !== undefined) updateObject.rpe = (updates as any).rpe;
+      if ((updates as any).gear_id !== undefined) updateObject.gear_id = (updates as any).gear_id;
 
       const { data, error } = await supabase
         .from("workouts")
         .update(updateObject)
         .eq("id", id)
         .eq("user_id", user.id)
-        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,workout_metadata,planned_id,created_at,updated_at')
+        .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,workout_metadata,planned_id,rpe,gear_id,created_at,updated_at')
         .single();
 
       if (error) throw error;
