@@ -92,7 +92,7 @@ export function MobileHeader({
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="p-0 text-white/70 hover:text-white/90 hover:bg-white/10 transition-all duration-200"
+                  className="p-0 text-white/80 hover:text-white/90 hover:bg-white/10 transition-all duration-200"
                   style={{
                     width: '44px',
                     height: '44px',
@@ -113,9 +113,9 @@ export function MobileHeader({
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    <circle cx="1.5" cy="1.5" r="1.5" fill="rgba(255, 255, 255, 0.7)"/>
-                    <circle cx="1.5" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.7)"/>
-                    <circle cx="1.5" cy="14.5" r="1.5" fill="rgba(255, 255, 255, 0.7)"/>
+                    <circle cx="1.5" cy="1.5" r="1.5" fill="rgba(255, 255, 255, 0.8)"/>
+                    <circle cx="1.5" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.8)"/>
+                    <circle cx="1.5" cy="14.5" r="1.5" fill="rgba(255, 255, 255, 0.8)"/>
                   </svg>
                 </Button>
               </DropdownMenuTrigger>
