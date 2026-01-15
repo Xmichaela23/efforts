@@ -92,7 +92,7 @@ export const TrainingLoadChart: React.FC<TrainingLoadChartProps> = ({
               .sort((a, b) => b[1] - a[1]);
 
             return (
-              <div key={day.date} className="flex-1 flex flex-col items-center h-full">
+              <div key={day.date} className="flex-1 flex flex-col items-center justify-end h-full">
                 {/* Stacked bar - positioned at bottom, segments stack upward from bottom */}
                 <div 
                   className="w-full rounded-t overflow-hidden relative"
@@ -168,6 +168,7 @@ export const TrainingLoadChart: React.FC<TrainingLoadChartProps> = ({
           { type: 'bike', label: 'Bike' },
           { type: 'swim', label: 'Swim' },
           { type: 'strength', label: 'Strength' },
+          { type: 'mobility', label: 'Mobility' },
         ].map(({ type, label }) => (
           <div key={type} className="flex items-center gap-1">
             <div 
