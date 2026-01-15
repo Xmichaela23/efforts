@@ -172,10 +172,11 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
       });
 
       // Invalidate and refetch workout-detail query cache so useWorkoutDetail gets fresh data
-      queryClient.invalidateQueries({ queryKey: ['workout-detail', workoutData.id] });
-      queryClient.refetchQueries({ queryKey: ['workout-detail', workoutData.id] });
+      // This ensures when user navigates away and comes back, the data is fresh
+      await queryClient.invalidateQueries({ queryKey: ['workout-detail', workoutData.id] });
+      await queryClient.refetchQueries({ queryKey: ['workout-detail', workoutData.id] });
       
-      // Also dispatch event to trigger refresh in parent components
+      // Also dispatch event to trigger refresh in parent components (AppLayout's refreshSelectedWorkout)
       window.dispatchEvent(new CustomEvent('workout-detail:invalidate'));
       window.dispatchEvent(new CustomEvent('workouts:invalidate'));
 

@@ -179,7 +179,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     normalize: true,
     version: 'v1'
   });
-  const completedData: any = isCompleted ? (hydratedCompleted || workout) : workout;
+  // Prefer updatedWorkoutData (refreshed after changes) > hydratedCompleted (from useWorkoutDetail) > workout (prop)
+  const completedData: any = isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : workout;
 
   // Resolve linked planned row for completed workouts
   useEffect(() => {
