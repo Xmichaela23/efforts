@@ -27,142 +27,71 @@ export const usePlannedWorkouts = () => {
         throw new Error('User must be authenticated to fetch planned workouts');
       }
 
-      // Bound by date window to avoid loading entire history/future at once
+      // Use get-week edge function (SMART SERVER) - fetches unified data with computed
       const todayIso = new Date().toISOString().slice(0, 10);
       const pastIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 7 days
       const futureIso = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // next ~4 months
 
-      const { data, error } = await supabase
-        .from('planned_workouts')
-        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,rendered_description,units,source,workout_structure,workout_title,friendly_summary,total_duration_seconds,strength_exercises,mobility_exercises,pool_unit,pool_length_m,workload_planned,workload_actual,intensity_factor')
-        .eq('user_id', user.id)
-        .gte('date', pastIso)
-        .lte('date', futureIso)
-        .order('date', { ascending: true })
-        .limit(1000);
+      const { data, error } = await supabase.functions.invoke('get-week', { 
+        body: { from: pastIso, to: futureIso } 
+      });
 
       if (error) {
         throw error;
       }
 
-      // Transform the data to match our PlannedWorkout interface
-      const transformedWorkouts: PlannedWorkout[] = (data || [])
-        // Don't filter anything - show all planned workouts for auto-attachment
-        .map(workout => {
-        // Normalize JSONB fields that may come back as strings
-        const parseMaybeJson = (v: any) => {
-          if (v == null) return v;
-          if (typeof v === 'string') {
-            try { return JSON.parse(v); } catch { return v; }
-          }
-          return v;
-        };
-        const stepsPreset: string[] = [];
-        const exportHints = null;
-        const computed = null;
-        const rendered = (workout as any).rendered_description || undefined;
-        const units = (workout as any).units || undefined;
-        const parsedTags = (() => {
-          const raw = (workout as any).tags;
-          if (Array.isArray(raw)) return raw as any[];
-          if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) return p; } catch {} }
-          return [] as any[];
-        })();
-        // Parse view/expansion hints from DB columns (preferred) or from tags (schema-safe)
-        const displayOverrides = parseMaybeJson((workout as any).display_overrides) || null;
-        const expandSpecDb = parseMaybeJson((workout as any).expand_spec) || null;
-        const paceAnnotationDb = null; // column not present; derive from tags only
-        const parseExpandSpecFromTags = (tagsArr: string[]) => {
-          const out: any = {};
-          const idPrefixTag = tagsArr.find(t=>/^idprefix:/i.test(String(t)));
-          if (idPrefixTag) out.id_prefix = String(idPrefixTag.split(':')[1]||'').trim();
-          const expandTag = tagsArr.find(t=>/^expand:/i.test(String(t)));
-          if (expandTag){
-            const body = expandTag.split(':')[1] || '';
-            const parts = body.split(';');
-            for (const p of parts){
-              const [k,v] = p.split('=');
-              const key = String(k||'').trim().toLowerCase();
-              const val = String(v||'').trim().toLowerCase();
-              if (!key) continue;
-              if (key === 'reps') out.reps = Number(val);
-              if (key === 'omit_last_rest') out.omit_last_rest = (val==='1' || val==='true');
-              if (key === 'work'){
-                if (/^\d+\s*s$/.test(val)) { out.work = { time_s: Number(val.replace(/\D/g,'')) }; }
-                else if (/^\d+\s*m$/.test(val)) { out.work = { distance_m: Number(val.replace(/\D/g,'')) }; }
-                else if (/^\d+\s*mi$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.work = { distance_m: Math.round(n*1609.34) }; }
-                else if (/^\d+\s*km$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.work = { distance_m: Math.round(n*1000) }; }
-              }
-              if (key === 'rest'){
-                if (/^\d+\s*s$/.test(val)) { out.rest = { time_s: Number(val.replace(/\D/g,'')) }; }
-                else if (/^\d+\s*m$/.test(val)) { out.rest = { distance_m: Number(val.replace(/\D/g,'')) }; }
-                else if (/^\d+\s*mi$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.rest = { distance_m: Math.round(n*1609.34) }; }
-                else if (/^\d+\s*km$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.rest = { distance_m: Math.round(n*1000) }; }
-              }
-            }
-          }
-          return (out.reps && (out.work || out.rest)) ? out : null;
-        };
-        const parseDisplayOverridesFromTags = (tagsArr: string[]) => {
-          const view = tagsArr.find(t=>/^view:/i.test(String(t)));
-          const pace = tagsArr.find(t=>/^pace_annotation:/i.test(String(t)));
-          const ov: any = {};
-          if (view && String(view.split(':')[1]||'').toLowerCase()==='unpack') ov.planned_detail = 'unpack';
-          const pa = pace ? String(pace.split(':')[1]||'').toLowerCase() : '';
-          return { overrides: Object.keys(ov).length?ov:null, pace_annotation: pa||null };
-        };
-        const { overrides: displayOverridesFromTags, pace_annotation: paceAnnoFromTags } = parseDisplayOverridesFromTags(parsedTags.map(String));
-        const expandSpecFromTags = parseExpandSpecFromTags(parsedTags.map(String));
+      // Extract planned workouts from unified items (SMART SERVER returns unified format with computed)
+      const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
+      const plannedItems = items.filter((it: any) => !!it?.planned);
 
+      // Transform unified items to PlannedWorkout format
+      const transformedWorkouts: PlannedWorkout[] = plannedItems
+        .map((item: any) => {
+        // SMART SERVER returns unified format - extract planned data
+        const planned = item.planned || {};
         return {
-          id: workout.id,
-          name: workout.name,
-          type: workout.type,
-          date: workout.date,
-          description: workout.description,
-          duration: workout.duration,
+          id: item.id || planned.id || '',
+          name: planned.name || item.type || '',
+          type: item.type || planned.type || '',
+          date: item.date || planned.date || '',
+          description: planned.description || null,
+          duration: planned.duration || null,
           intervals: [],
-          strength_exercises: parseMaybeJson((workout as any).strength_exercises) || [],
-          mobility_exercises: parseMaybeJson((workout as any).mobility_exercises) || [],
-          workout_status: workout.workout_status,
-          source: workout.source,
-          training_plan_id: workout.training_plan_id,
-          week_number: workout.week_number,
-          day_number: workout.day_number,
-          // association field removed (column not present)
-          
-          // expose tags for UI filters
+          strength_exercises: planned.strength_exercises || [],
+          mobility_exercises: planned.mobility_exercises || [],
+          workout_status: item.status || planned.workout_status || 'planned',
+          source: planned.source || null,
+          training_plan_id: planned.training_plan_id || null,
+          week_number: planned.week_number || null,
+          day_number: planned.day_number || null,
           // @ts-ignore
-          tags: parsedTags,
-          // expose for optional activation UI
+          tags: planned.tags || [],
           // @ts-ignore
-          steps_preset: stepsPreset,
-          export_hints: exportHints,
-          rendered_description: rendered,
-          computed,
+          steps_preset: planned.steps_preset || [],
+          export_hints: null,
+          rendered_description: planned.rendered_description || null,
           // @ts-ignore
-          units,
-          // Structured fast-path fields
+          computed: planned.computed || (planned.steps ? { steps: planned.steps } : null),
           // @ts-ignore
-          workout_structure: parseMaybeJson((workout as any).workout_structure) || null,
+          units: planned.units || null,
           // @ts-ignore
-          workout_title: (workout as any).workout_title || null,
+          workout_structure: planned.workout_structure || null,
           // @ts-ignore
-          friendly_summary: (workout as any).friendly_summary || null,
+          workout_title: planned.workout_title || null,
           // @ts-ignore
-          total_duration_seconds: (workout as any).total_duration_seconds || null,
-          // Swim pool preference (nullable)
+          friendly_summary: planned.friendly_summary || null,
           // @ts-ignore
-          pool_unit: (workout as any).pool_unit || null,
+          total_duration_seconds: planned.total_duration_seconds || null,
           // @ts-ignore
-          pool_length_m: (workout as any).pool_length_m || null,
-          // View hints (DB columns take precedence over tag-encoded hints)
+          pool_unit: planned.pool_unit || null,
           // @ts-ignore
-          display_overrides: displayOverrides || displayOverridesFromTags || null,
+          pool_length_m: planned.pool_length_m || null,
           // @ts-ignore
-          expand_spec: expandSpecDb || expandSpecFromTags || null,
+          display_overrides: planned.display_overrides || null,
           // @ts-ignore
-          pace_annotation: paceAnnotationDb || paceAnnoFromTags || null,
+          expand_spec: planned.expand_spec || null,
+          // @ts-ignore
+          pace_annotation: planned.pace_annotation || null,
         } as any;
       });
 

@@ -194,6 +194,19 @@ Deno.serve(async (req)=>{
       base.setDate(base.getDate() + n);
       return toISODate(base);
     };
+    // Normalize any ISO date to the Monday of its week (matching activate-plan anchor)
+    const mondayOf = (iso)=>{
+      try {
+        const parts = String(iso).split('-').map((x)=>parseInt(x, 10));
+        const d = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+        const js = d.getDay(); // 0=Sun..6=Sat
+        const diff = (js === 0 ? -6 : (1 - js)); // shift to Monday
+        d.setDate(d.getDate() + diff);
+        return toISODate(d);
+      } catch {
+        return iso;
+      }
+    };
     const dayIndex = {
       Monday: 1,
       Tuesday: 2,
@@ -1055,21 +1068,156 @@ Deno.serve(async (req)=>{
     const totalPlanned = plannedWorkouts.length;
     const totalCompleted = completedWorkouts.length;
     // Get training plan context
+    // If multiple plans exist, prefer the one with weekly_summaries or most workouts in this week
     let trainingPlanContext = null;
-    const trainingPlanId = plannedWorkouts.find((p)=>p.planned?.training_plan_id)?.planned?.training_plan_id;
+    const planIdsInWeek = new Set<string>();
+    const planWorkoutCounts = new Map<string, number>();
+    for (const item of plannedWorkouts) {
+      const planId = item.planned?.training_plan_id;
+      if (planId) {
+        planIdsInWeek.add(planId);
+        planWorkoutCounts.set(planId, (planWorkoutCounts.get(planId) || 0) + 1);
+      }
+    }
+    
+    // Find the best plan: STRICTLY prefer one with weekly_summaries, regardless of workout count
+    let trainingPlanId: string | null = null;
+    if (planIdsInWeek.size > 0) {
+      // First, try to find a plan with weekly_summaries (prefer this over workout count)
+      const plansWithSummaries: Array<{ planId: string; workoutCount: number }> = [];
+      for (const planId of Array.from(planIdsInWeek)) {
+        try {
+          const { data: checkPlan } = await supabase.from('plans')
+            .select('config')
+            .eq('id', planId)
+            .maybeSingle();
+          if (checkPlan?.config?.weekly_summaries && Object.keys(checkPlan.config.weekly_summaries).length > 0) {
+            plansWithSummaries.push({
+              planId,
+              workoutCount: planWorkoutCounts.get(planId) || 0
+            });
+          }
+        } catch {}
+      }
+      
+      // If we found plans with summaries, prefer the one with most workouts among those
+      if (plansWithSummaries.length > 0) {
+        plansWithSummaries.sort((a, b) => b.workoutCount - a.workoutCount);
+        trainingPlanId = plansWithSummaries[0].planId;
+      } else {
+        // No plans with summaries - use the one with most workouts
+        let maxCount = 0;
+        for (const [planId, count] of planWorkoutCounts.entries()) {
+          if (count > maxCount) {
+            maxCount = count;
+            trainingPlanId = planId;
+          }
+        }
+        
+        // Fallback to first plan if still none selected
+        if (!trainingPlanId) {
+          trainingPlanId = Array.from(planIdsInWeek)[0];
+        }
+      }
+    }
+    
     if (trainingPlanId) {
       try {
-        const { data: planData } = await supabase.from('plans').select('config, name, current_week, duration_weeks').eq('id', trainingPlanId).single();
+        const { data: planData } = await supabase.from('plans').select('config, name, current_week, duration_weeks, sessions_by_week').eq('id', trainingPlanId).single();
         if (planData?.config) {
           const config = planData.config;
-          const weeklySummaries = config.weekly_summaries || {};
+          let weeklySummaries = config.weekly_summaries || {};
+          
+          // Generate weekly_summaries from sessions_by_week if missing
+          if (!weeklySummaries || Object.keys(weeklySummaries).length === 0) {
+            const sessionsByWeek = planData.sessions_by_week || {};
+            weeklySummaries = {};
+            const weekKeys = Object.keys(sessionsByWeek).sort((a, b) => parseInt(a) - parseInt(b));
+            
+            for (const weekKey of weekKeys) {
+              const sessions = Array.isArray(sessionsByWeek[weekKey]) ? sessionsByWeek[weekKey] : [];
+              if (sessions.length === 0) continue;
+              
+              // Analyze sessions to determine focus
+              const hasIntervals = sessions.some((s: any) => {
+                const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+                const tags = Array.isArray(s?.tags) ? s.tags : [];
+                const desc = String(s?.description || s?.name || '').toLowerCase();
+                return tokens.some((t: string) => /interval|vo2|5kpace|tempo|threshold/.test(String(t).toLowerCase())) ||
+                       tags.some((t: string) => /interval|vo2|tempo|threshold|hard/.test(String(t).toLowerCase())) ||
+                       /interval|vo2|tempo|threshold/.test(desc);
+              });
+              
+              const hasLongRun = sessions.some((s: any) => {
+                const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+                const tags = Array.isArray(s?.tags) ? s.tags : [];
+                const desc = String(s?.description || s?.name || '').toLowerCase();
+                return tokens.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
+                       tags.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
+                       /long run|longrun/.test(desc);
+              });
+              
+              const hasEasy = sessions.some((s: any) => {
+                const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+                const tags = Array.isArray(s?.tags) ? s.tags : [];
+                const desc = String(s?.description || s?.name || '').toLowerCase();
+                return tokens.some((t: string) => /easy|recovery|cooldown/.test(String(t).toLowerCase())) ||
+                       tags.some((t: string) => /easy|recovery/.test(String(t).toLowerCase())) ||
+                       /easy|recovery/.test(desc);
+              });
+              
+              // Determine focus based on session analysis
+              let focus = '';
+              if (hasIntervals && hasLongRun) {
+                focus = 'Build Phase';
+              } else if (hasIntervals) {
+                focus = 'Speed Development';
+              } else if (hasLongRun) {
+                focus = 'Endurance Building';
+              } else if (hasEasy) {
+                focus = 'Base Building';
+              } else {
+                focus = 'Training Week';
+              }
+              
+              // Extract key workouts
+              const keyWorkouts = sessions
+                .filter((s: any) => {
+                  const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+                  const tags = Array.isArray(s?.tags) ? s.tags : [];
+                  return tokens.some((t: string) => /interval|vo2|tempo|threshold|longrun/.test(String(t).toLowerCase())) ||
+                         tags.some((t: string) => /interval|vo2|tempo|threshold|longrun|hard/.test(String(t).toLowerCase()));
+                })
+                .map((s: any) => s.name || s.description || 'Key Workout')
+                .filter((name: string) => name && name.trim().length > 0);
+              
+              weeklySummaries[weekKey] = {
+                focus,
+                key_workouts: keyWorkouts.length > 0 ? keyWorkouts : undefined
+              };
+            }
+            
+            // Update plan config with generated summaries (for future requests)
+            if (Object.keys(weeklySummaries).length > 0) {
+              try {
+                await supabase.from('plans')
+                  .update({ config: { ...config, weekly_summaries: weeklySummaries } })
+                  .eq('id', trainingPlanId);
+              } catch (e) {
+                console.error('[get-week] Failed to persist generated weekly_summaries:', e);
+              }
+            }
+          }
           
           // Calculate week number based on viewed date range (fromISO), not today
           const durationWeeks = planData.duration_weeks || config.duration_weeks || 0;
           let currentWeek = planData.current_week || 1;
           const startDateStr = config.user_selected_start_date || config.start_date;
           if (startDateStr && fromISO) {
-            const startDate = new Date(startDateStr);
+            // Normalize start date to Monday (matching materializer anchor logic)
+            // This ensures consistency with week_number stored in planned_workouts
+            const startDateMonday = mondayOf(startDateStr);
+            const startDate = new Date(startDateMonday);
             const viewedDate = new Date(fromISO);
             // Reset to start of day for accurate calculation
             startDate.setHours(0, 0, 0, 0);
@@ -1089,18 +1237,41 @@ Deno.serve(async (req)=>{
           // Calculate weeks till race
           const weeksToRace = durationWeeks > 0 ? Math.max(0, durationWeeks - currentWeek + 1) : null;
           
+          // Extract focus - handle both string and empty/null cases
+          let focus = weekSummary.focus;
+          if (focus && typeof focus === 'string' && focus.trim().length > 0) {
+            focus = focus.trim();
+          } else {
+            focus = null; // Explicitly set to null if missing/empty
+          }
+          
+          // Extract notes - same handling
+          let notes = weekSummary.notes;
+          if (notes && typeof notes === 'string' && notes.trim().length > 0) {
+            notes = notes.trim();
+          } else {
+            notes = null;
+          }
+          
           trainingPlanContext = {
             planName: planData.name,
             currentWeek,
             durationWeeks,
-            focus: weekSummary.focus,
-            notes: weekSummary.notes,
+            focus: focus,
+            notes: notes,
             keyWorkouts: weekSummary.key_workouts || [],
             // Race info from config
             raceDate: config.race_date || null,
             raceName: config.race_name || null,
             weeksToRace
           };
+          
+          console.log('[get-week] Final trainingPlanContext:', {
+            currentWeek: trainingPlanContext.currentWeek,
+            focus: trainingPlanContext.focus,
+            notes: trainingPlanContext.notes,
+            hasFocus: !!trainingPlanContext.focus
+          });
         }
       } catch (error) {
         console.error('Failed to fetch training plan context:', error);

@@ -942,6 +942,86 @@ export default function PlanSelect() {
 
       const anchorMonday = (derivedStartMonday || computeMondayOf(startDate));
 
+      // Generate weekly_summaries from sessions_by_week if missing from template
+      const generateWeeklySummaries = (sessionsByWeek: any): any => {
+        const summaries: any = {};
+        const weekKeys = Object.keys(sessionsByWeek || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        
+        for (const weekKey of weekKeys) {
+          const sessions = Array.isArray(sessionsByWeek[weekKey]) ? sessionsByWeek[weekKey] : [];
+          if (sessions.length === 0) continue;
+          
+          // Analyze sessions to determine focus
+          const hasIntervals = sessions.some((s: any) => {
+            const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+            const tags = Array.isArray(s?.tags) ? s.tags : [];
+            const desc = String(s?.description || s?.name || '').toLowerCase();
+            return tokens.some((t: string) => /interval|vo2|5kpace|tempo|threshold/.test(String(t).toLowerCase())) ||
+                   tags.some((t: string) => /interval|vo2|tempo|threshold|hard/.test(String(t).toLowerCase())) ||
+                   /interval|vo2|tempo|threshold/.test(desc);
+          });
+          
+          const hasLongRun = sessions.some((s: any) => {
+            const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+            const tags = Array.isArray(s?.tags) ? s.tags : [];
+            const desc = String(s?.description || s?.name || '').toLowerCase();
+            return tokens.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
+                   tags.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
+                   /long run|longrun/.test(desc);
+          });
+          
+          const hasEasy = sessions.some((s: any) => {
+            const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+            const tags = Array.isArray(s?.tags) ? s.tags : [];
+            const desc = String(s?.description || s?.name || '').toLowerCase();
+            return tokens.some((t: string) => /easy|recovery|cooldown/.test(String(t).toLowerCase())) ||
+                   tags.some((t: string) => /easy|recovery/.test(String(t).toLowerCase())) ||
+                   /easy|recovery/.test(desc);
+          });
+          
+          // Determine focus based on session analysis
+          let focus = '';
+          if (hasIntervals && hasLongRun) {
+            focus = 'Build Phase';
+          } else if (hasIntervals) {
+            focus = 'Speed Development';
+          } else if (hasLongRun) {
+            focus = 'Endurance Building';
+          } else if (hasEasy) {
+            focus = 'Base Building';
+          } else {
+            focus = 'Training Week';
+          }
+          
+          // Extract key workouts
+          const keyWorkouts = sessions
+            .filter((s: any) => {
+              const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+              const tags = Array.isArray(s?.tags) ? s.tags : [];
+              return tokens.some((t: string) => /interval|vo2|tempo|threshold|longrun/.test(String(t).toLowerCase())) ||
+                     tags.some((t: string) => /interval|vo2|tempo|threshold|longrun|hard/.test(String(t).toLowerCase()));
+            })
+            .map((s: any) => s.name || s.description || 'Key Workout')
+            .filter((name: string) => name && name.trim().length > 0);
+          
+          summaries[weekKey] = {
+            focus,
+            key_workouts: keyWorkouts.length > 0 ? keyWorkouts : undefined,
+            estimated_hours: undefined,
+            hard_sessions: undefined,
+            notes: undefined
+          };
+        }
+        
+        return summaries;
+      };
+
+      const finalSessionsByWeek = mapped.sessions_by_week || {};
+      const templateWeeklySummaries = libPlan?.template?.weekly_summaries;
+      const generatedWeeklySummaries = (!templateWeeklySummaries || Object.keys(templateWeeklySummaries).length === 0) 
+        ? generateWeeklySummaries(finalSessionsByWeek)
+        : null;
+
       const payload = {
         name: libPlan.name,
         description: libPlan.description || '',
@@ -956,7 +1036,10 @@ export default function PlanSelect() {
           catalog_id: libPlan.id, 
           user_selected_start_date: anchorMonday,
           // Persist weekly_summaries within config so Weekly can read it consistently
-          ...(libPlan?.template?.weekly_summaries ? { weekly_summaries: JSON.parse(JSON.stringify(libPlan.template.weekly_summaries)) } : {}),
+          // Use template if available, otherwise generate from sessions_by_week
+          weekly_summaries: templateWeeklySummaries 
+            ? JSON.parse(JSON.stringify(templateWeeklySummaries))
+            : (generatedWeeklySummaries || {}),
           // Persist authoring baselines metadata for runtime use
           ...(libPlan?.template?.baselines_required ? { baselines_required: libPlan.template.baselines_required } : {}),
           ...(typeof libPlan?.template?.units === 'string' ? { units: libPlan.template.units } : {}),

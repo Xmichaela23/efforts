@@ -2634,7 +2634,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <div className="relative">
               <button onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/90 hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>Pick planned</button>
               {showPlannedMenu && (
-                <div className="absolute right-0 mt-1.5 w-72 bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-[100] p-2">
+                <div className="absolute right-0 mt-1.5 w-72 bg-[#1a1a2e] backdrop-blur-xl border-2 border-white/30 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_4px_16px_rgba(0,0,0,0.5)] z-[100] p-2">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="text-xs font-semibold text-white/60">Strength (Next 14 days)</div>
                     <button 
@@ -2673,9 +2673,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           setSourcePlannedId(w.id); 
                           setSourcePlannedDate(w.date); 
                           setShowPlannedMenu(false); 
-                        }} className="w-full text-left px-2 py-1.5 rounded hover:bg-white/[0.08] text-sm flex items-center justify-between text-white/90" type="button">
-                          <span>{weekdayShortFromYmd(w.date)} — {w.name||'Strength'}</span>
-                          <span className="text-2xs px-1.5 py-0.5 rounded border-2 border-white/30 text-white/70 bg-white/[0.08]">{String(w.workout_status||'planned')}</span>
+                        }} className="w-full text-left px-2 py-1.5 rounded hover:bg-white/[0.15] text-sm flex items-center justify-between text-white" type="button">
+                          <span className="font-light">{weekdayShortFromYmd(w.date)} — {w.name||'Strength'}</span>
+                          <span className="text-2xs px-1.5 py-0.5 rounded border-2 border-white/40 text-white/80 bg-white/[0.12]">{String(w.workout_status||'planned')}</span>
                         </button>
                       ))}
                   </div>
