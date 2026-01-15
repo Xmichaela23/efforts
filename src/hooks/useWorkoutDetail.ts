@@ -105,7 +105,7 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
         return remote;
       }
     },
-    staleTime: 60 * 60 * 1000, // 60 minutes - computed data is immutable once created
+    staleTime: 0, // Always refetch to get latest GPS track (especially if polyline was decoded)
     gcTime: 6 * 60 * 60 * 1000, // 6 hours
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
