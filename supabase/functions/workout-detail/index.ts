@@ -222,6 +222,81 @@ Deno.serve(async (req) => {
         }
       } else if (!gpsTrack && !row.gps_trackpoints) {
         console.log(`[workout-detail] No gps_track and no gps_trackpoints for workout ${id}`);
+        // If we have strava_activity_id, try to fetch GPS from Strava
+        if (row.strava_activity_id && userId) {
+          try {
+            console.log(`[workout-detail] Attempting to fetch GPS from Strava for activity ${row.strava_activity_id}`);
+            // Get Strava access token
+            const { data: conn } = await supabase
+              .from('device_connections')
+              .select('connection_data, access_token, refresh_token')
+              .eq('user_id', userId)
+              .eq('provider', 'strava')
+              .maybeSingle();
+            
+            let accessToken = conn?.connection_data?.access_token || conn?.access_token;
+            
+            // Refresh token if needed
+            if (!accessToken && conn?.refresh_token) {
+              const clientId = Deno.env.get('STRAVA_CLIENT_ID');
+              const clientSecret = Deno.env.get('STRAVA_CLIENT_SECRET');
+              if (clientId && clientSecret) {
+                const tokenResp = await fetch('https://www.strava.com/oauth/token', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    grant_type: 'refresh_token',
+                    refresh_token: conn.refresh_token,
+                  }),
+                });
+                if (tokenResp.ok) {
+                  const tokenJson = await tokenResp.json();
+                  accessToken = tokenJson.access_token;
+                }
+              }
+            }
+            
+            if (accessToken) {
+              // Fetch latlng streams from Strava
+              const streamsResp = await fetch(`https://www.strava.com/api/v3/activities/${row.strava_activity_id}/streams?keys=latlng`, {
+                headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              });
+              
+              if (streamsResp.ok) {
+                const streams = await streamsResp.json();
+                const latlngStream = streams.find((s: any) => s.type === 'latlng');
+                
+                if (latlngStream && Array.isArray(latlngStream.data) && latlngStream.data.length > 0) {
+                  const workoutTimestamp = row.timestamp 
+                    ? Math.floor(new Date(row.timestamp).getTime() / 1000)
+                    : Math.floor(Date.now() / 1000);
+                  
+                  gpsTrack = latlngStream.data
+                    .filter((p: any) => Array.isArray(p) && p.length === 2)
+                    .map(([lat, lng]: [number, number], index: number) => ({
+                      lat,
+                      lng,
+                      timestamp: (workoutTimestamp + index) * 1000,
+                      startTimeInSeconds: workoutTimestamp + index
+                    }));
+                  
+                  console.log(`[workout-detail] Fetched ${gpsTrack.length} GPS points from Strava streams`);
+                  
+                  // Optionally save to database (fire-and-forget)
+                  supabase.from('workouts')
+                    .update({ gps_track: gpsTrack })
+                    .eq('id', id)
+                    .then(() => console.log(`[workout-detail] Saved GPS track to database`))
+                    .catch((err) => console.warn(`[workout-detail] Failed to save GPS track:`, err));
+                }
+              }
+            }
+          } catch (fetchErr) {
+            console.warn(`[workout-detail] Failed to fetch GPS from Strava:`, fetchErr);
+          }
+        }
       }
       
       (detail as any).gps_track = gpsTrack;
