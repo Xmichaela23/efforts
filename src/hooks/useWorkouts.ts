@@ -1869,6 +1869,10 @@ export const useWorkouts = () => {
           threshold_power: data.threshold_power,
           total_cycles: data.total_cycles,
         }
+      },
+      // Include RPE and gear_id in returned workout object
+      rpe: (data as any).rpe ?? undefined,
+      gear_id: (data as any).gear_id ?? undefined
       };
 
       setWorkouts((prev) => prev.map((w) => (w.id === id ? updated : w)));
