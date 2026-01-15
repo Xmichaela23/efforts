@@ -53,17 +53,31 @@ const corsHeaders = {
 // TYPE DEFINITIONS
 // =============================================================================
 
+interface PlanContext {
+  hasActivePlan: boolean;
+  planId: string | null;
+  weekIndex: number | null; // 1-based week number
+  phaseKey: string | null;
+  phaseName: string | null;
+  isRecoveryWeek: boolean;
+  isTaperWeek: boolean;
+  weekIntent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
+  weekFocusLabel: string | null;
+  planName: string | null;
+}
+
 interface ACWRData {
   ratio: number;
-  status: 'undertrained' | 'optimal' | 'elevated' | 'high_risk';
+  status: 'undertrained' | 'optimal' | 'elevated' | 'high_risk' | 'recovery' | 'optimal_recovery';
   acute_daily_avg: number;
   chronic_daily_avg: number;
   acute_total: number;
   chronic_total: number;
   data_days: number;
+  plan_context?: PlanContext;
   projected?: {
     ratio: number;
-    status: 'undertrained' | 'optimal' | 'elevated' | 'high_risk';
+    status: 'undertrained' | 'optimal' | 'elevated' | 'high_risk' | 'recovery' | 'optimal_recovery';
     planned_workload: number;
   };
 }
@@ -247,10 +261,16 @@ Deno.serve(async (req) => {
     console.log(`📊 Found ${workouts.length} completed workouts, ${planned.length} planned workouts`);
 
     // ==========================================================================
+    // FETCH PLAN CONTEXT
+    // ==========================================================================
+
+    const planContext = await fetchPlanContext(supabase, user_id, focusDateISO, focusDate);
+
+    // ==========================================================================
     // CALCULATE ACWR
     // ==========================================================================
 
-    const acwr = calculateACWR(workouts, focusDate, sevenDaysAgo, twentyEightDaysAgo, planned);
+    const acwr = calculateACWR(workouts, focusDate, sevenDaysAgo, twentyEightDaysAgo, planned, planContext);
 
     // ==========================================================================
     // CALCULATE SPORT BREAKDOWN (last 7 days)
@@ -271,52 +291,10 @@ Deno.serve(async (req) => {
     const weekComparison = calculateWeekComparison(workouts, sevenDaysAgo, focusDate, previousWeekStart);
 
     // ==========================================================================
-    // CHECK FOR ACTIVE TRAINING PLAN
-    // ==========================================================================
-    
-    let hasActivePlan = false;
-    try {
-      // Method 1: Check training_plans table for is_active = true
-      const { data: activePlans } = await supabase
-        .from('training_plans')
-        .select('id, name')
-        .eq('user_id', user_id)
-        .eq('is_active', true)
-        .limit(1);
-      
-      if (activePlans && activePlans.length > 0) {
-        hasActivePlan = true;
-        console.log(`📋 User has active plan: ${activePlans[0].name}`);
-      }
-      
-      // Method 2: Check for upcoming planned workouts (indicates following a plan)
-      if (!hasActivePlan) {
-        const tomorrow = new Date(focusDate);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const nextWeek = new Date(focusDate);
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        
-        const { data: upcomingPlanned, count } = await supabase
-          .from('planned_workouts')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user_id)
-          .gte('date', tomorrow.toLocaleDateString('en-CA'))
-          .lte('date', nextWeek.toLocaleDateString('en-CA'));
-        
-        if (count && count >= 2) {
-          hasActivePlan = true;
-          console.log(`📋 User has ${count} planned workouts in next 7 days - treating as active plan`);
-        }
-      }
-    } catch (e) {
-      console.log('⚠️ Could not check for active plan:', e);
-    }
-
-    // ==========================================================================
     // GENERATE SMART INSIGHTS
     // ==========================================================================
 
-    const insights = generateInsights(acwr, sportBreakdown, weekComparison, timeline, hasActivePlan);
+    const insights = generateInsights(acwr, sportBreakdown, weekComparison, timeline, planContext);
 
     // ==========================================================================
     // BUILD RESPONSE
@@ -349,6 +327,225 @@ Deno.serve(async (req) => {
 });
 
 // =============================================================================
+// PLAN CONTEXT FETCHING
+// =============================================================================
+
+/**
+ * Fetch plan context for a given date
+ * Returns null if no active plan or cannot determine context
+ */
+async function fetchPlanContext(
+  supabase: any,
+  userId: string,
+  focusDateISO: string,
+  focusDate: Date
+): Promise<PlanContext | null> {
+  const defaultContext: PlanContext = {
+    hasActivePlan: false,
+    planId: null,
+    weekIndex: null,
+    phaseKey: null,
+    phaseName: null,
+    isRecoveryWeek: false,
+    isTaperWeek: false,
+    weekIntent: 'unknown',
+    weekFocusLabel: null,
+    planName: null
+  };
+
+  try {
+    // Find active plan - check plans table first (new system)
+    const { data: activePlans } = await supabase
+      .from('plans')
+      .select('id, name, config, current_week, duration_weeks, sessions_by_week')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (!activePlans || activePlans.length === 0) {
+      return null; // No active plan
+    }
+
+    const plan = activePlans[0];
+    const config = plan.config || {};
+    
+    // Calculate current week based on focus date
+    const startDateStr = config.user_selected_start_date || config.start_date;
+    if (!startDateStr) {
+      console.log('⚠️ Plan exists but no start date - cannot determine week');
+      return null;
+    }
+
+    // Normalize start date to Monday (matching get-week logic)
+    const mondayOf = (iso: string): string => {
+      const d = new Date(iso);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+      const monday = new Date(d.setDate(diff));
+      return monday.toLocaleDateString('en-CA');
+    };
+
+    const startDateMonday = mondayOf(startDateStr);
+    const startDate = new Date(startDateMonday);
+    const viewedDate = new Date(focusDateISO);
+    startDate.setHours(0, 0, 0, 0);
+    viewedDate.setHours(0, 0, 0, 0);
+    const diffMs = viewedDate.getTime() - startDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    let weekIndex = Math.max(1, Math.floor(diffDays / 7) + 1);
+    
+    const durationWeeks = plan.duration_weeks || config.duration_weeks || 0;
+    if (durationWeeks > 0) {
+      weekIndex = Math.min(weekIndex, durationWeeks);
+    }
+
+    // Get weekly summaries
+    let weeklySummaries = config.weekly_summaries || {};
+    
+    // Generate from sessions_by_week if missing (same logic as get-week)
+    if (!weeklySummaries || Object.keys(weeklySummaries).length === 0) {
+      const sessionsByWeek = plan.sessions_by_week || {};
+      weeklySummaries = {};
+      const weekKeys = Object.keys(sessionsByWeek).sort((a, b) => parseInt(a) - parseInt(b));
+      
+      for (const weekKey of weekKeys) {
+        const sessions = Array.isArray(sessionsByWeek[weekKey]) ? sessionsByWeek[weekKey] : [];
+        if (sessions.length === 0) continue;
+        
+        const hasIntervals = sessions.some((s: any) => {
+          const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+          const tags = Array.isArray(s?.tags) ? s.tags : [];
+          const desc = String(s?.description || s?.name || '').toLowerCase();
+          return tokens.some((t: string) => /interval|vo2|5kpace|tempo|threshold/.test(String(t).toLowerCase())) ||
+                 tags.some((t: string) => /interval|vo2|tempo|threshold|hard/.test(String(t).toLowerCase())) ||
+                 /interval|vo2|tempo|threshold/.test(desc);
+        });
+        
+        const hasLongRun = sessions.some((s: any) => {
+          const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+          const tags = Array.isArray(s?.tags) ? s.tags : [];
+          const desc = String(s?.description || s?.name || '').toLowerCase();
+          return tokens.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
+                 tags.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
+                 /long run|longrun/.test(desc);
+        });
+        
+        let focus = '';
+        if (hasIntervals && hasLongRun) {
+          focus = 'Build Phase';
+        } else if (hasIntervals) {
+          focus = 'Speed Development';
+        } else if (hasLongRun) {
+          focus = 'Endurance Building';
+        } else {
+          focus = 'Training Week';
+        }
+        
+        weeklySummaries[weekKey] = { focus };
+      }
+    }
+
+    const weekSummary = weeklySummaries[String(weekIndex)] || {};
+    const weekFocusLabel = weekSummary.focus || null;
+
+    // Determine recovery/taper status (explicit detection, ranked by trust)
+    let isRecoveryWeek = false;
+    let isTaperWeek = false;
+    let weekIntent: PlanContext['weekIntent'] = 'build';
+    let phaseKey: string | null = null;
+    let phaseName: string | null = null;
+
+    // PRIORITY 1: Explicit per-week tag in weekly_summaries
+    if (weekFocusLabel) {
+      const focusLower = weekFocusLabel.toLowerCase();
+      if (focusLower.includes('recovery') || focusLower.includes('recovery week')) {
+        isRecoveryWeek = true;
+        weekIntent = 'recovery';
+      } else if (focusLower.includes('taper') || focusLower.includes('taper week')) {
+        isTaperWeek = true;
+        weekIntent = 'taper';
+      } else if (focusLower.includes('peak')) {
+        weekIntent = 'peak';
+      }
+    }
+
+    // PRIORITY 2: Explicit phase metadata (recovery_weeks array)
+    if (!isRecoveryWeek && !isTaperWeek && config.phases) {
+      for (const [phaseKeyName, phaseData] of Object.entries(config.phases)) {
+        const phase = phaseData as any;
+        if (phase.weeks && phase.weeks.includes(weekIndex)) {
+          phaseKey = phaseKeyName;
+          phaseName = phaseKeyName;
+          
+          // Check if phase has recovery_weeks array
+          if (phase.recovery_weeks && Array.isArray(phase.recovery_weeks) && phase.recovery_weeks.includes(weekIndex)) {
+            isRecoveryWeek = true;
+            weekIntent = 'recovery';
+          }
+          
+          // Check if it's a taper phase
+          if (phaseKeyName.toLowerCase().includes('taper')) {
+            isTaperWeek = true;
+            weekIntent = 'taper';
+          }
+          
+          // If we haven't set intent yet, infer from phase name
+          if (weekIntent === 'build') {
+            if (phaseKeyName.toLowerCase().includes('peak')) {
+              weekIntent = 'peak';
+            } else if (phaseKeyName.toLowerCase().includes('base')) {
+              weekIntent = 'baseline';
+            }
+          }
+          
+          break;
+        }
+      }
+    }
+
+    // PRIORITY 3: Pattern-based (only if explicitly declared)
+    if (!isRecoveryWeek && !isTaperWeek && config.recoveryPattern === 'every_4th') {
+      // Every 4th week is recovery (but not in taper)
+      const taperPhase = config.phases ? Object.values(config.phases).find((p: any) => 
+        p.name && p.name.toLowerCase().includes('taper')
+      ) : null;
+      
+      const isInTaper = taperPhase && (taperPhase as any).weeks && (taperPhase as any).weeks.includes(weekIndex);
+      
+      if (!isInTaper && weekIndex % 4 === 0) {
+        isRecoveryWeek = true;
+        weekIntent = 'recovery';
+      }
+    }
+
+    // If we still don't know, default to 'build' (not 'unknown' - that's for no plan)
+    if (weekIntent === 'unknown') {
+      weekIntent = 'build';
+    }
+
+    console.log(`📋 Plan context: week=${weekIndex}, intent=${weekIntent}, recovery=${isRecoveryWeek}, taper=${isTaperWeek}`);
+
+    return {
+      hasActivePlan: true,
+      planId: plan.id,
+      weekIndex,
+      phaseKey,
+      phaseName,
+      isRecoveryWeek,
+      isTaperWeek,
+      weekIntent,
+      weekFocusLabel,
+      planName: plan.name
+    };
+
+  } catch (error) {
+    console.error('⚠️ Error fetching plan context:', error);
+    return null; // No plan context available
+  }
+}
+
+// =============================================================================
 // ACWR CALCULATION
 // =============================================================================
 
@@ -357,7 +554,8 @@ function calculateACWR(
   focusDate: Date,
   sevenDaysAgo: Date,
   twentyEightDaysAgo: Date,
-  plannedWorkouts: PlannedWorkoutRecord[]
+  plannedWorkouts: PlannedWorkoutRecord[],
+  planContext: PlanContext | null
 ): ACWRData {
   
   // Filter to acute window (last 7 days)
@@ -385,8 +583,8 @@ function calculateACWR(
     ? Math.round((acuteDailyAvg / chronicDailyAvg) * 100) / 100 
     : 0;
 
-  // Determine status
-  const status = getACWRStatus(ratio);
+  // Determine status (plan-aware)
+  const status = getACWRStatus(ratio, planContext);
 
   // Count days with data (for progressive disclosure)
   const uniqueDates = new Set(chronicWorkouts.map(w => w.date));
@@ -407,7 +605,7 @@ function calculateACWR(
 
       projected = {
         ratio: projectedRatio,
-        status: getACWRStatus(projectedRatio),
+        status: getACWRStatus(projectedRatio, planContext),
         planned_workload: plannedWorkload
       };
     }
@@ -423,11 +621,55 @@ function calculateACWR(
     acute_total: acuteTotal,
     chronic_total: chronicTotal,
     data_days: dataDays,
+    plan_context: planContext || undefined,
     projected
   };
 }
 
-function getACWRStatus(ratio: number): 'undertrained' | 'optimal' | 'elevated' | 'high_risk' {
+/**
+ * Get ACWR status based on ratio and plan context
+ * Plan-aware: recovery/taper weeks have different thresholds
+ */
+function getACWRStatus(
+  ratio: number,
+  planContext: PlanContext | null
+): 'undertrained' | 'optimal' | 'elevated' | 'high_risk' | 'recovery' | 'optimal_recovery' {
+  
+  // No plan: use general ACWR principles
+  if (!planContext || !planContext.hasActivePlan) {
+    if (ratio < 0.80) return 'undertrained';
+    if (ratio <= 1.30) return 'optimal';
+    if (ratio <= 1.50) return 'elevated';
+    return 'high_risk';
+  }
+
+  const { weekIntent, isRecoveryWeek, isTaperWeek } = planContext;
+
+  // Recovery week: low load is EXPECTED and GOOD
+  if (isRecoveryWeek || weekIntent === 'recovery') {
+    if (ratio < 0.80) return 'optimal_recovery'; // Not "undertrained" - this is intentional!
+    if (ratio <= 1.05) return 'optimal';
+    if (ratio <= 1.20) return 'elevated'; // Even recovery weeks shouldn't spike too high
+    return 'high_risk';
+  }
+
+  // Taper week: low load is expected
+  if (isTaperWeek || weekIntent === 'taper') {
+    if (ratio < 0.80) return 'optimal'; // Expected low load
+    if (ratio <= 1.10) return 'optimal';
+    if (ratio <= 1.25) return 'elevated';
+    return 'high_risk';
+  }
+
+  // Build/Peak weeks: use plan-aware thresholds (trust the plan's periodization)
+  if (weekIntent === 'build' || weekIntent === 'peak' || weekIntent === 'baseline') {
+    if (ratio < 0.80) return 'undertrained';
+    if (ratio <= 1.50) return 'optimal'; // Higher threshold when on plan (trust periodization)
+    if (ratio <= 1.70) return 'elevated';
+    return 'high_risk';
+  }
+
+  // Unknown intent: default to general principles (shouldn't happen, but safety fallback)
   if (ratio < 0.80) return 'undertrained';
   if (ratio <= 1.30) return 'optimal';
   if (ratio <= 1.50) return 'elevated';
@@ -660,9 +902,15 @@ function generateInsights(
   sportBreakdown: SportBreakdown,
   weekComparison: WeekComparison,
   timeline: TimelineDay[],
-  hasActivePlan: boolean = false
+  planContext: PlanContext | null
 ): Insight[] {
   const insights: Insight[] = [];
+
+  const hasActivePlan = planContext?.hasActivePlan || false;
+  const isRecoveryWeek = planContext?.isRecoveryWeek || false;
+  const isTaperWeek = planContext?.isTaperWeek || false;
+  const weekIntent = planContext?.weekIntent || 'unknown';
+  const weekFocusLabel = planContext?.weekFocusLabel;
 
   // ==========================================================================
   // PLAN-AWARE THRESHOLDS
@@ -677,12 +925,17 @@ function generateInsights(
   // Weekly jump threshold: higher when on a plan (planned progression)
   const weeklyJumpThreshold = hasActivePlan ? 50 : 30;
 
-  // 1. High ACWR Warning
-  if (acwr.ratio > acwrWarningThreshold && acwr.data_days >= 7) {
+  // 1. High ACWR Warning (skip for recovery weeks - low load is expected)
+  if (!isRecoveryWeek && acwr.ratio > acwrWarningThreshold && acwr.data_days >= 7) {
     const severity = acwr.ratio > acwrCriticalThreshold ? 'critical' : 'warning';
-    const message = hasActivePlan
-      ? `ACWR at ${acwr.ratio.toFixed(2)} - elevated even for plan progression, consider extra recovery`
-      : `ACWR at ${acwr.ratio.toFixed(2)} - consider reducing load or adding recovery`;
+    let message: string;
+    
+    if (hasActivePlan) {
+      message = `ACWR at ${acwr.ratio.toFixed(2)} - elevated even for plan progression, consider extra recovery`;
+    } else {
+      message = `ACWR at ${acwr.ratio.toFixed(2)} - consider reducing load or adding recovery`;
+    }
+    
     insights.push({
       type: 'acwr_high',
       severity,
@@ -691,26 +944,54 @@ function generateInsights(
     });
   }
 
-  // 2. Consecutive Hard Days (softened when on a plan)
-  const consecutiveHardDays = calculateConsecutiveHardDays(timeline);
-  const consecutiveThreshold = hasActivePlan ? 4 : 3; // Allow more consecutive days when on plan
-  if (consecutiveHardDays >= consecutiveThreshold) {
-    const message = hasActivePlan
-      ? `${consecutiveHardDays} consecutive quality days - ensure adequate sleep/nutrition`
-      : `${consecutiveHardDays} consecutive quality days - prioritize recovery`;
-    insights.push({
-      type: 'consecutive_hard',
-      severity: 'warning',
-      message,
-      data: { days: consecutiveHardDays }
-    });
+  // 1b. Recovery week specific insight (low ACWR is good, but warn if too high)
+  if (isRecoveryWeek) {
+    if (acwr.ratio > 1.20 && acwr.data_days >= 7) {
+      insights.push({
+        type: 'acwr_high',
+        severity: 'warning',
+        message: `Recovery week: ACWR at ${acwr.ratio.toFixed(2)} is elevated. Lower load is intentional - focus on sleep, mobility, easy volume.`,
+        data: { ratio: acwr.ratio, status: acwr.status }
+      });
+    } else if (acwr.ratio <= 1.05) {
+      // Positive reinforcement for proper recovery
+      insights.push({
+        type: 'acwr_high', // Reuse type for now, could add 'recovery_optimal' type
+        severity: 'info',
+        message: `Recovery week: Lower load is intentional. Focus on sleep, mobility, and easy volume to maximize adaptation.`,
+        data: { ratio: acwr.ratio, status: acwr.status }
+      });
+    }
   }
 
-  // 3. Large Weekly Jump (higher threshold and softer message when on plan)
-  if (weekComparison.change_direction === 'increase' && weekComparison.change_percent > weeklyJumpThreshold) {
-    const message = hasActivePlan
-      ? `Weekly load increased ${weekComparison.change_percent}% - normal for build phase, monitor recovery`
-      : `Weekly load increased ${weekComparison.change_percent}% - monitor for fatigue signals`;
+  // 2. Consecutive Hard Days (softened when on a plan, skip for recovery weeks)
+  if (!isRecoveryWeek && !isTaperWeek) {
+    const consecutiveHardDays = calculateConsecutiveHardDays(timeline);
+    const consecutiveThreshold = hasActivePlan ? 4 : 3; // Allow more consecutive days when on plan
+    if (consecutiveHardDays >= consecutiveThreshold) {
+      const message = hasActivePlan
+        ? `${consecutiveHardDays} consecutive quality days - ensure adequate sleep/nutrition`
+        : `${consecutiveHardDays} consecutive quality days - prioritize recovery`;
+      insights.push({
+        type: 'consecutive_hard',
+        severity: 'warning',
+        message,
+        data: { days: consecutiveHardDays }
+      });
+    }
+  }
+
+  // 3. Large Weekly Jump (higher threshold and softer message when on plan, skip for recovery weeks)
+  if (!isRecoveryWeek && weekComparison.change_direction === 'increase' && weekComparison.change_percent > weeklyJumpThreshold) {
+    let message: string;
+    if (hasActivePlan && weekIntent === 'build') {
+      message = `Weekly load increased ${weekComparison.change_percent}% - normal for build phase, monitor recovery`;
+    } else if (hasActivePlan) {
+      message = `Weekly load increased ${weekComparison.change_percent}% - monitor recovery`;
+    } else {
+      message = `Weekly load increased ${weekComparison.change_percent}% - monitor for fatigue signals`;
+    }
+    
     insights.push({
       type: 'weekly_jump',
       severity: hasActivePlan ? 'info' : 'warning',
@@ -720,6 +1001,16 @@ function generateInsights(
         current: weekComparison.current_week_total,
         previous: weekComparison.previous_week_total
       }
+    });
+  }
+
+  // 3b. Low load warning for build weeks (not recovery/taper)
+  if (!isRecoveryWeek && !isTaperWeek && acwr.ratio < 0.80 && hasActivePlan && weekIntent === 'build') {
+    insights.push({
+      type: 'weekly_jump', // Reuse type
+      severity: 'info',
+      message: `Load is below target for a build week. Consider adding volume if feeling fresh.`,
+      data: { ratio: acwr.ratio }
     });
   }
 

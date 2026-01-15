@@ -92,6 +92,45 @@ function calculateStrengthWorkload(exercises) {
   return Math.round(volumeFactor * Math.pow(intensity, 2) * 100);
 }
 
+function calculateMobilityWorkloadForItem(item) {
+  const isCompleted = String(item?.status || '').toLowerCase() === 'completed';
+  const exercises = isCompleted
+    ? (item?.executed?.mobility_exercises || [])
+    : (item?.planned?.mobility_exercises || []);
+  
+  // No evidence: return 0 (no made-up values)
+  if (!Array.isArray(exercises) || exercises.length === 0) return 0;
+  
+  const total = exercises.length;
+  const completed = exercises.filter(e => e.completed).length;
+  
+  // No evidence: return 0 if nothing was completed
+  if (completed === 0) return 0;
+  
+  const completionRatio = total > 0 ? completed / total : 0;
+  
+  // Get intensity (0.60-0.70 range based on completion)
+  const baseIntensity = 0.60;
+  const intensity = baseIntensity + (completionRatio * 0.1);
+  const clampedIntensity = Math.max(0.50, Math.min(0.80, intensity));
+  
+  // Base dose: ~1 point per exercise at full completion
+  const basePerExercise = 1.0;
+  const raw = total * basePerExercise * completionRatio;
+  
+  // Gentle multiplier, bounded (0.85–1.00 in the normal band)
+  const intensityMultiplier = Math.max(0.75, Math.min(1.10,
+    0.85 + (clampedIntensity - 0.60) * 1.5
+  ));
+  
+  const workload = Math.round(raw * intensityMultiplier);
+  
+  // Only enforce a minimum if they did a non-trivial amount
+  const minIfMeaningful = completed >= 3 ? 3 : 0;
+  
+  return Math.max(minIfMeaningful, Math.min(workload, 30));
+}
+
 function calculateWorkloadForItem(item) {
   try {
     const type = String(item?.type || '').toLowerCase();
@@ -106,9 +145,9 @@ function calculateWorkloadForItem(item) {
       return calculateStrengthWorkload(exercises);
     }
     
-    // For mobility, use fixed low workload
+    // For mobility, use exercise-based calculation (no made-up values)
     if (type === 'mobility') {
-      return 10; // Fixed low workload for mobility
+      return calculateMobilityWorkloadForItem(item);
     }
     
     // For pilates_yoga, use duration × 0.75² × 100

@@ -5,6 +5,8 @@
  * 
  * Formulas:
  * - Strength: workload = volume_factor × intensity² × 100 (volume-based, uses RIR)
+ * - Mobility: exercise-based, ~1 point per exercise, capped at 30 (no duration)
+ * - Pilates/Yoga: duration (minutes) × RPE
  * - Other: workload = duration (hours) × intensity² × 100 (duration-based)
  * 
  * Input: { workout_id, workout_data? }
@@ -199,6 +201,11 @@ function calculateWorkload(workout: WorkoutData, sessionRPE?: number): number {
   // Strength workouts use volume-based calculation, not duration
   if (workout.type === 'strength' && workout.strength_exercises && workout.strength_exercises.length > 0) {
     return calculateStrengthWorkload(workout.strength_exercises, sessionRPE);
+  }
+  
+  // Mobility workouts use exercise-based calculation (no duration)
+  if (workout.type === 'mobility') {
+    return calculateMobilityWorkload(workout);
   }
   
   // Pilates/Yoga workouts use duration × RPE × modality_factor
@@ -639,6 +646,57 @@ function getPilatesYogaIntensity(workout: WorkoutData, sessionRPE?: number): num
   
   // Map RPE (1-10) to intensity (0.55-0.95)
   return mapRPEToIntensity(rpe);
+}
+
+/**
+ * Clamp a number between min and max values
+ */
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+/**
+ * Calculate workload for mobility workouts
+ * Exercise-based calculation: ~1 point per exercise, scaled by completion and intensity
+ * Typical sessions: 5-15 points, big PT routines: 20-30 points max
+ * 
+ * Returns 0 when there's no evidence (no exercises or no completed exercises)
+ */
+function calculateMobilityWorkload(workout: WorkoutData): number {
+  const ex = workout.mobility_exercises ?? [];
+  
+  // No evidence: return 0 (no made-up values)
+  if (ex.length === 0) return 0;
+
+  const total = ex.length;
+  const completed = ex.filter(e => e.completed).length;
+  
+  // No evidence: return 0 if nothing was completed
+  if (completed === 0) return 0;
+  
+  const completionRatio = total > 0 ? completed / total : 0;
+
+  // Expect ~0.60–0.70, but clamp to safety
+  const intensityRaw = getMobilityIntensity(ex);
+  const intensity = clamp(intensityRaw, 0.50, 0.80);
+
+  // Base dose: ~1 point per exercise at full completion
+  const basePerExercise = 1.0;
+  const raw = total * basePerExercise * completionRatio;
+
+  // Gentle multiplier, bounded (0.85–1.00 in the normal band)
+  const intensityMultiplier = clamp(
+    0.85 + (intensity - 0.60) * 1.5,
+    0.75,
+    1.10
+  );
+
+  const workload = Math.round(raw * intensityMultiplier);
+
+  // Only enforce a minimum if they did a non-trivial amount
+  const minIfMeaningful = completed >= 3 ? 3 : 0;
+
+  return clamp(workload, minIfMeaningful, 30);
 }
 
 /**

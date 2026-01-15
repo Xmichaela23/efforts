@@ -24,15 +24,27 @@ import { supabase } from '@/lib/supabase';
 
 export interface ACWRData {
   ratio: number;
-  status: 'undertrained' | 'optimal' | 'elevated' | 'high_risk';
+  status: 'undertrained' | 'optimal' | 'elevated' | 'high_risk' | 'recovery' | 'optimal_recovery';
   acute_daily_avg: number;
   chronic_daily_avg: number;
   acute_total: number;
   chronic_total: number;
   data_days: number;
+  plan_context?: {
+    hasActivePlan: boolean;
+    planId: string | null;
+    weekIndex: number | null;
+    phaseKey: string | null;
+    phaseName: string | null;
+    isRecoveryWeek: boolean;
+    isTaperWeek: boolean;
+    weekIntent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
+    weekFocusLabel: string | null;
+    planName: string | null;
+  };
   projected?: {
     ratio: number;
-    status: 'undertrained' | 'optimal' | 'elevated' | 'high_risk';
+    status: 'undertrained' | 'optimal' | 'elevated' | 'high_risk' | 'recovery' | 'optimal_recovery';
     planned_workload: number;
   };
 }

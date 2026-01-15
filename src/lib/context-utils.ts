@@ -69,10 +69,10 @@ export function getDisciplineTextClass(type: string): string {
 // ACWR STATUS
 // =============================================================================
 
-export type ACWRStatus = 'undertrained' | 'optimal' | 'elevated' | 'high_risk';
+export type ACWRStatus = 'undertrained' | 'optimal' | 'elevated' | 'high_risk' | 'recovery' | 'optimal_recovery';
 
 /**
- * Get ACWR status from ratio
+ * Get ACWR status from ratio (legacy function - now handled server-side)
  */
 export function getACWRStatus(ratio: number): ACWRStatus {
   if (ratio < 0.80) return 'undertrained';
@@ -118,6 +118,20 @@ export const ACWR_STATUS_CONFIG: Record<ACWRStatus, {
     bgClass: 'bg-red-500',
     textClass: 'text-red-500',
     description: 'Training load is very high - consider recovery'
+  },
+  recovery: {
+    label: 'Recovery',
+    color: '#22c55e', // green-500 (same as optimal - recovery is good)
+    bgClass: 'bg-green-500',
+    textClass: 'text-green-500',
+    description: 'Recovery week: Lower load is intentional and beneficial'
+  },
+  optimal_recovery: {
+    label: 'Optimal Recovery',
+    color: '#22c55e', // green-500
+    bgClass: 'bg-green-500',
+    textClass: 'text-green-500',
+    description: 'Recovery week: Lower load is intentional and beneficial for adaptation'
   }
 };
 
