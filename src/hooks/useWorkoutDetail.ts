@@ -97,9 +97,17 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       });
 
       // Merge with base row from context to preserve scalars
+      // BUT: prioritize remote GPS track if it exists (server may have fetched/decoded it)
       try {
         const base = Array.isArray(workouts) ? (workouts as any[]).find((x:any)=> String(x?.id||'') === String(id)) : null;
-        if (base && remote) return { ...base, ...remote };
+        if (base && remote) {
+          const merged = { ...base, ...remote };
+          // If server returned GPS track, use it (even if base has null/empty)
+          if (remote.gps_track && (Array.isArray(remote.gps_track) && remote.gps_track.length > 0)) {
+            merged.gps_track = remote.gps_track;
+          }
+          return merged;
+        }
         return remote;
       } catch {
         return remote;
