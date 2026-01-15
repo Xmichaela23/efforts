@@ -95,7 +95,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
   const processingTriggeredRef = useRef<Set<string>>(new Set()); // Track which workouts we've triggered
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const checkedDbRef = useRef<Set<string>>(new Set()); // Track which workouts we've checked DB for
-  const initializedRef = useRef<Set<string>>(new Set()); // Track which workouts have been initialized to prevent initial blink
+  const initializedRef = useRef<Set<string>>(new Set());
+  const gpsRestoreTriggeredRef = useRef<Set<string>>(new Set()); // Track which workouts we've tried to restore GPS for // Track which workouts have been initialized to prevent initial blink
   const mapPropsRef = useRef<{
     samples: any;
     trackLngLat: any;
@@ -377,6 +378,60 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
       }
     };
   }, [(hydrated||workoutData)?.id]); // Only depend on workout ID to prevent re-render loops
+
+  // Auto-restore GPS track from polyline if missing
+  useEffect(() => {
+    const workoutId = (hydrated||workoutData)?.id;
+    if (!workoutId) return;
+
+    const gpsTrack = (hydrated||workoutData)?.gps_track;
+    const hasGpsTrack = gpsTrack && (
+      (Array.isArray(gpsTrack) && gpsTrack.length > 0) ||
+      (typeof gpsTrack === 'string' && gpsTrack.trim().length > 0 && gpsTrack !== 'null')
+    );
+    const polyline = (hydrated||workoutData)?.gps_trackpoints;
+    const hasPolyline = polyline && typeof polyline === 'string' && polyline.trim().length > 0;
+
+    // Only restore if: no GPS track, has polyline, and haven't tried to restore yet
+    if (!hasGpsTrack && hasPolyline && !gpsRestoreTriggeredRef.current.has(workoutId)) {
+      gpsRestoreTriggeredRef.current.add(workoutId);
+      
+      (async () => {
+        try {
+          console.log('🗺️ [CompletedTab] Attempting to restore GPS track from polyline:', workoutId);
+          const { data, error } = await supabase.functions.invoke('restore-gps-track', {
+            body: { workout_id: workoutId }
+          });
+
+          if (error) {
+            console.warn('⚠️ [CompletedTab] Failed to restore GPS track:', error);
+            gpsRestoreTriggeredRef.current.delete(workoutId); // Allow retry
+            return;
+          }
+
+          if (data?.success) {
+            console.log('✅ [CompletedTab] GPS track restored:', data.points, 'points');
+            // Reload workout data to get the restored GPS track
+            const { data: refreshed, error: refreshError } = await supabase
+              .from('workouts')
+              .select('gps_track')
+              .eq('id', workoutId)
+              .single();
+            
+            if (!refreshError && refreshed) {
+              const restoredTrack = typeof refreshed.gps_track === 'string' 
+                ? JSON.parse(refreshed.gps_track) 
+                : refreshed.gps_track;
+              setHydrated((prev: any) => ({ ...prev, gps_track: restoredTrack }));
+            }
+          }
+        } catch (err) {
+          console.warn('❌ [CompletedTab] Error restoring GPS track:', err);
+          gpsRestoreTriggeredRef.current.delete(workoutId); // Allow retry
+        }
+      })();
+    }
+  }, [(hydrated||workoutData)?.id, hydrated?.gps_track, workoutData?.gps_track, hydrated?.gps_trackpoints, workoutData?.gps_trackpoints]);
   
   useEffect(() => {
     setHydrated((prev: any) => {
@@ -467,13 +522,15 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
   
   const finalTrack = useMemo(() => {
     const trackFromMemo = memo?.track;
-    if (trackFromMemo) return trackFromMemo;
+    if (trackFromMemo && trackFromMemo.length > 0) return trackFromMemo;
     
+    // Try to get GPS track from workout data
     const gpsRaw = (hydrated||workoutData)?.gps_track;
     const gps = Array.isArray(gpsRaw)
       ? gpsRaw
       : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
-    return gps
+    
+    const trackFromGps = gps
       .map((p:any)=>{
         const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
         const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
@@ -481,7 +538,26 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
         return null;
       })
       .filter(Boolean) as [number,number][];
-  }, [memo?.track, hydrated?.gps_track, workoutData?.gps_track]);
+    
+    // If we have GPS track, return it
+    if (trackFromGps.length > 0) return trackFromGps;
+    
+    // Fallback: try to decode polyline if gps_track is missing
+    const polyline = (hydrated||workoutData)?.gps_trackpoints;
+    if (polyline && typeof polyline === 'string' && polyline.trim().length > 0) {
+      try {
+        const decoded = decodePolyline(polyline);
+        if (decoded.length > 0) {
+          // Convert [lat, lng] to [lng, lat] format expected by map
+          return decoded.map(([lat, lng]) => [lng, lat] as [number, number]);
+        }
+      } catch (err) {
+        console.warn('Failed to decode polyline:', err);
+      }
+    }
+    
+    return [];
+  }, [memo?.track, hydrated?.gps_track, workoutData?.gps_track, hydrated?.gps_trackpoints, workoutData?.gps_trackpoints]);
 
   const mapProps = useMemo(() => {
     // Check if data actually changed by comparing array lengths and first/last values
