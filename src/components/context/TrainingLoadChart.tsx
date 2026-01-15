@@ -26,9 +26,13 @@ export const TrainingLoadChart: React.FC<TrainingLoadChartProps> = ({
   // Take only the last 7 days (timeline is reverse chronological)
   const weekData = timeline.slice(0, 7);
   
-  // Find max daily total for scaling with minimum to prevent distortion
-  const maxDayTotal = Math.max(...weekData.map(d => d.daily_total), 100);
-  const effectiveMax = Math.max(maxDayTotal, 150);
+  // Find max daily total for scaling
+  const dailyTotals = weekData.map(d => d.daily_total);
+  const maxDayTotal = Math.max(...dailyTotals, 1); // At least 1 to avoid division by zero
+  
+  // Scale to chart height: ensure max bar uses ~95% of height to prevent overflow
+  // This gives visual breathing room and prevents any rounding/rendering edge cases
+  const effectiveMax = maxDayTotal / 0.95; // Max bar will be 95% of chartHeight
   const chartHeight = 120; // pixels
 
   // Day abbreviations
@@ -46,11 +50,20 @@ export const TrainingLoadChart: React.FC<TrainingLoadChartProps> = ({
       </div>
 
       {/* Bar Chart */}
-      <div className="flex items-end justify-between gap-1" style={{ height: chartHeight }}>
+      <div 
+        className="flex items-end justify-between gap-1 relative"
+        style={{ 
+          height: chartHeight,
+          overflow: 'hidden',
+          minHeight: chartHeight,
+          maxHeight: chartHeight
+        }}
+      >
         {chronologicalData.map((day, idx) => {
           const dayDate = new Date(day.date + 'T12:00:00');
           const dayLabel = dayAbbrev[dayDate.getDay()];
-          const barHeight = Math.min((day.daily_total / effectiveMax) * chartHeight, chartHeight);
+          // Calculate bar height: max bar will be 95% of chartHeight, others scale proportionally
+          const barHeight = Math.min((day.daily_total / effectiveMax) * chartHeight, chartHeight * 0.95);
           
           // Group workouts by type for stacking
           const workoutsByType: Record<string, number> = {};
@@ -66,11 +79,15 @@ export const TrainingLoadChart: React.FC<TrainingLoadChartProps> = ({
             .sort((a, b) => b[1] - a[1]);
 
           return (
-            <div key={day.date} className="flex-1 flex flex-col items-center">
+            <div key={day.date} className="flex-1 flex flex-col items-center h-full">
               {/* Stacked bar */}
               <div 
                 className="w-full rounded-t overflow-hidden flex flex-col-reverse"
-                style={{ height: barHeight }}
+                style={{ 
+                  height: `${barHeight}px`,
+                  maxHeight: `${chartHeight}px`,
+                  flexShrink: 0
+                }}
               >
                 {sortedTypes.map(([type, workload]) => {
                   const segmentHeight = day.daily_total > 0 
