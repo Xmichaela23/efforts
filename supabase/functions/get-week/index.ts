@@ -1334,11 +1334,11 @@ Deno.serve(async (req)=>{
           if (typeof dbWorkload === 'number' && dbWorkload > 0) {
             workloadCompleted += dbWorkload;
           } else {
-            // PRIORITY 2: Calculate on-the-fly if DB value missing (self-healing)
+            // PRIORITY 2: Calculate on-the-fly if DB value missing or zero (self-healing)
             const calculatedWorkload = calculateWorkloadForItem(item);
             workloadCompleted += calculatedWorkload;
-            // Queue backfill to DB
-            if (item?.id && calculatedWorkload > 0) {
+            // Queue backfill to DB (update if null or zero)
+            if (item?.id && calculatedWorkload > 0 && (!dbWorkload || dbWorkload === 0)) {
               workloadBackfillUpdates.push({ 
                 table: 'workouts', 
                 id: item.id, 
@@ -1376,7 +1376,7 @@ Deno.serve(async (req)=>{
                 await supabase.from('workouts')
                   .update({ workload_actual: update.workload_actual })
                   .eq('id', update.id)
-                  .is('workload_actual', null); // Only update if currently null
+                  .or('workload_actual.is.null,workload_actual.eq.0'); // Update if null or zero
               } else if (update.table === 'planned_workouts') {
                 await supabase.from('planned_workouts')
                   .update({ workload_planned: update.workload_planned })
