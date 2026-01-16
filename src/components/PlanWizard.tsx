@@ -321,9 +321,9 @@ const METHODOLOGIES: Record<Approach, {
 /**
  * Get the available methodology based on goal, fitness, and distance
  * - complete goal → Simple Completion only
- * - speed goal + beginner + marathon → Performance Build locked
- * - speed goal + beginner + shorter distances → Performance Build unlocked
- * - speed goal + intermediate/advanced → Performance Build only
+ * - performance goal + beginner + marathon → Performance Build locked
+ * - performance goal + beginner + shorter distances → Performance Build unlocked
+ * - performance goal + intermediate/advanced → Performance Build only
  */
 function getMethodologyForGoal(goal: Goal | null, fitness: Fitness | null, distance: Distance | null): {
   approach: Approach | null;
@@ -340,12 +340,12 @@ function getMethodologyForGoal(goal: Goal | null, fitness: Fitness | null, dista
   }
 
   if (goal === 'speed') {
-    // Speed goal → Performance Build, but locked for beginners doing marathon only
+    // Performance goal → Performance Build, but locked for beginners doing marathon only
     if (fitness === 'beginner' && distance === 'marathon') {
       return {
         approach: 'performance_build',
         locked: true,
-        lockedReason: 'Speed-focused marathon training requires Intermediate+ fitness (25+ mpw). Consider selecting "Complete" goal, or build your base first.'
+        lockedReason: 'Performance-focused marathon training requires Intermediate+ fitness (25+ mpw). Consider selecting "Complete" goal, or build your base first.'
       };
     }
     return { approach: 'performance_build', locked: false, lockedReason: '' };
@@ -592,7 +592,7 @@ export default function PlanWizard() {
       if (physicalStep >= steps.length) return steps[steps.length - 1];
       return steps[physicalStep] || steps[steps.length - 1];
     } else {
-      // Speed goal: includes effort score step
+      // Performance goal: includes effort score step
       const steps = ['discipline', 'distance', 'fitness', 'goal', 'effortScore', 'duration', 'startDate', 'strength', 'runningDays'];
       // Bounds check: if out of bounds, clamp to last valid step
       if (physicalStep < 0) return steps[0];
@@ -1088,15 +1088,15 @@ export default function PlanWizard() {
                   <RadioGroupItem value="complete" id="complete" className="mt-1" />
                   <Label htmlFor="complete" className="flex-1 cursor-pointer">
                     <span className="block font-medium text-white">Complete</span>
-                    <span className="block text-xs text-white/50 mt-0.5 italic">For those focused on the experience, returning to running, or first-timers who want to complete</span>
+                    <span className="block text-xs text-white/50 mt-0.5 italic">For first-timers, returning runners, or anyone focused on finishing strong</span>
                     <span className="block text-sm text-white/60 mt-2">
-                      Build the endurance to finish strong. Training is effort-based (easy, moderate, hard) so you can run by feel.
+                      Build the endurance to finish confidently. Training is effort-based (easy, moderate, hard) so you can run by feel and stay healthy throughout the build.
                     </span>
                   </Label>
                 </div>
               </div>
               
-              {/* Speed Goal → Performance Build (locked only for beginners doing marathon) */}
+              {/* Performance Goal → Performance Build (locked only for beginners doing marathon) */}
               {(() => {
                 const isSpeedLocked = state.fitness === 'beginner' && state.distance === 'marathon';
                 return (
@@ -1110,16 +1110,16 @@ export default function PlanWizard() {
                   />
                   <Label htmlFor="speed" className={`flex-1 ${isSpeedLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                     <span className="block font-medium text-white">
-                      {isSpeedLocked ? 'Speed (Locked)' : 'Speed'}
+                      {isSpeedLocked ? 'Performance (Locked)' : 'Performance'}
                     </span>
-                    <span className="block text-xs text-white/50 mt-0.5 italic">For experienced runners looking to improve their time</span>
+                    <span className="block text-xs text-white/50 mt-0.5 italic">For runners focused on improving overall running performance</span>
                     {isSpeedLocked ? (
                       <span className="block text-xs text-orange-400 mt-2">
-                        Speed-focused marathon training requires Intermediate+ fitness (25+ mpw).
+                        Performance-focused marathon training requires Intermediate+ fitness (25+ mpw). Consider selecting "Complete" goal, or build your base first.
                       </span>
                     ) : (
                       <span className="block text-sm text-white/60 mt-2">
-                        Train with a focus on improving speed. Includes structured intervals and tempo runs with paces calculated from your 5K.
+                        Train with structured workouts and personalized pace zones. Includes intervals, tempo, and race-pace work designed to improve efficiency, endurance, and speed development across distances.
                       </span>
                     )}
                   </Label>
@@ -1142,7 +1142,7 @@ export default function PlanWizard() {
         );
 
       case 'effortScore':
-        // EFFORT SCORE STEP (only for speed/Performance Build goal)
+        // EFFORT SCORE STEP (only for performance/Performance Build goal)
         // Calculate score when user enters race time
         const handleRaceTimeChange = (timeStr: string) => {
           setState(prev => {
@@ -2040,7 +2040,7 @@ export default function PlanWizard() {
                     </div>
                   </div>
                   
-                  {/* Show Effort Score and projected finish time for Speed goal */}
+                  {/* Show Effort Score and projected finish time for Performance goal */}
                   {state.effortScore && projectedFinishTime && (
                     <div className="p-4 bg-blue-500/10 backdrop-blur-lg rounded-xl border-2 border-blue-400/30">
                       <div className="space-y-2 text-sm">
@@ -2217,7 +2217,7 @@ export default function PlanWizard() {
                         <Label htmlFor="upper_aesthetics" className="flex-1 cursor-pointer">
                           <span className="font-medium text-white">Upper Aesthetics</span>
                           <span className="block text-sm text-gray-400 mt-1">
-                            Prioritizes upper-body strength and posture while keeping lower-body work light so running stays the priority.
+                            Prioritizes upper-body strength while keeping lower-body work light so running performance stays the priority.
                           </span>
                           <span className="block text-xs text-gray-500 mt-2">
                             • Higher-rep upper work with progressive overload
@@ -2231,6 +2231,11 @@ export default function PlanWizard() {
                           <span className="block text-xs text-teal-400 mt-2">
                             Best for: Endurance athletes motivated by physique or upper-body weakness
                           </span>
+                          {state.goal === 'speed' && state.strengthProtocol === 'upper_aesthetics' && (
+                            <span className="block text-xs text-blue-400/80 mt-2 italic">
+                              Note: This combination increases total weekly training load. Recommended for runners already training consistently.
+                            </span>
+                          )}
                         </Label>
                       </div>
                     </div>
@@ -2538,7 +2543,7 @@ export default function PlanWizard() {
     }
   };
 
-  // Step count varies: speed goal adds Effort Score step (step 4)
+  // Step count varies: performance goal adds Effort Score step (step 4)
   const needsEffortScore = state.goal === 'speed';
   const getStepCount = () => needsEffortScore ? 9 : 8;
 
