@@ -74,16 +74,18 @@ Deno.serve(async (req: Request) => {
     let effortPaces: TrainingPaces | undefined;
     
     if (request.approach === 'performance_build') {
-      // Use provided score (from wizard) or calculate from race data
-      if (request.effort_score) {
-        effortScore = request.effort_score;
-        console.log(`[EffortScore] Using provided score: ${effortScore}`);
-      } else if (request.effort_source_distance && request.effort_source_time) {
+      // SMART SERVER: Prioritize raw data over pre-calculated values
+      // Calculate from raw race/5K time if provided (source of truth)
+      if (request.effort_source_distance && request.effort_source_time) {
         effortScore = calculateEffortScore(
           request.effort_source_distance,
           request.effort_source_time
         );
-        console.log(`[EffortScore] Calculated from race: ${effortScore}`);
+        console.log(`[EffortScore] Calculated from raw data (${request.effort_source_distance}m in ${request.effort_source_time}s): ${effortScore}`);
+      } else if (request.effort_score) {
+        // Fallback to provided score (for manual entry or when raw data unavailable)
+        effortScore = request.effort_score;
+        console.log(`[EffortScore] Using provided score: ${effortScore}`);
       } else {
         // Fallback to estimate from fitness level
         effortScore = estimateScoreFromFitness(request.fitness);

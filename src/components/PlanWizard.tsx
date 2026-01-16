@@ -464,32 +464,40 @@ export default function PlanWizard() {
           const pn = data.performance_numbers || {};
           const ep = data.effort_paces || {};
           
-          // Check for saved pace data
-          const easyPace = ep.base || pn.easyPace || pn.easy_pace;
-          const fiveKTime = pn.fiveK || pn.fiveKTime;
-          // effort_score is saved as a column when plan is generated
-          let effortScore = data.effort_score || pn.effortScore || pn.effort_score;
+          // Extract raw data - don't pre-calculate, let the selection handler do it
+          // This ensures we use the most current performance_numbers when "saved" is selected
+          const fiveKTimeRaw = pn.fiveK || pn.fiveKTime;
+          const easyPaceRaw = pn.easyPace || pn.easy_pace;
           
-          // If we have 5K time but no effortScore, calculate it
-          if (!effortScore && fiveKTime && typeof fiveKTime === 'number') {
-            const fiveKMeters = 5000;
-            const result = calculateEffortScoreResult(fiveKMeters, fiveKTime);
-            effortScore = result.score;
+          // Convert 5K time to seconds for storage (handle string "MM:SS" format)
+          let fiveKTime: number | undefined;
+          if (typeof fiveKTimeRaw === 'number') {
+            fiveKTime = fiveKTimeRaw;
+          } else if (typeof fiveKTimeRaw === 'string') {
+            // Parse "MM:SS" format (e.g., "27:00" -> 1620 seconds)
+            const parsed = parsePace(fiveKTimeRaw);
+            if (parsed) fiveKTime = parsed;
           }
           
-          // Build effort paces from saved data
-          let effortPaces: TrainingPaces | undefined;
-          if (ep.base && ep.race && ep.steady && ep.power && ep.speed) {
-            effortPaces = {
-              base: ep.base,
-              race: ep.race,
-              steady: ep.steady,
-              power: ep.power,
-              speed: ep.speed
-            };
-          } else if (effortScore) {
-            effortPaces = getPacesFromScore(effortScore);
+          // Convert easy pace to seconds for storage (handle string "MM:SS/mi" format)
+          let easyPace: number | undefined;
+          if (typeof easyPaceRaw === 'number') {
+            easyPace = easyPaceRaw;
+          } else if (typeof easyPaceRaw === 'string') {
+            const parsed = parsePace(easyPaceRaw);
+            if (parsed) easyPace = parsed;
           }
+          
+          // Store raw values - calculation happens when "saved" is selected
+          // But also store stored effort_paces/effort_score as fallback
+          const effortScore = data.effort_score || pn.effortScore || pn.effort_score;
+          const effortPaces = (ep.base && ep.race && ep.steady && ep.power && ep.speed) ? {
+            base: ep.base,
+            race: ep.race,
+            steady: ep.steady,
+            power: ep.power,
+            speed: ep.speed
+          } : undefined;
           
           // Get equipment data
           const equipment = data.equipment?.strength as string[] | undefined;
@@ -497,10 +505,16 @@ export default function PlanWizard() {
           // Set if we have ANY meaningful data
           const hasData = effortPaces || effortScore || easyPace || fiveKTime || equipment?.length;
           if (hasData) {
-            console.log('[PlanWizard] Setting saved baselines:', { easyPace, fiveKTime, effortScore, effortPaces, equipment });
+            console.log('[PlanWizard] Setting saved baselines (raw data):', { 
+              easyPace, 
+              fiveKTime, 
+              effortScore, 
+              effortPaces, 
+              equipment 
+            });
             setSavedBaselines({
-              easyPace: typeof easyPace === 'number' ? easyPace : undefined,
-              fiveKTime: typeof fiveKTime === 'number' ? fiveKTime : undefined,
+              easyPace: easyPace || (typeof ep.base === 'number' ? ep.base : undefined),
+              fiveKTime: fiveKTime,
               effortScore: typeof effortScore === 'number' ? effortScore : undefined,
               effortPaces,
               equipment
@@ -674,7 +688,7 @@ export default function PlanWizard() {
       // Safeguard: don't increment beyond valid step range
       const maxStep = getStepCount() - 1;
       if (step < maxStep) {
-        setStep(step + 1);
+      setStep(step + 1);
       } else {
         // Already at max step, try to generate
         handleGenerate();
@@ -777,19 +791,35 @@ export default function PlanWizard() {
       }
 
       // Add Effort Score data for Performance Build plans
-      if (state.approach === 'performance_build' && state.effortScore && state.effortPaces) {
-        requestBody.effort_score = state.effortScore;
-        requestBody.effort_score_status = state.effortScoreStatus;
-        requestBody.effort_paces = state.effortPaces;
-        requestBody.effort_paces_source = state.effortPacesSource;
-        
-        // Include source race data if available (for verified scores)
-        if (state.effortScoreStatus === 'verified' && state.effortRaceDistance && state.effortRaceTime) {
+      // SMART SERVER: Send raw data (5K time) instead of pre-calculated values
+      // Server will recalculate as source of truth
+      if (state.approach === 'performance_build') {
+        // If using saved baselines with 5K time, send raw data for server to calculate
+        if (state.paceInputMethod === 'saved' && savedBaselines?.fiveKTime) {
+          // Send raw 5K time - server will recalculate effort score
+          requestBody.effort_source_distance = 5000; // 5K in meters
+          requestBody.effort_source_time = savedBaselines.fiveKTime; // seconds
+          requestBody.effort_score_status = 'verified';
+          console.log('[PlanWizard] Sending raw 5K time for server calculation:', savedBaselines.fiveKTime);
+        }
+        // If user entered a race time, send that raw data
+        else if (state.effortScoreStatus === 'verified' && state.effortRaceDistance && state.effortRaceTime) {
           const timeSeconds = parseTimeToSeconds(state.effortRaceTime, state.effortRaceDistance);
           if (timeSeconds) {
             requestBody.effort_source_distance = raceDistanceToMeters(state.effortRaceDistance);
             requestBody.effort_source_time = timeSeconds;
+            requestBody.effort_score_status = 'verified';
+            console.log('[PlanWizard] Sending raw race data for server calculation');
           }
+        }
+        // Fallback: send calculated values (for "unknown" or manual pace entry)
+        // Server will still recalculate if effort_source_* is provided
+        else if (state.effortScore && state.effortPaces) {
+          requestBody.effort_score = state.effortScore;
+          requestBody.effort_score_status = state.effortScoreStatus || 'estimated';
+          requestBody.effort_paces = state.effortPaces;
+          requestBody.effort_paces_source = state.effortPacesSource;
+          console.log('[PlanWizard] Sending pre-calculated effort score (fallback)');
         }
       }
 
@@ -1268,24 +1298,41 @@ export default function PlanWizard() {
                   const method = v as PaceInputMethod;
                   
                   // If using saved baselines, auto-populate from them
+                  // PRIORITY: Use current profile data (5K time) over stored effort_paces/effort_score
                   if (method === 'saved' && savedBaselines) {
                     let paces = savedBaselines.effortPaces;
                     let score = savedBaselines.effortScore;
                     
-                    // If we have 5K time but no score/paces, calculate them
-                    if (!paces && !score && savedBaselines.fiveKTime) {
-                      const result = calculateEffortScoreResult(5000, savedBaselines.fiveKTime);
+                    // If we have 5K time in performance_numbers, recalculate from that (most current data)
+                    if (savedBaselines.fiveKTime) {
+                      const fiveKMeters = 5000;
+                      const result = calculateEffortScoreResult(fiveKMeters, savedBaselines.fiveKTime);
                       score = result.score;
-                      paces = getPacesFromScore(score);
+                      
+                      // If we also have easy pace, use calculatePacesFromKnownPaces for more accuracy
+                      if (savedBaselines.easyPace) {
+                        const fiveKPaceSeconds = Math.round(savedBaselines.fiveKTime / 3.10686); // 5K = 3.10686 miles
+                        const paceResult = calculatePacesFromKnownPaces(savedBaselines.easyPace, fiveKPaceSeconds);
+                        score = paceResult.score;
+                        paces = paceResult.paces;
+                        console.log('[PlanWizard] Recalculated from performance_numbers (5K + easy pace)');
+                      } else {
+                        paces = result.paces;
+                        console.log('[PlanWizard] Recalculated from performance_numbers (5K time only)');
+                      }
                     }
                     // If we have score but no paces, calculate paces
                     else if (!paces && score) {
                       paces = getPacesFromScore(score);
                     }
+                    // Otherwise use stored effort_paces/effort_score (fallback)
+                    else if (paces || score) {
+                      console.log('[PlanWizard] Using stored effort_paces/effort_score (no 5K time in profile)');
+                    }
                     
-                    setState(prev => ({
-                      ...prev,
-                      paceInputMethod: method,
+                  setState(prev => ({
+                    ...prev,
+                    paceInputMethod: method,
                       hasRecentRace: false,
                       effortScore: score || null,
                       effortPaces: paces || null,
@@ -1366,11 +1413,11 @@ export default function PlanWizard() {
                     <div className="pt-2">
                       <p className="text-sm text-teal-400 mb-2">Your time?</p>
                       <div className="flex items-center gap-3">
-                        <input
-                          type="text"
-                          placeholder={state.effortRaceDistance === 'marathon' || state.effortRaceDistance === 'half' ? 'H:MM:SS' : 'MM:SS'}
-                          value={state.effortRaceTime}
-                          onChange={(e) => handleRaceTimeChange(e.target.value)}
+                      <input
+                        type="text"
+                        placeholder={state.effortRaceDistance === 'marathon' || state.effortRaceDistance === 'half' ? 'H:MM:SS' : 'MM:SS'}
+                        value={state.effortRaceTime}
+                        onChange={(e) => handleRaceTimeChange(e.target.value)}
                           className="w-32 p-3 bg-white/5 border border-teal-500/30 rounded-xl text-lg font-mono text-teal-200 placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
                         />
                         <span className="text-gray-500 text-sm">
@@ -1414,78 +1461,78 @@ export default function PlanWizard() {
                       <div className="absolute inset-0 bg-gradient-to-br from-teal-500/20 via-cyan-500/10 to-transparent rounded-2xl blur-xl" />
                       <div className="relative p-5 bg-black/40 backdrop-blur-sm rounded-xl border border-teal-500/30">
                         <p className="text-lg font-semibold text-white">
-                          Effort Score: {state.effortScore}
-                        </p>
+                        Effort Score: {state.effortScore}
+                      </p>
                         <div className="mt-4 text-sm space-y-3">
-                          <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between">
                             <span className="text-gray-400">Base pace:</span>
                             <div className="flex items-center">
-                              <input
-                                type="text"
-                                key={`base-${state.effortPaces.base}`}
-                                defaultValue={formatPace(state.effortPaces.base)}
-                                onBlur={(e) => {
-                                  const seconds = parsePace(e.target.value);
-                                  if (seconds && state.effortPaces) {
-                                    setState(prev => ({
-                                      ...prev,
-                                      effortPaces: { ...prev.effortPaces!, base: seconds },
-                                      effortPacesSource: 'manual'
-                                    }));
-                                  } else {
-                                    e.target.value = formatPace(state.effortPaces!.base);
-                                  }
-                                }}
+                          <input
+                            type="text"
+                            key={`base-${state.effortPaces.base}`}
+                            defaultValue={formatPace(state.effortPaces.base)}
+                            onBlur={(e) => {
+                              const seconds = parsePace(e.target.value);
+                              if (seconds && state.effortPaces) {
+                                setState(prev => ({
+                                  ...prev,
+                                  effortPaces: { ...prev.effortPaces!, base: seconds },
+                                  effortPacesSource: 'manual'
+                                }));
+                              } else {
+                                e.target.value = formatPace(state.effortPaces!.base);
+                              }
+                            }}
                                 className="w-20 px-2 py-1.5 text-right font-mono text-teal-200 bg-white/10 border border-teal-500/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-400"
                               /><span className="ml-2 text-gray-500">/mi</span>
                             </div>
-                          </div>
-                          <div className="flex items-center justify-between">
+                        </div>
+                        <div className="flex items-center justify-between">
                             <span className="text-gray-400">Race pace:</span>
                             <div className="flex items-center">
-                              <input
-                                type="text"
-                                key={`race-${state.effortPaces.race}`}
-                                defaultValue={formatPace(state.effortPaces.race)}
-                                onBlur={(e) => {
-                                  const seconds = parsePace(e.target.value);
-                                  if (seconds && state.effortPaces) {
-                                    setState(prev => ({
-                                      ...prev,
-                                      effortPaces: { ...prev.effortPaces!, race: seconds },
-                                      effortPacesSource: 'manual'
-                                    }));
-                                  } else {
-                                    e.target.value = formatPace(state.effortPaces!.race);
-                                  }
-                                }}
+                          <input
+                            type="text"
+                            key={`race-${state.effortPaces.race}`}
+                            defaultValue={formatPace(state.effortPaces.race)}
+                            onBlur={(e) => {
+                              const seconds = parsePace(e.target.value);
+                              if (seconds && state.effortPaces) {
+                                setState(prev => ({
+                                  ...prev,
+                                  effortPaces: { ...prev.effortPaces!, race: seconds },
+                                  effortPacesSource: 'manual'
+                                }));
+                              } else {
+                                e.target.value = formatPace(state.effortPaces!.race);
+                              }
+                            }}
                                 className="w-20 px-2 py-1.5 text-right font-mono text-teal-200 bg-white/10 border border-teal-500/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-400"
                               /><span className="ml-2 text-gray-500">/mi</span>
                             </div>
-                          </div>
-                          <div className="flex items-center justify-between">
+                        </div>
+                        <div className="flex items-center justify-between">
                             <span className="text-gray-400">Steady pace:</span>
                             <div className="flex items-center">
-                              <input
-                                type="text"
-                                key={`steady-${state.effortPaces.steady}`}
-                                defaultValue={formatPace(state.effortPaces.steady)}
-                                onBlur={(e) => {
-                                  const seconds = parsePace(e.target.value);
-                                  if (seconds && state.effortPaces) {
-                                    setState(prev => ({
-                                      ...prev,
-                                      effortPaces: { ...prev.effortPaces!, steady: seconds },
-                                      effortPacesSource: 'manual'
-                                    }));
-                                  } else {
-                                    e.target.value = formatPace(state.effortPaces!.steady);
-                                  }
-                                }}
+                          <input
+                            type="text"
+                            key={`steady-${state.effortPaces.steady}`}
+                            defaultValue={formatPace(state.effortPaces.steady)}
+                            onBlur={(e) => {
+                              const seconds = parsePace(e.target.value);
+                              if (seconds && state.effortPaces) {
+                                setState(prev => ({
+                                  ...prev,
+                                  effortPaces: { ...prev.effortPaces!, steady: seconds },
+                                  effortPacesSource: 'manual'
+                                }));
+                              } else {
+                                e.target.value = formatPace(state.effortPaces!.steady);
+                              }
+                            }}
                                 className="w-20 px-2 py-1.5 text-right font-mono text-teal-200 bg-white/10 border border-teal-500/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-400"
                               /><span className="ml-2 text-gray-500">/mi</span>
-                            </div>
-                          </div>
+                        </div>
+                      </div>
                         </div>
                         {/* Estimated Marathon Time */}
                         {state.effortPaces?.race && (
@@ -1505,12 +1552,12 @@ export default function PlanWizard() {
                           </div>
                         )}
                         <p className="mt-4 text-xs text-teal-400/80">
-                          {state.effortPacesSource === 'manual' 
-                            ? 'Using your custom paces.' 
-                            : state.effortRaceRecency && state.effortRaceRecency !== 'recent'
-                              ? 'Adjusted for race recency. Tap to customize.'
-                              : 'Tap to customize.'}
-                        </p>
+                        {state.effortPacesSource === 'manual' 
+                          ? 'Using your custom paces.' 
+                          : state.effortRaceRecency && state.effortRaceRecency !== 'recent'
+                            ? 'Adjusted for race recency. Tap to customize.'
+                            : 'Tap to customize.'}
+                      </p>
                       </div>
                     </div>
                   )}
@@ -1570,21 +1617,21 @@ export default function PlanWizard() {
                       <div className="absolute inset-0 bg-gradient-to-br from-teal-500/20 via-cyan-500/10 to-transparent rounded-2xl blur-xl" />
                       <div className="relative p-5 bg-black/40 backdrop-blur-sm rounded-xl border border-teal-500/30">
                         <p className="text-lg font-semibold text-white">
-                          Effort Score: {state.effortScore}
-                        </p>
+                        Effort Score: {state.effortScore}
+                      </p>
                         <p className="text-xs text-teal-300 mt-1 mb-4">
-                          Calculated from your 5K time. Your easy pace is used as-is.
-                        </p>
+                        Calculated from your 5K time. Your easy pace is used as-is.
+                      </p>
                         <div className="text-sm space-y-3">
-                          <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between">
                             <span className="text-gray-400">Base pace:</span>
                             <span className="font-mono text-teal-200">{formatPace(state.effortPaces.base)}/mi</span>
-                          </div>
-                          <div className="flex items-center justify-between">
+                        </div>
+                        <div className="flex items-center justify-between">
                             <span className="text-gray-400">Race pace <span className="text-xs text-teal-400/60">(marathon)</span>:</span>
                             <span className="font-mono font-semibold text-teal-200">{formatPace(state.effortPaces.race)}/mi</span>
-                          </div>
-                          <div className="flex items-center justify-between">
+                        </div>
+                        <div className="flex items-center justify-between">
                             <span className="text-gray-400">Steady pace <span className="text-xs text-teal-400/60">(threshold)</span>:</span>
                             <span className="font-mono text-teal-200">{formatPace(state.effortPaces.steady)}/mi</span>
                           </div>
@@ -1623,19 +1670,19 @@ export default function PlanWizard() {
                       Effort Score: {state.effortScore}
                     </p>
                     <div className="text-sm text-gray-200 space-y-3">
-                      <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between">
                         <span className="text-gray-400">Base pace:</span>
                         <span className="font-mono text-teal-200">{formatPace(state.effortPaces.base)}/mi</span>
-                      </div>
-                      <div className="flex items-center justify-between">
+                        </div>
+                        <div className="flex items-center justify-between">
                         <span className="text-gray-400">Race pace:</span>
                         <span className="font-mono text-teal-200">{formatPace(state.effortPaces.race)}/mi</span>
-                      </div>
-                      <div className="flex items-center justify-between">
+                        </div>
+                        <div className="flex items-center justify-between">
                         <span className="text-gray-400">Interval pace:</span>
                         <span className="font-mono text-teal-200">{formatPace(state.effortPaces.power)}/mi</span>
+                        </div>
                       </div>
-                    </div>
                     {/* Estimated Marathon Time */}
                     <div className="mt-4 pt-4 border-t border-teal-500/20">
                       <div className="flex items-center justify-between">
@@ -1655,8 +1702,8 @@ export default function PlanWizard() {
                       These paces will be used for your training plan.
                     </p>
                   </div>
-                </div>
-              )}
+                    </div>
+                  )}
               
               {/* Don't know paces - simple guidance */}
               {state.paceInputMethod === 'unknown' && (
@@ -1764,10 +1811,10 @@ export default function PlanWizard() {
             }
             
             return {
-              ...prev,
-              raceDate,
-              duration: weeks,
-              startDate,
+            ...prev,
+            raceDate,
+            duration: weeks,
+            startDate,
               raceName: newRaceName
             };
           });
@@ -1849,13 +1896,13 @@ export default function PlanWizard() {
                     {/* Custom race name input - show if Other selected or no matches */}
                     {(state.distance !== 'marathon' || !state.raceDate || findMatchingMarathons(state.raceDate).length === 0 || 
                       (state.raceName && !findMatchingMarathons(state.raceDate).some(m => m.marathon.name === state.raceName))) && (
-                      <input
-                        type="text"
-                        value={state.raceName}
-                        onChange={(e) => setState(prev => ({ ...prev, raceName: e.target.value }))}
-                        placeholder="Race name (optional)"
+                    <input
+                      type="text"
+                      value={state.raceName}
+                      onChange={(e) => setState(prev => ({ ...prev, raceName: e.target.value }))}
+                      placeholder="Race name (optional)"
                         className="w-full p-3 bg-white/5 border border-teal-500/30 rounded-xl text-base text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                      />
+                    />
                     )}
                   </div>
                   {state.raceDate && (
@@ -1907,8 +1954,8 @@ export default function PlanWizard() {
                               if (isNaN(startDate.getTime()) || isNaN(raceDate.getTime())) return 'Select dates';
                               return `${startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} → ${raceDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`;
                             })()}
-                          </p>
-                        </div>
+                        </p>
+                      </div>
                       )}
                     </div>
                   )}
@@ -2343,7 +2390,7 @@ export default function PlanWizard() {
       case 'runningDays':
         // RUNNING DAYS STEP (now after strength, with recommendations)
         try {
-          const availableDays = getAvailableDays(state.approach);
+        const availableDays = getAvailableDays(state.approach);
         
         // Get recommended running days based on strength selection
         const getRunDaysRecommendation = () => {
@@ -2669,7 +2716,7 @@ export default function PlanWizard() {
                               const isRun = isRunningSession(session.name);
                               return (
                                 <div key={idx} className="flex items-start justify-between">
-                                  <div className="flex-1">
+                                <div className="flex-1">
                                     <div className="flex items-center gap-2">
                                       {/* Color indicator */}
                                       <div className={`w-1 h-4 rounded-full ${isRun ? 'bg-teal-500' : 'bg-amber-500'}`} />
@@ -2677,14 +2724,14 @@ export default function PlanWizard() {
                                         {session.name}
                                       </span>
                                     </div>
-                                    {session.description && (
+                                  {session.description && (
                                       <p className="text-xs text-gray-400 mt-1 ml-3 leading-relaxed">{session.description}</p>
-                                    )}
-                                  </div>
+                                  )}
+                                </div>
                                   <span className={`text-xs ml-2 px-2 py-0.5 rounded ${isRun ? 'bg-teal-500/20 text-teal-400' : 'bg-amber-500/20 text-amber-400'}`}>
                                     {session.duration}m
                                   </span>
-                                </div>
+                              </div>
                               );
                             })}
                           </div>
@@ -2749,9 +2796,9 @@ export default function PlanWizard() {
         }
         menuItems={
           <>
-            <DropdownMenuItem onClick={() => navigate('/baselines')} className="text-white/80 hover:text-white hover:bg-white/10">Training Baselines</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/connections')} className="text-white/80 hover:text-white hover:bg-white/10">Connections</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/')} className="text-white/80 hover:text-white hover:bg-white/10">Dashboard</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/baselines')} className="text-white/80 hover:text-white hover:bg-white/10">Training Baselines</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/connections')} className="text-white/80 hover:text-white hover:bg-white/10">Connections</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/')} className="text-white/80 hover:text-white hover:bg-white/10">Dashboard</DropdownMenuItem>
           </>
         }
       />
