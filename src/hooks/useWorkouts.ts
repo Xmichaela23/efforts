@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { analyzeWorkoutWithRetry } from "../services/workoutAnalysisService";
+import { safeParseJSONB } from "@/utils/jsonb";
 
 // [Keep all your existing interfaces exactly as they are]
 export interface RunInterval {
@@ -1437,9 +1438,9 @@ export const useWorkouts = () => {
         planned_id: (data as any)?.planned_id ?? null,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        intervals: data.intervals ? JSON.parse(data.intervals) : [],
-        strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
-        mobility_exercises: ((): any[] => { try { return data.mobility_exercises ? JSON.parse(data.mobility_exercises) : []; } catch { return Array.isArray((data as any).mobility_exercises) ? (data as any).mobility_exercises : []; } })(),
+        intervals: safeParseJSONB(data.intervals, []),
+        strength_exercises: safeParseJSONB(data.strength_exercises, []),
+        mobility_exercises: safeParseJSONB(data.mobility_exercises, []),
         avg_heart_rate: data.avg_heart_rate,
         max_heart_rate: data.max_heart_rate,
         avg_power: data.avg_power,
@@ -1741,9 +1742,9 @@ export const useWorkouts = () => {
         planned_id: (data as any)?.planned_id ?? null,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        intervals: data.intervals ? JSON.parse(data.intervals) : [],
-        strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
-        mobility_exercises: (() => { try { return data.mobility_exercises ? JSON.parse(data.mobility_exercises) : []; } catch { return Array.isArray((data as any).mobility_exercises) ? (data as any).mobility_exercises : []; } })(),
+        intervals: safeParseJSONB(data.intervals, []),
+        strength_exercises: safeParseJSONB(data.strength_exercises, []),
+        mobility_exercises: safeParseJSONB(data.mobility_exercises, []),
         avg_heart_rate: data.avg_heart_rate,
         max_heart_rate: data.max_heart_rate,
         avg_power: data.avg_power,

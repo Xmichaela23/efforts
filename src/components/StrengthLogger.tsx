@@ -2419,7 +2419,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         saved = await updateWorkout(String(scheduledWorkout?.id), completedWorkout as any);
       } else {
         console.log('🆕 Creating new completed workout');
-        saved = await addWorkout(completedWorkout);
+        saved = await addWorkout(completedWorkout as any);
       }
       console.log('✅ Save successful, returned:', saved);
 
@@ -2435,7 +2435,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             workout_data: {
               type: completedWorkout.type,
               duration: completedWorkout.duration,
-              steps_preset: completedWorkout.steps_preset,
+              steps_preset: (completedWorkout as any).steps_preset,
               strength_exercises: completedWorkout.strength_exercises,
               mobility_exercises: completedWorkout.mobility_exercises,
               workout_status: 'completed'
