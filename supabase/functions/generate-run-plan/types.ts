@@ -11,7 +11,7 @@ export interface GeneratePlanRequest {
   goal: 'complete' | 'speed';
   duration_weeks: number;
   start_date?: string; // ISO date string (YYYY-MM-DD)
-  approach: 'simple_completion' | 'performance_build';
+  approach: 'sustainable' | 'performance_build';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
   strength_frequency?: 0 | 2 | 3;
   strength_tier?: 'injury_prevention' | 'strength_power';
@@ -173,8 +173,8 @@ export interface MethodologyDefinition {
 }
 
 export const METHODOLOGIES: Record<string, MethodologyDefinition> = {
-  'simple_completion': {
-    id: 'simple_completion',
+  'sustainable': {
+    id: 'sustainable',
     name: 'Simple Completion',
     shortDescription: 'Easy-to-follow plan focused on finishing healthy',
     longDescription: 'Straightforward training using effort-based pacing (easy, moderate, hard) so you don\'t need complicated pace charts. Minimal speedwork keeps training enjoyable while building the endurance needed to cross the finish line.',
@@ -219,7 +219,7 @@ export interface ApproachConstraints {
 }
 
 export const APPROACH_CONSTRAINTS: Record<string, ApproachConstraints> = {
-  'simple_completion': {
+  'sustainable': {
     min_days: '3-4',
     max_days: '5-6',
     supported_days: ['3-4', '4-5', '5-6'],

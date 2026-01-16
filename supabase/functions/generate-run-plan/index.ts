@@ -2,7 +2,7 @@
 // 
 // Purpose: Generate personalized run training plans based on user parameters
 // Supports 2 training approaches:
-// - Simple Completion (Hal Higdon inspired) - for completion goals
+// - Sustainable (Hal Higdon inspired) - for completion goals
 // - Performance Build (Jack Daniels inspired) - for time/speed goals
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -14,7 +14,7 @@ import {
   TrainingPlan
 } from './types.ts';
 import { validateRequest, validatePlanSchema, validateTokens, detectScheduleConflicts } from './validation.ts';
-import { SimpleCompletionGenerator } from './generators/simple-completion.ts';
+import { SustainableGenerator } from './generators/sustainable.ts';
 import { PerformanceBuildGenerator } from './generators/performance-build.ts';
 import { overlayStrength, overlayStrengthLegacy } from './strength-overlay.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
@@ -124,8 +124,8 @@ Deno.serve(async (req: Request) => {
     let phaseStructure;
 
     switch (request.approach) {
-      case 'simple_completion': {
-        const generator = new SimpleCompletionGenerator(generatorParams);
+      case 'sustainable': {
+        const generator = new SustainableGenerator(generatorParams);
         plan = generator.generatePlan();
         phaseStructure = generator['determinePhaseStructure']();
         break;

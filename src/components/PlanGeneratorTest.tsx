@@ -9,7 +9,7 @@ import JSZip from 'jszip';
 interface TestCombo {
   id: string;
   duration_weeks: number;
-  approach: 'simple_completion' | 'performance_build';
+  approach: 'sustainable' | 'performance_build';
   fitness: 'beginner' | 'intermediate' | 'advanced';
   goal: 'complete' | 'speed';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
@@ -33,7 +33,7 @@ const TEST_COMBINATIONS: TestCombo[] = [
   { id: '5', duration_weeks: 20, approach: 'performance_build', fitness: 'advanced', goal: 'speed', days_per_week: '6-7', label: '20w Performance Speed Advanced (6-7d)' },
   
   // Edge cases - long plans (removed 8w plans - validation requires min 10 weeks for marathon)
-  { id: '7', duration_weeks: 20, approach: 'simple_completion', fitness: 'beginner', goal: 'complete', days_per_week: '3-4', label: '20w Simple Complete Long' },
+  { id: '7', duration_weeks: 20, approach: 'sustainable', fitness: 'beginner', goal: 'complete', days_per_week: '3-4', label: '20w Simple Complete Long' },
   
   // Strength protocol variations
   { id: '8', duration_weeks: 11, approach: 'performance_build', fitness: 'intermediate', goal: 'speed', days_per_week: '4-5', strength_frequency: 2, strength_protocol: 'durability', label: '11w + Durability (2x)' },
@@ -46,8 +46,8 @@ const TEST_COMBINATIONS: TestCombo[] = [
   { id: '13', duration_weeks: 11, approach: 'performance_build', fitness: 'intermediate', goal: 'speed', days_per_week: '6-7', label: '11w Performance (6-7d)' },
   
   // Simple completion variations
-  { id: '14', duration_weeks: 11, approach: 'simple_completion', fitness: 'intermediate', goal: 'complete', days_per_week: '4-5', label: '11w Simple Complete' },
-  { id: '15', duration_weeks: 16, approach: 'simple_completion', fitness: 'intermediate', goal: 'complete', days_per_week: '5-6', label: '16w Simple Complete' },
+  { id: '14', duration_weeks: 11, approach: 'sustainable', fitness: 'intermediate', goal: 'complete', days_per_week: '4-5', label: '11w Simple Complete' },
+  { id: '15', duration_weeks: 16, approach: 'sustainable', fitness: 'intermediate', goal: 'complete', days_per_week: '5-6', label: '16w Simple Complete' },
 ];
 
 export default function PlanGeneratorTest() {

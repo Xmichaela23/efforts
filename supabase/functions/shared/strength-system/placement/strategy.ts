@@ -156,7 +156,7 @@ function getDanielsFallbackStrategy(ctx: PlacementContext): PlacementStrategy {
  * Map run approach to methodology ID
  */
 export function mapApproachToMethodology(approach: string): MethodologyId {
-  if (approach === 'simple_completion') {
+  if (approach === 'sustainable') {
     return 'hal_higdon_complete';
   } else if (approach === 'performance_build') {
     return 'jack_daniels_performance';

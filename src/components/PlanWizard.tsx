@@ -34,7 +34,7 @@ type Distance = '5k' | '10k' | 'half' | 'marathon';
 type Fitness = 'novice' | 'beginner' | 'intermediate' | 'advanced';
 type MpwRange = '12-15' | '16-19' | '20-25' | '25-35' | '35-45' | '45+';
 type Goal = 'complete' | 'speed';
-type Approach = 'simple_completion' | 'performance_build';
+type Approach = 'sustainable' | 'performance_build';
 type DaysPerWeek = '3-4' | '4-5' | '5-6' | '6-7';
 type StrengthTier = 'injury_prevention' | 'strength_power';
 type EquipmentType = 'home_gym' | 'commercial_gym';
@@ -298,7 +298,7 @@ const METHODOLOGIES: Record<Approach, {
   basedOn: string;
   supported_days: DaysPerWeek[];
 }> = {
-  'simple_completion': {
+  'sustainable': {
     name: 'Simple Completion',
     shortDescription: 'Easy-to-follow plan focused on finishing healthy',
     longDescription: 'Effort-based pacing (easy, moderate, hard) with minimal speedwork. Conservative progression designed to get you to the finish line.',
@@ -335,8 +335,8 @@ function getMethodologyForGoal(goal: Goal | null, fitness: Fitness | null, dista
   }
 
   if (goal === 'complete') {
-    // Complete goal → Simple Completion for all fitness levels
-    return { approach: 'simple_completion', locked: false, lockedReason: '' };
+    // Complete goal → Sustainable for all fitness levels
+    return { approach: 'sustainable', locked: false, lockedReason: '' };
   }
 
   if (goal === 'speed') {
