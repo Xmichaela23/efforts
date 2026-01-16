@@ -46,7 +46,14 @@ export function overlayStrength(
     const week = parseInt(weekStr, 10);
     const phase = getCurrentPhase(week, phaseStructure);
     const isRecovery = phaseStructure.recovery_weeks.includes(week);
-    const weekInPhase = week - phase.start_week + 1;
+    // Calculate weekInPhase excluding recovery weeks
+    // Count only non-recovery weeks from phase start to current week
+    let weekInPhase = 0;
+    for (let w = phase.start_week; w <= week; w++) {
+      if (!phaseStructure.recovery_weeks.includes(w)) {
+        weekInPhase++;
+      }
+    }
     
     // Build protocol context
     const context: ProtocolContext = {

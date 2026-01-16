@@ -376,12 +376,20 @@ Deno.serve(async (req)=>{
                 continue;
               }
               // Find all sessions authored for this day
-              const daySessions = weekArr.filter((s)=>String(s?.day) === dayName);
+              // Normalize day names for comparison (handle case/whitespace differences)
+              const normalizeDayName = (d: string) => String(d || '').trim();
+              const daySessions = weekArr.filter((s)=>{
+                const sessionDay = normalizeDayName(s?.day || '');
+                const targetDay = normalizeDayName(dayName);
+                return sessionDay === targetDay;
+              });
               console.log('[get-week] daySessions for', dayName, ':', daySessions.length, 'found');
               if (!daySessions.length) continue;
               for (const s of daySessions){
                 // Normalize type (include mobility). If unknown, skip instead of defaulting to run.
-                const raw = String(s?.discipline || s?.type || '').toLowerCase();
+                // Check type field first (strength sessions have type: 'strength'), then discipline as fallback
+                const raw = String((s?.type && s.type.trim()) || (s?.discipline && s.discipline.trim()) || '').toLowerCase();
+                console.log('[get-week] Session type check:', { raw, type: s?.type, discipline: s?.discipline, name: s?.name });
                 let normType = null;
                 const hasMob = Array.isArray(s?.mobility_exercises) && s.mobility_exercises.length > 0;
                 if (hasMob) normType = 'mobility';
@@ -395,10 +403,12 @@ Deno.serve(async (req)=>{
                 else if (raw === 'pilates_yoga' || raw === 'pilates' || raw === 'yoga') normType = 'pilates_yoga';
                 // Skip unknown/blank types entirely to avoid phantom RN rows
                 if (!normType) {
+                  console.log('[get-week] Skipping session - unknown type:', { raw, type: s?.type, discipline: s?.discipline, name: s?.name, day: s?.day });
                   if (debug && debugNotes.length < 50) debugNotes.push({
                     where: 'skip_unknown_type',
                     iso,
-                    raw
+                    raw,
+                    sessionName: s?.name
                   });
                   continue;
                 }

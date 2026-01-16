@@ -29,7 +29,7 @@ export const performanceNeuralProtocol: StrengthProtocol = {
   id: 'neural_speed',
   legacy_ids: ['performance_neural'], // Backwards compatibility
   name: 'Neural Speed',
-  description: 'Heavy, low-rep compound lifts to support power and efficiency without interfering with run training.',
+  description: 'Heavy, low-rep compound lifts to support power and efficiency without interfering with run training. This is a neural efficiency approach, not a strength-building program. You will not add noticeable muscle mass. Strength numbers may increase slightly, but that is not the goal. The benefit ideally shows up in how easy fast paces feel, not in the gym.',
   tradeoffs: [
     'Not a hypertrophy or high-volume program',
     'Requires good lifting technique and commercial gym equipment',

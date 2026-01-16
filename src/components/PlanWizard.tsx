@@ -2197,7 +2197,10 @@ export default function PlanWizard() {
                             • Very low reps, very low volume, strict RIR
                           </span>
                           <span className="block text-xs text-amber-400/80 mt-2 font-medium">
-                            Tradeoff: not for size; requires good technique/equipment.
+                            Important: This is a neural efficiency approach, not a strength-building program. You will not add noticeable muscle mass. Strength numbers may increase slightly, but that is not the goal. The benefit ideally shows up in how easy fast paces feel, not in the gym.
+                          </span>
+                          <span className="block text-xs text-gray-500 mt-2">
+                            Tradeoff: Requires good technique/equipment. Bodyweight tier downgrades to maintenance.
                           </span>
                           <span className="block text-xs text-teal-400 mt-2">
                             Best for: Performance-oriented runners, speed work, want strength without soreness
