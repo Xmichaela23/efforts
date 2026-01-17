@@ -8,6 +8,8 @@ import { Calendar, CheckCircle, Info } from 'lucide-react';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -261,6 +263,154 @@ export default function WorkoutCalendar({
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
   const [workloadTooltipOpen, setWorkloadTooltipOpen] = useState(false);
   const { useImperial } = useAppContext();
+  const { updatePlannedWorkout } = usePlannedWorkouts();
+  
+  // Drag and drop state
+  const [draggedWorkout, setDraggedWorkout] = useState<any>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [validationResult, setValidationResult] = useState<any>(null);
+  const [showValidationPopup, setShowValidationPopup] = useState(false);
+  const [reschedulePending, setReschedulePending] = useState<{ workoutId: string; oldDate: string; newDate: string; workoutName: string } | null>(null);
+
+  // Handle drag start
+  const handleDragStart = (e: React.DragEvent, workout: any) => {
+    const workoutStatus = String(workout?.workout_status || '').toLowerCase();
+    // Only allow dragging planned workouts
+    if (workoutStatus === 'planned' && workout?.id) {
+      setDraggedWorkout(workout);
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', workout.id);
+      // Make drag image semi-transparent
+      if (e.currentTarget instanceof HTMLElement) {
+        e.currentTarget.style.opacity = '0.5';
+      }
+    } else {
+      e.preventDefault();
+    }
+  };
+
+  // Handle drag end
+  const handleDragEnd = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+    setDraggedWorkout(null);
+    setDragOverDate(null);
+  };
+
+  // Handle drag over (for drop zone highlighting)
+  const handleDragOver = (e: React.DragEvent, date: string) => {
+    if (draggedWorkout) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setDragOverDate(date);
+    }
+  };
+
+  // Handle drag leave
+  const handleDragLeave = () => {
+    setDragOverDate(null);
+  };
+
+  // Handle drop - validate and show popup
+  const handleDrop = async (e: React.DragEvent, targetDate: string) => {
+    e.preventDefault();
+    setDragOverDate(null);
+
+    if (!draggedWorkout || !draggedWorkout.id) return;
+
+    const oldDate = draggedWorkout.date || toDateOnlyString(new Date());
+    
+    // Don't validate if dropping on same date
+    if (oldDate === targetDate) {
+      setDraggedWorkout(null);
+      return;
+    }
+
+    try {
+      // Call validation edge function
+      const { data, error } = await supabase.functions.invoke('validate-reschedule', {
+        body: {
+          workout_id: draggedWorkout.id,
+          new_date: targetDate
+        }
+      });
+
+      if (error) {
+        console.error('Validation error:', error);
+        return;
+      }
+
+      // Show validation popup
+      setValidationResult(data);
+      setReschedulePending({
+        workoutId: draggedWorkout.id,
+        oldDate,
+        newDate: targetDate,
+        workoutName: draggedWorkout.name || `${draggedWorkout.type} workout`
+      });
+      setShowValidationPopup(true);
+      setDraggedWorkout(null);
+    } catch (err) {
+      console.error('Error validating reschedule:', err);
+    }
+  };
+
+  // Handle confirm reschedule
+  const handleConfirmReschedule = async () => {
+    if (!reschedulePending || !updatePlannedWorkout) return;
+
+    try {
+      await updatePlannedWorkout(reschedulePending.workoutId, {
+        date: reschedulePending.newDate
+      });
+
+      // Invalidate to refresh calendar
+      window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+      window.dispatchEvent(new CustomEvent('planned:invalidate'));
+
+      setShowValidationPopup(false);
+      setReschedulePending(null);
+      setValidationResult(null);
+    } catch (err) {
+      console.error('Error rescheduling workout:', err);
+    }
+  };
+
+  // Handle cancel
+  const handleCancelReschedule = () => {
+    setShowValidationPopup(false);
+    setReschedulePending(null);
+    setValidationResult(null);
+  };
+
+  // Handle suggestion click
+  const handleSuggestionClick = async (date: string) => {
+    if (!reschedulePending) return;
+
+    try {
+      // Re-validate for suggested date
+      const { data, error } = await supabase.functions.invoke('validate-reschedule', {
+        body: {
+          workout_id: reschedulePending.workoutId,
+          new_date: date
+        }
+      });
+
+      if (error) {
+        console.error('Validation error:', error);
+        return;
+      }
+
+      setValidationResult(data);
+      setReschedulePending({
+        ...reschedulePending,
+        newDate: date
+      });
+    } catch (err) {
+      console.error('Error validating suggestion:', err);
+    }
+  };
 
   // Sync referenceDate when week:navigate event is dispatched (from TodaysEffort)
   useEffect(() => {
@@ -656,9 +806,13 @@ export default function WorkoutCalendar({
               type="button"
               key={key}
               onClick={() => handleDayClick(d)}
+              onDragOver={(e) => handleDragOver(e, key)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, key)}
               className={[
                 "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-2.5 flex flex-col justify-between items-stretch",
                 "hover:bg-white/[0.05] transition-all",
+                dragOverDate === key ? "ring-2 ring-white/40 bg-white/[0.08]" : "",
               ].join(" ")}
               style={{
                 aspectRatio: '1', // Perfect squares for geometric precision
@@ -683,14 +837,20 @@ export default function WorkoutCalendar({
                     const workoutType = String(evt?._src?.type || evt?._src?.workout_type || '').toLowerCase();
                     const disciplineColors = getDisciplinePillClasses(workoutType, isCompleted);
                     
+                    const isPlanned = workoutStatus === 'planned';
+                    const workoutId = evt?._src?.id;
+                    
                     return (
                       <span
                         key={`${key}-${i}`}
                         role="button"
                         tabIndex={0}
+                        draggable={isPlanned && !!workoutId}
+                        onDragStart={(e) => isPlanned && workoutId && handleDragStart(e, evt._src)}
+                        onDragEnd={handleDragEnd}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`cursor-pointer text-xs px-2 py-1 rounded-xl w-full text-center truncate transition-all backdrop-blur-sm font-light tracking-wide ${disciplineColors}`}
+                        className={`text-xs px-2 py-1 rounded-xl w-full text-center truncate transition-all backdrop-blur-sm font-light tracking-wide ${disciplineColors} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                       >
                         {(() => {
                           const label = String(evt.label || '');
@@ -1042,6 +1202,20 @@ export default function WorkoutCalendar({
         <>
           {/* Prefetch disabled for performance */}
         </>
+      )}
+
+      {/* Validation Popup */}
+      {showValidationPopup && validationResult && reschedulePending && (
+        <RescheduleValidationPopup
+          workoutId={reschedulePending.workoutId}
+          workoutName={reschedulePending.workoutName}
+          oldDate={reschedulePending.oldDate}
+          newDate={reschedulePending.newDate}
+          validation={validationResult}
+          onConfirm={handleConfirmReschedule}
+          onCancel={handleCancelReschedule}
+          onSuggestionClick={handleSuggestionClick}
+        />
       )}
     </div>
   );
