@@ -472,6 +472,10 @@ Deno.serve(async (req) => {
     }
 
     // ===== B) INTENSITY SPACING =====
+    // Science: High-intensity workouts require 48-72h recovery for optimal adaptation
+    // (muscle glycogen resynthesis, protein synthesis, CNS recovery)
+    // Consecutive days (<24h) = high injury risk, compromised quality
+    // Within 48h = suboptimal but manageable for experienced athletes
     const targetDay = new_date;
     const prevDay = addDays(targetDay, -1);
     const nextDay = addDays(targetDay, 1);
@@ -482,7 +486,7 @@ Deno.serve(async (req) => {
       // In recovery/taper weeks, be more lenient - skip warnings
       const isRecoveryOrTaper = isRecoveryWeek || isTaperWeek || weekIntent === 'recovery' || weekIntent === 'taper';
       
-      // Check consecutive days (warn, not block - user knows their body)
+      // Check consecutive days (<24h) - science: too close, compromises recovery
       const prevWorkouts = contextByDate.get(prevDay) || [];
       const nextWorkouts = contextByDate.get(nextDay) || [];
       
@@ -496,17 +500,17 @@ Deno.serve(async (req) => {
           const phaseNote = isRecoveryWeek ? " You're in a recovery week, so" : isTaperWeek ? " You're in taper, so" : weekIntent === 'peak' ? " You're in peak week, so" : planPhase ? ` You're in ${planPhase} phase, so` : '';
           reasons.push({
             code: 'hard_consecutive',
-            message: `Hard workouts back-to-back.${phaseNote} you'll need recovery between them.`,
+            message: `Hard workouts back-to-back.${phaseNote} science says you need 48-72h between hard efforts.`,
             data: { 
               adjacentDay: prevHasHard ? prevDay : nextDay,
               planPhase,
               weekIntent,
-              suggestion: 'Space them out by at least 1 day'
+              suggestion: 'Space them out by at least 2 days for proper recovery'
             }
           });
         }
       } else {
-        // Check within 2 days (warn, but skip in recovery/taper)
+        // Check within 48h (2 days) - science: minimum recovery window, suboptimal
         if (!isRecoveryOrTaper) {
           const prev2Workouts = contextByDate.get(prev2Day) || [];
           const next2Workouts = contextByDate.get(next2Day) || [];
@@ -518,7 +522,7 @@ Deno.serve(async (req) => {
             const phaseNote = isRecoveryWeek ? " You're in a recovery week, so" : isTaperWeek ? " You're in taper, so" : weekIntent === 'peak' ? " You're in peak week, so" : planPhase ? ` You're in ${planPhase} phase, so` : '';
             reasons.push({
               code: 'hard_within_2_days',
-              message: `Hard workouts too close together.${phaseNote} aim for 2+ days between them for recovery.`,
+              message: `Hard workouts within 48h.${phaseNote} optimal recovery is 48-72h between hard efforts.`,
               data: { 
                 nearbyHardDays: [prev2Day, next2Day].filter(d => {
                   const workouts = contextByDate.get(d) || [];
@@ -526,7 +530,7 @@ Deno.serve(async (req) => {
                 }),
                 planPhase,
                 weekIntent,
-                suggestion: 'Move to give more space from other hard workouts'
+                suggestion: 'Aim for 2-3 days between hard workouts for best adaptation'
               }
             });
           }
@@ -535,6 +539,9 @@ Deno.serve(async (req) => {
     }
 
     // ===== C) LONG SESSION SPACING =====
+    // Science: Long endurance sessions deplete glycogen, cause muscle damage
+    // Need 24-48h for glycogen resynthesis and repair before next long session
+    // Back-to-back long sessions = accumulated fatigue, compromised quality
     if (isLong) {
       const isRecoveryOrTaper = isRecoveryWeek || isTaperWeek || weekIntent === 'recovery' || weekIntent === 'taper';
       const prevWorkouts = contextByDate.get(prevDay) || [];
@@ -551,18 +558,20 @@ Deno.serve(async (req) => {
           const phaseNote = isRecoveryWeek ? " You're in a recovery week, so" : isTaperWeek ? " You're in taper, so" : planPhase ? ` You're in ${planPhase} phase, so` : '';
           reasons.push({
             code: 'long_adjacent',
-            message: `Long sessions back-to-back.${phaseNote} that's a lot of volume without recovery.`,
+            message: `Long sessions back-to-back.${phaseNote} glycogen needs 24-48h to resynthesize.`,
             data: { 
               adjacentDay: prevHasLong ? prevDay : nextDay,
               planPhase,
               weekIntent,
-              suggestion: 'Space them out by at least 1 day'
+              suggestion: 'Space them out by at least 1 day for glycogen recovery'
             }
           });
         }
       }
       
       // Warn if long + strength same day (but less strict in recovery/taper)
+      // Science: Concurrent training can cause interference effect
+      // Long endurance + strength same day = compromised adaptation in both
       const sameDayHasStrength = sameDayWorkouts.some((w: any) => w.type === 'strength');
       if (sameDayHasStrength && !isRecoveryOrTaper) {
         if (severity === 'green') severity = 'yellow';
@@ -570,18 +579,22 @@ Deno.serve(async (req) => {
         const phaseNote = isRecoveryWeek ? " You're in a recovery week, so" : isTaperWeek ? " You're in taper, so" : planPhase ? ` You're in ${planPhase} phase, so` : '';
         reasons.push({
           code: 'long_plus_strength',
-          message: `Long run + strength same day.${strengthNote}${phaseNote} that's a lot of stress.`,
+          message: `Long run + strength same day.${strengthNote}${phaseNote} concurrent training can interfere with adaptation.`,
           data: { 
             strengthFocus: strengthFocus,
             planPhase,
             weekIntent,
-            suggestion: 'Move strength to another day or split them up'
+            suggestion: 'Separate by 6+ hours or move to different days'
           }
         });
       }
     }
 
     // ===== D) STRENGTH SPACING =====
+    // Science: Muscle protein synthesis (MPS) peaks 24-48h post-exercise
+    // Lower body (large muscle groups): 48-72h optimal for MPS and recovery
+    // Upper body (smaller groups): 24-48h usually sufficient
+    // Full body: treat as lower body (48-72h)
     if (strengthFocus === 'lower' || strengthFocus === 'full') {
       const prevDayWorkouts = contextByDate.get(prevDay) || [];
       const prev2DayWorkouts = contextByDate.get(prev2Day) || [];
@@ -599,17 +612,18 @@ Deno.serve(async (req) => {
         const phaseNote = isRecoveryWeek ? " You're in a recovery week, so" : isTaperWeek ? " You're in taper, so" : planPhase ? ` You're in ${planPhase} phase, so` : '';
         reasons.push({
           code: 'lower_strength_spacing',
-          message: `Lower body lifts too close together.${phaseNote} legs need 2+ days to recover.`,
+          message: `Lower body lifts too close.${phaseNote} muscle protein synthesis needs 48-72h for legs.`,
           data: { 
             strengthFocus,
             planPhase,
             weekIntent,
-            suggestion: 'Space them out by at least 2 days'
+            suggestion: 'Space them out by 2-3 days for optimal adaptation'
           }
         });
       }
     }
     
+    // Upper body: smaller muscle groups, faster recovery (24-48h)
     if (strengthFocus === 'upper') {
       const prevDayWorkouts = contextByDate.get(prevDay) || [];
       const nextDayWorkouts = contextByDate.get(nextDay) || [];
@@ -620,14 +634,21 @@ Deno.serve(async (req) => {
         if (severity === 'green') severity = 'yellow';
         reasons.push({
           code: 'upper_strength_consecutive',
-          message: 'Upper body strength on consecutive days may be too much',
-          data: { strengthFocus }
+          message: 'Upper body on consecutive days. Upper body recovers faster (24-48h), but back-to-back may be too much.',
+          data: { 
+            strengthFocus,
+            suggestion: 'Space by at least 1 day'
+          }
         });
       }
     }
 
     // ===== E) WORKLOAD CAPS =====
-    // Consider plan phase - peak/taper weeks may have different thresholds
+    // Science: Training stress accumulates; daily caps prevent overreaching
+    // Based on duration × intensity² model (simplified TSS)
+    // Normal: ~120 daily (allows 1 hard + 1 medium or 2 medium sessions)
+    // Peak: ~140 daily (allows higher volume during peak training blocks)
+    // These are guidelines - individual recovery varies
     const workloadCap = (weekIntent === 'peak' || planPhase?.toLowerCase().includes('peak')) ? 140 : 120;
     const workloadWarning = (weekIntent === 'peak' || planPhase?.toLowerCase().includes('peak')) ? 100 : 80;
     
