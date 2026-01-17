@@ -45,6 +45,10 @@ interface ValidationResult {
     planName?: string;
     canonicalDate?: string;
     daysFromCanonical?: number;
+    planPhase?: string;
+    weekIntent?: string;
+    isRecoveryWeek?: boolean;
+    isTaperWeek?: boolean;
   };
 }
 
@@ -239,9 +243,13 @@ Deno.serve(async (req) => {
     const dayNumber = workout.day_number;
     let canonicalDate: string | null = null;
     let planName: string | null = null;
+    let planPhase: string | null = null;
+    let weekIntent: string | null = null;
+    let isRecoveryWeek = false;
+    let isTaperWeek = false;
     
     if (trainingPlanId && weekNumber && dayNumber) {
-      // Fetch plan to get start date
+      // Fetch plan to get start date and phase info
       const { data: plan } = await supabase
         .from('training_plans')
         .select('id, name, config')
@@ -253,6 +261,57 @@ Deno.serve(async (req) => {
         planName = plan.name;
         const config = plan.config || {};
         const startDateStr = config.user_selected_start_date || config.start_date;
+        
+        // Determine plan phase and week intent
+        const weekIndex = Number(weekNumber) || 1;
+        if (config.phases) {
+          for (const [phaseKey, phaseData] of Object.entries(config.phases)) {
+            const phase = phaseData as any;
+            if (phase.weeks && Array.isArray(phase.weeks) && phase.weeks.includes(weekIndex)) {
+              planPhase = phaseKey;
+              
+              // Check if it's a recovery week
+              if (phase.recovery_weeks && Array.isArray(phase.recovery_weeks) && phase.recovery_weeks.includes(weekIndex)) {
+                isRecoveryWeek = true;
+                weekIntent = 'recovery';
+              } else if (phaseKey.toLowerCase().includes('taper')) {
+                isTaperWeek = true;
+                weekIntent = 'taper';
+              } else if (phaseKey.toLowerCase().includes('peak')) {
+                weekIntent = 'peak';
+              } else if (phaseKey.toLowerCase().includes('base')) {
+                weekIntent = 'baseline';
+              } else {
+                weekIntent = 'build';
+              }
+              break;
+            }
+          }
+        }
+        
+        // Also check weekly_summaries for explicit week labels
+        if (!weekIntent) {
+          const { data: weeklySummary } = await supabase
+            .from('weekly_summaries')
+            .select('focus_label')
+            .eq('training_plan_id', trainingPlanId)
+            .eq('week_number', weekIndex)
+            .eq('user_id', user.id)
+            .single();
+          
+          if (weeklySummary?.focus_label) {
+            const label = String(weeklySummary.focus_label).toLowerCase();
+            if (label.includes('recovery')) {
+              isRecoveryWeek = true;
+              weekIntent = 'recovery';
+            } else if (label.includes('taper')) {
+              isTaperWeek = true;
+              weekIntent = 'taper';
+            } else if (label.includes('peak')) {
+              weekIntent = 'peak';
+            }
+          }
+        }
         
         if (startDateStr) {
           // Calculate canonical date: start_date + (week_number - 1) * 7 + (day_number - 1)
@@ -386,7 +445,7 @@ Deno.serve(async (req) => {
     const next2Day = addDays(targetDay, 2);
 
     if (intensity === 'hard') {
-      // Check consecutive days
+      // Check consecutive days (warn, not block - user knows their body)
       const prevWorkouts = contextByDate.get(prevDay) || [];
       const nextWorkouts = contextByDate.get(nextDay) || [];
       
@@ -394,11 +453,16 @@ Deno.serve(async (req) => {
       const nextHasHard = nextWorkouts.some((w: any) => classifyIntensity(w) === 'hard');
       
       if (prevHasHard || nextHasHard) {
-        severity = 'red';
+        if (severity === 'green') severity = 'yellow';
         reasons.push({
           code: 'hard_consecutive',
-          message: 'Hard workouts cannot be on consecutive days',
-          data: { adjacentDay: prevHasHard ? prevDay : nextDay }
+          message: 'Hard workouts on consecutive days may be too intense. Consider spacing them out.',
+          data: { 
+            adjacentDay: prevHasHard ? prevDay : nextDay,
+            planPhase,
+            weekIntent,
+            suggestion: 'Move to a day with at least 1 day of recovery between hard workouts'
+          }
         });
       } else {
         // Check within 2 days (warn)
@@ -411,11 +475,15 @@ Deno.serve(async (req) => {
           if (severity === 'green') severity = 'yellow';
           reasons.push({
             code: 'hard_within_2_days',
-            message: 'Hard workouts should have at least 2 days between them',
-            data: { nearbyHardDays: [prev2Day, next2Day].filter(d => {
-              const workouts = contextByDate.get(d) || [];
-              return workouts.some((w: any) => classifyIntensity(w) === 'hard');
-            })}
+            message: 'Hard workouts should ideally have at least 2 days between them for recovery',
+            data: { 
+              nearbyHardDays: [prev2Day, next2Day].filter(d => {
+                const workouts = contextByDate.get(d) || [];
+                return workouts.some((w: any) => classifyIntensity(w) === 'hard');
+              }),
+              planPhase,
+              weekIntent
+            }
           });
         }
       }
@@ -431,11 +499,16 @@ Deno.serve(async (req) => {
       const nextHasLong = nextWorkouts.some((w: any) => isLongSession(w));
       
       if (prevHasLong || nextHasLong) {
-        severity = 'red';
+        if (severity === 'green') severity = 'yellow';
         reasons.push({
           code: 'long_adjacent',
-          message: 'Long sessions should have at least 1 day between them',
-          data: { adjacentDay: prevHasLong ? prevDay : nextDay }
+          message: 'Long sessions on adjacent days may be too much. Consider spacing them out.',
+          data: { 
+            adjacentDay: prevHasLong ? prevDay : nextDay,
+            planPhase,
+            weekIntent,
+            suggestion: 'Move to a day with at least 1 day between long sessions'
+          }
         });
       }
       
@@ -446,7 +519,11 @@ Deno.serve(async (req) => {
         reasons.push({
           code: 'long_plus_strength',
           message: 'Long session and strength on the same day may be too much',
-          data: { strengthFocus: strengthFocus }
+          data: { 
+            strengthFocus: strengthFocus,
+            planPhase,
+            weekIntent
+          }
         });
       }
     }
@@ -465,11 +542,16 @@ Deno.serve(async (req) => {
       });
       
       if (nearbyLower) {
-        severity = 'red';
+        if (severity === 'green') severity = 'yellow';
         reasons.push({
           code: 'lower_strength_spacing',
-          message: 'Lower body strength needs at least 2 days between sessions',
-          data: { strengthFocus }
+          message: 'Lower body strength ideally needs at least 2 days between sessions for recovery',
+          data: { 
+            strengthFocus,
+            planPhase,
+            weekIntent,
+            suggestion: 'Move to a day with at least 2 days between lower body sessions'
+          }
         });
       }
     }
@@ -491,19 +573,34 @@ Deno.serve(async (req) => {
     }
 
     // ===== E) WORKLOAD CAPS =====
-    if (afterDaily > 120) {
-      severity = 'red';
+    // Consider plan phase - peak/taper weeks may have different thresholds
+    const workloadCap = (weekIntent === 'peak' || planPhase?.toLowerCase().includes('peak')) ? 140 : 120;
+    const workloadWarning = (weekIntent === 'peak' || planPhase?.toLowerCase().includes('peak')) ? 100 : 80;
+    
+    if (afterDaily > workloadCap) {
+      if (severity === 'green') severity = 'yellow';
       reasons.push({
         code: 'workload_cap_exceeded',
-        message: `Daily workload would exceed 120 (${afterDaily})`,
-        data: { workload: afterDaily, cap: 120 }
+        message: `Daily workload would be very high (${afterDaily}). This may be too much in one day.`,
+        data: { 
+          workload: afterDaily, 
+          cap: workloadCap,
+          planPhase,
+          weekIntent,
+          suggestion: 'Consider splitting workouts across multiple days or reducing intensity'
+        }
       });
-    } else if (afterDaily > 80) {
+    } else if (afterDaily > workloadWarning) {
       if (severity === 'green') severity = 'yellow';
       reasons.push({
         code: 'workload_high',
         message: `Daily workload would be high (${afterDaily})`,
-        data: { workload: afterDaily, threshold: 80 }
+        data: { 
+          workload: afterDaily, 
+          threshold: workloadWarning,
+          planPhase,
+          weekIntent
+        }
       });
     }
 
@@ -622,7 +719,11 @@ Deno.serve(async (req) => {
         isPlanWorkout: true,
         planName: planName || undefined,
         canonicalDate: canonicalDate || undefined,
-        daysFromCanonical
+        daysFromCanonical,
+        planPhase: planPhase || undefined,
+        weekIntent: weekIntent || undefined,
+        isRecoveryWeek,
+        isTaperWeek
       } : {
         isPlanWorkout: false
       }

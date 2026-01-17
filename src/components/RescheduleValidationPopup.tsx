@@ -25,6 +25,10 @@ interface ValidationResult {
     planName?: string;
     canonicalDate?: string;
     daysFromCanonical?: number;
+    planPhase?: string;
+    weekIntent?: string;
+    isRecoveryWeek?: boolean;
+    isTaperWeek?: boolean;
   };
 }
 
@@ -153,13 +157,21 @@ export default function RescheduleValidationPopup({
         </div>
 
         {/* Plan context */}
-        {planContext?.isPlanWorkout && planContext.canonicalDate && (
+        {planContext?.isPlanWorkout && (
           <div className="mb-4 p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10">
             <p className="text-xs text-white/60 font-light">
               Part of <span className="text-white/80">{planContext.planName || 'training plan'}</span>
-              {planContext.daysFromCanonical !== undefined && planContext.daysFromCanonical !== 0 && (
-                <span className="ml-1">
-                  ({planContext.daysFromCanonical > 0 ? '+' : ''}{planContext.daysFromCanonical} days from planned)
+              {planContext.planPhase && (
+                <span className="ml-1 text-white/70">
+                  • {planContext.planPhase.charAt(0).toUpperCase() + planContext.planPhase.slice(1)}
+                  {planContext.weekIntent && planContext.weekIntent !== planContext.planPhase && (
+                    <span className="text-white/50"> ({planContext.weekIntent})</span>
+                  )}
+                </span>
+              )}
+              {planContext.canonicalDate && planContext.daysFromCanonical !== undefined && planContext.daysFromCanonical !== 0 && (
+                <span className="ml-1 block mt-1">
+                  {planContext.daysFromCanonical > 0 ? '+' : ''}{planContext.daysFromCanonical} days from planned date
                 </span>
               )}
             </p>
