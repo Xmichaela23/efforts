@@ -420,12 +420,13 @@ Deno.serve(async (req) => {
     // Warn about conflicts (will be replaced automatically)
     if (sameTypeWorkouts.length > 0) {
       if (severity === 'green') severity = 'yellow';
+      const conflictNames = sameTypeWorkouts.map(c => c.name || `${c.type} workout`).join(', ');
       reasons.push({
         code: 'same_type_conflict',
-        message: `There's already a ${workout.type} workout on this day. It will be replaced.`,
+        message: `There's already a ${workout.type} workout on this day (${conflictNames}). Moving this workout here will replace the existing one. This is typically fine, but make sure you're not losing an important planned session.`,
         data: {
           conflicts: sameTypeWorkouts,
-          suggestion: 'The existing workout will be moved to maintain plan structure'
+          suggestion: 'The existing workout will be automatically removed when you confirm. Review to ensure this is the workout you want to keep.'
         }
       });
     }
@@ -438,26 +439,33 @@ Deno.serve(async (req) => {
       
       if (daysDiff > 7) {
         if (severity === 'green') severity = 'yellow';
+        const phaseContext = planPhase ? ` (currently in ${planPhase} phase${weekIntent && weekIntent !== planPhase ? `, ${weekIntent} week` : ''})` : '';
         reasons.push({
           code: 'plan_date_drift',
-          message: `Moving ${daysDiff} days from planned date (${canonicalDate}). This may affect plan progression.`,
+          message: `Moving ${daysDiff} days from planned date (${canonicalDate})${phaseContext}. This significant shift may affect plan progression and the intended training stimulus. The plan was designed with specific spacing between workouts.`,
           data: { 
             canonicalDate, 
             newDate: new_date, 
             daysDiff,
-            planName: planName || 'training plan'
+            planName: planName || 'training plan',
+            planPhase,
+            weekIntent,
+            suggestion: 'Consider moving closer to the planned date to maintain plan structure, or adjust other workouts to compensate'
           }
         });
       } else if (daysDiff > 2) {
         if (severity === 'green') severity = 'yellow';
+        const phaseContext = planPhase ? ` (${planPhase} phase${weekIntent && weekIntent !== planPhase ? `, ${weekIntent} week` : ''})` : '';
         reasons.push({
           code: 'plan_date_drift_minor',
-          message: `Moving ${daysDiff} days from planned date`,
+          message: `Moving ${daysDiff} days from planned date${phaseContext}. This is a minor shift, but may still affect the intended training rhythm.`,
           data: { 
             canonicalDate, 
             newDate: new_date, 
             daysDiff,
-            planName: planName || 'training plan'
+            planName: planName || 'training plan',
+            planPhase,
+            weekIntent
           }
         });
       }
@@ -485,14 +493,15 @@ Deno.serve(async (req) => {
         // In recovery/taper, this is more acceptable
         if (!isRecoveryOrTaper) {
           if (severity === 'green') severity = 'yellow';
+          const phaseContext = planPhase ? ` You're in ${planPhase} phase${weekIntent && weekIntent !== planPhase ? ` (${weekIntent} week)` : ''}, which typically requires adequate recovery between hard efforts.` : '';
           reasons.push({
             code: 'hard_consecutive',
-            message: 'Hard workouts on consecutive days may be too intense. Consider spacing them out.',
+            message: `Hard workouts on consecutive days may be too intense and could compromise recovery.${phaseContext} Consider spacing them out to allow your body to adapt properly.`,
             data: { 
               adjacentDay: prevHasHard ? prevDay : nextDay,
               planPhase,
               weekIntent,
-              suggestion: 'Move to a day with at least 1 day of recovery between hard workouts'
+              suggestion: 'Move to a day with at least 1 day of recovery between hard workouts to maintain training quality'
             }
           });
         }
@@ -506,16 +515,18 @@ Deno.serve(async (req) => {
           
           if (hasHardWithin2) {
             if (severity === 'green') severity = 'yellow';
+            const phaseContext = planPhase ? ` In ${planPhase} phase${weekIntent && weekIntent !== planPhase ? ` (${weekIntent} week)` : ''},` : '';
             reasons.push({
               code: 'hard_within_2_days',
-              message: 'Hard workouts should ideally have at least 2 days between them for recovery',
+              message: `${phaseContext} Hard workouts should ideally have at least 2 days between them for proper recovery and adaptation. Having them too close together can lead to accumulated fatigue and reduced training quality.`,
               data: { 
                 nearbyHardDays: [prev2Day, next2Day].filter(d => {
                   const workouts = contextByDate.get(d) || [];
                   return workouts.some((w: any) => classifyIntensity(w) === 'hard');
                 }),
                 planPhase,
-                weekIntent
+                weekIntent,
+                suggestion: 'Consider moving to a day with more spacing from other hard workouts'
               }
             });
           }
@@ -537,14 +548,15 @@ Deno.serve(async (req) => {
         // In recovery/taper, long sessions are often reduced anyway
         if (!isRecoveryOrTaper) {
           if (severity === 'green') severity = 'yellow';
+          const phaseContext = planPhase ? ` In ${planPhase} phase${weekIntent && weekIntent !== planPhase ? ` (${weekIntent} week)` : ''},` : '';
           reasons.push({
             code: 'long_adjacent',
-            message: 'Long sessions on adjacent days may be too much. Consider spacing them out.',
+            message: `${phaseContext} Long sessions on adjacent days may be too much volume and could lead to overreaching. Long workouts require significant recovery time, and back-to-back long sessions can compromise both sessions' quality.`,
             data: { 
               adjacentDay: prevHasLong ? prevDay : nextDay,
               planPhase,
               weekIntent,
-              suggestion: 'Move to a day with at least 1 day between long sessions'
+              suggestion: 'Move to a day with at least 1 day between long sessions to allow proper recovery and maintain training quality'
             }
           });
         }
@@ -554,13 +566,15 @@ Deno.serve(async (req) => {
       const sameDayHasStrength = sameDayWorkouts.some((w: any) => w.type === 'strength');
       if (sameDayHasStrength && !isRecoveryOrTaper) {
         if (severity === 'green') severity = 'yellow';
+        const phaseContext = planPhase ? ` In ${planPhase} phase${weekIntent && weekIntent !== planPhase ? ` (${weekIntent} week)` : ''},` : '';
         reasons.push({
           code: 'long_plus_strength',
-          message: 'Long session and strength on the same day may be too much',
+          message: `${phaseContext} Combining a long session with strength training on the same day may be too much total stress. Both require significant recovery, and doing them together can compromise the quality of both workouts and increase injury risk.`,
           data: { 
             strengthFocus: strengthFocus,
             planPhase,
-            weekIntent
+            weekIntent,
+            suggestion: 'Consider moving the strength workout to another day, or splitting them with adequate rest between'
           }
         });
       }
@@ -581,14 +595,15 @@ Deno.serve(async (req) => {
       
       if (nearbyLower) {
         if (severity === 'green') severity = 'yellow';
+        const phaseContext = planPhase ? ` In ${planPhase} phase${weekIntent && weekIntent !== planPhase ? ` (${weekIntent} week)` : ''},` : '';
         reasons.push({
           code: 'lower_strength_spacing',
-          message: 'Lower body strength ideally needs at least 2 days between sessions for recovery',
+          message: `${phaseContext} Lower body strength sessions ideally need at least 2 days between them for proper muscle recovery and adaptation. Lower body muscles (quads, glutes, hamstrings) are large muscle groups that require more recovery time than upper body.`,
           data: { 
             strengthFocus,
             planPhase,
             weekIntent,
-            suggestion: 'Move to a day with at least 2 days between lower body sessions'
+            suggestion: 'Move to a day with at least 2 days between lower body sessions to allow muscles to recover and adapt'
           }
         });
       }
@@ -617,27 +632,33 @@ Deno.serve(async (req) => {
     
     if (afterDaily > workloadCap) {
       if (severity === 'green') severity = 'yellow';
+      const phaseContext = planPhase ? ` In ${planPhase} phase${weekIntent && weekIntent !== planPhase ? ` (${weekIntent} week)` : ''},` : '';
+      const capContext = (weekIntent === 'peak' || planPhase?.toLowerCase().includes('peak')) 
+        ? ' Peak weeks allow higher daily workloads (up to 140), but' 
+        : ' Typical daily workload cap is 120, and';
       reasons.push({
         code: 'workload_cap_exceeded',
-        message: `Daily workload would be very high (${afterDaily}). This may be too much in one day.`,
+        message: `${phaseContext}${capContext} this day would reach ${afterDaily}, which may be too much stress in a single day. High daily workload increases injury risk and can compromise recovery for subsequent days.`,
         data: { 
           workload: afterDaily, 
           cap: workloadCap,
           planPhase,
           weekIntent,
-          suggestion: 'Consider splitting workouts across multiple days or reducing intensity'
+          suggestion: 'Consider splitting workouts across multiple days, reducing intensity of one workout, or moving one to a lighter day'
         }
       });
     } else if (afterDaily > workloadWarning) {
       if (severity === 'green') severity = 'yellow';
+      const phaseContext = planPhase ? ` In ${planPhase} phase${weekIntent && weekIntent !== planPhase ? ` (${weekIntent} week)` : ''},` : '';
       reasons.push({
         code: 'workload_high',
-        message: `Daily workload would be high (${afterDaily})`,
+        message: `${phaseContext} Daily workload would be high (${afterDaily}). While manageable, this is approaching the upper limit and may impact recovery. Monitor how you feel after this day.`,
         data: { 
           workload: afterDaily, 
           threshold: workloadWarning,
           planPhase,
-          weekIntent
+          weekIntent,
+          suggestion: 'Ensure adequate sleep and nutrition around this high-workload day'
         }
       });
     }
