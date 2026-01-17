@@ -347,8 +347,8 @@ Deno.serve(async (req) => {
     // ===== PLAN CONTEXT: Warn if moving plan workout far from canonical date =====
     if (canonicalDate && canonicalDate !== new_date) {
       const canonical = new Date(canonicalDate + 'T12:00:00');
-      const new = new Date(new_date + 'T12:00:00');
-      const daysDiff = Math.abs(Math.round((new.getTime() - canonical.getTime()) / (1000 * 60 * 60 * 24)));
+      const newDate = new Date(new_date + 'T12:00:00');
+      const daysDiff = Math.abs(Math.round((newDate.getTime() - canonical.getTime()) / (1000 * 60 * 60 * 24)));
       
       if (daysDiff > 7) {
         if (severity === 'green') severity = 'yellow';
