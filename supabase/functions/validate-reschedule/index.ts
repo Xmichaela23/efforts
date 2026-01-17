@@ -507,24 +507,94 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Generate suggestions (simple: find days with low workload in ±3 day window)
+    // Generate suggestions (find valid days in ±3 day window)
     const suggestions: string[] = [];
     if (severity === 'red' || severity === 'yellow') {
       for (let i = -3; i <= 3; i++) {
-        if (i === 0) continue; // Skip target day
+        if (i === 0) continue; // Skip target day (already blocked)
         const candidateDate = addDays(new_date, i);
+        
+        // Skip if date is outside our context map
+        if (!contextByDate.has(candidateDate)) continue;
+        
         const candidateWorkload = calculateDayWorkload(candidateDate) + workoutWorkload;
         const candidateWorkouts = contextByDate.get(candidateDate) || [];
         const candidateHasHard = candidateWorkouts.some((w: any) => classifyIntensity(w) === 'hard');
+        const candidateHasLong = candidateWorkouts.some((w: any) => isLongSession(w));
+        const candidateHasStrength = candidateWorkouts.some((w: any) => w.type === 'strength');
         
-        // Prefer days with low workload and no hard workouts
-        if (candidateWorkload < 80 && !candidateHasHard && intensity !== 'hard') {
-          suggestions.push(candidateDate);
-        } else if (candidateWorkload < 60 && intensity === 'hard') {
+        // Check if this candidate would be valid
+        let isValidCandidate = true;
+        let candidateScore = 0; // Lower is better
+        
+        // Hard workouts: can't be consecutive
+        if (intensity === 'hard') {
+          const prevDay = addDays(candidateDate, -1);
+          const nextDay = addDays(candidateDate, 1);
+          const prevWorkouts = contextByDate.get(prevDay) || [];
+          const nextWorkouts = contextByDate.get(nextDay) || [];
+          if (prevWorkouts.some((w: any) => classifyIntensity(w) === 'hard') ||
+              nextWorkouts.some((w: any) => classifyIntensity(w) === 'hard')) {
+            isValidCandidate = false;
+          }
+          if (candidateHasHard) {
+            isValidCandidate = false; // Can't have two hard workouts same day
+          }
+        }
+        
+        // Long sessions: can't be adjacent
+        if (isLong && candidateHasLong) {
+          const prevDay = addDays(candidateDate, -1);
+          const nextDay = addDays(candidateDate, 1);
+          const prevWorkouts = contextByDate.get(prevDay) || [];
+          const nextWorkouts = contextByDate.get(nextDay) || [];
+          if (prevWorkouts.some((w: any) => isLongSession(w)) ||
+              nextWorkouts.some((w: any) => isLongSession(w))) {
+            isValidCandidate = false;
+          }
+        }
+        
+        // Lower body strength: can't be within 2 days
+        if ((strengthFocus === 'lower' || strengthFocus === 'full') && candidateHasStrength) {
+          const nearbyWorkouts = [
+            ...(contextByDate.get(addDays(candidateDate, -1)) || []),
+            ...(contextByDate.get(addDays(candidateDate, -2)) || []),
+            ...(contextByDate.get(addDays(candidateDate, 1)) || []),
+            ...(contextByDate.get(addDays(candidateDate, 2)) || []),
+          ];
+          const nearbyLower = nearbyWorkouts.some((w: any) => {
+            const focus = classifyStrengthFocus(w);
+            return focus === 'lower' || focus === 'full';
+          });
+          if (nearbyLower) {
+            isValidCandidate = false;
+          }
+        }
+        
+        // Workload check
+        if (candidateWorkload > 120) {
+          isValidCandidate = false;
+        } else if (candidateWorkload > 80) {
+          candidateScore += 10; // Penalty for high workload
+        }
+        
+        // Long + strength same day: penalty but not block
+        if (isLong && candidateHasStrength) {
+          candidateScore += 5; // Penalty
+        }
+        
+        // Add to suggestions if valid, sorted by score
+        if (isValidCandidate) {
           suggestions.push(candidateDate);
         }
       }
-      // Limit to 3 suggestions
+      
+      // Sort by workload (lower is better) and limit to 3
+      suggestions.sort((a, b) => {
+        const aWorkload = calculateDayWorkload(a) + workoutWorkload;
+        const bWorkload = calculateDayWorkload(b) + workoutWorkload;
+        return aWorkload - bWorkload;
+      });
       suggestions.splice(3);
     }
 
