@@ -292,20 +292,24 @@ Deno.serve(async (req) => {
     let weekIntent: string | null = null;
     let isRecoveryWeek = false;
     let isTaperWeek = false;
+    let startDateStr: string | null = null;
+    let plan: any = null;
+    let config: any = {};
     
     if (trainingPlanId && weekNumber && dayNumber) {
       // Fetch plan to get start date and phase info
-      const { data: plan } = await supabase
+      const { data: planData } = await supabase
         .from('training_plans')
         .select('id, name, config')
         .eq('id', trainingPlanId)
         .eq('user_id', user.id)
         .single();
       
-      if (plan) {
+      if (planData) {
+        plan = planData;
         planName = plan.name;
-        const config = plan.config || {};
-        const startDateStr = config.user_selected_start_date || config.start_date;
+        config = plan.config || {};
+        startDateStr = config.user_selected_start_date || config.start_date;
         
         // Determine plan phase and week intent
         const weekIndex = Number(weekNumber) || 1;
@@ -466,16 +470,16 @@ Deno.serve(async (req) => {
     
     // Calculate target date's day_number in the plan
     let targetDayNumber: number | null = null;
-    if (trainingPlanId && plan && canonicalDate) {
+    if (trainingPlanId && startDateStr) {
       try {
-        const startDate = new Date((config.user_selected_start_date || config.start_date) + 'T12:00:00');
+        const startDate = new Date(startDateStr + 'T12:00:00');
         const targetDate = new Date(new_date + 'T12:00:00');
         const daysDiff = Math.round((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
         // day_number = (daysDiff % 7) + 1, but we need to account for week_number
         // Actually, we need to find which week this date falls in
         const weeksFromStart = Math.floor(daysDiff / 7);
-        const dayInWeek = (daysDiff % 7) + 1;
-        targetDayNumber = dayInWeek;
+        const dayInWeek = ((daysDiff % 7) + 7) % 7; // Handle negative modulo
+        targetDayNumber = dayInWeek + 1; // 1-7
       } catch (e) {
         console.error('[validate-reschedule] Error calculating target day_number:', e);
       }
@@ -869,7 +873,7 @@ Deno.serve(async (req) => {
         
         // Calculate candidate's day_number in plan (if applicable)
         let candidateDayNumber: number | null = null;
-        if (trainingPlanId && plan && startDateStr) {
+        if (trainingPlanId && startDateStr) {
           try {
             const startDate = new Date(startDateStr + 'T12:00:00');
             const targetDate = new Date(candidateDate + 'T12:00:00');
