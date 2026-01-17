@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Calendar as CalendarIcon } from 'lucide-react';
-import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 
 interface RescheduleDatePickerProps {
@@ -79,7 +79,7 @@ export default function RescheduleDatePicker({
 
         {/* Calendar */}
         <div className="mb-4">
-          <Calendar
+          <CalendarPicker
             mode="single"
             selected={selectedDate}
             onSelect={setSelectedDate}
