@@ -531,8 +531,8 @@ Deno.serve(async (req) => {
     let daysFromCanonical: number | undefined;
     if (canonicalDate) {
       const canonical = new Date(canonicalDate + 'T12:00:00');
-      const new = new Date(new_date + 'T12:00:00');
-      daysFromCanonical = Math.round((new.getTime() - canonical.getTime()) / (1000 * 60 * 60 * 24));
+      const newDate = new Date(new_date + 'T12:00:00');
+      daysFromCanonical = Math.round((newDate.getTime() - canonical.getTime()) / (1000 * 60 * 60 * 24));
     }
 
     const result: ValidationResult = {
