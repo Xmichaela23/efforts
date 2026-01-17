@@ -292,9 +292,9 @@ Deno.serve(async (req) => {
     const strengthFocus = classifyStrengthFocus(workout);
     const workoutWorkload = estimateWorkload(workout);
 
-    // Fetch week context (target date ± 2 days)
-    const contextStart = addDays(new_date, -2);
-    const contextEnd = addDays(new_date, 2);
+    // Fetch week context (target date ± 3 days = full week for proper validation)
+    const contextStart = addDays(new_date, -3);
+    const contextEnd = addDays(new_date, 3);
     
     const { data: contextWorkouts, error: contextError } = await supabase
       .from('planned_workouts')
@@ -310,7 +310,8 @@ Deno.serve(async (req) => {
     }
 
     const contextByDate = new Map<string, any[]>();
-    for (let i = -2; i <= 2; i++) {
+    // Build map for full week (±3 days = 7 days total)
+    for (let i = -3; i <= 3; i++) {
       const date = addDays(new_date, i);
       contextByDate.set(date, []);
     }
