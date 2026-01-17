@@ -21,6 +21,7 @@ const corsHeaders = {
 // Intensity classification
 type IntensityBucket = 'hard' | 'medium' | 'easy';
 type StrengthFocus = 'lower' | 'upper' | 'full' | 'unknown';
+type WorkoutPurpose = 'quality_run' | 'long_run' | 'easy_run' | 'upper_body' | 'lower_body' | 'full_body' | 'other';
 
 interface ValidationReason {
   code: string;
@@ -141,6 +142,47 @@ function classifyStrengthFocus(workout: any): StrengthFocus {
   if (hasUpper) return 'upper';
   
   return 'unknown';
+}
+
+// Classify workout purpose (quality run, long run, easy run, upper body, lower body)
+function classifyWorkoutPurpose(workout: any): WorkoutPurpose {
+  const type = String(workout.type || '').toLowerCase();
+  const steps = Array.isArray(workout.steps_preset) ? workout.steps_preset : [];
+  const desc = String(workout.description || '').toLowerCase();
+  const name = String(workout.name || '').toLowerCase();
+  const allText = [...steps, desc, name].join(' ').toLowerCase();
+  
+  // Strength workouts
+  if (type === 'strength') {
+    const strengthFocus = classifyStrengthFocus(workout);
+    if (strengthFocus === 'upper') return 'upper_body';
+    if (strengthFocus === 'lower') return 'lower_body';
+    if (strengthFocus === 'full') return 'full_body';
+    return 'other';
+  }
+  
+  // Running workouts
+  if (type === 'run' || type === 'running') {
+    // Long run indicators
+    if (isLongSession(workout)) return 'long_run';
+    
+    // Quality run indicators (intervals, tempo, VO2, threshold)
+    const qualityIndicators = ['interval', 'vo2', 'tempo', 'threshold', 'thr', '5kpace', '10kpace', 'speed', 'strides'];
+    if (qualityIndicators.some(indicator => allText.includes(indicator))) {
+      return 'quality_run';
+    }
+    
+    // Easy run (recovery, easy, endurance, z1, z2)
+    const easyIndicators = ['easy', 'recovery', 'endurance', 'z1', 'z2'];
+    if (easyIndicators.some(indicator => allText.includes(indicator))) {
+      return 'easy_run';
+    }
+    
+    // Default to easy_run if no indicators
+    return 'easy_run';
+  }
+  
+  return 'other';
 }
 
 // Simple workload estimation (reuse existing logic if available)
@@ -353,6 +395,91 @@ Deno.serve(async (req) => {
     const isLong = isLongSession(workout);
     const strengthFocus = classifyStrengthFocus(workout);
     const workoutWorkload = estimateWorkload(workout);
+    const workoutPurpose = classifyWorkoutPurpose(workout);
+    
+    // Understand plan week structure (which day_number typically has which workout type)
+    let planWeekStructure: Map<number, WorkoutPurpose[]> = new Map();
+    let isPhaseTransition = false;
+    let previousWeekPhase: string | null = null;
+    
+    if (trainingPlanId && weekNumber) {
+      // Fetch workouts from same plan to understand week structure
+      // Look at multiple weeks to get a pattern
+      const { data: planWorkouts } = await supabase
+        .from('planned_workouts')
+        .select('day_number, type, steps_preset, description, name, strength_exercises, total_duration_seconds')
+        .eq('training_plan_id', trainingPlanId)
+        .eq('user_id', user.id)
+        .in('workout_status', ['planned', 'in_progress'])
+        .gte('week_number', Math.max(1, Number(weekNumber) - 2))
+        .lte('week_number', Number(weekNumber) + 2)
+        .order('week_number', { ascending: true })
+        .order('day_number', { ascending: true });
+      
+      if (planWorkouts && planWorkouts.length > 0) {
+        // Build structure: day_number -> typical workout purposes
+        const dayPurposeMap = new Map<number, Map<WorkoutPurpose, number>>();
+        
+        for (const pw of planWorkouts) {
+          const dn = Number(pw.day_number) || 1;
+          const purpose = classifyWorkoutPurpose(pw);
+          
+          if (!dayPurposeMap.has(dn)) {
+            dayPurposeMap.set(dn, new Map());
+          }
+          const purposeCount = dayPurposeMap.get(dn)!;
+          purposeCount.set(purpose, (purposeCount.get(purpose) || 0) + 1);
+        }
+        
+        // For each day, get the most common purpose(s)
+        for (const [dayNum, purposeCounts] of dayPurposeMap.entries()) {
+          const purposes: WorkoutPurpose[] = [];
+          const sorted = Array.from(purposeCounts.entries()).sort((a, b) => b[1] - a[1]);
+          // Take top 2 most common purposes for each day
+          for (let i = 0; i < Math.min(2, sorted.length); i++) {
+            if (sorted[i][1] >= 2) { // Must appear at least 2 times to be considered "typical"
+              purposes.push(sorted[i][0]);
+            }
+          }
+          if (purposes.length > 0) {
+            planWeekStructure.set(dayNum, purposes);
+          }
+        }
+      }
+      
+      // Check if this is a phase transition (recovery → build, etc.)
+      if (weekNumber && Number(weekNumber) > 1) {
+        const prevWeek = Number(weekNumber) - 1;
+        // Check previous week's phase
+        if (config.phases) {
+          for (const [phaseKey, phaseData] of Object.entries(config.phases)) {
+            const phase = phaseData as any;
+            if (phase.weeks && Array.isArray(phase.weeks) && phase.weeks.includes(prevWeek)) {
+              previousWeekPhase = phaseKey;
+              break;
+            }
+          }
+        }
+        isPhaseTransition = previousWeekPhase !== planPhase && previousWeekPhase !== null;
+      }
+    }
+    
+    // Calculate target date's day_number in the plan
+    let targetDayNumber: number | null = null;
+    if (trainingPlanId && plan && canonicalDate) {
+      try {
+        const startDate = new Date((config.user_selected_start_date || config.start_date) + 'T12:00:00');
+        const targetDate = new Date(new_date + 'T12:00:00');
+        const daysDiff = Math.round((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        // day_number = (daysDiff % 7) + 1, but we need to account for week_number
+        // Actually, we need to find which week this date falls in
+        const weeksFromStart = Math.floor(daysDiff / 7);
+        const dayInWeek = (daysDiff % 7) + 1;
+        targetDayNumber = dayInWeek;
+      } catch (e) {
+        console.error('[validate-reschedule] Error calculating target day_number:', e);
+      }
+    }
 
     // Fetch week context (target date ± 3 days = full week for proper validation)
     const contextStart = addDays(new_date, -3);
@@ -416,6 +543,41 @@ Deno.serve(async (req) => {
 
     const reasons: ValidationReason[] = [];
     let severity: 'green' | 'yellow' | 'red' = 'green';
+    
+    // Check if target date conflicts with plan structure
+    // e.g., don't put long run on quality day, don't put quality run on long run day
+    if (targetDayNumber && planWeekStructure.has(targetDayNumber)) {
+      const typicalPurposes = planWeekStructure.get(targetDayNumber)!;
+      const conflictsWithStructure = typicalPurposes.some(purpose => {
+        // Long run shouldn't go on quality day
+        if (workoutPurpose === 'long_run' && purpose === 'quality_run') return true;
+        // Quality run shouldn't go on long run day
+        if (workoutPurpose === 'quality_run' && purpose === 'long_run') return true;
+        // Don't put long run on upper body day (though upper body + long run is OK, it's not the plan structure)
+        // Actually, let's be more lenient - only warn about quality/long conflicts
+        return false;
+      });
+      
+      if (conflictsWithStructure) {
+        if (severity === 'green') severity = 'yellow';
+        const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][targetDayNumber - 1] || `Day ${targetDayNumber}`;
+        const typicalPurpose = typicalPurposes[0];
+        const purposeName = typicalPurpose === 'quality_run' ? 'quality run day' : 
+                           typicalPurpose === 'long_run' ? 'long run day' :
+                           typicalPurpose === 'upper_body' ? 'upper body day' :
+                           typicalPurpose === 'lower_body' ? 'lower body day' : 'different workout type';
+        reasons.push({
+          code: 'plan_structure_conflict',
+          message: `${dayName} is typically a ${purposeName} in your plan. Moving ${workoutPurpose === 'long_run' ? 'long run' : workoutPurpose === 'quality_run' ? 'quality run' : 'this workout'} here conflicts with that structure.`,
+          data: {
+            targetDayNumber,
+            typicalPurposes,
+            workoutPurpose,
+            suggestion: `Consider moving to a day that typically has ${workoutPurpose === 'long_run' ? 'long runs' : workoutPurpose === 'quality_run' ? 'quality runs' : 'this type of workout'}`
+          }
+        });
+      }
+    }
     
     // Warn about conflicts (will be replaced automatically)
     if (sameTypeWorkouts.length > 0) {
@@ -571,22 +733,31 @@ Deno.serve(async (req) => {
       
       // Warn if long + strength same day (but less strict in recovery/taper)
       // Science: Concurrent training can cause interference effect
-      // Long endurance + strength same day = compromised adaptation in both
+      // BUT: Upper body + long run = OK (different muscle groups, no interference)
+      // Lower body + long run = interference (same muscle groups)
       const sameDayHasStrength = sameDayWorkouts.some((w: any) => w.type === 'strength');
       if (sameDayHasStrength && !isRecoveryOrTaper) {
-        if (severity === 'green') severity = 'yellow';
-        const strengthNote = strengthFocus === 'upper' ? " Your lifts are upper body, so" : strengthFocus === 'lower' ? " Your lifts are lower body, so" : strengthFocus === 'full' ? " Your lifts are full body, so" : '';
-        const phaseNote = isRecoveryWeek ? " You're in a recovery week, so" : isTaperWeek ? " You're in taper, so" : planPhase ? ` You're in ${planPhase} phase, so` : '';
-        reasons.push({
-          code: 'long_plus_strength',
-          message: `Long run + strength same day.${strengthNote}${phaseNote} concurrent training can interfere with adaptation.`,
-          data: { 
-            strengthFocus: strengthFocus,
-            planPhase,
-            weekIntent,
-            suggestion: 'Separate by 6+ hours or move to different days'
-          }
-        });
+        // Check what type of strength is on the same day
+        const sameDayStrength = sameDayWorkouts.find((w: any) => w.type === 'strength');
+        const sameDayStrengthFocus = sameDayStrength ? classifyStrengthFocus(sameDayStrength) : 'unknown';
+        
+        // Only warn if it's lower body or full body (interference with running)
+        // Upper body + long run is fine (different muscle groups)
+        if (sameDayStrengthFocus === 'lower' || sameDayStrengthFocus === 'full') {
+          if (severity === 'green') severity = 'yellow';
+          const phaseNote = isRecoveryWeek ? " You're in a recovery week, so" : isTaperWeek ? " You're in taper, so" : planPhase ? ` You're in ${planPhase} phase, so` : '';
+          reasons.push({
+            code: 'long_plus_lower_strength',
+            message: `Long run + lower body strength same day.${phaseNote} this interferes with leg recovery.`,
+            data: { 
+              strengthFocus: sameDayStrengthFocus,
+              planPhase,
+              weekIntent,
+              suggestion: 'Move lower body strength to another day (upper body + long run is fine)'
+            }
+          });
+        }
+        // If it's upper body, don't warn - it's fine
       }
     }
 
@@ -686,7 +857,8 @@ Deno.serve(async (req) => {
     }
 
     // Generate suggestions (find valid days in ±3 day window)
-    const suggestions: string[] = [];
+    // Context-aware: respect plan structure, avoid quality days for long runs, etc.
+    const suggestionCandidates: Array<{ date: string; score: number }> = [];
     if (severity === 'red' || severity === 'yellow') {
       for (let i = -3; i <= 3; i++) {
         if (i === 0) continue; // Skip target day (already blocked)
@@ -695,15 +867,43 @@ Deno.serve(async (req) => {
         // Skip if date is outside our context map
         if (!contextByDate.has(candidateDate)) continue;
         
+        // Calculate candidate's day_number in plan (if applicable)
+        let candidateDayNumber: number | null = null;
+        if (trainingPlanId && plan && startDateStr) {
+          try {
+            const startDate = new Date(startDateStr + 'T12:00:00');
+            const targetDate = new Date(candidateDate + 'T12:00:00');
+            const daysDiff = Math.round((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            const dayInWeek = ((daysDiff % 7) + 7) % 7; // Handle negative modulo
+            candidateDayNumber = dayInWeek + 1; // 1-7
+          } catch (e) {
+            // Ignore
+          }
+        }
+        
         const candidateWorkload = calculateDayWorkload(candidateDate) + workoutWorkload;
         const candidateWorkouts = contextByDate.get(candidateDate) || [];
         const candidateHasHard = candidateWorkouts.some((w: any) => classifyIntensity(w) === 'hard');
         const candidateHasLong = candidateWorkouts.some((w: any) => isLongSession(w));
         const candidateHasStrength = candidateWorkouts.some((w: any) => w.type === 'strength');
+        const candidateStrengthFocus = candidateHasStrength ? classifyStrengthFocus(candidateWorkouts.find((w: any) => w.type === 'strength')) : 'unknown';
         
         // Check if this candidate would be valid
         let isValidCandidate = true;
         let candidateScore = 0; // Lower is better
+        
+        // Check plan structure conflict (e.g., don't suggest quality day for long run)
+        if (candidateDayNumber && planWeekStructure.has(candidateDayNumber)) {
+          const typicalPurposes = planWeekStructure.get(candidateDayNumber)!;
+          const conflictsWithStructure = typicalPurposes.some(purpose => {
+            if (workoutPurpose === 'long_run' && purpose === 'quality_run') return true;
+            if (workoutPurpose === 'quality_run' && purpose === 'long_run') return true;
+            return false;
+          });
+          if (conflictsWithStructure) {
+            isValidCandidate = false; // Don't suggest dates that conflict with plan structure
+          }
+        }
         
         // Hard workouts: can't be consecutive
         if (intensity === 'hard') {
@@ -756,25 +956,33 @@ Deno.serve(async (req) => {
           candidateScore += 10; // Penalty for high workload
         }
         
-        // Long + strength same day: penalty but not block
+        // Long + lower body strength same day: block (interference)
+        // Long + upper body strength same day: OK (no interference)
         if (isLong && candidateHasStrength) {
-          candidateScore += 5; // Penalty
+          if (candidateStrengthFocus === 'lower' || candidateStrengthFocus === 'full') {
+            isValidCandidate = false; // Block lower body + long run
+          }
+          // Upper body + long run is fine, no penalty
         }
         
-        // Add to suggestions if valid, sorted by score
+        // Bonus: prefer dates that match plan structure
+        if (candidateDayNumber && planWeekStructure.has(candidateDayNumber)) {
+          const typicalPurposes = planWeekStructure.get(candidateDayNumber)!;
+          if (typicalPurposes.includes(workoutPurpose)) {
+            candidateScore -= 5; // Bonus for matching plan structure
+          }
+        }
+        
+        // Add to suggestions if valid, with score
         if (isValidCandidate) {
-          suggestions.push(candidateDate);
+          suggestionCandidates.push({ date: candidateDate, score: candidateScore + candidateWorkload });
         }
       }
-      
-      // Sort by workload (lower is better) and limit to 3
-      suggestions.sort((a, b) => {
-        const aWorkload = calculateDayWorkload(a) + workoutWorkload;
-        const bWorkload = calculateDayWorkload(b) + workoutWorkload;
-        return aWorkload - bWorkload;
-      });
-      suggestions.splice(3);
     }
+    
+    // Sort by score (lower is better) and limit to 3
+    suggestionCandidates.sort((a, b) => a.score - b.score);
+    const suggestions = suggestionCandidates.slice(0, 3).map(s => s.date);
 
     // Calculate days from canonical if plan workout
     let daysFromCanonical: number | undefined;
