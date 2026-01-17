@@ -50,6 +50,9 @@ interface ValidationResult {
     isRecoveryWeek?: boolean;
     isTaperWeek?: boolean;
   };
+  conflicts?: {
+    sameTypeWorkouts: Array<{ id: string; name: string; type: string }>;
+  };
 }
 
 // Hard workout indicators (from steps_preset tokens)
@@ -401,8 +404,31 @@ Deno.serve(async (req) => {
     const afterDaily = calculateDayWorkload(new_date) + workoutWorkload;
     const afterWeekly = calculateWeekWorkload(new_date) + workoutWorkload;
 
+    // Check for conflicts: same type workouts on target date
+    const sameDayWorkouts = contextByDate.get(new_date) || [];
+    const sameTypeWorkouts = sameDayWorkouts
+      .filter((w: any) => w.type === workout.type && w.id !== workout_id)
+      .map((w: any) => ({
+        id: w.id,
+        name: w.name || `${w.type} workout`,
+        type: w.type
+      }));
+
     const reasons: ValidationReason[] = [];
     let severity: 'green' | 'yellow' | 'red' = 'green';
+    
+    // Warn about conflicts (will be replaced automatically)
+    if (sameTypeWorkouts.length > 0) {
+      if (severity === 'green') severity = 'yellow';
+      reasons.push({
+        code: 'same_type_conflict',
+        message: `There's already a ${workout.type} workout on this day. It will be replaced.`,
+        data: {
+          conflicts: sameTypeWorkouts,
+          suggestion: 'The existing workout will be moved to maintain plan structure'
+        }
+      });
+    }
     
     // ===== PLAN CONTEXT: Warn if moving plan workout far from canonical date =====
     if (canonicalDate && canonicalDate !== new_date) {
@@ -445,6 +471,9 @@ Deno.serve(async (req) => {
     const next2Day = addDays(targetDay, 2);
 
     if (intensity === 'hard') {
+      // In recovery/taper weeks, be more lenient - skip warnings
+      const isRecoveryOrTaper = isRecoveryWeek || isTaperWeek || weekIntent === 'recovery' || weekIntent === 'taper';
+      
       // Check consecutive days (warn, not block - user knows their body)
       const prevWorkouts = contextByDate.get(prevDay) || [];
       const nextWorkouts = contextByDate.get(nextDay) || [];
@@ -453,44 +482,50 @@ Deno.serve(async (req) => {
       const nextHasHard = nextWorkouts.some((w: any) => classifyIntensity(w) === 'hard');
       
       if (prevHasHard || nextHasHard) {
-        if (severity === 'green') severity = 'yellow';
-        reasons.push({
-          code: 'hard_consecutive',
-          message: 'Hard workouts on consecutive days may be too intense. Consider spacing them out.',
-          data: { 
-            adjacentDay: prevHasHard ? prevDay : nextDay,
-            planPhase,
-            weekIntent,
-            suggestion: 'Move to a day with at least 1 day of recovery between hard workouts'
-          }
-        });
-      } else {
-        // Check within 2 days (warn)
-        const prev2Workouts = contextByDate.get(prev2Day) || [];
-        const next2Workouts = contextByDate.get(next2Day) || [];
-        const hasHardWithin2 = [...prev2Workouts, ...next2Workouts]
-          .some((w: any) => classifyIntensity(w) === 'hard');
-        
-        if (hasHardWithin2) {
+        // In recovery/taper, this is more acceptable
+        if (!isRecoveryOrTaper) {
           if (severity === 'green') severity = 'yellow';
           reasons.push({
-            code: 'hard_within_2_days',
-            message: 'Hard workouts should ideally have at least 2 days between them for recovery',
+            code: 'hard_consecutive',
+            message: 'Hard workouts on consecutive days may be too intense. Consider spacing them out.',
             data: { 
-              nearbyHardDays: [prev2Day, next2Day].filter(d => {
-                const workouts = contextByDate.get(d) || [];
-                return workouts.some((w: any) => classifyIntensity(w) === 'hard');
-              }),
+              adjacentDay: prevHasHard ? prevDay : nextDay,
               planPhase,
-              weekIntent
+              weekIntent,
+              suggestion: 'Move to a day with at least 1 day of recovery between hard workouts'
             }
           });
+        }
+      } else {
+        // Check within 2 days (warn, but skip in recovery/taper)
+        if (!isRecoveryOrTaper) {
+          const prev2Workouts = contextByDate.get(prev2Day) || [];
+          const next2Workouts = contextByDate.get(next2Day) || [];
+          const hasHardWithin2 = [...prev2Workouts, ...next2Workouts]
+            .some((w: any) => classifyIntensity(w) === 'hard');
+          
+          if (hasHardWithin2) {
+            if (severity === 'green') severity = 'yellow';
+            reasons.push({
+              code: 'hard_within_2_days',
+              message: 'Hard workouts should ideally have at least 2 days between them for recovery',
+              data: { 
+                nearbyHardDays: [prev2Day, next2Day].filter(d => {
+                  const workouts = contextByDate.get(d) || [];
+                  return workouts.some((w: any) => classifyIntensity(w) === 'hard');
+                }),
+                planPhase,
+                weekIntent
+              }
+            });
+          }
         }
       }
     }
 
     // ===== C) LONG SESSION SPACING =====
     if (isLong) {
+      const isRecoveryOrTaper = isRecoveryWeek || isTaperWeek || weekIntent === 'recovery' || weekIntent === 'taper';
       const prevWorkouts = contextByDate.get(prevDay) || [];
       const nextWorkouts = contextByDate.get(nextDay) || [];
       const sameDayWorkouts = contextByDate.get(targetDay) || [];
@@ -499,22 +534,25 @@ Deno.serve(async (req) => {
       const nextHasLong = nextWorkouts.some((w: any) => isLongSession(w));
       
       if (prevHasLong || nextHasLong) {
-        if (severity === 'green') severity = 'yellow';
-        reasons.push({
-          code: 'long_adjacent',
-          message: 'Long sessions on adjacent days may be too much. Consider spacing them out.',
-          data: { 
-            adjacentDay: prevHasLong ? prevDay : nextDay,
-            planPhase,
-            weekIntent,
-            suggestion: 'Move to a day with at least 1 day between long sessions'
-          }
-        });
+        // In recovery/taper, long sessions are often reduced anyway
+        if (!isRecoveryOrTaper) {
+          if (severity === 'green') severity = 'yellow';
+          reasons.push({
+            code: 'long_adjacent',
+            message: 'Long sessions on adjacent days may be too much. Consider spacing them out.',
+            data: { 
+              adjacentDay: prevHasLong ? prevDay : nextDay,
+              planPhase,
+              weekIntent,
+              suggestion: 'Move to a day with at least 1 day between long sessions'
+            }
+          });
+        }
       }
       
-      // Warn if long + strength same day
+      // Warn if long + strength same day (but less strict in recovery/taper)
       const sameDayHasStrength = sameDayWorkouts.some((w: any) => w.type === 'strength');
-      if (sameDayHasStrength) {
+      if (sameDayHasStrength && !isRecoveryOrTaper) {
         if (severity === 'green') severity = 'yellow';
         reasons.push({
           code: 'long_plus_strength',
@@ -726,7 +764,10 @@ Deno.serve(async (req) => {
         isTaperWeek
       } : {
         isPlanWorkout: false
-      }
+      },
+      conflicts: sameTypeWorkouts.length > 0 ? {
+        sameTypeWorkouts
+      } : undefined
     };
 
     return new Response(

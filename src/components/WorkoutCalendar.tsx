@@ -263,7 +263,7 @@ export default function WorkoutCalendar({
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
   const [workloadTooltipOpen, setWorkloadTooltipOpen] = useState(false);
   const { useImperial } = useAppContext();
-  const { updatePlannedWorkout } = usePlannedWorkouts();
+  const { updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts();
   
   // Drag and drop state
   const [draggedWorkout, setDraggedWorkout] = useState<any>(null);
@@ -361,6 +361,19 @@ export default function WorkoutCalendar({
     if (!reschedulePending || !updatePlannedWorkout) return;
 
     try {
+      // Delete conflicting workouts (same type on same day)
+      if (validationResult?.conflicts?.sameTypeWorkouts) {
+        for (const conflict of validationResult.conflicts.sameTypeWorkouts) {
+          try {
+            await deletePlannedWorkout(conflict.id);
+            console.log(`[Calendar] Deleted conflicting workout: ${conflict.id}`);
+          } catch (err) {
+            console.error(`[Calendar] Error deleting conflict ${conflict.id}:`, err);
+            // Continue anyway - the move will still work
+          }
+        }
+      }
+
       await updatePlannedWorkout(reschedulePending.workoutId, {
         date: reschedulePending.newDate
       });
@@ -368,6 +381,7 @@ export default function WorkoutCalendar({
       // Invalidate to refresh calendar
       window.dispatchEvent(new CustomEvent('workouts:invalidate'));
       window.dispatchEvent(new CustomEvent('planned:invalidate'));
+      window.dispatchEvent(new CustomEvent('week:invalidate'));
 
       setShowValidationPopup(false);
       setReschedulePending(null);

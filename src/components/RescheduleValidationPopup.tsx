@@ -30,6 +30,9 @@ interface ValidationResult {
     isRecoveryWeek?: boolean;
     isTaperWeek?: boolean;
   };
+  conflicts?: {
+    sameTypeWorkouts: Array<{ id: string; name: string; type: string }>;
+  };
 }
 
 interface RescheduleValidationPopupProps {
@@ -53,7 +56,7 @@ export default function RescheduleValidationPopup({
   onCancel,
   onSuggestionClick,
 }: RescheduleValidationPopupProps) {
-  const { severity, reasons, before, after, suggestions, planContext } = validation;
+  const { severity, reasons, before, after, suggestions, planContext, conflicts } = validation;
   
   // Debug: log validation result
   React.useEffect(() => {
@@ -175,6 +178,22 @@ export default function RescheduleValidationPopup({
                 </span>
               )}
             </p>
+          </div>
+        )}
+
+        {/* Conflicts */}
+        {conflicts && conflicts.sameTypeWorkouts.length > 0 && (
+          <div className="mb-4 p-3 rounded-xl bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20">
+            <p className="text-xs text-yellow-400/80 font-light mb-2">
+              ⚠️ Same type workout(s) on this day will be replaced:
+            </p>
+            <div className="space-y-1">
+              {conflicts.sameTypeWorkouts.map((conflict, idx) => (
+                <p key={idx} className="text-xs text-white/70 font-light">
+                  • {conflict.name || `${conflict.type} workout`}
+                </p>
+              ))}
+            </div>
           </div>
         )}
 

@@ -84,7 +84,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [showReschedulePopup, setShowReschedulePopup] = useState(false);
   const [rescheduleValidation, setRescheduleValidation] = useState<any>(null);
   const [reschedulePending, setReschedulePending] = useState<{ workoutId: string; oldDate: string; newDate: string; workoutName: string } | null>(null);
-  const { updatePlannedWorkout } = usePlannedWorkouts();
+  const { updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts();
 
   // Unified week data for the workout's date (single-day window)
   const dateIso = String((workout as any)?.date || '').slice(0,10);
@@ -1286,6 +1286,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             }
             try {
               console.log('[Reschedule] Confirming reschedule:', reschedulePending);
+              
+              // Delete conflicting workouts (same type on same day)
+              if (rescheduleValidation.conflicts?.sameTypeWorkouts) {
+                for (const conflict of rescheduleValidation.conflicts.sameTypeWorkouts) {
+                  try {
+                    await deletePlannedWorkout(conflict.id);
+                    console.log(`[Reschedule] Deleted conflicting workout: ${conflict.id}`);
+                  } catch (err) {
+                    console.error(`[Reschedule] Error deleting conflict ${conflict.id}:`, err);
+                    // Continue anyway - the move will still work
+                  }
+                }
+              }
               
               const result = await updatePlannedWorkout(reschedulePending.workoutId, {
                 date: reschedulePending.newDate
