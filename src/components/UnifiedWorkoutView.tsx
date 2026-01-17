@@ -10,6 +10,7 @@ import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
 import StructuredPlannedView from './StructuredPlannedView';
 import RescheduleValidationPopup from './RescheduleValidationPopup';
+import RescheduleDatePicker from './RescheduleDatePicker';
 // Unified path only; remove legacy planned_workouts hooks
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { supabase } from '@/lib/supabase';
@@ -79,6 +80,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const suppressRelinkUntil = useRef<number>(0);
   
   // Reschedule validation state
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showReschedulePopup, setShowReschedulePopup] = useState(false);
   const [rescheduleValidation, setRescheduleValidation] = useState<any>(null);
   const [reschedulePending, setReschedulePending] = useState<{ workoutId: string; oldDate: string; newDate: string; workoutName: string } | null>(null);
@@ -1082,7 +1084,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       variant="ghost"
                       size="sm"
                       className="text-white/60 hover:text-white/80 hover:bg-white/10"
-                      onClick={async () => {
+                      onClick={() => {
                         const currentDate = (unifiedWorkout as any)?.date || '';
                         const workoutId = (unifiedWorkout as any)?.id || (workout as any)?.id;
                         
@@ -1091,41 +1093,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                           return;
                         }
                         
-                        const newDate = prompt('Enter new date (YYYY-MM-DD):', currentDate);
-                        if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate) && newDate !== currentDate) {
-                          try {
-                            console.log('[Reschedule] Validating:', { workoutId, oldDate: currentDate, newDate });
-                            
-                            // Validate reschedule
-                            const { data, error } = await supabase.functions.invoke('validate-reschedule', {
-                              body: {
-                                workout_id: workoutId,
-                                new_date: newDate
-                              }
-                            });
-
-                            if (error) {
-                              console.error('[Reschedule] Validation error:', error);
-                              alert('Error validating reschedule. Please try again.');
-                              return;
-                            }
-
-                            console.log('[Reschedule] Validation result:', data);
-
-                            // Show validation popup
-                            setRescheduleValidation(data);
-                            setReschedulePending({
-                              workoutId: workoutId,
-                              oldDate: currentDate,
-                              newDate: newDate,
-                              workoutName: (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`
-                            });
-                            setShowReschedulePopup(true);
-                          } catch (err) {
-                            console.error('[Reschedule] Error validating reschedule:', err);
-                            alert('Error validating reschedule. Please try again.');
-                          }
-                        }
+                        // Show date picker instead of prompt
+                        setShowDatePicker(true);
                       }}
                     >
                       Reschedule
@@ -1251,6 +1220,56 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       {/* Spacer for nav bar */}
       <div style={{ height: 'calc(var(--tabbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 16px)' }} />
       </div>
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <RescheduleDatePicker
+          currentDate={(unifiedWorkout as any)?.date || (workout as any)?.date || ''}
+          onSelect={async (newDate) => {
+            setShowDatePicker(false);
+            const currentDate = (unifiedWorkout as any)?.date || '';
+            const workoutId = (unifiedWorkout as any)?.id || (workout as any)?.id;
+            
+            if (newDate === currentDate) {
+              return; // No change
+            }
+            
+            try {
+              console.log('[Reschedule] Validating:', { workoutId, oldDate: currentDate, newDate });
+              
+              // Validate reschedule
+              const { data, error } = await supabase.functions.invoke('validate-reschedule', {
+                body: {
+                  workout_id: workoutId,
+                  new_date: newDate
+                }
+              });
+
+              if (error) {
+                console.error('[Reschedule] Validation error:', error);
+                alert('Error validating reschedule. Please try again.');
+                return;
+              }
+
+              console.log('[Reschedule] Validation result:', data);
+
+              // Show validation popup
+              setRescheduleValidation(data);
+              setReschedulePending({
+                workoutId: workoutId,
+                oldDate: currentDate,
+                newDate: newDate,
+                workoutName: (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`
+              });
+              setShowReschedulePopup(true);
+            } catch (err) {
+              console.error('[Reschedule] Error validating reschedule:', err);
+              alert('Error validating reschedule. Please try again.');
+            }
+          }}
+          onCancel={() => setShowDatePicker(false)}
+        />
+      )}
 
       {/* Reschedule Validation Popup */}
       {showReschedulePopup && rescheduleValidation && reschedulePending && (

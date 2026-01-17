@@ -169,15 +169,46 @@ export default function RescheduleValidationPopup({
         {/* Reasons - Always show if any exist */}
         {reasons && reasons.length > 0 ? (
           <div className="mb-4 space-y-2">
-            <p className="text-xs text-white/60 font-light mb-2">Validation warnings:</p>
-            {reasons.map((reason, idx) => (
-              <div
-                key={idx}
-                className="p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10"
-              >
-                <p className="text-sm text-white/90 font-light">{reason.message}</p>
-              </div>
-            ))}
+            <p className="text-xs text-white/60 font-light mb-2">
+              {severity === 'red' ? 'Issues preventing reschedule:' : 'Validation warnings:'}
+            </p>
+            {reasons.map((reason, idx) => {
+              // Generate actionable suggestions based on reason code
+              const getSuggestion = (code: string, data?: any) => {
+                switch (code) {
+                  case 'long_plus_strength':
+                    return 'Move the strength workout to another day, or move this long run to a day without strength';
+                  case 'workload_cap_exceeded':
+                    return `Move one of the existing workouts on ${formatDate(newDate)} to reduce daily workload below 120`;
+                  case 'hard_consecutive':
+                    return data?.adjacentDay ? `Move this workout to avoid consecutive hard days with ${formatDate(data.adjacentDay)}` : 'Move this workout to avoid consecutive hard days';
+                  case 'long_adjacent':
+                    return data?.adjacentDay ? `Move this long run to avoid being adjacent to another long session on ${formatDate(data.adjacentDay)}` : 'Move this long run to avoid being adjacent to another long session';
+                  case 'lower_strength_spacing':
+                    return 'Move this strength workout to allow at least 2 days between lower body sessions';
+                  case 'hard_within_2_days':
+                    return 'Move this workout to allow at least 2 days between hard workouts';
+                  default:
+                    return null;
+                }
+              };
+
+              const suggestion = getSuggestion(reason.code, reason.data);
+
+              return (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10"
+                >
+                  <p className="text-sm text-white/90 font-light mb-1">{reason.message}</p>
+                  {suggestion && (
+                    <p className="text-xs text-white/60 font-light mt-1 italic">
+                      💡 {suggestion}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           severity === 'green' && (
