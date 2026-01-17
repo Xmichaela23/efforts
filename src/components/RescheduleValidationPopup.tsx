@@ -152,9 +152,10 @@ export default function RescheduleValidationPopup({
           </div>
         )}
 
-        {/* Reasons */}
-        {reasons.length > 0 && (
+        {/* Reasons - Always show if any exist */}
+        {reasons && reasons.length > 0 ? (
           <div className="mb-4 space-y-2">
+            <p className="text-xs text-white/60 font-light mb-2">Validation warnings:</p>
             {reasons.map((reason, idx) => (
               <div
                 key={idx}
@@ -164,6 +165,12 @@ export default function RescheduleValidationPopup({
               </div>
             ))}
           </div>
+        ) : (
+          severity === 'green' && (
+            <div className="mb-4 p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10">
+              <p className="text-sm text-white/70 font-light">No issues detected with this reschedule.</p>
+            </div>
+          )
         )}
 
         {/* Workload impact */}
@@ -183,7 +190,7 @@ export default function RescheduleValidationPopup({
           </div>
         </div>
 
-        {/* Suggestions */}
+        {/* Suggestions - Show if available */}
         {suggestions && suggestions.length > 0 && (
           <div className="mb-4">
             <p className="text-xs text-white/60 font-light mb-2">Better dates:</p>

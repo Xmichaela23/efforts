@@ -1084,34 +1084,45 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       className="text-white/60 hover:text-white/80 hover:bg-white/10"
                       onClick={async () => {
                         const currentDate = (unifiedWorkout as any)?.date || '';
+                        const workoutId = (unifiedWorkout as any)?.id || (workout as any)?.id;
+                        
+                        if (!workoutId) {
+                          alert('Cannot reschedule: workout ID not found');
+                          return;
+                        }
+                        
                         const newDate = prompt('Enter new date (YYYY-MM-DD):', currentDate);
                         if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate) && newDate !== currentDate) {
                           try {
+                            console.log('[Reschedule] Validating:', { workoutId, oldDate: currentDate, newDate });
+                            
                             // Validate reschedule
                             const { data, error } = await supabase.functions.invoke('validate-reschedule', {
                               body: {
-                                workout_id: (unifiedWorkout as any)?.id,
+                                workout_id: workoutId,
                                 new_date: newDate
                               }
                             });
 
                             if (error) {
-                              console.error('Validation error:', error);
+                              console.error('[Reschedule] Validation error:', error);
                               alert('Error validating reschedule. Please try again.');
                               return;
                             }
 
+                            console.log('[Reschedule] Validation result:', data);
+
                             // Show validation popup
                             setRescheduleValidation(data);
                             setReschedulePending({
-                              workoutId: (unifiedWorkout as any)?.id,
+                              workoutId: workoutId,
                               oldDate: currentDate,
                               newDate: newDate,
-                              workoutName: (unifiedWorkout as any)?.name || `${(unifiedWorkout as any)?.type} workout`
+                              workoutName: (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`
                             });
                             setShowReschedulePopup(true);
                           } catch (err) {
-                            console.error('Error validating reschedule:', err);
+                            console.error('[Reschedule] Error validating reschedule:', err);
                             alert('Error validating reschedule. Please try again.');
                           }
                         }
@@ -1250,20 +1261,35 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           newDate={reschedulePending.newDate}
           validation={rescheduleValidation}
           onConfirm={async () => {
-            if (!reschedulePending || !updatePlannedWorkout) return;
+            if (!reschedulePending || !updatePlannedWorkout) {
+              console.error('[Reschedule] Missing reschedulePending or updatePlannedWorkout');
+              return;
+            }
             try {
-              await updatePlannedWorkout(reschedulePending.workoutId, {
+              console.log('[Reschedule] Confirming reschedule:', reschedulePending);
+              
+              const result = await updatePlannedWorkout(reschedulePending.workoutId, {
                 date: reschedulePending.newDate
               });
+              
+              console.log('[Reschedule] Update result:', result);
+              
+              // Trigger all invalidation events
               window.dispatchEvent(new CustomEvent('workouts:invalidate'));
               window.dispatchEvent(new CustomEvent('planned:invalidate'));
+              window.dispatchEvent(new CustomEvent('week:invalidate'));
+              
               setShowReschedulePopup(false);
               setReschedulePending(null);
               setRescheduleValidation(null);
-              onClose();
+              
+              // Close the workout view to refresh
+              setTimeout(() => {
+                onClose();
+              }, 100);
             } catch (err) {
-              console.error('Error rescheduling workout:', err);
-              alert('Error rescheduling workout. Please try again.');
+              console.error('[Reschedule] Error rescheduling workout:', err);
+              alert(`Error rescheduling workout: ${err instanceof Error ? err.message : 'Unknown error'}`);
             }
           }}
           onCancel={() => {
