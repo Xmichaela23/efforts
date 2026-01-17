@@ -50,6 +50,20 @@ export default function RescheduleValidationPopup({
   onSuggestionClick,
 }: RescheduleValidationPopupProps) {
   const { severity, reasons, before, after, suggestions, planContext } = validation;
+  
+  // Debug: log validation result
+  React.useEffect(() => {
+    console.log('[RescheduleValidationPopup] Validation result:', {
+      severity,
+      reasonsCount: reasons?.length || 0,
+      reasons,
+      suggestionsCount: suggestions?.length || 0,
+      suggestions,
+      planContext,
+      before,
+      after
+    });
+  }, [validation]);
 
   // Format date for display
   const formatDate = (dateStr: string) => {
