@@ -1084,17 +1084,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       variant="ghost"
                       size="sm"
                       className="text-white/60 hover:text-white/80 hover:bg-white/10"
-                      onClick={() => {
-                        const currentDate = (unifiedWorkout as any)?.date || '';
+                      onClick={async () => {
+                        const currentDate = (unifiedWorkout as any)?.date || (workout as any)?.date || '';
                         const workoutId = (unifiedWorkout as any)?.id || (workout as any)?.id;
                         
                         if (!workoutId) {
                           alert('Cannot reschedule: workout ID not found');
                           return;
                         }
-                        
-                        // Skip calendar, immediately fetch coach options
-                        const currentDate = (unifiedWorkout as any)?.date || (workout as any)?.date || '';
                         
                         if (!currentDate) {
                           alert('Unable to reschedule: missing date information');
