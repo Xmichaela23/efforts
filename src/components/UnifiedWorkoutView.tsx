@@ -1093,8 +1093,47 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                           return;
                         }
                         
-                        // Show date picker instead of prompt
-                        setShowDatePicker(true);
+                        // Skip calendar, immediately fetch coach options
+                        const currentDate = (unifiedWorkout as any)?.date || (workout as any)?.date || '';
+                        
+                        if (!currentDate) {
+                          alert('Unable to reschedule: missing date information');
+                          return;
+                        }
+
+                        try {
+                          console.log('[Reschedule] Fetching coach options for:', { workoutId, currentDate });
+                          
+                          // Call validate-reschedule with current date to get coach options
+                          // (new_date = old_date means "show me options" without actually moving)
+                          const { data, error } = await supabase.functions.invoke('validate-reschedule', {
+                            body: {
+                              workout_id: workoutId,
+                              new_date: currentDate // Same date = just get options
+                            }
+                          });
+
+                          if (error) {
+                            console.error('[Reschedule] Error fetching options:', error);
+                            alert('Error loading reschedule options. Please try again.');
+                            return;
+                          }
+
+                          console.log('[Reschedule] Coach options:', data);
+
+                          // Show validation popup with coach options
+                          setRescheduleValidation(data);
+                          setReschedulePending({
+                            workoutId: workoutId,
+                            oldDate: currentDate,
+                            newDate: currentDate, // Will be updated when user selects an option
+                            workoutName: (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`
+                          });
+                          setShowReschedulePopup(true);
+                        } catch (err) {
+                          console.error('[Reschedule] Error fetching options:', err);
+                          alert('Error loading reschedule options. Please try again.');
+                        }
                       }}
                     >
                       Reschedule

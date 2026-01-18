@@ -168,9 +168,16 @@ export default function RescheduleValidationPopup({
             <p className="text-sm text-white/70 font-light">
               {workoutName}
             </p>
-            <p className="text-xs text-white/50 mt-1">
-              {formatDate(oldDate)} → {formatDate(newDate)}
-            </p>
+            {oldDate !== newDate && (
+              <p className="text-xs text-white/50 mt-1">
+                {formatDate(oldDate)} → {formatDate(newDate)}
+              </p>
+            )}
+            {oldDate === newDate && coachOptions && (
+              <p className="text-xs text-white/50 mt-1">
+                Select a recommended option below
+              </p>
+            )}
           </div>
         </div>
 
@@ -212,76 +219,7 @@ export default function RescheduleValidationPopup({
           </div>
         )}
 
-        {/* Reasons - Always show if any exist */}
-        {reasons && reasons.length > 0 ? (
-          <div className="mb-4 space-y-2">
-            <p className="text-xs text-white/60 font-light mb-2">
-              {severity === 'red' ? 'Issues preventing reschedule:' : 'Validation warnings:'}
-            </p>
-            {reasons.map((reason, idx) => {
-              // Generate actionable suggestions based on reason code
-              const getSuggestion = (code: string, data?: any) => {
-                switch (code) {
-                  case 'long_plus_strength':
-                    return 'Move the strength workout to another day, or move this long run to a day without strength';
-                  case 'workload_cap_exceeded':
-                    return `Move one of the existing workouts on ${formatDate(newDate)} to reduce daily workload below 120`;
-                  case 'hard_consecutive':
-                    return data?.adjacentDay ? `Move this workout to avoid consecutive hard days with ${formatDate(data.adjacentDay)}` : 'Move this workout to avoid consecutive hard days';
-                  case 'long_adjacent':
-                    return data?.adjacentDay ? `Move this long run to avoid being adjacent to another long session on ${formatDate(data.adjacentDay)}` : 'Move this long run to avoid being adjacent to another long session';
-                  case 'lower_strength_spacing':
-                    return 'Move this strength workout to allow at least 2 days between lower body sessions';
-                  case 'hard_within_2_days':
-                    return 'Move this workout to allow at least 2 days between hard workouts';
-                  default:
-                    return null;
-                }
-              };
-
-              const suggestion = getSuggestion(reason.code, reason.data);
-
-              return (
-                <div
-                  key={idx}
-                  className="p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10"
-                >
-                  <p className="text-sm text-white/90 font-light mb-1">{reason.message}</p>
-                  {suggestion && (
-                    <p className="text-xs text-white/60 font-light mt-1 italic">
-                      💡 {suggestion}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          severity === 'green' && (
-            <div className="mb-4 p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10">
-              <p className="text-sm text-white/70 font-light">No issues detected with this reschedule.</p>
-            </div>
-          )
-        )}
-
-        {/* Workload impact */}
-        <div className="mb-4 p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10">
-          <p className="text-xs text-white/60 font-light mb-2">Workload impact</p>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-white/70 font-light">Daily</span>
-            <span className="text-white font-light">
-              {before.dailyWorkload} → <span className={after.dailyWorkload > before.dailyWorkload ? 'text-yellow-400' : 'text-white'}>{after.dailyWorkload}</span>
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-sm mt-1">
-            <span className="text-white/70 font-light">Weekly</span>
-            <span className="text-white font-light">
-              {before.weekWorkload} → <span className={after.weekWorkload > before.weekWorkload ? 'text-yellow-400' : 'text-white'}>{after.weekWorkload}</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Coach Brain Options - Show ranked options with analysis */}
+        {/* Coach Brain Options - Show FIRST if available */}
         {coachOptions && coachOptions.length > 0 && (
           <div className="mb-4">
             <p className="text-xs text-white/60 font-light mb-3">Coach's recommendations:</p>
@@ -372,6 +310,75 @@ export default function RescheduleValidationPopup({
             </div>
           </div>
         )}
+
+        {/* Reasons - Only show if no coach options OR if date has changed */}
+        {(!coachOptions || coachOptions.length === 0 || oldDate !== newDate) && reasons && reasons.length > 0 ? (
+          <div className="mb-4 space-y-2">
+            <p className="text-xs text-white/60 font-light mb-2">
+              {severity === 'red' ? 'Issues preventing reschedule:' : 'Validation warnings:'}
+            </p>
+            {reasons.map((reason, idx) => {
+              // Generate actionable suggestions based on reason code
+              const getSuggestion = (code: string, data?: any) => {
+                switch (code) {
+                  case 'long_plus_strength':
+                    return 'Move the strength workout to another day, or move this long run to a day without strength';
+                  case 'workload_cap_exceeded':
+                    return `Move one of the existing workouts on ${formatDate(newDate)} to reduce daily workload below 120`;
+                  case 'hard_consecutive':
+                    return data?.adjacentDay ? `Move this workout to avoid consecutive hard days with ${formatDate(data.adjacentDay)}` : 'Move this workout to avoid consecutive hard days';
+                  case 'long_adjacent':
+                    return data?.adjacentDay ? `Move this long run to avoid being adjacent to another long session on ${formatDate(data.adjacentDay)}` : 'Move this long run to avoid being adjacent to another long session';
+                  case 'lower_strength_spacing':
+                    return 'Move this strength workout to allow at least 2 days between lower body sessions';
+                  case 'hard_within_2_days':
+                    return 'Move this workout to allow at least 2 days between hard workouts';
+                  default:
+                    return null;
+                }
+              };
+
+              const suggestion = getSuggestion(reason.code, reason.data);
+
+              return (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10"
+                >
+                  <p className="text-sm text-white/90 font-light mb-1">{reason.message}</p>
+                  {suggestion && (
+                    <p className="text-xs text-white/60 font-light mt-1 italic">
+                      💡 {suggestion}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          severity === 'green' && (
+            <div className="mb-4 p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10">
+              <p className="text-sm text-white/70 font-light">No issues detected with this reschedule.</p>
+            </div>
+          )
+        )}
+
+        {/* Workload impact */}
+        <div className="mb-4 p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10">
+          <p className="text-xs text-white/60 font-light mb-2">Workload impact</p>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-white/70 font-light">Daily</span>
+            <span className="text-white font-light">
+              {before.dailyWorkload} → <span className={after.dailyWorkload > before.dailyWorkload ? 'text-yellow-400' : 'text-white'}>{after.dailyWorkload}</span>
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm mt-1">
+            <span className="text-white/70 font-light">Weekly</span>
+            <span className="text-white font-light">
+              {before.weekWorkload} → <span className={after.weekWorkload > before.weekWorkload ? 'text-yellow-400' : 'text-white'}>{after.weekWorkload}</span>
+            </span>
+          </div>
+        </div>
 
         {/* Fallback: Simple suggestions if no coach options */}
         {(!coachOptions || coachOptions.length === 0) && suggestions && suggestions.length > 0 && (
