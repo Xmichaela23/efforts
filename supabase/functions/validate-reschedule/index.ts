@@ -300,13 +300,34 @@ Deno.serve(async (req) => {
     let config: any = {};
     
     if (trainingPlanId && weekNumber && dayNumber) {
-      // Fetch plan to get start date and phase info
-      const { data: planData } = await supabase
-        .from('training_plans')
+      // NOTE: planned_workouts.training_plan_id references the 'plans' table, not 'training_plans'
+      // Try 'plans' table first (current system), then fallback to 'training_plans' (legacy)
+      let planData = null;
+      
+      // Try 'plans' table first
+      const { data: plansData, error: plansError } = await supabase
+        .from('plans')
         .select('id, name, config')
         .eq('id', trainingPlanId)
         .eq('user_id', user.id)
         .single();
+      
+      if (!plansError && plansData) {
+        planData = plansData;
+      } else {
+        // Fallback: try 'training_plans' table (legacy)
+        console.log('[validate-reschedule] Plan not found in plans table, trying training_plans...');
+        const { data: legacyPlanData } = await supabase
+          .from('training_plans')
+          .select('id, name, config')
+          .eq('id', trainingPlanId)
+          .eq('user_id', user.id)
+          .single();
+        
+        if (legacyPlanData) {
+          planData = legacyPlanData;
+        }
+      }
       
       if (planData) {
         plan = planData;
@@ -316,6 +337,8 @@ Deno.serve(async (req) => {
         
         // Determine plan phase and week intent
         const weekIndex = Number(weekNumber) || 1;
+        console.log('[validate-reschedule] Checking week type for week', weekIndex, 'config.phases:', config.phases ? Object.keys(config.phases) : 'none');
+        
         if (config.phases) {
           for (const [phaseKey, phaseData] of Object.entries(config.phases)) {
             const phase = phaseData as any;
@@ -326,9 +349,11 @@ Deno.serve(async (req) => {
               if (phase.recovery_weeks && Array.isArray(phase.recovery_weeks) && phase.recovery_weeks.includes(weekIndex)) {
                 isRecoveryWeek = true;
                 weekIntent = 'recovery';
+                console.log('[validate-reschedule] Detected recovery week from phases');
               } else if (phaseKey.toLowerCase().includes('taper')) {
                 isTaperWeek = true;
                 weekIntent = 'taper';
+                console.log('[validate-reschedule] Detected taper week from phase name');
               } else if (phaseKey.toLowerCase().includes('peak')) {
                 weekIntent = 'peak';
               } else if (phaseKey.toLowerCase().includes('base')) {
@@ -341,29 +366,55 @@ Deno.serve(async (req) => {
           }
         }
         
-        // Also check weekly_summaries for explicit week labels
-        if (!weekIntent) {
-          const { data: weeklySummary } = await supabase
-            .from('weekly_summaries')
-            .select('focus_label')
-            .eq('training_plan_id', trainingPlanId)
-            .eq('week_number', weekIndex)
-            .eq('user_id', user.id)
-            .single();
+        // Also check weekly_summaries (from plans.config.weekly_summaries OR weekly_summaries table)
+        if (!weekIntent || !isRecoveryWeek) {
+          // Check plans.config.weekly_summaries first (current system)
+          const weeklySummaries = config.weekly_summaries || {};
+          const weekSummary = weeklySummaries[String(weekIndex)] || {};
+          const focusLabel = weekSummary.focus || weekSummary.focus_label;
           
-          if (weeklySummary?.focus_label) {
-            const label = String(weeklySummary.focus_label).toLowerCase();
+          if (focusLabel) {
+            const label = String(focusLabel).toLowerCase();
+            console.log('[validate-reschedule] Checking weekly_summaries focus_label:', label);
             if (label.includes('recovery')) {
               isRecoveryWeek = true;
               weekIntent = 'recovery';
+              console.log('[validate-reschedule] Detected recovery week from weekly_summaries');
             } else if (label.includes('taper')) {
               isTaperWeek = true;
               weekIntent = 'taper';
+              console.log('[validate-reschedule] Detected taper week from weekly_summaries');
             } else if (label.includes('peak')) {
               weekIntent = 'peak';
             }
+          } else {
+            // Fallback: check weekly_summaries table (legacy)
+            const { data: weeklySummary } = await supabase
+              .from('weekly_summaries')
+              .select('focus_label')
+              .eq('training_plan_id', trainingPlanId)
+              .eq('week_number', weekIndex)
+              .eq('user_id', user.id)
+              .single();
+            
+            if (weeklySummary?.focus_label) {
+              const label = String(weeklySummary.focus_label).toLowerCase();
+              console.log('[validate-reschedule] Checking weekly_summaries table focus_label:', label);
+              if (label.includes('recovery')) {
+                isRecoveryWeek = true;
+                weekIntent = 'recovery';
+                console.log('[validate-reschedule] Detected recovery week from weekly_summaries table');
+              } else if (label.includes('taper')) {
+                isTaperWeek = true;
+                weekIntent = 'taper';
+              } else if (label.includes('peak')) {
+                weekIntent = 'peak';
+              }
+            }
           }
         }
+        
+        console.log('[validate-reschedule] Final week type detection:', { isRecoveryWeek, isTaperWeek, weekIntent, planPhase });
         
         if (startDateStr) {
           // Calculate canonical date: start_date + (week_number - 1) * 7 + (day_number - 1)
@@ -1043,6 +1094,14 @@ Deno.serve(async (req) => {
           isTaperWeek ? 'taper' :
           'build';
 
+        console.log('[validate-reschedule] Coach Brain context:', {
+          isRecoveryWeek,
+          isTaperWeek,
+          weekIntent,
+          weekType,
+          planPhase
+        });
+
         // Get the appropriate engine for this plan type
         const planType = config.approach || 'performance_build';
         const engine = getRescheduleEngine(planType);
@@ -1054,6 +1113,8 @@ Deno.serve(async (req) => {
           timeline,
           currentWeekType: weekType
         });
+        
+        console.log('[validate-reschedule] Coach Brain generated', options.length, 'options');
 
         // Convert to response format
         coachOptions = options.map(opt => ({
