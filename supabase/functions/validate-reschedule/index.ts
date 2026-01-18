@@ -440,8 +440,10 @@ Deno.serve(async (req) => {
           const purposes: WorkoutPurpose[] = [];
           const sorted = Array.from(purposeCounts.entries()).sort((a, b) => b[1] - a[1]);
           // Take top 2 most common purposes for each day
+          // More lenient: if we have at least 2 weeks of data, use >= 2; otherwise use >= 1
+          const minOccurrences = planWorkouts.length >= 14 ? 2 : 1; // 14 = ~2 weeks of workouts
           for (let i = 0; i < Math.min(2, sorted.length); i++) {
-            if (sorted[i][1] >= 2) { // Must appear at least 2 times to be considered "typical"
+            if (sorted[i][1] >= minOccurrences) {
               purposes.push(sorted[i][0]);
             }
           }
@@ -449,6 +451,9 @@ Deno.serve(async (req) => {
             planWeekStructure.set(dayNum, purposes);
           }
         }
+        
+        console.log('[validate-reschedule] Plan week structure detected:', 
+          Array.from(planWeekStructure.entries()).map(([dn, p]) => `Day ${dn}: ${p.join(', ')}`).join('; '));
       }
       
       // Check if this is a phase transition (recovery → build, etc.)
@@ -480,10 +485,19 @@ Deno.serve(async (req) => {
         const weeksFromStart = Math.floor(daysDiff / 7);
         const dayInWeek = ((daysDiff % 7) + 7) % 7; // Handle negative modulo
         targetDayNumber = dayInWeek + 1; // 1-7
+        console.log('[validate-reschedule] Target date calculation:', {
+          startDate: startDateStr,
+          targetDate: new_date,
+          daysDiff,
+          dayInWeek,
+          targetDayNumber
+        });
       } catch (e) {
         console.error('[validate-reschedule] Error calculating target day_number:', e);
       }
     }
+    
+    console.log('[validate-reschedule] Workout purpose:', workoutPurpose, 'Target day:', targetDayNumber, 'Plan structure:', planWeekStructure.size > 0 ? 'detected' : 'not detected');
 
     // Fetch week context (target date ± 3 days = full week for proper validation)
     const contextStart = addDays(new_date, -3);
@@ -552,6 +566,12 @@ Deno.serve(async (req) => {
     // e.g., don't put long run on quality day, don't put quality run on long run day
     if (targetDayNumber && planWeekStructure.has(targetDayNumber)) {
       const typicalPurposes = planWeekStructure.get(targetDayNumber)!;
+      console.log('[validate-reschedule] Checking plan structure conflict:', {
+        targetDayNumber,
+        workoutPurpose,
+        typicalPurposes
+      });
+      
       const conflictsWithStructure = typicalPurposes.some(purpose => {
         // Long run shouldn't go on quality day
         if (workoutPurpose === 'long_run' && purpose === 'quality_run') return true;
@@ -581,6 +601,8 @@ Deno.serve(async (req) => {
           }
         });
       }
+    } else if (targetDayNumber) {
+      console.log('[validate-reschedule] No plan structure found for day', targetDayNumber);
     }
     
     // Warn about conflicts (will be replaced automatically)
