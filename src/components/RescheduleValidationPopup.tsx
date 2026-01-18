@@ -8,6 +8,20 @@ interface ValidationReason {
   data?: any;
 }
 
+interface CoachOption {
+  rank: 1 | 2 | 3 | 4 | 5;
+  label: string;
+  action: 'move' | 'split' | 'skip';
+  targetDateOffset?: number;
+  riskLevel: 'safe' | 'moderate' | 'high';
+  tags: string[];
+  analysis: {
+    physiological: string;
+    scheduling: string;
+    verdict: string;
+  };
+}
+
 interface ValidationResult {
   severity: 'green' | 'yellow' | 'red';
   reasons: ValidationReason[];
@@ -33,6 +47,7 @@ interface ValidationResult {
   conflicts?: {
     sameTypeWorkouts: Array<{ id: string; name: string; type: string }>;
   };
+  coachOptions?: CoachOption[];
 }
 
 interface RescheduleValidationPopupProps {
@@ -56,7 +71,7 @@ export default function RescheduleValidationPopup({
   onCancel,
   onSuggestionClick,
 }: RescheduleValidationPopupProps) {
-  const { severity, reasons, before, after, suggestions, planContext, conflicts } = validation;
+  const { severity, reasons, before, after, suggestions, planContext, conflicts, coachOptions } = validation;
   
   // Debug: log validation result
   React.useEffect(() => {
@@ -266,8 +281,100 @@ export default function RescheduleValidationPopup({
           </div>
         </div>
 
-        {/* Suggestions - Show if available */}
-        {suggestions && suggestions.length > 0 && (
+        {/* Coach Brain Options - Show ranked options with analysis */}
+        {coachOptions && coachOptions.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs text-white/60 font-light mb-3">Coach's recommendations:</p>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {coachOptions.map((option, idx) => {
+                const getRiskColor = () => {
+                  switch (option.riskLevel) {
+                    case 'safe': return 'rgba(34, 197, 94, 0.2)';
+                    case 'moderate': return 'rgba(250, 204, 21, 0.2)';
+                    case 'high': return 'rgba(239, 68, 68, 0.2)';
+                  }
+                };
+                const getRiskBorder = () => {
+                  switch (option.riskLevel) {
+                    case 'safe': return 'rgba(34, 197, 94, 0.4)';
+                    case 'moderate': return 'rgba(250, 204, 21, 0.4)';
+                    case 'high': return 'rgba(239, 68, 68, 0.4)';
+                  }
+                };
+
+                // Calculate target date if it's a move action
+                let targetDate: string | null = null;
+                if (option.action === 'move' && option.targetDateOffset !== undefined) {
+                  const oldDateObj = new Date(oldDate + 'T12:00:00');
+                  oldDateObj.setDate(oldDateObj.getDate() + option.targetDateOffset);
+                  targetDate = oldDateObj.toISOString().split('T')[0];
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-xl backdrop-blur-md border-2"
+                    style={{
+                      background: getRiskColor(),
+                      borderColor: getRiskBorder(),
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-light text-white/50">#{option.rank}</span>
+                          <h4 className="text-sm font-light text-white">{option.label}</h4>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            option.riskLevel === 'safe' ? 'bg-green-500/20 text-green-400' :
+                            option.riskLevel === 'moderate' ? 'bg-yellow-500/20 text-yellow-400' :
+                            'bg-red-500/20 text-red-400'
+                          }`}>
+                            {option.riskLevel}
+                          </span>
+                        </div>
+                        {option.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {option.tags.map((tag, tagIdx) => (
+                              <span key={tagIdx} className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-white/50">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {targetDate && (
+                        <button
+                          onClick={() => onSuggestionClick?.(targetDate!)}
+                          className="px-3 py-1.5 rounded-lg bg-white/[0.1] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.15] transition-all text-xs font-light"
+                        >
+                          {formatDate(targetDate)}
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Analysis */}
+                    <div className="mt-3 space-y-2 text-xs">
+                      <div>
+                        <p className="text-white/60 font-light mb-1">📉 Physiology:</p>
+                        <p className="text-white/80 font-light">{option.analysis.physiological}</p>
+                      </div>
+                      <div>
+                        <p className="text-white/60 font-light mb-1">⚡ Scheduling:</p>
+                        <p className="text-white/80 font-light">{option.analysis.scheduling}</p>
+                      </div>
+                      <div className="pt-2 border-t border-white/10">
+                        <p className="text-white font-light">{option.analysis.verdict}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Fallback: Simple suggestions if no coach options */}
+        {(!coachOptions || coachOptions.length === 0) && suggestions && suggestions.length > 0 && (
           <div className="mb-4">
             <p className="text-xs text-white/60 font-light mb-2">Better dates:</p>
             <div className="flex flex-wrap gap-2">

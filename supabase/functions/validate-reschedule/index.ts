@@ -1,17 +1,20 @@
 /**
  * EDGE FUNCTION: validate-reschedule
  * 
- * SMART SERVER: Validates workout rescheduling with minimal v1 rules
+ * SMART SERVER: Validates workout rescheduling with Coach Brain integration
  * 
  * Input: { workout_id, new_date }
- * Output: { severity, reasons, before, after, suggestions }
+ * Output: { severity, reasons, before, after, suggestions, coachOptions }
  * 
  * Architecture: Smart Server, Dumb Client
  * - All validation logic happens server-side
+ * - Coach Brain provides ranked reschedule options with scientific explanations
  * - Client just calls and displays results
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { getRescheduleEngine } from '../_shared/coaching/index.ts';
+import { buildTimeline, findDayIndex } from './timeline-builder.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1018,6 +1021,56 @@ Deno.serve(async (req) => {
       daysFromCanonical = Math.round((newDate.getTime() - canonical.getTime()) / (1000 * 60 * 60 * 24));
     }
 
+    // ===== COACH BRAIN: Get ranked reschedule options =====
+    let coachOptions: ValidationResult['coachOptions'] = undefined;
+    
+    try {
+      // Build timeline (Current Week + Next Week)
+      const timeline = await buildTimeline(
+        supabase,
+        user.id,
+        oldDate, // Use original workout date to build timeline
+        trainingPlanId
+      );
+
+      // Find the workout's position in timeline
+      const dayIndex = findDayIndex(timeline, oldDate);
+      
+      if (dayIndex >= 0 && timeline[dayIndex]?.workout) {
+        // Determine week type
+        const weekType: 'recovery' | 'build' | 'taper' = 
+          isRecoveryWeek ? 'recovery' :
+          isTaperWeek ? 'taper' :
+          'build';
+
+        // Get the appropriate engine for this plan type
+        const planType = config.approach || 'performance_build';
+        const engine = getRescheduleEngine(planType);
+
+        // Get ranked options
+        const options = engine.getOptions({
+          missedWorkout: workout,
+          dayIndex,
+          timeline,
+          currentWeekType: weekType
+        });
+
+        // Convert to response format
+        coachOptions = options.map(opt => ({
+          rank: opt.rank,
+          label: opt.label,
+          action: opt.action,
+          targetDateOffset: opt.targetDateOffset,
+          riskLevel: opt.riskLevel,
+          tags: opt.tags,
+          analysis: opt.analysis
+        }));
+      }
+    } catch (coachError: any) {
+      console.error('[validate-reschedule] Coach Brain error:', coachError);
+      // Non-fatal - continue without coach options
+    }
+
     const result: ValidationResult = {
       severity,
       reasons,
@@ -1044,7 +1097,8 @@ Deno.serve(async (req) => {
       },
       conflicts: sameTypeWorkouts.length > 0 ? {
         sameTypeWorkouts
-      } : undefined
+      } : undefined,
+      coachOptions
     };
 
     return new Response(
