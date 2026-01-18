@@ -99,9 +99,9 @@ export class PerformancePlanRescheduleEngine implements RescheduleEngine {
         riskLevel: 'safe',
         tags: ['Volume Preserved', 'Reduced Stress'],
         analysis: {
-          physiological: "Splitting the distance reduces structural stress on bones/tendons while maintaining total weekly aerobic volume.",
-          scheduling: "Uses two days instead of one, but keeps intensity low.",
-          verdict: "Safe and effective for recovery weeks."
+          physiological: "You're in a recovery week. Splitting the distance reduces structural stress on bones/tendons while maintaining total weekly aerobic volume. Lower stress per session supports recovery goals.",
+          scheduling: "Uses two days instead of one, but keeps intensity low. This preserves volume while respecting the recovery week's purpose.",
+          verdict: "Safe and effective for recovery weeks. This maintains aerobic fitness while reducing structural load."
         }
       });
     }

@@ -52,9 +52,9 @@ export class AnalysisBuilder {
    */
   static recoverySkip() {
     return {
-      physiological: "In a recovery week, the goal is to lower cortisol and restore hormonal balance. Reducing volume further supports this goal.",
-      scheduling: "You lose volume, but you gain freshness. This trade-off is mathematically positive for long-term adaptation.",
-      verdict: "Strategic Choice. Taking a zero here is better than forcing a run if life stress is high."
+      physiological: "You're in a recovery week. The goal is to lower cortisol and restore hormonal balance (testosterone/cortisol ratio). Skipping this workout further supports that goal by reducing physiological stress.",
+      scheduling: "You lose volume, but you gain freshness. In recovery weeks, freshness > volume. This trade-off is mathematically positive for long-term adaptation.",
+      verdict: "Strategic Choice. Recovery weeks are designed for shedding fatigue. Taking a zero here is physiologically sound, especially if life stress is high."
     };
   }
 
@@ -64,9 +64,9 @@ export class AnalysisBuilder {
    */
   static emergencySkip() {
     return {
-      physiological: "Missing a long run reduces your aerobic stimulus for the week, but preventing injury/burnout is always physiogically superior to forcing a bad run.",
-      scheduling: "This creates a gap in your volume progression, but protects the integrity of your upcoming interval sessions.",
-      verdict: "Use as a last resort. It is better to skip than to run injured, but try not to make this a habit."
+      physiological: "You're in a build week. Missing a long run reduces your aerobic stimulus for the week, but preventing injury/burnout is always physiogically superior to forcing a bad run.",
+      scheduling: "This creates a gap in your volume progression, but protects the integrity of your upcoming interval sessions. Build weeks prioritize adaptation stimulus.",
+      verdict: "Use as a last resort. It is better to skip than to run injured, but try not to make this a habit. Build weeks need volume for adaptation."
     };
   }
 }

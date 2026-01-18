@@ -194,6 +194,12 @@ export default function RescheduleValidationPopup({
                   )}
                 </span>
               )}
+              {(planContext.isRecoveryWeek || planContext.isTaperWeek) && (
+                <span className="ml-1 block mt-1 text-white/70">
+                  {planContext.isRecoveryWeek && '🔄 Recovery Week: Prioritizing freshness over volume'}
+                  {planContext.isTaperWeek && '📉 Taper Week: Reducing load for race readiness'}
+                </span>
+              )}
               {planContext.canonicalDate && planContext.daysFromCanonical !== undefined && planContext.daysFromCanonical !== 0 && (
                 <span className="ml-1 block mt-1">
                   {planContext.daysFromCanonical > 0 ? '+' : ''}{planContext.daysFromCanonical} days from planned date
