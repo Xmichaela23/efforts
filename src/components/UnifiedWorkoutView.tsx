@@ -1387,6 +1387,82 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               console.error('Error validating suggestion:', err);
             }
           }}
+          onCoachOptionClick={async (option) => {
+            if (!reschedulePending || !updatePlannedWorkout) return;
+
+            try {
+              if (option.action === 'move' && option.targetDateOffset !== undefined) {
+                // Calculate target date
+                const oldDateObj = new Date(reschedulePending.oldDate + 'T12:00:00');
+                oldDateObj.setDate(oldDateObj.getDate() + option.targetDateOffset);
+                const targetDate = oldDateObj.toISOString().split('T')[0];
+
+                // Validate the move first
+                const { data, error } = await supabase.functions.invoke('validate-reschedule', {
+                  body: {
+                    workout_id: reschedulePending.workoutId,
+                    new_date: targetDate
+                  }
+                });
+
+                if (error) {
+                  console.error('[Reschedule] Validation error:', error);
+                  alert('Error validating reschedule. Please try again.');
+                  return;
+                }
+
+                // Delete conflicts if any
+                if (data?.conflicts?.sameTypeWorkouts) {
+                  for (const conflict of data.conflicts.sameTypeWorkouts) {
+                    try {
+                      await deletePlannedWorkout(conflict.id);
+                      console.log(`[Reschedule] Deleted conflicting workout: ${conflict.id}`);
+                    } catch (err) {
+                      console.error(`[Reschedule] Error deleting conflict ${conflict.id}:`, err);
+                    }
+                  }
+                }
+
+                // Move the workout
+                await updatePlannedWorkout(reschedulePending.workoutId, {
+                  date: targetDate
+                });
+
+                // Trigger invalidation
+                window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+                window.dispatchEvent(new CustomEvent('planned:invalidate'));
+                window.dispatchEvent(new CustomEvent('week:invalidate'));
+
+                // Close popup and workout view
+                setShowReschedulePopup(false);
+                setReschedulePending(null);
+                setRescheduleValidation(null);
+                setTimeout(() => onClose(), 100);
+              } else if (option.action === 'skip') {
+                // Skip the workout - mark as skipped or delete
+                if (confirm(`Skip "${reschedulePending.workoutName}"? This will remove it from your plan.`)) {
+                  await deletePlannedWorkout(reschedulePending.workoutId);
+
+                  // Trigger invalidation
+                  window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+                  window.dispatchEvent(new CustomEvent('planned:invalidate'));
+                  window.dispatchEvent(new CustomEvent('week:invalidate'));
+
+                  // Close popup and workout view
+                  setShowReschedulePopup(false);
+                  setReschedulePending(null);
+                  setRescheduleValidation(null);
+                  setTimeout(() => onClose(), 100);
+                }
+              } else if (option.action === 'split') {
+                // Split functionality - show message for now
+                alert('Split functionality coming soon. For now, you can manually create two shorter workouts on different days.');
+              }
+            } catch (err) {
+              console.error('[Reschedule] Error executing coach option:', err);
+              alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            }
+          }}
         />
       )}
     </div>

@@ -59,6 +59,7 @@ interface RescheduleValidationPopupProps {
   onConfirm: () => void;
   onCancel: () => void;
   onSuggestionClick?: (date: string) => void;
+  onCoachOptionClick?: (option: CoachOption) => void;
 }
 
 export default function RescheduleValidationPopup({
@@ -70,6 +71,7 @@ export default function RescheduleValidationPopup({
   onConfirm,
   onCancel,
   onSuggestionClick,
+  onCoachOptionClick,
 }: RescheduleValidationPopupProps) {
   const { severity, reasons, before, after, suggestions, planContext, conflicts, coachOptions } = validation;
   
@@ -286,14 +288,6 @@ export default function RescheduleValidationPopup({
                           </div>
                         )}
                       </div>
-                      {targetDate && (
-                        <button
-                          onClick={() => onSuggestionClick?.(targetDate!)}
-                          className="px-3 py-1.5 rounded-lg bg-white/[0.1] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.15] transition-all text-xs font-light"
-                        >
-                          {formatDate(targetDate)}
-                        </button>
-                      )}
                     </div>
                     
                     {/* Analysis */}
@@ -309,6 +303,43 @@ export default function RescheduleValidationPopup({
                       <div className="pt-2 border-t border-white/10">
                         <p className="text-white font-light">{option.analysis.verdict}</p>
                       </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="mt-4 pt-3 border-t border-white/10">
+                      {option.action === 'move' && targetDate && (
+                        <button
+                          onClick={() => {
+                            if (onCoachOptionClick) {
+                              onCoachOptionClick(option);
+                            } else if (onSuggestionClick) {
+                              onSuggestionClick(targetDate);
+                            }
+                          }}
+                          className="w-full px-4 py-2.5 rounded-lg bg-white/[0.1] backdrop-blur-md border border-white/20 text-white font-light hover:bg-white/[0.15] hover:border-white/30 transition-all text-sm"
+                        >
+                          Move to {formatDate(targetDate)}
+                        </button>
+                      )}
+                      {option.action === 'skip' && (
+                        <button
+                          onClick={() => onCoachOptionClick?.(option)}
+                          className="w-full px-4 py-2.5 rounded-lg bg-white/[0.1] backdrop-blur-md border border-white/20 text-white font-light hover:bg-white/[0.15] hover:border-white/30 transition-all text-sm"
+                        >
+                          Skip This Workout
+                        </button>
+                      )}
+                      {option.action === 'split' && (
+                        <button
+                          onClick={() => {
+                            alert('Split functionality coming soon. For now, you can manually create two shorter workouts.');
+                          }}
+                          className="w-full px-4 py-2.5 rounded-lg bg-white/[0.1] backdrop-blur-md border border-white/20 text-white font-light hover:bg-white/[0.15] hover:border-white/30 transition-all text-sm opacity-60"
+                          disabled
+                        >
+                          Split Workout (Coming Soon)
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
