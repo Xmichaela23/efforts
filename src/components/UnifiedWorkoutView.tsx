@@ -1139,9 +1139,23 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       variant="ghost"
                       size="sm"
                       className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                      onClick={() => {
+                      onClick={async () => {
                         if (confirm('Delete this planned workout?')) {
-                          onDelete(String((unifiedWorkout as any)?.id));
+                          try {
+                            const workoutId = String((unifiedWorkout as any)?.id);
+                            await deletePlannedWorkout(workoutId);
+                            
+                            // Trigger invalidation to refresh calendar
+                            window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+                            window.dispatchEvent(new CustomEvent('planned:invalidate'));
+                            window.dispatchEvent(new CustomEvent('week:invalidate'));
+                            
+                            // Close the workout view
+                            onClose();
+                          } catch (err) {
+                            console.error('[Delete] Error deleting planned workout:', err);
+                            alert(`Error deleting workout: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                          }
                         }
                       }}
                     >
@@ -1336,8 +1350,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 }
               }
               
+              // Clear week_number and day_number so it's no longer tied to plan structure
+              // This prevents the repairPlan function from reverting it to canonical date
               const result = await updatePlannedWorkout(reschedulePending.workoutId, {
-                date: reschedulePending.newDate
+                date: reschedulePending.newDate,
+                week_number: null,
+                day_number: null
               });
               
               console.log('[Reschedule] Update result:', result);
@@ -1424,8 +1442,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 }
 
                 // Move the workout
+                // Clear week_number and day_number so it's no longer tied to plan structure
+                // This prevents the repairPlan function from reverting it to canonical date
                 await updatePlannedWorkout(reschedulePending.workoutId, {
-                  date: targetDate
+                  date: targetDate,
+                  week_number: null,
+                  day_number: null
                 });
 
                 // Trigger invalidation
