@@ -67,6 +67,11 @@ const WEEKLY_MILEAGE: Record<string, Record<string, { start: number; peak: numbe
   }
 };
 
+/**
+ * Week type classification for JD-aligned plan structure
+ */
+type WeekType = 'A' | 'B' | 'RECOVERY' | 'RACE_PREP';
+
 export class PerformanceBuildGenerator extends BaseGenerator {
   // Cache for dynamically calculated long run progression
   private longRunProgressionCache?: number[];
@@ -1210,11 +1215,6 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   // ============================================================================
   // CORE WEEK CLASSIFICATION (Jack Daniels Method)
   // ============================================================================
-
-  /**
-   * Week type classification for JD-aligned plan structure
-   */
-  type WeekType = 'A' | 'B' | 'RECOVERY' | 'RACE_PREP';
 
   /**
    * Determine if this is a recovery week
