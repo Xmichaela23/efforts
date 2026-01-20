@@ -294,24 +294,24 @@ const VALID_TOKEN_PATTERNS = [
   // Warmup/Cooldown - distance based
   /^warmup_run_easy_\d+mi$/,
   /^cooldown_easy_\d+mi$/,
-  // Easy runs - time and distance based
+  // Easy runs - time and distance based (supports decimals for distance)
   /^run_easy_\d+min$/,
-  /^run_easy_\d+mi$/,
+  /^run_easy_[\d.]+mi$/,
   // Long runs - time based
   /^longrun_\d+min_(easypace|easy)(_last\d+min_MP)?$/,
-  // Long runs - distance based
-  /^longrun_\d+mi_easypace$/,
-  /^longrun_\d+mi_easypace_last\d+mi_MP$/,
-  // Marathon pace runs
-  /^run_mp_\d+mi$/,
+  // Long runs - distance based (supports decimals)
+  /^longrun_[\d.]+mi_easypace$/,
+  /^longrun_[\d.]+mi_easypace_last[\d.]+mi_MP$/,
+  // Marathon pace runs (supports decimals: 26.2mi, 1.2mi)
+  /^run_mp_[\d.]+mi$/,
   // Intervals
   /^interval_\d+x\d+(m|mi)_5kpace_[rR]\d+(s|min)?$/,
   // Tempo - legacy (5kpace) and new (threshold)
   /^tempo_\d+(min|mi)_5kpace(_plus\d+:\d+)?$/,
-  /^tempo_\d+(min|mi)_threshold$/,
-  // Cruise intervals
-  /^cruise_\d+x\d+mi_T_pace_r\d+s$/,
-  /^cruise_\d+x\d+mi_threshold_r\d+s$/,
+  /^tempo_[\d.]+(min|mi)_threshold$/,
+  // Cruise intervals (supports decimals: 1.5mi, 2.5mi)
+  /^cruise_\d+x[\d.]+mi_T_pace_r\d+s$/,
+  /^cruise_\d+x[\d.]+mi_threshold_r\d+s$/,
   // Fartlek
   /^fartlek_\d+x\d+-\d+s_moderate$/,
   // Strides
