@@ -97,14 +97,12 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     const v3: any[] = Array.isArray(computedAny?.steps) ? computedAny.steps : [];
     const parentDiscV3 = String((workout as any)?.type||'').toLowerCase();
     
-    // RACE DAY: If no steps but we have steps_preset token, trigger materialization
+    // If no steps but we have steps_preset tokens, trigger materialization for any run workout
     if (v3.length === 0 && parentDiscV3 === 'run') {
-      const tags: string[] = Array.isArray((workout as any)?.tags) ? (workout as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
-      const isRaceDay = tags.includes('race_day') || tags.includes('marathon_pace');
       const hasTokens = Array.isArray((workout as any)?.steps_preset) && (workout as any).steps_preset.length > 0;
       
-      if (isRaceDay && hasTokens) {
-        // Race day with tokens but no computed steps - trigger materialization
+      if (hasTokens) {
+        // Run workout with tokens but no computed steps - trigger materialization
         const workoutId = (workout as any)?.id;
         if (workoutId) {
           // Trigger materialization asynchronously (don't block render)
@@ -121,7 +119,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
               // Trigger a refresh event to reload the workout
               window.dispatchEvent(new CustomEvent('planned:invalidate'));
             } catch (e) {
-              console.error('[StructuredPlannedView] Failed to materialize race day:', e);
+              console.error('[StructuredPlannedView] Failed to materialize workout:', e);
             }
           })();
         }
