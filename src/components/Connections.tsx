@@ -1034,7 +1034,8 @@ const Connections: React.FC = () => {
                         onClick={() => {
                           let start = stravaStartDate;
                           let end = stravaEndDate;
-                          if (!start && !end) {
+                          // Only use custom dates if BOTH are set, otherwise default to last 30 days
+                          if (!start || !end) {
                             const endD = new Date();
                             const startD = new Date();
                             startD.setDate(startD.getDate() - 30);
