@@ -246,7 +246,23 @@ Deno.serve(async (req: Request) => {
           race_date: request.race_date || null,
           race_name: request.race_name || null,
           effort_score: effortScore || null,
-          target_time: effortScore && request.distance ? getTargetTime(effortScore, request.distance) : null,
+          // Use actual race pace from effort_paces.race (user's VDOT/goal) × distance
+          // NOT VDOT table lookup - ensures consistency with race day generation
+          target_time: request.effort_paces?.race && request.distance ? (() => {
+            const raceDistanceMiles: Record<string, number> = {
+              '5k': 3.10686,
+              '10k': 6.21371,
+              'half': 13.1,
+              'marathon': 26.2
+            };
+            const distanceMiles = raceDistanceMiles[request.distance.toLowerCase()];
+            if (distanceMiles) {
+              // effort_paces.race is in seconds per mile, so: distance × pace = total seconds
+              return Math.round(distanceMiles * request.effort_paces.race);
+            }
+            // Fallback to VDOT table if no race pace available
+            return effortScore ? getTargetTime(effortScore, request.distance) : null;
+          })() : (effortScore && request.distance ? getTargetTime(effortScore, request.distance) : null),
           baselines_required: plan.baselines_required,
           units: plan.units,
           weekly_summaries: plan.weekly_summaries

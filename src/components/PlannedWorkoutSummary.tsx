@@ -494,8 +494,18 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           }
         }
       };
+      // Check if this is a race day workout (fixed M pace, no range)
+      const tags: string[] = Array.isArray((workout as any)?.tags) ? (workout as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
+      const isRaceDay = tags.includes('race_day') || tags.includes('marathon_pace');
+      
       const paceStrWithRange = (paceTarget?: string, kind?: string, paceRange?: any) => {
         try {
+          // RACE DAY: Show fixed M pace (no range) - matches generator logic
+          if (isRaceDay && paceTarget) {
+            // For race day, return the exact pace target without range
+            return paceTarget;
+          }
+          
           // Priority 1: Use server-processed pace_range object
           if (paceRange && typeof paceRange === 'object' && paceRange.lower && paceRange.upper) {
             const formatPace = (sec: number) => {

@@ -158,6 +158,14 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         })();
         // Check for pace range first, then fall back to single pace target
         const pTxt = ((): string | undefined => {
+          // RACE DAY: Show fixed M pace (no range) - check workout tags
+          const workoutTags: string[] = Array.isArray((workout as any)?.tags) ? (workout as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
+          const isRaceDay = workoutTags.includes('race_day') || workoutTags.includes('marathon_pace');
+          if (isRaceDay && typeof st?.paceTarget==='string') {
+            // For race day, return exact pace target without range
+            return st.paceTarget;
+          }
+          
           // Priority 1: Check for pace_range object with lower/upper bounds
           const prng = (st as any)?.pace_range || (st as any)?.paceRange;
           if (prng && typeof prng === 'object' && prng.lower && prng.upper) {
