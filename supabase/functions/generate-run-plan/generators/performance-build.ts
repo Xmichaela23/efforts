@@ -238,22 +238,13 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     const sessions: Session[] = [];
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-    // PRIORITY: Always create race day session on final Sunday for marathon plans
-    // This ensures race day is never missed, even if proximity calculation is slightly off
-    const isFinalWeek = weekNumber === this.params.duration_weeks;
-    const isMarathon = this.params.distance === 'marathon';
-    if (isFinalWeek && isMarathon) {
-      const raceName = this.params.race_name || 'MARATHON';
-      const raceYear = this.params.race_date ? new Date(this.params.race_date + 'T00:00:00').getFullYear() : new Date().getFullYear();
-      sessions.push(this.createSession(
-        'Sunday',
-        'RACE DAY',
-        `${raceName} ${raceYear}. Trust your training. Go crush it.`,
-        this.milesToMinutes(26.2),
-        [TOKEN_PATTERNS.long_run(this.milesToMinutes(26.2))],
-        ['race', 'marathon']
-      ));
-    }
+      // PRIORITY: Always create race day session on final Sunday for marathon plans
+      // This ensures race day is never missed, even if proximity calculation is slightly off
+      const isFinalWeek = weekNumber === this.params.duration_weeks;
+      const isMarathon = this.params.distance === 'marathon';
+      if (isFinalWeek && isMarathon) {
+        sessions.push(this.createRaceDaySession());
+      }
 
     for (const day of days) {
       // Skip Sunday if we already added race day session
@@ -268,16 +259,7 @@ export class PerformanceBuildGenerator extends BaseGenerator {
           // Race day - THE MARATHON
           // Only add if this is the final week and Sunday (fallback if above check didn't catch it)
           if (isFinalWeek && day === 'Sunday' && isMarathon) {
-            const raceName = this.params.race_name || 'MARATHON';
-            const raceYear = this.params.race_date ? new Date(this.params.race_date + 'T00:00:00').getFullYear() : new Date().getFullYear();
-            sessions.push(this.createSession(
-              day,
-              'RACE DAY',
-              `${raceName} ${raceYear}. Trust your training. Go crush it.`,
-              this.milesToMinutes(26.2),
-              [TOKEN_PATTERNS.long_run(this.milesToMinutes(26.2))],
-              ['race', 'marathon']
-            ));
+            sessions.push(this.createRaceDaySession());
           }
           break;
           
@@ -837,6 +819,50 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   }
 
   // ============================================================================
+  // RACE DAY RESOLVER (Special Case - Distance-First, M-Pace)
+  // ============================================================================
+
+  /**
+   * Create race day session (JD-compliant: distance-first, M-pace, time-derived)
+   * Rules:
+   * - Distance: 26.2 miles (fixed)
+   * - Pace: M pace (single value, no range)
+   * - Duration: computed from distance ÷ M pace
+   * - No E pace, no pace ranges, no easy segments
+   */
+  private createRaceDaySession(): Session {
+    const raceName = this.params.race_name || 'MARATHON';
+    const raceYear = this.params.race_date ? new Date(this.params.race_date + 'T00:00:00').getFullYear() : new Date().getFullYear();
+    
+    // Get M pace (marathon goal pace) - this is the ONLY pace for race day
+    const mpPace = this.getMarathonPaceForTimeCalc(); // minutes per mile
+    
+    // Calculate duration from distance ÷ pace (distance-first logic)
+    const raceDistance = 26.2; // miles (fixed)
+    const raceDuration = Math.round(raceDistance * mpPace); // minutes
+    
+    // Format pace for description (convert minutes to mm:ss)
+    const paceMinutes = Math.floor(mpPace);
+    const paceSeconds = Math.round((mpPace - paceMinutes) * 60);
+    const paceFormatted = `${paceMinutes}:${String(paceSeconds).padStart(2, '0')}/mi`;
+    
+    const description = `${raceName} ${raceYear}. ` +
+      `26.2 miles at M pace (${paceFormatted}). ` +
+      `Trust your training. Go crush it.`;
+    
+    // Use M-pace token (distance-based, M pace)
+    // Token: run_mp_26.2mi (marathon pace run, 26.2 miles)
+    return this.createSession(
+      'Sunday',
+      `${raceName} RACE DAY`,
+      description,
+      raceDuration,
+      [TOKEN_PATTERNS.mp_run_miles(26.2)],
+      ['race_day', 'marathon', 'marathon_pace']
+    );
+  }
+
+  // ============================================================================
   // STRENGTH ATTACHMENT (Step 6)
   // ============================================================================
 
@@ -1318,16 +1344,7 @@ export class PerformanceBuildGenerator extends BaseGenerator {
 
     // PRIORITY 1: Race day (final week, Sunday, marathon distance)
     if (weekNumber === this.params.duration_weeks && this.params.distance === 'marathon') {
-      const raceName = this.params.race_name || 'MARATHON';
-      const raceYear = this.params.race_date ? new Date(this.params.race_date).getFullYear() : new Date().getFullYear();
-      return this.createSession(
-        'Sunday',
-        `${raceName} RACE DAY`,
-        `${raceName} ${raceYear}. Trust your training. Go crush it.`,
-        this.milesToMinutes(26.2),
-        [],
-        ['race_day', 'marathon']
-      );
+      return this.createRaceDaySession();
     }
 
     // Get target long run miles
