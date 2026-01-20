@@ -149,6 +149,9 @@ export function calculateEffortScore(
 
 /**
  * Get training paces from Effort Score
+ * 
+ * IMPORTANT: "race" pace is calculated from marathon time ÷ 26.2 to ensure consistency.
+ * This ensures race pace × 26.2 = marathon time, which is intuitive for users.
  */
 export function getPacesFromScore(score: number): TrainingPaces {
   let lower = PACE_TABLE[0];
@@ -165,18 +168,22 @@ export function getPacesFromScore(score: number): TrainingPaces {
     }
   }
 
+  // Calculate race pace from marathon time to ensure race pace × 26.2 = marathon time
+  const marathonTime = getTargetTime(score, 'marathon');
+  const racePace = marathonTime ? Math.round(marathonTime / 26.2) : null;
+
   if (score <= lower.vdot) {
-    return { ...lower.paces };
+    return { ...lower.paces, race: racePace || lower.paces.race };
   }
   if (score >= upper.vdot) {
-    return { ...upper.paces };
+    return { ...upper.paces, race: racePace || upper.paces.race };
   }
 
   const fraction = (score - lower.vdot) / (upper.vdot - lower.vdot);
   
   return {
     base: Math.round(lower.paces.base - fraction * (lower.paces.base - upper.paces.base)),
-    race: Math.round(lower.paces.race - fraction * (lower.paces.race - upper.paces.race)),
+    race: racePace || Math.round(lower.paces.race - fraction * (lower.paces.race - upper.paces.race)), // Calculated from marathon time for consistency
     steady: Math.round(lower.paces.steady - fraction * (lower.paces.steady - upper.paces.steady)),
     power: Math.round(lower.paces.power - fraction * (lower.paces.power - upper.paces.power)),
     speed: Math.round(lower.paces.speed - fraction * (lower.paces.speed - upper.paces.speed)),

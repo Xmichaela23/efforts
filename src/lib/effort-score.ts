@@ -177,6 +177,9 @@ export function calculateEffortScore(
 /**
  * Get training paces from Effort Score
  * Returns paces in seconds per mile
+ * 
+ * IMPORTANT: "race" pace is calculated from marathon time ÷ 26.2 to ensure consistency.
+ * This ensures race pace × 26.2 = marathon time, which is intuitive for users.
  */
 export function getPacesFromScore(score: number): TrainingPaces {
   // Find the two pace entries that bracket this score
@@ -196,18 +199,28 @@ export function getPacesFromScore(score: number): TrainingPaces {
 
   // Handle edge cases
   if (score <= lower.vdot) {
-    return { ...lower.paces };
+    // Calculate race pace from marathon time to ensure consistency
+    const marathonTime = getProjectedFinishTime(score, 'marathon');
+    const racePace = Math.round(marathonTime / 26.2);
+    return { ...lower.paces, race: racePace };
   }
   if (score >= upper.vdot) {
-    return { ...upper.paces };
+    // Calculate race pace from marathon time to ensure consistency
+    const marathonTime = getProjectedFinishTime(score, 'marathon');
+    const racePace = Math.round(marathonTime / 26.2);
+    return { ...upper.paces, race: racePace };
   }
 
   // Linear interpolation for each pace
   const fraction = (score - lower.vdot) / (upper.vdot - lower.vdot);
   
+  // Calculate race pace from marathon time to ensure race pace × 26.2 = marathon time
+  const marathonTime = getProjectedFinishTime(score, 'marathon');
+  const racePace = Math.round(marathonTime / 26.2);
+  
   return {
     base: Math.round(lower.paces.base - fraction * (lower.paces.base - upper.paces.base)),
-    race: Math.round(lower.paces.race - fraction * (lower.paces.race - upper.paces.race)),
+    race: racePace, // Calculated from marathon time for consistency
     steady: Math.round(lower.paces.steady - fraction * (lower.paces.steady - upper.paces.steady)),
     power: Math.round(lower.paces.power - fraction * (lower.paces.power - upper.paces.power)),
     speed: Math.round(lower.paces.speed - fraction * (lower.paces.speed - upper.paces.speed)),
