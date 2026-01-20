@@ -114,11 +114,17 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
       return b.effort_paces.power;
     }
     if (which === 'easy' && b.effort_paces.base) {
-      console.log(`[Paces] Using effort_paces.base for easy: ${b.effort_paces.base}s/mi`);
+      const paceSec = b.effort_paces.base;
+      const min = Math.floor(paceSec / 60);
+      const sec = paceSec % 60;
+      console.log(`[Paces] Using effort_paces.base for easy: ${paceSec}s/mi (${min}:${String(sec).padStart(2,'0')}/mi)`);
       return b.effort_paces.base;
     }
     if (which === 'marathon' && b.effort_paces.race) {
-      console.log(`[Paces] Using effort_paces.race for marathon: ${b.effort_paces.race}s/mi`);
+      const paceSec = b.effort_paces.race;
+      const min = Math.floor(paceSec / 60);
+      const sec = paceSec % 60;
+      console.log(`[Paces] Using effort_paces.race for marathon: ${paceSec}s/mi (${min}:${String(sec).padStart(2,'0')}/mi)`);
       return b.effort_paces.race;
     }
     if (which === 'threshold' && b.effort_paces.steady) {
@@ -1665,6 +1671,9 @@ Deno.serve(async (req) => {
       } as any;
       if (ub?.effort_paces) {
         console.log(`[Paces] Found effort_paces from PlanWizard:`, ub.effort_paces);
+        console.log(`[Paces] Effort Score: ${ub?.effort_score || 'not set'}, Source: ${ub?.effort_paces_source || 'unknown'}`);
+      } else {
+        console.log(`[Paces] ⚠️  No effort_paces found - will fall back to legacy performance_numbers`);
       }
       console.log(`🔍 [FTP DEBUG] User ${userId} baselines:`, baselines);
       console.log(`🔍 [FTP DEBUG] FTP value:`, baselines?.ftp);
