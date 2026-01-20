@@ -1614,9 +1614,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         return !tags.includes('optional');
       })
       .reduce((total: number, w: any) => {
+        // Priority 1: Use computed.total_duration_seconds (from materialization)
         const sec = Number((w as any)?.computed?.total_duration_seconds);
-        const min = Number.isFinite(sec) && sec > 0 ? Math.round(sec / 60) : 0;
-        return total + min;
+        if (Number.isFinite(sec) && sec > 0) {
+          return total + Math.round(sec / 60);
+        }
+        // Priority 2: Use planned.duration (stored in minutes by generator)
+        const min = Number((w as any)?.duration);
+        if (Number.isFinite(min) && min > 0) {
+          return total + min;
+        }
+        // Priority 3: Fallback to weekly summary estimated_hours (from generator)
+        // This ensures we have a value even if materialization hasn't run yet
+        return total;
       }, 0);
   };
 
@@ -1744,8 +1754,24 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   if (currentView === 'detail' && selectedPlanDetail) {
     const progress = selectedPlanDetail.duration ? Math.round((selectedPlanDetail.currentWeek / selectedPlanDetail.duration) * 100) : 0;
     const currentWeekData = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 ? selectedPlanDetail.weeks.find((w: any) => w.weekNumber === selectedWeek) : null;
-    const totalVolume = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 ? selectedPlanDetail.weeks.reduce((total: number, week: any) => total + getWeeklyVolume(week), 0) : 0;
-    const averageWeeklyVolume = selectedPlanDetail.duration && selectedPlanDetail.duration > 0 ? Math.round(totalVolume / selectedPlanDetail.duration) : 0;
+    // Calculate total volume from workouts (prefer computed, fallback to planned duration)
+    const totalVolume = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 
+      ? selectedPlanDetail.weeks.reduce((total: number, week: any) => total + getWeeklyVolume(week), 0)
+      : 0;
+    
+    // Fallback: Use weekly_summaries.estimated_hours if workouts don't have computed durations yet
+    const fallbackTotal = (() => {
+      const weeklySummaries: any = (selectedPlanDetail as any)?.config?.weekly_summaries || {};
+      return Object.values(weeklySummaries).reduce((sum: number, ws: any) => {
+        const hrs = Number(ws?.estimated_hours) || 0;
+        return sum + Math.round(hrs * 60); // Convert hours to minutes
+      }, 0);
+    })();
+    
+    const finalTotalVolume = totalVolume > 0 ? totalVolume : fallbackTotal;
+    const averageWeeklyVolume = selectedPlanDetail.duration && selectedPlanDetail.duration > 0 
+      ? Math.round(finalTotalVolume / selectedPlanDetail.duration) 
+      : 0;
 
     return (
       <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
@@ -1933,7 +1959,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 <span className="font-semibold text-teal-500">{selectedPlanDetail.totalWorkouts || 0}</span> workouts
               </span>
               <span>
-                <span className="font-semibold text-teal-500">{formatDuration(totalVolume)}</span> total
+                <span className="font-semibold text-teal-500">{formatDuration(finalTotalVolume)}</span> total
               </span>
               <span>
                 <span className="font-semibold text-teal-500">{formatDuration(averageWeeklyVolume)}</span> avg/wk
