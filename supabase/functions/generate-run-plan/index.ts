@@ -97,6 +97,18 @@ Deno.serve(async (req: Request) => {
         effortPaces = request.effort_paces;
         console.log(`[EffortScore] Using provided paces (source: ${request.effort_paces_source || 'unknown'})`);
       } else {
+        // effortScore is guaranteed to be set at this point (set above in lines 79-93)
+        if (effortScore === undefined) {
+          console.error('[EffortScore] effortScore is undefined - this should not happen');
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'Failed to calculate effort score. Please provide a race time or effort score.',
+              validation_errors: ['Missing effort_score - required for performance_build plans']
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         effortPaces = getPacesFromScore(effortScore);
         console.log(`[EffortScore] Calculated paces from score`);
       }
