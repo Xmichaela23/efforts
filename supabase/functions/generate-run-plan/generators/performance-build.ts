@@ -1841,8 +1841,9 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       // Round times to nearest 5 minutes for cleaner descriptions
       const easyTimeRounded = Math.round(easyTime / 5) * 5;
       const mpTimeRounded = Math.round(mpTime / 5) * 5;
+      const totalTimeRounded = easyTimeRounded + mpTimeRounded;
       
-      description = `${totalTime} minutes (${totalMilesApprox.toFixed(1)} miles): ` +
+      description = `${totalTimeRounded} minutes (${totalMilesApprox.toFixed(1)} miles): ` +
         `First ${easyTimeRounded} minutes at E pace (easy, conversational), ` +
         `final ${mpTimeRounded} minutes at M pace (marathon goal pace). ` +
         `Practice race-day fueling and pacing.`;

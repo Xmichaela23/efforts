@@ -1520,7 +1520,33 @@ function toV3Step(st: any, row?: any): any {
     }
   }
   
-  if (typeof st?.distance_m === 'number') out.distanceMeters = Math.max(1, Math.round(st.distance_m));
+  // Distance: explicit or calculated from duration + pace (for time-based steps)
+  if (typeof st?.distance_m === 'number' && st.distance_m > 0) {
+    out.distanceMeters = Math.max(1, Math.round(st.distance_m));
+  } else if (typeof out.seconds === 'number' && out.seconds > 0) {
+    // For time-based steps: calculate distance from duration and pace
+    let paceSecPerMi: number | null = null;
+    
+    // Try to get pace from pace_range (use midpoint)
+    if (Array.isArray(st?.pace_range) && st.pace_range.length === 2) {
+      const a = Number(st.pace_range[0]);
+      const b = Number(st.pace_range[1]);
+      if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
+        paceSecPerMi = (a + b) / 2;
+      }
+    }
+    // Fallback to single pace target
+    if (!paceSecPerMi && typeof st?.pace_sec_per_mi === 'number' && st.pace_sec_per_mi > 0) {
+      paceSecPerMi = st.pace_sec_per_mi;
+    }
+    
+    // Calculate distance: (duration_seconds / pace_sec_per_mi) * 1609.34 meters
+    if (paceSecPerMi && paceSecPerMi > 0) {
+      const miles = out.seconds / paceSecPerMi;
+      const distanceMeters = miles * 1609.34;
+      out.distanceMeters = Math.max(1, Math.round(distanceMeters));
+    }
+  }
   if (typeof st?.pace_sec_per_mi === 'number') {
     out.paceTarget = `${mmss(st.pace_sec_per_mi)}/mi`;
     
