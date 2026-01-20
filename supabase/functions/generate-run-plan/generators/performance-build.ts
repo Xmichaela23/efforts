@@ -834,11 +834,14 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     const raceName = this.params.race_name || 'MARATHON';
     const raceYear = this.params.race_date ? new Date(this.params.race_date + 'T00:00:00').getFullYear() : new Date().getFullYear();
     
-    // Get M pace (marathon goal pace) - this is the ONLY pace for race day
-    const mpPace = this.getMarathonPaceForTimeCalc(); // minutes per mile
+    // Get M pace (marathon goal pace) - uses user's actual pace from effort_paces.race (VDOT)
+    // NOT hardcoded - uses user's actual goal time/VDOT to calculate their M pace
+    const mpPace = this.getMarathonPaceForTimeCalc(); // minutes per mile (from user's VDOT/goal)
+    
+    // Get race distance based on plan distance (not hardcoded to 26.2)
+    const raceDistance = this.getRaceDistance(); // miles (marathon=26.2, half=13.1, 10k=6.2, 5k=3.1)
     
     // Calculate duration from distance ÷ pace (distance-first logic)
-    const raceDistance = 26.2; // miles (fixed)
     const raceDuration = Math.round(raceDistance * mpPace); // minutes
     
     // Format pace for description (convert minutes to mm:ss)
@@ -847,19 +850,33 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     const paceFormatted = `${paceMinutes}:${String(paceSeconds).padStart(2, '0')}/mi`;
     
     const description = `${raceName} ${raceYear}. ` +
-      `26.2 miles at M pace (${paceFormatted}). ` +
+      `${raceDistance} miles at M pace (${paceFormatted}). ` +
       `Trust your training. Go crush it.`;
     
     // Use M-pace token (distance-based, M pace)
-    // Token: run_mp_26.2mi (marathon pace run, 26.2 miles)
+    // Token: run_mp_{distance}mi (marathon pace run at user's actual race distance)
     return this.createSession(
       'Sunday',
       `${raceName} RACE DAY`,
       description,
       raceDuration,
-      [TOKEN_PATTERNS.mp_run_miles(26.2)],
-      ['race_day', 'marathon', 'marathon_pace']
+      [TOKEN_PATTERNS.mp_run_miles(raceDistance)],
+      ['race_day', this.params.distance, 'marathon_pace']
     );
+  }
+
+  /**
+   * Get race distance in miles based on plan distance
+   * NOT hardcoded - uses user's actual race distance
+   */
+  private getRaceDistance(): number {
+    const distanceMap: Record<string, number> = {
+      'marathon': 26.2,
+      'half': 13.1,
+      '10k': 6.2,
+      '5k': 3.1
+    };
+    return distanceMap[this.params.distance] || 26.2; // Default to marathon if unknown
   }
 
   // ============================================================================
@@ -1464,14 +1481,14 @@ export class PerformanceBuildGenerator extends BaseGenerator {
 
   /**
    * Get marathon pace in minutes per mile (for M-pace segment calculations)
+   * REQUIRES user's actual M pace from effort_paces.race (VDOT) - no fallback
    */
   private getMarathonPaceForTimeCalc(): number {
-    // If we have effort_paces, use the race pace (which is M pace)
-    if (this.params.effort_paces?.race) {
-      return this.params.effort_paces.race / 60; // Convert seconds to minutes
+    // MUST use user's actual pace from VDOT/goal time - no hardcoded fallback
+    if (!this.params.effort_paces?.race) {
+      throw new Error('M pace calculation requires effort_paces.race (VDOT). Performance build plans require user pace data.');
     }
-    // Fall back to base class fitness-based estimate
-    return super.getMarathonPaceMinPerMile();
+    return this.params.effort_paces.race / 60; // Convert seconds to minutes
   }
 
   /**
