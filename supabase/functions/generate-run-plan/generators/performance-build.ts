@@ -90,14 +90,29 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     this.intervalTypeHistory = [];
 
     for (let week = 1; week <= this.params.duration_weeks; week++) {
-      const phase = this.getCurrentPhase(week, phaseStructure);
-      const isRecovery = this.isRecoveryWeek(week, phaseStructure);
+      try {
+        const phase = this.getCurrentPhase(week, phaseStructure);
+        const isRecovery = this.isRecoveryWeek(week, phaseStructure);
 
-      const weekSessions = this.generateWeekSessions(week, phase, phaseStructure, isRecovery);
-      sessions_by_week[week.toString()] = weekSessions;
-      weekly_summaries[week.toString()] = this.generateWeeklySummary(
-        week, weekSessions, phase, isRecovery
-      );
+        const weekSessions = this.generateWeekSessions(week, phase, phaseStructure, isRecovery);
+        sessions_by_week[week.toString()] = weekSessions;
+        weekly_summaries[week.toString()] = this.generateWeeklySummary(
+          week, weekSessions, phase, isRecovery
+        );
+        console.log(`[PlanGen] Week ${week}: Generated ${weekSessions.length} sessions`);
+      } catch (error) {
+        console.error(`[PlanGen] Error generating week ${week}:`, error);
+        // Don't fail entire plan - add empty week to maintain structure
+        sessions_by_week[week.toString()] = [];
+        weekly_summaries[week.toString()] = {
+          focus: 'Error generating week',
+          key_workouts: [],
+          estimated_hours: 0,
+          hard_sessions: 0,
+          total_miles: 0,
+          notes: 'Week generation failed - please regenerate plan'
+        };
+      }
     }
 
     return {
