@@ -2121,23 +2121,49 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                     : /peak/.test(focusText)
                     ? 'Peak'
                     : 'Build';
-                  const count = (currentWeekData?.workouts || []).filter((w:any)=>w.type!=='rest').length;
                   
-                  // Get total miles from weekly summary or calculate from workouts
-                  const weeklySummariesObj: any = (selectedPlanDetail as any)?.config?.weekly_summaries || 
-                    (selectedPlanDetail as any)?.weekly_summaries || {};
-                  const wsKey = String(selectedWeek);
-                  const ws: any = weeklySummariesObj?.[wsKey] || {};
-                  const totalMiles = typeof ws?.total_miles === 'number' ? ws.total_miles : null;
+                  // Calculate cumulative totals for all weeks in this phase
+                  // Find all weeks with the same phase/stage
+                  const allWeeks = selectedPlanDetail.weeks || [];
+                  const phaseWeeks = allWeeks.filter((w: any) => {
+                    const wFocus = String(w?.focus || '').toLowerCase();
+                    if (stage === 'Taper') return /taper/.test(wFocus);
+                    if (stage === 'Deload') return /deload|recovery/.test(wFocus);
+                    if (stage === 'Peak') return /peak/.test(wFocus);
+                    return !/taper|deload|recovery|peak/.test(wFocus); // Build phase
+                  });
+                  
+                  // Calculate cumulative totals for the phase
+                  const phaseMiles = phaseWeeks.reduce((total: number, week: any) => {
+                    const weeklySummariesObj: any = (selectedPlanDetail as any)?.config?.weekly_summaries || 
+                      (selectedPlanDetail as any)?.weekly_summaries || {};
+                    const wsKey = String(week.weekNumber);
+                    const ws: any = weeklySummariesObj?.[wsKey] || {};
+                    const miles = typeof ws?.total_miles === 'number' ? ws.total_miles : 0;
+                    return total + miles;
+                  }, 0);
+                  
+                  const phaseVolume = phaseWeeks.reduce((total: number, week: any) => {
+                    return total + getWeeklyVolume(week, true); // Exclude race day from phase totals
+                  }, 0);
+                  
+                  const phaseWorkoutCount = phaseWeeks.reduce((total: number, week: any) => {
+                    const count = (week?.workouts || []).filter((w:any)=>w.type!=='rest' && !Array.isArray(w?.tags)?.includes('optional')).length;
+                    return total + count;
+                  }, 0);
                   
                   return (
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="text-white font-medium">{stage}</span>
-                      {totalMiles !== null && (
-                        <span className="text-white/60">{totalMiles} mi</span>
+                      {phaseMiles > 0 && (
+                        <span className="text-white/60">{phaseMiles.toFixed(1)} mi</span>
                       )}
-                      <span className="text-white/60">{formatDuration(getWeeklyVolume(currentWeekData))}</span>
-                      <span className="text-white/60">{count} workouts</span>
+                      {phaseVolume > 0 && (
+                        <span className="text-white/60">{formatDuration(phaseVolume)}</span>
+                      )}
+                      {phaseWorkoutCount > 0 && (
+                        <span className="text-white/60">{phaseWorkoutCount} workouts</span>
+                      )}
                     </div>
                   );
                 })()}
