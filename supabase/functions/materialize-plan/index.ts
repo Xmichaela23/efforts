@@ -1521,10 +1521,13 @@ function toV3Step(st: any, row?: any): any {
   }
   
   // Distance: explicit or calculated from duration + pace (for time-based steps)
-  if (typeof st?.distance_m === 'number' && st.distance_m > 0) {
-    out.distanceMeters = Math.max(1, Math.round(st.distance_m));
-  } else if (typeof out.seconds === 'number' && out.seconds > 0) {
-    // For time-based steps: calculate distance from duration and pace
+  // IMPORTANT: If step has duration_s (time-based), calculate distance from duration + pace
+  // If step has distance_m but NO duration_s (distance-based), use the explicit distance
+  const hasExplicitDuration = typeof st?.duration_s === 'number' && st.duration_s > 0;
+  const hasExplicitDistance = typeof st?.distance_m === 'number' && st.distance_m > 0;
+  
+  if (hasExplicitDuration && typeof out.seconds === 'number' && out.seconds > 0) {
+    // Time-based step: calculate distance from duration and pace (ignore any existing distance_m)
     let paceSecPerMi: number | null = null;
     
     // Try to get pace from pace_range (use midpoint)
@@ -1546,6 +1549,9 @@ function toV3Step(st: any, row?: any): any {
       const distanceMeters = miles * 1609.34;
       out.distanceMeters = Math.max(1, Math.round(distanceMeters));
     }
+  } else if (hasExplicitDistance && !hasExplicitDuration) {
+    // Distance-based step (no duration_s): use explicit distance
+    out.distanceMeters = Math.max(1, Math.round(st.distance_m));
   }
   if (typeof st?.pace_sec_per_mi === 'number') {
     out.paceTarget = `${mmss(st.pace_sec_per_mi)}/mi`;
