@@ -1500,17 +1500,30 @@ function toV3Step(st: any): any {
   if (typeof st?.pace_sec_per_mi === 'number') {
     out.paceTarget = `${mmss(st.pace_sec_per_mi)}/mi`;
     
-    // Calculate pace range with appropriate tolerance
-    // Use strict tolerance for quality work (matches Garmin/TrainingPeaks standards)
-    // Use lenient tolerance for easy/recovery/long runs (accounts for terrain, fatigue)
-    const paceSec = st.pace_sec_per_mi;
-    const tolerance = (st?.kind === 'work') 
-      ? 0.02   // ±2% for quality work (~10-20s for most paces)
-      : 0.06;  // ±6% for easy runs (~30-60s for most paces)
+    // RACE DAY: No pace range - fixed M pace only (matches generator logic)
+    // Check if this is a race day workout (from tags or description)
+    const isRaceDay = (() => {
+      const rowTags: string[] = Array.isArray((row as any)?.tags) ? (row as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
+      const desc: string = String((row as any)?.description || '').toLowerCase();
+      return rowTags.includes('race_day') || rowTags.includes('marathon_pace') || /race\s+day/i.test(desc);
+    })();
     
-    const lower = Math.round(paceSec * (1 - tolerance));
-    const upper = Math.round(paceSec * (1 + tolerance));
-    out.pace_range = { lower, upper };
+    if (isRaceDay) {
+      // Race day: fixed pace, no range (exact M pace target)
+      out.pace_range = { lower: st.pace_sec_per_mi, upper: st.pace_sec_per_mi };
+    } else {
+      // Calculate pace range with appropriate tolerance
+      // Use strict tolerance for quality work (matches Garmin/TrainingPeaks standards)
+      // Use lenient tolerance for easy/recovery/long runs (accounts for terrain, fatigue)
+      const paceSec = st.pace_sec_per_mi;
+      const tolerance = (st?.kind === 'work') 
+        ? 0.02   // ±2% for quality work (~10-20s for most paces)
+        : 0.06;  // ±6% for easy runs (~30-60s for most paces)
+      
+      const lower = Math.round(paceSec * (1 - tolerance));
+      const upper = Math.round(paceSec * (1 + tolerance));
+      out.pace_range = { lower, upper };
+    }
   }
   if (Array.isArray(st?.pace_range) && st.pace_range.length===2) {
     const a = Number(st.pace_range[0]); const b = Number(st.pace_range[1]);
