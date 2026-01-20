@@ -72,14 +72,17 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   private longRunProgressionCache?: number[];
   // Track long run distances as we generate weeks (for state-aware calculation)
   private longRunHistory: number[] = [];
+  // Track interval types for variety enforcement
+  private intervalTypeHistory: Array<'400' | '800' | '1000' | '1200' | 'mile'> = [];
 
   generatePlan(): TrainingPlan {
     const phaseStructure = this.determinePhaseStructure();
     const sessions_by_week: Record<string, Session[]> = {};
     const weekly_summaries: Record<string, any> = {};
     
-    // Initialize long run history for state-aware calculation
+    // Initialize tracking arrays for state-aware calculation
     this.longRunHistory = [];
+    this.intervalTypeHistory = [];
 
     for (let week = 1; week <= this.params.duration_weeks; week++) {
       const phase = this.getCurrentPhase(week, phaseStructure);
@@ -142,6 +145,9 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     // Get targets
     const weeklyMiles = this.calculateWeeklyMileage(weekNumber, phase, isRecovery, phaseStructure);
     
+    // CORE WEEK CLASSIFICATION (Step 1)
+    const weekType = this.getWeekType(weekNumber, phase, phaseStructure, isRecovery);
+    
     // Check race proximity for each day - this enables smart tapering
     const raceProximity = this.checkWeekRaceProximity(weekNumber);
     
@@ -150,73 +156,41 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       return this.generateRaceWeekSessions(weekNumber, raceProximity, runningDays);
     }
     
-    // Long run (Sunday) - with MP segments in Phase III
-    // Skip if Sunday is too close to race
-    const sundayProximity = this.getRaceProximitySession(
-      this.getDaysUntilRace(weekNumber, 'Sunday', this.params.start_date, this.params.race_date)
-    );
-    
-    // Always calculate long run distance for history tracking (even if session isn't created)
-    let longRunMiles: number;
-    if (this.params.distance === 'marathon') {
-      longRunMiles = this.calculateStateAwareLongRun(weekNumber, isRecovery, phaseStructure);
-    } else {
-      // For non-marathon distances, use static progression
-      longRunMiles = this.getLongRunMiles(weekNumber, isRecovery);
+    // LONG RUN RESOLVER (Step 2 - Highest Priority)
+    const longRunSession = this.resolveLongRun(weekNumber, weekType, phase, phaseStructure, isRecovery);
+    if (longRunSession) {
+      sessions.push(longRunSession);
     }
     
-    // Track this week's long run distance in history (always, for state-aware calculation)
+    // Track long run distance for history (for state-aware calculation)
+    const longRunMiles = this.getLongRunMilesForWeek(weekNumber, isRecovery, phaseStructure);
     this.longRunHistory[weekNumber - 1] = longRunMiles;
-    
-    if (sundayProximity === 'normal' || sundayProximity === 'reduced_quality') {
-      // PRIORITY 1: Check for race day (final week, Sunday, marathon distance)
-      // Always create race day on final Sunday for marathon plans, regardless of proximity
-      if (weekNumber === this.params.duration_weeks && 
-          this.params.distance === 'marathon') {
-        // Race day - create race session
-        const raceName = this.params.race_name || 'MARATHON';
-        const raceYear = this.params.race_date ? new Date(this.params.race_date).getFullYear() : new Date().getFullYear();
-        sessions.push(this.createSession(
-          'Sunday',
-          `${raceName} RACE DAY`,
-          `${raceName} ${raceYear}. Trust your training. Go crush it.`,
-          this.milesToMinutes(26.2),
-          [],
-          ['race_day', 'marathon']
-        ));
-        // Update history with race day distance
-        this.longRunHistory[weekNumber - 1] = 26.2;
-      } else {
-      const withMP = phase.name === 'Race Prep' && !isRecovery && 
-                     (this.params.distance === 'marathon' || this.params.distance === 'half');
-      const mpMiles = withMP ? this.getMPSegmentMiles(weekNumber, phase) : 0;
-      
-      sessions.push(this.createVDOTLongRun(longRunMiles, mpMiles));
-      }
-    }
 
     // Use target long run miles for usedMiles calculation (for weekly planning)
     // Note: Actual session may be shorter due to Jack Daniels time caps (2.5-3 hours)
     let usedMiles = sessions.length > 0 ? longRunMiles : 0;
 
-    // Two Quality Days (2Q System) - not in recovery or taper
-    if (!isRecovery) {
-      const quality = this.addQualitySessions(sessions, weekNumber, phase, runningDays);
-      usedMiles += quality;
-    } else {
-      // Recovery week: reduced quality on both Tuesday and Thursday
-      // Tuesday: Easy + Strides (maintains leg turnover)
+    // QUALITY DAY RESOLVER (Step 3)
+    if (weekType === 'RECOVERY') {
+      // Recovery week: easy + strides only
       sessions.push(this.createEasyWithStrides(4, 'Tuesday'));
       usedMiles += 4;
-      
-      // Thursday: Easy run (reduced volume, maintains 2Q structure)
-      // Always add Thursday run in recovery weeks, regardless of runningDays count
       sessions.push(this.createEasyRunTime(3, 'Thursday'));
       usedMiles += 3;
+    } else {
+      // Week A, Week B, or Race Prep
+      const quality = this.resolveQualityDays(sessions, weekNumber, weekType, phase, runningDays);
+      usedMiles += quality;
     }
+
+    // M-PACE INJECTOR (Step 5) - runs after quality day resolver
+    this.injectMPaceIfEligible(sessions, weekNumber, weekType, phase);
 
     // Fill with easy runs
     this.fillWithEasyRuns(sessions, runningDays, weeklyMiles - usedMiles);
+
+    // STRENGTH ATTACHMENT (Step 6) - runs last, based on resolved sessions
+    this.attachStrengthSessions(sessions, weekType, weekNumber);
 
     return this.assignDaysToSessions(sessions, runningDays);
   }
@@ -385,83 +359,551 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   }
 
   // ============================================================================
-  // QUALITY SESSIONS (2Q SYSTEM)
+  // QUALITY DAY RESOLVER (Step 3)
   // ============================================================================
 
   /**
-   * Add quality sessions based on phase
-   * 2Q System: Two quality days EVERY non-recovery week
-   * Q1 = Tuesday (Intervals)
-   * Q2 = Thursday (Tempo/Cruise)
+   * Resolve quality days based on week type (JD-aligned)
+   * Week A: Tue = light I/strides, Thu = primary T
+   * Week B: Tue = primary I, Thu = easy/steady
+   * Race Prep: Special case (M-pace work)
    * Returns total quality miles added
    */
-  private addQualitySessions(
-    sessions: Session[], 
-    weekNumber: number, 
-    phase: Phase, 
+  private resolveQualityDays(
+    sessions: Session[],
+    weekNumber: number,
+    weekType: WeekType,
+    phase: Phase,
     runningDays: number
   ): number {
     let mileageUsed = 0;
     const weekInPhase = weekNumber - phase.start_week + 1;
 
-    switch (phase.name) {
-      case 'Base':
-        // Phase I: Foundation - 2Q from Week 1
-        // Q1 Tuesday: Introductory intervals (lower volume)
-        sessions.push(this.createBaseIntervalSession(weekInPhase));
-        mileageUsed += 5;
-        
-        // Q2 Thursday: Cruise intervals (T pace)
-        if (runningDays >= 5) {
-          sessions.push(this.createBaseCruiseSession(weekInPhase));
-          mileageUsed += 5;
-        }
-        break;
+    // Race Prep weeks use special logic
+    if (weekType === 'RACE_PREP') {
+      return this.resolveRacePrepQuality(sessions, weekNumber, phase, runningDays, weekInPhase);
+    }
 
-      case 'Speed':
-        // Phase II: Full I + T work
-        // Q1 Tuesday: Intervals
-        sessions.push(this.createIntervalSession(weekInPhase));
-        mileageUsed += 6;
-        
-        // Q2 Thursday: Cruise Intervals
-        if (runningDays >= 5) {
-          sessions.push(this.createCruiseIntervals(weekInPhase));
-          mileageUsed += 7;
-        }
-        break;
+    // Week A: Threshold Emphasis
+    if (weekType === 'A') {
+      // Tuesday: Light I / Strides (not a full workout)
+      const tueSession = this.createLightIOrStrides(weekNumber, weekInPhase);
+      sessions.push(tueSession);
+      mileageUsed += 4; // Approximate
 
-      case 'Race Prep':
-        // Phase III: Marathon-specific M pace work
-        if (this.params.distance === 'marathon' || this.params.distance === 'half') {
-          // Q1 Tuesday: MP run
-          sessions.push(this.createMPaceSession(weekInPhase));
-          mileageUsed += 6;
-          
-          // Q2 Thursday: Cruise intervals
-          if (runningDays >= 5) {
-            sessions.push(this.createCruiseIntervals(weekInPhase));
-            mileageUsed += 7;
-          }
-        } else {
-          // Shorter distances: continue I + T
-          sessions.push(this.createIntervalSession(weekInPhase));
-          mileageUsed += 6;
-          if (runningDays >= 5) {
-            sessions.push(this.createTempoRun(weekInPhase));
-            mileageUsed += 6;
-          }
-        }
-        break;
+      // Thursday: Primary T workout
+      if (runningDays >= 5) {
+        const thuSession = this.createPrimaryTWorkout(weekNumber, weekInPhase);
+        sessions.push(thuSession);
+        mileageUsed += 6; // Approximate
+      }
+    }
 
-      case 'Taper':
-        // Phase IV: Reduced volume sharpening - 1Q only
-        sessions.push(this.createTaperInterval());
+    // Week B: Interval Emphasis
+    if (weekType === 'B') {
+      // Tuesday: Primary I workout
+      const tueSession = this.createPrimaryIWorkout(weekNumber, weekInPhase);
+      sessions.push(tueSession);
+      mileageUsed += 6; // Approximate
+
+      // Thursday: Easy / Steady (no quality)
+      if (runningDays >= 5) {
+        sessions.push(this.createEasyRunTime(4, 'Thursday'));
         mileageUsed += 4;
-        break;
+      }
     }
 
     return mileageUsed;
+  }
+
+  /**
+   * Resolve Race Prep quality days (special case)
+   */
+  private resolveRacePrepQuality(
+    sessions: Session[],
+    weekNumber: number,
+    phase: Phase,
+    runningDays: number,
+    weekInPhase: number
+  ): number {
+    let mileageUsed = 0;
+
+    if (this.params.distance === 'marathon' || this.params.distance === 'half') {
+      // Tuesday: M-pace run
+      sessions.push(this.createMPaceSession(weekInPhase));
+      mileageUsed += 6;
+
+      // Thursday: Cruise intervals or easy
+      if (runningDays >= 5) {
+        sessions.push(this.createCruiseIntervals(weekInPhase));
+        mileageUsed += 7;
+      }
+    } else {
+      // Shorter distances: continue I + T pattern
+      sessions.push(this.createIntervalSession(weekInPhase));
+      mileageUsed += 6;
+      if (runningDays >= 5) {
+        sessions.push(this.createTempoRun(weekInPhase));
+        mileageUsed += 6;
+      }
+    }
+
+    return mileageUsed;
+  }
+
+  /**
+   * Create light I / strides session (Week A Tuesday)
+   * Allowed: 4-6 × 200m @ R, 6-10 × 200m @ R, easy + strides
+   * Disallowed: Full I-pace workouts, > 2 miles quality volume
+   */
+  private createLightIOrStrides(weekNumber: number, weekInPhase: number): Session {
+    // Weeks 1-3: Can include R work (6-10 × 200m)
+    if (weekNumber <= 3) {
+      const reps = weekNumber === 1 ? 6 : weekNumber === 2 ? 8 : 10;
+      return this.createSession(
+        'Tuesday',
+        'R Pace Strides',
+        `Easy 4 miles + ${reps} × 200m @ R pace (fast but relaxed, full recovery). ` +
+        `Maintains leg turnover and mechanics.`,
+        this.milesToMinutes(4) + reps * 2,
+        [TOKEN_PATTERNS.easy_run(30), TOKEN_PATTERNS.strides_4x100m], // Approximate token
+        ['easy_run', 'strides', 'recovery']
+      );
+    }
+
+    // Weeks 5+: Easy + strides only
+    return this.createEasyWithStrides(4, 'Tuesday');
+  }
+
+  /**
+   * Create primary T workout (Week A Thursday)
+   * Allowed: Cruise intervals, continuous tempo, tempo segments
+   */
+  private createPrimaryTWorkout(weekNumber: number, weekInPhase: number): Session {
+    // Progressive cruise intervals: 3×1mi → 4×1mi → 3×1.5mi
+    const reps = weekInPhase <= 2 ? 3 : 4;
+    const milesEach = weekInPhase >= 3 ? 1.5 : 1;
+    const totalQuality = reps * milesEach;
+
+    return this.createSession(
+      'Thursday',
+      'Cruise Intervals',
+      `${reps}×${milesEach}mi at T pace with 60-90s jog recovery. ` +
+      `Total: ${totalQuality} miles @ T (comfortably hard, ~10K effort). ` +
+      `Cruise intervals build lactate threshold.`,
+      50 + reps * 2,
+      [
+        TOKEN_PATTERNS.warmup_1mi,
+        TOKEN_PATTERNS.cruise_intervals(reps, milesEach),
+        TOKEN_PATTERNS.cooldown_1mi
+      ],
+      ['hard_run', 'threshold']
+    );
+  }
+
+  // ============================================================================
+  // INTERVAL VARIETY ENGINE (Step 4)
+  // ============================================================================
+
+  /**
+   * Create primary I workout (Week B Tuesday) with variety enforcement
+   * Tracks last 2 interval types to enforce variety
+   * Progression: 400s → 800s → 1000s → miles → 1200s
+   */
+  private createPrimaryIWorkout(weekNumber: number, weekInPhase: number): Session {
+    // Determine interval type based on week and variety rules
+    const intervalType = this.selectIntervalType(weekNumber);
+    
+    // Track this interval type for variety enforcement
+    this.intervalTypeHistory.push(intervalType);
+
+    // Create session based on type
+    switch (intervalType) {
+      case '400':
+        return this.createInterval400s(weekNumber);
+      case '800':
+        return this.createInterval800s(weekNumber);
+      case '1000':
+        return this.createInterval1000s(weekNumber);
+      case '1200':
+        return this.createInterval1200s(weekNumber);
+      case 'mile':
+        return this.createIntervalMiles(weekNumber);
+    }
+  }
+
+  /**
+   * Select interval type with variety enforcement
+   * Never repeat same type 3+ weeks in a row
+   * Progression: 400s → 800s → 1000s → miles → 1200s
+   */
+  private selectIntervalType(weekNumber: number): '400' | '800' | '1000' | '1200' | 'mile' {
+    const lastTwo = this.intervalTypeHistory.slice(-2);
+    
+    // Early weeks: Start with 400s
+    if (weekNumber === 1 || weekNumber === 2) {
+      return '400';
+    }
+
+    // Week 3: Move to 800s
+    if (weekNumber === 3) {
+      return '800';
+    }
+
+    // Week 5 (after recovery): Back to 800s
+    if (weekNumber === 5) {
+      return '800';
+    }
+
+    // Week 6: Move to 1000s
+    if (weekNumber === 6) {
+      return '1000';
+    }
+
+    // Week 7: Move to miles or 1200s
+    if (weekNumber === 7) {
+      // Avoid repeating if last was 1000
+      if (lastTwo[lastTwo.length - 1] === '1000') {
+        return 'mile';
+      }
+      return '1000';
+    }
+
+    // Default progression: cycle through types, avoid 3+ repeats
+    const progression: Array<'400' | '800' | '1000' | '1200' | 'mile'> = ['400', '800', '1000', 'mile', '1200'];
+    const lastType = lastTwo[lastTwo.length - 1];
+    const lastIndex = progression.indexOf(lastType);
+    
+    // If same type 2+ times, force change
+    if (lastTwo.length >= 2 && lastTwo[0] === lastTwo[1]) {
+      return progression[(lastIndex + 1) % progression.length];
+    }
+
+    // Otherwise, progress naturally
+    return progression[Math.min(lastIndex + 1, progression.length - 1)];
+  }
+
+  /**
+   * Create 400m interval session
+   */
+  private createInterval400s(weekNumber: number): Session {
+    const reps = weekNumber <= 2 ? 6 : 8;
+    const restSec = 90;
+    const qualityMiles = reps * 0.25;
+
+    return this.createSession(
+      'Tuesday',
+      'I Pace Intervals',
+      `${reps}×400m at I pace (5K effort). ` +
+      `Jog ${restSec}s recovery between reps. ` +
+      `Total quality: ~${qualityMiles.toFixed(1)} miles. ` +
+      `Shorter intervals for economy and mechanics.`,
+      40,
+      [
+        TOKEN_PATTERNS.warmup_1mi,
+        TOKEN_PATTERNS.intervals_800(Math.ceil(reps / 2), restSec), // Approximate token
+        TOKEN_PATTERNS.cooldown_1mi
+      ],
+      ['hard_run', 'intervals', 'vo2max']
+    );
+  }
+
+  /**
+   * Create 800m interval session
+   */
+  private createInterval800s(weekNumber: number): Session {
+    const reps = weekNumber <= 3 ? 5 : 6;
+    const restSec = 120;
+    const qualityMiles = reps * 0.5;
+
+    return this.createSession(
+      'Tuesday',
+      'I Pace Intervals',
+      `${reps}×800m at I pace (5K effort). ` +
+      `Jog ${restSec}s recovery between reps. ` +
+      `Total quality: ~${qualityMiles.toFixed(1)} miles. ` +
+      `These develop VO2max and running economy.`,
+      50,
+      [
+        TOKEN_PATTERNS.warmup_1mi,
+        TOKEN_PATTERNS.intervals_800(reps, restSec),
+        TOKEN_PATTERNS.cooldown_1mi
+      ],
+      ['hard_run', 'intervals', 'vo2max']
+    );
+  }
+
+  /**
+   * Create 1000m interval session
+   */
+  private createInterval1000s(weekNumber: number): Session {
+    const reps = 4;
+    const restSec = 180;
+    const qualityMiles = reps * 0.62;
+
+    return this.createSession(
+      'Tuesday',
+      'I Pace Intervals',
+      `${reps}×1000m at I pace (5K effort). ` +
+      `Jog ${restSec}s recovery between reps. ` +
+      `Total quality: ~${qualityMiles.toFixed(1)} miles. ` +
+      `Longer intervals for sustained VO2max development.`,
+      55,
+      [
+        TOKEN_PATTERNS.warmup_1mi,
+        TOKEN_PATTERNS.intervals_1000(reps, restSec),
+        TOKEN_PATTERNS.cooldown_1mi
+      ],
+      ['hard_run', 'intervals', 'vo2max']
+    );
+  }
+
+  /**
+   * Create 1200m interval session
+   */
+  private createInterval1200s(weekNumber: number): Session {
+    const reps = 4;
+    const restSec = 180;
+    const qualityMiles = reps * 0.75;
+
+    return this.createSession(
+      'Tuesday',
+      'I Pace Intervals',
+      `${reps}×1200m at I pace (5K effort). ` +
+      `Jog ${restSec}s recovery between reps. ` +
+      `Total quality: ~${qualityMiles.toFixed(1)} miles. ` +
+      `Extended intervals for marathon-specific VO2max work.`,
+      60,
+      [
+        TOKEN_PATTERNS.warmup_1mi,
+        TOKEN_PATTERNS.intervals_1200(reps, restSec),
+        TOKEN_PATTERNS.cooldown_1mi
+      ],
+      ['hard_run', 'intervals', 'vo2max']
+    );
+  }
+
+  /**
+   * Create 1 mile interval session
+   */
+  private createIntervalMiles(weekNumber: number): Session {
+    const reps = 3;
+    const restMin = 4;
+    const qualityMiles = reps;
+
+    return this.createSession(
+      'Tuesday',
+      'I Pace Intervals',
+      `${reps}×1 mile at I pace (5K effort). ` +
+      `Jog ${restMin} min recovery between reps. ` +
+      `Total quality: ${qualityMiles} miles. ` +
+      `Mile repeats for sustained VO2max and mental toughness.`,
+      60,
+      [
+        TOKEN_PATTERNS.warmup_1mi,
+        TOKEN_PATTERNS.intervals_1mi(reps, restMin),
+        TOKEN_PATTERNS.cooldown_1mi
+      ],
+      ['hard_run', 'intervals', 'vo2max']
+    );
+  }
+
+  // ============================================================================
+  // M-PACE INJECTOR (Step 5)
+  // ============================================================================
+
+  /**
+   * Inject M-pace work if eligible (Weeks 5-6, Week B only)
+   * Rules:
+   * - Skip if weekType === RECOVERY, weekNumber < 5, or weekType === RACE_PREP
+   * - Week 7: no extra M (already in long run)
+   * - Week 5-6 only: add M midweek only on Week B Thursday
+   * - Week A weeks: no midweek M (Thu is T)
+   * - Enforce 40 min total @ M cap per week
+   */
+  private injectMPaceIfEligible(
+    sessions: Session[],
+    weekNumber: number,
+    weekType: WeekType,
+    phase: Phase
+  ): void {
+    // Skip if not eligible
+    if (weekType === 'RECOVERY' || weekNumber < 5 || weekType === 'RACE_PREP') {
+      return;
+    }
+
+    // Week 7: no extra M (already in long run)
+    if (weekNumber === 7) {
+      return;
+    }
+
+    // Only Week B weeks (Weeks 5-6)
+    if (weekType !== 'B' || weekNumber > 6) {
+      return;
+    }
+
+    // Find Thursday session (should be easy/steady in Week B)
+    const thursdaySession = sessions.find(s => s.day === 'Thursday');
+    if (!thursdaySession) {
+      return; // No Thursday session to modify
+    }
+
+    // Check if Thursday is already a quality workout (shouldn't be in Week B)
+    if (thursdaySession.tags?.some(tag => tag === 'hard_run' || tag === 'threshold' || tag === 'tempo')) {
+      return; // Don't stack M on quality day
+    }
+
+    // Calculate M-pace segment
+    const mpPace = this.getMarathonPaceForTimeCalc();
+    let mpTime: number;
+    let mpMiles: number;
+
+    if (weekNumber === 5) {
+      mpTime = 12; // 10-15 min, use 12 min
+      mpMiles = Math.round((mpTime / mpPace) * 10) / 10; // ~2-3 miles
+    } else if (weekNumber === 6) {
+      mpTime = 18; // 15-20 min, use 18 min
+      mpMiles = Math.round((mpTime / mpPace) * 10) / 10; // ~3-4 miles
+    } else {
+      return; // Shouldn't reach here, but safety check
+    }
+
+    // Check total M time for week (long run may already have M)
+    const existingMPTime = this.calculateExistingMPTime(sessions);
+    if (existingMPTime + mpTime > 40) {
+      // Cap at 40 min total
+      mpTime = Math.max(0, 40 - existingMPTime);
+      if (mpTime < 10) {
+        return; // Too little M to add
+      }
+      mpMiles = Math.round((mpTime / mpPace) * 10) / 10;
+    }
+
+    // Replace Thursday easy run with easy + M-pace session
+    const easyTime = 25; // ~25 min easy
+    const easyMiles = this.minutesToApproximateMiles(easyTime);
+    const totalTime = easyTime + mpTime;
+    const totalMiles = easyMiles + mpMiles;
+
+    const newSession = this.createSession(
+      'Thursday',
+      'Easy Run + M Pace',
+      `${totalTime} minutes (${totalMiles.toFixed(1)} miles): ` +
+      `${easyTime} min @ E pace, then ${mpTime} min @ M pace (marathon goal pace). ` +
+      `Early M-pace exposure for rhythm and economy.`,
+      totalTime,
+      [
+        TOKEN_PATTERNS.easy_run(easyTime),
+        TOKEN_PATTERNS.mp_run_miles(mpMiles)
+      ],
+      ['easy_run', 'marathon_pace']
+    );
+
+    // Replace Thursday session
+    const thursdayIndex = sessions.findIndex(s => s.day === 'Thursday');
+    if (thursdayIndex >= 0) {
+      sessions[thursdayIndex] = newSession;
+    }
+  }
+
+  /**
+   * Calculate existing M-pace time in sessions (for cap enforcement)
+   */
+  private calculateExistingMPTime(sessions: Session[]): number {
+    let totalMPTime = 0;
+
+    for (const session of sessions) {
+      // Check if session has marathon_pace tag
+      if (session.tags?.includes('marathon_pace')) {
+        // Try to extract M-pace time from description
+        const description = session.description || '';
+        const mpMatch = description.match(/(\d+)\s*min.*@\s*M\s*pace/);
+        if (mpMatch) {
+          totalMPTime += parseInt(mpMatch[1], 10);
+        } else {
+          // Fallback: estimate from miles if we have M-pace tag
+          // This is conservative
+          totalMPTime += 10; // Estimate 10 min if we can't parse
+        }
+      }
+    }
+
+    return totalMPTime;
+  }
+
+  // ============================================================================
+  // STRENGTH ATTACHMENT (Step 6)
+  // ============================================================================
+
+  /**
+   * Attach strength sessions based on resolved run stress
+   * Rules:
+   * - Week B Tuesday (primary I): attach lower neural (required)
+   * - Week A Tuesday: optional lower neural (light run stress)
+   * - Week A Thursday: never lower neural (T day)
+   * - Recovery: no lower neural
+   * - Upper body: optional on Mon/Fri
+   */
+  private attachStrengthSessions(
+    sessions: Session[],
+    weekType: WeekType,
+    weekNumber: number
+  ): void {
+    // Find Tuesday and Thursday sessions
+    const tuesdaySession = sessions.find(s => s.day === 'Tuesday');
+    const thursdaySession = sessions.find(s => s.day === 'Thursday');
+
+    // Week B Tuesday: primary I day → attach lower neural (required)
+    if (weekType === 'B' && tuesdaySession) {
+      const isPrimaryI = tuesdaySession.tags?.includes('intervals') && 
+                         tuesdaySession.tags?.includes('vo2max');
+      if (isPrimaryI) {
+        // Mark for lower neural strength attachment
+        // This would be handled by strength overlay system
+        // For now, we just ensure the session is tagged correctly
+        if (!tuesdaySession.tags) {
+          tuesdaySession.tags = [];
+        }
+        if (!tuesdaySession.tags.includes('strength_lower_neural')) {
+          tuesdaySession.tags.push('strength_lower_neural');
+        }
+      }
+    }
+
+    // Week A Tuesday: optional lower neural (light run stress)
+    if (weekType === 'A' && tuesdaySession) {
+      const isLightI = tuesdaySession.tags?.includes('strides') || 
+                       tuesdaySession.tags?.includes('recovery');
+      if (isLightI) {
+        // Optional - would be handled by strength overlay
+        // Don't force it, but allow it
+      }
+    }
+
+    // Week A Thursday: never lower neural (T day)
+    if (weekType === 'A' && thursdaySession) {
+      const isPrimaryT = thursdaySession.tags?.includes('threshold') || 
+                         thursdaySession.tags?.includes('tempo');
+      if (isPrimaryT) {
+        // Explicitly exclude lower neural
+        if (thursdaySession.tags?.includes('strength_lower_neural')) {
+          thursdaySession.tags = thursdaySession.tags.filter(t => t !== 'strength_lower_neural');
+        }
+      }
+    }
+
+    // Recovery: no lower neural
+    if (weekType === 'RECOVERY') {
+      // Remove any strength tags from recovery week sessions
+      sessions.forEach(s => {
+        if (s.tags) {
+          s.tags = s.tags.filter(t => !t.startsWith('strength_'));
+        }
+      });
+    }
+
+    // Upper body: optional on Mon/Fri (handled by strength overlay system)
+    // We don't need to do anything here - the overlay system will handle it
   }
 
   /**
@@ -763,6 +1205,227 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   private getTaperWeeks(): number {
     const durationReqs = getMarathonDurationRequirements(this.params.duration_weeks);
     return durationReqs.taperWeeks;
+  }
+
+  // ============================================================================
+  // CORE WEEK CLASSIFICATION (Jack Daniels Method)
+  // ============================================================================
+
+  /**
+   * Week type classification for JD-aligned plan structure
+   */
+  type WeekType = 'A' | 'B' | 'RECOVERY' | 'RACE_PREP';
+
+  /**
+   * Determine if this is a recovery week
+   * Recovery weeks occur every 4th week (weeks 4, 8, 12, etc.)
+   */
+  private isRecoveryWeekJD(weekNumber: number): boolean {
+    return weekNumber % 4 === 0;
+  }
+
+  /**
+   * Determine if this is a race prep week
+   * Race prep typically starts around week 9+ for marathon plans
+   */
+  private isRacePrepWeek(weekNumber: number, phase: Phase): boolean {
+    return phase.name === 'Race Prep' || phase.name === 'Taper';
+  }
+
+  /**
+   * Calculate emphasis counter for Week A/B determination
+   * Counter increments only on non-recovery weeks
+   * Decouples from recovery week placement for rescheduling safety
+   * Week 1 = counter 0 (Week A), Week 2 = counter 1 (Week B), etc.
+   */
+  private calculateEmphasisCounter(weekNumber: number, phaseStructure: PhaseStructure): number {
+    let counter = 0;
+    for (let w = 1; w < weekNumber; w++) {
+      // Skip recovery weeks (every 4th week)
+      if (w % 4 === 0) continue;
+      
+      // Skip taper weeks (check phase structure)
+      const weekPhase = this.getCurrentPhase(w, phaseStructure);
+      if (weekPhase.name === 'Taper') continue;
+      
+      counter++;
+    }
+    return counter; // Week 1 returns 0 (Week A)
+  }
+
+  /**
+   * Determine week type: A (T emphasis), B (I emphasis), RECOVERY, or RACE_PREP
+   * This is the primary classification used by all other logic
+   */
+  private getWeekType(weekNumber: number, phase: Phase, phaseStructure: PhaseStructure, isRecovery: boolean): WeekType {
+    // Recovery weeks are always RECOVERY type
+    if (isRecovery || this.isRecoveryWeekJD(weekNumber)) {
+      return 'RECOVERY';
+    }
+
+    // Race prep weeks are special case (not A/B pattern)
+    if (this.isRacePrepWeek(weekNumber, phase)) {
+      return 'RACE_PREP';
+    }
+
+    // Calculate emphasis counter for A/B determination
+    const emphasisCounter = this.calculateEmphasisCounter(weekNumber, phaseStructure);
+    
+    // Week A (T emphasis) = even counter (0, 2, 4, ...)
+    // Week B (I emphasis) = odd counter (1, 3, 5, ...)
+    return emphasisCounter % 2 === 0 ? 'A' : 'B';
+  }
+
+  // ============================================================================
+  // LONG RUN RESOLVER (Step 2 - Highest Priority)
+  // ============================================================================
+
+  /**
+   * Get long run target miles for a week (for mileage calculation)
+   */
+  private getLongRunMilesForWeek(weekNumber: number, isRecovery: boolean, phaseStructure: PhaseStructure): number {
+    if (this.params.distance === 'marathon') {
+      return this.calculateStateAwareLongRun(weekNumber, isRecovery, phaseStructure);
+    } else {
+      return this.getLongRunMiles(weekNumber, isRecovery);
+    }
+  }
+
+  /**
+   * Resolve long run session based on week type and JD rules
+   * Priority order:
+   * 1. Recovery week → reduced easy long run
+   * 2. Week 7 → segmented quality long run (Week B only)
+   * 3. Week 9 → continuous M finish long run (Race Prep)
+   * 4. Week A/B default → easy long run (with optional M finish Weeks 5+)
+   * 5. Enforce time caps (2.5h / 3h)
+   */
+  private resolveLongRun(
+    weekNumber: number,
+    weekType: WeekType,
+    phase: Phase,
+    phaseStructure: PhaseStructure,
+    isRecovery: boolean
+  ): Session | null {
+    // Check race proximity
+    const sundayProximity = this.getRaceProximitySession(
+      this.getDaysUntilRace(weekNumber, 'Sunday', this.params.start_date, this.params.race_date)
+    );
+    
+    if (sundayProximity !== 'normal' && sundayProximity !== 'reduced_quality') {
+      return null; // Too close to race
+    }
+
+    // PRIORITY 1: Race day (final week, Sunday, marathon distance)
+    if (weekNumber === this.params.duration_weeks && this.params.distance === 'marathon') {
+      const raceName = this.params.race_name || 'MARATHON';
+      const raceYear = this.params.race_date ? new Date(this.params.race_date).getFullYear() : new Date().getFullYear();
+      return this.createSession(
+        'Sunday',
+        `${raceName} RACE DAY`,
+        `${raceName} ${raceYear}. Trust your training. Go crush it.`,
+        this.milesToMinutes(26.2),
+        [],
+        ['race_day', 'marathon']
+      );
+    }
+
+    // Get target long run miles
+    const longRunMiles = this.getLongRunMilesForWeek(weekNumber, isRecovery, phaseStructure);
+
+    // PRIORITY 2: Recovery week → reduced easy long run
+    if (weekType === 'RECOVERY') {
+      // Recovery weeks: 75% of previous week, capped at 2 hours
+      const recoveryMiles = Math.max(8, Math.floor(longRunMiles * 0.75));
+      return this.createVDOTLongRun(recoveryMiles, 0);
+    }
+
+    // PRIORITY 3: Week 7 → segmented quality long run (Week B only)
+    if (weekNumber === 7 && weekType === 'B' && this.params.distance === 'marathon') {
+      return this.createQualityLongRunSegmented(longRunMiles);
+    }
+
+    // PRIORITY 4: Week 9 → continuous M finish long run (Race Prep)
+    if (weekNumber === 9 && weekType === 'RACE_PREP' && this.params.distance === 'marathon') {
+      const mpMiles = this.getMPSegmentMiles(weekNumber, phase);
+      return this.createVDOTLongRun(longRunMiles, mpMiles);
+    }
+
+    // PRIORITY 5: Week A/B default → easy long run (with optional M finish Weeks 5+)
+    if (weekType === 'A' || weekType === 'B') {
+      // Weeks 5+: Allow small M-pace finish
+      let mpMiles = 0;
+      if (weekNumber >= 5 && !isRecovery && 
+          (this.params.distance === 'marathon' || this.params.distance === 'half')) {
+        // Small M-pace finish: last 10-20 min @ M
+        const mpPace = this.getMarathonPaceForTimeCalc();
+        const mpTime = Math.min(20, 10 + (weekNumber - 5) * 2); // 10 min Week 5, 20 min Week 6+
+        mpMiles = Math.round((mpTime / mpPace) * 10) / 10;
+      }
+      return this.createVDOTLongRun(longRunMiles, mpMiles);
+    }
+
+    // Fallback: easy long run
+    return this.createVDOTLongRun(longRunMiles, 0);
+  }
+
+  /**
+   * Create segmented quality long run (Week 7 only)
+   * Format: E + 2 × (20 min @ M) with easy between
+   * Time-capped at 3 hours
+   */
+  private createQualityLongRunSegmented(targetMiles: number): Session {
+    const easyPace = this.getEasyPaceForTimeCalc();
+    const mpPace = this.getMarathonPaceForTimeCalc();
+    const timeCap = 180; // 3 hours
+
+    // Structure: 20 min E + 20 min @ M + 10 min E + 20 min @ M + 10 min E
+    const mpTime = 20; // 20 minutes @ M pace
+    const easyBetween = 10; // 10 minutes easy between segments
+    const easyStart = 20; // 20 minutes easy to start
+    const easyEnd = 10; // 10 minutes easy to finish
+
+    const totalTime = easyStart + mpTime + easyBetween + mpTime + easyEnd;
+    const cappedTime = Math.min(totalTime, timeCap);
+
+    // If capped, scale proportionally
+    let finalEasyStart: number;
+    let finalMPTime: number;
+    let finalEasyBetween: number;
+    let finalEasyEnd: number;
+
+    if (cappedTime < totalTime) {
+      const scale = cappedTime / totalTime;
+      finalEasyStart = Math.round(easyStart * scale / 5) * 5;
+      finalMPTime = Math.round(mpTime * scale / 5) * 5;
+      finalEasyBetween = Math.round(easyBetween * scale / 5) * 5;
+      finalEasyEnd = Math.round(easyEnd * scale / 5) * 5;
+    } else {
+      finalEasyStart = easyStart;
+      finalMPTime = mpTime;
+      finalEasyBetween = easyBetween;
+      finalEasyEnd = easyEnd;
+    }
+
+    const easyMiles1 = this.minutesToApproximateMiles(finalEasyStart, easyPace);
+    const mpMiles1 = this.minutesToApproximateMiles(finalMPTime, mpPace);
+    const easyMiles2 = this.minutesToApproximateMiles(finalEasyBetween, easyPace);
+    const mpMiles2 = this.minutesToApproximateMiles(finalMPTime, mpPace);
+    const easyMiles3 = this.minutesToApproximateMiles(finalEasyEnd, easyPace);
+    const totalMiles = easyMiles1 + mpMiles1 + easyMiles2 + mpMiles2 + easyMiles3;
+
+    const description = `${cappedTime} minutes (${totalMiles.toFixed(1)} miles): ` +
+      `${finalEasyStart} min E + ${finalMPTime} min @ M + ${finalEasyBetween} min E + ${finalMPTime} min @ M + ${finalEasyEnd} min E. ` +
+      `Quality long run with structured M-pace segments. Practice returning to M pace under fatigue.`;
+
+    return this.createSession(
+      'Sunday',
+      'Quality Long Run',
+      description,
+      cappedTime,
+      [TOKEN_PATTERNS.long_run_with_mp(finalEasyStart + finalEasyBetween + finalEasyEnd, finalMPTime * 2)],
+      ['long_run', 'quality', 'marathon_pace']
+    );
   }
 
   // ============================================================================
