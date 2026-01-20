@@ -608,14 +608,16 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
     const m = lower.match(/run_easy_(\d+)min/); const sec = m ? parseInt(m[1],10)*60 : 1800; out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }
   
-  // Marathon pace run DISTANCE based: run_mp_5mi
-  if (/run_mp_\d+mi/.test(lower)) {
-    const m = lower.match(/run_mp_(\d+)mi/);
+  // Marathon pace run DISTANCE based: run_mp_5mi or run_mp_26.2mi (supports decimals)
+  if (/run_mp_[\d.]+mi/.test(lower)) {
+    const m = lower.match(/run_mp_([\d.]+)mi/);
     if (m) {
-      const miles = parseInt(m[1], 10);
-      const mpPace = secPerMiFromBaseline(baselines, 'marathon') || secPerMiFromBaseline(baselines, 'easy') || undefined;
-      out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: mpPace });
-      return out;
+      const miles = parseFloat(m[1]);
+      if (Number.isFinite(miles) && miles > 0) {
+        const mpPace = secPerMiFromBaseline(baselines, 'marathon') || secPerMiFromBaseline(baselines, 'easy') || undefined;
+        out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: mpPace });
+        return out;
+      }
     }
   }
   // Tempo: tempo_25min_threshold (new style)
