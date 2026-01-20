@@ -1552,6 +1552,8 @@ function toV3Step(st: any, row?: any): any {
       if (hasExplicitDistance) {
         console.log(`  ⚠️  Overriding incorrect distance_m=${st.distance_m}m (${(st.distance_m/1609.34).toFixed(1)}mi) with calculated ${distanceMeters.toFixed(0)}m (${miles.toFixed(2)}mi) from duration_s=${st.duration_s}s`);
       }
+    } else {
+      console.log(`  ⚠️  Time-based step (duration_s=${st.duration_s}s) but no pace available to calculate distance`);
     }
   } else if (hasExplicitDistance && !hasExplicitDuration) {
     // Distance-based step (no duration_s): use explicit distance
