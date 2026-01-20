@@ -1606,12 +1606,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getWeeklyVolume = (week: any) => {
+  const getWeeklyVolume = (week: any, excludeRaceDay: boolean = false) => {
     if (!week || !Array.isArray(week.workouts)) return 0;
     return week.workouts
       .filter((w: any) => {
         const tags = Array.isArray(w?.tags) ? w.tags.map((t: string) => t.toLowerCase()) : [];
-        return !tags.includes('optional');
+        // Exclude optional workouts
+        if (tags.includes('optional')) return false;
+        // Exclude race day if requested (for average calculation)
+        if (excludeRaceDay && (tags.includes('race_day') || /race\s+day/i.test(w?.name || ''))) return false;
+        return true;
       })
       .reduce((total: number, w: any) => {
         // Priority 1: Use computed.total_duration_seconds (from materialization)
@@ -1755,8 +1759,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     const progress = selectedPlanDetail.duration ? Math.round((selectedPlanDetail.currentWeek / selectedPlanDetail.duration) * 100) : 0;
     const currentWeekData = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 ? selectedPlanDetail.weeks.find((w: any) => w.weekNumber === selectedWeek) : null;
     // Calculate total volume from workouts (prefer computed, fallback to planned duration)
+    // Include race day in total
     const totalVolume = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 
-      ? selectedPlanDetail.weeks.reduce((total: number, week: any) => total + getWeeklyVolume(week), 0)
+      ? selectedPlanDetail.weeks.reduce((total: number, week: any) => total + getWeeklyVolume(week, false), 0)
+      : 0;
+    
+    // Calculate training volume (excluding race day) for average calculation
+    const trainingVolume = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 
+      ? selectedPlanDetail.weeks.reduce((total: number, week: any) => total + getWeeklyVolume(week, true), 0)
       : 0;
     
     // Fallback: Use weekly_summaries.estimated_hours if workouts don't have computed durations yet
@@ -1769,8 +1779,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     })();
     
     const finalTotalVolume = totalVolume > 0 ? totalVolume : fallbackTotal;
+    // For average: use training volume (excluding race day) divided by number of weeks
+    // This gives average weekly training time, not including the one-time race event
+    const finalTrainingVolume = trainingVolume > 0 ? trainingVolume : fallbackTotal;
     const averageWeeklyVolume = selectedPlanDetail.duration && selectedPlanDetail.duration > 0 
-      ? Math.round(finalTotalVolume / selectedPlanDetail.duration) 
+      ? Math.round(finalTrainingVolume / selectedPlanDetail.duration) 
       : 0;
 
     return (
