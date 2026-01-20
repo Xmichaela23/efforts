@@ -6,6 +6,10 @@
 // - 4-Phase Structure: Foundation → Early Quality → Peak → Taper
 // - Quality limits: No single workout exceeds 10K of hard running
 // - All paces calculated from user's 5K baseline
+// - TIME-BASED long runs and easy runs (per Jack Daniels' method):
+//   * Long runs capped at 2.5 hours (easy) or 3 hours (with M-pace segments)
+//   * Easy runs use "time on feet" approach (30-60 minutes)
+//   * Prevents excessive fatigue for slower runners while maintaining training stimulus
 //
 // Based on principles from Jack Daniels' Running Formula.
 // This is an adaptation and not officially endorsed by Jack Daniels or Human Kinetics.
@@ -191,7 +195,8 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       }
     }
 
-    // Use the calculated long run miles for usedMiles calculation
+    // Use target long run miles for usedMiles calculation (for weekly planning)
+    // Note: Actual session may be shorter due to Jack Daniels time caps (2.5-3 hours)
     let usedMiles = sessions.length > 0 ? longRunMiles : 0;
 
     // Two Quality Days (2Q System) - not in recovery or taper
@@ -206,7 +211,7 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       
       // Thursday: Easy run (reduced volume, maintains 2Q structure)
       // Always add Thursday run in recovery weeks, regardless of runningDays count
-      sessions.push(this.createEasyRunMiles(3, 'Thursday'));
+      sessions.push(this.createEasyRunTime(3, 'Thursday'));
       usedMiles += 3;
     }
 
@@ -760,6 +765,76 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     return durationReqs.taperWeeks;
   }
 
+  // ============================================================================
+  // TIME-BASED HELPERS (Jack Daniels Method)
+  // ============================================================================
+
+  /**
+   * Get easy pace in minutes per mile (for time-based calculations)
+   * Uses effort_paces if available, otherwise falls back to base class estimate
+   */
+  private getEasyPaceForTimeCalc(): number {
+    // If we have effort_paces (from VDOT calculation), use the base pace
+    if (this.params.effort_paces?.base) {
+      return this.params.effort_paces.base / 60; // Convert seconds to minutes
+    }
+    // Fall back to base class fitness-based estimate
+    return super.getEasyPaceMinPerMile();
+  }
+
+  /**
+   * Get marathon pace in minutes per mile (for M-pace segment calculations)
+   */
+  private getMarathonPaceForTimeCalc(): number {
+    // If we have effort_paces, use the race pace (which is M pace)
+    if (this.params.effort_paces?.race) {
+      return this.params.effort_paces.race / 60; // Convert seconds to minutes
+    }
+    // Fall back to base class fitness-based estimate
+    return super.getMarathonPaceMinPerMile();
+  }
+
+  /**
+   * Get time cap for long runs based on Jack Daniels' method
+   * - 2.5 hours (150 min) for easy long runs
+   * - 3 hours (180 min) for long runs with M-pace segments
+   */
+  private getLongRunTimeCap(hasMPaceSegments: boolean): number {
+    return hasMPaceSegments ? 180 : 150; // 3 hours with M-pace, 2.5 hours easy
+  }
+
+  /**
+   * Convert time (minutes) to approximate miles at easy pace
+   * Used for descriptions and tracking
+   */
+  private minutesToApproximateMiles(minutes: number, paceMinPerMile?: number): number {
+    const pace = paceMinPerMile || this.getEasyPaceForTimeCalc();
+    return Math.round((minutes / pace) * 10) / 10; // Round to 1 decimal
+  }
+
+  /**
+   * Calculate long run time based on target progression
+   * Applies Jack Daniels time caps (2.5hr easy, 3hr with M-pace)
+   */
+  private calculateLongRunTime(targetMiles: number, hasMPaceSegments: boolean, mpMiles: number = 0): number {
+    const easyPace = this.getEasyPaceForTimeCalc();
+    const mpPace = this.getMarathonPaceForTimeCalc();
+    const timeCap = this.getLongRunTimeCap(hasMPaceSegments);
+    
+    // Calculate time if we were to run target miles
+    // For runs with M-pace segments, calculate time based on actual M-pace miles
+    let estimatedTime: number;
+    if (hasMPaceSegments && mpMiles > 0) {
+      const easyMiles = targetMiles - mpMiles;
+      estimatedTime = (easyMiles * easyPace) + (mpMiles * mpPace);
+    } else {
+      estimatedTime = targetMiles * easyPace;
+    }
+    
+    // Apply time cap (Jack Daniels rule)
+    return Math.min(Math.round(estimatedTime), timeCap);
+  }
+
   /**
    * Calculate dynamic long run progression based on plan duration
    * Duration-aware: shorter plans have earlier peaks and capped distances
@@ -1025,26 +1100,75 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   // ============================================================================
 
   /**
-   * Long run with VDOT pacing description
+   * Long run with VDOT pacing description (TIME-BASED per Jack Daniels method)
+   * Uses time caps: 2.5 hours for easy runs, 3 hours for runs with M-pace segments
    */
-  private createVDOTLongRun(miles: number, mpMiles: number = 0): Session {
-    const duration = this.milesToMinutes(miles);
+  private createVDOTLongRun(targetMiles: number, mpMiles: number = 0): Session {
+    const hasMPaceSegments = mpMiles > 0;
+    
+    // Calculate actual time based on pace, applying Jack Daniels time caps
+    const totalTime = this.calculateLongRunTime(targetMiles, hasMPaceSegments, mpMiles);
+    const timeCap = this.getLongRunTimeCap(hasMPaceSegments);
+    
+    // Calculate approximate miles for description (may be less than target if capped)
+    const easyPace = this.getEasyPaceForTimeCalc();
+    const mpPace = this.getMarathonPaceForTimeCalc();
     
     let description: string;
     let tokens: string[];
     
-    if (mpMiles > 0) {
-      description = `${miles} miles: First ${miles - mpMiles} miles at E pace (easy, conversational), ` +
-        `final ${mpMiles} miles at M pace (marathon goal pace). ` +
+    if (hasMPaceSegments) {
+      // Calculate time breakdown for M-pace segments
+      // First, calculate what the time would be without cap
+      const mpTimeUncapped = mpMiles * mpPace;
+      const easyMilesUncapped = targetMiles - mpMiles;
+      const easyTimeUncapped = easyMilesUncapped * easyPace;
+      const totalTimeUncapped = easyTimeUncapped + mpTimeUncapped;
+      
+      // If time was capped, scale down proportionally
+      let mpTime: number;
+      let easyTime: number;
+      if (totalTimeUncapped > timeCap) {
+        const scaleFactor = timeCap / totalTimeUncapped;
+        mpTime = mpTimeUncapped * scaleFactor;
+        easyTime = easyTimeUncapped * scaleFactor;
+      } else {
+        mpTime = mpTimeUncapped;
+        easyTime = easyTimeUncapped;
+      }
+      
+      const easyMilesApprox = this.minutesToApproximateMiles(easyTime, easyPace);
+      const mpMilesActual = this.minutesToApproximateMiles(mpTime, mpPace);
+      const totalMilesApprox = easyMilesApprox + mpMilesActual;
+      
+      // Round times to nearest 5 minutes for cleaner descriptions
+      const easyTimeRounded = Math.round(easyTime / 5) * 5;
+      const mpTimeRounded = Math.round(mpTime / 5) * 5;
+      
+      description = `${totalTime} minutes (${totalMilesApprox.toFixed(1)} miles): ` +
+        `First ${easyTimeRounded} minutes at E pace (easy, conversational), ` +
+        `final ${mpTimeRounded} minutes at M pace (marathon goal pace). ` +
         `Practice race-day fueling and pacing.`;
-      tokens = [TOKEN_PATTERNS.long_run_with_mp_miles(miles, mpMiles)];
+      
+      // Use time-based tokens per Jack Daniels method
+      tokens = [TOKEN_PATTERNS.long_run_with_mp(easyTimeRounded, mpTimeRounded)];
     } else {
-      description = `${miles} miles at E pace (easy, conversational). ` +
+      const totalMilesApprox = this.minutesToApproximateMiles(totalTime, easyPace);
+      const timeRounded = Math.round(totalTime / 5) * 5;
+      
+      description = `${timeRounded} minutes (${totalMilesApprox.toFixed(1)} miles) at E pace (easy, conversational). ` +
         `Stay relaxed and save energy for quality days.`;
-      tokens = [TOKEN_PATTERNS.long_run_miles(miles)];
+      
+      // Use time-based tokens per Jack Daniels method
+      tokens = [TOKEN_PATTERNS.long_run(timeRounded)];
     }
     
-    return this.createSession('Sunday', 'Long Run', description, duration, tokens, ['long_run']);
+    // Note if time was capped
+    if (totalTime >= timeCap && targetMiles * easyPace > timeCap) {
+      description += ` [Time capped at ${timeCap} minutes per Jack Daniels' method to prevent excessive fatigue.]`;
+    }
+    
+    return this.createSession('Sunday', 'Long Run', description, totalTime, tokens, ['long_run']);
   }
 
   /**
@@ -1164,17 +1288,41 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   }
 
   /**
-   * Easy run with strides
+   * Easy run with strides (TIME-BASED per Jack Daniels method)
    */
-  private createEasyWithStrides(miles: number, day: string): Session {
+  private createEasyWithStrides(targetMiles: number, day: string): Session {
+    const easyPace = this.getEasyPaceForTimeCalc();
+    const easyTime = Math.round(targetMiles * easyPace);
+    const easyTimeRounded = Math.round(easyTime / 5) * 5;
+    const easyMilesApprox = this.minutesToApproximateMiles(easyTimeRounded, easyPace);
+    
     return this.createSession(
       day,
       'Easy Run + Strides',
-      `${miles} miles at E pace, then 4×100m strides (fast but relaxed, full recovery). ` +
+      `${easyTimeRounded} minutes (${easyMilesApprox.toFixed(1)} miles) at E pace, then 4×100m strides (fast but relaxed, full recovery). ` +
       `Strides maintain leg turnover and neuromuscular coordination.`,
-      this.milesToMinutes(miles) + 10,
-      [TOKEN_PATTERNS.easy_run_miles(miles), TOKEN_PATTERNS.strides_4x100m],
+      easyTimeRounded + 10,
+      [TOKEN_PATTERNS.easy_run(easyTimeRounded), TOKEN_PATTERNS.strides_4x100m],
       ['easy_run', 'strides', 'recovery'] // Explicitly tag as recovery/aerobic, not quality
+    );
+  }
+
+  /**
+   * Create time-based easy run (per Jack Daniels method)
+   */
+  private createEasyRunTime(targetMiles: number, day: string): Session {
+    const easyPace = this.getEasyPaceForTimeCalc();
+    const easyTime = Math.round(targetMiles * easyPace);
+    const easyTimeRounded = Math.round(easyTime / 5) * 5;
+    const easyMilesApprox = this.minutesToApproximateMiles(easyTimeRounded, easyPace);
+    
+    return this.createSession(
+      day,
+      'Easy Run',
+      `${easyTimeRounded} minutes (${easyMilesApprox.toFixed(1)} miles) at E pace. Recovery and aerobic maintenance.`,
+      easyTimeRounded,
+      [TOKEN_PATTERNS.easy_run(easyTimeRounded)],
+      ['easy_run']
     );
   }
 
@@ -1199,29 +1347,30 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   }
 
   /**
-   * Get appropriate easy run distance based on days_per_week selection
+   * Get appropriate easy run time range based on days_per_week selection
    * Fewer days = shorter easy runs to keep weekly volume appropriate
+   * Returns time in minutes (per Jack Daniels "time on feet" philosophy)
    */
-  private getEasyRunCaps(): { min: number; max: number } {
+  private getEasyRunTimeRange(): { min: number; max: number } {
     const daysPerWeek = this.params.days_per_week;
     
     switch (daysPerWeek) {
       case '3-4':
-        return { min: 3, max: 5 };
+        return { min: 30, max: 45 };  // 30-45 minutes
       case '4-5':
-        return { min: 4, max: 6 };  // Reduced from 4-8
+        return { min: 35, max: 50 };  // 35-50 minutes
       case '5-6':
-        return { min: 5, max: 7 };
+        return { min: 40, max: 60 };  // 40-60 minutes
       case '6-7':
-        return { min: 5, max: 8 };
+        return { min: 45, max: 60 };  // 45-60 minutes
       default:
-        return { min: 4, max: 6 };
+        return { min: 35, max: 50 };
     }
   }
 
   /**
-   * Fill remaining days with easy runs
-   * Scales easy run distance based on days_per_week selection
+   * Fill remaining days with easy runs (TIME-BASED per Jack Daniels method)
+   * Uses "time on feet" approach rather than distance
    */
   private fillWithEasyRuns(
     sessions: Session[], 
@@ -1231,17 +1380,25 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     const remainingDays = Math.max(0, targetDays - sessions.length);
     if (remainingDays <= 0) return;
 
-    const { min, max } = this.getEasyRunCaps();
-    const milesPerDay = Math.max(min, Math.round(remainingMiles / remainingDays));
-    const easyMiles = Math.max(min, Math.min(max, milesPerDay));
+    const { min, max } = this.getEasyRunTimeRange();
+    const easyPace = this.getEasyPaceForTimeCalc();
+    
+    // Convert remaining miles to approximate time, then distribute
+    const totalTimeNeeded = remainingMiles * easyPace;
+    const timePerDay = Math.max(min, Math.round(totalTimeNeeded / remainingDays));
+    const easyTime = Math.max(min, Math.min(max, timePerDay));
+    
+    // Round to nearest 5 minutes for cleaner descriptions
+    const easyTimeRounded = Math.round(easyTime / 5) * 5;
+    const easyMilesApprox = this.minutesToApproximateMiles(easyTimeRounded, easyPace);
     
     for (let i = 0; i < remainingDays; i++) {
       sessions.push(this.createSession(
         '',
         'Easy Run',
-        `${easyMiles} miles at E pace. Recovery and aerobic maintenance.`,
-        this.milesToMinutes(easyMiles),
-        [TOKEN_PATTERNS.easy_run_miles(easyMiles)],
+        `${easyTimeRounded} minutes (${easyMilesApprox.toFixed(1)} miles) at E pace. Recovery and aerobic maintenance.`,
+        easyTimeRounded,
+        [TOKEN_PATTERNS.easy_run(easyTimeRounded)],
         ['easy_run']
       ));
     }
