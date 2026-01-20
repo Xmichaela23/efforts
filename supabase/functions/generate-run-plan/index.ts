@@ -133,6 +133,18 @@ Deno.serve(async (req: Request) => {
         break;
       }
       case 'performance_build': {
+        // Validate that effort_paces.race exists (required for M pace calculations)
+        if (!effortPaces?.race) {
+          console.error('[PlanGen] Missing effort_paces.race for performance_build plan');
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'Performance build plans require race pace data (effort_paces.race). Please provide a race time or effort score.',
+              validation_errors: ['Missing effort_paces.race - required for M pace calculations']
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         const generator = new PerformanceBuildGenerator(generatorParams);
         plan = generator.generatePlan();
         phaseStructure = generator['determinePhaseStructure']();
