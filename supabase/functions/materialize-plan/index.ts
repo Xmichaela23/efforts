@@ -1488,7 +1488,7 @@ function mmss(sec: number): string {
   return `${m}:${String(ss).padStart(2,'0')}`;
 }
 
-function toV3Step(st: any): any {
+function toV3Step(st: any, row?: any): any {
   const out: any = { id: st?.id || uid() };
   
   // Duration: explicit or calculated from distance + pace
@@ -1527,6 +1527,7 @@ function toV3Step(st: any): any {
     // RACE DAY: No pace range - fixed M pace only (matches generator logic)
     // Check if this is a race day workout (from tags or description)
     const isRaceDay = (() => {
+      if (!row) return false;
       const rowTags: string[] = Array.isArray((row as any)?.tags) ? (row as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
       const desc: string = String((row as any)?.description || '').toLowerCase();
       return rowTags.includes('race_day') || rowTags.includes('marathon_pace') || /race\s+day/i.test(desc);
@@ -1673,7 +1674,7 @@ Deno.serve(async (req) => {
           console.log(`  🔄 Recovery steps: ${recoverySteps}`);
           // Assign stable planned_index per step
           const withIndex = steps.map((st:any, idx:number)=> ({ ...st, planned_index: idx }));
-          const v3 = withIndex.map(toV3Step);
+          const v3 = withIndex.map((st: any) => toV3Step(st, row));
           // Recalculate total from v3 steps (which have calculated durations for distance-based steps)
           const actualTotal = v3.reduce((sum:number, st:any) => sum + (Number(st?.seconds) || 0), 0);
           // For strength workouts with no calculated duration, preserve the original duration from the plan
