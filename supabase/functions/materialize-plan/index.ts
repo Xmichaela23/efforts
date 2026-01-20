@@ -615,19 +615,19 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
     }
   }
   
-  // Easy run DISTANCE based: run_easy_5mi
-  if (/run_easy_\d+mi/.test(lower)) {
-    const m = lower.match(/run_easy_(\d+)mi/);
+  // easy run TIME based: run_easy_Xmin (CHECK FIRST to avoid matching "min" in distance pattern)
+  if (/run_easy_\d+min/.test(lower)) {
+    const m = lower.match(/run_easy_(\d+)min/); const sec = m ? parseInt(m[1],10)*60 : 1800; out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
+  }
+  
+  // Easy run DISTANCE based: run_easy_5mi (CHECK AFTER time-based to avoid false matches)
+  if (/run_easy_\d+mi\b/.test(lower)) {
+    const m = lower.match(/run_easy_(\d+)mi\b/);
     if (m) {
       const miles = parseInt(m[1], 10);
       out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: secPerMiFromBaseline(baselines, 'easy') || undefined });
       return out;
     }
-  }
-  
-  // easy run TIME based: run_easy_Xmin
-  if (/run_easy_\d+min/.test(lower)) {
-    const m = lower.match(/run_easy_(\d+)min/); const sec = m ? parseInt(m[1],10)*60 : 1800; out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }
   
   // Marathon pace run DISTANCE based: run_mp_5mi or run_mp_26.2mi (supports decimals)
