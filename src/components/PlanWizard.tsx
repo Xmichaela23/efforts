@@ -2059,10 +2059,34 @@ export default function PlanWizard() {
           ? new Date(new Date(state.startDate + 'T00:00:00').getTime() + (state.duration * 7 - 1) * 24 * 60 * 60 * 1000)
           : null;
         
-        // Calculate projected finish time if we have effort score
-        const projectedFinishTime = state.effortScore && state.distance
-          ? getProjectedFinishTime(state.effortScore, state.distance as RaceDistance)
-          : null;
+        // Calculate projected finish time
+        // PRIORITY: Use actual race pace from effortPaces.race (user's VDOT/goal) if available
+        // FALLBACK: Use VDOT table lookup from effort score
+        const projectedFinishTime = (() => {
+          if (!state.distance) return null;
+          
+          // If we have actual race pace, calculate from pace × distance (matches generator logic)
+          if (state.effortPaces?.race) {
+            const raceDistanceMiles: Record<RaceDistance, number> = {
+              '5k': 3.10686,   // 5km in miles
+              '10k': 6.21371,  // 10km in miles
+              'half': 13.1,
+              'marathon': 26.2
+            };
+            const distanceMiles = raceDistanceMiles[state.distance as RaceDistance];
+            if (distanceMiles) {
+              // race pace is in seconds per mile, so: distance × pace = total seconds
+              return Math.round(distanceMiles * state.effortPaces.race);
+            }
+          }
+          
+          // Fallback to VDOT table lookup if no race pace available
+          if (state.effortScore) {
+            return getProjectedFinishTime(state.effortScore, state.distance as RaceDistance);
+          }
+          
+          return null;
+        })();
         
         return (
           <StepContainer title={state.hasRaceDate ? "Confirm your schedule" : "When do you want to start?"}>
