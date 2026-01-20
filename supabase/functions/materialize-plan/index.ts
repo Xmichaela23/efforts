@@ -1521,13 +1521,13 @@ function toV3Step(st: any, row?: any): any {
   }
   
   // Distance: explicit or calculated from duration + pace (for time-based steps)
-  // IMPORTANT: If step has duration_s (time-based), calculate distance from duration + pace
-  // If step has distance_m but NO duration_s (distance-based), use the explicit distance
+  // CRITICAL: If step has duration_s (time-based), ALWAYS calculate distance from duration + pace
+  // NEVER use distance_m for time-based steps, even if it exists (it's likely incorrect)
   const hasExplicitDuration = typeof st?.duration_s === 'number' && st.duration_s > 0;
   const hasExplicitDistance = typeof st?.distance_m === 'number' && st.distance_m > 0;
   
   if (hasExplicitDuration && typeof out.seconds === 'number' && out.seconds > 0) {
-    // Time-based step: calculate distance from duration and pace (ignore any existing distance_m)
+    // Time-based step: calculate distance from duration and pace (IGNORE any existing distance_m)
     let paceSecPerMi: number | null = null;
     
     // Try to get pace from pace_range (use midpoint)
@@ -1548,6 +1548,10 @@ function toV3Step(st: any, row?: any): any {
       const miles = out.seconds / paceSecPerMi;
       const distanceMeters = miles * 1609.34;
       out.distanceMeters = Math.max(1, Math.round(distanceMeters));
+      // Log if we're overriding an incorrect distance_m
+      if (hasExplicitDistance) {
+        console.log(`  ⚠️  Overriding incorrect distance_m=${st.distance_m}m (${(st.distance_m/1609.34).toFixed(1)}mi) with calculated ${distanceMeters.toFixed(0)}m (${miles.toFixed(2)}mi) from duration_s=${st.duration_s}s`);
+      }
     }
   } else if (hasExplicitDistance && !hasExplicitDuration) {
     // Distance-based step (no duration_s): use explicit distance
