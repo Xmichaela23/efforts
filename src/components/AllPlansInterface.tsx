@@ -2148,7 +2148,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   }, 0);
                   
                   const phaseWorkoutCount = phaseWeeks.reduce((total: number, week: any) => {
-                    const count = (week?.workouts || []).filter((w:any)=>w.type!=='rest' && !Array.isArray(w?.tags)?.includes('optional')).length;
+                    const count = (week?.workouts || []).filter((w: any) => {
+                      if (w.type === 'rest') return false;
+                      const tags = Array.isArray(w?.tags) ? w.tags : [];
+                      return !tags.includes('optional');
+                    }).length;
                     return total + count;
                   }, 0);
                   
