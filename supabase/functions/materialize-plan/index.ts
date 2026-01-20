@@ -588,9 +588,31 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
     }
   }
   
-  // long run TIME based (support longrun_Xmin and long_run_Xmin)
-  if (/long[_-]?run_\d+min/.test(lower)) {
-    const m = lower.match(/longrun_(\d+)min/); const sec = m ? parseInt(m[1],10)*60 : 3600; out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
+  // Long run TIME based with MP segment: longrun_160min_easypace_last20min_MP
+  if (/longrun_\d+min_easypace_last\d+min_mp/i.test(lower)) {
+    const m = lower.match(/longrun_(\d+)min_easypace_last(\d+)min_mp/i);
+    if (m) {
+      const totalMin = parseInt(m[1], 10);
+      const mpMin = parseInt(m[2], 10);
+      const easyMin = totalMin - mpMin;
+      const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
+      const mpPace = secPerMiFromBaseline(baselines, 'marathon') || easyPace; // Fall back to easy if no MP baseline
+      // Easy portion
+      out.push({ id: uid(), kind: 'work', duration_s: easyMin * 60, pace_sec_per_mi: easyPace });
+      // MP portion
+      out.push({ id: uid(), kind: 'work', duration_s: mpMin * 60, pace_sec_per_mi: mpPace });
+      return out;
+    }
+  }
+  
+  // long run TIME based (support longrun_Xmin, longrun_Xmin_easypace, and long_run_Xmin)
+  if (/long[_-]?run_\d+min(?:_easypace)?/.test(lower)) {
+    const m = lower.match(/long[_-]?run_(\d+)min/);
+    if (m) {
+      const sec = parseInt(m[1], 10) * 60;
+      out.push({ id: uid(), kind: 'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines, 'easy') || undefined });
+      return out;
+    }
   }
   
   // Easy run DISTANCE based: run_easy_5mi
@@ -1570,15 +1592,27 @@ Deno.serve(async (req) => {
     // Find rows to materialize
     let rows: any[] = [];
     if (plannedRowId) {
-      const { data } = await supabase.from('planned_workouts').select('*').eq('id', plannedRowId).limit(1);
+      console.log(`[materialize-plan] Looking for planned_workout_id: ${plannedRowId}`);
+      const { data, error } = await supabase.from('planned_workouts').select('*').eq('id', plannedRowId).limit(1);
+      if (error) console.error(`[materialize-plan] Error querying planned_workout_id:`, error);
       rows = data || [];
+      console.log(`[materialize-plan] Found ${rows.length} row(s) for planned_workout_id`);
     } else if (planId) {
-      const { data } = await supabase.from('planned_workouts').select('*').eq('training_plan_id', planId).order('date');
+      console.log(`[materialize-plan] Looking for plan_id: ${planId}`);
+      const { data, error } = await supabase.from('planned_workouts').select('*').eq('training_plan_id', planId).order('date');
+      if (error) console.error(`[materialize-plan] Error querying plan_id:`, error);
       rows = data || [];
+      console.log(`[materialize-plan] Found ${rows.length} row(s) for plan_id`);
+      if (rows.length > 0) {
+        console.log(`[materialize-plan] Sample row: type=${rows[0].type}, has_steps_preset=${Array.isArray(rows[0].steps_preset) && rows[0].steps_preset.length > 0}, steps_preset=${JSON.stringify(rows[0].steps_preset)}`);
+      }
     } else {
       return new Response(JSON.stringify({ error:'plan_id or planned_workout_id required' }), { status:400, headers:{ ...corsHeaders, 'Content-Type':'application/json'} });
     }
-    if (!rows.length) return new Response(JSON.stringify({ success:true, materialized:0 }), { headers:{ ...corsHeaders, 'Content-Type':'application/json'} });
+    if (!rows.length) {
+      console.warn(`[materialize-plan] No rows found to materialize - returning early`);
+      return new Response(JSON.stringify({ success:true, materialized:0 }), { headers:{ ...corsHeaders, 'Content-Type':'application/json'} });
+    }
 
     // Load baselines for user inferred from first row
     const userId = rows[0]?.user_id;
@@ -1620,8 +1654,19 @@ Deno.serve(async (req) => {
     for (const row of rows) {
       try {
         console.log(`📋 Materializing: ${row.type} - ${row.name} (${row.id})`);
+        const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
         const { steps, total_s } = expandTokensForRow(row, baselines, adjustments);
         console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
+        
+        // Log error if materialization failed but tokens exist
+        if (steps.length === 0 && tokens.length > 0) {
+          console.error(`❌ Materialization failed for ${row.id}:`);
+          console.error(`   Type: ${row.type}`);
+          console.error(`   Name: ${row.name}`);
+          console.error(`   Tokens: ${tokens.join(', ')}`);
+          console.error(`   This indicates tokens did not match any patterns or fallbacks failed`);
+        }
+        
         if (steps && steps.length) {
           // Count recovery steps
           const recoverySteps = steps.filter((st:any) => st.kind === 'recovery' || st.kind === 'rest').length;
