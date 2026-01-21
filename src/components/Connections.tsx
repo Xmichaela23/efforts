@@ -1297,6 +1297,21 @@ const Connections: React.FC = () => {
         </p>
       </div>
 
+      <div className="text-center text-sm text-white/70 mt-4">
+        <p>
+          <a 
+            href="https://efforts.work/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-white/90 text-cyan-400"
+          >
+            Privacy Policy
+          </a>
+          <br />
+          <span className="text-xs text-white/60">See how Efforts uses data from your connected accounts.</span>
+        </p>
+      </div>
+
       <div className="text-center text-xs text-white/60 mt-4">
         <p>
           If you want to delete your Strava or Garmin data from the app,{' '}
