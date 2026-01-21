@@ -1211,9 +1211,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent value="completed" className="flex-1 p-2">
+          <TabsContent value="completed" className="flex-1 px-1 py-2">
             <div className={cardClass} style={cardStyle}>
-              <div className={hasCardStyle ? 'p-4' : ''}>
+              <div className={hasCardStyle ? 'px-2 py-4' : ''}>
                 {isCompleted ? (
                   <div>
                       {/* Delete control removed per product decision */}

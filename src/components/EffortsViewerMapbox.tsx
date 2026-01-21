@@ -1579,35 +1579,31 @@ function EffortsViewerMapbox({
     
     const dx = Math.abs(t.clientX - touchStartRef.current.x);
     const dy = Math.abs(t.clientY - touchStartRef.current.y);
-    const verticalThreshold = 8; // Lower threshold for vertical detection - prioritize scrolling
-    const horizontalThreshold = 20; // Higher threshold for horizontal - require clear intent
+    const verticalThreshold = 12; // Higher threshold for vertical - require more movement
+    const horizontalThreshold = 10; // Lower threshold for horizontal - activate sooner
     
     // If gesture intent hasn't been determined yet, check direction
     if (!touchStartRef.current.isScrubbing) {
-      // Prioritize vertical scrolling: if there's ANY meaningful vertical movement, allow scrolling
-      // This prevents snagging when scrolling with slight horizontal drift
-      if (dy > verticalThreshold) {
-        // If vertical movement exists and is at least 60% of horizontal, prioritize scrolling
-        // OR if vertical is simply greater than threshold (even if horizontal is also large)
-        if (dy >= dx * 0.6 || dy > horizontalThreshold) {
-          // Vertical gesture detected - this is scrolling
-          // Clear ref immediately to allow scrolling, don't prevent default
-          touchStartRef.current = null;
-          setIsScrubbing(false);
-          return; // Exit early, don't process any scrubbing
-        }
-      }
-      
-      // Only activate scrubbing if horizontal movement is CLEARLY dominant
-      // Horizontal must be significantly larger than vertical AND exceed threshold
-      if (dx > horizontalThreshold && dx > dy * 2.0) {
-        // Horizontal gesture detected - horizontal must be 2x vertical to activate scrubbing
-        // This makes it very hard to accidentally trigger scrubbing when scrolling
+      // Check horizontal first - prioritize horizontal scrubbing responsiveness
+      // If horizontal movement is clearly present, activate scrubbing quickly
+      if (dx > horizontalThreshold && dx >= dy * 1.2) {
+        // Horizontal gesture detected - horizontal must be 1.2x vertical to activate scrubbing
+        // Lower ratio makes horizontal scrubbing more responsive
         touchStartRef.current.isScrubbing = true;
         e.preventDefault(); // Prevent scrolling for horizontal gestures
         setIsScrubbing(true);
         setIdx(toIdxFromClientX(t.clientX, svgRef.current!));
         return;
+      }
+      
+      // Only allow vertical scrolling if vertical is clearly dominant
+      // Require more vertical movement to prevent snagging horizontal scrubs
+      if (dy > verticalThreshold && dy > dx * 1.5) {
+        // Vertical gesture detected - vertical must be 1.5x horizontal to allow scrolling
+        // This prevents vertical from snagging horizontal scrubbing attempts
+        touchStartRef.current = null;
+        setIsScrubbing(false);
+        return; // Exit early, allow scrolling
       }
       
       // If movement is small or ambiguous, don't do anything yet - allow natural scrolling
