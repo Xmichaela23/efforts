@@ -1754,15 +1754,15 @@ Deno.serve(async (req) => {
           const finalDuration = actualTotal > 0 ? Math.round(actualTotal / 60) : (originalDuration > 0 ? originalDuration : 1);
           const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds }, total_duration_seconds: finalTotalSeconds, duration: Math.max(1, finalDuration) };
           
-          // Update race day description if pace was corrected
+          // Update race day description to match actual pace used in computed steps
           const isRaceDay = (() => {
             const rowTags: string[] = Array.isArray((row as any)?.tags) ? (row as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
             const desc: string = String((row as any)?.description || '').toLowerCase();
             return rowTags.includes('race_day') || rowTags.includes('marathon_pace') || /race\s+day/i.test(desc);
           })();
           
-          if (isRaceDay && baselines?.effort_paces?.race) {
-            // Find the actual pace used in computed steps
+          if (isRaceDay) {
+            // Find the actual pace used in computed steps (should be from corrected baselines)
             const raceStep = v3.find((st: any) => st?.pace_sec_per_mi || st?.paceTarget);
             if (raceStep) {
               const paceSec = raceStep.pace_sec_per_mi || (() => {
@@ -1771,18 +1771,20 @@ Deno.serve(async (req) => {
                 return null;
               })();
               
-              if (paceSec && paceSec !== baselines.effort_paces.race) {
-                // Pace was corrected - update description to match
+              if (paceSec) {
+                // Always update description to match the pace actually used in computed steps
                 const paceMin = Math.floor(paceSec / 60);
                 const paceSecRem = Math.round(paceSec % 60);
                 const paceFormatted = `${paceMin}:${String(paceSecRem).padStart(2, '0')}/mi`;
                 
-                // Update description to reflect corrected pace
+                // Update description to reflect actual pace used
                 const oldDesc = String((row as any)?.description || '');
                 const newDesc = oldDesc.replace(/\((\d+):(\d+)\/mi\)/, `(${paceFormatted})`);
                 if (newDesc !== oldDesc) {
                   update.description = newDesc;
-                  console.log(`[Paces] 🔧 Updated race day description pace: ${oldDesc.match(/\((\d+):(\d+)\/mi\)/)?.[0]} → ${paceFormatted}`);
+                  console.log(`[Paces] 🔧 Updated race day description pace to match computed steps: ${oldDesc.match(/\((\d+):(\d+)\/mi\)/)?.[0] || 'unknown'} → ${paceFormatted}`);
+                } else {
+                  console.log(`[Paces] ✓ Race day description already matches computed pace: ${paceFormatted}`);
                 }
               }
             }
