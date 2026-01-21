@@ -11,6 +11,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from './exercise-config.ts';
+import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 
 // Type for plan adjustments
 type PlanAdjustment = {
@@ -1668,52 +1669,21 @@ Deno.serve(async (req) => {
       // Recalculate effort_paces from effort_score if source is 'calculated' (fixes outdated paces)
       let effortPaces = ub?.effort_paces;
       if (ub?.effort_score && ub?.effort_paces_source === 'calculated' && effortPaces) {
-        // Recalculate race pace from marathon time to ensure consistency
+        // Recalculate all paces from effort_score using shared calculation function
         // This fixes plans created before the race pace calculation fix
         const score = Number(ub.effort_score);
         if (Number.isFinite(score) && score > 0) {
-          // Calculate marathon time from VDOT table (interpolated)
-          const VDOT_TABLE = [
-            { vdot: 34, marathon: 15648 },
-            { vdot: 35, marathon: 15168 },
-            { vdot: 36, marathon: 14712 },
-            { vdot: 38, marathon: 13872 },
-            { vdot: 40, marathon: 13104 },
-            { vdot: 42, marathon: 12408 },
-            { vdot: 44, marathon: 11772 },
-            { vdot: 45, marathon: 11472 },
-            { vdot: 46, marathon: 11184 },
-            { vdot: 48, marathon: 10644 },
-            { vdot: 50, marathon: 10152 },
-            { vdot: 52, marathon: 9696 },
-            { vdot: 54, marathon: 9276 },
-            { vdot: 56, marathon: 8892 },
-            { vdot: 58, marathon: 8538 },
-            { vdot: 60, marathon: 8220 },
-            { vdot: 65, marathon: 7482 },
-            { vdot: 70, marathon: 6858 },
-            { vdot: 75, marathon: 6330 },
-            { vdot: 80, marathon: 5880 },
-          ];
-          
-          let lower = VDOT_TABLE[0];
-          let upper = VDOT_TABLE[VDOT_TABLE.length - 1];
-          for (let i = 0; i < VDOT_TABLE.length - 1; i++) {
-            if (score >= VDOT_TABLE[i].vdot && score <= VDOT_TABLE[i + 1].vdot) {
-              lower = VDOT_TABLE[i];
-              upper = VDOT_TABLE[i + 1];
-              break;
+          try {
+            const recalculatedPaces = getPacesFromScore(score);
+            
+            // Only update if the stored race pace is significantly different (more than 5 seconds)
+            if (Math.abs((effortPaces.race || 0) - recalculatedPaces.race) > 5) {
+              console.log(`[Paces] 🔧 Recalculating paces from effort_score ${score}: race ${effortPaces.race}s/mi → ${recalculatedPaces.race}s/mi`);
+              effortPaces = recalculatedPaces; // Use all recalculated paces for consistency
             }
-          }
-          
-          const fraction = score <= lower.vdot ? 0 : (score >= upper.vdot ? 1 : (score - lower.vdot) / (upper.vdot - lower.vdot));
-          const marathonTime = lower.marathon - fraction * (lower.marathon - upper.marathon);
-          const correctedRacePace = Math.round(marathonTime / 26.2);
-          
-          // Only update if the stored pace is significantly different (more than 5 seconds)
-          if (Math.abs((effortPaces.race || 0) - correctedRacePace) > 5) {
-            console.log(`[Paces] 🔧 Recalculating race pace from effort_score ${score}: ${effortPaces.race}s/mi → ${correctedRacePace}s/mi`);
-            effortPaces = { ...effortPaces, race: correctedRacePace };
+          } catch (e) {
+            console.error(`[Paces] ⚠️  Error recalculating paces from effort_score:`, e);
+            // Continue with stored paces if recalculation fails
           }
         }
       }
