@@ -1784,6 +1784,40 @@ Deno.serve(async (req) => {
           const finalDuration = actualTotal > 0 ? Math.round(actualTotal / 60) : (originalDuration > 0 ? originalDuration : 1);
           const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds }, total_duration_seconds: finalTotalSeconds, duration: Math.max(1, finalDuration) };
           
+          // Update race day description if pace was corrected
+          const isRaceDay = (() => {
+            const rowTags: string[] = Array.isArray((row as any)?.tags) ? (row as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
+            const desc: string = String((row as any)?.description || '').toLowerCase();
+            return rowTags.includes('race_day') || rowTags.includes('marathon_pace') || /race\s+day/i.test(desc);
+          })();
+          
+          if (isRaceDay && baselines?.effort_paces?.race) {
+            // Find the actual pace used in computed steps
+            const raceStep = v3.find((st: any) => st?.pace_sec_per_mi || st?.paceTarget);
+            if (raceStep) {
+              const paceSec = raceStep.pace_sec_per_mi || (() => {
+                const match = String(raceStep.paceTarget || '').match(/(\d+):(\d+)/);
+                if (match) return parseInt(match[1]) * 60 + parseInt(match[2]);
+                return null;
+              })();
+              
+              if (paceSec && paceSec !== baselines.effort_paces.race) {
+                // Pace was corrected - update description to match
+                const paceMin = Math.floor(paceSec / 60);
+                const paceSecRem = Math.round(paceSec % 60);
+                const paceFormatted = `${paceMin}:${String(paceSecRem).padStart(2, '0')}/mi`;
+                
+                // Update description to reflect corrected pace
+                const oldDesc = String((row as any)?.description || '');
+                const newDesc = oldDesc.replace(/\((\d+):(\d+)\/mi\)/, `(${paceFormatted})`);
+                if (newDesc !== oldDesc) {
+                  update.description = newDesc;
+                  console.log(`[Paces] 🔧 Updated race day description pace: ${oldDesc.match(/\((\d+):(\d+)\/mi\)/)?.[0]} → ${paceFormatted}`);
+                }
+              }
+            }
+          }
+          
           // Debug: Log band exercises before DB write
           const bandSteps = v3.filter((st:any) => st?.kind === 'strength' && st?.strength?.name?.toLowerCase().includes('band'));
           if (bandSteps.length > 0) {
