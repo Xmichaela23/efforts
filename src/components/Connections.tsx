@@ -28,7 +28,7 @@ import { useToast } from './ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '../lib/supabase';
 import { Capacitor } from '@capacitor/core';
-import { Browser } from '@capacitor/browser';
+import { InAppBrowser } from '@capacitor/inappbrowser';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 interface ConnectionStatus {
@@ -889,7 +889,15 @@ const Connections: React.FC = () => {
     
     // Use in-app browser for native apps, regular link for web
     if (Capacitor.isNativePlatform()) {
-      await Browser.open({ url });
+      await InAppBrowser.openInSystemBrowser({
+        url,
+        options: {
+          iOS: {
+            closeButtonText: 'Done',
+            viewStyle: 'fullscreen'
+          }
+        }
+      });
     } else {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
