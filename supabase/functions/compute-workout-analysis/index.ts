@@ -1811,7 +1811,12 @@ Deno.serve(async (req) => {
       workout_id,
       partial_computed_keys: Object.keys(partialComputed),
       has_analysis: !!partialComputed.analysis,
-      has_overall: !!partialComputed.overall
+      has_overall: !!partialComputed.overall,
+      analysis_series_keys: partialComputed.analysis?.series ? Object.keys(partialComputed.analysis.series) : null,
+      analysis_series_lengths: partialComputed.analysis?.series ? Object.fromEntries(
+        Object.entries(partialComputed.analysis.series).map(([k, v]) => [k, Array.isArray(v) ? v.length : 'not-array'])
+      ) : null,
+      partial_computed_json: JSON.stringify(partialComputed).substring(0, 500) // First 500 chars
     });
     
     const { error: rpcError, data: rpcData } = await supabase.rpc('merge_computed', {
