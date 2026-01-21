@@ -1612,20 +1612,25 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             return `${sign}${val} mi`;
           };
 
-          // Get contextual message (pass planned and executedSecPerMi for range validation)
-          const message = getContextualMessage(workoutIntent, finalDurationPct, finalDistPct, finalPacePct, 'run', planned, executedSecPerMi);
-          
           // Read server-generated score explanation (smart server, dumb client)
+          // Prefer backend-generated plan-aware explanation over client-side generic message
           const scoreReasoning = (completed as any)?.workout_analysis?.score_explanation || null;
+          
+          // Fallback to client-side message only if backend didn't generate one
+          const message = scoreReasoning ? null : getContextualMessage(workoutIntent, finalDurationPct, finalDistPct, finalPacePct, 'run', planned, executedSecPerMi);
 
           return (
             <div className="w-full pt-1 pb-2">
-              {/* Descriptive blurb first */}
-              {message && (
+              {/* Descriptive blurb first - prefer backend plan-aware explanation */}
+              {scoreReasoning ? (
+                <div className="mb-3 text-sm text-gray-300 text-center">
+                  {scoreReasoning}
+                </div>
+              ) : message ? (
                 <div className="mb-3 text-sm text-gray-300 text-center">
                   {message.icon} {message.text}
                 </div>
-              )}
+              ) : null}
               
               {/* Adherence scores */}
               <div className="flex items-center justify-center gap-6 text-center mb-3">

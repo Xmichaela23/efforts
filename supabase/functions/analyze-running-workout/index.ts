@@ -1658,8 +1658,25 @@ Deno.serve(async (req) => {
     console.log('  - detailedAnalysis keys:', detailedAnalysis ? Object.keys(detailedAnalysis) : 'N/A');
     console.log('  - detailedAnalysis value:', JSON.stringify(detailedAnalysis, null, 2));
     
+    // Fetch plan context for smarter, plan-aware verbiage
+    let planContext = null;
+    if (plannedWorkout?.training_plan_id && workout?.date) {
+      planContext = await fetchPlanContextForWorkout(
+        supabase,
+        workout.user_id,
+        plannedWorkout.training_plan_id,
+        workout.date
+      );
+      console.log('📋 [PLAN CONTEXT] Fetched:', planContext ? {
+        weekIndex: planContext.weekIndex,
+        weekIntent: planContext.weekIntent,
+        isRecoveryWeek: planContext.isRecoveryWeek,
+        phaseName: planContext.phaseName
+      } : 'No plan context');
+    }
+
     // Generate deterministic score explanation (explains WHY scores are what they are)
-    const scoreExplanation = generateScoreExplanation(performance, detailedAnalysis, plannedWorkout);
+    const scoreExplanation = generateScoreExplanation(performance, detailedAnalysis, plannedWorkout, planContext);
     console.log('📝 [SCORE EXPLANATION] Generated:', scoreExplanation);
     
     // Use RPC to merge computed (preserves analysis.series from compute-workout-analysis)
@@ -3699,10 +3716,208 @@ function generateMileByMileTerrainBreakdown(
  * This runs server-side to ensure the explanation is always in sync
  * with the scoring logic (smart server, dumb client).
  */
+/**
+ * Fetch plan context for a workout date
+ */
+async function fetchPlanContextForWorkout(
+  supabase: any,
+  userId: string,
+  planId: string,
+  workoutDate: string
+): Promise<{
+  hasActivePlan: boolean;
+  weekIndex: number | null;
+  weekIntent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
+  isRecoveryWeek: boolean;
+  isTaperWeek: boolean;
+  phaseName: string | null;
+  weekFocusLabel: string | null;
+  planName: string | null;
+} | null> {
+  try {
+    const { data: plan } = await supabase
+      .from('plans')
+      .select('id, name, config, duration_weeks')
+      .eq('id', planId)
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single();
+
+    if (!plan) return null;
+
+    const config = plan.config || {};
+    const startDateStr = config.user_selected_start_date || config.start_date;
+    if (!startDateStr) return null;
+
+    // Normalize start date to Monday
+    const mondayOf = (iso: string): string => {
+      const d = new Date(iso);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      return monday.toLocaleDateString('en-CA');
+    };
+
+    const startDateMonday = mondayOf(startDateStr);
+    const startDate = new Date(startDateMonday);
+    const viewedDate = new Date(workoutDate);
+    startDate.setHours(0, 0, 0, 0);
+    viewedDate.setHours(0, 0, 0, 0);
+    const diffMs = viewedDate.getTime() - startDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    let weekIndex = Math.max(1, Math.floor(diffDays / 7) + 1);
+    
+    const durationWeeks = plan.duration_weeks || config.duration_weeks || 0;
+    if (durationWeeks > 0) {
+      weekIndex = Math.min(weekIndex, durationWeeks);
+    }
+
+    // Get weekly summaries
+    let weeklySummaries = config.weekly_summaries || {};
+    if (!weeklySummaries || Object.keys(weeklySummaries).length === 0) {
+      const sessionsByWeek = plan.sessions_by_week || {};
+      weeklySummaries = {};
+      const weekKeys = Object.keys(sessionsByWeek).sort((a, b) => parseInt(a) - parseInt(b));
+      
+      for (const weekKey of weekKeys) {
+        const sessions = Array.isArray(sessionsByWeek[weekKey]) ? sessionsByWeek[weekKey] : [];
+        if (sessions.length === 0) continue;
+        
+        const hasIntervals = sessions.some((s: any) => {
+          const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+          const tags = Array.isArray(s?.tags) ? s.tags : [];
+          const desc = String(s?.description || s?.name || '').toLowerCase();
+          return tokens.some((t: string) => /interval|vo2|5kpace|tempo|threshold/.test(String(t).toLowerCase())) ||
+                 tags.some((t: string) => /interval|vo2|tempo|threshold|hard/.test(String(t).toLowerCase())) ||
+                 /interval|vo2|tempo|threshold/.test(desc);
+        });
+        
+        const hasLongRun = sessions.some((s: any) => {
+          const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+          const tags = Array.isArray(s?.tags) ? s.tags : [];
+          const desc = String(s?.description || s?.name || '').toLowerCase();
+          return tokens.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
+                 tags.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
+                 /long run|longrun/.test(desc);
+        });
+        
+        let focus = '';
+        if (hasIntervals && hasLongRun) {
+          focus = 'Build Phase';
+        } else if (hasIntervals) {
+          focus = 'Speed Development';
+        } else if (hasLongRun) {
+          focus = 'Endurance Building';
+        } else {
+          focus = 'Training Week';
+        }
+        
+        weeklySummaries[weekKey] = { focus };
+      }
+    }
+
+    const weekSummary = weeklySummaries[String(weekIndex)] || {};
+    const weekFocusLabel = weekSummary.focus || null;
+
+    // Determine recovery/taper status
+    let isRecoveryWeek = false;
+    let isTaperWeek = false;
+    let weekIntent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown' = 'build';
+    let phaseName: string | null = null;
+
+    // PRIORITY 1: Explicit per-week tag
+    if (weekFocusLabel) {
+      const focusLower = weekFocusLabel.toLowerCase();
+      if (focusLower.includes('recovery') || focusLower.includes('recovery week')) {
+        isRecoveryWeek = true;
+        weekIntent = 'recovery';
+      } else if (focusLower.includes('taper') || focusLower.includes('taper week')) {
+        isTaperWeek = true;
+        weekIntent = 'taper';
+      } else if (focusLower.includes('peak')) {
+        weekIntent = 'peak';
+      }
+    }
+
+    // PRIORITY 2: Explicit phase metadata
+    if (!isRecoveryWeek && !isTaperWeek && config.phases) {
+      for (const [phaseKeyName, phaseData] of Object.entries(config.phases)) {
+        const phase = phaseData as any;
+        if (phase.weeks && phase.weeks.includes(weekIndex)) {
+          phaseName = phaseKeyName;
+          
+          if (phase.recovery_weeks && Array.isArray(phase.recovery_weeks) && phase.recovery_weeks.includes(weekIndex)) {
+            isRecoveryWeek = true;
+            weekIntent = 'recovery';
+          }
+          
+          if (phaseKeyName.toLowerCase().includes('taper')) {
+            isTaperWeek = true;
+            weekIntent = 'taper';
+          }
+          
+          if (weekIntent === 'build') {
+            if (phaseKeyName.toLowerCase().includes('peak')) {
+              weekIntent = 'peak';
+            } else if (phaseKeyName.toLowerCase().includes('base')) {
+              weekIntent = 'baseline';
+            }
+          }
+          
+          break;
+        }
+      }
+    }
+
+    // PRIORITY 3: Pattern-based
+    if (!isRecoveryWeek && !isTaperWeek && config.recoveryPattern === 'every_4th') {
+      const taperPhase = config.phases ? Object.values(config.phases).find((p: any) => 
+        p.name && p.name.toLowerCase().includes('taper')
+      ) : null;
+      
+      const isInTaper = taperPhase && (taperPhase as any).weeks && (taperPhase as any).weeks.includes(weekIndex);
+      
+      if (!isInTaper && weekIndex % 4 === 0) {
+        isRecoveryWeek = true;
+        weekIntent = 'recovery';
+      }
+    }
+
+    if (weekIntent === 'unknown') {
+      weekIntent = 'build';
+    }
+
+    return {
+      hasActivePlan: true,
+      weekIndex,
+      weekIntent,
+      isRecoveryWeek,
+      isTaperWeek,
+      phaseName,
+      weekFocusLabel,
+      planName: plan.name
+    };
+
+  } catch (error) {
+    console.error('⚠️ Error fetching plan context:', error);
+    return null;
+  }
+}
+
 function generateScoreExplanation(
   performance: { execution_adherence: number; pace_adherence: number; duration_adherence: number },
   detailedAnalysis: any,
-  plannedWorkout?: any
+  plannedWorkout?: any,
+  planContext?: {
+    hasActivePlan: boolean;
+    weekIndex: number | null;
+    weekIntent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
+    isRecoveryWeek: boolean;
+    isTaperWeek: boolean;
+    phaseName: string | null;
+    weekFocusLabel: string | null;
+    planName: string | null;
+  } | null
 ): string | null {
   const intervalBreakdown = detailedAnalysis?.interval_breakdown;
   
@@ -3726,7 +3941,15 @@ function generateScoreExplanation(
   const isEasyOrRecoveryRun = easyKeywords.some(kw => 
     workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
   );
-  console.log(`🔍 [EXPLANATION EASY CHECK] isEasyOrRecoveryRun=${isEasyOrRecoveryRun}, workoutName="${workoutName}"`);
+  
+  // Plan-aware context: use plan week intent if available, otherwise fall back to workout detection
+  const isRecoveryContext = planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery' || isEasyOrRecoveryRun;
+  const isTaperContext = planContext?.isTaperWeek || planContext?.weekIntent === 'taper';
+  const isBuildContext = planContext?.weekIntent === 'build' || planContext?.weekIntent === 'peak';
+  const weekNumber = planContext?.weekIndex;
+  const phaseName = planContext?.phaseName;
+  
+  console.log(`🔍 [EXPLANATION CONTEXT] isEasyOrRecoveryRun=${isEasyOrRecoveryRun}, planContext=${planContext ? JSON.stringify({ weekIntent: planContext.weekIntent, isRecoveryWeek: planContext.isRecoveryWeek, weekIndex: planContext.weekIndex }) : 'none'}`);
 
   // Format pace from seconds to MM:SS
   const fmtPace = (secPerMi: number): string => {
@@ -3800,17 +4023,40 @@ function generateScoreExplanation(
   const paceAdherencePct = Math.round(performance.pace_adherence);
   
   if (paceAdherencePct >= 95 && okIntervals.length === deviations.length) {
-    // Perfect or near-perfect adherence
-    parts.push(`All ${deviations.length} work intervals within prescribed ${targetRange}/mi range`);
+    // Perfect or near-perfect adherence - plan-aware
+    if (planContext?.hasActivePlan && isBuildContext) {
+      const weekInfo = weekNumber ? ` (Week ${weekNumber})` : '';
+      parts.push(`Build week${weekInfo}: All ${deviations.length} work intervals within prescribed ${targetRange}/mi range — excellent execution`);
+    } else if (planContext?.isRecoveryWeek) {
+      parts.push(`Recovery week: All ${deviations.length} intervals within prescribed ${targetRange}/mi range — perfect pacing for adaptation`);
+    } else {
+      parts.push(`All ${deviations.length} work intervals within prescribed ${targetRange}/mi range`);
+    }
   } else if (paceAdherencePct >= 85) {
     // Good execution
     if (fastIntervals.length > 0 && slowIntervals.length === 0) {
       const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
-      parts.push(`Strong execution — ${fastIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgFastDelta)}/mi faster than target`);
-    } else if (slowIntervals.length > 0 && isEasyOrRecoveryRun) {
-      // Easy/recovery run where slower is fine
+      if (planContext?.hasActivePlan && isBuildContext) {
+        const weekInfo = weekNumber ? ` (Week ${weekNumber})` : '';
+        parts.push(`Build week${weekInfo}: Strong execution — ${fastIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgFastDelta)}/mi faster than target`);
+      } else {
+        parts.push(`Strong execution — ${fastIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgFastDelta)}/mi faster than target`);
+      }
+    } else if (slowIntervals.length > 0 && isRecoveryContext) {
+      // Recovery/easy run where slower is fine - make it plan-aware
       const avgSlowDelta = Math.round(slowIntervals.reduce((sum, d) => sum + d.delta, 0) / slowIntervals.length);
-      parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — good recovery effort`);
+      
+      if (planContext?.isRecoveryWeek) {
+        // Recovery week: emphasize that slower is intentional and beneficial
+        const weekInfo = weekNumber ? `Week ${weekNumber}` : '';
+        parts.push(`Recovery week ${weekInfo}: Completed ${fmtDelta(avgSlowDelta)}/mi slower than target — perfect for adaptation and supercompensation`);
+      } else if (planContext?.hasActivePlan && isEasyOrRecoveryRun) {
+        // Easy run during build week: still good, but note it's for recovery
+        parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — good recovery effort, maintaining aerobic base`);
+      } else {
+        // Generic easy run (no plan context)
+        parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — good recovery effort`);
+      }
     } else if (slowIntervals.length > 0) {
       parts.push(`${okIntervals.length} of ${deviations.length} intervals on target`);
     } else {
@@ -3820,8 +4066,15 @@ function generateScoreExplanation(
     // Moderate adherence - explain what happened
     if (fastIntervals.length > 0 && slowIntervals.length === 0) {
       const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
-      if (isEasyOrRecoveryRun) {
-        parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than target — running too hard on recovery days limits adaptation`);
+      if (isRecoveryContext) {
+        // Recovery/easy run that was too fast
+        if (planContext?.isRecoveryWeek) {
+          parts.push(`Recovery week: Ran ${fmtDelta(avgFastDelta)}/mi faster than target — too hard for recovery, limits adaptation and supercompensation`);
+        } else if (planContext?.hasActivePlan) {
+          parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than target — running too hard on recovery days limits adaptation`);
+        } else {
+          parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than target — running too hard on recovery days limits adaptation`);
+        }
       } else {
         parts.push(`Completed intervals ${fmtDelta(avgFastDelta)}/mi faster than prescribed (${targetRange}/mi)`);
         if (avgFastDelta > 30) {
@@ -3830,11 +4083,21 @@ function generateScoreExplanation(
       }
     } else if (slowIntervals.length > 0 && fastIntervals.length === 0) {
       const avgSlowDelta = Math.round(slowIntervals.reduce((sum, d) => sum + d.delta, 0) / slowIntervals.length);
-      if (isEasyOrRecoveryRun) {
-        // Easy run where slower is totally fine
-        parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — recovery achieved`);
+      if (isRecoveryContext) {
+        // Recovery/easy run where slower is totally fine
+        if (planContext?.isRecoveryWeek) {
+          parts.push(`Recovery week: Completed ${fmtDelta(avgSlowDelta)}/mi slower than target — optimal for adaptation`);
+        } else {
+          parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — recovery achieved`);
+        }
       } else {
-        parts.push(`${slowIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgSlowDelta)}/mi slower than target (${targetRange}/mi) — missed intended effort`);
+        // Work intervals that were too slow - plan-aware messaging
+        if (planContext?.hasActivePlan && isBuildContext) {
+          const weekInfo = weekNumber ? ` (Week ${weekNumber})` : '';
+          parts.push(`Build week${weekInfo}: ${slowIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgSlowDelta)}/mi slower than target — missed intended stimulus, may limit progression`);
+        } else {
+          parts.push(`${slowIntervals.length} of ${deviations.length} intervals ran ${fmtDelta(avgSlowDelta)}/mi slower than target (${targetRange}/mi) — missed intended effort`);
+        }
       }
     } else if (fastIntervals.length > 0 && slowIntervals.length > 0) {
       parts.push(`Inconsistent pacing: ${fastIntervals.length} intervals fast, ${slowIntervals.length} slow`);
@@ -3843,18 +4106,39 @@ function generateScoreExplanation(
     // Low adherence - explain the issue  
     if (slowIntervals.length > 0) {
       const avgSlowDelta = Math.round(slowIntervals.reduce((sum, d) => sum + d.delta, 0) / slowIntervals.length);
-      if (isEasyOrRecoveryRun) {
-        // Easy run - slower is fine, this shouldn't happen with new scoring but handle it
-        parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — still achieved recovery benefit`);
+      if (isRecoveryContext) {
+        // Recovery/easy run - slower is fine
+        if (planContext?.isRecoveryWeek) {
+          parts.push(`Recovery week: Completed ${fmtDelta(avgSlowDelta)}/mi slower than target — still achieved recovery benefit`);
+        } else {
+          parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — still achieved recovery benefit`);
+        }
       } else {
-        parts.push(`${slowIntervals.length} of ${deviations.length} intervals missed target by ${fmtDelta(avgSlowDelta)}/mi — workout stimulus not achieved`);
+        // Work intervals that missed target significantly
+        if (planContext?.hasActivePlan && isBuildContext) {
+          const weekInfo = weekNumber ? ` (Week ${weekIndex})` : '';
+          parts.push(`Build week${weekInfo}: ${slowIntervals.length} of ${deviations.length} intervals missed target by ${fmtDelta(avgSlowDelta)}/mi — workout stimulus not achieved, may impact phase goals`);
+        } else {
+          parts.push(`${slowIntervals.length} of ${deviations.length} intervals missed target by ${fmtDelta(avgSlowDelta)}/mi — workout stimulus not achieved`);
+        }
       }
     } else if (fastIntervals.length > 0) {
       const avgFastDelta = Math.round(fastIntervals.reduce((sum, d) => sum + d.delta, 0) / fastIntervals.length);
-      if (isEasyOrRecoveryRun) {
-        parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than prescribed — too hard for recovery day`);
+      if (isRecoveryContext) {
+        // Recovery/easy run that was too fast
+        if (planContext?.isRecoveryWeek) {
+          parts.push(`Recovery week: Ran ${fmtDelta(avgFastDelta)}/mi faster than prescribed — too hard, compromises recovery and adaptation`);
+        } else {
+          parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than prescribed — too hard for recovery day`);
+        }
       } else {
-        parts.push(`Ran significantly faster (${fmtDelta(avgFastDelta)}/mi) than prescribed ${targetRange}/mi`);
+        // Work intervals that were too fast
+        if (planContext?.hasActivePlan && isBuildContext) {
+          const weekInfo = weekNumber ? ` (Week ${weekNumber})` : '';
+          parts.push(`Build week${weekInfo}: Ran significantly faster (${fmtDelta(avgFastDelta)}/mi) than prescribed ${targetRange}/mi — monitor fatigue and injury risk`);
+        } else {
+          parts.push(`Ran significantly faster (${fmtDelta(avgFastDelta)}/mi) than prescribed ${targetRange}/mi`);
+        }
       }
     }
   }

@@ -6,12 +6,22 @@
  * PURPOSE: Calculate training context for Context screen
  * 
  * WHAT IT DOES:
- * - Calculates ACWR (Acute:Chronic Workload Ratio) using rolling 7/28 day windows
+ * - Calculates ACWR (Acute:Chronic Workload Ratio) using plan-aligned week windows
  * - Aggregates sport breakdown (run/bike/swim/strength/mobility)
  * - Builds 14-day activity timeline
  * - Generates smart insights (ACWR warnings, consecutive hard days, etc.)
- * - Calculates week-over-week comparison
+ * - Calculates week-over-week comparison using plan weeks when available
  * - Provides projected ACWR if planned workout exists
+ * 
+ * SMART DATE RANGES:
+ * - When a plan is active: Uses plan week boundaries (Monday-Sunday)
+ *   - Acute window: Current plan week (Monday to focus date)
+ *   - Chronic window: Last 4 plan weeks
+ *   - Week comparison: Current plan week vs previous plan week
+ * - When no plan: Uses rolling windows (last 7/28 days)
+ * 
+ * This prevents the issue where a recovery week's "last 7 days" includes
+ * days from the previous build week, making the analysis misleading.
  * 
  * INPUT: { user_id: string, date: string, workout_id?: string }
  * OUTPUT: TrainingContextResponse (see interface below)
@@ -19,7 +29,7 @@
  * FORMULAS:
  * - Workload (cardio): duration (hours) × intensity² × 100
  * - Workload (strength): volume_factor × intensity² × 100
- * - ACWR: (7-day sum / 7) / (28-day sum / 28)
+ * - ACWR: (acute daily avg) / (chronic daily avg)
  * 
  * ACWR THRESHOLDS (plan-aware):
  * 
@@ -34,6 +44,8 @@
  * - 0.80 - 1.50: optimal (plan progression)
  * - 1.50 - 1.70: elevated (warning)
  * - > 1.70: high_risk (critical)
+ * 
+ * Recovery/Taper weeks have adjusted thresholds (lower load is expected)
  * =============================================================================
  */
 
@@ -204,37 +216,38 @@ Deno.serve(async (req) => {
 
     console.log(`📊 Generating training context for user ${user_id}, date ${date}`);
 
-    // Calculate date ranges
     const focusDate = new Date(date + 'T12:00:00');
-    const sevenDaysAgo = new Date(focusDate);
-    sevenDaysAgo.setDate(focusDate.getDate() - 6);
-    const twentyEightDaysAgo = new Date(focusDate);
-    twentyEightDaysAgo.setDate(focusDate.getDate() - 27);
-    const fourteenDaysAgo = new Date(focusDate);
-    fourteenDaysAgo.setDate(focusDate.getDate() - 13);
-    const previousWeekStart = new Date(sevenDaysAgo);
-    previousWeekStart.setDate(previousWeekStart.getDate() - 7);
-
     const focusDateISO = date;
-    const sevenDaysAgoISO = sevenDaysAgo.toLocaleDateString('en-CA');
-    const twentyEightDaysAgoISO = twentyEightDaysAgo.toLocaleDateString('en-CA');
-    const fourteenDaysAgoISO = fourteenDaysAgo.toLocaleDateString('en-CA');
-    const previousWeekStartISO = previousWeekStart.toLocaleDateString('en-CA');
 
-    console.log(`📅 Date ranges: acute=${sevenDaysAgoISO} to ${focusDateISO}, chronic=${twentyEightDaysAgoISO} to ${focusDateISO}`);
+    // ==========================================================================
+    // FETCH PLAN CONTEXT FIRST (needed for smart date range calculation)
+    // ==========================================================================
+
+    const planContext = await fetchPlanContext(supabase, user_id, focusDateISO, focusDate);
+
+    // ==========================================================================
+    // CALCULATE SMART DATE RANGES (plan-aligned when plan is active)
+    // ==========================================================================
+
+    const dateRanges = calculateSmartDateRanges(focusDate, focusDateISO, planContext);
+
+    console.log(`📅 Date ranges: acute=${dateRanges.acuteStartISO} to ${dateRanges.acuteEndISO}, chronic=${dateRanges.chronicStartISO} to ${dateRanges.chronicEndISO}`);
+    if (planContext?.hasActivePlan) {
+      console.log(`📋 Using plan-aligned windows: current week (${dateRanges.currentWeekStartISO} - ${dateRanges.currentWeekEndISO}), previous week (${dateRanges.previousWeekStartISO} - ${dateRanges.previousWeekEndISO})`);
+    }
 
     // ==========================================================================
     // FETCH DATA
     // ==========================================================================
 
-    // Fetch completed workouts for last 28 days
+    // Fetch completed workouts for chronic window (28 days or 4 plan weeks)
     const { data: completedWorkouts, error: completedError } = await supabase
       .from('workouts')
       .select('id, type, name, date, workload_actual, workload_planned, intensity_factor, duration, moving_time, workout_status')
       .eq('user_id', user_id)
       .eq('workout_status', 'completed')
-      .gte('date', twentyEightDaysAgoISO)
-      .lte('date', focusDateISO)
+      .gte('date', dateRanges.chronicStartISO)
+      .lte('date', dateRanges.chronicEndISO)
       .order('date', { ascending: false });
 
     if (completedError) {
@@ -261,34 +274,28 @@ Deno.serve(async (req) => {
     console.log(`📊 Found ${workouts.length} completed workouts, ${planned.length} planned workouts`);
 
     // ==========================================================================
-    // FETCH PLAN CONTEXT
+    // CALCULATE ACWR (using smart date ranges)
     // ==========================================================================
 
-    const planContext = await fetchPlanContext(supabase, user_id, focusDateISO, focusDate);
+    const acwr = calculateACWR(workouts, focusDate, dateRanges, planned, planContext);
 
     // ==========================================================================
-    // CALCULATE ACWR
+    // CALCULATE SPORT BREAKDOWN (using current plan week or last 7 days)
     // ==========================================================================
 
-    const acwr = calculateACWR(workouts, focusDate, sevenDaysAgo, twentyEightDaysAgo, planned, planContext);
-
-    // ==========================================================================
-    // CALCULATE SPORT BREAKDOWN (last 7 days)
-    // ==========================================================================
-
-    const sportBreakdown = calculateSportBreakdown(workouts, sevenDaysAgo, focusDate);
+    const sportBreakdown = calculateSportBreakdown(workouts, dateRanges);
 
     // ==========================================================================
     // BUILD TIMELINE (last 14 days)
     // ==========================================================================
 
-    const timeline = buildTimeline(workouts, planned, fourteenDaysAgo, focusDate, sevenDaysAgo);
+    const timeline = buildTimeline(workouts, planned, dateRanges.fourteenDaysAgo, focusDate, dateRanges.acuteStart);
 
     // ==========================================================================
-    // CALCULATE WEEK COMPARISON
+    // CALCULATE WEEK COMPARISON (using plan weeks when available)
     // ==========================================================================
 
-    const weekComparison = calculateWeekComparison(workouts, sevenDaysAgo, focusDate, previousWeekStart);
+    const weekComparison = calculateWeekComparison(workouts, dateRanges, planContext);
 
     // ==========================================================================
     // GENERATE SMART INSIGHTS
@@ -325,6 +332,163 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// =============================================================================
+// SMART DATE RANGE CALCULATION
+// =============================================================================
+
+interface SmartDateRanges {
+  // Acute window (7 days or current plan week)
+  acuteStart: Date;
+  acuteEnd: Date;
+  acuteStartISO: string;
+  acuteEndISO: string;
+  
+  // Chronic window (28 days or 4 plan weeks)
+  chronicStart: Date;
+  chronicEnd: Date;
+  chronicStartISO: string;
+  chronicEndISO: string;
+  
+  // Current plan week boundaries (if plan is active)
+  currentWeekStart: Date | null;
+  currentWeekEnd: Date | null;
+  currentWeekStartISO: string | null;
+  currentWeekEndISO: string | null;
+  
+  // Previous plan week boundaries (if plan is active)
+  previousWeekStart: Date | null;
+  previousWeekEnd: Date | null;
+  previousWeekStartISO: string | null;
+  previousWeekEndISO: string | null;
+  
+  // For timeline (always 14 days)
+  fourteenDaysAgo: Date;
+  fourteenDaysAgoISO: string;
+}
+
+/**
+ * Calculate smart date ranges that align with plan weeks when a plan is active.
+ * Falls back to rolling windows when no plan is active.
+ */
+function calculateSmartDateRanges(
+  focusDate: Date,
+  focusDateISO: string,
+  planContext: PlanContext | null
+): SmartDateRanges {
+  
+  // Helper: Get Monday of a given date
+  const mondayOf = (date: Date): Date => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+  
+  // Helper: Get Sunday of a given date (end of week)
+  const sundayOf = (date: Date): Date => {
+    const monday = mondayOf(date);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    return sunday;
+  };
+  
+  // Helper: Format date to ISO string (YYYY-MM-DD)
+  const toISO = (date: Date): string => {
+    return date.toLocaleDateString('en-CA');
+  };
+  
+  // If we have an active plan, use plan-aligned week boundaries
+  if (planContext?.hasActivePlan && planContext.weekIndex !== null) {
+    // Get plan start date to calculate week boundaries
+    // We'll need to fetch this, but for now use a fallback approach
+    // The plan context should ideally include the start date, but we'll calculate from focus date
+    
+    // Calculate current week Monday (plan weeks start on Monday)
+    const currentWeekMonday = mondayOf(focusDate);
+    const currentWeekSunday = sundayOf(focusDate);
+    
+    // Previous week boundaries
+    const previousWeekMonday = new Date(currentWeekMonday);
+    previousWeekMonday.setDate(currentWeekMonday.getDate() - 7);
+    const previousWeekSunday = new Date(currentWeekMonday);
+    previousWeekSunday.setDate(currentWeekMonday.getDate() - 1);
+    previousWeekSunday.setHours(23, 59, 59, 999);
+    
+    // Use current plan week for acute window
+    const acuteStart = currentWeekMonday;
+    const acuteEnd = focusDate; // Up to focus date (may be mid-week)
+    
+    // Use last 4 plan weeks for chronic window (or from plan start if less than 4 weeks)
+    const chronicStart = new Date(currentWeekMonday);
+    chronicStart.setDate(currentWeekMonday.getDate() - (4 * 7) + 1); // 4 weeks back, starting from Monday
+    
+    // For timeline, still use 14 days back
+    const fourteenDaysAgo = new Date(focusDate);
+    fourteenDaysAgo.setDate(focusDate.getDate() - 13);
+    
+    return {
+      acuteStart,
+      acuteEnd,
+      acuteStartISO: toISO(acuteStart),
+      acuteEndISO: toISO(acuteEnd),
+      
+      chronicStart,
+      chronicEnd: focusDate,
+      chronicStartISO: toISO(chronicStart),
+      chronicEndISO: focusDateISO,
+      
+      currentWeekStart: currentWeekMonday,
+      currentWeekEnd: currentWeekSunday,
+      currentWeekStartISO: toISO(currentWeekMonday),
+      currentWeekEndISO: toISO(currentWeekSunday),
+      
+      previousWeekStart: previousWeekMonday,
+      previousWeekEnd: previousWeekSunday,
+      previousWeekStartISO: toISO(previousWeekMonday),
+      previousWeekEndISO: toISO(previousWeekSunday),
+      
+      fourteenDaysAgo,
+      fourteenDaysAgoISO: toISO(fourteenDaysAgo)
+    };
+  }
+  
+  // No plan: use rolling windows (original behavior)
+  const sevenDaysAgo = new Date(focusDate);
+  sevenDaysAgo.setDate(focusDate.getDate() - 6);
+  const twentyEightDaysAgo = new Date(focusDate);
+  twentyEightDaysAgo.setDate(focusDate.getDate() - 27);
+  const fourteenDaysAgo = new Date(focusDate);
+  fourteenDaysAgo.setDate(focusDate.getDate() - 13);
+  
+  return {
+    acuteStart: sevenDaysAgo,
+    acuteEnd: focusDate,
+    acuteStartISO: toISO(sevenDaysAgo),
+    acuteEndISO: focusDateISO,
+    
+    chronicStart: twentyEightDaysAgo,
+    chronicEnd: focusDate,
+    chronicStartISO: toISO(twentyEightDaysAgo),
+    chronicEndISO: focusDateISO,
+    
+    currentWeekStart: null,
+    currentWeekEnd: null,
+    currentWeekStartISO: null,
+    currentWeekEndISO: null,
+    
+    previousWeekStart: null,
+    previousWeekEnd: null,
+    previousWeekStartISO: null,
+    previousWeekEndISO: null,
+    
+    fourteenDaysAgo,
+    fourteenDaysAgoISO: toISO(fourteenDaysAgo)
+  };
+}
 
 // =============================================================================
 // PLAN CONTEXT FETCHING
@@ -552,31 +716,39 @@ async function fetchPlanContext(
 function calculateACWR(
   workouts: WorkoutRecord[],
   focusDate: Date,
-  sevenDaysAgo: Date,
-  twentyEightDaysAgo: Date,
+  dateRanges: SmartDateRanges,
   plannedWorkouts: PlannedWorkoutRecord[],
   planContext: PlanContext | null
 ): ACWRData {
   
-  // Filter to acute window (last 7 days)
+  // Filter to acute window (current plan week or last 7 days)
   const acuteWorkouts = workouts.filter(w => {
     const workoutDate = new Date(w.date + 'T12:00:00');
-    return workoutDate >= sevenDaysAgo && workoutDate <= focusDate;
+    return workoutDate >= dateRanges.acuteStart && workoutDate <= dateRanges.acuteEnd;
   });
 
-  // Filter to chronic window (last 28 days)
+  // Filter to chronic window (last 4 plan weeks or 28 days)
   const chronicWorkouts = workouts.filter(w => {
     const workoutDate = new Date(w.date + 'T12:00:00');
-    return workoutDate >= twentyEightDaysAgo && workoutDate <= focusDate;
+    return workoutDate >= dateRanges.chronicStart && workoutDate <= dateRanges.chronicEnd;
   });
 
   // Calculate totals
   const acuteTotal = acuteWorkouts.reduce((sum, w) => sum + (w.workload_actual || 0), 0);
   const chronicTotal = chronicWorkouts.reduce((sum, w) => sum + (w.workload_actual || 0), 0);
 
-  // Calculate daily averages (rolling windows)
-  const acuteDailyAvg = acuteTotal / 7;
-  const chronicDailyAvg = chronicTotal / 28;
+  // Calculate daily averages
+  // For plan-aligned: use actual days in current week (up to focus date)
+  // For rolling: use 7 days
+  const acuteDays = planContext?.hasActivePlan && dateRanges.currentWeekStart
+    ? Math.max(1, Math.ceil((dateRanges.acuteEnd.getTime() - dateRanges.acuteStart.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+    : 7;
+  
+  // Chronic window: use 28 days for rolling, or 4 weeks (28 days) for plan-aligned
+  const chronicDays = 28;
+
+  const acuteDailyAvg = acuteTotal / acuteDays;
+  const chronicDailyAvg = chronicTotal / chronicDays;
 
   // Calculate ACWR ratio
   const ratio = chronicDailyAvg > 0 
@@ -682,14 +854,13 @@ function getACWRStatus(
 
 function calculateSportBreakdown(
   workouts: WorkoutRecord[],
-  sevenDaysAgo: Date,
-  focusDate: Date
+  dateRanges: SmartDateRanges
 ): SportBreakdown {
   
-  // Filter to last 7 days
+  // Filter to acute window (current plan week or last 7 days)
   const recentWorkouts = workouts.filter(w => {
     const workoutDate = new Date(w.date + 'T12:00:00');
-    return workoutDate >= sevenDaysAgo && workoutDate <= focusDate;
+    return workoutDate >= dateRanges.acuteStart && workoutDate <= dateRanges.acuteEnd;
   });
 
   // Initialize breakdown
@@ -855,21 +1026,46 @@ function getDefaultWorkoutName(type: string): string {
 
 function calculateWeekComparison(
   workouts: WorkoutRecord[],
-  sevenDaysAgo: Date,
-  focusDate: Date,
-  previousWeekStart: Date
+  dateRanges: SmartDateRanges,
+  planContext: PlanContext | null
 ): WeekComparison {
   
-  // Current week (last 7 days ending on focus date)
+  // Current week: use current plan week if available, otherwise last 7 days
+  let currentWeekStart: Date;
+  let currentWeekEnd: Date;
+  
+  if (planContext?.hasActivePlan && dateRanges.currentWeekStart && dateRanges.currentWeekEnd) {
+    // Use plan-aligned current week
+    currentWeekStart = dateRanges.currentWeekStart;
+    currentWeekEnd = dateRanges.acuteEnd; // Up to focus date (may be mid-week)
+  } else {
+    // Use rolling 7-day window
+    currentWeekStart = dateRanges.acuteStart;
+    currentWeekEnd = dateRanges.acuteEnd;
+  }
+  
   const currentWeekWorkouts = workouts.filter(w => {
     const workoutDate = new Date(w.date + 'T12:00:00');
-    return workoutDate >= sevenDaysAgo && workoutDate <= focusDate;
+    return workoutDate >= currentWeekStart && workoutDate <= currentWeekEnd;
   });
   const currentWeekTotal = currentWeekWorkouts.reduce((sum, w) => sum + (w.workload_actual || 0), 0);
 
-  // Previous week (7 days before that)
-  const previousWeekEnd = new Date(sevenDaysAgo);
-  previousWeekEnd.setDate(previousWeekEnd.getDate() - 1);
+  // Previous week: use previous plan week if available, otherwise previous 7 days
+  let previousWeekStart: Date;
+  let previousWeekEnd: Date;
+  
+  if (planContext?.hasActivePlan && dateRanges.previousWeekStart && dateRanges.previousWeekEnd) {
+    // Use plan-aligned previous week
+    previousWeekStart = dateRanges.previousWeekStart;
+    previousWeekEnd = dateRanges.previousWeekEnd;
+  } else {
+    // Use rolling previous 7-day window
+    previousWeekStart = new Date(currentWeekStart);
+    previousWeekStart.setDate(currentWeekStart.getDate() - 7);
+    previousWeekEnd = new Date(currentWeekStart);
+    previousWeekEnd.setDate(currentWeekStart.getDate() - 1);
+    previousWeekEnd.setHours(23, 59, 59, 999);
+  }
   
   const previousWeekWorkouts = workouts.filter(w => {
     const workoutDate = new Date(w.date + 'T12:00:00');
@@ -933,14 +1129,25 @@ function generateInsights(
   // Weekly jump threshold: higher when on a plan (planned progression)
   const weeklyJumpThreshold = hasActivePlan ? 50 : 30;
 
-  // 1. High ACWR Warning (skip for recovery weeks - low load is expected)
-  if (!isRecoveryWeek && acwr.ratio > acwrWarningThreshold && acwr.data_days >= 7) {
+  // 1. High ACWR Warning (context-aware based on week intent)
+  if (acwr.ratio > acwrWarningThreshold && acwr.data_days >= 7) {
     const severity = acwr.ratio > acwrCriticalThreshold ? 'critical' : 'warning';
     let message: string;
     
-    if (hasActivePlan) {
+    if (isRecoveryWeek) {
+      // Recovery week with high ACWR - this is concerning
+      message = `Recovery week: ACWR at ${acwr.ratio.toFixed(2)} is elevated. This week should have lower load - consider reducing intensity or volume.`;
+    } else if (isTaperWeek) {
+      // Taper week with high ACWR - also concerning
+      message = `Taper week: ACWR at ${acwr.ratio.toFixed(2)} is elevated. Taper weeks should have reduced load - prioritize rest.`;
+    } else if (hasActivePlan && weekIntent === 'build') {
+      // Build week with high ACWR - expected but monitor
+      message = `Build week: ACWR at ${acwr.ratio.toFixed(2)} is elevated. Monitor recovery signals and ensure adequate sleep/nutrition.`;
+    } else if (hasActivePlan) {
+      // Other plan week with high ACWR
       message = `ACWR at ${acwr.ratio.toFixed(2)} - elevated even for plan progression, consider extra recovery`;
     } else {
+      // No plan - general warning
       message = `ACWR at ${acwr.ratio.toFixed(2)} - consider reducing load or adding recovery`;
     }
     
@@ -952,24 +1159,15 @@ function generateInsights(
     });
   }
 
-  // 1b. Recovery week specific insight (low ACWR is good, but warn if too high)
-  if (isRecoveryWeek) {
-    if (acwr.ratio > 1.20 && acwr.data_days >= 7) {
-      insights.push({
-        type: 'acwr_high',
-        severity: 'warning',
-        message: `Recovery week: ACWR at ${acwr.ratio.toFixed(2)} is elevated. Lower load is intentional - focus on sleep, mobility, easy volume.`,
-        data: { ratio: acwr.ratio, status: acwr.status }
-      });
-    } else if (acwr.ratio <= 1.05) {
-      // Positive reinforcement for proper recovery
-      insights.push({
-        type: 'acwr_high', // Reuse type for now, could add 'recovery_optimal' type
-        severity: 'info',
-        message: `Recovery week: Lower load is intentional. Focus on sleep, mobility, and easy volume to maximize adaptation.`,
-        data: { ratio: acwr.ratio, status: acwr.status }
-      });
-    }
+  // 1b. Recovery/Taper week specific insights (positive reinforcement for proper load)
+  if ((isRecoveryWeek || isTaperWeek) && acwr.ratio <= 1.05 && acwr.data_days >= 7) {
+    const weekType = isTaperWeek ? 'Taper' : 'Recovery';
+    insights.push({
+      type: 'acwr_high', // Reuse type for now, could add 'recovery_optimal' type
+      severity: 'info',
+      message: `${weekType} week: Lower load is intentional and appropriate. Focus on sleep, mobility, and easy volume to maximize adaptation.`,
+      data: { ratio: acwr.ratio, status: acwr.status }
+    });
   }
 
   // 2. Consecutive Hard Days (softened when on a plan, skip for recovery weeks)
@@ -989,20 +1187,39 @@ function generateInsights(
     }
   }
 
-  // 3. Large Weekly Jump (higher threshold and softer message when on plan, skip for recovery weeks)
-  if (!isRecoveryWeek && weekComparison.change_direction === 'increase' && weekComparison.change_percent > weeklyJumpThreshold) {
+  // 3. Large Weekly Jump (context-aware based on week transitions)
+  if (weekComparison.change_direction === 'increase' && weekComparison.change_percent > weeklyJumpThreshold) {
     let message: string;
-    if (hasActivePlan && weekIntent === 'build') {
-      message = `Weekly load increased ${weekComparison.change_percent}% - normal for build phase, monitor recovery`;
+    let severity: 'critical' | 'warning' | 'info' = 'info';
+    
+    // Check if we're transitioning from recovery to build (expected jump)
+    const isRecoveryToBuild = isRecoveryWeek === false && hasActivePlan && weekIntent === 'build';
+    
+    if (isRecoveryWeek) {
+      // Recovery week with large increase - concerning
+      message = `Recovery week: Load increased ${weekComparison.change_percent}% from last week. Recovery weeks should have lower load - consider reducing.`;
+      severity = 'warning';
+    } else if (isTaperWeek) {
+      // Taper week with large increase - very concerning
+      message = `Taper week: Load increased ${weekComparison.change_percent}% from last week. Taper weeks should reduce load - prioritize rest.`;
+      severity = 'warning';
+    } else if (hasActivePlan && weekIntent === 'build') {
+      // Build week with increase - expected but monitor
+      message = `Build week: Load increased ${weekComparison.change_percent}% from last week. This is normal for build phase - monitor recovery signals.`;
+      severity = 'info';
     } else if (hasActivePlan) {
+      // Other plan week with increase
       message = `Weekly load increased ${weekComparison.change_percent}% - monitor recovery`;
+      severity = 'info';
     } else {
+      // No plan - general warning
       message = `Weekly load increased ${weekComparison.change_percent}% - monitor for fatigue signals`;
+      severity = 'warning';
     }
     
     insights.push({
       type: 'weekly_jump',
-      severity: hasActivePlan ? 'info' : 'warning',
+      severity,
       message,
       data: { 
         change: weekComparison.change_percent,
@@ -1017,8 +1234,22 @@ function generateInsights(
     insights.push({
       type: 'weekly_jump', // Reuse type
       severity: 'info',
-      message: `Load is below target for a build week. Consider adding volume if feeling fresh.`,
+      message: `Build week: Load is below target (ACWR ${acwr.ratio.toFixed(2)}). Consider adding volume if feeling fresh.`,
       data: { ratio: acwr.ratio }
+    });
+  }
+  
+  // 3c. Recovery week with too much load (compared to previous week)
+  if (isRecoveryWeek && weekComparison.change_direction === 'increase' && weekComparison.change_percent > 10) {
+    insights.push({
+      type: 'weekly_jump',
+      severity: 'warning',
+      message: `Recovery week: Load increased ${weekComparison.change_percent}% from last week. Recovery weeks should reduce load - prioritize easy volume and rest.`,
+      data: { 
+        change: weekComparison.change_percent,
+        current: weekComparison.current_week_total,
+        previous: weekComparison.previous_week_total
+      }
     });
   }
 
