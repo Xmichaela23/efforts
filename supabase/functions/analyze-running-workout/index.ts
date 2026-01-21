@@ -1603,13 +1603,40 @@ Deno.serve(async (req) => {
     console.log('💾 [TIMING] Starting database update...');
     console.log('💾 [TIMING] Updating computed.intervals with', computedIntervals.length, 'intervals');
     
+    // CRITICAL: Re-read workout to get latest computed.overall and computed.analysis from compute-workout-analysis
+    // This ensures we preserve data even if compute-workout-analysis finished writing after we first read
+    console.log('🔄 Re-reading workout to get latest computed data from compute-workout-analysis...');
+    const { data: latestWorkout, error: reReadError } = await supabase
+      .from('workouts')
+      .select('computed')
+      .eq('id', workout_id)
+      .single();
+    
+    if (reReadError) {
+      console.warn('⚠️ Failed to re-read workout, using original data:', reReadError.message);
+    }
+    
+    // Use latest workout data if available, otherwise fall back to original
+    const workoutToUse = latestWorkout || workout;
+    
     // Build minimal computed object - DON'T spread (avoids sending thousands of sensor samples)
-    const minimalComputed = {
-      version: workout.computed?.version || '1.0',
-      overall: workout.computed?.overall || {},
+    // CRITICAL: Preserve analysis.series and overall from compute-workout-analysis (contains chart data and metrics)
+    const minimalComputed: any = {
+      version: workoutToUse.computed?.version || workout.computed?.version || '1.0',
       intervals: computedIntervals,  // Enhanced with granular_metrics
-      planned_steps_light: workout.computed?.planned_steps_light || null
+      planned_steps_light: workoutToUse.computed?.planned_steps_light || workout.computed?.planned_steps_light || null
     };
+    // Only include overall/analysis if they exist (preserve from compute-workout-analysis)
+    if (workoutToUse.computed?.overall || workout.computed?.overall) {
+      minimalComputed.overall = workoutToUse.computed?.overall || workout.computed?.overall;
+      console.log('✅ Preserving overall from compute-workout-analysis');
+    }
+    if (workoutToUse.computed?.analysis || workout.computed?.analysis) {
+      minimalComputed.analysis = workoutToUse.computed?.analysis || workout.computed?.analysis;
+      console.log('✅ Preserving analysis.series from compute-workout-analysis');
+    } else {
+      console.warn('⚠️ No analysis.series found - compute-workout-analysis may not have completed yet');
+    }
     
     // Create analysis_v2 with version metadata
     const analysisV2 = {
