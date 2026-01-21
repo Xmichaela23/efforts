@@ -858,6 +858,8 @@ function EffortsViewerMapbox({
   const [locked, setLocked] = useState(false);
   const [scrubDistance, setScrubDistance] = useState<number | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
+  // Gesture detection state for distinguishing scrolling from scrubbing
+  const touchStartRef = useRef<{ x: number; y: number; isScrubbing: boolean } | null>(null);
   
   // Handle thumb scrubbing
   const handleScrub = (distance_m: number) => {
@@ -1563,16 +1565,53 @@ function EffortsViewerMapbox({
     setIsScrubbing(true);
     setIdx(toIdxFromClientX(e.clientX, svgRef.current!)); 
   };
-  const onTouch = (e: React.TouchEvent<SVGSVGElement>) => {
-    if (locked) return; 
-    const t = e.touches[0]; 
+  const onTouchStart = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (locked) return;
+    const t = e.touches[0];
     if (!t) return;
-    setIsScrubbing(true);
-    setIdx(toIdxFromClientX(t.clientX, svgRef.current!));
+    // Record initial touch position - gesture intent not yet determined
+    touchStartRef.current = { x: t.clientX, y: t.clientY, isScrubbing: false };
+  };
+  const onTouch = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (locked) return;
+    const t = e.touches[0];
+    if (!t || !touchStartRef.current) return;
+    
+    const dx = Math.abs(t.clientX - touchStartRef.current.x);
+    const dy = Math.abs(t.clientY - touchStartRef.current.y);
+    const threshold = 10; // Minimum movement to determine intent
+    
+    // If gesture intent hasn't been determined yet, check direction
+    if (!touchStartRef.current.isScrubbing && (dx > threshold || dy > threshold)) {
+      // Determine intent: horizontal movement = scrubbing, vertical = scrolling
+      if (dx > dy && dx > threshold) {
+        // Horizontal gesture detected - this is scrubbing
+        touchStartRef.current.isScrubbing = true;
+        e.preventDefault(); // Prevent scrolling for horizontal gestures
+        setIsScrubbing(true);
+      } else if (dy > dx && dy > threshold) {
+        // Vertical gesture detected - this is scrolling
+        // Don't prevent default, allow page to scroll
+        touchStartRef.current = null; // Clear ref to allow scrolling
+        setIsScrubbing(false);
+        return;
+      }
+    }
+    
+    // If we've determined this is a scrubbing gesture, handle it
+    if (touchStartRef.current.isScrubbing) {
+      e.preventDefault(); // Continue preventing scroll during scrubbing
+      setIsScrubbing(true);
+      setIdx(toIdxFromClientX(t.clientX, svgRef.current!));
+    }
   };
   const onTouchEnd = (e: React.TouchEvent<SVGSVGElement>) => {
-    e.preventDefault();
+    // Only prevent default if we were scrubbing
+    if (touchStartRef.current?.isScrubbing) {
+      e.preventDefault();
+    }
     setIsScrubbing(false);
+    touchStartRef.current = null;
   };
   const onMouseUp = (e: React.MouseEvent<SVGSVGElement>) => {
     // Reset scrubbing when mouse button is released
@@ -2196,11 +2235,11 @@ function EffortsViewerMapbox({
             onMouseMove={onMove}
             onMouseUp={onMouseUp}
             onMouseLeave={onMouseLeave}
-            onTouchStart={onTouch}
+            onTouchStart={onTouchStart}
             onTouchMove={onTouch}
             onTouchEnd={onTouchEnd}
             onDoubleClick={() => setLocked((l) => !l)}
-            style={{ display: "block", borderRadius: 8, background: "transparent", touchAction: "none", cursor: "crosshair" }}
+            style={{ display: "block", borderRadius: 8, background: "transparent", touchAction: "pan-y", cursor: "crosshair" }}
           >
           {/* Gradient definitions */}
           <defs>
