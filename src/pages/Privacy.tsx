@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -7,20 +8,28 @@ interface PrivacyProps {
 }
 
 export default function Privacy({ onBack }: PrivacyProps) {
+  const navigate = useNavigate();
+  
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      navigate(-1); // Go back in browser history, or navigate to home if no history
+    }
+  };
+
   return (
-    <div className="min-h-screen p-4 max-w-4xl mx-auto">
+    <div className="min-h-screen p-4 max-w-4xl mx-auto bg-black">
       {/* Header with back button */}
-      {onBack && (
-        <div className="mb-6">
-          <Button 
-            onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 text-black hover:text-blue-600"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-        </div>
-      )}
+      <div className="mb-6">
+        <Button 
+          onClick={handleBack}
+          className="flex items-center gap-2 px-4 py-2 text-white hover:text-cyan-400 bg-transparent border border-white/20 hover:border-cyan-400"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </Button>
+      </div>
 
       {/* Privacy Policy Content */}
       <div className="space-y-6">

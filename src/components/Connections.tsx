@@ -28,7 +28,6 @@ import { useToast } from './ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '../lib/supabase';
 import { Capacitor } from '@capacitor/core';
-import { InAppBrowser } from '@capacitor/inappbrowser';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 interface ConnectionStatus {
@@ -884,23 +883,9 @@ const Connections: React.FC = () => {
     }
   };
 
-  const openPrivacyPolicy = async () => {
-    const url = 'https://efforts.work/privacy';
-    
-    // Use in-app browser for native apps, regular link for web
-    if (Capacitor.isNativePlatform()) {
-      await InAppBrowser.openInSystemBrowser({
-        url,
-        options: {
-          iOS: {
-            closeButtonText: 'Done',
-            viewStyle: 'fullscreen'
-          }
-        }
-      });
-    } else {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
+  const openPrivacyPolicy = () => {
+    // Navigate to privacy page within the app so users can easily return
+    navigate('/privacy');
   };
 
   return (
