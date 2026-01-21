@@ -1676,10 +1676,22 @@ Deno.serve(async (req) => {
           try {
             const recalculatedPaces = getPacesFromScore(score);
             
-            // Only update if the stored race pace is significantly different (more than 5 seconds)
-            if (Math.abs((effortPaces.race || 0) - recalculatedPaces.race) > 5) {
+            // Always recalculate if stored pace differs (even by 1 second) to ensure consistency
+            if (Math.abs((effortPaces.race || 0) - recalculatedPaces.race) > 0) {
               console.log(`[Paces] 🔧 Recalculating paces from effort_score ${score}: race ${effortPaces.race}s/mi → ${recalculatedPaces.race}s/mi`);
               effortPaces = recalculatedPaces; // Use all recalculated paces for consistency
+              
+              // Also update user_baselines to persist the correction
+              try {
+                await supabase.from('user_baselines').update({
+                  effort_paces: recalculatedPaces,
+                  effort_updated_at: new Date().toISOString()
+                }).eq('user_id', userId);
+                console.log(`[Paces] ✅ Updated user_baselines.effort_paces with corrected race pace`);
+              } catch (updateErr) {
+                console.error(`[Paces] ⚠️  Failed to update user_baselines:`, updateErr);
+                // Continue - baselines object is already updated in memory
+              }
             }
           } catch (e) {
             console.error(`[Paces] ⚠️  Error recalculating paces from effort_score:`, e);
@@ -1782,11 +1794,17 @@ Deno.serve(async (req) => {
                 const newDesc = oldDesc.replace(/\((\d+):(\d+)\/mi\)/, `(${paceFormatted})`);
                 if (newDesc !== oldDesc) {
                   update.description = newDesc;
-                  console.log(`[Paces] 🔧 Updated race day description pace to match computed steps: ${oldDesc.match(/\((\d+):(\d+)\/mi\)/)?.[0] || 'unknown'} → ${paceFormatted}`);
+                  update.rendered_description = newDesc; // Also update rendered_description
+                  console.log(`[Paces] 🔧 Updated race day description: "${oldDesc}" → "${newDesc}"`);
+                  console.log(`[Paces] 🔧 Pace: ${oldDesc.match(/\((\d+):(\d+)\/mi\)/)?.[0] || 'unknown'} → ${paceFormatted} (${paceSec}s/mi)`);
                 } else {
-                  console.log(`[Paces] ✓ Race day description already matches computed pace: ${paceFormatted}`);
+                  console.log(`[Paces] ✓ Race day description already matches computed pace: ${paceFormatted} (${paceSec}s/mi)`);
                 }
+              } else {
+                console.log(`[Paces] ⚠️  Race day workout but no pace found in computed steps`);
               }
+            } else {
+              console.log(`[Paces] ⚠️  Race day workout but no steps found`);
             }
           }
           
