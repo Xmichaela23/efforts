@@ -452,18 +452,24 @@ Deno.serve(async (req) => {
     try {
       const baseUrl = Deno.env.get('SUPABASE_URL')
       const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY')
+      console.log(`[activate-plan] Calling materialize-plan for plan_id: ${planId}`);
       const resp = await fetch(`${baseUrl}/functions/v1/materialize-plan`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}`, 'apikey': key },
         body: JSON.stringify({ plan_id: planId })
       })
+      console.log(`[activate-plan] materialize-plan response status: ${resp.status}`);
+      const respText = await resp.text();
+      console.log(`[activate-plan] materialize-plan response: ${respText}`);
       // If materialize function fails hard, abort activation
       if (!resp.ok) {
+        console.error(`[activate-plan] materialize-plan failed: ${respText}`);
         // Best effort cleanup of inserted rows
         try { await supabase.from('planned_workouts').delete().eq('training_plan_id', planId) } catch {}
         return new Response(JSON.stringify({ success:false, error:'materialize_failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type':'application/json' } })
       }
     } catch (e) {
+      console.error(`[activate-plan] materialize-plan exception:`, e);
       try { await supabase.from('planned_workouts').delete().eq('training_plan_id', planId) } catch {}
       return new Response(JSON.stringify({ success:false, error:'materialize_exception', details: String(e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type':'application/json' } })
     }
