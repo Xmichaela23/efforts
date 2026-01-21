@@ -28,6 +28,7 @@ import { useToast } from './ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '../lib/supabase';
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 interface ConnectionStatus {
@@ -883,6 +884,17 @@ const Connections: React.FC = () => {
     }
   };
 
+  const openPrivacyPolicy = async () => {
+    const url = 'https://efforts.work/privacy';
+    
+    // Use in-app browser for native apps, regular link for web
+    if (Capacitor.isNativePlatform()) {
+      await Browser.open({ url });
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
     <div className="mobile-app-container">
       <MobileHeader />
@@ -1299,14 +1311,12 @@ const Connections: React.FC = () => {
 
       <div className="text-center text-sm text-white/70 mt-4">
         <p>
-          <a 
-            href="https://efforts.work/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-white/90 text-cyan-400"
+          <button
+            onClick={openPrivacyPolicy}
+            className="underline hover:text-white/90 text-cyan-400 cursor-pointer"
           >
             Privacy Policy
-          </a>
+          </button>
           <br />
           <span className="text-xs text-white/60">See how Efforts uses data from your connected accounts.</span>
         </p>
