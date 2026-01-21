@@ -110,8 +110,10 @@ Deno.serve(async (req) => {
     });
   }
 
+  let workout_id: string | undefined;
   try {
-    const { workout_id } = await req.json();
+    const payload = await req.json();
+    workout_id = payload.workout_id;
     
     if (!workout_id) {
       return new Response(JSON.stringify({ error: 'workout_id required' }), { 
@@ -124,6 +126,25 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // FIX: Check advisory lock to prevent duplicate execution
+    const { data: gotLock } = await supabase.rpc('try_advisory_lock', {
+      lock_key: `calculate-metrics:${workout_id}`
+    });
+
+    if (!gotLock) {
+      console.log(`[calculate-workout-metrics] Already running for ${workout_id}, skipping`);
+      return new Response(JSON.stringify({ skipped: true, reason: 'already_running' }), { 
+        status: 200, 
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
+      });
+    }
+
+    // FIX: Update status to processing
+    await supabase.from('workouts').update({
+      metrics_status: 'processing',
+      metrics_updated_at: new Date().toISOString()
+    }).eq('id', workout_id);
 
     console.log(`📊 Calculating comprehensive metrics for workout: ${workout_id}`);
 
@@ -188,6 +209,12 @@ Deno.serve(async (req) => {
       })
       .eq('id', workout_id);
 
+    // FIX: Update status to complete on success
+    await supabase.from('workouts').update({
+      metrics_status: 'complete',
+      metrics_updated_at: new Date().toISOString()
+    }).eq('id', workout_id);
+
     return new Response(JSON.stringify({
       success: true,
       metrics: metrics
@@ -199,6 +226,22 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
+    // FIX: Update status to failed on error
+    if (workout_id) {
+      try {
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        );
+        await supabase.from('workouts').update({
+          metrics_status: 'failed',
+          metrics_error: error.message || 'Internal server error',
+          metrics_updated_at: new Date().toISOString()
+        }).eq('id', workout_id);
+      } catch (statusErr) {
+        console.error('[calculate-workout-metrics] Failed to update status:', statusErr);
+      }
+    }
     console.error('Calculate workout metrics error:', error);
     return new Response(JSON.stringify({
       error: error.message || 'Internal server error'

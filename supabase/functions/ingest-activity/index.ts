@@ -495,9 +495,9 @@ function mapStravaToWorkout(activity, userId) {
       ? activity.start_latlng[1] 
       : (gps_track && gps_track[0]?.lng != null ? gps_track[0].lng : null),
     // GPS track built from streams or pre-provided
-    gps_track: gps_track ? JSON.stringify(gps_track) : (activity.gps_track ?? null),
+    gps_track: gps_track || (activity.gps_track ?? null),
     // Sensor data built from streams or pre-provided
-    sensor_data: sensor_data ? JSON.stringify({ samples: sensor_data }) : (activity.sensor_data ?? null),
+    sensor_data: sensor_data ? { samples: sensor_data } : (activity.sensor_data ?? null),
     swim_data: activity.swim_data ?? null,
     laps: activity.laps ?? null,
     // Polyline if available
@@ -513,7 +513,8 @@ function mapStravaToWorkout(activity, userId) {
     avg_temperature: Number.isFinite(activity.average_temp) ? Math.round(activity.average_temp) : null,
     max_temperature: Number.isFinite(activity.max_temp) ? Math.round(activity.max_temp) : null,
     // Server-computed summary for UI (includes GAP/cadence when available)
-    computed: computedJsonObj ? JSON.stringify(computedJsonObj) : null,
+    // CRITICAL: Store as JSONB object, not string - let PostgreSQL handle JSONB conversion
+    computed: computedJsonObj || null,
     // Strava achievements (PRs, segment efforts, best efforts)
     achievements: achievements ? JSON.stringify(achievements) : null,
     // Device info for display (e.g., "Garmin Forerunner 265", "Wahoo ELEMNT", "Zwift")
@@ -1029,8 +1030,8 @@ async function mapGarminToWorkout(activity, userId) {
     start_position_lat: activity.starting_latitude ?? (Array.isArray(activity.gps_track) ? activity.gps_track[0]?.lat ?? activity.gps_track[0]?.latitude ?? activity.gps_track[0]?.latitudeInDegree ?? null : null) ?? null,
     start_position_long: activity.starting_longitude ?? (Array.isArray(activity.gps_track) ? activity.gps_track[0]?.lng ?? activity.gps_track[0]?.longitude ?? activity.gps_track[0]?.longitudeInDegree ?? null : null) ?? null,
     // Heavy JSON fields stored directly on workouts - prioritize enriched sensor data
-    gps_track: activity.gps_track ? JSON.stringify(activity.gps_track) : null,
-    sensor_data: enrichedData.sensor_data ? JSON.stringify(enrichedData.sensor_data) : activity.sensor_data ? JSON.stringify(activity.sensor_data) : null,
+    gps_track: activity.gps_track || null,
+    sensor_data: enrichedData.sensor_data || activity.sensor_data || null,
     // If details provided normalized lengths/laps, persist them
     swim_data: (()=>{
       try {
@@ -1119,7 +1120,8 @@ async function mapGarminToWorkout(activity, userId) {
             }
           }
         } catch  {}
-        return JSON.stringify(c);
+        // CRITICAL: Return object directly, not stringified - let PostgreSQL handle JSONB conversion
+        return c || null;
       } catch  {
         return null;
       }
@@ -1318,8 +1320,46 @@ Deno.serve(async (req)=>{
       }
       
       if (wid) {
-        // Auto-attach (fire-and-forget, don't await)
-        fetch(fnUrl, {
+        // Set initial status columns (zero complexity elegant solution)
+        await supabase.from('workouts').update({
+          summary_status: 'pending',
+          analysis_status: 'pending',
+          metrics_status: 'pending',
+          summary_updated_at: new Date().toISOString(),
+          metrics_updated_at: new Date().toISOString()
+        }).eq('id', wid);
+
+        // FIX: Await auto-attach-planned BEFORE triggering analysis (deterministic ordering)
+        // This ensures planned_id exists before analyze-running-workout runs
+        console.log('[ingest-activity] Awaiting auto-attach-planned for deterministic ordering...');
+        try {
+          const attachResponse = await fetch(fnUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${key}`,
+              'apikey': key
+            },
+            body: JSON.stringify({
+              workout_id: wid
+            })
+          });
+          if (!attachResponse.ok) {
+            const errText = await attachResponse.text();
+            console.error('[ingest-activity] auto-attach-planned returned non-OK status:', attachResponse.status, errText);
+          } else {
+            console.log('[ingest-activity] auto-attach-planned succeeded for workout:', wid);
+          }
+        } catch (attachErr) {
+          console.error('[ingest-activity] auto-attach-planned failed:', attachErr);
+        }
+
+        // Now trigger processing functions (planned_id is set if match found)
+        // All fire-and-forget (background processing)
+        // Trigger processing functions as fire-and-forget (background processing)
+        // Functions will use advisory locks to prevent duplicates
+        const sumUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
+        fetch(sumUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1329,70 +1369,33 @@ Deno.serve(async (req)=>{
           body: JSON.stringify({
             workout_id: wid
           })
-        }).catch(err => console.error('[ingest-activity] auto-attach-planned failed:', err));
-        // Ensure computed summary (GAP, cadence, intervals) is generated with latest server logic
-        try {
-          const sumUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
-          await fetch(sumUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-              'apikey': key
-            },
-            body: JSON.stringify({
-              workout_id: wid
-            })
-          });
-        } catch (summaryErr) {
-          console.error('[ingest-activity] compute-workout-summary failed:', summaryErr);
-        }
-        // Ensure provider-agnostic analysis (series/splits) computes date correction too
-        try {
-          const anUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
-          const analysisResp = await fetch(anUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-              'apikey': key
-            },
-            body: JSON.stringify({
-              workout_id: wid
-            })
-          });
-          if (!analysisResp.ok) {
-            const errText = await analysisResp.text();
-            console.error('[ingest-activity] compute-workout-analysis returned non-OK status:', analysisResp.status, errText);
-          } else {
-            console.log('[ingest-activity] compute-workout-analysis succeeded for workout:', wid);
-          }
-        } catch (analysisErr) {
-          console.error('[ingest-activity] compute-workout-analysis failed:', analysisErr);
-        }
-        // Calculate comprehensive metrics (max pace, adherence, etc.) for smart server architecture
-        try {
-          const metricsUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calculate-workout-metrics`;
-          const metricsResp = await fetch(metricsUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-              'apikey': key
-            },
-            body: JSON.stringify({
-              workout_id: wid
-            })
-          });
-          if (!metricsResp.ok) {
-            const errText = await metricsResp.text();
-            console.error('[ingest-activity] calculate-workout-metrics returned non-OK status:', metricsResp.status, errText);
-          } else {
-            console.log('[ingest-activity] calculate-workout-metrics succeeded for workout:', wid);
-          }
-        } catch (metricsErr) {
-          console.error('[ingest-activity] calculate-workout-metrics failed:', metricsErr);
-        }
+        }).catch(err => console.error('[ingest-activity] compute-workout-summary failed:', err));
+
+        const anUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
+        fetch(anUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${key}`,
+            'apikey': key
+          },
+          body: JSON.stringify({
+            workout_id: wid
+          })
+        }).catch(err => console.error('[ingest-activity] compute-workout-analysis failed:', err));
+
+        const metricsUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calculate-workout-metrics`;
+        fetch(metricsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${key}`,
+            'apikey': key
+          },
+          body: JSON.stringify({
+            workout_id: wid
+          })
+        }).catch(err => console.error('[ingest-activity] calculate-workout-metrics failed:', err));
         // Calculate workload for completed workouts (Garmin/Strava imports)
         try {
           const workloadUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calculate-workload`;
@@ -1417,6 +1420,7 @@ Deno.serve(async (req)=>{
           console.error('[ingest-activity] calculate-workload failed:', workloadErr);
         }
         // Generate details chat/context for completed workouts (fire-and-forget background processing)
+        // Note: analyze-running-workout will now have planned_id available (deterministic ordering)
         if (workoutStatus === 'completed' && workoutType) {
           try {
             // Route to appropriate analyzer based on workout type

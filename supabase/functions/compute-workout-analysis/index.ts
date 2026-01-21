@@ -1010,6 +1010,24 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
+    // FIX: Check advisory lock to prevent duplicate execution
+    const { data: gotLock } = await supabase.rpc('try_advisory_lock', {
+      lock_key: `compute-analysis:${workout_id}`
+    });
+
+    if (!gotLock) {
+      console.log(`[compute-workout-analysis] Already running for ${workout_id}, skipping`);
+      return new Response(JSON.stringify({ skipped: true, reason: 'already_running' }), { 
+        status: 200, 
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
+      });
+    }
+
+    // FIX: Update analysis_status to analyzing (already exists, just updating)
+    await supabase.from('workouts').update({
+      analysis_status: 'analyzing'
+    }).eq('id', workout_id);
+
     // Load workout essentials
     const { data: w, error: wErr } = await supabase
       .from('workouts')
@@ -1756,57 +1774,8 @@ Deno.serve(async (req) => {
       best_efforts: partialComputed.best_efforts ? Object.keys(partialComputed.best_efforts).join(',') : null
     });
 
-    // Trigger granular analysis for running workouts
-    // NOTE: analyze-running-workout writes to workout_analysis independently
-    console.log('🔍 Checking granular analysis conditions:', {
-      type: w.type,
-      planned_id: w.planned_id,
-      isRun: w.type === 'run',
-      hasPlannedId: !!w.planned_id
-    });
-    
-    if (w.type === 'run') {
-      try {
-        console.log('🏃 Triggering analyze-running-workout...');
-        
-        // Call the dedicated analyze-running-workout function
-        // It will write to workout_analysis independently
-        const { error: runningError } = await supabase.functions.invoke('analyze-running-workout', {
-          body: { workout_id: workout_id }
-        });
-        
-        if (runningError) {
-          console.error('❌ Running analysis failed:', runningError.message);
-        } else {
-          console.log('✅ Running analysis triggered successfully');
-        }
-      } catch (error) {
-        console.error('❌ Failed to trigger running analysis:', error);
-      }
-    }
-    
-    // Trigger granular analysis for cycling workouts
-    if (w.type === 'ride') {
-      try {
-        console.log('🚴 Triggering analyze-cycling-workout...');
-        
-        // Call the dedicated analyze-cycling-workout function
-        // It will write to workout_analysis independently
-        const { error: cyclingError } = await supabase.functions.invoke('analyze-cycling-workout', {
-          body: { workout_id: workout_id }
-        });
-        
-        if (cyclingError) {
-          console.error('❌ Cycling analysis failed:', cyclingError.message);
-        } else {
-          console.log('✅ Cycling analysis triggered successfully');
-        }
-      } catch (error) {
-        console.error('❌ Failed to trigger cycling analysis:', error);
-      }
-    }
-
     // Use database RPC for atomic JSONB merge - REQUIRED, no fallbacks
+    // CRITICAL: Write data BEFORE triggering analyze-running-workout so it can read overall/analysis
     console.log('[compute-workout-analysis] Calling merge_computed RPC with:', {
       workout_id,
       partial_computed_keys: Object.keys(partialComputed),
@@ -1837,6 +1806,12 @@ Deno.serve(async (req) => {
     
     console.log('✅ UPDATE result: merged via RPC', rpcData);
 
+    // FIX: Update analysis_status to complete on success
+    // Note: analyze-running-workout will also set this, but we set it here for consistency
+    await supabase.from('workouts').update({
+      analysis_status: 'complete'
+    }).eq('id', workout_id);
+
     return new Response(JSON.stringify({ 
       success: true, 
       analysisVersion: ANALYSIS_VERSION,
@@ -1847,6 +1822,15 @@ Deno.serve(async (req) => {
       }
     }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
   } catch (e: any) {
+    // FIX: Update analysis_status to failed on error
+    try {
+      await supabase.from('workouts').update({
+        analysis_status: 'failed',
+        analysis_error: String(e)
+      }).eq('id', workout_id);
+    } catch (statusErr) {
+      console.error('[compute-workout-analysis] Failed to update status:', statusErr);
+    }
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
   }
 });

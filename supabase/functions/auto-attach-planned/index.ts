@@ -219,56 +219,10 @@ Deno.serve(async (req) => {
         if (workoutUpdateErr) {
           throw new Error(`Failed to link workout: ${workoutUpdateErr.message}`);
         }
-        console.log('[auto-attach-planned] Workout linked, waiting 1s for DB commit...');
+        console.log('[auto-attach-planned] Workout linked successfully');
         
-        // Wait for database transaction to commit before calling functions
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        console.log('[auto-attach-planned] Calling compute-workout-summary');
-        const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
-        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-        const computeResponse = await fetch(fnUrl, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
-          body: JSON.stringify({ workout_id: w.id }) 
-        });
-        console.log('[auto-attach-planned] compute-workout-summary status:', computeResponse.status);
-        
-        // Wait for compute-workout-summary to commit computed.intervals before analysis
-        console.log('[auto-attach-planned] explicit: Summary computed, waiting 1s for DB commit...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Ensure computed.analysis is populated (needed for max pace, etc.)
-        console.log('[auto-attach-planned] Calling compute-workout-analysis');
-        const analysisUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
-        const analysisResponse = await fetch(analysisUrl, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
-          body: JSON.stringify({ workout_id: w.id }) 
-        });
-        console.log('[auto-attach-planned] compute-workout-analysis status:', analysisResponse.status);
-        
-        // Run discipline-specific analysis
-        if (w.type === 'run' || w.type === 'running') {
-          console.log('[auto-attach-planned] Calling analyze-running-workout');
-          const analyzeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`;
-          const analyzeResponse = await fetch(analyzeUrl, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
-            body: JSON.stringify({ workout_id: w.id }) 
-          });
-          console.log('[auto-attach-planned] analyze-running-workout status:', analyzeResponse.status);
-        } else if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
-          console.log('[auto-attach-planned] Calling analyze-cycling-workout');
-          const analyzeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-cycling-workout`;
-          const analyzeResponse = await fetch(analyzeUrl, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
-            body: JSON.stringify({ workout_id: w.id }) 
-          });
-          console.log('[auto-attach-planned] analyze-cycling-workout status:', analyzeResponse.status);
-        }
-        
+        // FIX: No function triggers - ingest-activity handles orchestration
+        // This ensures deterministic ordering (planned_id exists before analysis runs)
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       } catch (explicitError: any) {
         console.error('[auto-attach-planned] Explicit attach error:', explicitError);
@@ -277,42 +231,10 @@ Deno.serve(async (req) => {
     }
 
     // ===== AUTO-ATTACH PATH (heuristic matching) =====
-    // Already linked → recompute summary and trigger analysis if missing
+    // Already linked → return early (no function triggers)
     if (currentPlannedId) {
-      try {
-        const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
-        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-        await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
-        
-        // Wait for summary to complete before checking analysis
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Check if analysis is missing or incomplete, and trigger if needed
-        const hasCompleteAnalysis = w.workout_analysis && 
-          w.workout_analysis.performance && 
-          w.workout_analysis.granular_analysis &&
-          w.analysis_status === 'complete';
-        
-        if (!hasCompleteAnalysis && w.workout_status === 'completed') {
-          // Trigger analysis in background (fire-and-forget)
-          try {
-            if (w.type === 'run' || w.type === 'running') {
-              fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key },
-                body: JSON.stringify({ workout_id: w.id })
-              }).catch(err => console.error('[auto-attach-planned] Failed to trigger analysis for already-attached workout:', err));
-            } else if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
-              fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-cycling-workout`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key },
-                body: JSON.stringify({ workout_id: w.id })
-              }).catch(err => console.error('[auto-attach-planned] Failed to trigger analysis for already-attached workout:', err));
-            }
-          } catch {}
-        }
-      } catch {}
-      return new Response(JSON.stringify({ success: true, attached: false, recomputed: true, reason: 'already_linked' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      console.log('[auto-attach-planned] Workout already linked to planned_id:', currentPlannedId);
+      return new Response(JSON.stringify({ success: true, attached: false, reason: 'already_linked' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
     // Fetch planned candidates of same sport on the exact YYYY-MM-DD only (timezone-agnostic)
@@ -405,37 +327,10 @@ Deno.serve(async (req) => {
         });
       } catch {}
 
-      // Compute server summary
-      try {
-        const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
-        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-        await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
-      } catch {}
-
-      // Wait for compute-workout-summary to commit computed.intervals before analysis
-      console.log('[auto-attach-planned] strength/mobility: Summary computed, waiting 1s for DB commit...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Trigger discipline-specific analysis (same as explicit attach path)
-      try {
-        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-        if (w.type === 'run' || w.type === 'running') {
-          console.log('[auto-attach-planned] date_type_match: Calling analyze-running-workout');
-          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
-            body: JSON.stringify({ workout_id: w.id }) 
-          });
-        } else if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
-          console.log('[auto-attach-planned] date_type_match: Calling analyze-cycling-workout');
-          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-cycling-workout`, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
-            body: JSON.stringify({ workout_id: w.id }) 
-          });
-        }
-      } catch {}
-
+      console.log('[auto-attach-planned] strength/mobility: Workout linked successfully');
+      
+      // FIX: No function triggers - ingest-activity handles orchestration
+      // This ensures deterministic ordering (planned_id exists before analysis runs)
       return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, mode: 'date_type_match' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
@@ -578,67 +473,10 @@ Deno.serve(async (req) => {
       } catch {}
     }
 
-    // Wait for database transaction to commit before calling analysis functions
-    // This ensures planned_id is visible to subsequent function calls
-    // (matches the delay in the explicit attach path)
-    console.log('[auto-attach-planned] heuristic: Workout linked, waiting 1s for DB commit...');
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Ensure planned is materialized now that it's linked (guarantees steps for Summary)
-    try {
-      const baseUrl = Deno.env.get('SUPABASE_URL');
-      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-      await fetch(`${baseUrl}/functions/v1/materialize-plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key },
-        body: JSON.stringify({ planned_workout_id: best.id })
-      });
-    } catch {}
-
-    // Compute server summary
-    try {
-      const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
-      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-      await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
-    } catch {}
-
-    // Wait for compute-workout-summary to commit computed.intervals before analysis
-    console.log('[auto-attach-planned] heuristic: Summary computed, waiting 1s for DB commit...');
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Call compute-workout-analysis to normalize sensor data (matches explicit attach path)
-    try {
-      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-      console.log('[auto-attach-planned] heuristic: Calling compute-workout-analysis');
-      const analysisUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
-      const analysisResponse = await fetch(analysisUrl, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
-        body: JSON.stringify({ workout_id: w.id }) 
-      });
-      console.log('[auto-attach-planned] heuristic: compute-workout-analysis status:', analysisResponse.status);
-    } catch {}
-
-    // Trigger discipline-specific analysis (same as explicit attach path)
-    try {
-      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-      if (w.type === 'run' || w.type === 'running') {
-        console.log('[auto-attach-planned] heuristic: Calling analyze-running-workout');
-        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-running-workout`, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
-          body: JSON.stringify({ workout_id: w.id }) 
-        });
-      } else if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
-        console.log('[auto-attach-planned] heuristic: Calling analyze-cycling-workout');
-        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-cycling-workout`, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, 
-          body: JSON.stringify({ workout_id: w.id }) 
-        });
-      }
-    } catch {}
-
+    console.log('[auto-attach-planned] heuristic: Workout linked successfully');
+    
+    // FIX: No function triggers - ingest-activity handles orchestration
+    // This ensures deterministic ordering (planned_id exists before analysis runs)
     return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
     console.error('[auto-attach-planned] Error:', e);

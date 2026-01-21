@@ -561,6 +561,25 @@ Deno.serve(async (req) => {
     const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
     try { console.error('[compute] SUPABASE CLIENT CREATED'); } catch {}
 
+    // FIX: Check advisory lock to prevent duplicate execution
+    const { data: gotLock } = await supabase.rpc('try_advisory_lock', {
+      lock_key: `compute-summary:${workout_id}`
+    });
+
+    if (!gotLock) {
+      console.log(`[compute-workout-summary] Already running for ${workout_id}, skipping`);
+      return new Response(JSON.stringify({ skipped: true, reason: 'already_running' }), { 
+        status: 200, 
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
+      });
+    }
+
+    // FIX: Update status to processing
+    await supabase.from('workouts').update({
+      summary_status: 'processing',
+      summary_updated_at: new Date().toISOString()
+    }).eq('id', workout_id);
+
     // Load workout + planned link
     const { data: w, error: workoutError } = await supabase
       .from('workouts')
@@ -1947,22 +1966,40 @@ Deno.serve(async (req) => {
       return Math.max(...validSpeeds);
     })();
 
-    const computed = {
+    // Build overall object, preserving existing values if they're better/more complete
+    const existingOverall = existingComputed?.overall || {};
+    const computed: any = {
       version: COMPUTED_VERSION,
       intervals: outIntervals,
       planned_steps_light: plannedSnapshot,
       overall: {
-        duration_s_moving: overallSec,
-        distance_m: Math.round(overallMeters),
-        avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
-        gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null,
-        max_speed_mps: max_speed_mps != null ? Number(max_speed_mps.toFixed(2)) : null,
-        execution_score: overallExecutionScore
+        // Use our calculated values, but preserve existing if ours are missing/zero
+        duration_s_moving: (overallSec > 0) ? overallSec : (existingOverall?.duration_s_moving || null),
+        distance_m: (overallMeters > 0) ? Math.round(overallMeters) : (existingOverall?.distance_m || 0),
+        avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec) || existingOverall?.avg_pace_s_per_mi || null,
+        gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : existingOverall?.gap_pace_s_per_mi || null,
+        max_speed_mps: max_speed_mps != null ? Number(max_speed_mps.toFixed(2)) : existingOverall?.max_speed_mps || null,
+        execution_score: overallExecutionScore || existingOverall?.execution_score || null,
+        // Preserve any other fields from existing overall
+        ...(existingOverall?.duration_s_elapsed ? { duration_s_elapsed: existingOverall.duration_s_elapsed } : {})
       }
     };
+    
+    // CRITICAL: Preserve analysis.series from compute-workout-analysis (contains chart data)
+    // This prevents data loss when compute-workout-summary runs after compute-workout-analysis
+    if (existingComputed?.analysis) {
+      computed.analysis = existingComputed.analysis;
+      console.log('[compute-workout-summary] Preserving existing analysis.series');
+    }
 
     // Write to workouts
     await writeComputed(computed);
+
+    // FIX: Update status to complete on success
+    await supabase.from('workouts').update({
+      summary_status: 'complete',
+      summary_updated_at: new Date().toISOString()
+    }).eq('id', workout_id);
 
     return new Response(JSON.stringify({ success:true, computed }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
 
@@ -2013,9 +2050,24 @@ Deno.serve(async (req) => {
       }
       const computed = { version: COMPUTED_VERSION, intervals: [], overall: { duration_s_moving: secs>0?secs:null, distance_m: meters>0?meters:0, avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(meters, secs), gap_pace_s_per_mi: null } } as any;
       await writeComputed(computed);
+      // FIX: Update status to complete even for fallback (data was written)
+      await supabase.from('workouts').update({
+        summary_status: 'complete',
+        summary_updated_at: new Date().toISOString()
+      }).eq('id', workout_id);
       console.error('[compute-summary:error]', { code: e?.code||e?.name||'Error', msg: e?.message||String(e) });
       return new Response(JSON.stringify({ success:true, mode:'fallback', note:'wrote minimal overall due to error' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     } catch {
+      // FIX: Update status to failed on error
+      try {
+        await supabase.from('workouts').update({
+          summary_status: 'failed',
+          summary_error: (e && (e.message || e.msg)) || String(e),
+          summary_updated_at: new Date().toISOString()
+        }).eq('id', workout_id);
+      } catch (statusErr) {
+        console.error('[compute-workout-summary] Failed to update status:', statusErr);
+      }
       // eslint-disable-next-line no-console
       try { console.error('[compute-summary:error]', { code: e?.code||e?.name||'Error', msg: e?.message||String(e) }); } catch {}
       const payload:any = { error: (e && (e.message || e.msg)) || String(e) };
