@@ -97,34 +97,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     const v3: any[] = Array.isArray(computedAny?.steps) ? computedAny.steps : [];
     const parentDiscV3 = String((workout as any)?.type||'').toLowerCase();
     
-    // If no steps but we have steps_preset tokens, trigger materialization for any run workout
-    if (v3.length === 0 && parentDiscV3 === 'run') {
-      const hasTokens = Array.isArray((workout as any)?.steps_preset) && (workout as any).steps_preset.length > 0;
-      
-      if (hasTokens) {
-        // Run workout with tokens but no computed steps - trigger materialization
-        const workoutId = (workout as any)?.id;
-        if (workoutId) {
-          // Trigger materialization asynchronously (don't block render)
-          (async () => {
-            try {
-              const { createClient } = await import('@supabase/supabase-js');
-              const supabase = createClient(
-                import.meta.env.VITE_SUPABASE_URL,
-                import.meta.env.VITE_SUPABASE_ANON_KEY
-              );
-              await supabase.functions.invoke('materialize-plan', { 
-                body: { planned_workout_id: workoutId } 
-              });
-              // Trigger a refresh event to reload the workout
-              window.dispatchEvent(new CustomEvent('planned:invalidate'));
-            } catch (e) {
-              console.error('[StructuredPlannedView] Failed to materialize workout:', e);
-            }
-          })();
-        }
-      }
-    }
+    // REMOVED: Client-side auto-materialization was causing errors
+    // Server-side materialization should happen during activate-plan
+    // If steps are missing, it's a server-side issue, not client-side
     
     if (v3.length) {
       const fmtDur = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
