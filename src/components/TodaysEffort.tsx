@@ -953,32 +953,37 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   return (
     <div className="w-full flex-shrink-0" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)', position:'relative', overflow: 'visible', zIndex: 0}}>
-      {/* Header - with backdrop blur for scroll-behind effect */}
+      {/* Today Panel - Live instrument cockpit (raised, glowing, primary focus) */}
       <div 
         ref={headerRef}
-        className="mb-2 px-4 flex-shrink-0" 
+        className="mb-3 flex-shrink-0" 
         style={{ 
           position: 'relative', 
-          zIndex: 10,
-          background: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          marginLeft: '-1rem',
-          marginRight: '-1rem',
-          paddingLeft: '1.25rem',
-          paddingRight: '1.25rem',
-          paddingTop: '0.25rem',
-          paddingBottom: '0.5rem',
+          zIndex: 20, // Higher z-index to feel raised above grid
+          // Raised panel with subtle elevation and glow field
+          background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%)',
+          border: '0.5px solid rgba(255, 255, 255, 0.08)', // Slightly brighter border for panel definition
+          borderRadius: '12px', // Rounded corners for mounted instrument feel
+          padding: '0.75rem 1rem', // More padding for panel breathing room
+          // Panel depth: raised above background with glow field
+          boxShadow: `
+            0 0 0 1px rgba(255,255,255,0.04) inset,
+            0 2px 8px rgba(0,0,0,0.5),
+            0 0 20px rgba(255, 240, 200, 0.08),
+            0 0 40px rgba(255, 240, 200, 0.04)
+          `, // Inner stroke + depth + warm glow field
+          marginLeft: '-0.5rem',
+          marginRight: '-0.5rem',
         }}
       >
         <div className="space-y-1">
-          {/* Line 1: Date - Live channel (brightest, energized) */}
+          {/* Line 1: Date - Live channel (brightest, energized, more phosphor) */}
           <div>
             <span 
               className="text-sm font-light tracking-wide" 
               style={{ 
-                color: 'rgba(255, 255, 255, 0.95)', // Brighter - closer to primary numbers
-                textShadow: '0 0 2px rgba(255, 255, 255, 0.15), 0 0 4px rgba(255, 255, 255, 0.08)', // Faint backlit LCD glow
+                color: 'rgba(255, 255, 255, 1.0)', // Maximum brightness - primary instrument readout
+                textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)', // Stronger backlit LCD glow with warm phosphor
               }}
             >
               {formatDisplayDate(activeDate)}
@@ -989,7 +994,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           {(weather || cityName) && (
             <div className="flex items-center gap-1 flex-wrap">
               {weather && isTodayDate && (
-                <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
                   {Math.round(weather.temperature)}°F {weather.condition}
                   {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
                   {weather.sunrise && weather.sunset ? (()=>{ 
@@ -1007,7 +1012,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               )}
               {/* City name from geolocation (show for any date if available) */}
               {cityName && (
-                <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
                   {weather && isTodayDate ? ' • ' : ''}{cityName}
                 </span>
               )}
@@ -1115,17 +1120,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     }
                   }}
                 >
-                  {/* Planned: grouped like weekly - tap to open bottom sheet */}
+                  {/* Planned: show full workout details */}
                   {workout.workout_status === 'planned' ? (
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        {/* Left: workout summary - tap card to open bottom sheet */}
-                        <div className="flex-1 min-w-0">
-                          <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={true} />
-                        </div>
-                        {/* Chevron indicator */}
-                        <div className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.4)' }}>›</div>
-                      </div>
+                      {/* Show full workout summary with all details visible */}
+                      <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={false} />
                     </div>
                   ) : (
                     <div 

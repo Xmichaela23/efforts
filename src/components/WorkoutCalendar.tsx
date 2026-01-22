@@ -832,18 +832,19 @@ export default function WorkoutCalendar({
               style={{
                 aspectRatio: '1', // Perfect squares for geometric precision
                 borderRadius: '14px', // Day tile radius: 14-16px for hierarchy
-                border: '0.5px solid rgba(255, 255, 255, 0.04)', // Much dimmer border - recede structure
-                background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.01) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)', // Darker panel
-                boxShadow: '0 0 0 1px rgba(255,255,255,0.02) inset, 0 1px 4px rgba(0,0,0,0.4)', // Subtler inner stroke
+                border: '0.5px solid rgba(255, 255, 255, 0.02)', // Even dimmer border - ghosted timeline
+                background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.005) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.35) 100%)', // More muted, ghosted background
+                boxShadow: '0 0 0 1px rgba(255,255,255,0.01) inset, 0 1px 3px rgba(0,0,0,0.5)', // Even subtler - recede into background
                 padding: '0.375rem', // Tightened from p-2.5 (0.625rem) - less empty space
+                opacity: 0.85, // Overall ghosted feel - timeline backdrop
               }}
             >
-              {/* Top row: Day + Date inline - De-emphasized labels */}
+              {/* Top row: Day + Date inline - Ghosted timeline labels (further de-emphasized) */}
               <div className="flex items-baseline justify-start mb-1">
-                <div className="text-xs font-extralight tracking-wider" style={{ color: 'rgba(255, 255, 255, 0.35)' }}>
+                <div className="text-xs font-extralight tracking-wider" style={{ color: 'rgba(255, 255, 255, 0.2)' }}>
                   {weekdayFmt.format(d)}
                 </div>
-                <div className="ml-1.5 text-xs font-extralight" style={{ color: 'rgba(255, 255, 255, 0.3)' }}>{d.getDate()}</div>
+                <div className="ml-1.5 text-xs font-extralight" style={{ color: 'rgba(255, 255, 255, 0.18)' }}>{d.getDate()}</div>
               </div>
 
               {/* Bottom area: Event labels - dense stacking */}
@@ -897,10 +898,18 @@ export default function WorkoutCalendar({
                         style={{
                           ...phosphorPill.style,
                           borderRadius: '4px', // More rectangular - tighter radius for label strips
-                          // Inset stroke for mounted/cut-into-panel feel
+                          // Reduce glow intensity for ghosted timeline feel (multiply opacity by 0.6)
                           boxShadow: phosphorPill.style.boxShadow 
-                            ? `${phosphorPill.style.boxShadow}, 0 0 0 0.5px rgba(255, 255, 255, 0.08) inset`
-                            : '0 0 0 0.5px rgba(255, 255, 255, 0.08) inset',
+                            ? (() => {
+                                // Reduce glow opacity by 40% to de-emphasize in timeline
+                                const reducedGlow = phosphorPill.style.boxShadow
+                                  .replace(/rgba\(([^)]+),\s*([\d.]+)\)/g, (match, rgb, alpha) => {
+                                    const newAlpha = parseFloat(alpha) * 0.6;
+                                    return `rgba(${rgb}, ${newAlpha})`;
+                                  });
+                                return `${reducedGlow}, 0 0 0 0.5px rgba(255, 255, 255, 0.05) inset`; // Dimmer inset too
+                              })()
+                            : '0 0 0 0.5px rgba(255, 255, 255, 0.05) inset',
                           // Reduce outer border dominance - lighter border for less "floating bubble" feel
                           borderColor: phosphorPill.style.borderColor ? 
                             (typeof phosphorPill.style.borderColor === 'string' && phosphorPill.style.borderColor.includes('rgba') ?
@@ -976,11 +985,11 @@ export default function WorkoutCalendar({
                   
                   if (isRestDay) {
                     return (
-                      <span className="text-base italic" style={{ color: 'rgba(255, 255, 255, 0.25)' }}>Rest</span>
+                      <span className="text-base italic" style={{ color: 'rgba(255, 255, 255, 0.15)' }}>Rest</span> // Further dimmed for ghosted timeline
                     );
                   }
                   return (
-                    <span className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.12)' }}>&nbsp;</span>
+                    <span className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.08)' }}>&nbsp;</span> // Even dimmer empty cells
                   );
                 })()}
               </div>
