@@ -6,7 +6,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity } from 'lucide-react';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
-import { getDisciplineGlowColor } from '@/lib/context-utils';
+import { getDisciplineGlowColor, getDisciplineTextClass } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
@@ -911,7 +911,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 <span> • </span>
               )}
               {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                <span className="text-teal-500">
+                <span className={getDisciplineTextClass('run')}>
                   {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
                 </span>
               )}
