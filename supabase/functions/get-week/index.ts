@@ -536,7 +536,13 @@ Deno.serve(async (req)=>{
       'metrics',
       // sets for strength/mobility
       'strength_exercises',
-      'mobility_exercises'
+      'mobility_exercises',
+      // source tracking for display
+      'source',
+      'is_strava_imported',
+      'strava_activity_id',
+      'garmin_activity_id',
+      'device_info'
     ].join(',');
     const { data: wkRaw, error: wkErr } = await supabase.from('workouts').select(workoutSel).eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
       ascending: true
@@ -814,7 +820,14 @@ Deno.serve(async (req)=>{
         const num = (x)=>typeof x === 'number' && isFinite(x) ? x : undefined;
         if (overall.distance_m == null) overall.distance_m = undefined; // do not guess units
         if (overall.duration_s_moving == null && overall.duration_s == null) {
-          overall.duration_s_moving = num(w?.moving_time) ?? num(w?.elapsed_time);
+          // ✅ FIX: moving_time and elapsed_time are stored in MINUTES, convert to SECONDS
+          const movingMin = num(w?.moving_time);
+          const elapsedMin = num(w?.elapsed_time);
+          if (movingMin != null && movingMin > 0) {
+            overall.duration_s_moving = Math.round(movingMin * 60);
+          } else if (elapsedMin != null && elapsedMin > 0) {
+            overall.duration_s_moving = Math.round(elapsedMin * 60);
+          }
         }
         // Accept canonical m/s if provided by importer
         if (overall.avg_speed_mps == null) overall.avg_speed_mps = num(w?.avg_speed_mps);
@@ -881,7 +894,13 @@ Deno.serve(async (req)=>{
         planned_id: w.planned_id || null,
         // Workload data from database (single source of truth)
         workload_actual: w.workload_actual ?? null,
-        intensity_factor: w.intensity_factor ?? null
+        intensity_factor: w.intensity_factor ?? null,
+        // Source tracking for display
+        source: w.source || null,
+        is_strava_imported: w.is_strava_imported || null,
+        strava_activity_id: w.strava_activity_id || null,
+        garmin_activity_id: w.garmin_activity_id || null,
+        device_info: w.device_info || null
       };
     };
     const items = workouts.map(unify);

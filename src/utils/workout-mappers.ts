@@ -79,6 +79,12 @@ export function mapUnifiedItemToCompleted(item: any): any {
     workout_status: 'completed',
     ...item.executed, // Spread all executed data (metrics, distance, duration, etc.)
     computed: item.executed || null,
+    // Source tracking for display (same as details screen)
+    source: item.source || null,
+    is_strava_imported: item.is_strava_imported || null,
+    strava_activity_id: item.strava_activity_id || null,
+    garmin_activity_id: item.garmin_activity_id || null,
+    device_info: item.device_info || null,
   };
 }
 

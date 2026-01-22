@@ -1139,21 +1139,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             })();
                             const rawDeviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
                             const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
-                            
-                            // Debug logging
-                            if (isRunRideSwim) {
-                              console.log('🔍 Source attribution check:', {
-                                workoutId: workout.id,
-                                type,
-                                source,
-                                isStravaImported,
-                                stravaId,
-                                garminId,
-                                deviceInfo,
-                                deviceName,
-                                rawDeviceName
-                              });
-                            }
 
                             if (source === 'strava' || stravaId || isStravaImported) {
                               const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
