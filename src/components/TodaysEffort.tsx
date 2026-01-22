@@ -6,7 +6,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity } from 'lucide-react';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
-import { getDisciplineGlowColor, getDisciplineTextClass } from '@/lib/context-utils';
+import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
@@ -1277,17 +1277,37 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           <DrawerFooter className="border-t border-white/10 pt-4">
             <div className="flex flex-col gap-2 w-full">
               {/* Start on Phone - Primary action for run/ride */}
-              {selectedPlannedWorkout && isPhoneExecutable(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
-                <button
-                  className="w-full px-4 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-light tracking-wide transition-all shadow-lg shadow-cyan-500/20"
-                  onClick={() => {
-                    setExecutingWorkout(selectedPlannedWorkout);
-                    setSelectedPlannedWorkout(null);
-                  }}
-                >
-                  📱 Start on Phone
-                </button>
-              )}
+              {selectedPlannedWorkout && isPhoneExecutable(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (() => {
+                const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
+                const isRun = ['run', 'running', 'walk'].includes(workoutType);
+                const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
+                const sportColor = isRun ? SPORT_COLORS.run : (isRide ? SPORT_COLORS.ride : SPORT_COLORS.run); // default to run color
+                const rgb = getDisciplineColorRgb(isRun ? 'run' : (isRide ? 'ride' : 'run'));
+                const colorName = isRun ? 'yellow' : (isRide ? 'green' : 'yellow');
+                
+                return (
+                  <button
+                    className={`w-full px-4 py-3 rounded-xl text-white text-sm font-light tracking-wide transition-all shadow-lg`}
+                    style={{
+                      backgroundColor: sportColor,
+                      borderColor: `rgba(${rgb}, 0.8)`,
+                      boxShadow: `0 0 0 1px rgba(${rgb}, 0.2) inset, 0 4px 12px rgba(${rgb}, 0.2)`,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.9)`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = sportColor;
+                    }}
+                    onClick={() => {
+                      setExecutingWorkout(selectedPlannedWorkout);
+                      setSelectedPlannedWorkout(null);
+                    }}
+                  >
+                    📱 Start on Phone
+                  </button>
+                );
+              })()}
               <div className="flex gap-2 w-full">
               {selectedPlannedWorkout && isEnduranceType(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
                 <button
