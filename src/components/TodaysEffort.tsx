@@ -1126,22 +1126,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const isRunRideSwim = type === 'run' || type === 'running' || type === 'ride' || type === 'cycling' || type === 'bike' || type === 'swim' || type === 'swimming';
                             if (!isRunRideSwim) return null;
                             
-                            // Debug: Log the workout object to see what we're working with
-                            console.log('🔍 [TodaysEffort] Source attribution check:', {
-                              workoutId: workout.id,
-                              type,
-                              hasSource: !!(workout as any)?.source,
-                              source: (workout as any)?.source,
-                              hasStravaId: !!(workout as any)?.strava_activity_id,
-                              stravaId: (workout as any)?.strava_activity_id,
-                              hasGarminId: !!(workout as any)?.garmin_activity_id,
-                              garminId: (workout as any)?.garmin_activity_id,
-                              hasDeviceInfo: !!(workout as any)?.device_info,
-                              deviceInfo: (workout as any)?.device_info,
-                              isStravaImported: (workout as any)?.is_strava_imported,
-                              workoutKeys: Object.keys(workout || {})
-                            });
-                            
                             const source = (workout as any)?.source;
                             const isStravaImported = (workout as any)?.is_strava_imported;
                             const stravaId = (workout as any)?.strava_activity_id;
@@ -1157,59 +1141,29 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
 
                             if (source === 'strava' || stravaId || isStravaImported) {
-                              const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
                               return (
-                                <div className="flex items-center gap-1.5 ml-2 flex-wrap">
+                                <div className="flex items-center gap-1 ml-2">
                                   <img 
                                     src="/icons/strava-powered-by.svg" 
                                     alt="Powered by Strava" 
-                                    className="h-2.5"
+                                    className="h-2"
                                   />
-                                  {deviceName ? (
-                                    <span className="text-gray-400 text-xs">via {deviceName}</span>
-                                  ) : null}
-                                  {stravaUrl && (
-                                    <>
-                                      {deviceName && <span className="text-gray-300">•</span>}
-                                      <a 
-                                        href={stravaUrl} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-[#FC5200] font-light underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        View on Strava
-                                      </a>
-                                    </>
+                                  {deviceName && (
+                                    <span className="text-gray-400 text-[10px] leading-tight">via {deviceName}</span>
                                   )}
                                 </div>
                               );
                             }
 
                             if (source === 'garmin' || garminId) {
-                              const garminUrl = garminId ? `https://connect.garmin.com/modern/activity/${garminId}` : null;
                               return (
-                                <div className="flex items-center gap-1.5 ml-2 flex-wrap">
-                                  <span className="text-gray-400 text-xs">via</span>
-                                  <svg width="6" height="8" viewBox="0 0 10 12" className="flex-shrink-0">
+                                <div className="flex items-center gap-0.5 ml-2">
+                                  <span className="text-gray-400 text-[10px] leading-tight">via</span>
+                                  <svg width="5" height="6" viewBox="0 0 10 12" className="flex-shrink-0">
                                     <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
                                   </svg>
-                                  <span className="text-[#007CC3] font-light text-xs">Garmin</span>
-                                  {deviceName && <span className="text-gray-400 text-xs"> {deviceName}</span>}
-                                  {garminUrl && (
-                                    <>
-                                      <span className="text-gray-300">•</span>
-                                      <a
-                                        href={garminUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-[#007CC3] font-light underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        View
-                                      </a>
-                                    </>
-                                  )}
+                                  <span className="text-[#007CC3] font-light text-[10px] leading-tight">Garmin</span>
+                                  {deviceName && <span className="text-gray-400 text-[10px] leading-tight"> {deviceName}</span>}
                                 </div>
                               );
                             }
@@ -1220,7 +1174,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       </div>
                       
                       {/* Metrics Row */}
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground font-light">
                         {formatRichWorkoutDisplay(workout).metrics.map((metric: any, index: number) => (
                           <span key={index}>{typeof metric === 'string' ? metric : (metric && typeof metric.value === 'string' ? metric.value : '')}</span>
                         ))}
