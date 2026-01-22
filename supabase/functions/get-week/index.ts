@@ -884,6 +884,17 @@ Deno.serve(async (req)=>{
           });
         }
       } catch  {}
+      // Parse device_info if it's a string (same as workout-detail)
+      let deviceInfo = w.device_info || null;
+      try {
+        if (typeof deviceInfo === 'string') {
+          deviceInfo = JSON.parse(deviceInfo);
+        }
+      } catch {
+        // If parsing fails, use as-is (might already be an object from JSONB)
+        deviceInfo = w.device_info || null;
+      }
+      
       return {
         id: w.id,
         date,
@@ -900,7 +911,7 @@ Deno.serve(async (req)=>{
         is_strava_imported: w.is_strava_imported || null,
         strava_activity_id: w.strava_activity_id || null,
         garmin_activity_id: w.garmin_activity_id || null,
-        device_info: w.device_info || null
+        device_info: deviceInfo
       };
     };
     const items = workouts.map(unify);

@@ -72,19 +72,55 @@ export function mapUnifiedItemToPlanned(item: any): PlannedWorkout {
  * Used by TodaysEffort for completed workouts
  */
 export function mapUnifiedItemToCompleted(item: any): any {
-  return {
+  // Debug: Log what we're receiving from get-week
+  if (item?.type === 'run' || item?.type === 'ride' || item?.type === 'swim') {
+    console.log('🔍 [mapUnifiedItemToCompleted] Input item:', {
+      id: item.id,
+      type: item.type,
+      hasSource: !!item.source,
+      source: item.source,
+      hasStravaId: !!item.strava_activity_id,
+      stravaId: item.strava_activity_id,
+      hasGarminId: !!item.garmin_activity_id,
+      garminId: item.garmin_activity_id,
+      hasDeviceInfo: !!item.device_info,
+      deviceInfo: item.device_info,
+      isStravaImported: item.is_strava_imported,
+      itemKeys: Object.keys(item || {})
+    });
+  }
+  
+  const mapped = {
     id: item.id,
     date: item.date,
     type: item.type,
     workout_status: 'completed',
     ...item.executed, // Spread all executed data (metrics, distance, duration, etc.)
     computed: item.executed || null,
-    // Source tracking for display (same as details screen)
+    // Source tracking for display (same as details screen) - put AFTER spread to ensure they're not overwritten
     source: item.source || null,
     is_strava_imported: item.is_strava_imported || null,
     strava_activity_id: item.strava_activity_id || null,
     garmin_activity_id: item.garmin_activity_id || null,
     device_info: item.device_info || null,
   };
+  
+  // Debug: Log what we're returning
+  if (item?.type === 'run' || item?.type === 'ride' || item?.type === 'swim') {
+    console.log('🔍 [mapUnifiedItemToCompleted] Output mapped:', {
+      id: mapped.id,
+      hasSource: !!mapped.source,
+      source: mapped.source,
+      hasStravaId: !!mapped.strava_activity_id,
+      stravaId: mapped.strava_activity_id,
+      hasGarminId: !!mapped.garmin_activity_id,
+      garminId: mapped.garmin_activity_id,
+      hasDeviceInfo: !!mapped.device_info,
+      deviceInfo: mapped.device_info,
+      mappedKeys: Object.keys(mapped || {})
+    });
+  }
+  
+  return mapped;
 }
 

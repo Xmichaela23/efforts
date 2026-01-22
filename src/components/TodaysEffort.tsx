@@ -1126,6 +1126,22 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const isRunRideSwim = type === 'run' || type === 'running' || type === 'ride' || type === 'cycling' || type === 'bike' || type === 'swim' || type === 'swimming';
                             if (!isRunRideSwim) return null;
                             
+                            // Debug: Log the workout object to see what we're working with
+                            console.log('🔍 [TodaysEffort] Source attribution check:', {
+                              workoutId: workout.id,
+                              type,
+                              hasSource: !!(workout as any)?.source,
+                              source: (workout as any)?.source,
+                              hasStravaId: !!(workout as any)?.strava_activity_id,
+                              stravaId: (workout as any)?.strava_activity_id,
+                              hasGarminId: !!(workout as any)?.garmin_activity_id,
+                              garminId: (workout as any)?.garmin_activity_id,
+                              hasDeviceInfo: !!(workout as any)?.device_info,
+                              deviceInfo: (workout as any)?.device_info,
+                              isStravaImported: (workout as any)?.is_strava_imported,
+                              workoutKeys: Object.keys(workout || {})
+                            });
+                            
                             const source = (workout as any)?.source;
                             const isStravaImported = (workout as any)?.is_strava_imported;
                             const stravaId = (workout as any)?.strava_activity_id;
