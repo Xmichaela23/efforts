@@ -1902,7 +1902,7 @@ export default function PlanWizard() {
                       value={state.raceName}
                       onChange={(e) => setState(prev => ({ ...prev, raceName: e.target.value }))}
                       placeholder="Race name (optional)"
-                        className="w-full p-3 bg-white/5 border border-teal-500/30 rounded-xl text-base text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className={`w-full p-3 bg-white/5 border ${getDisciplineBorderClass('run', '30')} rounded-xl text-base text-white placeholder:text-white/30 focus:outline-none focus:ring-2 ${getDisciplineFocusRingClass('run')} ${getDisciplineFocusBorderClass('run')}`}
                     />
                     )}
                   </div>
@@ -2114,7 +2114,7 @@ export default function PlanWizard() {
                   
                   {/* Show Effort Score and projected finish time for Performance goal */}
                   {state.effortScore && projectedFinishTime && (
-                    <div className="p-4 bg-blue-500/10 backdrop-blur-lg rounded-xl border-2 border-blue-400/30">
+                    <div className={`p-4 bg-yellow-200/10 backdrop-blur-lg rounded-xl border-2 ${getDisciplineBorderClass('run', '30').replace('border-', 'border-2 border-').replace('/30', '/30')}">
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-blue-300">Effort Score:</span>
