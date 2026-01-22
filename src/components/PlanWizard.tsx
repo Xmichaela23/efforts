@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
-import { getDisciplineGlowColor } from '@/lib/context-utils';
+import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass } from '@/lib/context-utils';
 import { useToast } from '@/components/ui/use-toast';
 import { MobileHeader } from './MobileHeader';
 import {
@@ -1661,34 +1661,34 @@ export default function PlanWizard() {
               {/* Using saved baselines - glass morphism with teal glow */}
               {state.paceInputMethod === 'saved' && state.effortScore && state.effortPaces && (
                 <div className="relative mt-4">
-                  {/* Teal glow effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-teal-500/20 via-cyan-500/10 to-transparent rounded-2xl blur-xl" />
-                  <div className="relative p-5 bg-black/40 backdrop-blur-sm rounded-xl border border-teal-500/30">
+                  {/* Yellow glow effect */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-yellow-200/20 via-yellow-100/10 to-transparent rounded-2xl blur-xl" />
+                  <div className={`relative p-5 bg-black/40 backdrop-blur-sm rounded-xl border ${getDisciplineBorderClass('run', '30')}`}>
                     <p className="text-lg font-semibold text-white">
                       ✓ Using Saved Paces
                     </p>
-                    <p className="text-xs text-teal-300 mt-1 mb-4">
+                    <p className={`text-xs ${getDisciplineTextClassVariant('run', '400')} mt-1 mb-4`}>
                       Effort Score: {state.effortScore}
                     </p>
                     <div className="text-sm text-gray-200 space-y-3">
                         <div className="flex items-center justify-between">
                         <span className="text-gray-400">Base pace:</span>
-                        <span className="font-mono text-teal-200">{formatPace(state.effortPaces.base)}/mi</span>
+                        <span className={`font-mono ${getDisciplineTextClassVariant('run', '400')}`}>{formatPace(state.effortPaces.base)}/mi</span>
                         </div>
                         <div className="flex items-center justify-between">
                         <span className="text-gray-400">Race pace:</span>
-                        <span className="font-mono text-teal-200">{formatPace(state.effortPaces.race)}/mi</span>
+                        <span className={`font-mono ${getDisciplineTextClassVariant('run', '400')}`}>{formatPace(state.effortPaces.race)}/mi</span>
                         </div>
                         <div className="flex items-center justify-between">
                         <span className="text-gray-400">Interval pace:</span>
-                        <span className="font-mono text-teal-200">{formatPace(state.effortPaces.power)}/mi</span>
+                        <span className={`font-mono ${getDisciplineTextClassVariant('run', '400')}`}>{formatPace(state.effortPaces.power)}/mi</span>
                         </div>
                       </div>
                     {/* Estimated Marathon Time */}
-                    <div className="mt-4 pt-4 border-t border-teal-500/20">
+                    <div className={`mt-4 pt-4 border-t ${getDisciplineBorderClass('run', '30')}`}>
                       <div className="flex items-center justify-between">
                         <span className="text-gray-400">Est. marathon time:</span>
-                        <span className="font-mono font-semibold text-lg text-teal-300">
+                        <span className={`font-mono font-semibold text-lg ${getDisciplineTextClassVariant('run', '400')}`}>
                           {(() => {
                             const marathonSeconds = state.effortPaces.race * 26.2;
                             const hours = Math.floor(marathonSeconds / 3600);
@@ -1699,7 +1699,7 @@ export default function PlanWizard() {
                         </span>
                       </div>
                     </div>
-                    <p className="text-xs text-teal-400/80 mt-4">
+                    <p className={`text-xs ${getDisciplineTextClassVariant('run', '400')}/80 mt-4`}>
                       These paces will be used for your training plan.
                     </p>
                   </div>
