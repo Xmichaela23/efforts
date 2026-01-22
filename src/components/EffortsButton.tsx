@@ -247,12 +247,21 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
   
   // Discipline colors for gradient ring - use centralized color system
   // This ensures the wordmark automatically updates when colors change
+  // Brightened versions for wordmark (20-30% more luminous) - only affects wordmark, not rest of app
+  const brightenColor = (hex: string, percent: number = 25): string => {
+    const num = parseInt(hex.replace('#', ''), 16);
+    const r = Math.min(255, ((num >> 16) & 0xff) + Math.round(((255 - ((num >> 16) & 0xff)) * percent) / 100));
+    const g = Math.min(255, ((num >> 8) & 0xff) + Math.round(((255 - ((num >> 8) & 0xff)) * percent) / 100));
+    const b = Math.min(255, (num & 0xff) + Math.round(((255 - (num & 0xff)) * percent) / 100));
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+  };
+  
   const colorDefinitions = {
-    run: SPORT_COLORS.run,           // Yellow (very light yellow)
-    strength: SPORT_COLORS.strength,  // Orange
-    ride: SPORT_COLORS.ride,         // Green
-    pilates: SPORT_COLORS.pilates_yoga, // Purple
-    swim: SPORT_COLORS.swim,         // Blue
+    run: brightenColor(SPORT_COLORS.run, 25),           // Yellow - brightened 25%
+    strength: brightenColor(SPORT_COLORS.strength, 25),  // Orange - brightened 25%
+    ride: brightenColor(SPORT_COLORS.ride, 25),         // Green - brightened 25%
+    pilates: brightenColor(SPORT_COLORS.pilates_yoga, 25), // Purple - brightened 25%
+    swim: brightenColor(SPORT_COLORS.swim, 25),         // Blue - brightened 25%
   };
 
   // Shuffle color order once on component mount (app launch)
@@ -325,28 +334,14 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
     return layerColors[layerIndex - 1];
   };
 
-  // Scanning system animation - slow cycle through LED channels
-  const [scanPhase, setScanPhase] = React.useState(0);
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      setScanPhase(prev => (prev + 0.02) % (Math.PI * 2)); // Slow scan - 2% per 50ms
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Calculate glow intensity for each layer (scanning system + active state)
+  // Calculate glow intensity for each layer (constant bright, no pulsing)
   const getLayerGlow = (layerIndex: number) => {
     const discipline = getDisciplineForLayer(layerIndex);
     const isActive = discipline && activeDisciplines.includes(discipline);
     
-    // Scanning effect - wave that cycles through layers
-    const scanWave = Math.sin(scanPhase + (layerIndex * 0.8));
-    const scanIntensity = 0.3 + (scanWave * 0.2); // Base 0.3, pulse ±0.2
-    
-    // Active disciplines glow brighter
-    const activeBoost = isActive ? 0.4 : 0;
-    
-    return Math.min(1.0, scanIntensity + activeBoost);
+    // Constant bright state - no pulsing animation
+    // Active disciplines glow at maximum brightness, inactive at high constant brightness
+    return isActive ? 1.0 : 0.85; // Active: full brightness, Inactive: 85% brightness
   };
   
   return (
@@ -373,13 +368,13 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
             <stop offset="100%" stopColor={colorDefinitions[layerColors[3]]}/>
           </linearGradient>
           
-          {/* Glow filters for each LED channel "e" - stronger glow */}
+          {/* Glow filters for each LED channel "e" - stronger glow (increased 20-30%) */}
           {[0, 1, 2, 3, 4, 5].map((layerIndex) => {
             const discipline = getDisciplineForLayer(layerIndex);
             const isActive = discipline && activeDisciplines.includes(discipline);
-            const blurAmount = isActive ? 4 : 3; // Brighter blur for active
+            const blurAmount = isActive ? 5 : 4; // Increased from 4/3 to 5/4 (~25% increase)
             // Base opacity - scanning animation will be applied via text opacity
-            const baseOpacity = isActive ? 0.6 : 0.4;
+            const baseOpacity = isActive ? 0.75 : 0.5; // Increased from 0.6/0.4 to 0.75/0.5 (~25% increase)
             
             return (
               <filter key={layerIndex} id={`eGlow-${uniqueId}-${layerIndex}`} x="-100%" y="-100%" width="300%" height="300%">
@@ -424,7 +419,7 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
           e
         </text>
         
-        {/* Layer 1 - LED channel with glow and scanning */}
+        {/* Layer 1 - LED channel with constant bright glow */}
         <text
           x={58}
           y={56}
@@ -437,12 +432,12 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
           filter={`url(#eGlow-${uniqueId}-1)`}
           opacity={getLayerGlow(1)}
           transform={`translate(${parallax.x * parallaxLayers[1]}, ${parallax.y * parallaxLayers[1]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Layer 2 - LED channel with glow and scanning */}
+        {/* Layer 2 - LED channel with constant bright glow */}
         <text
           x={70}
           y={66}
@@ -455,12 +450,12 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
           filter={`url(#eGlow-${uniqueId}-2)`}
           opacity={getLayerGlow(2)}
           transform={`translate(${parallax.x * parallaxLayers[2]}, ${parallax.y * parallaxLayers[2]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Layer 3 - LED channel with glow and scanning */}
+        {/* Layer 3 - LED channel with constant bright glow */}
         <text
           x={80}
           y={74}
@@ -473,12 +468,12 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
           filter={`url(#eGlow-${uniqueId}-3)`}
           opacity={getLayerGlow(3)}
           transform={`translate(${parallax.x * parallaxLayers[3]}, ${parallax.y * parallaxLayers[3]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Layer 4 - LED channel with glow and scanning */}
+        {/* Layer 4 - LED channel with constant bright glow */}
         <text
           x={88}
           y={80}
@@ -491,12 +486,12 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
           filter={`url(#eGlow-${uniqueId}-4)`}
           opacity={getLayerGlow(4)}
           transform={`translate(${parallax.x * parallaxLayers[4]}, ${parallax.y * parallaxLayers[4]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Layer 5 - LED channel with glow and scanning */}
+        {/* Layer 5 - LED channel with constant bright glow */}
         <text
           x={95}
           y={85}
@@ -509,7 +504,7 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
           filter={`url(#eGlow-${uniqueId}-5)`}
           opacity={getLayerGlow(5)}
           transform={`translate(${parallax.x * parallaxLayers[5]}, ${parallax.y * parallaxLayers[5]})`}
-          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out' }}
         >
           e
         </text>
