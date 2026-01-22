@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
-import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineFocusRingClass, getDisciplineFocusBorderClass, getDisciplineSelectedButtonClasses, getDisciplineUnselectedButtonClasses } from '@/lib/context-utils';
+import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineFocusRingClass, getDisciplineFocusBorderClass, getDisciplineSelectedButtonClasses, getDisciplineUnselectedButtonClasses, getDisciplineBgClassVariant } from '@/lib/context-utils';
 import { useToast } from '@/components/ui/use-toast';
 import { MobileHeader } from './MobileHeader';
 import {
@@ -2675,20 +2675,20 @@ export default function PlanWizard() {
         />
         
         {/* Header */}
-        <div className="relative border-b border-teal-500/20 px-4 py-3">
+        <div className={`relative border-b ${getDisciplineBorderClass('run', '20')} px-4 py-3`}>
           <h1 className="text-lg font-semibold text-center text-white">Your Plan</h1>
         </div>
 
         {/* Content */}
         <div className="relative p-4 pb-32 max-w-lg mx-auto">
-          {/* Plan summary card with teal accent */}
-          <div className="mb-6 bg-black/40 backdrop-blur-xl border border-teal-500/30 rounded-2xl p-5 relative overflow-hidden">
-            {/* Teal glow behind card */}
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-teal-500/20 rounded-full blur-2xl" />
-            <h2 className="text-xl font-semibold mb-2 text-teal-400 relative">{generatedPlan.name}</h2>
+          {/* Plan summary card with yellow accent */}
+          <div className={`mb-6 bg-black/40 backdrop-blur-xl border ${getDisciplineBorderClass('run', '30')} rounded-2xl p-5 relative overflow-hidden`}>
+            {/* Yellow glow behind card */}
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-200/20 rounded-full blur-2xl" />
+            <h2 className={`text-xl font-semibold mb-2 ${getDisciplineTextClassVariant('run', '400')} relative`}>{generatedPlan.name}</h2>
             <p className="text-sm text-gray-300 mb-4 leading-relaxed relative">{generatedPlan.description}</p>
             <div className="flex gap-4 text-sm relative">
-              <span className="px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+              <span className={`px-3 py-1 rounded-full ${getDisciplineBgClassVariant('run', '500')}/20 ${getDisciplineTextClassVariant('run', '400')} border ${getDisciplineBorderClass('run', '30')}`}>
                 {generatedPlan.duration_weeks} weeks
               </span>
               <span className="px-3 py-1 rounded-full bg-white/10 text-gray-300 border border-white/20">
@@ -2708,7 +2708,7 @@ export default function PlanWizard() {
 
           {/* Week 1 preview */}
           <div className="mb-4">
-            <h3 className="text-sm font-medium text-teal-400/80 mb-3 tracking-wide">WEEK 1 PREVIEW</h3>
+            <h3 className={`text-sm font-medium ${getDisciplineTextClassVariant('run', '400')}/80 mb-3 tracking-wide`}>WEEK 1 PREVIEW</h3>
             <div className="space-y-2">
               {(() => {
                 // Group sessions by day
@@ -2730,7 +2730,7 @@ export default function PlanWizard() {
                         : 'bg-black/40 backdrop-blur-md border border-white/10'
                     }`}>
                       <div className="flex gap-3">
-                        <span className={`text-xs font-semibold w-10 pt-1 ${isRest ? 'text-white/20' : 'text-teal-500'}`}>
+                        <span className={`text-xs font-semibold w-10 pt-1 ${isRest ? 'text-white/20' : getDisciplineTextClass('run')}`}>
                           {day.slice(0, 3)}
                         </span>
                         {isRest ? (
@@ -2744,8 +2744,8 @@ export default function PlanWizard() {
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2">
                                       {/* Color indicator */}
-                                      <div className={`w-1 h-4 rounded-full ${isRun ? 'bg-teal-500' : 'bg-amber-500'}`} />
-                                      <span className={`font-medium text-sm ${isRun ? 'text-teal-300' : 'text-amber-300'}`}>
+                                      <div className={`w-1 h-4 rounded-full ${isRun ? 'bg-yellow-200' : 'bg-amber-500'}`} />
+                                      <span className={`font-medium text-sm ${isRun ? getDisciplineTextClassVariant('run', '400') : 'text-amber-300'}`}>
                                         {session.name}
                                       </span>
                                     </div>
@@ -2753,7 +2753,7 @@ export default function PlanWizard() {
                                       <p className="text-xs text-gray-400 mt-1 ml-3 leading-relaxed">{session.description}</p>
                                   )}
                                 </div>
-                                  <span className={`text-xs ml-2 px-2 py-0.5 rounded ${isRun ? 'bg-teal-500/20 text-teal-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                  <span className={`text-xs ml-2 px-2 py-0.5 rounded ${isRun ? `${getDisciplineBgClassVariant('run', '500')}/20 ${getDisciplineTextClassVariant('run', '400')}` : 'bg-amber-500/20 text-amber-400'}`}>
                                     {session.duration}m
                                   </span>
                               </div>
