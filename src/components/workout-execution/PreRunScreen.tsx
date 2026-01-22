@@ -14,6 +14,7 @@ import { MapPin, Heart, Volume2, VolumeX, Loader2, Check, X, AlertCircle } from 
 import type { WorkoutEnvironment, WorkoutEquipment, PlannedWorkoutStructure } from '@/types/workoutExecution';
 import type { GPSStatus } from '@/hooks/workout-execution/useGeolocation';
 import type { HRConnectionStatus } from '@/hooks/workout-execution/useBluetoothHR';
+import { getDisciplineColorRgb, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineBgClassVariant } from '@/lib/context-utils';
 
 interface PreRunScreenProps {
   environment: WorkoutEnvironment;
@@ -168,11 +169,14 @@ export const PreRunScreen: React.FC<PreRunScreenProps> = ({
     }
   };
   
-  // Discipline colors - teal for run (20,184,166), green for ride (22,163,74)
-  const rgb = isRun ? '20,184,166' : '22,163,74';
-  const accentClasses = isRun 
-    ? { text: 'text-teal-400', border: 'border-teal-500/30', bg: 'bg-teal-600', hoverBg: 'hover:bg-teal-500' }
-    : { text: 'text-green-400', border: 'border-green-500/30', bg: 'bg-green-600', hoverBg: 'hover:bg-green-500' };
+  // Discipline colors - using centralized color system
+  const rgb = getDisciplineColorRgb(workoutType);
+  const accentClasses = {
+    text: getDisciplineTextClassVariant(workoutType, '400'),
+    border: getDisciplineBorderClass(workoutType, '30'),
+    bg: getDisciplineBgClassVariant(workoutType, '600'),
+    hoverBg: `hover:${getDisciplineBgClassVariant(workoutType, '500')}`,
+  };
   
   return (
     <div 

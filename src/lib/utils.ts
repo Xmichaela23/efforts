@@ -12,70 +12,23 @@ export type Discipline = 'run' | 'ride' | 'swim' | 'strength' | 'walk' | 'bike' 
 // See: archive/muji-inspired-colors-archived.ts
 // Current colors use glassmorphism theme (see: src/lib/context-utils.ts)
 
-// Legacy function - now uses glassmorphism colors for consistency
-// Import from context-utils.ts for new code
-export function getDisciplineColor(type: string): string {
-  // Use glassmorphism theme colors (teal for run, green for ride, etc.)
-  const t = (type || '').toLowerCase();
-  if (t === 'run' || t === 'running') return '#14b8a6'; // teal-500
-  if (t === 'ride' || t === 'cycling' || t === 'bike') return '#22c55e'; // green-500
-  if (t === 'swim' || t === 'swimming') return '#3b82f6'; // blue-500
-  if (t === 'strength' || t === 'weight' || t === 'weights') return '#f97316'; // orange-500
-  if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') return '#a855f7'; // purple-500
-  if (t === 'walk') return '#14b8a6'; // teal-500 (same as run)
-  return '#64748b'; // gray-500 fallback
-}
+// =============================================================================
+// COLOR UTILITIES - Re-exported from context-utils.ts for backward compatibility
+// =============================================================================
+// All color functions are now centralized in context-utils.ts
+// These re-exports maintain backward compatibility with existing code
+// New code should import directly from '@/lib/context-utils'
 
-// Get Tailwind classes for discipline-colored pills (dark theme glassmorphism)
-export function getDisciplinePillClasses(type: string, isCompleted: boolean = false): string {
-  const t = (type || '').toLowerCase();
-  
-  // Run: Teal-500 (#14b8a6) - aqua-green
-  if (t === 'run' || t === 'running') {
-    return isCompleted
-      ? 'bg-teal-500/20 border border-teal-500/30 text-teal-400 backdrop-blur-md hover:bg-teal-500/30'
-      : 'bg-transparent border border-teal-500/50 text-white/90 hover:bg-teal-500/10';
-  }
-  // Ride/Cycling: Green-600 (#16a34a)
-  if (t === 'ride' || t === 'cycling' || t === 'bike') {
-    return isCompleted
-      ? 'bg-green-600/20 border border-green-500/30 text-green-400 backdrop-blur-md hover:bg-green-600/30'
-      : 'bg-transparent border border-green-500/50 text-white/90 hover:bg-green-500/10';
-  }
-  // Swim: Blue-600 (#2563eb) - true blue
-  if (t === 'swim' || t === 'swimming') {
-    return isCompleted
-      ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 backdrop-blur-md hover:bg-blue-600/30'
-      : 'bg-transparent border border-blue-500/50 text-white/90 hover:bg-blue-500/10';
-  }
-  // Strength: Orange-600 (#ea580c)
-  if (t === 'strength' || t === 'weight' || t === 'weights') {
-    return isCompleted
-      ? 'bg-orange-600/20 border border-orange-500/30 text-orange-400 backdrop-blur-md hover:bg-orange-600/30'
-      : 'bg-transparent border border-orange-500/50 text-white/90 hover:bg-orange-500/10';
-  }
-  // Mobility/Pilates/Yoga: Purple-600 (#9333ea)
-  if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') {
-    return isCompleted
-      ? 'bg-purple-600/20 border border-purple-500/30 text-purple-400 backdrop-blur-md hover:bg-purple-600/30'
-      : 'bg-transparent border border-purple-500/50 text-white/90 hover:bg-purple-500/10';
-  }
-  // Default fallback: neutral
-  return isCompleted
-    ? 'bg-zinc-500/20 border border-zinc-400/30 text-white/80 backdrop-blur-md hover:bg-zinc-500/30'
-    : 'bg-transparent border border-white/40 text-white/90 hover:bg-white/10';
-}
-
-// Get checkmark color based on discipline
-export function getDisciplineCheckmarkColor(type: string): string {
-  const t = (type || '').toLowerCase();
-  if (t === 'run' || t === 'running') return 'text-teal-500';
-  if (t === 'ride' || t === 'cycling' || t === 'bike') return 'text-green-500';
-  if (t === 'swim' || t === 'swimming') return 'text-blue-500';
-  if (t === 'strength' || t === 'weight' || t === 'weights') return 'text-orange-500';
-  if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') return 'text-purple-500';
-  return 'text-white';
-}
+export {
+  getDisciplineColor,
+  getDisciplinePillClasses,
+  getDisciplineCheckmarkColor,
+  getDisciplineColorRgb,
+  getDisciplineTextClassVariant,
+  getDisciplineBorderClass,
+  getDisciplineBgClassVariant,
+  hexToRgb,
+} from './context-utils';
 
 // Time and pace formatting utilities
 export function formatTime(seconds: number): string {

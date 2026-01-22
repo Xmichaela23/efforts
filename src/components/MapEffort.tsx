@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import maplibregl from 'maplibre-gl';
 import { cumulativeMeters, pointAtDistance, sanitizeLngLat, type LngLat } from '../lib/geo';
 import { Maximize2, Minimize2 } from 'lucide-react';
+import { SPORT_COLORS } from '@/lib/context-utils';
 
 // Segment effort type for Strava segments
 export type SegmentEffort = {
@@ -368,7 +369,7 @@ export default function MapEffort({
               'case',
               ['==', ['%', ['get', 'index'], 2], 0],
               '#f97316',  // Orange (even index)
-              '#14b8a6'   // Teal (odd index) - much more visible contrast
+              SPORT_COLORS.run   // Run color (odd index) - much more visible contrast
             ],
             'line-width': 5,
             'line-opacity': 0.9

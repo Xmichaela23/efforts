@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
+import { getDisciplineGlowColor } from '@/lib/context-utils';
 import { useToast } from '@/components/ui/use-toast';
 import { MobileHeader } from './MobileHeader';
 import {
@@ -2670,7 +2671,7 @@ export default function PlanWizard() {
         {/* Subtle teal glow at top */}
         <div 
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at center, rgba(20, 184, 166, 0.15) 0%, transparent 70%)' }}
+          style={{ background: `radial-gradient(ellipse at center, ${getDisciplineGlowColor('run', 0.15)} 0%, transparent 70%)` }}
         />
         
         {/* Header */}
@@ -2782,7 +2783,7 @@ export default function PlanWizard() {
             background: 'linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.8))',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            borderTop: '1px solid rgba(20, 184, 166, 0.2)',
+            borderTop: `1px solid ${getDisciplineGlowColor('run', 0.2)}`,
             paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)'
           }}
         >

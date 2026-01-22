@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
+import { getDisciplineGlowColor } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle, Info } from 'lucide-react';
@@ -892,17 +893,8 @@ export default function WorkoutCalendar({
                                     const t = (workoutType || '').toLowerCase();
                                     let glowColor = 'rgba(255, 255, 255, 0.6)'; // default white
                                     
-                                    if (t === 'run' || t === 'running') {
-                                      glowColor = 'rgba(20, 184, 166, 0.8)'; // teal-500
-                                    } else if (t === 'strength' || t === 'weight' || t === 'weights') {
-                                      glowColor = 'rgba(249, 115, 22, 0.8)'; // orange-500
-                                    } else if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') {
-                                      glowColor = 'rgba(192, 132, 252, 0.8)'; // purple-500
-                                    } else if (t === 'ride' || t === 'cycling' || t === 'bike') {
-                                      glowColor = 'rgba(34, 197, 94, 0.8)'; // green-500
-                                    } else if (t === 'swim' || t === 'swimming') {
-                                      glowColor = 'rgba(43, 90, 140, 0.8)'; // swim blue
-                                    }
+                                    // Use centralized color system for glow
+                                    glowColor = t ? getDisciplineGlowColor(t, 0.8) : 'rgba(255, 255, 255, 0.6)'; // default white
                                     
                                     return {
                                       textShadow: `

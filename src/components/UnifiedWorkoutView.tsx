@@ -17,7 +17,7 @@ import { supabase } from '@/lib/supabase';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
-import { SPORT_COLORS, getDisciplineColor } from '@/lib/context-utils';
+import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 // Get unified planned workout data with pace ranges (same as Today's Effort and Weekly)
@@ -769,14 +769,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const workoutTypeForGradient = getWorkoutType();
   const sportColor = getDisciplineColor(workoutTypeForGradient);
   
-  // Convert hex color to RGB string for gradient
-  const hexToRgb = (hex: string): string => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (!result) return '20,184,166'; // fallback to teal
-    return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
-  };
-  
-  const sportRgb = hexToRgb(sportColor);
+  // Use centralized RGB conversion helper
+  const sportRgb = getDisciplineColorRgb(workoutTypeForGradient);
   
   // Sport color gradient style for all disciplines (consistent positioning)
   // Applied to fixed parent container so it stays in place without needing background-attachment: fixed

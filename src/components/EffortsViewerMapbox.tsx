@@ -7,6 +7,7 @@ import WeatherDisplay from "./WeatherDisplay";
 import { useWeather } from "../hooks/useWeather";
 import { formatSpeed } from "../utils/workoutFormatting";
 import { isVirtualActivity, getVirtualWorkoutLabel } from "../utils/workoutNames";
+import { getDisciplineColorRgb, SPORT_COLORS } from "@/lib/context-utils";
 
 /** ---------- Route Simplification (Douglas-Peucker Algorithm) ---------- */
 
@@ -1783,8 +1784,8 @@ function EffortsViewerMapbox({
           const isRunOrWalk = isRun || isWalk;
           
           // Color scheme: teal for runs/walks (matches app discipline color), green for cycling
-          // Run color: #14b8a6 (teal-500) = rgb(20,184,166)
-          const primaryColorRgb = isRunOrWalk ? '20,184,166' : '34,197,94';
+          // Using centralized color system
+          const primaryColorRgb = getDisciplineColorRgb(workoutType);
           const darkBg = isRunOrWalk 
             ? 'linear-gradient(135deg, #0f1f1f 0%, #1a2e2e 50%, #0f1f1f 100%)'
             : 'linear-gradient(135deg, #0f1f0f 0%, #1a2e1a 50%, #0f1f0f 100%)';
@@ -1828,7 +1829,7 @@ function EffortsViewerMapbox({
                   height: 48,
                   margin: '0 auto 12px',
                   background: isRunOrWalk 
-                    ? 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)'  // teal-600 to teal-500
+                    ? `linear-gradient(135deg, #0d9488 0%, ${SPORT_COLORS.run} 100%)`  // teal-600 to run color
                     : 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
                   borderRadius: 12,
                   display: 'flex',

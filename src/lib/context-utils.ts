@@ -17,10 +17,13 @@
 /**
  * Unified sport colors - use these everywhere for consistency
  * Matches the glassmorphism dark theme
+ * 
+ * This is the SINGLE SOURCE OF TRUTH for all discipline colors.
+ * Change colors here and they will propagate throughout the app.
  */
 export const SPORT_COLORS = {
-  run: '#14b8a6',      // teal-500
-  running: '#14b8a6',  // alias
+  run: '#FEF08A',      // yellow-200 (very light yellow)
+  running: '#FEF08A',  // alias
   bike: '#22c55e',     // green-500
   ride: '#22c55e',     // alias
   cycling: '#22c55e',  // alias
@@ -35,7 +38,46 @@ export const SPORT_COLORS = {
 } as const;
 
 /**
+ * Mapping from discipline type to Tailwind color name
+ * This maps to the color in SPORT_COLORS above.
+ * Update both SPORT_COLORS and this mapping when changing colors.
+ */
+const DISCIPLINE_TO_TAILWIND: Record<string, string> = {
+  run: 'yellow',
+  running: 'yellow',
+  walk: 'yellow', // same as run
+  ride: 'green',
+  bike: 'green',
+  cycling: 'green',
+  swim: 'blue',
+  swimming: 'blue',
+  strength: 'orange',
+  strength_training: 'orange',
+  weight: 'orange',
+  weights: 'orange',
+  mobility: 'purple',
+  pilates_yoga: 'purple',
+  pilates: 'purple',
+  yoga: 'purple',
+  stretch: 'purple',
+};
+
+/**
+ * Convert hex color to RGB string (format: "r,g,b")
+ * Useful for rgba() CSS and inline styles
+ */
+export function hexToRgb(hex: string): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) {
+    // Fallback to teal if invalid
+    return '20,184,166';
+  }
+  return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
+}
+
+/**
  * Get discipline color for charts and indicators
+ * Returns hex color from SPORT_COLORS
  */
 export function getDisciplineColor(type: string): string {
   const normalized = (type || '').toLowerCase();
@@ -43,29 +85,169 @@ export function getDisciplineColor(type: string): string {
 }
 
 /**
- * Get Tailwind class for discipline (for components using Tailwind)
+ * Get RGB string for a discipline color (format: "r, g, b")
+ * Useful for rgba() CSS and inline styles
+ */
+export function getDisciplineColorRgb(type: string): string {
+  const color = getDisciplineColor(type);
+  return hexToRgb(color);
+}
+
+/**
+ * Get Tailwind color name for a discipline (e.g., "teal", "green")
+ * Used internally to generate Tailwind classes
+ */
+function getDisciplineTailwindColorName(type: string): string {
+  const normalized = (type || '').toLowerCase();
+  return DISCIPLINE_TO_TAILWIND[normalized] || 'gray';
+}
+
+/**
+ * Get Tailwind class for discipline background (for components using Tailwind)
+ * Note: Tailwind JIT requires full class names, so we return hardcoded classes
+ * but derive them from the mapping above for easier maintenance
  */
 export function getDisciplineTailwindClass(type: string): string {
-  const t = (type || '').toLowerCase();
-  if (t === 'run' || t === 'running') return 'bg-teal-500';
-  if (t === 'ride' || t === 'cycling' || t === 'bike') return 'bg-green-500';
-  if (t === 'swim' || t === 'swimming') return 'bg-blue-500';
-  if (t === 'strength' || t === 'strength_training') return 'bg-orange-500';
-  if (t === 'mobility' || t === 'pilates_yoga' || t === 'pilates' || t === 'yoga') return 'bg-purple-500';
-  return 'bg-gray-500';
+  const colorName = getDisciplineTailwindColorName(type);
+  // Map to actual Tailwind classes (required for JIT compilation)
+  const classMap: Record<string, string> = {
+    yellow: 'bg-yellow-200', // very light yellow
+    teal: 'bg-teal-500',
+    green: 'bg-green-500',
+    blue: 'bg-blue-500',
+    orange: 'bg-orange-500',
+    purple: 'bg-purple-500',
+    gray: 'bg-gray-500',
+  };
+  return classMap[colorName] || 'bg-gray-500';
 }
 
 /**
  * Get text color class for discipline
  */
 export function getDisciplineTextClass(type: string): string {
-  const t = (type || '').toLowerCase();
-  if (t === 'run' || t === 'running') return 'text-teal-500';
-  if (t === 'ride' || t === 'cycling' || t === 'bike') return 'text-green-500';
-  if (t === 'swim' || t === 'swimming') return 'text-blue-500';
-  if (t === 'strength' || t === 'strength_training') return 'text-orange-500';
-  if (t === 'mobility' || t === 'pilates_yoga' || t === 'pilates' || t === 'yoga') return 'text-purple-500';
-  return 'text-gray-500';
+  const colorName = getDisciplineTailwindColorName(type);
+  const classMap: Record<string, string> = {
+    yellow: 'text-yellow-200', // very light yellow
+    teal: 'text-teal-500',
+    green: 'text-green-500',
+    blue: 'text-blue-500',
+    orange: 'text-orange-500',
+    purple: 'text-purple-500',
+    gray: 'text-gray-500',
+  };
+  return classMap[colorName] || 'text-gray-500';
+}
+
+/**
+ * Get checkmark color class based on discipline
+ */
+export function getDisciplineCheckmarkColor(type: string): string {
+  const colorName = getDisciplineTailwindColorName(type);
+  const classMap: Record<string, string> = {
+    yellow: 'text-yellow-200', // very light yellow
+    teal: 'text-teal-500',
+    green: 'text-green-500',
+    blue: 'text-blue-500',
+    orange: 'text-orange-500',
+    purple: 'text-purple-500',
+    gray: 'text-gray-500',
+  };
+  return classMap[colorName] || 'text-white';
+}
+
+/**
+ * Get Tailwind classes for discipline-colored pills (dark theme glassmorphism)
+ * Returns different styles for completed vs planned workouts
+ */
+export function getDisciplinePillClasses(type: string, isCompleted: boolean = false): string {
+  const colorName = getDisciplineTailwindColorName(type);
+  
+  // Map to actual Tailwind classes (required for JIT compilation)
+  const completedClasses: Record<string, string> = {
+    yellow: 'bg-yellow-200/20 border border-yellow-200/30 text-yellow-200 backdrop-blur-md hover:bg-yellow-200/30',
+    teal: 'bg-teal-500/20 border border-teal-500/30 text-teal-400 backdrop-blur-md hover:bg-teal-500/30',
+    green: 'bg-green-600/20 border border-green-500/30 text-green-400 backdrop-blur-md hover:bg-green-600/30',
+    blue: 'bg-blue-600/20 border border-blue-500/30 text-blue-400 backdrop-blur-md hover:bg-blue-600/30',
+    orange: 'bg-orange-600/20 border border-orange-500/30 text-orange-400 backdrop-blur-md hover:bg-orange-600/30',
+    purple: 'bg-purple-600/20 border border-purple-500/30 text-purple-400 backdrop-blur-md hover:bg-purple-600/30',
+    gray: 'bg-zinc-500/20 border border-zinc-400/30 text-white/80 backdrop-blur-md hover:bg-zinc-500/30',
+  };
+  
+  const plannedClasses: Record<string, string> = {
+    yellow: 'bg-transparent border border-yellow-200/50 text-white/90 hover:bg-yellow-200/10',
+    teal: 'bg-transparent border border-teal-500/50 text-white/90 hover:bg-teal-500/10',
+    green: 'bg-transparent border border-green-500/50 text-white/90 hover:bg-green-500/10',
+    blue: 'bg-transparent border border-blue-500/50 text-white/90 hover:bg-blue-500/10',
+    orange: 'bg-transparent border border-orange-500/50 text-white/90 hover:bg-orange-500/10',
+    purple: 'bg-transparent border border-purple-500/50 text-white/90 hover:bg-purple-500/10',
+    gray: 'bg-transparent border border-white/40 text-white/90 hover:bg-white/10',
+  };
+  
+  if (isCompleted) {
+    return completedClasses[colorName] || completedClasses.gray;
+  } else {
+    return plannedClasses[colorName] || plannedClasses.gray;
+  }
+}
+
+/**
+ * Get text color class with variant (e.g., text-teal-400 for lighter variant)
+ */
+export function getDisciplineTextClassVariant(type: string, variant: '400' | '500' = '500'): string {
+  const colorName = getDisciplineTailwindColorName(type);
+  const classMap: Record<string, Record<string, string>> = {
+    yellow: { '400': 'text-yellow-200', '500': 'text-yellow-200' }, // very light yellow
+    teal: { '400': 'text-teal-400', '500': 'text-teal-500' },
+    green: { '400': 'text-green-400', '500': 'text-green-500' },
+    blue: { '400': 'text-blue-400', '500': 'text-blue-500' },
+    orange: { '400': 'text-orange-400', '500': 'text-orange-500' },
+    purple: { '400': 'text-purple-400', '500': 'text-purple-500' },
+    gray: { '400': 'text-gray-400', '500': 'text-gray-500' },
+  };
+  return classMap[colorName]?.[variant] || classMap.gray[variant];
+}
+
+/**
+ * Get border color class with opacity (e.g., border-teal-500/30)
+ */
+export function getDisciplineBorderClass(type: string, opacity: '30' | '50' | '60' = '50'): string {
+  const colorName = getDisciplineTailwindColorName(type);
+  const classMap: Record<string, Record<string, string>> = {
+    yellow: { '30': 'border-yellow-200/30', '50': 'border-yellow-200/50', '60': 'border-yellow-200/60' },
+    teal: { '30': 'border-teal-500/30', '50': 'border-teal-500/50', '60': 'border-teal-500/60' },
+    green: { '30': 'border-green-500/30', '50': 'border-green-500/50', '60': 'border-green-500/60' },
+    blue: { '30': 'border-blue-500/30', '50': 'border-blue-500/50', '60': 'border-blue-500/60' },
+    orange: { '30': 'border-orange-500/30', '50': 'border-orange-500/50', '60': 'border-orange-500/60' },
+    purple: { '30': 'border-purple-500/30', '50': 'border-purple-500/50', '60': 'border-purple-500/60' },
+    gray: { '30': 'border-gray-500/30', '50': 'border-gray-500/50', '60': 'border-gray-500/60' },
+  };
+  return classMap[colorName]?.[opacity] || classMap.gray[opacity];
+}
+
+/**
+ * Get background color class with variant (e.g., bg-teal-600)
+ */
+export function getDisciplineBgClassVariant(type: string, variant: '500' | '600' = '500'): string {
+  const colorName = getDisciplineTailwindColorName(type);
+  const classMap: Record<string, Record<string, string>> = {
+    yellow: { '500': 'bg-yellow-200', '600': 'bg-yellow-300' }, // very light yellow variants
+    teal: { '500': 'bg-teal-500', '600': 'bg-teal-600' },
+    green: { '500': 'bg-green-500', '600': 'bg-green-600' },
+    blue: { '500': 'bg-blue-500', '600': 'bg-blue-600' },
+    orange: { '500': 'bg-orange-500', '600': 'bg-orange-600' },
+    purple: { '500': 'bg-purple-500', '600': 'bg-purple-600' },
+    gray: { '500': 'bg-gray-500', '600': 'bg-gray-600' },
+  };
+  return classMap[colorName]?.[variant] || classMap.gray[variant];
+}
+
+/**
+ * Get RGBA color string for glow effects (e.g., "rgba(20, 184, 166, 0.8)")
+ */
+export function getDisciplineGlowColor(type: string, opacity: number = 0.8): string {
+  const rgb = getDisciplineColorRgb(type);
+  return `rgba(${rgb}, ${opacity})`;
 }
 
 // =============================================================================

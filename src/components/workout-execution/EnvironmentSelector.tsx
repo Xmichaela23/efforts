@@ -7,6 +7,7 @@
 
 import React from 'react';
 import type { WorkoutEnvironment, WorkoutEquipment } from '@/types/workoutExecution';
+import { getDisciplineColorRgb, getDisciplineTextClassVariant, getDisciplineBorderClass } from '@/lib/context-utils';
 
 interface EnvironmentSelectorProps {
   workoutType: 'run' | 'ride';
@@ -19,13 +20,13 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
   onSelect,
   onBack,
 }) => {
-  const isRun = workoutType === 'run';
-  
-  // Discipline colors - teal for run (20,184,166), green for ride (22,163,74)
-  const rgb = isRun ? '20,184,166' : '22,163,74';
-  const accentClasses = isRun 
-    ? { text: 'text-teal-400', border: 'border-teal-500/30', hoverBorder: 'hover:border-teal-500/60' }
-    : { text: 'text-green-400', border: 'border-green-500/30', hoverBorder: 'hover:border-green-500/60' };
+  // Discipline colors - using centralized color system
+  const rgb = getDisciplineColorRgb(workoutType);
+  const accentClasses = {
+    text: getDisciplineTextClassVariant(workoutType, '400'),
+    border: getDisciplineBorderClass(workoutType, '30'),
+    hoverBorder: `hover:${getDisciplineBorderClass(workoutType, '60')}`,
+  };
   
   return (
     <div 

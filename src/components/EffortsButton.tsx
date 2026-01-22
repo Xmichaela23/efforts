@@ -1,4 +1,5 @@
 import * as React from "react";
+import { SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowColor } from '@/lib/context-utils';
 
 /**
  * Efforts Wordmark - "efforts" with holographic "o"
@@ -531,9 +532,9 @@ export function EffortsButton({
   const centerX = viewBoxSize / 2;
   const centerY = viewBoxSize / 2;
   
-  // Single accent color with glow - teal/cyan like Tron
-  const accentColor = '#14b8a6'; // teal-500
-  const glowColor = 'rgba(20, 184, 166, 0.6)';
+  // Single accent color with glow - using centralized color system
+  const accentColor = SPORT_COLORS.run;
+  const glowColor = getDisciplineGlowColor('run', 0.6);
 
   return (
     <button
@@ -718,13 +719,13 @@ function EffortsButtonGradient({
   const centerY = viewBoxSize / 2;
   const uniqueId = React.useId().replace(/:/g, '');
 
-  // Vibrant discipline colors
+  // Vibrant discipline colors - using centralized color system
   const colors = {
-    swim: '#2563eb',     // blue
-    ride: '#16a34a',     // green
-    run: '#14b8a6',      // teal
-    strength: '#f97316', // orange
-    pilates: '#a855f7',  // purple
+    swim: SPORT_COLORS.swim,
+    ride: SPORT_COLORS.ride,
+    run: SPORT_COLORS.run,
+    strength: SPORT_COLORS.strength,
+    pilates: SPORT_COLORS.pilates_yoga,
   };
 
   return (
@@ -869,7 +870,7 @@ function EffortsButtonGradient({
           y={centerY + 12}
           textAnchor="middle"
           dominantBaseline="central"
-          fill="#14b8a6"
+          fill={SPORT_COLORS.run}
           fontSize={105}
           fontWeight={300}
           fontFamily="'Rajdhani', system-ui, sans-serif"
@@ -972,7 +973,7 @@ export function EffortsButtonPill({
       <div 
         className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-70 transition-opacity duration-700 blur-xl"
         style={{
-          background: 'linear-gradient(90deg, #14b8a6 0%, #f97316 50%, #a855f7 100%)',
+          background: `linear-gradient(90deg, ${SPORT_COLORS.run} 0%, ${SPORT_COLORS.strength} 50%, ${SPORT_COLORS.pilates_yoga} 100%)`,
         }}
       />
       
@@ -984,14 +985,14 @@ export function EffortsButtonPill({
       >
         <defs>
           <linearGradient id={`pillGradient-${uniqueId}`} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.9"/>
+            <stop offset="0%" stopColor={SPORT_COLORS.run} stopOpacity="0.9"/>
             <stop offset="50%" stopColor="#f97316" stopOpacity="0.9"/>
             <stop offset="100%" stopColor="#a855f7" stopOpacity="0.9"/>
           </linearGradient>
           
           {/* Energy gradient for the "e" */}
           <linearGradient id={`pillEGradient-${uniqueId}`} x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.85"/>
+            <stop offset="0%" stopColor={SPORT_COLORS.run} stopOpacity="0.85"/>
             <stop offset="50%" stopColor="white" stopOpacity="1"/>
             <stop offset="100%" stopColor="#a855f7" stopOpacity="0.85"/>
           </linearGradient>
@@ -1082,7 +1083,7 @@ export function EffortsButtonPill({
           y={44}
           textAnchor="middle"
           dominantBaseline="central"
-          fill="#14b8a6"
+          fill={SPORT_COLORS.run}
           fontSize={95}
           fontWeight={100}
           fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"

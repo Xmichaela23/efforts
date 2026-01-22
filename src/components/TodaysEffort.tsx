@@ -6,6 +6,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity } from 'lucide-react';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
+import { getDisciplineGlowColor } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
@@ -1083,19 +1084,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                               style={(() => {
                                 // Get color based on workout type for tight LED glow
                                 const t = String(workout.type || workout.workout_type || '').toLowerCase();
-                                let glowColor = 'rgba(255, 255, 255, 0.6)'; // default white
-                                
-                                if (t === 'run' || t === 'running') {
-                                  glowColor = 'rgba(20, 184, 166, 0.8)'; // teal-500
-                                } else if (t === 'strength' || t === 'weight' || t === 'weights') {
-                                  glowColor = 'rgba(249, 115, 22, 0.8)'; // orange-500
-                                } else if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'stretch' || t === 'pilates_yoga') {
-                                  glowColor = 'rgba(192, 132, 252, 0.8)'; // purple-500
-                                } else if (t === 'ride' || t === 'cycling' || t === 'bike') {
-                                  glowColor = 'rgba(34, 197, 94, 0.8)'; // green-500
-                                } else if (t === 'swim' || t === 'swimming') {
-                                  glowColor = 'rgba(43, 90, 140, 0.8)'; // swim blue
-                                }
+                                // Use centralized color system for glow
+                                const glowColor = t ? getDisciplineGlowColor(t, 0.8) : 'rgba(255, 255, 255, 0.6)'; // default white
                                 
                                 return {
                                   textShadow: `
