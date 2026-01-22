@@ -9,6 +9,15 @@
         "revision" : "596259033e94829dffc552a40e7129262122995e",
         "version" : "8.0.0"
       }
+    },
+    {
+      "identity" : "osinappbrowserlib-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/OutSystems/OSInAppBrowserLib-iOS.git",
+      "state" : {
+        "revision" : "02077543fe499b68dd2e636bb1c2a40521e67d6a",
+        "version" : "2.3.1"
+      }
     }
   ],
   "version" : 3
