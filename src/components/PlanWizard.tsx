@@ -1716,7 +1716,7 @@ export default function PlanWizard() {
                     <button
                       type="button"
                       onClick={() => navigate('/baselines')}
-                      className="px-5 py-2.5 border border-teal-400 text-teal-300 text-sm font-medium rounded-full hover:bg-teal-500/10 transition-colors"
+                      className={`px-5 py-2.5 border ${getDisciplineBorderClass('run', '50')} ${getDisciplineTextClassVariant('run', '400')} text-sm font-medium rounded-full hover:bg-yellow-200/10 transition-colors`}
                     >
                       Go to Baselines →
                     </button>
@@ -1728,7 +1728,7 @@ export default function PlanWizard() {
                     <button
                       type="button"
                       onClick={() => setStep(step - 1)}
-                      className="px-5 py-2.5 border border-teal-500/40 text-gray-300 text-sm rounded-full hover:border-teal-400 hover:text-teal-300 transition-colors"
+                      className={`px-5 py-2.5 border ${getDisciplineBorderClass('run', '50')} text-gray-300 text-sm rounded-full hover:${getDisciplineBorderClass('run', '60')} hover:${getDisciplineTextClassVariant('run', '400')} transition-colors`}
                     >
                       ← Back to goal selection
                     </button>
@@ -2223,8 +2223,8 @@ export default function PlanWizard() {
                     {/* Durability */}
                     <div className={`p-4 rounded-xl border transition-colors ${
                       state.strengthProtocol === 'durability' 
-                        ? 'border-teal-500/60 bg-teal-500/15' 
-                        : 'border-teal-500/30 bg-black/40 hover:border-teal-500/50'
+                        ? `${getDisciplineBorderClass('run', '60')} bg-yellow-200/15` 
+                        : `${getDisciplineBorderClass('run', '30')} bg-black/40 hover:${getDisciplineBorderClass('run', '50')}`
                     }`}>
                       <div className="flex items-start space-x-3">
                         <RadioGroupItem value="durability" id="durability" className="mt-1" />
@@ -2242,7 +2242,7 @@ export default function PlanWizard() {
                           <span className="block text-xs text-amber-400/80 mt-2 font-medium">
                             Tradeoff: no heavy compounds or strength PR focus.
                           </span>
-                          <span className="block text-xs text-teal-400 mt-2">
+                          <span className={`block text-xs ${getDisciplineTextClassVariant('run', '400')} mt-2`}>
                             Best for: Distance runners, volume increases, injury-prone athletes
                           </span>
                         </Label>
@@ -2252,8 +2252,8 @@ export default function PlanWizard() {
                     {/* Neural Speed */}
                     <div className={`p-4 rounded-xl border transition-colors ${
                       state.strengthProtocol === 'neural_speed' 
-                        ? 'border-teal-500/60 bg-teal-500/15' 
-                        : 'border-teal-500/30 bg-black/40 hover:border-teal-500/50'
+                        ? `${getDisciplineBorderClass('run', '60')} bg-yellow-200/15` 
+                        : `${getDisciplineBorderClass('run', '30')} bg-black/40 hover:${getDisciplineBorderClass('run', '50')}`
                     }`}>
                       <div className="flex items-start space-x-3">
                         <RadioGroupItem value="neural_speed" id="neural_speed" className="mt-1" />
@@ -2274,7 +2274,7 @@ export default function PlanWizard() {
                           <span className="block text-xs text-gray-500 mt-2">
                             Tradeoff: Requires good technique/equipment. Bodyweight tier downgrades to maintenance.
                           </span>
-                          <span className="block text-xs text-teal-400 mt-2">
+                          <span className={`block text-xs ${getDisciplineTextClassVariant('run', '400')} mt-2`}>
                             Best for: Performance-oriented runners, speed work, want strength without soreness
                           </span>
                         </Label>
@@ -2284,8 +2284,8 @@ export default function PlanWizard() {
                     {/* Upper Aesthetics */}
                     <div className={`p-4 rounded-xl border transition-colors ${
                       state.strengthProtocol === 'upper_aesthetics' 
-                        ? 'border-teal-500/60 bg-teal-500/15' 
-                        : 'border-teal-500/30 bg-black/40 hover:border-teal-500/50'
+                        ? `${getDisciplineBorderClass('run', '60')} bg-yellow-200/15` 
+                        : `${getDisciplineBorderClass('run', '30')} bg-black/40 hover:${getDisciplineBorderClass('run', '50')}`
                     }`}>
                       <div className="flex items-start space-x-3">
                         <RadioGroupItem value="upper_aesthetics" id="upper_aesthetics" className="mt-1" />
@@ -2303,7 +2303,7 @@ export default function PlanWizard() {
                           <span className="block text-xs text-amber-400/80 mt-2 font-medium">
                             Tradeoff: lower body is maintained, not pushed.
                           </span>
-                          <span className="block text-xs text-teal-400 mt-2">
+                          <span className={`block text-xs ${getDisciplineTextClassVariant('run', '400')} mt-2`}>
                             Best for: Endurance athletes motivated by physique or upper-body weakness
                           </span>
                           {state.goal === 'speed' && state.strengthProtocol === 'upper_aesthetics' && (
@@ -2798,7 +2798,7 @@ export default function PlanWizard() {
             <button
               type="button"
               onClick={handleAccept}
-              className="px-6 py-2.5 rounded-full bg-teal-600 border border-teal-400/40 text-white font-medium hover:bg-teal-500 transition-all shadow-lg shadow-teal-500/20"
+              className={`px-6 py-2.5 rounded-full bg-yellow-300 border border-yellow-200/40 text-white font-medium hover:bg-yellow-200 transition-all shadow-lg shadow-yellow-200/20`}
             >
               Accept Plan
             </button>
