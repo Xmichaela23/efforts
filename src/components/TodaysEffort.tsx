@@ -1141,27 +1141,57 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
 
                             if (source === 'strava' || stravaId || isStravaImported) {
+                              const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
                               return (
-                                <div className="flex items-center gap-1.5 ml-2">
+                                <div className="flex items-center gap-1.5 ml-2 flex-wrap">
                                   <img 
                                     src="/icons/strava-powered-by.svg" 
                                     alt="Powered by Strava" 
                                     className="h-2.5"
                                   />
                                   {deviceName && <span className="text-gray-400 text-xs">via {deviceName}</span>}
+                                  {stravaUrl && (
+                                    <>
+                                      <span className="text-gray-300">•</span>
+                                      <a 
+                                        href={stravaUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-[#FC5200] font-light underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        View on Strava
+                                      </a>
+                                    </>
+                                  )}
                                 </div>
                               );
                             }
 
                             if (source === 'garmin' || garminId) {
+                              const garminUrl = garminId ? `https://connect.garmin.com/modern/activity/${garminId}` : null;
                               return (
-                                <div className="flex items-center gap-1 ml-2">
+                                <div className="flex items-center gap-1.5 ml-2 flex-wrap">
                                   <span className="text-gray-400 text-xs">via</span>
                                   <svg width="6" height="8" viewBox="0 0 10 12" className="flex-shrink-0">
                                     <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
                                   </svg>
                                   <span className="text-[#007CC3] font-light text-xs">Garmin</span>
-                                  {deviceName && <span className="text-gray-400 text-xs">({deviceName})</span>}
+                                  {deviceName && <span className="text-gray-400 text-xs">{deviceName}</span>}
+                                  {garminUrl && (
+                                    <>
+                                      <span className="text-gray-300">•</span>
+                                      <a
+                                        href={garminUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-[#007CC3] font-light underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        View
+                                      </a>
+                                    </>
+                                  )}
                                 </div>
                               );
                             }
