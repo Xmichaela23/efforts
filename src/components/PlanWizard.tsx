@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
-import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineFocusRingClass, getDisciplineSelectedButtonClasses, getDisciplineUnselectedButtonClasses } from '@/lib/context-utils';
+import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineFocusRingClass, getDisciplineFocusBorderClass, getDisciplineSelectedButtonClasses, getDisciplineUnselectedButtonClasses } from '@/lib/context-utils';
 import { useToast } from '@/components/ui/use-toast';
 import { MobileHeader } from './MobileHeader';
 import {
@@ -1851,7 +1851,7 @@ export default function PlanWizard() {
                     value={state.raceDate}
                     min={getMinRaceDate()}
                     onChange={(e) => handleRaceDateChange(e.target.value)}
-                    className={`w-full p-3 bg-white/5 border ${getDisciplineBorderClass('run', '30')} rounded-xl text-base text-white focus:outline-none focus:ring-2 ${getDisciplineFocusRingClass('run')} focus:${getDisciplineBorderClass('run', '50').replace('border-', 'border-')}`}
+                    className={`w-full p-3 bg-white/5 border ${getDisciplineBorderClass('run', '30')} rounded-xl text-base text-white focus:outline-none focus:ring-2 ${getDisciplineFocusRingClass('run')} ${getDisciplineFocusBorderClass('run')}`}
                   />
                   <div className="space-y-2">
                     {/* Show marathon suggestions if any match */}
@@ -1942,7 +1942,7 @@ export default function PlanWizard() {
                           const weeks = Math.max(4, Math.min(24, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))));
                           setState(prev => ({ ...prev, startDate: newStart, duration: weeks }));
                         }}
-                        className={`w-full p-3 bg-white/5 border ${getDisciplineBorderClass('run', '30')} rounded-xl text-base text-white focus:outline-none focus:ring-2 ${getDisciplineFocusRingClass('run')} focus:${getDisciplineBorderClass('run', '50').replace('border-', 'border-')}`}
+                        className={`w-full p-3 bg-white/5 border ${getDisciplineBorderClass('run', '30')} rounded-xl text-base text-white focus:outline-none focus:ring-2 ${getDisciplineFocusRingClass('run')} ${getDisciplineFocusBorderClass('run')}`}
                       />
                       {/* Plan duration summary - only show if valid dates */}
                       {state.startDate && state.raceDate && !isNaN(state.duration) && (

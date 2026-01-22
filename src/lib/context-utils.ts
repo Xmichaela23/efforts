@@ -260,6 +260,23 @@ export function getDisciplineFocusRingClass(type: string): string {
 }
 
 /**
+ * Get focus border class for inputs (e.g., focus:border-yellow-200/50)
+ */
+export function getDisciplineFocusBorderClass(type: string): string {
+  const colorName = getDisciplineTailwindColorName(type);
+  const classMap: Record<string, string> = {
+    yellow: 'focus:border-yellow-200/50',
+    teal: 'focus:border-teal-500/50',
+    green: 'focus:border-green-500/50',
+    blue: 'focus:border-blue-500/50',
+    orange: 'focus:border-orange-500/50',
+    purple: 'focus:border-purple-500/50',
+    gray: 'focus:border-gray-500/50',
+  };
+  return classMap[colorName] || classMap.gray;
+}
+
+/**
  * Get selected button classes for race/plan selection
  */
 export function getDisciplineSelectedButtonClasses(type: string): string {
