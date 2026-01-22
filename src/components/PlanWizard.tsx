@@ -2117,21 +2117,21 @@ export default function PlanWizard() {
                     <div className={`p-4 bg-yellow-200/10 backdrop-blur-lg rounded-xl border-2 ${getDisciplineBorderClass('run', '30').replace('border-', 'border-2 border-').replace('/30', '/30')}">
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-blue-300">Effort Score:</span>
-                          <span className="font-semibold text-blue-100">{state.effortScore}</span>
+                          <span className={getDisciplineTextClassVariant('run', '400')}>Effort Score:</span>
+                          <span className={`font-semibold ${getDisciplineTextClassVariant('run', '400')}`}>{state.effortScore}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-blue-300">Projected finish:</span>
-                          <span className="font-semibold text-blue-100">{formatFinishTime(projectedFinishTime)}</span>
+                          <span className={getDisciplineTextClassVariant('run', '400')}>Projected finish:</span>
+                          <span className={`font-semibold ${getDisciplineTextClassVariant('run', '400')}`}>{formatFinishTime(projectedFinishTime)}</span>
                         </div>
                         {state.effortPaces && (
                           <div className="flex justify-between">
-                            <span className="text-blue-300">Goal pace:</span>
-                            <span className="font-semibold text-blue-100">{formatPace(state.effortPaces.race)}/mi</span>
+                            <span className={getDisciplineTextClassVariant('run', '400')}>Goal pace:</span>
+                            <span className={`font-semibold ${getDisciplineTextClassVariant('run', '400')}`}>{formatPace(state.effortPaces.race)}/mi</span>
                           </div>
                         )}
                       </div>
-                      <p className="text-xs text-blue-300/80 mt-2">
+                      <p className={`text-xs ${getDisciplineTextClassVariant('run', '400')}/80 mt-2`}>
                         Based on your fitness level. All workouts will use these paces.
                       </p>
                     </div>
