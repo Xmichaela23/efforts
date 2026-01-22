@@ -175,7 +175,7 @@ export function getDisciplinePillClasses(type: string, isCompleted: boolean = fa
   };
   
   const plannedClasses: Record<string, string> = {
-    yellow: 'bg-transparent border-2 border-yellow-200/60 text-white/90 hover:bg-yellow-200/10',
+    yellow: 'bg-transparent border border-yellow-200/60 text-white/90 hover:bg-yellow-200/10',
     teal: 'bg-transparent border border-teal-500/50 text-white/90 hover:bg-teal-500/10',
     green: 'bg-transparent border border-green-500/50 text-white/90 hover:bg-green-500/10',
     blue: 'bg-transparent border border-blue-500/50 text-white/90 hover:bg-blue-500/10',
