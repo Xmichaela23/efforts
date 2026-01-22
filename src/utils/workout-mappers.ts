@@ -73,22 +73,21 @@ export function mapUnifiedItemToPlanned(item: any): PlannedWorkout {
  */
 export function mapUnifiedItemToCompleted(item: any): any {
   // Source tracking fields MUST come from top-level item, not from item.executed
-  // Put them BEFORE spreading item.executed to ensure they're not overwritten
+  // Spread executed first, then add source fields AFTER to ensure they override anything from executed
   const mapped = {
     id: item.id,
     date: item.date,
     type: item.type,
     workout_status: 'completed',
-    // Source tracking for display (same as details screen) - put BEFORE spread to ensure they're not overwritten
+    // Spread executed data first (metrics, distance, duration, etc.)
+    ...(item.executed || {}),
+    computed: item.executed || null,
+    // Source tracking for display (same as details screen) - put AFTER spread to ensure they override
     source: item.source || null,
     is_strava_imported: item.is_strava_imported || null,
     strava_activity_id: item.strava_activity_id || null,
     garmin_activity_id: item.garmin_activity_id || null,
     device_info: item.device_info || null,
-    // Then spread executed data (metrics, distance, duration, etc.)
-    // This might overwrite some fields, but source tracking is already set above
-    ...item.executed,
-    computed: item.executed || null,
   };
   
   return mapped;
