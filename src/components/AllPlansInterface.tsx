@@ -1945,7 +1945,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                       </span>
                       {weeksToRace !== null && weeksToRace > 0 && (
                         <span>
-                          <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{weeksToRace}</span> weeks to go
+                          <span className={`font-light ${getDisciplineTextClass('run')}`}>{weeksToRace}</span> weeks to go
                         </span>
                       )}
                     </>

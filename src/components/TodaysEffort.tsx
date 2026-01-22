@@ -1014,7 +1014,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 <span> • </span>
               )}
               {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                <span className={getDisciplineTextClass('run')}>
+                <span className={`${getDisciplineTextClass('run')} font-light`}>
                   {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
                 </span>
               )}
