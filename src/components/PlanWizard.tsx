@@ -1638,10 +1638,10 @@ export default function PlanWizard() {
                           </div>
                         </div>
                         {/* Estimated Marathon Time */}
-                        <div className="mt-4 pt-4 border-t border-teal-500/20">
+                        <div className={`mt-4 pt-4 border-t ${getDisciplineBorderClass('run', '30')}`}>
                           <div className="flex items-center justify-between">
                             <span className="text-gray-400">Est. marathon time:</span>
-                            <span className="font-mono font-semibold text-lg text-teal-300">
+                            <span className={`font-mono font-semibold text-lg ${getDisciplineTextClassVariant('run', '400')}`}>
                               {(() => {
                                 const marathonSeconds = state.effortPaces.race * 26.2;
                                 const hours = Math.floor(marathonSeconds / 3600);
