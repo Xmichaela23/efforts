@@ -1139,6 +1139,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             })();
                             const rawDeviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
                             const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
+                            
+                            // Debug logging
+                            if (isRunRideSwim) {
+                              console.log('🔍 Source attribution check:', {
+                                workoutId: workout.id,
+                                type,
+                                source,
+                                isStravaImported,
+                                stravaId,
+                                garminId,
+                                deviceInfo,
+                                deviceName,
+                                rawDeviceName
+                              });
+                            }
 
                             if (source === 'strava' || stravaId || isStravaImported) {
                               const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
@@ -1149,10 +1164,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                                     alt="Powered by Strava" 
                                     className="h-2.5"
                                   />
-                                  {deviceName && <span className="text-gray-400 text-xs">via {deviceName}</span>}
+                                  {deviceName ? (
+                                    <span className="text-gray-400 text-xs">via {deviceName}</span>
+                                  ) : null}
                                   {stravaUrl && (
                                     <>
-                                      <span className="text-gray-300">•</span>
+                                      {deviceName && <span className="text-gray-300">•</span>}
                                       <a 
                                         href={stravaUrl} 
                                         target="_blank" 
@@ -1177,7 +1194,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                                     <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
                                   </svg>
                                   <span className="text-[#007CC3] font-light text-xs">Garmin</span>
-                                  {deviceName && <span className="text-gray-400 text-xs">{deviceName}</span>}
+                                  {deviceName && <span className="text-gray-400 text-xs"> {deviceName}</span>}
                                   {garminUrl && (
                                     <>
                                       <span className="text-gray-300">•</span>
