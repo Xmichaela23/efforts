@@ -767,10 +767,11 @@ export default function WorkoutCalendar({
     weekEnd
   )} ${weekEnd.getDate()}`;
 
+  // VERTICAL TIMELINE PREVIEW - Replace grid with timeline list
   return (
     <div
       className="w-full max-w-md mx-auto flex flex-col touch-pan-y bg-transparent"
-      style={{ height: '100%', maxHeight: 'calc(var(--cal-cell-h) * 3 + 8px)' }}
+      style={{ height: '100%' }}
       onTouchStart={(e) => {
         const t = e.changedTouches[0];
         setTouchStartX(t.clientX);
@@ -810,15 +811,31 @@ export default function WorkoutCalendar({
         }
       }}
     >
-      {/* 3-column week grid - compact height to emphasize Today */}
-      <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full relative" style={{ 
-        rowGap: '2px', 
-        columnGap: '2px', 
-        alignContent: 'stretch', 
-        alignItems: 'stretch',
-        maxHeight: 'calc(var(--cal-cell-h) * 3 + 4px)', // 3 rows + gaps
-        flexShrink: 0, // Don't grow, stay compact
-      }}>
+      {/* Week Navigation - Bright timeline header */}
+      <div className="flex items-center justify-between py-2 mb-2">
+        <button
+          aria-label="Previous week"
+          className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
+          style={{ color: 'rgba(255, 255, 255, 0.7)' }}
+          onClick={() => handlePrevWeek(addDays(weekStart, -7))}
+        >
+          ‹
+        </button>
+        <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+          {rangeLabel}
+        </span>
+        <button
+          aria-label="Next week"
+          className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
+          style={{ color: 'rgba(255, 255, 255, 0.7)' }}
+          onClick={() => handleNextWeek(addDays(weekEnd, 1))}
+        >
+          ›
+        </button>
+      </div>
+
+      {/* Vertical Timeline - Days as horizontal rows (training log style) */}
+      <div className="flex flex-col gap-1 flex-1 overflow-y-auto pb-2">
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -833,30 +850,31 @@ export default function WorkoutCalendar({
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, key)}
               className={[
-                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] backdrop-blur-md flex flex-col items-stretch",
-                "hover:bg-white/[0.02] transition-all",
-                dragOverDate === key ? "ring-2 ring-white/40 bg-white/[0.05]" : "",
+                "w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all",
+                "hover:bg-white/[0.02]",
+                dragOverDate === key ? "ring-1 ring-white/20 bg-white/[0.03]" : "",
               ].join(" ")}
               style={{
-                aspectRatio: '1', // Perfect squares for geometric precision
-                borderRadius: '14px', // Day tile radius: 14-16px for hierarchy
-                border: '0.5px solid rgba(255, 255, 255, 0.02)', // Even dimmer border - ghosted timeline
-                background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.005) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.35) 100%)', // More muted, ghosted background
-                boxShadow: '0 0 0 1px rgba(255,255,255,0.01) inset, 0 1px 3px rgba(0,0,0,0.5)', // Even subtler - recede into background
-                padding: '0.375rem', // Tightened from p-2.5 (0.625rem) - less empty space
-                opacity: 0.85, // Overall ghosted feel - timeline backdrop
+                borderRadius: '6px',
+                border: '0.5px solid rgba(255, 255, 255, 0.12)',
+                background: isToday 
+                  ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.15) 100%)'
+                  : 'radial-gradient(ellipse at left, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.2) 100%)',
+                opacity: 1.0, // Full opacity - bright
               }}
             >
-              {/* Top row: Day + Date inline - Ghosted timeline labels (further de-emphasized) */}
-              <div className="flex items-baseline justify-start mb-1">
-                <div className="text-xs font-extralight tracking-wider" style={{ color: 'rgba(255, 255, 255, 0.2)' }}>
+              {/* Left: Day label - bright and visible */}
+              <div className="flex-shrink-0 w-12 text-left">
+                <div className="text-xs font-light" style={{ color: isToday ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.75)' }}>
                   {weekdayFmt.format(d)}
                 </div>
-                <div className="ml-1.5 text-xs font-extralight" style={{ color: 'rgba(255, 255, 255, 0.18)' }}>{d.getDate()}</div>
+                <div className="text-xs font-light tabular-nums" style={{ color: isToday ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.7)' }}>
+                  {d.getDate()}
+                </div>
               </div>
 
-              {/* Bottom area: Event labels - dense stacking */}
-              <div className={`flex flex-col ${items.length === 0 && trainingPlanContext ? 'items-center justify-center flex-1' : 'items-start'}`} style={{ gap: '0.125rem' }}>
+              {/* Right: Workout chips - horizontal flow */}
+              <div className="flex-1 flex items-center gap-1 flex-wrap min-h-[24px]">
                 {items.length > 0 && (
                   items.map((evt, i) => {
                     // Check actual workout_status from _src
@@ -902,36 +920,34 @@ export default function WorkoutCalendar({
                         onDragEnd={handleDragEnd}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`text-xs px-1.5 py-0.5 w-full text-center truncate transition-all backdrop-blur-sm font-light tracking-wide ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                        className={`text-xs px-2 py-0.5 flex-shrink-0 transition-all backdrop-blur-sm font-light tracking-wide ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                         style={{
                           ...phosphorPill.style,
-                          borderRadius: '4px', // More rectangular - tighter radius for label strips
-                          // Reduce glow intensity for ghosted timeline feel (multiply opacity by 0.6)
+                          borderRadius: '4px',
+                          // Full glow brightness for timeline
                           boxShadow: phosphorPill.style.boxShadow 
                             ? (() => {
-                                // Reduce glow opacity by 40% to de-emphasize in timeline
                                 const reducedGlow = phosphorPill.style.boxShadow
                                   .replace(/rgba\(([^)]+),\s*([\d.]+)\)/g, (match, rgb, alpha) => {
-                                    const newAlpha = parseFloat(alpha) * 0.6;
+                                    const newAlpha = parseFloat(alpha) * 0.9; // Minimal reduction - bright
                                     return `rgba(${rgb}, ${newAlpha})`;
                                   });
-                                return `${reducedGlow}, 0 0 0 0.5px rgba(255, 255, 255, 0.05) inset`; // Dimmer inset too
+                                return `${reducedGlow}, 0 0 0 0.5px rgba(255, 255, 255, 0.12) inset`;
                               })()
-                            : '0 0 0 0.5px rgba(255, 255, 255, 0.05) inset',
-                          // Reduce outer border dominance - lighter border for less "floating bubble" feel
+                            : '0 0 0 0.5px rgba(255, 255, 255, 0.12) inset',
                           borderColor: phosphorPill.style.borderColor ? 
                             (typeof phosphorPill.style.borderColor === 'string' && phosphorPill.style.borderColor.includes('rgba') ?
                               (() => {
                                 const rgbaMatch = phosphorPill.style.borderColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
                                 if (rgbaMatch) {
                                   const [, r, g, b, alpha] = rgbaMatch;
-                                  const newAlpha = Math.max(0.12, parseFloat(alpha) * 0.6);
+                                  const newAlpha = Math.max(0.35, parseFloat(alpha) * 0.95); // Much brighter borders
                                   return `rgba(${r}, ${g}, ${b}, ${newAlpha})`;
                                 }
                                 return phosphorPill.style.borderColor;
                               })() : phosphorPill.style.borderColor) : undefined,
-                          borderWidth: '0.5px', // Thinner border for less dominance
-                          marginBottom: '0.125rem', // Tight spacing between chips - dense stacking
+                          borderWidth: '0.5px',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         {(() => {
@@ -987,276 +1003,244 @@ export default function WorkoutCalendar({
                   </>
                 )}
                 {items.length === 0 && !loadingDebounced && (() => {
-                  // Show "Rest" if there's an active plan (for any date, past or future)
-                  // Rest/empty cells: No fill, no border color, no glow - powered off
                   const isRestDay = trainingPlanContext;
-                  
                   if (isRestDay) {
                     return (
-                      <span className="text-base italic" style={{ color: 'rgba(255, 255, 255, 0.15)' }}>Rest</span> // Further dimmed for ghosted timeline
+                      <span className="text-xs italic" style={{ color: 'rgba(255, 255, 255, 0.2)' }}>Rest</span>
                     );
                   }
-                  return (
-                    <span className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.08)' }}>&nbsp;</span> // Even dimmer empty cells
-                  );
+                  return null;
                 })()}
               </div>
             </button>
           );
         })}
         
-        {/* Fill remaining cells to complete 3x3 grid */}
-        {Array.from({ length: 9 - weekDays.length }).map((_, index) => {
-          const isLastCell = index === (9 - weekDays.length - 1);
-          const isSecondLastCell = index === (9 - weekDays.length - 2);
+        {/* Total Workload - Separate panel at bottom of timeline */}
+        {(() => {
+          // Collect all metrics
+          const metrics: Array<{ label: string; value: string }> = [];
           
-          // Skip the second-to-last cell since we're merging it with the last cell
-          if (isSecondLastCell) return null;
+          // Distance Totals - server-provided
+          if (weeklyStats.distances) {
+            if (weeklyStats.distances.run_meters > 0) {
+              const runValue = useImperial 
+                ? `${(weeklyStats.distances.run_meters / 1609.34).toFixed(1)} mi`
+                : `${(weeklyStats.distances.run_meters / 1000).toFixed(1)} km`;
+              metrics.push({
+                label: 'Run:',
+                value: runValue,
+                isNumeric: true
+              });
+            }
+            if (weeklyStats.distances.swim_meters > 0) {
+              metrics.push({
+                label: 'Swim:',
+                value: useImperial
+                  ? `${Math.round(weeklyStats.distances.swim_meters / 0.9144)} yd`
+                  : `${Math.round(weeklyStats.distances.swim_meters)} m`
+              });
+            }
+            if (weeklyStats.distances.cycling_meters > 0) {
+              metrics.push({
+                label: 'Bike:',
+                value: useImperial
+                  ? `${(weeklyStats.distances.cycling_meters / 1609.34).toFixed(1)} mi`
+                  : `${(weeklyStats.distances.cycling_meters / 1000).toFixed(1)} km`
+              });
+            }
+          }
+          
+          // Total Volume Load - calculated from strength workouts
+          let totalVolumeLoad = 0;
+          for (const item of unifiedItems) {
+            if (String(item?.type || '').toLowerCase() === 'strength') {
+              const executedExercises = Array.isArray(item?.executed?.strength_exercises) 
+                ? item.executed.strength_exercises 
+                : [];
+              
+              for (const ex of executedExercises) {
+                if (!ex || !Array.isArray(ex.sets)) continue;
+                
+                const isTimeBased = ex.name?.toLowerCase().includes('plank') || 
+                                  ex.name?.toLowerCase().includes('wall sit') ||
+                                  ex.name?.toLowerCase().includes('hold') ||
+                                  ex.sets.some((s: any) => s.duration_seconds && s.duration_seconds > 0 && (!s.reps || s.reps === 0));
+                
+                if (isTimeBased) continue;
+                
+                for (const set of ex.sets) {
+                  if (set.completed === false) continue;
+                  
+                  const weight = Number(set.weight) || 0;
+                  const reps = Number(set.reps) || 0;
+                  
+                  if (weight > 0 && reps > 0) {
+                    totalVolumeLoad += weight * reps;
+                  }
+                }
+              }
+            }
+          }
+          
+          if (totalVolumeLoad > 0) {
+            const strengthValue = `${totalVolumeLoad.toLocaleString()} ${useImperial ? 'lb' : 'kg'}`;
+            metrics.push({
+              label: 'Strength:',
+              value: strengthValue,
+              isNumeric: true
+            });
+          }
+          
+          // Total Pilates/Yoga Hours
+          let totalMinutes = 0;
+          for (const item of unifiedItems) {
+            if (String(item?.type || '').toLowerCase() === 'pilates_yoga') {
+              const secs = resolveMovingSeconds(item);
+              if (secs && secs > 0) {
+                totalMinutes += Math.round(secs / 60);
+              }
+            }
+          }
+          
+          if (totalMinutes > 0) {
+            const hours = Math.floor(totalMinutes / 60);
+            const mins = totalMinutes % 60;
+            const hoursDisplay = hours > 0 
+              ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`)
+              : `${mins}m`;
+            metrics.push({
+              label: 'Pilates/Yoga:',
+              value: hoursDisplay
+            });
+          }
+          
+          // Total Workout Hours
+          let totalWorkoutMinutes = 0;
+          for (const item of unifiedItems) {
+            const type = String(item?.type || '').toLowerCase();
+            if (type === 'strength' || type === 'mobility') continue;
+            
+            const secs = resolveMovingSeconds(item);
+            if (secs && secs > 0) {
+              totalWorkoutMinutes += Math.round(secs / 60);
+            }
+          }
+          
+          if (totalWorkoutMinutes > 0) {
+            const hours = Math.floor(totalWorkoutMinutes / 60);
+            const mins = totalWorkoutMinutes % 60;
+            const hoursDisplay = hours > 0 
+              ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`)
+              : `${mins}m`;
+            metrics.push({
+              label: 'Total:',
+              value: hoursDisplay
+            });
+          }
           
           return (
-            <div 
-              key={`empty-${index}`}
-              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/20 p-3 flex flex-col justify-start items-start ${
-                isLastCell ? 'col-span-2' : ''
-              }`}
-              style={{
-                borderRadius: '14px', // Day tile radius: 14-16px for hierarchy
-                boxShadow: '0 0 0 1px rgba(255,255,255,0.05) inset, 0 2px 8px rgba(0,0,0,0.3)',
-                // Last cell (Total Workload) needs more height to show all disciplines
-                minHeight: isLastCell ? 'calc(var(--cal-cell-h) * 1.5)' : 'var(--cal-cell-h)',
-              }}
-            >
-              {/* Weekly context and workload spans the last two cells */}
-              {isLastCell && (
-                <div className="space-y-1.5 w-full" style={{ fontSize: '0.7rem', paddingBottom: '0.5rem' }}>
-                  {/* Total Workload with counts - compact physical panel */}
-                  <div 
-                    className="flex items-center gap-1.5 px-1.5 py-1 rounded-lg flex-wrap"
-                    style={{
-                      background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)',
-                      border: '0.5px solid rgba(255, 255, 255, 0.08)',
-                      boxShadow: '0 0 0 1px rgba(255,255,255,0.03) inset, 0 2px 8px rgba(0,0,0,0.3)',
-                    }}
-                  >
-                    <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Total Workload</span>
-                    <Popover open={workloadTooltipOpen} onOpenChange={setWorkloadTooltipOpen}>
-                      <PopoverTrigger asChild>
-                        <button 
-                          type="button" 
-                          className="inline-flex items-center touch-manipulation"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setWorkloadTooltipOpen(!workloadTooltipOpen);
-                          }}
-                        >
-                          <Info className="w-3 h-3 cursor-pointer" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent side="top" className="max-w-xs p-4" sideOffset={8}>
-                        <div className="text-xs space-y-2">
-                          <div>
-                            <strong>Total Workload</strong>
-                            <br />
-                            Tracks your weekly training stress by combining workout duration and intensity.
-                          </div>
-                          <div>
-                            <strong>How it works:</strong>
-                            <ul className="list-disc list-inside mt-1 space-y-0.5">
-                              <li>Longer workouts = higher workload</li>
-                              <li>Harder efforts = higher workload</li>
-                              <li>Different disciplines use appropriate metrics (pace/power for endurance, weight×reps for strength, RPE for yoga)</li>
-                            </ul>
-                          </div>
-                          <div>
-                            <strong>The numbers:</strong>
-                            <br />
-                            📅 <strong>Planned:</strong> Total scheduled training stress (includes optional workouts)
-                            <br />
-                            ✓ <strong>Completed:</strong> Actual training stress from finished workouts
-                          </div>
-                          <div className="pt-1 border-t border-gray-200">
-                            <strong>Why it matters:</strong> Use this to balance hard weeks (high workload) with recovery weeks (lower workload) and track your training progression over time.
-                          </div>
+            <div className="mt-2 pt-2 border-t border-white/10">
+              <div className="space-y-1.5" style={{ fontSize: '0.7rem' }}>
+                {/* Total Workload header */}
+                <div 
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg flex-wrap"
+                  style={{
+                    background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)',
+                    border: '0.5px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: '0 0 0 1px rgba(255,255,255,0.03) inset, 0 2px 8px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Total Workload</span>
+                  <Popover open={workloadTooltipOpen} onOpenChange={setWorkloadTooltipOpen}>
+                    <PopoverTrigger asChild>
+                      <button 
+                        type="button" 
+                        className="inline-flex items-center touch-manipulation"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setWorkloadTooltipOpen(!workloadTooltipOpen);
+                        }}
+                      >
+                        <Info className="w-3 h-3 cursor-pointer" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" className="max-w-xs p-4" sideOffset={8}>
+                      <div className="text-xs space-y-2">
+                        <div>
+                          <strong>Total Workload</strong>
+                          <br />
+                          Tracks your weekly training stress by combining workout duration and intensity.
                         </div>
-                      </PopoverContent>
-                    </Popover>
-                    <div className="flex items-center gap-0.5">
-                      <Calendar className="w-2.5 h-2.5" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
-                      <span className="text-xs tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.planned}</span>
-                    </div>
-                    <div className="flex items-center gap-0.5">
-                      <CheckCircle className="w-2.5 h-2.5" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
-                      <span className="text-xs tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.completed}</span>
-                    </div>
+                        <div>
+                          <strong>How it works:</strong>
+                          <ul className="list-disc list-inside mt-1 space-y-0.5">
+                            <li>Longer workouts = higher workload</li>
+                            <li>Harder efforts = higher workload</li>
+                            <li>Different disciplines use appropriate metrics (pace/power for endurance, weight×reps for strength, RPE for yoga)</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <strong>The numbers:</strong>
+                          <br />
+                          📅 <strong>Planned:</strong> Total scheduled training stress (includes optional workouts)
+                          <br />
+                          ✓ <strong>Completed:</strong> Actual training stress from finished workouts
+                        </div>
+                        <div className="pt-1 border-t border-gray-200">
+                          <strong>Why it matters:</strong> Use this to balance hard weeks (high workload) with recovery weeks (lower workload) and track your training progression over time.
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <div className="flex items-center gap-0.5">
+                    <Calendar className="w-2.5 h-2.5" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                    <span className="text-xs tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.planned}</span>
                   </div>
-                  
-                  {/* All Metrics - compact, grouped together */}
-                  {(() => {
-                    // Collect all metrics in one array
-                    const metrics: Array<{ label: string; value: string }> = [];
-                    
-                    // Distance Totals - server-provided
-                    if (weeklyStats.distances) {
-                      if (weeklyStats.distances.run_meters > 0) {
-                        const runValue = useImperial 
-                          ? `${(weeklyStats.distances.run_meters / 1609.34).toFixed(1)} mi`
-                          : `${(weeklyStats.distances.run_meters / 1000).toFixed(1)} km`;
-                        metrics.push({
-                          label: 'Run:',
-                          value: runValue,
-                          isNumeric: true
-                        });
-                      }
-                      if (weeklyStats.distances.swim_meters > 0) {
-                        metrics.push({
-                          label: 'Swim:',
-                          value: useImperial
-                            ? `${Math.round(weeklyStats.distances.swim_meters / 0.9144)} yd`
-                            : `${Math.round(weeklyStats.distances.swim_meters)} m`
-                        });
-                      }
-                      if (weeklyStats.distances.cycling_meters > 0) {
-                        metrics.push({
-                          label: 'Bike:',
-                          value: useImperial
-                            ? `${(weeklyStats.distances.cycling_meters / 1609.34).toFixed(1)} mi`
-                            : `${(weeklyStats.distances.cycling_meters / 1000).toFixed(1)} km`
-                        });
-                      }
-                    }
-                    
-                    // Total Volume Load - calculated from strength workouts
-                    let totalVolumeLoad = 0;
-                    for (const item of unifiedItems) {
-                      if (String(item?.type || '').toLowerCase() === 'strength') {
-                        const executedExercises = Array.isArray(item?.executed?.strength_exercises) 
-                          ? item.executed.strength_exercises 
-                          : [];
-                        
-                        for (const ex of executedExercises) {
-                          if (!ex || !Array.isArray(ex.sets)) continue;
-                          
-                          const isTimeBased = ex.name?.toLowerCase().includes('plank') || 
-                                            ex.name?.toLowerCase().includes('wall sit') ||
-                                            ex.name?.toLowerCase().includes('hold') ||
-                                            ex.sets.some((s: any) => s.duration_seconds && s.duration_seconds > 0 && (!s.reps || s.reps === 0));
-                          
-                          if (isTimeBased) continue;
-                          
-                          for (const set of ex.sets) {
-                            if (set.completed === false) continue;
-                            
-                            const weight = Number(set.weight) || 0;
-                            const reps = Number(set.reps) || 0;
-                            
-                            if (weight > 0 && reps > 0) {
-                              totalVolumeLoad += weight * reps;
-                            }
-                          }
-                        }
-                      }
-                    }
-                    
-                    if (totalVolumeLoad > 0) {
-                      const strengthValue = `${totalVolumeLoad.toLocaleString()} ${useImperial ? 'lb' : 'kg'}`;
-                      metrics.push({
-                        label: 'Strength:',
-                        value: strengthValue,
-                        isNumeric: true
-                      });
-                    }
-                    
-                    // Total Pilates/Yoga Hours
-                    let totalMinutes = 0;
-                    for (const item of unifiedItems) {
-                      if (String(item?.type || '').toLowerCase() === 'pilates_yoga') {
-                        const secs = resolveMovingSeconds(item);
-                        if (secs && secs > 0) {
-                          totalMinutes += Math.round(secs / 60);
-                        }
-                      }
-                    }
-                    
-                    if (totalMinutes > 0) {
-                      const hours = Math.floor(totalMinutes / 60);
-                      const mins = totalMinutes % 60;
-                      const hoursDisplay = hours > 0 
-                        ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`)
-                        : `${mins}m`;
-                      metrics.push({
-                        label: 'Pilates/Yoga:',
-                        value: hoursDisplay
-                      });
-                    }
-                    
-                    // Total Workout Hours - sum of all workout durations
-                    let totalWorkoutMinutes = 0;
-                    for (const item of unifiedItems) {
-                      const type = String(item?.type || '').toLowerCase();
-                      // Skip strength (volume-based, not time-based) and mobility (no duration typically)
-                      if (type === 'strength' || type === 'mobility') continue;
+                  <div className="flex items-center gap-0.5">
+                    <CheckCircle className="w-2.5 h-2.5" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                    <span className="text-xs tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.completed}</span>
+                  </div>
+                </div>
+                
+                {/* All Metrics */}
+                {metrics.length > 0 && (
+                  <div className="space-y-0.5 pt-1">
+                    {metrics.map((metric, index) => {
+                      const labelLower = String(metric.label || '').toLowerCase();
+                      let disciplineType = '';
+                      if (labelLower.includes('run')) disciplineType = 'run';
+                      else if (labelLower.includes('strength')) disciplineType = 'strength';
+                      else if (labelLower.includes('swim')) disciplineType = 'swim';
+                      else if (labelLower.includes('bike')) disciplineType = 'bike';
+                      else if (labelLower.includes('pilates') || labelLower.includes('yoga') || labelLower.includes('mobility')) disciplineType = 'mobility';
                       
-                      const secs = resolveMovingSeconds(item);
-                      if (secs && secs > 0) {
-                        totalWorkoutMinutes += Math.round(secs / 60);
-                      }
-                    }
-                    
-                    if (totalWorkoutMinutes > 0) {
-                      const hours = Math.floor(totalWorkoutMinutes / 60);
-                      const mins = totalWorkoutMinutes % 60;
-                      const hoursDisplay = hours > 0 
-                        ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`)
-                        : `${mins}m`;
-                      metrics.push({
-                        label: 'Total:',
-                        value: hoursDisplay
-                      });
-                    }
-                    
-                    if (metrics.length > 0) {
+                      const labelColor = disciplineType ? getDisciplinePhosphorCore(disciplineType) : 'rgba(255, 255, 255, 0.9)';
+                      
                       return (
-                        <div className="space-y-0.5 pt-1">
-                          {metrics.map((metric, index) => {
-                            // Determine discipline type from label for color
-                            const labelLower = String(metric.label || '').toLowerCase();
-                            let disciplineType = '';
-                            if (labelLower.includes('run')) disciplineType = 'run';
-                            else if (labelLower.includes('strength')) disciplineType = 'strength';
-                            else if (labelLower.includes('swim')) disciplineType = 'swim';
-                            else if (labelLower.includes('bike')) disciplineType = 'bike';
-                            else if (labelLower.includes('pilates') || labelLower.includes('yoga') || labelLower.includes('mobility')) disciplineType = 'mobility';
-                            
-                            const labelColor = disciplineType ? getDisciplinePhosphorCore(disciplineType) : 'rgba(255, 255, 255, 0.9)';
-                            
-                            return (
-                              <div key={index} className="flex items-center justify-between gap-1">
-                                <span className="text-xs font-light leading-tight" style={{ color: labelColor, fontSize: '0.7rem' }}>
-                                  {metric.label}
-                                </span>
-                                <span 
-                                  className="text-xs font-light tabular-nums leading-tight"
-                                  style={{
-                                    color: 'rgba(255, 255, 255, 0.85)',
-                                    fontSize: '0.7rem'
-                                  }}
-                                >
-                                  {metric.value}
-                                </span>
-                              </div>
-                            );
-                          })}
+                        <div key={index} className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-light leading-tight" style={{ color: labelColor, fontSize: '0.7rem' }}>
+                            {metric.label}
+                          </span>
+                          <span 
+                            className="text-xs font-light tabular-nums leading-tight"
+                            style={{
+                              color: 'rgba(255, 255, 255, 0.85)',
+                              fontSize: '0.7rem'
+                            }}
+                          >
+                            {metric.value}
+                          </span>
                         </div>
                       );
-                    }
-                    return null;
-                  })()}
-                </div>
-              )}
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           );
-        })}
+        })()}
       </div>
       
       {/* Hidden background prefetchers */}
