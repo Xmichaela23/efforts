@@ -1302,16 +1302,16 @@ const Connections: React.FC = () => {
         </p>
       </div>
 
-      <div className="text-center text-sm text-white/70 mt-4">
-        <p>
-          <button
-            onClick={openPrivacyPolicy}
-            className="underline hover:text-white/90 text-cyan-400 cursor-pointer"
-          >
-            Privacy Policy
-          </button>
-          <br />
-          <span className="text-xs text-white/60">See how Efforts uses data from your connected accounts.</span>
+      <div className="text-center mt-6 mb-4 px-4">
+        <Button
+          onClick={openPrivacyPolicy}
+          variant="outline"
+          className="text-base font-medium text-cyan-400 hover:text-cyan-300 border-cyan-400/50 hover:border-cyan-300 bg-transparent hover:bg-cyan-400/10 mb-2"
+        >
+          Privacy Policy
+        </Button>
+        <p className="text-xs text-white/60 mt-2">
+          See how Efforts uses data from your connected accounts.
         </p>
       </div>
 
