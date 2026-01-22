@@ -11,30 +11,33 @@
  */
 
 // =============================================================================
-// SPORT COLORS (Glassmorphism Theme)
+// SPORT COLORS (Phosphor / 1980s Instrument Indicators)
 // =============================================================================
 
 /**
  * Unified sport colors - use these everywhere for consistency
- * Matches the glassmorphism dark theme
+ * Phosphor LED aesthetic: muted, desaturated cores (not neon)
  * 
  * This is the SINGLE SOURCE OF TRUTH for all discipline colors.
  * Change colors here and they will propagate throughout the app.
+ * 
+ * Meta rule: "Treat discipline colors like LEDs on a 1980s lab instrument
+ * — always softly on, brighter when active or completed, never flat, never neon."
  */
 export const SPORT_COLORS = {
-  run: '#FEF08A',      // yellow-200 (very light yellow)
-  running: '#FEF08A',  // alias
-  bike: '#22c55e',     // green-500
-  ride: '#22c55e',     // alias
-  cycling: '#22c55e',  // alias
-  swim: '#3b82f6',     // blue-500
-  swimming: '#3b82f6', // alias
-  strength: '#f97316', // orange-500
-  strength_training: '#f97316', // alias
-  weight: '#f97316',   // alias
-  weights: '#f97316',  // alias
-  mobility: '#a855f7', // purple-500
-  pilates_yoga: '#a855f7', // alias
+  run: '#CDBA52',      // phosphor amber-yellow (muted, desaturated)
+  running: '#CDBA52',  // alias
+  bike: '#6BA85A',     // phosphor green (muted, desaturated)
+  ride: '#6BA85A',     // alias
+  cycling: '#6BA85A',  // alias
+  swim: '#5A7FA8',     // phosphor blue (muted, desaturated)
+  swimming: '#5A7FA8', // alias
+  strength: '#C98A4A', // phosphor orange (muted, desaturated)
+  strength_training: '#C98A4A', // alias
+  weight: '#C98A4A',   // alias
+  weights: '#C98A4A',  // alias
+  mobility: '#9A7AB8', // phosphor purple (muted, desaturated)
+  pilates_yoga: '#9A7AB8', // alias
 } as const;
 
 /**
@@ -106,10 +109,14 @@ function getDisciplineTailwindColorName(type: string): string {
  * Get Tailwind class for discipline background (for components using Tailwind)
  * Note: Tailwind JIT requires full class names, so we return hardcoded classes
  * but derive them from the mapping above for easier maintenance
+ * 
+ * @deprecated Use getDisciplinePhosphorCore() with inline styles instead for phosphor colors
+ * This still returns Tailwind classes but they may not match phosphor system
  */
 export function getDisciplineTailwindClass(type: string): string {
   const colorName = getDisciplineTailwindColorName(type);
   // Map to actual Tailwind classes (required for JIT compilation)
+  // Note: These are legacy classes - for phosphor system, use getDisciplinePhosphorCore() with inline styles
   const classMap: Record<string, string> = {
     yellow: 'bg-yellow-200', // very light yellow
     teal: 'bg-teal-500',
@@ -120,6 +127,16 @@ export function getDisciplineTailwindClass(type: string): string {
     gray: 'bg-gray-500',
   };
   return classMap[colorName] || 'bg-gray-500';
+}
+
+/**
+ * Get inline style for discipline background color (phosphor system)
+ * Use this instead of getDisciplineTailwindClass for phosphor colors
+ */
+export function getDisciplineBgStyle(type: string): React.CSSProperties {
+  return {
+    backgroundColor: getDisciplinePhosphorCore(type),
+  };
 }
 
 /**
@@ -157,38 +174,92 @@ export function getDisciplineCheckmarkColor(type: string): string {
 }
 
 /**
- * Get Tailwind classes for discipline-colored pills (dark theme glassmorphism)
- * Returns different styles for completed vs planned workouts
+ * Get Tailwind classes for discipline-colored pills (phosphor system)
+ * Note: This is now mainly for base structure - fill/border/glow come from getDisciplinePhosphorPill()
+ * 
+ * @deprecated Use getDisciplinePhosphorPill() instead for complete styling
  */
 export function getDisciplinePillClasses(type: string, isCompleted: boolean = false): string {
-  const colorName = getDisciplineTailwindColorName(type);
+  // Base classes: border will be set via style.borderColor
+  return 'border';
+}
+
+/**
+ * Get complete phosphor pill styling (className + style object)
+ * Uses FILL as primary completion signal:
+ * - Border = discipline color (always)
+ * - Fill = state (no fill for planned, dark fill for completed, brighter for today)
+ * - Glow = relevance (faint for future, medium for week, medium-high for done, strongest for today)
+ * 
+ * @param type - Discipline type
+ * @param state - 'idle' (future/planned), 'week' (this week), 'done' (completed), 'active' (today/active)
+ * @param textBrightness - Optional brightness multiplier for text (0.0-1.0), defaults based on state
+ * @returns Object with className and style for React components
+ */
+export function getDisciplinePhosphorPill(
+  type: string,
+  state: 'idle' | 'week' | 'done' | 'active' = 'idle',
+  textBrightness?: number
+): { className: string; style: React.CSSProperties } {
+  const coreColor = getDisciplinePhosphorCore(type);
+  const glowStyle = getDisciplineGlowStyle(type, state);
   
-  // Map to actual Tailwind classes (required for JIT compilation)
-  const completedClasses: Record<string, string> = {
-    yellow: 'bg-yellow-200/20 border border-yellow-200/30 text-yellow-200 backdrop-blur-md hover:bg-yellow-200/30',
-    teal: 'bg-teal-500/20 border border-teal-500/30 text-teal-400 backdrop-blur-md hover:bg-teal-500/30',
-    green: 'bg-green-600/20 border border-green-500/30 text-green-400 backdrop-blur-md hover:bg-green-600/30',
-    blue: 'bg-blue-600/20 border border-blue-500/30 text-blue-400 backdrop-blur-md hover:bg-blue-600/30',
-    orange: 'bg-orange-600/20 border border-orange-500/30 text-orange-400 backdrop-blur-md hover:bg-orange-600/30',
-    purple: 'bg-purple-600/20 border border-purple-500/30 text-purple-400 backdrop-blur-md hover:bg-purple-600/30',
-    gray: 'bg-zinc-500/20 border border-zinc-400/30 text-white/80 backdrop-blur-md hover:bg-zinc-500/30',
+  // Text brightness based on state (if not explicitly provided)
+  const brightnessMap: Record<string, number> = {
+    idle: 0.7,    // Future: dim text
+    week: 0.8,    // This week: normal text
+    done: 0.9,    // Completed: slightly brighter text
+    active: 1.0,  // Today: brightest text
   };
+  const brightness = textBrightness !== undefined ? textBrightness : brightnessMap[state] || 0.8;
   
-  const plannedClasses: Record<string, string> = {
-    yellow: 'bg-transparent border border-yellow-200/60 text-white/90 hover:bg-yellow-200/10',
-    teal: 'bg-transparent border border-teal-500/50 text-white/90 hover:bg-teal-500/10',
-    green: 'bg-transparent border border-green-500/50 text-white/90 hover:bg-green-500/10',
-    blue: 'bg-transparent border border-blue-500/50 text-white/90 hover:bg-blue-500/10',
-    orange: 'bg-transparent border border-orange-500/50 text-white/90 hover:bg-orange-500/10',
-    purple: 'bg-transparent border border-purple-500/50 text-white/90 hover:bg-purple-500/10',
-    gray: 'bg-transparent border border-white/40 text-white/90 hover:bg-white/10',
-  };
+  // Apply brightness to core color for text
+  const rgb = hexToRgb(coreColor);
+  const [r, g, b] = rgb.split(',').map(v => parseInt(v.trim()));
+  const textColor = `rgb(${Math.round(r * brightness)}, ${Math.round(g * brightness)}, ${Math.round(b * brightness)})`;
   
-  if (isCompleted) {
-    return completedClasses[colorName] || completedClasses.gray;
-  } else {
-    return plannedClasses[colorName] || plannedClasses.gray;
+  // Fill color based on state
+  // - Future/Planned: No fill (transparent/dark steel)
+  // - This Week: No fill (transparent/dark steel)
+  // - Completed: Very dark discipline fill (20% opacity of core)
+  // - Today (uncompleted): No fill (transparent/dark steel) - only completed workouts get fills
+  let fillColor = 'transparent';
+  if (state === 'done') {
+    // Completed: very dark fill (20% opacity) - ONLY completed workouts get fills
+    fillColor = `rgba(${r}, ${g}, ${b}, 0.20)`;
   }
+  // idle, week, and active: transparent (no fill) - uncompleted workouts never get fills
+  
+  // Border color: always discipline color (muted phosphor)
+  // But make borders softer - reduce opacity for less noise
+  const borderColor = coreColor;
+  const borderOpacity = state === 'idle' ? 0.4 : (state === 'week' ? 0.5 : 0.6);
+  const borderRgb = hexToRgb(coreColor);
+  const [br, bg, bb] = borderRgb.split(',').map(v => parseInt(v.trim()));
+  const borderColorWithOpacity = `rgba(${br}, ${bg}, ${bb}, ${borderOpacity})`;
+  
+  // Combine all styles
+  const style: React.CSSProperties = {
+    ...glowStyle,
+    color: textColor,
+    backgroundColor: fillColor,
+    borderColor: borderColorWithOpacity,
+  };
+  
+  // Base classes: neutral border width, transparent/semi-transparent bg
+  // Border color comes from style.borderColor
+  const baseClasses = 'border';
+  
+  // Softer borders - thinner for less visual noise
+  // Use 1px for all states (calmer, more engineered)
+  const borderWidth = '1px';
+  
+  const className = baseClasses;
+  
+  // Add border width to style
+  style.borderWidth = borderWidth;
+  
+  return { className, style };
 }
 
 /**
@@ -312,10 +383,136 @@ export function getDisciplineUnselectedButtonClasses(type: string): string {
 
 /**
  * Get RGBA color string for glow effects (e.g., "rgba(20, 184, 166, 0.8)")
+ * @deprecated Use getDisciplineGlowStyle instead for phosphor system
  */
 export function getDisciplineGlowColor(type: string, opacity: number = 0.8): string {
   const rgb = getDisciplineColorRgb(type);
   return `rgba(${rgb}, ${opacity})`;
+}
+
+// =============================================================================
+// PHOSPHOR GLOW SYSTEM (1980s Instrument Indicators)
+// =============================================================================
+
+/**
+ * Get CSS variable name for discipline glow RGB (space-delimited format)
+ * Returns the CSS variable name (e.g., "--run-glow-rgb")
+ */
+function getDisciplineGlowRgbVar(type: string): string {
+  const normalized = (type || '').toLowerCase();
+  const varMap: Record<string, string> = {
+    run: '--run-glow-rgb',
+    running: '--run-glow-rgb',
+    walk: '--run-glow-rgb',
+    strength: '--strength-glow-rgb',
+    strength_training: '--strength-glow-rgb',
+    weight: '--strength-glow-rgb',
+    weights: '--strength-glow-rgb',
+    mobility: '--mobility-glow-rgb',
+    pilates_yoga: '--mobility-glow-rgb',
+    pilates: '--mobility-glow-rgb',
+    yoga: '--mobility-glow-rgb',
+    stretch: '--mobility-glow-rgb',
+    swim: '--swim-glow-rgb',
+    swimming: '--swim-glow-rgb',
+    bike: '--bike-glow-rgb',
+    ride: '--bike-glow-rgb',
+    cycling: '--bike-glow-rgb',
+  };
+  return varMap[normalized] || '--run-glow-rgb';
+}
+
+/**
+ * Get CSS variable names for discipline glow alpha tiers
+ * Returns object with a1, a2, a3 variable names for the specified state
+ */
+function getDisciplineGlowAlphaVars(type: string, state: 'idle' | 'week' | 'done' | 'active'): {
+  a1: string;
+  a2: string;
+  a3: string;
+} {
+  const normalized = (type || '').toLowerCase();
+  const prefixMap: Record<string, string> = {
+    run: '--run-glow',
+    running: '--run-glow',
+    walk: '--run-glow',
+    strength: '--strength-glow',
+    strength_training: '--strength-glow',
+    weight: '--strength-glow',
+    weights: '--strength-glow',
+    mobility: '--mobility-glow',
+    pilates_yoga: '--mobility-glow',
+    pilates: '--mobility-glow',
+    yoga: '--mobility-glow',
+    stretch: '--mobility-glow',
+    swim: '--swim-glow',
+    swimming: '--swim-glow',
+    bike: '--bike-glow',
+    ride: '--bike-glow',
+    cycling: '--bike-glow',
+  };
+  const prefix = prefixMap[normalized] || '--run-glow';
+  return {
+    a1: `${prefix}-a1-${state}`,
+    a2: `${prefix}-a2-${state}`,
+    a3: `${prefix}-a3-${state}`,
+  };
+}
+
+/**
+ * Get inline style object for multi-layer phosphor glow (3-layer CRT/phosphor bleed)
+ * 
+ * @param type - Discipline type (run, strength, mobility, swim, bike)
+ * @param state - Glow intensity: 'idle' (planned), 'done' (completed), 'active' (today/active)
+ * @returns React style object with box-shadow for 3-layer glow
+ * 
+ * Standard glow geometry:
+ * - Layer 1: 2px blur, tight inner glow
+ * - Layer 2: 8px blur, medium spread
+ * - Layer 3: 22px blur, large bloom
+ */
+export function getDisciplineGlowStyle(
+  type: string,
+  state: 'idle' | 'week' | 'done' | 'active' = 'idle'
+): React.CSSProperties {
+  // Read CSS variables from document (works in browser)
+  // Fallback to direct values if not in browser or CSS vars not available
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    // SSR fallback: use default values
+    const defaultRgb = '205 186 82'; // run yellow default
+    const defaultAlphas = { idle: [0.02, 0.01, 0.005], week: [0.15, 0.10, 0.06], done: [0.25, 0.18, 0.12], active: [0.40, 0.28, 0.18] };
+    const alphas = defaultAlphas[state] || defaultAlphas.idle;
+    return {
+      boxShadow: `0 0 2px rgba(${defaultRgb}, ${alphas[0]}), 0 0 8px rgba(${defaultRgb}, ${alphas[1]}), 0 0 22px rgba(${defaultRgb}, ${alphas[2]})`,
+    };
+  }
+  
+  const rgbVar = getDisciplineGlowRgbVar(type);
+  const alphaVars = getDisciplineGlowAlphaVars(type, state);
+  
+  // Read CSS variable values
+  const root = document.documentElement;
+  const rgb = root.style.getPropertyValue(rgbVar) || getComputedStyle(root).getPropertyValue(rgbVar) || '205 186 82';
+  const a1 = root.style.getPropertyValue(alphaVars.a1) || getComputedStyle(root).getPropertyValue(alphaVars.a1) || '0.10';
+  const a2 = root.style.getPropertyValue(alphaVars.a2) || getComputedStyle(root).getPropertyValue(alphaVars.a2) || '0.06';
+  const a3 = root.style.getPropertyValue(alphaVars.a3) || getComputedStyle(root).getPropertyValue(alphaVars.a3) || '0.03';
+  
+  // Build box-shadow with 3 layers using actual rgba values
+  const shadow1 = `0 0 2px rgba(${rgb.trim()}, ${a1.trim()})`;
+  const shadow2 = `0 0 8px rgba(${rgb.trim()}, ${a2.trim()})`;
+  const shadow3 = `0 0 22px rgba(${rgb.trim()}, ${a3.trim()})`;
+  
+  return {
+    boxShadow: `${shadow1}, ${shadow2}, ${shadow3}`,
+  };
+}
+
+/**
+ * Get phosphor core color (muted, desaturated hue)
+ * Returns hex color from SPORT_COLORS (now using phosphor cores)
+ */
+export function getDisciplinePhosphorCore(type: string): string {
+  return getDisciplineColor(type);
 }
 
 // =============================================================================

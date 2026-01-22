@@ -17,7 +17,7 @@ import { supabase } from '@/lib/supabase';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
-import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
+import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 // Get unified planned workout data with pace ranges (same as Today's Effort and Weekly)
@@ -742,24 +742,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const isMobility = workoutType === 'mobility';
   const isStrength = workoutType === 'strength';
   
-  // Color theme: purple for mobility, amber for strength
+  // Phosphor glow for mobility and strength cards
   const getCardStyle = () => {
     if (isMobility) {
-      return { background: 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(168,85,247,0.05) 50%, rgba(255,255,255,0.03) 100%)' };
+      const glowStyle = getDisciplineGlowStyle('mobility', 'idle');
+      return { ...glowStyle, background: 'radial-gradient(ellipse at center top, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.1) 100%)' };
     }
     if (isStrength) {
-      return { background: 'linear-gradient(135deg, rgba(249,115,22,0.15) 0%, rgba(249,115,22,0.05) 50%, rgba(255,255,255,0.03) 100%)' };
+      const glowStyle = getDisciplineGlowStyle('strength', 'idle');
+      return { ...glowStyle, background: 'radial-gradient(ellipse at center top, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.1) 100%)' };
     }
     return {};
   };
   const getCardClass = () => {
-    if (isMobility) {
-      return 'backdrop-blur-xl border border-purple-500/30 rounded-2xl mx-1 shadow-[0_0_0_1px_rgba(168,85,247,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]';
-    }
-    if (isStrength) {
-      return 'backdrop-blur-xl border border-orange-500/30 rounded-2xl mx-1 shadow-[0_0_0_1px_rgba(249,115,22,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]';
-    }
-    return '';
+    // Dark steel panel: neutral border, subtle inner stroke via shadow
+    return 'backdrop-blur-xl border border-white/10 rounded-2xl mx-1 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]';
   };
   const cardStyle = getCardStyle();
   const cardClass = getCardClass();

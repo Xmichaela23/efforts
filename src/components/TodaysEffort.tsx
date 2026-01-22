@@ -6,7 +6,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity } from 'lucide-react';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
-import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb } from '@/lib/context-utils';
+import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
@@ -972,35 +972,51 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         }}
       >
         <div className="space-y-1">
-          {/* Line 1: Date */}
+          {/* Line 1: Date - Live channel (brightest, energized) */}
           <div>
-            <span className="text-base font-light tracking-wide text-foreground">
+            <span 
+              className="text-sm font-light tracking-wide" 
+              style={{ 
+                color: 'rgba(255, 255, 255, 0.95)', // Brighter - closer to primary numbers
+                textShadow: '0 0 2px rgba(255, 255, 255, 0.15), 0 0 4px rgba(255, 255, 255, 0.08)', // Faint backlit LCD glow
+              }}
+            >
               {formatDisplayDate(activeDate)}
             </span>
           </div>
 
-          {/* Line 2: Weather + Location (weather only for today) */}
+          {/* Line 2: Weather + Location - Visible but secondary */}
           {(weather || cityName) && (
             <div className="flex items-center gap-1 flex-wrap">
               {weather && isTodayDate && (
-                <span className="text-sm font-light text-white/60 tracking-normal">
+                <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
                   {Math.round(weather.temperature)}°F {weather.condition}
                   {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
-                  {weather.sunrise && weather.sunset ? (()=>{ try { const fmt=(iso:string)=>{ const d=new Date(iso); return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, m=> m.trim().toLowerCase()); }; return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; } catch { return '';} })() : ''}
+                  {weather.sunrise && weather.sunset ? (()=>{ 
+                    try { 
+                      const fmt = (iso: string) => { 
+                        const d = new Date(iso); 
+                        return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, (m) => m.trim().toLowerCase()); 
+                      }; 
+                      return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; 
+                    } catch { 
+                      return ''; 
+                    }
+                  })() : ''}
                 </span>
               )}
               {/* City name from geolocation (show for any date if available) */}
               {cityName && (
-                <span className="text-sm font-light text-white/60 tracking-normal">
+                <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
                   {weather && isTodayDate ? ' • ' : ''}{cityName}
                 </span>
               )}
             </div>
           )}
 
-          {/* Line 3: Week + Focus + Event (all training context together) */}
+          {/* Line 3: Week + Focus + Event - Yellow (run plan), dimmer than Today */}
           {trainingPlanContext && (trainingPlanContext.currentWeek || trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
-            <div className="text-sm text-white/60 font-light tracking-normal">
+            <div className="text-xs font-extralight tracking-normal" style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.65 }}>
               {trainingPlanContext.currentWeek && (
                 <span>Week {trainingPlanContext.currentWeek}</span>
               )}
@@ -1014,7 +1030,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 <span> • </span>
               )}
               {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                <span className={`${getDisciplineTextClass('run')} font-light`}>
+                <span className="font-light" style={{ 
+                  opacity: 0.8 // Slightly less bright than "Today" - yellow but dimmer
+                }}>
                   {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
                 </span>
               )}
@@ -1043,13 +1061,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
           <div className="flex items-center justify-center h-full px-4">
-            <p className={`text-center ${
-              trainingPlanContext
-                ? 'text-muted-foreground text-lg font-medium italic'
-                : isPastDate
-                  ? 'text-muted-foreground text-xs'
-                  : 'text-muted-foreground text-xs'
-            }`}>
+            <p className="text-center text-lg font-medium italic" style={{ color: 'rgba(255, 255, 255, 0.25)' }}>
               {trainingPlanContext
                 ? 'Rest'
                 : isPastDate
@@ -1061,11 +1073,42 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         ) : (
           // Compact workout display - vertical list (reverted)
           <div className="">
-            <div className="space-y-1">
-              {displayWorkouts.map((workout) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              {displayWorkouts.map((workout) => {
+                const workoutType = workout.type || workout.workout_type || '';
+                const isCompleted = workout.workout_status === 'completed';
+                // Today's workouts: completed = 'done' (filled), not completed = 'week' (empty border, no fill)
+                // This matches calendar behavior - empty border when not completed
+                const glowState: 'idle' | 'week' | 'done' | 'active' = isCompleted ? 'done' : 'week';
+                const phosphorPill = getDisciplinePhosphorPill(workoutType, glowState);
+                
+                return (
                 <div
                   key={workout.id}
-                  className={`w-full text-left p-3 rounded-2xl transition-all backdrop-blur-lg border cursor-pointer ${getDisciplinePillClasses(workout.type || workout.workout_type || '', workout.workout_status === 'completed')}`}
+                  className={`w-full text-left transition-all backdrop-blur-lg cursor-pointer ${phosphorPill.className}`}
+                  style={{
+                    ...phosphorPill.style,
+                    borderRadius: '4px', // More rectangular - tighter radius for label strips
+                    padding: '0.5rem 0.75rem', // Reduced height - tighter vertical padding
+                    // Inset stroke for mounted/cut-into-panel feel
+                    boxShadow: phosphorPill.style.boxShadow 
+                      ? `${phosphorPill.style.boxShadow}, 0 0 0 0.5px rgba(255, 255, 255, 0.08) inset`
+                      : '0 0 0 0.5px rgba(255, 255, 255, 0.08) inset',
+                    // Reduce outer border dominance - lighter border for less "floating bubble" feel
+                    borderColor: phosphorPill.style.borderColor ? 
+                      (typeof phosphorPill.style.borderColor === 'string' && phosphorPill.style.borderColor.includes('rgba') ?
+                        (() => {
+                          const rgbaMatch = phosphorPill.style.borderColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+                          if (rgbaMatch) {
+                            const [, r, g, b, alpha] = rgbaMatch;
+                            const newAlpha = Math.max(0.12, parseFloat(alpha) * 0.6);
+                            return `rgba(${r}, ${g}, ${b}, ${newAlpha})`;
+                          }
+                          return phosphorPill.style.borderColor;
+                        })() : phosphorPill.style.borderColor) : undefined,
+                    borderWidth: '0.5px', // Thinner border for less dominance
+                    marginBottom: '0.25rem', // Tight spacing between chips
+                  }}
                   onClick={() => {
                     if (workout.workout_status === 'planned') {
                       setSelectedPlannedWorkout(workout);
@@ -1081,7 +1124,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={true} />
                         </div>
                         {/* Chevron indicator */}
-                        <div className="text-white/40 text-sm">›</div>
+                        <div className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.4)' }}>›</div>
                       </div>
                     </div>
                   ) : (
@@ -1095,7 +1138,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     >
                       {/* Title and Duration Row */}
                       <div className="flex items-center justify-between">
-                        <div className="font-light tracking-normal text-base text-foreground">
+                        <div className="font-light tracking-normal text-base" style={{ color: getDisciplinePhosphorCore(workoutType) }}>
                           {(() => {
                             const type = String(workout.type || '').toLowerCase();
                             const desc = String(workout.description || '').toLowerCase();
@@ -1206,9 +1249,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const sec = resolveMovingSeconds(workout);
                             if (Number.isFinite(sec as any) && (sec as number) > 0) {
                               const mins = Math.round((sec as number) / 60);
-                              return <span className="text-white font-light" style={{ 
-                                fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
-                                letterSpacing: '0.02em'
+                              return <span className="font-light tabular-nums" style={{
+                                color: 'rgba(255, 255, 255, 0.85)'
                               }}>{mins}:00</span>;
                             }
                             return null;
@@ -1275,24 +1317,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
         </div>
       </div>
 
-      {/* Week of header - fixed at absolute bottom of TodaysEffort with glassmorphism */}
+      {/* Week of header - de-emphasized label */}
       <div 
-        className="flex items-center justify-between py-1 rounded-t-lg border border-white/15 border-b-0"
+        className="flex items-center justify-between py-1 rounded-t-lg"
         style={{
           position: 'absolute',
           bottom: 0,
           left: '0.5rem',
           right: '0.5rem',
-          background: 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(48px) saturate(150%)',
-          WebkitBackdropFilter: 'blur(48px) saturate(150%)',
+          background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.01) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)',
+          border: '0.5px solid rgba(255, 255, 255, 0.04)',
+          borderBottom: 'none',
+          boxShadow: '0 0 0 1px rgba(255,255,255,0.02) inset, 0 1px 4px rgba(0,0,0,0.4)',
           paddingLeft: '0.5rem',
           paddingRight: '0.5rem',
           zIndex: 20,
@@ -1300,17 +1344,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       >
         <button
           aria-label="Previous week"
-          className="px-2 py-1 min-w-8 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
+          className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
+          style={{ color: 'rgba(255, 255, 255, 0.3)' }}
           onClick={() => handleWeekNav('prev')}
         >
           ‹
         </button>
-        <span className="text-sm font-light tracking-normal text-white">
+        <span className="text-xs font-extralight tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.35)' }}>
           Week of {formatWeekRange(weekStart, weekEnd)}
         </span>
         <button
           aria-label="Next week"
-          className="px-2 py-1 min-w-8 rounded hover:bg-white/10 active:bg-white/20 text-white/80"
+          className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
+          style={{ color: 'rgba(255, 255, 255, 0.3)' }}
           onClick={() => handleWeekNav('next')}
         >
           ›

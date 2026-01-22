@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
-import { getDisciplineGlowColor } from '@/lib/context-utils';
+import { getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle, Info } from 'lucide-react';
@@ -825,32 +825,60 @@ export default function WorkoutCalendar({
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, key)}
               className={[
-                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-2.5 flex flex-col justify-between items-stretch",
-                "hover:bg-white/[0.05] transition-all",
-                dragOverDate === key ? "ring-2 ring-white/40 bg-white/[0.08]" : "",
+                "mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] backdrop-blur-md flex flex-col items-stretch",
+                "hover:bg-white/[0.02] transition-all",
+                dragOverDate === key ? "ring-2 ring-white/40 bg-white/[0.05]" : "",
               ].join(" ")}
               style={{
                 aspectRatio: '1', // Perfect squares for geometric precision
-                border: '0.5px solid rgba(255, 255, 255, 0.12)', // Hairline border for module divisions (more visible)
+                borderRadius: '14px', // Day tile radius: 14-16px for hierarchy
+                border: '0.5px solid rgba(255, 255, 255, 0.04)', // Much dimmer border - recede structure
+                background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.01) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)', // Darker panel
+                boxShadow: '0 0 0 1px rgba(255,255,255,0.02) inset, 0 1px 4px rgba(0,0,0,0.4)', // Subtler inner stroke
+                padding: '0.375rem', // Tightened from p-2.5 (0.625rem) - less empty space
               }}
             >
-              {/* Top row: Day + Date inline */}
-              <div className="flex items-baseline justify-start">
-                <div className="text-sm font-light tracking-wider text-foreground">
+              {/* Top row: Day + Date inline - De-emphasized labels */}
+              <div className="flex items-baseline justify-start mb-1">
+                <div className="text-xs font-extralight tracking-wider" style={{ color: 'rgba(255, 255, 255, 0.35)' }}>
                   {weekdayFmt.format(d)}
                 </div>
-                <div className="ml-2 text-sm text-muted-foreground">{d.getDate()}</div>
+                <div className="ml-1.5 text-xs font-extralight" style={{ color: 'rgba(255, 255, 255, 0.3)' }}>{d.getDate()}</div>
               </div>
 
-              {/* Bottom area: Event labels anchored at bottom */}
-              <div className={`flex flex-col gap-1 ${items.length === 0 && trainingPlanContext ? 'items-center justify-center flex-1' : 'items-start'}`}>
+              {/* Bottom area: Event labels - dense stacking */}
+              <div className={`flex flex-col ${items.length === 0 && trainingPlanContext ? 'items-center justify-center flex-1' : 'items-start'}`} style={{ gap: '0.125rem' }}>
                 {items.length > 0 && (
                   items.map((evt, i) => {
                     // Check actual workout_status from _src
                     const workoutStatus = String((evt?._src?.workout_status || '')).toLowerCase();
                     const isCompleted = workoutStatus === 'completed';
                     const workoutType = String(evt?._src?.type || evt?._src?.workout_type || '').toLowerCase();
-                    const disciplineColors = getDisciplinePillClasses(workoutType, isCompleted);
+                    
+                    // Determine glow state based on date and status
+                    // Fill rule: ONLY completed workouts get fills. Today's uncompleted workouts = no fill.
+                    // State hierarchy: Completed (done, filled) > Today (active, no fill, strongest glow) > This Week (week, no fill) > Future (idle, no fill)
+                    let glowState: 'idle' | 'week' | 'done' | 'active' = 'idle';
+                    if (isCompleted) {
+                      glowState = 'done'; // Completed workouts get fill and medium-high glow
+                    } else if (isToday) {
+                      glowState = 'active'; // Today's uncompleted workouts get strongest glow but NO fill
+                    } else {
+                      // Check if this week (within current week range)
+                      const workoutDate = evt?._src?.date || key;
+                      const today = new Date();
+                      const currentWeekStart = startOfWeek(today);
+                      const currentWeekEnd = new Date(currentWeekStart);
+                      currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
+                      currentWeekEnd.setHours(23, 59, 59, 59);
+                      
+                      const workoutDateObj = new Date(workoutDate + 'T12:00:00');
+                      const isThisWeek = workoutDateObj >= currentWeekStart && workoutDateObj <= currentWeekEnd;
+                      
+                      glowState = isThisWeek ? 'week' : 'idle'; // This week = medium glow, future = very faint
+                    }
+                    
+                    const phosphorPill = getDisciplinePhosphorPill(workoutType, glowState);
                     
                     const isPlanned = workoutStatus === 'planned';
                     const workoutId = evt?._src?.id;
@@ -865,14 +893,36 @@ export default function WorkoutCalendar({
                         onDragEnd={handleDragEnd}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`text-xs px-2 py-1 rounded-xl w-full text-center truncate transition-all backdrop-blur-sm font-light tracking-wide ${disciplineColors} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                        className={`text-xs px-1.5 py-0.5 w-full text-center truncate transition-all backdrop-blur-sm font-light tracking-wide ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                        style={{
+                          ...phosphorPill.style,
+                          borderRadius: '4px', // More rectangular - tighter radius for label strips
+                          // Inset stroke for mounted/cut-into-panel feel
+                          boxShadow: phosphorPill.style.boxShadow 
+                            ? `${phosphorPill.style.boxShadow}, 0 0 0 0.5px rgba(255, 255, 255, 0.08) inset`
+                            : '0 0 0 0.5px rgba(255, 255, 255, 0.08) inset',
+                          // Reduce outer border dominance - lighter border for less "floating bubble" feel
+                          borderColor: phosphorPill.style.borderColor ? 
+                            (typeof phosphorPill.style.borderColor === 'string' && phosphorPill.style.borderColor.includes('rgba') ?
+                              (() => {
+                                const rgbaMatch = phosphorPill.style.borderColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+                                if (rgbaMatch) {
+                                  const [, r, g, b, alpha] = rgbaMatch;
+                                  const newAlpha = Math.max(0.12, parseFloat(alpha) * 0.6);
+                                  return `rgba(${r}, ${g}, ${b}, ${newAlpha})`;
+                                }
+                                return phosphorPill.style.borderColor;
+                              })() : phosphorPill.style.borderColor) : undefined,
+                          borderWidth: '0.5px', // Thinner border for less dominance
+                          marginBottom: '0.125rem', // Tight spacing between chips - dense stacking
+                        }}
                       >
                         {(() => {
                           const label = String(evt.label || '');
                           const hasCheckmark = /✓+$/.test(label);
                           if (hasCheckmark && isCompleted) {
                             const labelText = label.replace(/✓+$/, '').trim();
-                            // Extract numbers for monospace font
+                            // Extract numbers for tabular numerals
                             const parts = labelText.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
                             const nonNumericParts = labelText.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
                             return (
@@ -880,46 +930,28 @@ export default function WorkoutCalendar({
                                 {nonNumericParts.map((part, i) => {
                                   const isNumeric = parts.includes(part);
                                   return isNumeric ? (
-                                    <span key={i} style={{ 
-                                      fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
-                                      letterSpacing: '0.03em'
-                                    }}>{part}</span>
+                                    <span key={i} className="tabular-nums">{part}</span>
                                   ) : part;
                                 })}
                                 <span 
-                                  className={getDisciplineCheckmarkColor(workoutType)}
-                                  style={(() => {
-                                    // Get color based on workout type for tight LED glow
-                                    const t = (workoutType || '').toLowerCase();
-                                    let glowColor = 'rgba(255, 255, 255, 0.6)'; // default white
-                                    
-                                    // Use centralized color system for glow
-                                    glowColor = t ? getDisciplineGlowColor(t, 0.8) : 'rgba(255, 255, 255, 0.6)'; // default white
-                                    
-                                    return {
-                                      textShadow: `
-                                        0 0 2px ${glowColor.replace('0.8', '1')},
-                                        0 0 4px ${glowColor.replace('0.8', '0.6')},
-                                        0 0 6px ${glowColor.replace('0.8', '0.3')},
-                                        0 0 8px ${glowColor.replace('0.8', '0.15')}
-                                      `
-                                    };
-                                  })()}
+                                  style={{
+                                    // Checkmark should be dimmer than discipline color (secondary signal)
+                                    // Use the same color as label but at lower brightness
+                                    color: getDisciplinePhosphorCore(workoutType),
+                                    opacity: 0.35, // Much dimmer than label text - secondary confirmation only
+                                  }}
                                 > ✓</span>
                               </>
                             );
                           }
-                          // Apply monospace to numbers in regular labels too
+                          // Apply tabular numerals to numbers in regular labels too
                           const parts = label.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
                           if (parts.length > 0) {
                             const nonNumericParts = label.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
                               return nonNumericParts.map((part, i) => {
                                 const isNumeric = parts.includes(part);
                                   return isNumeric ? (
-                                    <span key={i} style={{ 
-                                      fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
-                                      letterSpacing: '0.03em'
-                                    }}>{part}</span>
+                                    <span key={i} className="tabular-nums">{part}</span>
                                   ) : part;
                               });
                           }
@@ -939,15 +971,16 @@ export default function WorkoutCalendar({
                 )}
                 {items.length === 0 && !loadingDebounced && (() => {
                   // Show "Rest" if there's an active plan (for any date, past or future)
+                  // Rest/empty cells: No fill, no border color, no glow - powered off
                   const isRestDay = trainingPlanContext;
                   
                   if (isRestDay) {
                     return (
-                      <span className="text-base text-muted-foreground/70 italic">Rest</span>
+                      <span className="text-base italic" style={{ color: 'rgba(255, 255, 255, 0.25)' }}>Rest</span>
                     );
                   }
                   return (
-                    <span className="text-xs text-muted-foreground/50">&nbsp;</span>
+                    <span className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.12)' }}>&nbsp;</span>
                   );
                 })()}
               </div>
@@ -966,16 +999,27 @@ export default function WorkoutCalendar({
           return (
             <div 
               key={`empty-${index}`}
-              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/20 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-3 flex flex-col justify-start items-start ${
+              className={`mobile-calendar-cell w-full h-full min-h-[var(--cal-cell-h)] bg-white/[0.03] backdrop-blur-md border border-white/20 p-3 flex flex-col justify-start items-start ${
                 isLastCell ? 'col-span-2' : ''
               }`}
+              style={{
+                borderRadius: '14px', // Day tile radius: 14-16px for hierarchy
+                boxShadow: '0 0 0 1px rgba(255,255,255,0.05) inset, 0 2px 8px rgba(0,0,0,0.3)',
+              }}
             >
               {/* Weekly context and workload spans the last two cells */}
               {isLastCell && (
                 <div className="space-y-2">
-                  {/* Total Workload with counts */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-light tracking-normal">Total Workload</span>
+                  {/* Total Workload with counts - physical panel */}
+                  <div 
+                    className="flex items-center gap-2 p-2 rounded-lg"
+                    style={{
+                      background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)',
+                      border: '0.5px solid rgba(255, 255, 255, 0.08)',
+                      boxShadow: '0 0 0 1px rgba(255,255,255,0.03) inset, 0 2px 8px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    <span className="text-sm font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Total Workload</span>
                     <Popover open={workloadTooltipOpen} onOpenChange={setWorkloadTooltipOpen}>
                       <PopoverTrigger asChild>
                         <button 
@@ -987,7 +1031,7 @@ export default function WorkoutCalendar({
                             setWorkloadTooltipOpen(!workloadTooltipOpen);
                           }}
                         >
-                          <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                          <Info className="w-3.5 h-3.5 cursor-pointer" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
                         </button>
                       </PopoverTrigger>
                       <PopoverContent side="top" className="max-w-xs p-4" sideOffset={8}>
@@ -1019,18 +1063,12 @@ export default function WorkoutCalendar({
                       </PopoverContent>
                     </Popover>
                     <div className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      <span className="text-sm" style={{ 
-                        fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
-                        letterSpacing: '0.02em'
-                      }}>{weeklyStats.planned}</span>
+                      <Calendar className="w-3 h-3" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                      <span className="text-sm tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.planned}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" />
-                      <span className="text-sm" style={{ 
-                        fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
-                        letterSpacing: '0.02em'
-                      }}>{weeklyStats.completed}</span>
+                      <CheckCircle className="w-3 h-3" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                      <span className="text-sm tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.completed}</span>
                     </div>
                   </div>
                   
@@ -1160,33 +1198,29 @@ export default function WorkoutCalendar({
                     
                     if (metrics.length > 0) {
                       return (
-                        <div className="space-y-1 pt-1">
+                        <div className="space-y-1.5 pt-2">
                           {metrics.map((metric, index) => {
-                            // Extract numbers from value for monospace styling
-                            const valueParts = String(metric.value).match(/(\d+[.,]?\d*)/g) || [];
-                            const hasNumbers = valueParts.length > 0;
+                            // Determine discipline type from label for color
+                            const labelLower = String(metric.label || '').toLowerCase();
+                            let disciplineType = '';
+                            if (labelLower.includes('run')) disciplineType = 'run';
+                            else if (labelLower.includes('strength')) disciplineType = 'strength';
+                            else if (labelLower.includes('swim')) disciplineType = 'swim';
+                            else if (labelLower.includes('bike')) disciplineType = 'bike';
+                            else if (labelLower.includes('pilates') || labelLower.includes('yoga') || labelLower.includes('mobility')) disciplineType = 'mobility';
+                            
+                            const labelColor = disciplineType ? getDisciplinePhosphorCore(disciplineType) : 'rgba(255, 255, 255, 0.9)';
                             
                             return (
                               <div key={index} className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground">{metric.label}</span>
+                                <span style={{ color: labelColor }}>{metric.label}</span>
                                 <span 
-                                  className="font-light tracking-normal text-foreground"
-                                  style={hasNumbers ? { 
-                                    fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace",
-                                    letterSpacing: '0.02em'
-                                  } : {}}
+                                  className="font-light tracking-normal tabular-nums"
+                                  style={{
+                                    color: 'rgba(255, 255, 255, 0.85)'
+                                  }}
                                 >
-                                  {hasNumbers ? (
-                                    String(metric.value).split(/(\d+[.,]?\d*)/g).map((part, i) => {
-                                      const isNumeric = valueParts.includes(part);
-                                      return isNumeric ? (
-                                        <span key={i} style={{ 
-                                          fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace", 
-                                          letterSpacing: '0.02em'
-                                        }}>{part}</span>
-                                      ) : part;
-                                    })
-                                  ) : metric.value}
+                                  {metric.value}
                                 </span>
                               </div>
                             );

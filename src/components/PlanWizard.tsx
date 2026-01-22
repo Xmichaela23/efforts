@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
-import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineFocusRingClass, getDisciplineFocusBorderClass, getDisciplineSelectedButtonClasses, getDisciplineUnselectedButtonClasses, getDisciplineBgClassVariant } from '@/lib/context-utils';
+import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineFocusRingClass, getDisciplineFocusBorderClass, getDisciplineSelectedButtonClasses, getDisciplineUnselectedButtonClasses, getDisciplineBgClassVariant, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useToast } from '@/components/ui/use-toast';
 import { MobileHeader } from './MobileHeader';
 import {
@@ -1713,25 +1713,37 @@ export default function PlanWizard() {
                     Go to Baselines to schedule a 5K time trial or easy pace test. We'll calculate your training paces from the results.
                   </p>
                   <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => navigate('/baselines')}
-                      className={`px-5 py-2.5 border ${getDisciplineBorderClass('run', '50')} ${getDisciplineTextClassVariant('run', '400')} text-sm font-medium rounded-full hover:bg-yellow-200/10 transition-colors`}
-                    >
-                      Go to Baselines →
-                    </button>
+                    {(() => {
+                      const buttonPill = getDisciplinePhosphorPill('run', 'idle');
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => navigate('/baselines')}
+                          className={`px-5 py-2.5 border border-white/10 text-sm font-medium rounded-full hover:bg-white/5 transition-colors ${buttonPill.className}`}
+                          style={buttonPill.style}
+                        >
+                          Go to Baselines →
+                        </button>
+                      );
+                    })()}
                   </div>
                   <div className="pt-2 border-t border-white/10">
                     <p className="text-xs text-gray-500 mb-3">
                       Don't want to test? Choose "Complete" goal for effort-based training that doesn't require precise paces.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setStep(step - 1)}
-                      className={`px-5 py-2.5 border ${getDisciplineBorderClass('run', '50')} text-gray-300 text-sm rounded-full hover:${getDisciplineBorderClass('run', '60')} hover:${getDisciplineTextClassVariant('run', '400')} transition-colors`}
-                    >
-                      ← Back to goal selection
-                    </button>
+                    {(() => {
+                      const buttonPill = getDisciplinePhosphorPill('run', 'idle');
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setStep(step - 1)}
+                          className={`px-5 py-2.5 border border-white/10 text-white/80 text-sm rounded-full hover:bg-white/5 transition-colors ${buttonPill.className}`}
+                          style={buttonPill.style}
+                        >
+                          ← Back to goal selection
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
@@ -2221,99 +2233,111 @@ export default function PlanWizard() {
                     className="space-y-3"
                   >
                     {/* Durability */}
-                    <div className={`p-4 rounded-xl border transition-colors ${
-                      state.strengthProtocol === 'durability' 
-                        ? `${getDisciplineBorderClass('run', '60')} bg-yellow-200/15` 
-                        : `${getDisciplineBorderClass('run', '30')} bg-black/40 hover:${getDisciplineBorderClass('run', '50')}`
-                    }`}>
-                      <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="durability" id="durability" className="mt-1" />
-                        <Label htmlFor="durability" className="flex-1 cursor-pointer">
-                          <span className="font-medium text-white">Durability</span>
-                          <span className="block text-sm text-gray-400 mt-1">
-                            Classic runner-strength exercises to build muscular support so you can handle training volume more reliably.
-                          </span>
-                          <span className="block text-xs text-gray-500 mt-2">
-                            • Step-ups, lunges, calves, unilateral work
-                          </span>
-                          <span className="block text-xs text-gray-500">
-                            • Moderate effort, no heavy compounds
-                          </span>
-                          <span className="block text-xs text-amber-400/80 mt-2 font-medium">
-                            Tradeoff: no heavy compounds or strength PR focus.
-                          </span>
-                          <span className={`block text-xs ${getDisciplineTextClassVariant('run', '400')} mt-2`}>
-                            Best for: Distance runners, volume increases, injury-prone athletes
-                          </span>
-                        </Label>
-                      </div>
-                    </div>
+                    {(() => {
+                      const isSelected = state.strengthProtocol === 'durability';
+                      const glowState: 'idle' | 'done' | 'active' = isSelected ? 'active' : 'idle';
+                      const glowStyle = getDisciplineGlowStyle('run', glowState);
+                      const runCore = getDisciplinePhosphorCore('run');
+                      return (
+                        <div className={`p-4 rounded-xl border border-white/10 transition-colors bg-black/40 ${isSelected ? 'bg-white/5' : ''}`} style={glowStyle}>
+                          <div className="flex items-start space-x-3">
+                            <RadioGroupItem value="durability" id="durability" className="mt-1" />
+                            <Label htmlFor="durability" className="flex-1 cursor-pointer">
+                              <span className="font-medium text-white">Durability</span>
+                              <span className="block text-sm text-gray-400 mt-1">
+                                Classic runner-strength exercises to build muscular support so you can handle training volume more reliably.
+                              </span>
+                              <span className="block text-xs text-gray-500 mt-2">
+                                • Step-ups, lunges, calves, unilateral work
+                              </span>
+                              <span className="block text-xs text-gray-500">
+                                • Moderate effort, no heavy compounds
+                              </span>
+                              <span className="block text-xs mt-2 font-medium" style={{ color: getDisciplinePhosphorCore('strength'), opacity: 0.8 }}>
+                                Tradeoff: no heavy compounds or strength PR focus.
+                              </span>
+                              <span className="block text-xs mt-2" style={{ color: runCore }}>
+                                Best for: Distance runners, volume increases, injury-prone athletes
+                              </span>
+                            </Label>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     
                     {/* Neural Speed */}
-                    <div className={`p-4 rounded-xl border transition-colors ${
-                      state.strengthProtocol === 'neural_speed' 
-                        ? `${getDisciplineBorderClass('run', '60')} bg-yellow-200/15` 
-                        : `${getDisciplineBorderClass('run', '30')} bg-black/40 hover:${getDisciplineBorderClass('run', '50')}`
-                    }`}>
-                      <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="neural_speed" id="neural_speed" className="mt-1" />
-                        <Label htmlFor="neural_speed" className="flex-1 cursor-pointer">
-                          <span className="font-medium text-white">Neural Speed</span>
-                          <span className="block text-sm text-gray-400 mt-1">
-                            Heavy, low-rep compound lifts to support power and efficiency without interfering with run training.
-                          </span>
-                          <span className="block text-xs text-gray-500 mt-2">
-                            • Squats, trap bar deadlifts, bench, rows
-                          </span>
-                          <span className="block text-xs text-gray-500">
-                            • Very low reps, very low volume, strict RIR
-                          </span>
-                          <span className="block text-xs text-amber-400/80 mt-2 font-medium">
-                            Important: This is a neural efficiency approach, not a strength-building program. You will not add noticeable muscle mass. Strength numbers may increase slightly, but that is not the goal. The benefit ideally shows up in how easy fast paces feel, not in the gym.
-                          </span>
-                          <span className="block text-xs text-gray-500 mt-2">
-                            Tradeoff: Requires good technique/equipment. Bodyweight tier downgrades to maintenance.
-                          </span>
-                          <span className={`block text-xs ${getDisciplineTextClassVariant('run', '400')} mt-2`}>
-                            Best for: Performance-oriented runners, speed work, want strength without soreness
-                          </span>
-                        </Label>
-                      </div>
-                    </div>
+                    {(() => {
+                      const isSelected = state.strengthProtocol === 'neural_speed';
+                      const glowState: 'idle' | 'done' | 'active' = isSelected ? 'active' : 'idle';
+                      const glowStyle = getDisciplineGlowStyle('run', glowState);
+                      const runCore = getDisciplinePhosphorCore('run');
+                      return (
+                        <div className={`p-4 rounded-xl border border-white/10 transition-colors bg-black/40 ${isSelected ? 'bg-white/5' : ''}`} style={glowStyle}>
+                          <div className="flex items-start space-x-3">
+                            <RadioGroupItem value="neural_speed" id="neural_speed" className="mt-1" />
+                            <Label htmlFor="neural_speed" className="flex-1 cursor-pointer">
+                              <span className="font-medium text-white">Neural Speed</span>
+                              <span className="block text-sm text-gray-400 mt-1">
+                                Heavy, low-rep compound lifts to support power and efficiency without interfering with run training.
+                              </span>
+                              <span className="block text-xs text-gray-500 mt-2">
+                                • Squats, trap bar deadlifts, bench, rows
+                              </span>
+                              <span className="block text-xs text-gray-500">
+                                • Very low reps, very low volume, strict RIR
+                              </span>
+                              <span className="block text-xs mt-2 font-medium" style={{ color: getDisciplinePhosphorCore('strength'), opacity: 0.8 }}>
+                                Important: This is a neural efficiency approach, not a strength-building program. You will not add noticeable muscle mass. Strength numbers may increase slightly, but that is not the goal. The benefit ideally shows up in how easy fast paces feel, not in the gym.
+                              </span>
+                              <span className="block text-xs text-gray-500 mt-2">
+                                Tradeoff: Requires good technique/equipment. Bodyweight tier downgrades to maintenance.
+                              </span>
+                              <span className="block text-xs mt-2" style={{ color: runCore }}>
+                                Best for: Performance-oriented runners, speed work, want strength without soreness
+                              </span>
+                            </Label>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     
                     {/* Upper Aesthetics */}
-                    <div className={`p-4 rounded-xl border transition-colors ${
-                      state.strengthProtocol === 'upper_aesthetics' 
-                        ? `${getDisciplineBorderClass('run', '60')} bg-yellow-200/15` 
-                        : `${getDisciplineBorderClass('run', '30')} bg-black/40 hover:${getDisciplineBorderClass('run', '50')}`
-                    }`}>
-                      <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="upper_aesthetics" id="upper_aesthetics" className="mt-1" />
-                        <Label htmlFor="upper_aesthetics" className="flex-1 cursor-pointer">
-                          <span className="font-medium text-white">Upper Aesthetics</span>
-                          <span className="block text-sm text-gray-400 mt-1">
-                            Prioritizes upper-body strength while keeping lower-body work light so running performance stays the priority.
-                          </span>
-                          <span className="block text-xs text-gray-500 mt-2">
-                            • Higher-rep upper work with progressive overload
-                          </span>
-                          <span className="block text-xs text-gray-500">
-                            • Lower body kept light and supportive
-                          </span>
-                          <span className="block text-xs text-amber-400/80 mt-2 font-medium">
-                            Tradeoff: lower body is maintained, not pushed.
-                          </span>
-                          <span className={`block text-xs ${getDisciplineTextClassVariant('run', '400')} mt-2`}>
-                            Best for: Endurance athletes motivated by physique or upper-body weakness
-                          </span>
-                          {state.goal === 'speed' && state.strengthProtocol === 'upper_aesthetics' && (
-                            <span className="block text-xs text-blue-400/80 mt-2 italic">
-                              Note: This combination increases total weekly training load. Recommended for runners already training consistently.
-                            </span>
-                          )}
-                        </Label>
-                      </div>
-                    </div>
+                    {(() => {
+                      const isSelected = state.strengthProtocol === 'upper_aesthetics';
+                      const glowState: 'idle' | 'done' | 'active' = isSelected ? 'active' : 'idle';
+                      const glowStyle = getDisciplineGlowStyle('run', glowState);
+                      const runCore = getDisciplinePhosphorCore('run');
+                      return (
+                        <div className={`p-4 rounded-xl border border-white/10 transition-colors bg-black/40 ${isSelected ? 'bg-white/5' : ''}`} style={glowStyle}>
+                          <div className="flex items-start space-x-3">
+                            <RadioGroupItem value="upper_aesthetics" id="upper_aesthetics" className="mt-1" />
+                            <Label htmlFor="upper_aesthetics" className="flex-1 cursor-pointer">
+                              <span className="font-medium text-white">Upper Aesthetics</span>
+                              <span className="block text-sm text-gray-400 mt-1">
+                                Prioritizes upper-body strength while keeping lower-body work light so running performance stays the priority.
+                              </span>
+                              <span className="block text-xs text-gray-500 mt-2">
+                                • Higher-rep upper work with progressive overload
+                              </span>
+                              <span className="block text-xs text-gray-500">
+                                • Lower body kept light and supportive
+                              </span>
+                              <span className="block text-xs mt-2 font-medium" style={{ color: getDisciplinePhosphorCore('strength'), opacity: 0.8 }}>
+                                Tradeoff: lower body is maintained, not pushed.
+                              </span>
+                              <span className="block text-xs mt-2" style={{ color: runCore }}>
+                                Best for: Endurance athletes motivated by physique or upper-body weakness
+                              </span>
+                              {state.goal === 'speed' && state.strengthProtocol === 'upper_aesthetics' && (
+                                <span className="block text-xs text-blue-400/80 mt-2 italic">
+                                  Note: This combination increases total weekly training load. Recommended for runners already training consistently.
+                                </span>
+                              )}
+                            </Label>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </RadioGroup>
                 </div>
               )}
@@ -2681,34 +2705,46 @@ export default function PlanWizard() {
 
         {/* Content */}
         <div className="relative p-4 pb-32 max-w-lg mx-auto">
-          {/* Plan summary card with yellow accent */}
-          <div className={`mb-6 bg-black/40 backdrop-blur-xl border ${getDisciplineBorderClass('run', '30')} rounded-2xl p-5 relative overflow-hidden`}>
-            {/* Yellow glow behind card */}
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-200/20 rounded-full blur-2xl" />
-            <h2 className={`text-xl font-semibold mb-2 ${getDisciplineTextClassVariant('run', '400')} relative`}>{generatedPlan.name}</h2>
-            <p className="text-sm text-gray-300 mb-4 leading-relaxed relative">{generatedPlan.description}</p>
-            <div className="flex gap-4 text-sm relative">
-              <span className={`px-3 py-1 rounded-full ${getDisciplineBgClassVariant('run', '500')}/20 ${getDisciplineTextClassVariant('run', '400')} border ${getDisciplineBorderClass('run', '30')}`}>
-                {generatedPlan.duration_weeks} weeks
-              </span>
-              <span className="px-3 py-1 rounded-full bg-white/10 text-gray-300 border border-white/20">
-                Starts {new Date(state.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            </div>
-          </div>
+          {/* Plan summary card with phosphor glow */}
+          {(() => {
+            const phosphorPill = getDisciplinePhosphorPill('run', 'active');
+            return (
+              <div className={`mb-6 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-5 relative overflow-hidden`} style={phosphorPill.style}>
+                <h2 className="text-xl font-semibold mb-2 relative" style={{ color: getDisciplinePhosphorCore('run') }}>{generatedPlan.name}</h2>
+                <p className="text-sm text-white/90 mb-4 leading-relaxed relative">{generatedPlan.description}</p>
+                <div className="flex gap-4 text-sm relative">
+                  {(() => {
+                    const durationPill = getDisciplinePhosphorPill('run', 'idle');
+                    return (
+                      <span className={`px-3 py-1 rounded-full border border-white/10 ${durationPill.className}`} style={durationPill.style}>
+                        {generatedPlan.duration_weeks} weeks
+                      </span>
+                    );
+                  })()}
+                  <span className="px-3 py-1 rounded-full bg-white/10 text-white/80 border border-white/20">
+                    Starts {new Date(state.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Training info notes */}
-          {state.strengthFrequency > 0 && (
-            <div className="mb-6 p-4 bg-amber-500/10 backdrop-blur-sm rounded-xl border border-amber-500/20">
-              <p className="text-sm text-amber-200 leading-relaxed">
-                <span className="font-semibold text-amber-300">Strength Training:</span> Weights are calculated from your 1RM baselines using research-backed ratios. Each session has a target RIR (Reps In Reserve). Adjust weights up or down based on how your actual RIR compares to the target.
-              </p>
-            </div>
-          )}
+          {state.strengthFrequency > 0 && (() => {
+            const strengthGlow = getDisciplineGlowStyle('strength', 'idle');
+            const strengthCore = getDisciplinePhosphorCore('strength');
+            return (
+              <div className="mb-6 p-4 bg-black/40 backdrop-blur-sm rounded-xl border border-white/10" style={strengthGlow}>
+                <p className="text-sm leading-relaxed" style={{ color: strengthCore }}>
+                  <span className="font-semibold" style={{ color: strengthCore, opacity: 1 }}>Strength Training:</span> Weights are calculated from your 1RM baselines using research-backed ratios. Each session has a target RIR (Reps In Reserve). Adjust weights up or down based on how your actual RIR compares to the target.
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Week 1 preview */}
           <div className="mb-4">
-            <h3 className={`text-sm font-medium ${getDisciplineTextClassVariant('run', '400')}/80 mb-3 tracking-wide`}>WEEK 1 PREVIEW</h3>
+            <h3 className="text-sm font-medium mb-3 tracking-wide" style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.8 }}>WEEK 1 PREVIEW</h3>
             <div className="space-y-2">
               {(() => {
                 // Group sessions by day
@@ -2730,7 +2766,7 @@ export default function PlanWizard() {
                         : 'bg-black/40 backdrop-blur-md border border-white/10'
                     }`}>
                       <div className="flex gap-3">
-                        <span className={`text-xs font-semibold w-10 pt-1 ${isRest ? 'text-white/20' : getDisciplineTextClass('run')}`}>
+                        <span className={`text-xs font-semibold w-10 pt-1 ${isRest ? 'text-white/20' : ''}`} style={!isRest ? { color: getDisciplinePhosphorCore('run') } : undefined}>
                           {day.slice(0, 3)}
                         </span>
                         {isRest ? (
@@ -2744,8 +2780,8 @@ export default function PlanWizard() {
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2">
                                       {/* Color indicator */}
-                                      <div className={`w-1 h-4 rounded-full ${isRun ? 'bg-yellow-200' : 'bg-amber-500'}`} />
-                                      <span className={`font-medium text-sm ${isRun ? getDisciplineTextClassVariant('run', '400') : 'text-amber-300'}`}>
+                                      <div className="w-1 h-4 rounded-full" style={{ backgroundColor: isRun ? getDisciplinePhosphorCore('run') : getDisciplinePhosphorCore('strength') }} />
+                                      <span className="font-medium text-sm" style={{ color: isRun ? getDisciplinePhosphorCore('run') : getDisciplinePhosphorCore('strength') }}>
                                         {session.name}
                                       </span>
                                     </div>
@@ -2753,9 +2789,40 @@ export default function PlanWizard() {
                                       <p className="text-xs text-gray-400 mt-1 ml-3 leading-relaxed">{session.description}</p>
                                   )}
                                 </div>
-                                  <span className={`text-xs ml-2 px-2 py-0.5 rounded ${isRun ? `${getDisciplineBgClassVariant('run', '500')}/20 ${getDisciplineTextClassVariant('run', '400')}` : 'bg-amber-500/20 text-amber-400'}`}>
-                                    {session.duration}m
-                                  </span>
+                                  {(() => {
+                                    const durationPill = getDisciplinePhosphorPill(isRun ? 'run' : 'strength', 'idle');
+                                    // Simplify border color - just reduce opacity if it's an rgba string
+                                    let adjustedBorderColor = durationPill.style.borderColor;
+                                    if (typeof adjustedBorderColor === 'string' && adjustedBorderColor.includes('rgba')) {
+                                      // Simple approach: reduce opacity by 40% for mounted feel
+                                      const opacityPattern = new RegExp(',\\s*([\\d.]+)\\)');
+                                      const opacityMatch = adjustedBorderColor.match(opacityPattern);
+                                      if (opacityMatch) {
+                                        const currentOpacity = parseFloat(opacityMatch[1]);
+                                        const newOpacity = Math.max(0.12, currentOpacity * 0.6);
+                                        const replacePattern = new RegExp(',\\s*[\\d.]+\\)');
+                                        adjustedBorderColor = adjustedBorderColor.replace(replacePattern, `, ${newOpacity})`);
+                                      }
+                                    }
+                                    return (
+                                      <span 
+                                        className={`text-xs ml-2 px-2 py-0.5 ${durationPill.className}`} 
+                                        style={{
+                                          ...durationPill.style,
+                                          borderRadius: '8px', // Indicator plate: 8-10px (not pill-shaped)
+                                          // Inset stroke for mounted/cut-into-panel feel
+                                          boxShadow: durationPill.style.boxShadow 
+                                            ? `${durationPill.style.boxShadow}, 0 0 0 0.5px rgba(255, 255, 255, 0.08) inset`
+                                            : '0 0 0 0.5px rgba(255, 255, 255, 0.08) inset',
+                                          // Reduce outer border dominance
+                                          borderColor: adjustedBorderColor,
+                                          borderWidth: '0.5px',
+                                        }}
+                                      >
+                                        {session.duration}m
+                                      </span>
+                                    );
+                                  })()}
                               </div>
                               );
                             })}
@@ -2795,13 +2862,20 @@ export default function PlanWizard() {
             >
               Start Over
             </button>
-            <button
-              type="button"
-              onClick={handleAccept}
-              className={`px-6 py-2.5 rounded-full bg-yellow-300 border border-yellow-200/40 text-white font-medium hover:bg-yellow-200 transition-all shadow-lg shadow-yellow-200/20`}
-            >
-              Accept Plan
-            </button>
+            {(() => {
+              const acceptGlow = getDisciplineGlowStyle('run', 'active');
+              const runCore = getDisciplinePhosphorCore('run');
+              return (
+                <button
+                  type="button"
+                  onClick={handleAccept}
+                  className="px-6 py-2.5 rounded-full border border-white/10 bg-black/40 text-white font-medium hover:bg-white/5 transition-all"
+                  style={{ ...acceptGlow, color: runCore }}
+                >
+                  Accept Plan
+                </button>
+              );
+            })()}
           </div>
         </div>
       </div>

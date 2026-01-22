@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 // Planned workouts hook deprecated; unified server paths are the source of truth
 import { useAppContext } from '@/contexts/AppContext';
 import { getDisciplineColor } from '@/lib/utils';
-import { getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplinePillClasses } from '@/lib/context-utils';
+import { getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplinePillClasses, getDisciplinePhosphorPill } from '@/lib/context-utils';
 // PlannedWorkoutView is deprecated; unified view replaces it
 import WorkoutSummaryView from './WorkoutSummaryView';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
@@ -2096,9 +2096,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                           isSelected 
                             ? 'bg-white/[0.15] border-2 border-white/30 text-white font-medium' 
                             : isCurrent 
-                              ? `${getDisciplinePillClasses('run', false)}` 
+                              ? (() => {
+                                  const phosphor = getDisciplinePhosphorPill('run', 'idle');
+                                  return phosphor.className;
+                                })()
                               : 'bg-white/[0.05] border border-white/15 text-white/60 hover:bg-white/[0.08] hover:text-white/80'
                         }`}
+                        style={isCurrent && !isSelected ? getDisciplinePhosphorPill('run', 'idle').style : undefined}
                       >
                         {wn}
                         {isCurrent && !isSelected && (

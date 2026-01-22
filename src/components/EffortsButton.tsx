@@ -8,6 +8,7 @@ import { SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowColor } from '@/l
 interface EffortsWordmarkProps {
   size?: number;
   className?: string;
+  activeDisciplines?: string[]; // e.g., ['run', 'strength'] for today's active disciplines
 }
 
 /**
@@ -235,7 +236,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return shuffled;
 };
 
-export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkProps) {
+export function EffortsWordmark({ size = 48, className = "", activeDisciplines = [] }: EffortsWordmarkProps) {
   const uniqueId = React.useId().replace(/:/g, '');
   const fontFamily = "'Rajdhani', 'Orbitron', system-ui, sans-serif";
   const circleSize = size * 2.4; // larger circle for breathing room
@@ -317,19 +318,35 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
     5.5,    // swim blue - furthest (much more movement)
   ];
 
-  // VU meter pulse animation - subtle opacity variations
-  const [pulsePhase, setPulsePhase] = React.useState(0);
+  // Map layer indices to discipline types (based on shuffled order)
+  const getDisciplineForLayer = (layerIndex: number): string => {
+    // Layer 0 is white, layers 1-5 are colored disciplines
+    if (layerIndex === 0) return '';
+    return layerColors[layerIndex - 1];
+  };
+
+  // Scanning system animation - slow cycle through LED channels
+  const [scanPhase, setScanPhase] = React.useState(0);
   React.useEffect(() => {
     const interval = setInterval(() => {
-      setPulsePhase(prev => (prev + 0.1) % (Math.PI * 2));
-    }, 50); // 50ms updates for smooth animation
+      setScanPhase(prev => (prev + 0.02) % (Math.PI * 2)); // Slow scan - 2% per 50ms
+    }, 50);
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate opacity for each layer (VU meter effect - more pronounced heartbeat)
-  const getVUOpacity = (layerIndex: number) => {
-    const phase = pulsePhase + (layerIndex * 0.3); // Stagger each layer
-    return 0.7 + (Math.sin(phase) * 0.3); // Pulse between 0.7 and 1.0 (more visible)
+  // Calculate glow intensity for each layer (scanning system + active state)
+  const getLayerGlow = (layerIndex: number) => {
+    const discipline = getDisciplineForLayer(layerIndex);
+    const isActive = discipline && activeDisciplines.includes(discipline);
+    
+    // Scanning effect - wave that cycles through layers
+    const scanWave = Math.sin(scanPhase + (layerIndex * 0.8));
+    const scanIntensity = 0.3 + (scanWave * 0.2); // Base 0.3, pulse ±0.2
+    
+    // Active disciplines glow brighter
+    const activeBoost = isActive ? 0.4 : 0;
+    
+    return Math.min(1.0, scanIntensity + activeBoost);
   };
   
   return (
@@ -356,15 +373,25 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
             <stop offset="100%" stopColor={colorDefinitions[layerColors[3]]}/>
           </linearGradient>
           
-          <filter id={`ringGlow-${uniqueId}`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          
-          {/* Removed blur filter for clarity - each "e" should be sharp and distinct */}
+          {/* Glow filters for each LED channel "e" - stronger glow */}
+          {[0, 1, 2, 3, 4, 5].map((layerIndex) => {
+            const discipline = getDisciplineForLayer(layerIndex);
+            const isActive = discipline && activeDisciplines.includes(discipline);
+            const blurAmount = isActive ? 4 : 3; // Brighter blur for active
+            // Base opacity - scanning animation will be applied via text opacity
+            const baseOpacity = isActive ? 0.6 : 0.4;
+            
+            return (
+              <filter key={layerIndex} id={`eGlow-${uniqueId}-${layerIndex}`} x="-100%" y="-100%" width="300%" height="300%">
+                <feGaussianBlur stdDeviation={blurAmount} result="blur"/>
+                <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur" opacity={baseOpacity}/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            );
+          })}
         </defs>
         
         {/* Dark background inside circle - removed */}
@@ -381,13 +408,13 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           filter={`url(#ringGlow-${uniqueId})`}
         /> */}
         
-        {/* WHITE "e" - sharp, static */}
+        {/* Phosphor white "e" - sharp, static */}
         <text
           x={42}
           y={42}
           textAnchor="middle"
           dominantBaseline="central"
-          fill="#FFFFFF"
+          fill="rgba(255, 255, 255, 0.92)"
           fontSize={55}
           fontWeight={300}
           fontFamily={fontFamily}
@@ -397,95 +424,105 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           e
         </text>
         
-        {/* Layer 1 - shuffled color, vibrant, sharp, static */}
+        {/* Layer 1 - LED channel with glow and scanning */}
         <text
           x={58}
-          y={58}
+          y={56}
           textAnchor="middle"
           dominantBaseline="central"
           fill={colorDefinitions[layerColors[0]]}
           fontSize={38}
           fontWeight={300}
           fontFamily={fontFamily}
+          filter={`url(#eGlow-${uniqueId}-1)`}
+          opacity={getLayerGlow(1)}
           transform={`translate(${parallax.x * parallaxLayers[1]}, ${parallax.y * parallaxLayers[1]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Layer 2 - shuffled color, vibrant, sharp, static */}
+        {/* Layer 2 - LED channel with glow and scanning */}
         <text
           x={70}
-          y={70}
+          y={66}
           textAnchor="middle"
           dominantBaseline="central"
           fill={colorDefinitions[layerColors[1]]}
           fontSize={28}
           fontWeight={300}
           fontFamily={fontFamily}
+          filter={`url(#eGlow-${uniqueId}-2)`}
+          opacity={getLayerGlow(2)}
           transform={`translate(${parallax.x * parallaxLayers[2]}, ${parallax.y * parallaxLayers[2]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Layer 3 - shuffled color, sharp, static */}
+        {/* Layer 3 - LED channel with glow and scanning */}
         <text
           x={80}
-          y={80}
+          y={74}
           textAnchor="middle"
           dominantBaseline="central"
           fill={colorDefinitions[layerColors[2]]}
           fontSize={20}
           fontWeight={300}
           fontFamily={fontFamily}
+          filter={`url(#eGlow-${uniqueId}-3)`}
+          opacity={getLayerGlow(3)}
           transform={`translate(${parallax.x * parallaxLayers[3]}, ${parallax.y * parallaxLayers[3]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Layer 4 - shuffled color, vibrant, sharp, static */}
+        {/* Layer 4 - LED channel with glow and scanning */}
         <text
           x={88}
-          y={88}
+          y={80}
           textAnchor="middle"
           dominantBaseline="central"
           fill={colorDefinitions[layerColors[3]]}
           fontSize={14}
           fontWeight={300}
           fontFamily={fontFamily}
+          filter={`url(#eGlow-${uniqueId}-4)`}
+          opacity={getLayerGlow(4)}
           transform={`translate(${parallax.x * parallaxLayers[4]}, ${parallax.y * parallaxLayers[4]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>
 
-        {/* Layer 5, deepest - shuffled color, sharp, static */}
+        {/* Layer 5 - LED channel with glow and scanning */}
         <text
           x={95}
-          y={95}
+          y={85}
           textAnchor="middle"
           dominantBaseline="central"
           fill={colorDefinitions[layerColors[4]]}
           fontSize={10}
           fontWeight={300}
           fontFamily={fontFamily}
+          filter={`url(#eGlow-${uniqueId}-5)`}
+          opacity={getLayerGlow(5)}
           transform={`translate(${parallax.x * parallaxLayers[5]}, ${parallax.y * parallaxLayers[5]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
+          style={{ transition: 'transform 0.1s ease-out, opacity 0.1s ease-out' }}
         >
           e
         </text>
       </svg>
       
-      {/* "fforts" text - aligned with white e baseline */}
+      {/* "fforts" text - printed label with warm backlight */}
       <span
         style={{
           fontSize: size,
           fontWeight: 300,
           fontFamily,
           letterSpacing: '0.08em',
-          color: '#fff',
+          color: 'rgba(255, 255, 255, 0.92)', // Phosphor white (warm, not pure white)
           textTransform: 'lowercase',
           position: 'relative',
           zIndex: 3, // on top for bright ff
@@ -493,6 +530,8 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
           marginLeft: -size * 0.02,
           display: 'inline-block',
           lineHeight: 1, // tight line height for precise alignment
+          // Warm backlight - like printed label on hardware panel
+          textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.1)',
         }}
       >
         fforts

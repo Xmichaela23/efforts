@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { getDisciplineTailwindClass, formatWorkload } from '@/lib/context-utils';
+import { formatWorkload, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import type { SportBreakdown as SportBreakdownType } from '@/hooks/useTrainingContext';
 
 interface SportBreakdownProps {
@@ -48,11 +48,18 @@ export const SportBreakdown: React.FC<SportBreakdownProps> = ({ breakdown }) => 
   }
 
   return (
-    <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+    <div 
+      className="backdrop-blur-md rounded-lg p-4"
+      style={{
+        background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)',
+        border: '0.5px solid rgba(255, 255, 255, 0.08)',
+        boxShadow: '0 0 0 1px rgba(255,255,255,0.03) inset, 0 2px 8px rgba(0,0,0,0.3)',
+      }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className="text-sm font-medium text-white">Sport Breakdown</div>
-        <div className="text-sm text-white/60">Last 7 days</div>
+        <div className="text-sm font-medium" style={{ color: 'rgba(255, 255, 255, 0.92)' }}>Sport Breakdown</div>
+        <div className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>Last 7 days</div>
       </div>
       
       {/* Bars */}
@@ -60,28 +67,28 @@ export const SportBreakdown: React.FC<SportBreakdownProps> = ({ breakdown }) => 
         {activeSports.map(([sport, data]) => {
           const sportData = data as { workload: number; percent: number; sessions: number };
           const label = sportLabels[sport] || sport;
-          const colorClass = getDisciplineTailwindClass(sport);
+          const disciplineColor = getDisciplinePhosphorCore(sport);
           
           return (
             <div key={sport}>
               {/* Label row */}
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-white">{label}</span>
+                <span className="text-sm" style={{ color: disciplineColor }}>{label}</span>
                 <span className="text-xs text-white/60">
                   {formatWorkload(sportData.workload)} ({sportData.percent}%)
                 </span>
               </div>
               
               {/* Progress bar */}
-              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
                 <div 
-                  className={`h-full ${colorClass} rounded-full transition-all duration-300`}
-                  style={{ width: `${sportData.percent}%` }}
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{ width: `${sportData.percent}%`, backgroundColor: disciplineColor }}
                 />
               </div>
               
               {/* Sessions count */}
-              <div className="text-xs text-white/40 mt-0.5">
+              <div className="text-xs mt-0.5" style={{ color: 'rgba(255, 255, 255, 0.4)' }}>
                 {sportData.sessions} session{sportData.sessions !== 1 ? 's' : ''}
               </div>
             </div>
@@ -90,9 +97,9 @@ export const SportBreakdown: React.FC<SportBreakdownProps> = ({ breakdown }) => 
       </div>
 
       {/* Total */}
-      <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
-        <span className="text-sm text-white/60">Total Workload</span>
-        <span className="text-sm font-medium text-white">
+      <div className="mt-4 pt-3 flex items-center justify-between" style={{ borderTop: '0.5px solid rgba(255, 255, 255, 0.08)' }}>
+        <span className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>Total Workload</span>
+        <span className="text-sm font-medium" style={{ color: 'rgba(255, 255, 255, 0.92)' }}>
           {formatWorkload(breakdown.total_workload)}
         </span>
       </div>

@@ -4,6 +4,7 @@ import { normalizeStructuredSession } from '@/services/plans/normalizer';
 import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { getDisciplinePhosphorCore } from '@/lib/context-utils';
 
 type Baselines = NormalizerBaselines | Record<string, any> | null | undefined;
 
@@ -651,10 +652,13 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
     } catch { return []; }
   })();
   const stacked = String(lines).split(/\s•\s/g).filter(Boolean);
+  const workoutType = String(workout.type || workout.workout_type || '').toLowerCase();
+  const disciplineColor = getDisciplinePhosphorCore(workoutType);
+  
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="flex-1">
-        <div className="font-light tracking-normal text-base text-white flex items-center gap-2">
+        <div className="font-light tracking-normal text-base flex items-center gap-2" style={{ color: disciplineColor }}>
           <span>{title}</span>
           <span className="flex items-center gap-1">
             {(typeof minutes === 'number') ? (

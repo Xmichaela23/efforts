@@ -1,51 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Subtle synth texture overlay - 2% SVG noise filter */
-@layer base {
-  body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 9999;
-    opacity: 0.02;
-    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJub2lzZSI+PGZlVHVyYnVsZW5jZSBiYXNlRnJlcXVlbmN5PSIwLjkiIG51bU9jdGF2ZXM9IjQiIHJlc3VsdD0ibm9pc2UiLz48ZmVDb2xvck1hdHJpeCBpbi0ic291cmNlR3JhcGhpYyIgaW4yPSJub2lzZSIgdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNub2lzZSkiLz48L3N2Zz4=');
-    background-size: 200px 200px;
-    background-repeat: repeat;
-  }
-}
+/* No noise texture - clean, engineered feel */
+/* Removed noise overlay for "Cold-War human-performance operating system" aesthetic */
 
 @layer base {
   :root {
-    /* Dark grey background - not pure black */
-    --background: 0 0% 15%;
-    /* White text for contrast */
-    --foreground: 0 0% 98%;
-    /* Slightly lighter grey for cards - floating effect */
-    --card: 0 0% 20%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 20%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 15%;
-    --secondary: 0 0% 25%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 25%;
-    /* Lighter muted text for readability */
-    --muted-foreground: 0 0% 70%;
-    --accent: 0 0% 30%;
-    --accent-foreground: 0 0% 98%;
+    /* Dark steel panel background */
+    --background: 0 0% 8%;
+    /* Phosphor white for primary text (warm, not pure white) */
+    --foreground: 0 0% 92%;
+    /* Panel cards with depth */
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 92%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 92%;
+    --primary: 0 0% 92%;
+    --primary-foreground: 0 0% 8%;
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 92%;
+    --muted: 0 0% 18%;
+    /* Warm gray for secondary text (slightly warm, not flat gray) */
+    --muted-foreground: 0 0% 65%;
+    --accent: 0 0% 22%;
+    --accent-foreground: 0 0% 92%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 30%;
-    --input: 0 0% 25%;
-    --ring: 0 0% 50%;
+    --destructive-foreground: 0 0% 92%;
+    /* Softer borders - less visible */
+    --border: 0 0% 20%;
+    --input: 0 0% 15%;
+    --ring: 0 0% 40%;
     --radius: 1rem;
     /* Deterministic layout variables (universal for PWA + browser) */
     --header-h: 64px; /* matches h-16 */
@@ -58,10 +44,12 @@
     --series-hr: #ef4444;
     --series-cadence: #10b981;
     --series-elev-stroke: #9ca3af;
-    --surface: #262626;
-    --text-primary: #f5f5f5;
-    --text-secondary: #a3a3a3;
-    --grid-hairline: rgba(255,255,255,0.05);
+    --surface: #1a1a1a;
+    /* Phosphor white (warm, not pure white) */
+    --text-primary: #e8e8e8;
+    /* Warm gray for secondary text */
+    --text-secondary: #9a9a9a;
+    --grid-hairline: rgba(255,255,255,0.03);
 
     /* line widths */
     --lw-pace: 2px;
@@ -86,6 +74,100 @@
     --toggle-active-color: var(--text-primary);
     --toggle-inactive-color: #6b7280;
     --toggle-active-underline: 1px;
+
+    /* =============================================================================
+     * PHOSPHOR COLOR SYSTEM (1980s Instrument Indicators)
+     * =============================================================================
+     * Core colors: muted, desaturated phosphor hues (LED-like, not neon)
+     * Glow colors: same hue, used via alpha in multi-layer box-shadows
+     * 
+     * Meta rule: "Treat discipline colors like LEDs on a 1980s lab instrument
+     * — always softly on, brighter when active or completed, never flat, never neon."
+     */
+
+    /* Run (Yellow) - Phosphor amber-yellow LED */
+    --run-core: #CDBA52;
+    --run-glow-rgb: 205 186 82;
+    /* Future/Planned - Very faint, "powered but idle" - barely visible */
+    --run-glow-a1-idle: 0.02;
+    --run-glow-a2-idle: 0.01;
+    --run-glow-a3-idle: 0.005;
+    /* This Week (not done) - Medium glow - clearly visible */
+    --run-glow-a1-week: 0.15;
+    --run-glow-a2-week: 0.10;
+    --run-glow-a3-week: 0.06;
+    /* Completed - Medium-high glow - "latched" feel */
+    --run-glow-a1-done: 0.25;
+    --run-glow-a2-done: 0.18;
+    --run-glow-a3-done: 0.12;
+    /* Today - Strongest glow - "current signal" */
+    --run-glow-a1-active: 0.40;
+    --run-glow-a2-active: 0.28;
+    --run-glow-a3-active: 0.18;
+
+    /* Strength (Orange) - Phosphor orange LED */
+    --strength-core: #C98A4A;
+    --strength-glow-rgb: 201 138 74;
+    --strength-glow-a1-idle: 0.015;
+    --strength-glow-a2-idle: 0.008;
+    --strength-glow-a3-idle: 0.004;
+    --strength-glow-a1-week: 0.15;
+    --strength-glow-a2-week: 0.10;
+    --strength-glow-a3-week: 0.06;
+    --strength-glow-a1-done: 0.25;
+    --strength-glow-a2-done: 0.18;
+    --strength-glow-a3-done: 0.12;
+    --strength-glow-a1-active: 0.45;
+    --strength-glow-a2-active: 0.32;
+    --strength-glow-a3-active: 0.20;
+
+    /* Mobility (Purple) - Phosphor purple LED */
+    --mobility-core: #9A7AB8;
+    --mobility-glow-rgb: 154 122 184;
+    --mobility-glow-a1-idle: 0.015;
+    --mobility-glow-a2-idle: 0.008;
+    --mobility-glow-a3-idle: 0.004;
+    --mobility-glow-a1-week: 0.15;
+    --mobility-glow-a2-week: 0.10;
+    --mobility-glow-a3-week: 0.06;
+    --mobility-glow-a1-done: 0.25;
+    --mobility-glow-a2-done: 0.18;
+    --mobility-glow-a3-done: 0.12;
+    --mobility-glow-a1-active: 0.45;
+    --mobility-glow-a2-active: 0.32;
+    --mobility-glow-a3-active: 0.20;
+
+    /* Swim (Blue) - Phosphor blue LED */
+    --swim-core: #5A7FA8;
+    --swim-glow-rgb: 90 127 168;
+    --swim-glow-a1-idle: 0.015;
+    --swim-glow-a2-idle: 0.008;
+    --swim-glow-a3-idle: 0.004;
+    --swim-glow-a1-week: 0.15;
+    --swim-glow-a2-week: 0.10;
+    --swim-glow-a3-week: 0.06;
+    --swim-glow-a1-done: 0.25;
+    --swim-glow-a2-done: 0.18;
+    --swim-glow-a3-done: 0.12;
+    --swim-glow-a1-active: 0.45;
+    --swim-glow-a2-active: 0.32;
+    --swim-glow-a3-active: 0.20;
+
+    /* Bike (Green) - Phosphor green LED */
+    --bike-core: #6BA85A;
+    --bike-glow-rgb: 107 168 90;
+    --bike-glow-a1-idle: 0.02;
+    --bike-glow-a2-idle: 0.01;
+    --bike-glow-a3-idle: 0.005;
+    --bike-glow-a1-week: 0.15;
+    --bike-glow-a2-week: 0.10;
+    --bike-glow-a3-week: 0.06;
+    --bike-glow-a1-done: 0.25;
+    --bike-glow-a2-done: 0.18;
+    --bike-glow-a3-done: 0.12;
+    --bike-glow-a1-active: 0.40;
+    --bike-glow-a2-active: 0.28;
+    --bike-glow-a3-active: 0.18;
   }
 }
 
@@ -106,8 +188,8 @@
   
   body {
     @apply text-foreground;
-    font-family: 'Inter', sans-serif;
-    letter-spacing: 0.02em;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    letter-spacing: 0.01em;
     height: 100%;
     margin: 0;
     padding: 0;
@@ -116,15 +198,9 @@
     -webkit-overflow-scrolling: touch;
     /* Prevent white background on overscroll */
     overscroll-behavior: none;
-    /* Refined monochromatic gradient for sophisticated depth - strengthened for visibility */
-    background: linear-gradient(to bottom, #27272a, #18181b, #000000);
-    /* Enhanced gradient overlays for glassmorphism blur effect */
-    background-image: 
-      radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
-      radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
-      radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
-      linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+    /* Dark steel panel background - subtle gradient, no noise */
+    /* Very dark radial gradient: slightly lighter toward center, near-black toward edges */
+    background: radial-gradient(ellipse at center top, #0a0a0a 0%, #050505 40%, #000000 100%);
     background-attachment: fixed;
   }
   
@@ -135,8 +211,15 @@
   }
   
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Inter', sans-serif;
-    font-weight: 600;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 500;
+  }
+  
+  /* Tabular numerals for all numeric data - engineering precision */
+  [data-numeric],
+  .numeric,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -151,8 +234,8 @@
     height: 100vh;
     height: 100dvh;
     width: 100%;
-    /* Refined monochromatic gradient for sophisticated depth - strengthened for visibility */
-    background: linear-gradient(to bottom, #27272a, #18181b, #000000);
+    /* Dark steel panel background - subtle gradient, no noise */
+    background: radial-gradient(ellipse at center top, #0a0a0a 0%, #050505 40%, #000000 100%);
     overflow: hidden;
   }
   
