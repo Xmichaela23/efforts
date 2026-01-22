@@ -2114,7 +2114,7 @@ export default function PlanWizard() {
                   
                   {/* Show Effort Score and projected finish time for Performance goal */}
                   {state.effortScore && projectedFinishTime && (
-                    <div className={`p-4 bg-yellow-200/10 backdrop-blur-lg rounded-xl border-2 ${getDisciplineBorderClass('run', '30').replace('border-', 'border-2 border-').replace('/30', '/30')}">
+                    <div className="p-4 bg-yellow-200/10 backdrop-blur-lg rounded-xl border-2 border-yellow-200/30">
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className={getDisciplineTextClassVariant('run', '400')}>Effort Score:</span>
