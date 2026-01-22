@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
-import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass } from '@/lib/context-utils';
+import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineFocusRingClass, getDisciplineSelectedButtonClasses, getDisciplineUnselectedButtonClasses } from '@/lib/context-utils';
 import { useToast } from '@/components/ui/use-toast';
 import { MobileHeader } from './MobileHeader';
 import {
@@ -1851,7 +1851,7 @@ export default function PlanWizard() {
                     value={state.raceDate}
                     min={getMinRaceDate()}
                     onChange={(e) => handleRaceDateChange(e.target.value)}
-                    className="w-full p-3 bg-white/5 border border-teal-500/30 rounded-xl text-base text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className={`w-full p-3 bg-white/5 border ${getDisciplineBorderClass('run', '30')} rounded-xl text-base text-white focus:outline-none focus:ring-2 ${getDisciplineFocusRingClass('run')} focus:${getDisciplineBorderClass('run', '50').replace('border-', 'border-')}`}
                   />
                   <div className="space-y-2">
                     {/* Show marathon suggestions if any match */}
@@ -1869,8 +1869,8 @@ export default function PlanWizard() {
                                   onClick={() => setState(prev => ({ ...prev, raceName: marathon.name }))}
                                   className={`px-4 py-2 rounded-full border text-sm transition-colors ${
                                     state.raceName === marathon.name
-                                      ? 'bg-teal-500/20 border-teal-400 text-teal-300 font-medium'
-                                      : 'border-teal-500/40 text-gray-300 hover:border-teal-400 hover:text-teal-300'
+                                      ? getDisciplineSelectedButtonClasses('run')
+                                      : getDisciplineUnselectedButtonClasses('run')
                                   }`}
                                 >
                                   {marathon.name}
@@ -1882,8 +1882,8 @@ export default function PlanWizard() {
                                 onClick={() => setState(prev => ({ ...prev, raceName: '' }))}
                                 className={`px-4 py-2 rounded-full border text-sm transition-colors ${
                                   state.raceName && !matches.some(m => m.marathon.name === state.raceName)
-                                    ? 'bg-teal-500/20 border-teal-400 text-teal-300 font-medium'
-                                    : 'border-teal-500/40 text-gray-300 hover:border-teal-400 hover:text-teal-300'
+                                    ? getDisciplineSelectedButtonClasses('run')
+                                    : getDisciplineUnselectedButtonClasses('run')
                                 }`}
                               >
                                 Other
@@ -1942,13 +1942,13 @@ export default function PlanWizard() {
                           const weeks = Math.max(4, Math.min(24, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))));
                           setState(prev => ({ ...prev, startDate: newStart, duration: weeks }));
                         }}
-                        className="w-full p-3 bg-white/5 border border-teal-500/30 rounded-xl text-base text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className={`w-full p-3 bg-white/5 border ${getDisciplineBorderClass('run', '30')} rounded-xl text-base text-white focus:outline-none focus:ring-2 ${getDisciplineFocusRingClass('run')} focus:${getDisciplineBorderClass('run', '50').replace('border-', 'border-')}`}
                       />
                       {/* Plan duration summary - only show if valid dates */}
                       {state.startDate && state.raceDate && !isNaN(state.duration) && (
-                        <div className="p-4 bg-teal-500/10 rounded-xl border border-teal-500/30">
-                          <p className="text-sm text-teal-300 font-medium">{state.duration} week plan</p>
-                          <p className="text-xs text-teal-400/80 mt-1">
+                        <div className={`p-4 bg-yellow-200/10 rounded-xl border ${getDisciplineBorderClass('run', '30')}`}>
+                          <p className={`text-sm ${getDisciplineTextClassVariant('run', '400')} font-medium`}>{state.duration} week plan</p>
+                          <p className={`text-xs ${getDisciplineTextClassVariant('run', '400')}/80 mt-1`}>
                             {(() => {
                               const startDate = new Date(state.startDate + 'T00:00:00');
                               const raceDate = new Date(state.raceDate + 'T00:00:00');
@@ -2484,8 +2484,8 @@ export default function PlanWizard() {
             
             {/* Show detailed weekly structure based on strength + running selection */}
             {state.daysPerWeek && (
-              <div className="mt-4 p-4 bg-black/40 backdrop-blur-sm rounded-xl border border-teal-500/30 space-y-2">
-                <p className="text-sm font-medium text-teal-300">Your typical week:</p>
+              <div className={`mt-4 p-4 bg-black/40 backdrop-blur-sm rounded-xl border ${getDisciplineBorderClass('run', '30')} space-y-2`}>
+                <p className={`text-sm font-medium ${getDisciplineTextClassVariant('run', '400')}`}>Your typical week:</p>
                 {(() => {
                   const runDays = state.daysPerWeek === '3-4' ? 4 : state.daysPerWeek === '4-5' ? 5 : 6; // 5-6 and 6-7 both cap at 6
                   const strengthDays = state.strengthFrequency;
@@ -2564,7 +2564,7 @@ export default function PlanWizard() {
                       {dayLines.map((line, i) => (
                         <p key={i}>{line}</p>
                       ))}
-                      <p className="text-teal-400/80 mt-2 pt-2 border-t border-teal-500/20">
+                      <p className={`${getDisciplineTextClassVariant('run', '400')}/80 mt-2 pt-2 border-t ${getDisciplineBorderClass('run', '30')}`}>
                         {runDays} running days • {strengthDays > 0 ? `${doubleDays} doubles` : 'No strength'}
                       </p>
                     </div>

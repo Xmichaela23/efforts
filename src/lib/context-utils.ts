@@ -243,6 +243,57 @@ export function getDisciplineBgClassVariant(type: string, variant: '500' | '600'
 }
 
 /**
+ * Get focus ring class for inputs (e.g., focus:ring-yellow-200/50)
+ */
+export function getDisciplineFocusRingClass(type: string): string {
+  const colorName = getDisciplineTailwindColorName(type);
+  const classMap: Record<string, string> = {
+    yellow: 'focus:ring-yellow-200/50',
+    teal: 'focus:ring-teal-500/50',
+    green: 'focus:ring-green-500/50',
+    blue: 'focus:ring-blue-500/50',
+    orange: 'focus:ring-orange-500/50',
+    purple: 'focus:ring-purple-500/50',
+    gray: 'focus:ring-gray-500/50',
+  };
+  return classMap[colorName] || classMap.gray;
+}
+
+/**
+ * Get selected button classes for race/plan selection
+ */
+export function getDisciplineSelectedButtonClasses(type: string): string {
+  const colorName = getDisciplineTailwindColorName(type);
+  const classMap: Record<string, string> = {
+    yellow: 'bg-yellow-200/20 border-yellow-200/60 text-yellow-200 font-medium',
+    teal: 'bg-teal-500/20 border-teal-400 text-teal-300 font-medium',
+    green: 'bg-green-500/20 border-green-400 text-green-300 font-medium',
+    blue: 'bg-blue-500/20 border-blue-400 text-blue-300 font-medium',
+    orange: 'bg-orange-500/20 border-orange-400 text-orange-300 font-medium',
+    purple: 'bg-purple-500/20 border-purple-400 text-purple-300 font-medium',
+    gray: 'bg-gray-500/20 border-gray-400 text-gray-300 font-medium',
+  };
+  return classMap[colorName] || classMap.gray;
+}
+
+/**
+ * Get unselected button classes with hover
+ */
+export function getDisciplineUnselectedButtonClasses(type: string): string {
+  const colorName = getDisciplineTailwindColorName(type);
+  const classMap: Record<string, string> = {
+    yellow: `border-yellow-200/40 text-gray-300 hover:border-yellow-200/60 hover:text-yellow-200`,
+    teal: 'border-teal-500/40 text-gray-300 hover:border-teal-400 hover:text-teal-300',
+    green: 'border-green-500/40 text-gray-300 hover:border-green-400 hover:text-green-300',
+    blue: 'border-blue-500/40 text-gray-300 hover:border-blue-400 hover:text-blue-300',
+    orange: 'border-orange-500/40 text-gray-300 hover:border-orange-400 hover:text-orange-300',
+    purple: 'border-purple-500/40 text-gray-300 hover:border-purple-400 hover:text-purple-300',
+    gray: 'border-gray-500/40 text-gray-300 hover:border-gray-400 hover:text-gray-300',
+  };
+  return classMap[colorName] || classMap.gray;
+}
+
+/**
  * Get RGBA color string for glow effects (e.g., "rgba(20, 184, 166, 0.8)")
  */
 export function getDisciplineGlowColor(type: string, opacity: number = 0.8): string {
