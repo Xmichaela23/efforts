@@ -1637,10 +1637,15 @@ Deno.serve(async (req) => {
               const elapsedMin = Number((w as any)?.elapsed_time);
               if (Number.isFinite(elapsedMin) && elapsedMin > 0) elapsedDur = Math.round(elapsedMin * 60);
             }
+            // ✅ FIX: Sanity check for duration_s_moving - if prevOverall value is suspiciously small (< 60 seconds),
+            // it might be in minutes, so prefer the recalculated dur value
+            const prevDurationMoving = prevOverall?.duration_s_moving;
+            const safeDurationMoving = dur || (prevDurationMoving && prevDurationMoving >= 60 ? prevDurationMoving : null);
+            
             return {
               ...(prevOverall||{}),
               distance_m: dist || prevOverall?.distance_m || 0,
-              duration_s_moving: dur || prevOverall?.duration_s_moving || null,
+              duration_s_moving: safeDurationMoving,
               duration_s_elapsed: elapsedDur || prevOverall?.duration_s_elapsed || null,
             };
           }

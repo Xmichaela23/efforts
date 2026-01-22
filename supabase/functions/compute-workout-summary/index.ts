@@ -1822,7 +1822,9 @@ Deno.serve(async (req) => {
         }
       })();
       const prevDurationMoving = Number(prevComputed?.overall?.duration_s_moving);
-      if (Number.isFinite(prevDurationMoving) && prevDurationMoving > 0) {
+      // ✅ FIX: Sanity check - if duration is suspiciously small (< 60 seconds), it might be in minutes
+      // Recalculate from moving_time to ensure correct value
+      if (Number.isFinite(prevDurationMoving) && prevDurationMoving > 0 && prevDurationMoving >= 60) {
         overallSec = Math.round(prevDurationMoving);
       }
       // Priority 2: Use moving_time field (in minutes, convert to seconds)

@@ -47,8 +47,18 @@ export function generateIntervalBreakdown(
     if (intervalsToAnalyze.length === 1 && overallMovingTimeS && overallDistanceM && overallDistanceM > 0) {
       const miles = overallDistanceM / 1609.34;
       if (miles > 0) {
-        actualPace = overallMovingTimeS / miles; // seconds per mile
-        console.log(`🔍 [PACE RECALC] Steady-state: using overall moving_time=${overallMovingTimeS}s, distance=${overallDistanceM}m, pace=${actualPace.toFixed(0)}s/mi (${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi) [was: ${interval.executed?.avg_pace_s_per_mi || 'N/A'}s/mi]`);
+        // ✅ FIX: Sanity check - if overallMovingTimeS is suspiciously small (< 60), it might be in minutes
+        // Recalculate from rawWorkoutData.moving_time if available
+        let safeMovingTimeS = overallMovingTimeS;
+        if (overallMovingTimeS < 60 && rawWorkoutData?.moving_time) {
+          const mvMin = Number(rawWorkoutData.moving_time);
+          if (Number.isFinite(mvMin) && mvMin > 0) {
+            safeMovingTimeS = Math.round(mvMin * 60);
+            console.log(`⚠️ [PACE FIX] Detected suspicious duration_s_moving=${overallMovingTimeS}s, recalculating from moving_time=${mvMin}min → ${safeMovingTimeS}s`);
+          }
+        }
+        actualPace = safeMovingTimeS / miles; // seconds per mile
+        console.log(`🔍 [PACE RECALC] Steady-state: using overall moving_time=${safeMovingTimeS}s, distance=${overallDistanceM}m, pace=${actualPace.toFixed(0)}s/mi (${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi) [was: ${interval.executed?.avg_pace_s_per_mi || 'N/A'}s/mi]`);
       }
     } else if (sensorData && interval.sample_idx_start !== undefined && interval.sample_idx_end !== undefined && intervalDistanceM > 0) {
       // For interval workouts, calculate moving time from sensor samples
