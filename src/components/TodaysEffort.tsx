@@ -1309,49 +1309,83 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
           <DrawerFooter className="border-t border-white/10 pt-4">
             <div className="flex flex-col gap-3 w-full">
-              {/* Start on Phone - Primary action for run/ride */}
-              {selectedPlannedWorkout && isPhoneExecutable(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (() => {
-                const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
-                const isRun = ['run', 'running', 'walk'].includes(workoutType);
-                const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
-                const sportColor = isRun ? SPORT_COLORS.run : (isRide ? SPORT_COLORS.ride : SPORT_COLORS.run); // default to run color
-                const rgb = getDisciplineColorRgb(isRun ? 'run' : (isRide ? 'ride' : 'run'));
+              {/* Top row: Start on Phone and Send to Garmin - side by side with yellow outlines */}
+              <div className="flex gap-2 w-full">
+                {selectedPlannedWorkout && isPhoneExecutable(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (() => {
+                  const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
+                  const isRun = ['run', 'running', 'walk'].includes(workoutType);
+                  const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
+                  const sportColor = isRun ? SPORT_COLORS.run : (isRide ? SPORT_COLORS.ride : SPORT_COLORS.run); // default to run color
+                  const rgb = getDisciplineColorRgb(isRun ? 'run' : (isRide ? 'ride' : 'run'));
+                  
+                  return (
+                    <button
+                      className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white"
+                      style={{
+                        backgroundColor: 'transparent',
+                        borderColor: sportColor,
+                        borderWidth: '2px',
+                        borderStyle: 'solid',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.15)`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={() => {
+                        setExecutingWorkout(selectedPlannedWorkout);
+                        setSelectedPlannedWorkout(null);
+                      }}
+                    >
+                      Start on Phone
+                    </button>
+                  );
+                })()}
                 
-                return (
-                  <button
-                    className={`w-full px-4 py-3 rounded-xl text-white text-sm font-light tracking-wide transition-all shadow-lg`}
-                    style={{
-                      backgroundColor: sportColor,
-                      borderColor: `rgba(${rgb}, 0.8)`,
-                      boxShadow: `0 0 0 1px rgba(${rgb}, 0.2) inset, 0 4px 12px rgba(${rgb}, 0.2)`,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.9)`;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = sportColor;
-                    }}
-                    onClick={() => {
-                      setExecutingWorkout(selectedPlannedWorkout);
-                      setSelectedPlannedWorkout(null);
-                    }}
-                  >
-                    📱 Start on Phone
-                  </button>
-                );
-              })()}
+                {selectedPlannedWorkout && isEnduranceType(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (() => {
+                  const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
+                  const isRun = ['run', 'running', 'walk'].includes(workoutType);
+                  const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
+                  const sportColor = isRun ? SPORT_COLORS.run : (isRide ? SPORT_COLORS.ride : SPORT_COLORS.run); // default to run color
+                  const rgb = getDisciplineColorRgb(isRun ? 'run' : (isRide ? 'ride' : 'run'));
+                  
+                  return (
+                    <button
+                      className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white"
+                      style={{
+                        backgroundColor: 'transparent',
+                        borderColor: sportColor,
+                        borderWidth: '2px',
+                        borderStyle: 'solid',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.15)`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={(e) => {
+                        handleSendToGarmin(e, selectedPlannedWorkout);
+                      }}
+                    >
+                      {sendingToGarmin === selectedPlannedWorkout?.id ? 'Sending...' : 'Send to Garmin'}
+                    </button>
+                  );
+                })()}
+              </div>
               
               {/* Bottom row: Mark as Complete and Close - evenly spaced */}
               <div className="flex gap-2 w-full">
                 <button
-                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-sm font-light tracking-wide hover:bg-white/[0.12] transition-all"
+                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white font-medium tracking-wide hover:bg-white/[0.12] transition-all"
                   onClick={() => selectedPlannedWorkout && handleMarkComplete(selectedPlannedWorkout)}
                   disabled={markingComplete}
                 >
-                  {markingComplete ? 'Marking...' : '✓ Mark as Complete'}
+                  {markingComplete ? 'Marking...' : 'Mark as Complete'}
                 </button>
                 <button
-                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/20 text-white/70 text-sm font-light tracking-wide hover:bg-white/[0.08] hover:text-white transition-all"
+                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/20 text-white font-medium tracking-wide hover:bg-white/[0.08] transition-all"
                   onClick={() => setSelectedPlannedWorkout(null)}
                 >
                   Close
