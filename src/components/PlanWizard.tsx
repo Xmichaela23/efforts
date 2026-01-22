@@ -1552,7 +1552,7 @@ export default function PlanWizard() {
                             </div>
                           </div>
                         )}
-                        <p className="mt-4 text-xs text-teal-400/80">
+                        <p className={`mt-4 text-xs ${getDisciplineTextClassVariant('run', '400')}/80`}>
                         {state.effortPacesSource === 'manual' 
                           ? 'Using your custom paces.' 
                           : state.effortRaceRecency && state.effortRaceRecency !== 'recent'
@@ -1620,21 +1620,21 @@ export default function PlanWizard() {
                         <p className="text-lg font-semibold text-white">
                         Effort Score: {state.effortScore}
                       </p>
-                        <p className="text-xs text-teal-300 mt-1 mb-4">
+                        <p className={`text-xs ${getDisciplineTextClassVariant('run', '400')} mt-1 mb-4`}>
                         Calculated from your 5K time. Your easy pace is used as-is.
                       </p>
                         <div className="text-sm space-y-3">
                         <div className="flex items-center justify-between">
                             <span className="text-gray-400">Base pace:</span>
-                            <span className="font-mono text-teal-200">{formatPace(state.effortPaces.base)}/mi</span>
+                            <span className={`font-mono ${getDisciplineTextClassVariant('run', '400')}`}>{formatPace(state.effortPaces.base)}/mi</span>
                         </div>
                         <div className="flex items-center justify-between">
-                            <span className="text-gray-400">Race pace <span className="text-xs text-teal-400/60">(marathon)</span>:</span>
-                            <span className="font-mono font-semibold text-teal-200">{formatPace(state.effortPaces.race)}/mi</span>
+                            <span className="text-gray-400">Race pace <span className={`text-xs ${getDisciplineTextClassVariant('run', '400')}/60`}>(marathon)</span>:</span>
+                            <span className={`font-mono font-semibold ${getDisciplineTextClassVariant('run', '400')}`}>{formatPace(state.effortPaces.race)}/mi</span>
                         </div>
                         <div className="flex items-center justify-between">
-                            <span className="text-gray-400">Steady pace <span className="text-xs text-teal-400/60">(threshold)</span>:</span>
-                            <span className="font-mono text-teal-200">{formatPace(state.effortPaces.steady)}/mi</span>
+                            <span className="text-gray-400">Steady pace <span className={`text-xs ${getDisciplineTextClassVariant('run', '400')}/60`}>(threshold)</span>:</span>
+                            <span className={`font-mono ${getDisciplineTextClassVariant('run', '400')}`}>{formatPace(state.effortPaces.steady)}/mi</span>
                           </div>
                         </div>
                         {/* Estimated Marathon Time */}
