@@ -244,13 +244,14 @@ export function EffortsWordmark({ size = 48, className = "" }: EffortsWordmarkPr
   // Parallax state
   const [parallax, setParallax] = React.useState({ x: 0, y: 0 });
   
-  // Discipline colors for gradient ring - vibrant, distinct colors
+  // Discipline colors for gradient ring - use centralized color system
+  // This ensures the wordmark automatically updates when colors change
   const colorDefinitions = {
-    run: '#00FFC8',      // Bright cyan/teal
-    strength: '#FF8C00', // Bright orange
-    ride: '#22c55e',     // Green (keep as is)
-    pilates: '#B464FF',  // Bright purple
-    swim: '#2B5A8C',     // Deep blue (keep as is)
+    run: SPORT_COLORS.run,           // Yellow (very light yellow)
+    strength: SPORT_COLORS.strength,  // Orange
+    ride: SPORT_COLORS.ride,         // Green
+    pilates: SPORT_COLORS.pilates_yoga, // Purple
+    swim: SPORT_COLORS.swim,         // Blue
   };
 
   // Shuffle color order once on component mount (app launch)
