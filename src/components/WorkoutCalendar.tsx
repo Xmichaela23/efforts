@@ -769,7 +769,8 @@ export default function WorkoutCalendar({
 
   return (
     <div
-      className="w-full max-w-md mx-auto flex flex-col h-full touch-pan-y bg-transparent"
+      className="w-full max-w-md mx-auto flex flex-col touch-pan-y bg-transparent"
+      style={{ height: '100%', maxHeight: 'calc(var(--cal-cell-h) * 3 + 8px)' }}
       onTouchStart={(e) => {
         const t = e.changedTouches[0];
         setTouchStartX(t.clientX);
@@ -809,8 +810,15 @@ export default function WorkoutCalendar({
         }
       }}
     >
-      {/* 3-column week grid filling remaining height with min cell size */}
-      <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full flex-1 relative" style={{ rowGap: '2px', columnGap: '2px', alignContent: 'stretch', alignItems: 'stretch' }}>
+      {/* 3-column week grid - compact height to emphasize Today */}
+      <div className="mobile-calendar grid grid-cols-3 grid-rows-3 w-full relative" style={{ 
+        rowGap: '2px', 
+        columnGap: '2px', 
+        alignContent: 'stretch', 
+        alignItems: 'stretch',
+        maxHeight: 'calc(var(--cal-cell-h) * 3 + 4px)', // 3 rows + gaps
+        flexShrink: 0, // Don't grow, stay compact
+      }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -1014,21 +1022,23 @@ export default function WorkoutCalendar({
               style={{
                 borderRadius: '14px', // Day tile radius: 14-16px for hierarchy
                 boxShadow: '0 0 0 1px rgba(255,255,255,0.05) inset, 0 2px 8px rgba(0,0,0,0.3)',
+                // Last cell (Total Workload) needs more height to show all disciplines
+                minHeight: isLastCell ? 'calc(var(--cal-cell-h) * 1.5)' : 'var(--cal-cell-h)',
               }}
             >
               {/* Weekly context and workload spans the last two cells */}
               {isLastCell && (
-                <div className="space-y-2">
-                  {/* Total Workload with counts - physical panel */}
+                <div className="space-y-1.5 w-full" style={{ fontSize: '0.7rem', paddingBottom: '0.5rem' }}>
+                  {/* Total Workload with counts - compact physical panel */}
                   <div 
-                    className="flex items-center gap-2 p-2 rounded-lg"
+                    className="flex items-center gap-1.5 px-1.5 py-1 rounded-lg flex-wrap"
                     style={{
                       background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)',
                       border: '0.5px solid rgba(255, 255, 255, 0.08)',
                       boxShadow: '0 0 0 1px rgba(255,255,255,0.03) inset, 0 2px 8px rgba(0,0,0,0.3)',
                     }}
                   >
-                    <span className="text-sm font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Total Workload</span>
+                    <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Total Workload</span>
                     <Popover open={workloadTooltipOpen} onOpenChange={setWorkloadTooltipOpen}>
                       <PopoverTrigger asChild>
                         <button 
@@ -1040,7 +1050,7 @@ export default function WorkoutCalendar({
                             setWorkloadTooltipOpen(!workloadTooltipOpen);
                           }}
                         >
-                          <Info className="w-3.5 h-3.5 cursor-pointer" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                          <Info className="w-3 h-3 cursor-pointer" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
                         </button>
                       </PopoverTrigger>
                       <PopoverContent side="top" className="max-w-xs p-4" sideOffset={8}>
@@ -1071,17 +1081,17 @@ export default function WorkoutCalendar({
                         </div>
                       </PopoverContent>
                     </Popover>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
-                      <span className="text-sm tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.planned}</span>
+                    <div className="flex items-center gap-0.5">
+                      <Calendar className="w-2.5 h-2.5" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                      <span className="text-xs tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.planned}</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
-                      <span className="text-sm tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.completed}</span>
+                    <div className="flex items-center gap-0.5">
+                      <CheckCircle className="w-2.5 h-2.5" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                      <span className="text-xs tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.completed}</span>
                     </div>
                   </div>
                   
-                  {/* All Metrics - grouped together */}
+                  {/* All Metrics - compact, grouped together */}
                   {(() => {
                     // Collect all metrics in one array
                     const metrics: Array<{ label: string; value: string }> = [];
@@ -1207,7 +1217,7 @@ export default function WorkoutCalendar({
                     
                     if (metrics.length > 0) {
                       return (
-                        <div className="space-y-1.5 pt-2">
+                        <div className="space-y-0.5 pt-1">
                           {metrics.map((metric, index) => {
                             // Determine discipline type from label for color
                             const labelLower = String(metric.label || '').toLowerCase();
@@ -1221,12 +1231,15 @@ export default function WorkoutCalendar({
                             const labelColor = disciplineType ? getDisciplinePhosphorCore(disciplineType) : 'rgba(255, 255, 255, 0.9)';
                             
                             return (
-                              <div key={index} className="flex items-center justify-between text-xs">
-                                <span style={{ color: labelColor }}>{metric.label}</span>
+                              <div key={index} className="flex items-center justify-between gap-1">
+                                <span className="text-xs font-light leading-tight" style={{ color: labelColor, fontSize: '0.7rem' }}>
+                                  {metric.label}
+                                </span>
                                 <span 
-                                  className="font-light tracking-normal tabular-nums"
+                                  className="text-xs font-light tabular-nums leading-tight"
                                   style={{
-                                    color: 'rgba(255, 255, 255, 0.85)'
+                                    color: 'rgba(255, 255, 255, 0.85)',
+                                    fontSize: '0.7rem'
                                   }}
                                 >
                                   {metric.value}

@@ -11,8 +11,8 @@ function applyRuntimeLayoutOverrides() {
       const style = document.createElement('style');
       style.id = styleId;
       style.textContent = `
-      /* Pre-seed final targets to avoid first-paint jump */
-      :root { --todays-h: 14rem; --cal-cell-h: 150px; }
+      /* Pre-seed final targets to avoid first-paint jump - compact height for emphasis on Today */
+      :root { --todays-h: 14rem; --cal-cell-h: 100px; }
       .mobile-tabbar {
         padding-top: 8px !important;
         padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px) !important;
@@ -53,8 +53,8 @@ function fitLayout() {
 
     remaining -= (padTop + padBottom + borderTop + borderBottom + gap + 2);
 
-    // Apply directly to cells to bypass any CSS fallback
-    const desiredCell = Math.max(118, Math.min(remaining, 150));
+    // Apply directly to cells to bypass any CSS fallback - compact height for emphasis on Today
+    const desiredCell = Math.max(80, Math.min(remaining / 2.5, 100)); // Compact size, not full height
     document.documentElement.style.setProperty('--cal-cell-h', `${desiredCell}px`);
     const cells = document.querySelectorAll('.mobile-calendar-cell') as NodeListOf<HTMLElement>;
     cells.forEach((el) => {
@@ -76,10 +76,10 @@ function alignFrameLine() {
     const tabTop = tabbar.getBoundingClientRect().top;
     const availableHeight = tabTop - gridRect.top - 4; // 4px cushion
     
-    // 3 rows in the grid
-    const cellHeight = Math.floor(availableHeight / 3);
-    // No min/max constraints - fill the space exactly
-    const finalHeight = Math.max(100, cellHeight);
+    // 3 rows in the grid - compact height for emphasis on Today
+    const cellHeight = Math.floor(availableHeight / 3.5); // Compact, not full height
+    // Minimum height constraint for readability
+    const finalHeight = Math.max(80, Math.min(cellHeight, 100)); // Cap at 100px
     
     document.documentElement.style.setProperty('--cal-cell-h', `${finalHeight}px`);
     cells.forEach((el) => { 

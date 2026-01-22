@@ -37,7 +37,7 @@
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
     --todays-h: 14rem; /* balanced height */
-    --cal-cell-h: 150px; /* original size */
+    --cal-cell-h: 100px; /* compact height for ghosted timeline - emphasis on Today */
     /* Analytics tokens (mobile, minimal) */
     --series-pace: #3b82f6;
     --series-gap: #6366f1;
@@ -382,21 +382,21 @@
   @media (max-height: 740px) {
     :root {
       --todays-h: 10rem;
-      --cal-cell-h: 10.25rem;
+      --cal-cell-h: 70px; /* compact */
     }
   }
 
   @media (max-height: 670px) {
     :root {
       --todays-h: 8rem;
-      --cal-cell-h: 9.75rem;
+      --cal-cell-h: 65px; /* compact */
     }
   }
 
   @media (min-height: 900px) {
     :root {
       --todays-h: 16rem;
-      --cal-cell-h: 12rem;
+      --cal-cell-h: 110px; /* compact */
     }
   }
   
@@ -434,11 +434,11 @@
 /* Make PWA and browser blocks match the universal values to avoid divergence */
 @media (display-mode: standalone) {
   .mobile-tabbar { padding-top: 8px; padding-bottom: env(safe-area-inset-bottom); height: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); }
-  :root { --todays-h: 14rem; --cal-cell-h: 150px; }
+  :root { --todays-h: 14rem; --cal-cell-h: 100px; }
 }
 
 @media not all and (display-mode: standalone) {
-  :root { --todays-h: 14rem; --cal-cell-h: 150px; }
+  :root { --todays-h: 14rem; --cal-cell-h: 100px; }
 }
 
 /* iOS WebView backdrop-filter support */

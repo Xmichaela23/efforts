@@ -18,6 +18,82 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, Dr
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { isWatchConnectivityAvailable, sendWorkoutToWatch, convertToWatchWorkout } from '@/services/watchConnectivity';
 
+// Component for expandable workout cards with fixed height
+const WorkoutCardExpandable: React.FC<{
+  workout: any;
+  workoutType: string;
+  baselines: any;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  getDisciplinePhosphorCore: (type: string) => string;
+}> = ({ workout, workoutType, baselines, isExpanded, onToggleExpand, getDisciplinePhosphorCore }) => {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [needsExpansion, setNeedsExpansion] = useState(false);
+  
+  // Check if content exceeds fixed height
+  useEffect(() => {
+    if (contentRef.current && !isExpanded) {
+      // Use a small delay to ensure content is rendered
+      setTimeout(() => {
+        if (contentRef.current) {
+          const scrollHeight = contentRef.current.scrollHeight;
+          const clientHeight = contentRef.current.clientHeight;
+          setNeedsExpansion(scrollHeight > clientHeight + 5); // 5px tolerance
+        }
+      }, 100);
+    } else {
+      setNeedsExpansion(false);
+    }
+  }, [isExpanded, workout]);
+  
+  return (
+    <div className="space-y-1">
+      <div
+        ref={contentRef}
+        style={{
+          maxHeight: isExpanded ? 'none' : '120px', // Fixed height when collapsed
+          overflow: isExpanded ? 'visible' : 'hidden',
+          position: 'relative',
+          transition: 'max-height 0.3s ease-out',
+        }}
+      >
+        <PlannedWorkoutSummary workout={workout} baselines={baselines} hideLines={false} />
+        {/* Fade gradient when collapsed and content overflows */}
+        {!isExpanded && needsExpansion && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: '40px',
+              background: 'linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.9))',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+      </div>
+      {(needsExpansion || isExpanded) && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleExpand();
+          }}
+          className="text-xs font-light mt-1 w-full text-left"
+          style={{ 
+            color: getDisciplinePhosphorCore(workoutType),
+            opacity: 0.7,
+            cursor: 'pointer',
+          }}
+        >
+          {isExpanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+};
+
 interface TodaysEffortProps {
   selectedDate?: string;
   onAddEffort: (type: string, date?: string) => void;
@@ -41,6 +117,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [selectedPlannedWorkout, setSelectedPlannedWorkout] = useState<any | null>(null);
   const [executingWorkout, setExecutingWorkout] = useState<any | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
+  const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
   const today = new Date().toLocaleDateString('en-CA');
@@ -952,7 +1029,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }, [weather]);
 
   return (
-    <div className="w-full flex-shrink-0" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)', position:'relative', overflow: 'visible', zIndex: 0}}>
+    <div className="w-full flex-1" style={{fontFamily: 'Inter, sans-serif', minHeight: 'var(--todays-h)', position:'relative', overflow: 'visible', zIndex: 0}}>
       {/* Today Panel - Live instrument cockpit (raised, glowing, primary focus) */}
       <div 
         ref={headerRef}
@@ -1087,10 +1164,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 const glowState: 'idle' | 'week' | 'done' | 'active' = isCompleted ? 'done' : 'week';
                 const phosphorPill = getDisciplinePhosphorPill(workoutType, glowState);
                 
+                const workoutId = workout.id || String(workout.workout_status === 'planned' ? workout.workout_id : workout.id);
+                const isExpanded = expandedWorkouts.has(workoutId);
+                
+                const toggleExpand = () => {
+                  setExpandedWorkouts(prev => {
+                    const next = new Set(prev);
+                    if (isExpanded) {
+                      next.delete(workoutId);
+                    } else {
+                      next.add(workoutId);
+                    }
+                    return next;
+                  });
+                };
+                
                 return (
                 <div
                   key={workout.id}
-                  className={`w-full text-left transition-all backdrop-blur-lg cursor-pointer ${phosphorPill.className}`}
+                  className={`w-full text-left transition-all backdrop-blur-lg ${phosphorPill.className}`}
                   style={{
                     ...phosphorPill.style,
                     borderRadius: '4px', // More rectangular - tighter radius for label strips
@@ -1114,18 +1206,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     borderWidth: '0.5px', // Thinner border for less dominance
                     marginBottom: '0.25rem', // Tight spacing between chips
                   }}
-                  onClick={() => {
-                    if (workout.workout_status === 'planned') {
-                      setSelectedPlannedWorkout(workout);
-                    }
-                  }}
                 >
-                  {/* Planned: show full workout details */}
+                  {/* Planned: show workout details with fixed height and expand */}
                   {workout.workout_status === 'planned' ? (
-                    <div className="space-y-1">
-                      {/* Show full workout summary with all details visible */}
-                      <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={false} />
-                    </div>
+                    <WorkoutCardExpandable
+                      workout={workout}
+                      workoutType={workoutType}
+                      baselines={baselines}
+                      isExpanded={isExpanded}
+                      onToggleExpand={toggleExpand}
+                      getDisciplinePhosphorCore={getDisciplinePhosphorCore}
+                    />
                   ) : (
                     <div 
                       className="space-y-1 cursor-pointer"
