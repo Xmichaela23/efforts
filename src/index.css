@@ -47,6 +47,8 @@
     --surface: #1a1a1a;
     /* Phosphor white (warm, not pure white) */
     --text-primary: #e8e8e8;
+    /* Near-white for active/important text (Today, workout titles, metrics) */
+    --text-active: #f5f5f5;
     /* Warm gray for secondary text */
     --text-secondary: #9a9a9a;
     --grid-hairline: rgba(255,255,255,0.03);
@@ -85,25 +87,25 @@
      * — always softly on, brighter when active or completed, never flat, never neon."
      */
 
-    /* Run (Yellow) - Phosphor amber-yellow LED */
-    --run-core: #CDBA52;
-    --run-glow-rgb: 205 186 82;
+    /* Run (Amber) - Warm amber phosphor (oscilloscope/synth LED, not greenish yellow) */
+    --run-core: #B89A5A;
+    --run-glow-rgb: 184 154 90;
     /* Future/Planned - Very faint, "powered but idle" - barely visible */
-    --run-glow-a1-idle: 0.02;
-    --run-glow-a2-idle: 0.01;
-    --run-glow-a3-idle: 0.005;
-    /* This Week (not done) - Medium glow - clearly visible */
-    --run-glow-a1-week: 0.15;
-    --run-glow-a2-week: 0.10;
-    --run-glow-a3-week: 0.06;
-    /* Completed - Medium-high glow - "latched" feel */
-    --run-glow-a1-done: 0.25;
-    --run-glow-a2-done: 0.18;
-    --run-glow-a3-done: 0.12;
-    /* Today - Strongest glow - "current signal" */
-    --run-glow-a1-active: 0.40;
-    --run-glow-a2-active: 0.28;
-    --run-glow-a3-active: 0.18;
+    --run-glow-a1-idle: 0.015;
+    --run-glow-a2-idle: 0.008;
+    --run-glow-a3-idle: 0.004;
+    /* This Week (not done) - Minimal glow - "potential" feel, lighter, more outline */
+    --run-glow-a1-week: 0.08;
+    --run-glow-a2-week: 0.05;
+    --run-glow-a3-week: 0.03;
+    /* Completed - NO GLOW - "earned" means solid, no glow (will be overridden to 0 in code) */
+    --run-glow-a1-done: 0;
+    --run-glow-a2-done: 0;
+    --run-glow-a3-done: 0;
+    /* Today - Slight glow - "active" feel, brightest but subtle glow */
+    --run-glow-a1-active: 0.30;
+    --run-glow-a2-active: 0.20;
+    --run-glow-a3-active: 0.12;
 
     /* Strength (Orange) - Phosphor orange LED */
     --strength-core: #C98A4A;
@@ -111,15 +113,15 @@
     --strength-glow-a1-idle: 0.015;
     --strength-glow-a2-idle: 0.008;
     --strength-glow-a3-idle: 0.004;
-    --strength-glow-a1-week: 0.15;
-    --strength-glow-a2-week: 0.10;
-    --strength-glow-a3-week: 0.06;
-    --strength-glow-a1-done: 0.25;
-    --strength-glow-a2-done: 0.18;
-    --strength-glow-a3-done: 0.12;
-    --strength-glow-a1-active: 0.45;
-    --strength-glow-a2-active: 0.32;
-    --strength-glow-a3-active: 0.20;
+    --strength-glow-a1-week: 0.08;
+    --strength-glow-a2-week: 0.05;
+    --strength-glow-a3-week: 0.03;
+    --strength-glow-a1-done: 0;
+    --strength-glow-a2-done: 0;
+    --strength-glow-a3-done: 0;
+    --strength-glow-a1-active: 0.28;
+    --strength-glow-a2-active: 0.18;
+    --strength-glow-a3-active: 0.11;
 
     /* Mobility (Purple) - Phosphor purple LED */
     --mobility-core: #9A7AB8;
@@ -127,15 +129,15 @@
     --mobility-glow-a1-idle: 0.015;
     --mobility-glow-a2-idle: 0.008;
     --mobility-glow-a3-idle: 0.004;
-    --mobility-glow-a1-week: 0.15;
-    --mobility-glow-a2-week: 0.10;
-    --mobility-glow-a3-week: 0.06;
-    --mobility-glow-a1-done: 0.25;
-    --mobility-glow-a2-done: 0.18;
-    --mobility-glow-a3-done: 0.12;
-    --mobility-glow-a1-active: 0.45;
-    --mobility-glow-a2-active: 0.32;
-    --mobility-glow-a3-active: 0.20;
+    --mobility-glow-a1-week: 0.08;
+    --mobility-glow-a2-week: 0.05;
+    --mobility-glow-a3-week: 0.03;
+    --mobility-glow-a1-done: 0;
+    --mobility-glow-a2-done: 0;
+    --mobility-glow-a3-done: 0;
+    --mobility-glow-a1-active: 0.28;
+    --mobility-glow-a2-active: 0.18;
+    --mobility-glow-a3-active: 0.11;
 
     /* Swim (Blue) - Phosphor blue LED */
     --swim-core: #5A7FA8;
@@ -143,15 +145,15 @@
     --swim-glow-a1-idle: 0.015;
     --swim-glow-a2-idle: 0.008;
     --swim-glow-a3-idle: 0.004;
-    --swim-glow-a1-week: 0.15;
-    --swim-glow-a2-week: 0.10;
-    --swim-glow-a3-week: 0.06;
-    --swim-glow-a1-done: 0.25;
-    --swim-glow-a2-done: 0.18;
-    --swim-glow-a3-done: 0.12;
-    --swim-glow-a1-active: 0.45;
-    --swim-glow-a2-active: 0.32;
-    --swim-glow-a3-active: 0.20;
+    --swim-glow-a1-week: 0.08;
+    --swim-glow-a2-week: 0.05;
+    --swim-glow-a3-week: 0.03;
+    --swim-glow-a1-done: 0;
+    --swim-glow-a2-done: 0;
+    --swim-glow-a3-done: 0;
+    --swim-glow-a1-active: 0.28;
+    --swim-glow-a2-active: 0.18;
+    --swim-glow-a3-active: 0.11;
 
     /* Bike (Green) - Phosphor green LED */
     --bike-core: #6BA85A;
@@ -159,15 +161,15 @@
     --bike-glow-a1-idle: 0.02;
     --bike-glow-a2-idle: 0.01;
     --bike-glow-a3-idle: 0.005;
-    --bike-glow-a1-week: 0.15;
-    --bike-glow-a2-week: 0.10;
-    --bike-glow-a3-week: 0.06;
-    --bike-glow-a1-done: 0.25;
-    --bike-glow-a2-done: 0.18;
-    --bike-glow-a3-done: 0.12;
-    --bike-glow-a1-active: 0.40;
-    --bike-glow-a2-active: 0.28;
-    --bike-glow-a3-active: 0.18;
+    --bike-glow-a1-week: 0.08;
+    --bike-glow-a2-week: 0.05;
+    --bike-glow-a3-week: 0.03;
+    --bike-glow-a1-done: 0;
+    --bike-glow-a2-done: 0;
+    --bike-glow-a3-done: 0;
+    --bike-glow-a1-active: 0.25;
+    --bike-glow-a2-active: 0.16;
+    --bike-glow-a3-active: 0.10;
   }
 }
 

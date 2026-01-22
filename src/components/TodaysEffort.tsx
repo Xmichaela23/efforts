@@ -1316,21 +1316,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           )}
                           {workout.workout_status === 'completed' && (
                             <span 
-                              className={`ml-2 ${getDisciplineCheckmarkColor(workout.type || workout.workout_type || '')}`}
-                              style={(() => {
-                                // Get color based on workout type for tight LED glow
-                                const t = String(workout.type || workout.workout_type || '').toLowerCase();
-                                // Use centralized color system for glow
-                                const glowColor = t ? getDisciplineGlowColor(t, 0.8) : 'rgba(255, 255, 255, 0.6)'; // default white
-                                
-                                return {
-                                  textShadow: `
-                                    0 0 2px ${glowColor},
-                                    0 0 4px ${glowColor.replace('0.8', '0.4')},
-                                    0 0 8px ${glowColor.replace('0.8', '0.1')}
-                                  `
-                                };
-                              })()}
+                              className="ml-2"
+                              style={{
+                                // Checkmarks use primary white text color - status indicator, not category
+                                color: 'rgba(245, 245, 245, 0.9)', // Primary white text color (--text-active)
+                                // No glow - checkmarks read as status, not category
+                              }}
                             >✓</span>
                           )}
                         </div>

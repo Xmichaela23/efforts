@@ -1585,8 +1585,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   onViewCompleted={handleViewCompleted}
                   onEditEffort={handleEditEffort}
                 />
-                {/* Calendar as compact ghosted timeline - fixed height, not flex */}
-                <div style={{ flexShrink: 0, height: 'calc(var(--cal-cell-h) * 3 + 8px)' }}>
+                {/* Calendar as vertical timeline - flexible height to fit all days */}
+                <div style={{ flexShrink: 0 }}>
                   <WorkoutCalendar
                     onAddEffort={() => handleAddEffort('run')}
                     onSelectType={handleSelectEffortType}

@@ -25,8 +25,8 @@
  * — always softly on, brighter when active or completed, never flat, never neon."
  */
 export const SPORT_COLORS = {
-  run: '#CDBA52',      // phosphor amber-yellow (muted, desaturated)
-  running: '#CDBA52',  // alias
+  run: '#B89A5A',      // warm amber phosphor (oscilloscope/synth LED amber, not greenish yellow)
+  running: '#B89A5A',  // alias
   bike: '#6BA85A',     // phosphor green (muted, desaturated)
   ride: '#6BA85A',     // alias
   cycling: '#6BA85A',  // alias
@@ -204,43 +204,95 @@ export function getDisciplinePhosphorPill(
   const coreColor = getDisciplinePhosphorCore(type);
   const glowStyle = getDisciplineGlowStyle(type, state);
   
-  // Text brightness based on state (if not explicitly provided)
-  const brightnessMap: Record<string, number> = {
-    idle: 0.7,    // Future: dim text
-    week: 0.8,    // This week: normal text
-    done: 0.9,    // Completed: slightly brighter text
-    active: 1.0,  // Today: brightest text
-  };
-  const brightness = textBrightness !== undefined ? textBrightness : brightnessMap[state] || 0.8;
-  
-  // Apply brightness to core color for text
-  const rgb = hexToRgb(coreColor);
-  const [r, g, b] = rgb.split(',').map(v => parseInt(v.trim()));
-  const textColor = `rgb(${Math.round(r * brightness)}, ${Math.round(g * brightness)}, ${Math.round(b * brightness)})`;
+  // Text color hierarchy: Near-white for active/today, discipline color for others
+  // Amber is accent only, not the main light source
+  let textColor: string;
+  if (state === 'active') {
+    // Today: Near-white active text (premium, not murky)
+    textColor = 'rgba(245, 245, 245, 0.95)'; // Near-white
+  } else if (state === 'done') {
+    // Completed: Slightly dimmer near-white for contrast
+    textColor = 'rgba(245, 245, 245, 0.9)';
+  } else {
+    // Week/Future: Use discipline color but brighter for readability
+    // Upcoming should feel "potential" - lighter, more visible
+    const brightnessMap: Record<string, number> = {
+      idle: 0.85,    // Future: brighter for visibility (potential)
+      week: 0.9,     // This week: even brighter (potential)
+    };
+    const brightness = brightnessMap[state] || 0.85;
+    const rgb = hexToRgb(coreColor);
+    const [r, g, b] = rgb.split(',').map(v => parseInt(v.trim()));
+    textColor = `rgb(${Math.round(r * brightness)}, ${Math.round(g * brightness)}, ${Math.round(b * brightness)})`;
+  }
   
   // Fill color based on state
-  // - Future/Planned: No fill (transparent/dark steel)
-  // - This Week: No fill (transparent/dark steel)
-  // - Completed: Very dark discipline fill (20% opacity of core)
+  // - Future/Planned: No fill (transparent/dark steel) - outline only
+  // - This Week: No fill (transparent/dark steel) - outline only
+  // - Completed: Solid fill (earned, slightly desaturated)
   // - Today (uncompleted): No fill (transparent/dark steel) - only completed workouts get fills
   let fillColor = 'transparent';
   if (state === 'done') {
-    // Completed: very dark fill (20% opacity) - ONLY completed workouts get fills
-    fillColor = `rgba(${r}, ${g}, ${b}, 0.20)`;
+    // Completed: "earned" - solid, slightly desaturated fill
+    // Desaturate by mixing with gray, increase opacity for solid feel
+    const rgb = hexToRgb(coreColor);
+    const [r, g, b] = rgb.split(',').map(v => parseInt(v.trim()));
+    // Desaturate: mix with gray (128, 128, 128) at 30% to reduce saturation
+    const desatR = Math.round(r * 0.7 + 128 * 0.3);
+    const desatG = Math.round(g * 0.7 + 128 * 0.3);
+    const desatB = Math.round(b * 0.7 + 128 * 0.3);
+    // Solid fill: 18% opacity (more solid than before)
+    fillColor = `rgba(${desatR}, ${desatG}, ${desatB}, 0.18)`;
   }
   // idle, week, and active: transparent (no fill) - uncompleted workouts never get fills
   
   // Border color: always discipline color (muted phosphor)
-  // But make borders softer - reduce opacity for less noise
+  // Border luminance hierarchy: Today > Upcoming > Completed
   const borderColor = coreColor;
-  const borderOpacity = state === 'idle' ? 0.4 : (state === 'week' ? 0.5 : 0.6);
+  // Upcoming: more visible outline (potential)
+  // Completed: solid but no glow (earned)
+  // Today: brightest (active)
+  const borderOpacity = state === 'idle' ? 0.6 : (state === 'week' ? 0.7 : (state === 'done' ? 0.75 : 0.9)); // Higher for upcoming visibility
   const borderRgb = hexToRgb(coreColor);
   const [br, bg, bb] = borderRgb.split(',').map(v => parseInt(v.trim()));
   const borderColorWithOpacity = `rgba(${br}, ${bg}, ${bb}, ${borderOpacity})`;
   
+  // Glow handling: Completed = no glow (earned, solid), Today = slight glow (active), Upcoming = minimal glow (potential)
+  let finalBoxShadow: string | undefined;
+  if (state === 'done') {
+    // Completed: NO GLOW - "earned" means solid, no glow
+    finalBoxShadow = 'none';
+  } else if (state === 'active') {
+    // Today: slight glow or elevation - keep glow but add subtle elevation
+    const glow = glowStyle.boxShadow as string;
+    // Add subtle elevation shadow for depth
+    finalBoxShadow = `${glow}, 0 2px 4px rgba(0, 0, 0, 0.3)`;
+  } else {
+    // Upcoming: minimal glow - reduce glow intensity for "potential" feel
+    const glow = glowStyle.boxShadow as string;
+    // Reduce glow by 50% for lighter, more outline-focused feel
+    if (glow) {
+      // Parse and reduce alpha values in box-shadow
+      finalBoxShadow = glow.replace(/rgba\(([^)]+)\)/g, (match, rgbaContent) => {
+        const parts = rgbaContent.split(',');
+        if (parts.length === 4) {
+          const r = parts[0].trim();
+          const g = parts[1].trim();
+          const b = parts[2].trim();
+          const alpha = parseFloat(parts[3].trim());
+          const reducedAlpha = Math.max(0.01, alpha * 0.5); // Reduce by 50%, min 0.01
+          return `rgba(${r}, ${g}, ${b}, ${reducedAlpha})`;
+        }
+        return match;
+      });
+    } else {
+      finalBoxShadow = glow;
+    }
+  }
+  
   // Combine all styles
   const style: React.CSSProperties = {
-    ...glowStyle,
+    boxShadow: finalBoxShadow,
     color: textColor,
     backgroundColor: fillColor,
     borderColor: borderColorWithOpacity,
@@ -479,7 +531,7 @@ export function getDisciplineGlowStyle(
   // Fallback to direct values if not in browser or CSS vars not available
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     // SSR fallback: use default values
-    const defaultRgb = '205 186 82'; // run yellow default
+    const defaultRgb = '184 154 90'; // run amber phosphor default
     const defaultAlphas = { idle: [0.02, 0.01, 0.005], week: [0.15, 0.10, 0.06], done: [0.25, 0.18, 0.12], active: [0.40, 0.28, 0.18] };
     const alphas = defaultAlphas[state] || defaultAlphas.idle;
     return {
@@ -492,7 +544,7 @@ export function getDisciplineGlowStyle(
   
   // Read CSS variable values
   const root = document.documentElement;
-  const rgb = root.style.getPropertyValue(rgbVar) || getComputedStyle(root).getPropertyValue(rgbVar) || '205 186 82';
+  const rgb = root.style.getPropertyValue(rgbVar) || getComputedStyle(root).getPropertyValue(rgbVar) || '184 154 90';
   const a1 = root.style.getPropertyValue(alphaVars.a1) || getComputedStyle(root).getPropertyValue(alphaVars.a1) || '0.10';
   const a2 = root.style.getPropertyValue(alphaVars.a2) || getComputedStyle(root).getPropertyValue(alphaVars.a2) || '0.06';
   const a3 = root.style.getPropertyValue(alphaVars.a3) || getComputedStyle(root).getPropertyValue(alphaVars.a3) || '0.03';

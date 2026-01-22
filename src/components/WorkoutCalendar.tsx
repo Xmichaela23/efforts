@@ -811,8 +811,8 @@ export default function WorkoutCalendar({
         }
       }}
     >
-      {/* Week Navigation - Bright timeline header */}
-      <div className="flex items-center justify-between py-2 mb-2">
+      {/* Week Navigation - Bright timeline header (compact) */}
+      <div className="flex items-center justify-between py-1 mb-1">
         <button
           aria-label="Previous week"
           className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
@@ -850,7 +850,7 @@ export default function WorkoutCalendar({
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, key)}
               className={[
-                "w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all",
+                "w-full flex items-center gap-2 px-2 py-1 rounded transition-all",
                 "hover:bg-white/[0.02]",
                 dragOverDate === key ? "ring-1 ring-white/20 bg-white/[0.03]" : "",
               ].join(" ")}
@@ -858,23 +858,24 @@ export default function WorkoutCalendar({
                 borderRadius: '6px',
                 border: '0.5px solid rgba(255, 255, 255, 0.12)',
                 background: isToday 
-                  ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.15) 100%)'
-                  : 'radial-gradient(ellipse at left, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.2) 100%)',
-                opacity: 1.0, // Full opacity - bright
+                  ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0.12) 100%)' // Today: brighter
+                  : 'radial-gradient(ellipse at left, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%)', // Week rows: mid glow
+                opacity: 1.0,
+                minHeight: '36px', // Compact row height
               }}
             >
-              {/* Left: Day label - bright and visible */}
-              <div className="flex-shrink-0 w-12 text-left">
-                <div className="text-xs font-light" style={{ color: isToday ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.75)' }}>
+              {/* Left: Day label - bright and visible (compact) */}
+              <div className="flex-shrink-0 w-10 text-left">
+                <div className="text-xs font-light leading-tight" style={{ color: isToday ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.75)' }}>
                   {weekdayFmt.format(d)}
                 </div>
-                <div className="text-xs font-light tabular-nums" style={{ color: isToday ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.7)' }}>
+                <div className="text-xs font-light tabular-nums leading-tight" style={{ color: isToday ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.7)' }}>
                   {d.getDate()}
                 </div>
               </div>
 
-              {/* Right: Workout chips - horizontal flow */}
-              <div className="flex-1 flex items-center gap-1 flex-wrap min-h-[24px]">
+              {/* Right: Workout chips - horizontal flow (compact) */}
+              <div className="flex-1 flex items-center gap-1 flex-wrap min-h-[20px]">
                 {items.length > 0 && (
                   items.map((evt, i) => {
                     // Check actual workout_status from _src
@@ -920,10 +921,12 @@ export default function WorkoutCalendar({
                         onDragEnd={handleDragEnd}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`text-xs px-2 py-0.5 flex-shrink-0 transition-all backdrop-blur-sm font-light tracking-wide ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                        className={`text-xs px-1.5 py-0.5 flex-shrink-0 transition-all backdrop-blur-sm font-light tracking-wide ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                         style={{
                           ...phosphorPill.style,
                           borderRadius: '4px',
+                          fontSize: '0.7rem', // Slightly smaller text
+                          lineHeight: '1.2', // Tighter line height
                           // Full glow brightness for timeline
                           boxShadow: phosphorPill.style.boxShadow 
                             ? (() => {
@@ -968,10 +971,9 @@ export default function WorkoutCalendar({
                                 })}
                                 <span 
                                   style={{
-                                    // Checkmark should be dimmer than discipline color (secondary signal)
-                                    // Use the same color as label but at lower brightness
-                                    color: getDisciplinePhosphorCore(workoutType),
-                                    opacity: 0.35, // Much dimmer than label text - secondary confirmation only
+                                    // Checkmarks use primary white text color - status indicator, not category
+                                    color: 'rgba(245, 245, 245, 0.9)', // Primary white text color (--text-active)
+                                    // No glow, no discipline tint - checkmarks read as status, not category
                                   }}
                                 > ✓</span>
                               </>
@@ -1140,8 +1142,8 @@ export default function WorkoutCalendar({
           }
           
           return (
-            <div className="mt-2 pt-2 border-t border-white/10">
-              <div className="space-y-1.5" style={{ fontSize: '0.7rem' }}>
+            <div className="mt-2 pt-2 border-t border-white/10" style={{ minHeight: '140px' }}>
+              <div className="space-y-1.5" style={{ fontSize: '0.7rem', paddingBottom: '0.5rem' }}>
                 {/* Total Workload header */}
                 <div 
                   className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg flex-wrap"
