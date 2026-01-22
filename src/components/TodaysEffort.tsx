@@ -1390,11 +1390,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   
                   return (
                     <button
-                      className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white"
+                      className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
                       style={{
                         backgroundColor: 'transparent',
                         borderColor: sportColor,
-                        borderWidth: '2px',
+                        borderWidth: '1px',
                         borderStyle: 'solid',
                       }}
                       onMouseEnter={(e) => {
@@ -1422,11 +1422,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   
                   return (
                     <button
-                      className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white"
+                      className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
                       style={{
                         backgroundColor: 'transparent',
                         borderColor: sportColor,
-                        borderWidth: '2px',
+                        borderWidth: '1px',
                         borderStyle: 'solid',
                       }}
                       onMouseEnter={(e) => {
@@ -1445,21 +1445,57 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 })()}
               </div>
               
-              {/* Bottom row: Mark as Complete and Close - evenly spaced */}
+              {/* Bottom row: Mark as Complete and Close - evenly spaced with yellow outlines */}
               <div className="flex gap-2 w-full">
-                <button
-                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white font-medium tracking-wide hover:bg-white/[0.12] transition-all"
-                  onClick={() => selectedPlannedWorkout && handleMarkComplete(selectedPlannedWorkout)}
-                  disabled={markingComplete}
-                >
-                  {markingComplete ? 'Marking...' : 'Mark as Complete'}
-                </button>
-                <button
-                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/20 text-white font-medium tracking-wide hover:bg-white/[0.08] transition-all"
-                  onClick={() => setSelectedPlannedWorkout(null)}
-                >
-                  Close
-                </button>
+                {selectedPlannedWorkout && (() => {
+                  const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
+                  const isRun = ['run', 'running', 'walk'].includes(workoutType);
+                  const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
+                  const sportColor = isRun ? SPORT_COLORS.run : (isRide ? SPORT_COLORS.ride : SPORT_COLORS.run);
+                  const rgb = getDisciplineColorRgb(isRun ? 'run' : (isRide ? 'ride' : 'run'));
+                  
+                  return (
+                    <>
+                      <button
+                        className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
+                        style={{
+                          backgroundColor: 'transparent',
+                          borderColor: sportColor,
+                          borderWidth: '1px',
+                          borderStyle: 'solid',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.15)`;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                        onClick={() => handleMarkComplete(selectedPlannedWorkout)}
+                        disabled={markingComplete}
+                      >
+                        {markingComplete ? 'Marking...' : 'Mark as Complete'}
+                      </button>
+                      <button
+                        className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
+                        style={{
+                          backgroundColor: 'transparent',
+                          borderColor: sportColor,
+                          borderWidth: '1px',
+                          borderStyle: 'solid',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.15)`;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                        onClick={() => setSelectedPlannedWorkout(null)}
+                      >
+                        Close
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </DrawerFooter>
