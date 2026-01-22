@@ -40,6 +40,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [selectedPlannedWorkout, setSelectedPlannedWorkout] = useState<any | null>(null);
   const [executingWorkout, setExecutingWorkout] = useState<any | null>(null);
+  const [markingComplete, setMarkingComplete] = useState(false);
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
   const today = new Date().toLocaleDateString('en-CA');
@@ -188,6 +189,38 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const isPhoneExecutable = (type: string) => {
     const t = (type || '').toLowerCase();
     return ['run', 'ride', 'bike', 'cycling'].includes(t);
+  };
+  
+  // Mark workout as complete
+  const handleMarkComplete = async (workout: any) => {
+    try {
+      setMarkingComplete(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: 'Error', description: 'Please log in to mark workout as complete', variant: 'destructive' });
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('planned_workouts')
+        .update({ workout_status: 'completed' })
+        .eq('id', workout.id)
+        .eq('user_id', user.id);
+      
+      if (error) {
+        toast({ title: 'Error', description: `Failed to mark as complete: ${error.message}`, variant: 'destructive' });
+      } else {
+        toast({ title: 'Workout marked as complete', variant: 'success' });
+        setSelectedPlannedWorkout(null);
+        // Refresh the view
+        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      }
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to mark workout as complete', variant: 'destructive' });
+    } finally {
+      setMarkingComplete(false);
+    }
   };
   
   // Send workout to Apple Watch
@@ -1275,7 +1308,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
 
           <DrawerFooter className="border-t border-white/10 pt-4">
-            <div className="flex flex-col gap-2 w-full">
+            <div className="flex flex-col gap-3 w-full">
               {/* Start on Phone - Primary action for run/ride */}
               {selectedPlannedWorkout && isPhoneExecutable(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (() => {
                 const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
@@ -1283,7 +1316,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
                 const sportColor = isRun ? SPORT_COLORS.run : (isRide ? SPORT_COLORS.ride : SPORT_COLORS.run); // default to run color
                 const rgb = getDisciplineColorRgb(isRun ? 'run' : (isRide ? 'ride' : 'run'));
-                const colorName = isRun ? 'yellow' : (isRide ? 'green' : 'yellow');
                 
                 return (
                   <button
@@ -1308,47 +1340,22 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   </button>
                 );
               })()}
+              
+              {/* Bottom row: Mark as Complete and Close - evenly spaced */}
               <div className="flex gap-2 w-full">
-              {selectedPlannedWorkout && isEnduranceType(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
                 <button
                   className="flex-1 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-sm font-light tracking-wide hover:bg-white/[0.12] transition-all"
-                  onClick={(e) => {
-                    handleSendToGarmin(e, selectedPlannedWorkout);
-                  }}
+                  onClick={() => selectedPlannedWorkout && handleMarkComplete(selectedPlannedWorkout)}
+                  disabled={markingComplete}
                 >
-                  {sendingToGarmin === selectedPlannedWorkout?.id ? 'Sending...' : 'Send to Garmin'}
+                  {markingComplete ? 'Marking...' : '✓ Mark as Complete'}
                 </button>
-              )}
-              {/* Apple Watch - only shows in native iOS app with paired watch */}
-              {watchAvailable && selectedPlannedWorkout && isPhoneExecutable(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
                 <button
-                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-sm font-light tracking-wide hover:bg-white/[0.12] transition-all"
-                  onClick={(e) => {
-                    handleSendToWatch(e, selectedPlannedWorkout);
-                  }}
+                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/20 text-white/70 text-sm font-light tracking-wide hover:bg-white/[0.08] hover:text-white transition-all"
+                  onClick={() => setSelectedPlannedWorkout(null)}
                 >
-                  {sendingToWatch === selectedPlannedWorkout?.id ? 'Sending...' : 'Send to Watch'}
+                  Close
                 </button>
-              )}
-              {selectedPlannedWorkout && isStrengthOrMobility(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (
-                <button
-                  className="flex-1 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/30 text-white text-sm font-light tracking-wide hover:bg-white/[0.12] transition-all"
-                  onClick={() => {
-                    const w: any = { ...selectedPlannedWorkout };
-                    w.__openLogger = true;
-                    onEditEffort && onEditEffort(w);
-                    setSelectedPlannedWorkout(null);
-                  }}
-                >
-                  Go to workout
-                </button>
-              )}
-              <button
-                className="flex-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/20 text-white/70 text-sm font-light tracking-wide hover:bg-white/[0.08] transition-all"
-                onClick={() => setSelectedPlannedWorkout(null)}
-              >
-                Close
-              </button>
               </div>
             </div>
           </DrawerFooter>
