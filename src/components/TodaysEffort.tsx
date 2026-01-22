@@ -1120,6 +1120,54 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             }
                             return null;
                           })()}
+                          {/* Source attribution - only for completed runs/rides/swims */}
+                          {workout.workout_status === 'completed' && (() => {
+                            const type = String(workout?.type || '').toLowerCase();
+                            const isRunRideSwim = type === 'run' || type === 'running' || type === 'ride' || type === 'cycling' || type === 'bike' || type === 'swim' || type === 'swimming';
+                            if (!isRunRideSwim) return null;
+                            
+                            const source = (workout as any)?.source;
+                            const isStravaImported = (workout as any)?.is_strava_imported;
+                            const stravaId = (workout as any)?.strava_activity_id;
+                            const garminId = (workout as any)?.garmin_activity_id;
+                            const deviceInfo = (() => {
+                              try {
+                                const di = (workout as any)?.device_info || (workout as any)?.deviceInfo;
+                                if (typeof di === 'string') return JSON.parse(di);
+                                return di;
+                              } catch { return null; }
+                            })();
+                            const rawDeviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
+                            const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
+
+                            if (source === 'strava' || stravaId || isStravaImported) {
+                              return (
+                                <div className="flex items-center gap-1.5 ml-2">
+                                  <img 
+                                    src="/icons/strava-powered-by.svg" 
+                                    alt="Powered by Strava" 
+                                    className="h-2.5"
+                                  />
+                                  {deviceName && <span className="text-gray-400 text-xs">via {deviceName}</span>}
+                                </div>
+                              );
+                            }
+
+                            if (source === 'garmin' || garminId) {
+                              return (
+                                <div className="flex items-center gap-1 ml-2">
+                                  <span className="text-gray-400 text-xs">via</span>
+                                  <svg width="6" height="8" viewBox="0 0 10 12" className="flex-shrink-0">
+                                    <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
+                                  </svg>
+                                  <span className="text-[#007CC3] font-light text-xs">Garmin</span>
+                                  {deviceName && <span className="text-gray-400 text-xs">({deviceName})</span>}
+                                </div>
+                              );
+                            }
+
+                            return null;
+                          })()}
                         </div>
                       </div>
                       
