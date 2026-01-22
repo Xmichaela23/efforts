@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 // Planned workouts hook deprecated; unified server paths are the source of truth
 import { useAppContext } from '@/contexts/AppContext';
 import { getDisciplineColor } from '@/lib/utils';
+import { getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplinePillClasses } from '@/lib/context-utils';
 // PlannedWorkoutView is deprecated; unified view replaces it
 import WorkoutSummaryView from './WorkoutSummaryView';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
@@ -1933,7 +1934,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   {raceDate && (
                     <>
                       <span>
-                        <span className="font-semibold text-teal-500">
+                        <span className={`font-semibold ${getDisciplineTextClass('run')}`}>
                           {raceName || new Date(raceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
                         {raceName && (
@@ -1944,19 +1945,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                       </span>
                       {weeksToRace !== null && weeksToRace > 0 && (
                         <span>
-                          <span className="font-semibold text-teal-500">{weeksToRace}</span> weeks to go
+                          <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{weeksToRace}</span> weeks to go
                         </span>
                       )}
                     </>
                   )}
                   {effortScore && (
                     <span>
-                      Effort Score <span className="font-semibold text-teal-500">{effortScore}</span>
+                      Effort Score <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{effortScore}</span>
                     </span>
                   )}
                   {targetTime && distanceLabel && (
                     <span>
-                      Goal <span className="font-semibold text-teal-500">{formatTime(targetTime)}</span> {distanceLabel}
+                      Goal <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{formatTime(targetTime)}</span> {distanceLabel}
                     </span>
                   )}
                 </div>
@@ -1966,16 +1967,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             {/* Compact, single-line stats */}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/60 mb-3">
               <span>
-                <span className="font-semibold text-teal-500">{selectedPlanDetail.duration || 0}</span> wk
+                <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{selectedPlanDetail.duration || 0}</span> wk
               </span>
               <span>
-                <span className="font-semibold text-teal-500">{selectedPlanDetail.totalWorkouts || 0}</span> workouts
+                <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{selectedPlanDetail.totalWorkouts || 0}</span> workouts
               </span>
               <span>
-                <span className="font-semibold text-teal-500">{formatDuration(finalTotalVolume)}</span> total
+                <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{formatDuration(finalTotalVolume)}</span> total
               </span>
               <span>
-                <span className="font-semibold text-teal-500">{formatDuration(averageWeeklyVolume)}</span> avg/wk
+                <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{formatDuration(averageWeeklyVolume)}</span> avg/wk
               </span>
             </div>
 
@@ -2095,13 +2096,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                           isSelected 
                             ? 'bg-white/[0.15] border-2 border-white/30 text-white font-medium' 
                             : isCurrent 
-                              ? 'bg-teal-500/20 border border-teal-400/40 text-teal-300' 
+                              ? `${getDisciplinePillClasses('run', false)}` 
                               : 'bg-white/[0.05] border border-white/15 text-white/60 hover:bg-white/[0.08] hover:text-white/80'
                         }`}
                       >
                         {wn}
                         {isCurrent && !isSelected && (
-                          <span className="ml-1 text-[10px] text-teal-500">•</span>
+                          <span className={`ml-1 text-[10px] ${getDisciplineTextClass('run')}`}>•</span>
                         )}
                       </button>
                     );
@@ -2183,7 +2184,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               if (!focus && !notes) return null;
               return (
                 <div className="px-1 pb-3">
-                  {focus && (<div className="text-sm text-teal-500/80 italic">{focus}</div>)}
+                  {focus && (<div className={`text-sm ${getDisciplineTextClass('run')}/80 italic`}>{focus}</div>)}
                   {notes && (<div className="text-xs text-white/50 mt-1">{notes}</div>)}
                 </div>
               );
