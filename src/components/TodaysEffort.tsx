@@ -191,7 +191,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return ['run', 'ride', 'bike', 'cycling'].includes(t);
   };
   
-  // Mark workout as complete
+  // Mark workout as complete - creates workout record like imported/hooked workouts
   const handleMarkComplete = async (workout: any) => {
     try {
       setMarkingComplete(true);
@@ -201,22 +201,92 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         return;
       }
       
-      const { error } = await supabase
-        .from('planned_workouts')
-        .update({ workout_status: 'completed' })
-        .eq('id', workout.id)
-        .eq('user_id', user.id);
+      const workoutType = (workout.type || workout.workout_type || '').toLowerCase();
+      const isRun = ['run', 'running', 'walk'].includes(workoutType);
+      const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
       
-      if (error) {
-        toast({ title: 'Error', description: `Failed to mark as complete: ${error.message}`, variant: 'destructive' });
-      } else {
+      // Only create workout record for run/ride (these trigger RPE popup)
+      if (isRun || isRide) {
+        // Get duration from planned workout (in minutes)
+        const durationMinutes = workout.duration || workout.computed?.total_duration_seconds 
+          ? Math.round((workout.computed?.total_duration_seconds || 0) / 60) || workout.duration || 30
+          : 30;
+        
+        // Create workout record in workouts table (like imported/hooked workouts)
+        const workoutData: any = {
+          user_id: user.id,
+          type: workoutType,
+          date: workout.date || activeDate,
+          workout_status: 'completed',
+          name: workout.name || workout.rendered_description || workout.description || `${workoutType} workout`,
+          
+          // Basic metrics (minimal since no actual workout data)
+          duration: durationMinutes,
+          moving_time: durationMinutes,
+          elapsed_time: durationMinutes,
+          
+          // Link to planned workout
+          planned_id: workout.id,
+          
+          // Provider info
+          provider: 'manual',
+          completedmanually: true,
+          
+          // Analysis status
+          analysis_status: 'pending',
+        };
+        
+        // Insert workout record
+        const { data: createdWorkout, error: insertError } = await supabase
+          .from('workouts')
+          .insert(workoutData)
+          .select('id')
+          .single();
+        
+        if (insertError) {
+          console.error('Error creating workout:', insertError);
+          toast({ title: 'Error', description: `Failed to create workout: ${insertError.message}`, variant: 'destructive' });
+          return;
+        }
+        
+        // Also update planned_workouts status
+        const { error: updateError } = await supabase
+          .from('planned_workouts')
+          .update({ workout_status: 'completed' })
+          .eq('id', workout.id)
+          .eq('user_id', user.id);
+        
+        if (updateError) {
+          console.error('Error updating planned workout:', updateError);
+          // Don't fail the whole operation if this fails
+        }
+        
         toast({ title: 'Workout marked as complete', variant: 'success' });
         setSelectedPlannedWorkout(null);
-        // Refresh the view
+        
+        // Refresh the view - the RPE popup will appear via realtime subscription
         try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
         try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+      } else {
+        // For non-run/ride workouts, just update planned_workouts status
+        const { error } = await supabase
+          .from('planned_workouts')
+          .update({ workout_status: 'completed' })
+          .eq('id', workout.id)
+          .eq('user_id', user.id);
+        
+        if (error) {
+          toast({ title: 'Error', description: `Failed to mark as complete: ${error.message}`, variant: 'destructive' });
+        } else {
+          toast({ title: 'Workout marked as complete', variant: 'success' });
+          setSelectedPlannedWorkout(null);
+          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+          try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+        }
       }
     } catch (err) {
+      console.error('Error marking workout as complete:', err);
       toast({ title: 'Error', description: 'Failed to mark workout as complete', variant: 'destructive' });
     } finally {
       setMarkingComplete(false);
