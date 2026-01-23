@@ -811,26 +811,8 @@ export default function WorkoutCalendar({
         }
       }}
     >
-      {/* Week Navigation - Bright timeline header (compact, sticky with blur) */}
-      <div 
-        className="flex items-center justify-between py-1 mb-1"
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          backgroundColor: 'rgba(0, 0, 0, 0.95)',
-          paddingTop: '0.5rem',
-          paddingBottom: '0.5rem',
-          marginTop: '-0.5rem',
-          marginLeft: '-0.5rem',
-          marginRight: '-0.5rem',
-          paddingLeft: '0.5rem',
-          paddingRight: '0.5rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
-        }}
-      >
+      {/* Week Navigation - Bright timeline header (compact) */}
+      <div className="flex items-center justify-between py-1 mb-1">
         <button
           aria-label="Previous week"
           className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
