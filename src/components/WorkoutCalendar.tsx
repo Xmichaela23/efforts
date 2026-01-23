@@ -811,7 +811,14 @@ export default function WorkoutCalendar({
       }}
     >
       {/* Week Navigation - Bright timeline header (compact) */}
-      <div className="flex items-center justify-between py-1 mb-1">
+      <div 
+        className="flex items-center justify-between py-1 mb-1"
+        style={{
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          padding: '0.5rem 0.75rem',
+          borderRadius: '6px',
+        }}
+      >
         <button
           aria-label="Previous week"
           className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"

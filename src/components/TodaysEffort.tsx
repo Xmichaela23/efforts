@@ -1048,8 +1048,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             position: 'sticky',
             top: 0,
             zIndex: 20,
-            // Raised panel with subtle elevation and glow field
-            background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%)',
+            // Raised panel with subtle elevation and glow field - solid background
+            background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.9) 100%)',
             border: '0.5px solid rgba(255, 255, 255, 0.08)', // Slightly brighter border for panel definition
             borderRadius: '12px', // Rounded corners for mounted instrument feel
             padding: '0.75rem 1rem', // More padding for panel breathing room
