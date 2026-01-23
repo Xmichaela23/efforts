@@ -267,6 +267,100 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     const t = (type || '').toLowerCase();
     return ['run', 'ride', 'bike', 'cycling'].includes(t);
   };
+
+  // Provider + device attribution for completed imports (Strava/Garmin)
+  const getProviderAttribution = (w: any): { source: 'strava' | 'garmin' | null; deviceName?: string } => {
+    try {
+      const provider = String(w?.provider || '').toLowerCase();
+      const id = String(w?.id || '');
+      const stravaId = (w as any)?.strava_activity_id;
+      const garminId = (w as any)?.garmin_activity_id;
+      const isStravaImported = !!(w as any)?.strava_data || !!stravaId || id.startsWith('strava_') || provider === 'strava';
+      const isGarminImported = !!(w as any)?.garmin_data || !!garminId || id.startsWith('garmin_') || provider === 'garmin';
+
+      const deviceInfo = (() => {
+        try {
+          const di = (w as any)?.device_info || (w as any)?.deviceInfo || (w as any)?.deviceInfo;
+          if (typeof di === 'string') return JSON.parse(di);
+          return di;
+        } catch {
+          return null;
+        }
+      })();
+      const rawDeviceName =
+        deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product || deviceInfo?.name || deviceInfo?.model;
+      const deviceName = typeof rawDeviceName === 'string' ? rawDeviceName.replace(/^Garmin\s+/i, '') : undefined;
+
+      if (provider === 'strava' || isStravaImported) return { source: 'strava', deviceName };
+      if (provider === 'garmin' || isGarminImported) return { source: 'garmin', deviceName };
+      return { source: null };
+    } catch {
+      return { source: null };
+    }
+  };
+
+  // Compact metrics line for completed endurance workouts (matches the older “detail” cards)
+  const getCompactEnduranceMetrics = (w: any): string[] => {
+    try {
+      const type = String(w?.type || '').toLowerCase();
+      const overall = (w as any)?.computed?.overall || (w as any)?.overall || {};
+      const distM = Number(overall?.distance_m ?? overall?.distanceMeters ?? overall?.distance_meters);
+      const durS = Number(overall?.duration_s_moving ?? overall?.moving_seconds ?? overall?.duration_s) || Number(resolveMovingSeconds(w));
+      const avgHr = Number(overall?.avg_hr ?? w?.avg_heart_rate ?? w?.metrics?.avg_heart_rate);
+      const elevM = Number(overall?.elevation_gain_m ?? w?.elevation_gain ?? w?.metrics?.elevation_gain);
+
+      const parts: string[] = [];
+
+      // distance
+      if (Number.isFinite(distM) && distM > 0) {
+        if (type === 'swim') {
+          const yards = Math.round(distM / 0.9144);
+          const meters = Math.round(distM);
+          parts.push(useImperial ? `${yards.toLocaleString()} yd` : `${meters.toLocaleString()} m`);
+        } else {
+          parts.push(useImperial ? `${(distM / 1609.34).toFixed(1)} mi` : `${(distM / 1000).toFixed(1)} km`);
+        }
+      }
+
+      // pace / speed / swim pace
+      if (Number.isFinite(durS) && durS > 0 && Number.isFinite(distM) && distM > 0) {
+        if (type === 'run' || type === 'walk') {
+          const miles = distM / 1609.34;
+          const paceMinPerMile = (durS / 60) / miles;
+          const mm = Math.floor(paceMinPerMile);
+          const ss = Math.round((paceMinPerMile - mm) * 60);
+          parts.push(`${mm}:${String(ss).padStart(2, '0')}/mi`);
+        } else if (type === 'ride' || type === 'bike' || type === 'cycling') {
+          const avgSpeedMps = Number(overall?.avg_speed_mps) || distM / durS;
+          if (Number.isFinite(avgSpeedMps) && avgSpeedMps > 0) {
+            const mph = avgSpeedMps * 2.237;
+            parts.push(`${Math.round(mph * 10) / 10} mph`);
+          }
+        } else if (type === 'swim') {
+          const preferYards = !!useImperial;
+          const denom = preferYards ? (distM / 0.9144) / 100 : distM / 100;
+          if (denom > 0) {
+            const per100 = durS / denom;
+            const mm = Math.floor(per100 / 60);
+            const ss = Math.round(per100 % 60);
+            parts.push(`${mm}:${String(ss).padStart(2, '0')} ${preferYards ? '/100yd' : '/100m'}`);
+          }
+        }
+      }
+
+      // hr
+      if (Number.isFinite(avgHr) && avgHr > 0) parts.push(`${Math.round(avgHr)} bpm`);
+
+      // elevation (runs/rides)
+      if ((type === 'run' || type === 'walk' || type === 'ride' || type === 'bike' || type === 'cycling') && Number.isFinite(elevM) && elevM > 0) {
+        parts.push(useImperial ? `${Math.round(elevM * 3.28084)} ft` : `${Math.round(elevM)} m`);
+      }
+
+      return parts.filter(Boolean).slice(0, 4);
+    } catch {
+      return [];
+    }
+  };
   
   // Mark workout as complete - creates workout record like imported/hooked workouts
   const handleMarkComplete = async (workout: any) => {
@@ -1230,6 +1324,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 const glowState: 'idle' | 'week' | 'done' | 'active' = isCompleted ? 'done' : 'week';
                 const phosphorPill = getDisciplinePhosphorPill(workoutType, glowState);
                 const pillRgb = getDisciplineColorRgb(workoutType);
+                const providerAttr = isCompleted ? getProviderAttribution(workout) : { source: null as any };
+                const showImportAttribution = isCompleted && !!providerAttr?.source;
+                const showEnduranceDetails = isCompleted && isEnduranceType(workoutType);
+                const compactMetrics = showEnduranceDetails ? getCompactEnduranceMetrics(workout) : [];
 
                 const title = (() => {
                   const type = String(workout.type || '').toLowerCase();
@@ -1348,8 +1446,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         )}
                       </div>
 
-                      {/* Optional: tiny planned duration readout (kept subtle) */}
-                      {isPlanned && (() => {
+                      {/* Right side: planned duration OR import attribution (completed) */}
+                      {isPlanned ? (() => {
                         const sec = resolveMovingSeconds(workout);
                         if (Number.isFinite(sec as any) && (sec as number) > 0) {
                           const mins = Math.round((sec as number) / 60);
@@ -1360,8 +1458,72 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           );
                         }
                         return null;
-                      })()}
+                      })() : showImportAttribution ? (
+                        <div
+                          className="flex items-center gap-1.5 flex-shrink-0"
+                          style={{
+                            opacity: 0.78,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {providerAttr.source === 'strava' ? (
+                            <>
+                              <img
+                                src="/icons/strava-powered-by.svg"
+                                alt="Powered by Strava"
+                                className="h-3"
+                              />
+                              {providerAttr.deviceName && (
+                                <span className="text-xs font-light" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                                  via {providerAttr.deviceName}
+                                </span>
+                              )}
+                            </>
+                          ) : providerAttr.source === 'garmin' ? (
+                            <>
+                              <span className="text-xs font-light" style={{ color: 'rgba(0, 124, 195, 0.95)' }}>
+                                Garmin Connect
+                              </span>
+                              {providerAttr.deviceName && (
+                                <span className="text-xs font-light" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                                  ({providerAttr.deviceName})
+                                </span>
+                              )}
+                            </>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
+
+                    {/* Completed endurance details + import attribution */}
+                    {showEnduranceDetails && (
+                      <div className="mt-2">
+                        <div
+                          className="tabular-nums"
+                          style={{
+                            color: 'rgba(255,255,255,0.78)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {compactMetrics.map((m, idx) => (
+                            <span
+                              key={idx}
+                              className="text-xs font-light"
+                              style={{
+                                textShadow: '0 1px 1px rgba(0,0,0,0.55), 0 0 8px rgba(0,0,0,0.35)',
+                              }}
+                            >
+                              {m}
+                              {idx < compactMetrics.length - 1 ? (
+                                <span style={{ color: 'rgba(255,255,255,0.35)' }}>{' \u00A0\u00A0'}</span>
+                              ) : null}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </button>
                 );
               })}

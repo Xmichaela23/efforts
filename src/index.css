@@ -424,29 +424,24 @@
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    opacity: 0.62;
+    opacity: 0.55;
     mix-blend-mode: soft-light;
     background-color: rgba(0, 0, 0, 0.16);
     background-image:
-      /* “Efforts” wordmark spectral strip */
-      linear-gradient(90deg,
-        rgba(255, 215, 0, 0.18) 0%,
-        rgba(255, 140, 66, 0.14) 26%,
-        rgba(183, 148, 246, 0.14) 52%,
-        rgba(74, 158, 255, 0.12) 74%,
-        rgba(80, 200, 120, 0.12) 100%
-      ),
-      radial-gradient(ellipse at 18% 22%, rgba(255, 215, 0, 0.14) 0%, transparent 62%),
-      radial-gradient(ellipse at 50% 38%, rgba(239, 68, 68, 0.10) 0%, transparent 70%),
-      radial-gradient(ellipse at 82% 22%, rgba(74, 158, 255, 0.12) 0%, transparent 64%),
-      /* subtle diamond grid (kept faint so it reads like the header strip) */
-      linear-gradient(45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
-      linear-gradient(-45deg, rgba(255,255,255,0.10) 1px, transparent 1px),
-      linear-gradient(45deg, rgba(255,255,255,0.05) 1px, transparent 1px),
-      linear-gradient(-45deg, rgba(255,255,255,0.04) 1px, transparent 1px);
-    background-size: cover, cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px;
-    background-position: center, center, center, center, center, center, center, center;
-    background-blend-mode: screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light;
+      /* Match the header’s “supernova” field so the tabbar feels like the same backdrop */
+      radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.10) 0%, transparent 60%),
+      radial-gradient(ellipse at 82% 38%, rgba(74, 158, 255, 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 18% 42%, rgba(183, 148, 246, 0.08) 0%, transparent 60%),
+      /* subtle cross-channel bloom */
+      radial-gradient(ellipse at 58% 60%, rgba(80, 200, 120, 0.06) 0%, transparent 62%),
+      radial-gradient(ellipse at 44% 62%, rgba(255, 140, 66, 0.06) 0%, transparent 62%),
+      linear-gradient(45deg, rgba(255,255,255,0.20) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
+      linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: cover, cover, cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px;
+    background-position: center, center, center, center, center, center, center, center, center;
+    background-blend-mode: screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light;
   }
 
   /* Gentle “up-light” so the tabbar reads energized */
@@ -455,19 +450,22 @@
     position: absolute;
     left: 0;
     right: 0;
-    top: -18px;
-    height: 68px;
+    top: -28px;
+    height: 96px;
     z-index: 0;
     pointer-events: none;
     mix-blend-mode: screen;
     background-image:
-      radial-gradient(260px 86px at 20% 62%, rgba(255, 215, 0, 0.14) 0%, rgba(255, 215, 0, 0.0) 70%),
-      radial-gradient(280px 94px at 50% 70%, rgba(183, 148, 246, 0.12) 0%, rgba(183, 148, 246, 0.0) 74%),
-      radial-gradient(260px 86px at 80% 62%, rgba(74, 158, 255, 0.12) 0%, rgba(74, 158, 255, 0.0) 70%),
-      /* vignette so the “strip” sits behind buttons, not over them */
-      linear-gradient(to bottom, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.65) 100%);
-    opacity: 0.50;
-    filter: blur(18px) saturate(1.10);
+      /* Match header spill: diffuse “glow field” that feels continuous */
+      radial-gradient(140px 70px at 14% 55%, rgba(255, 215, 0, 0.42) 0%, rgba(255, 215, 0, 0.0) 72%),
+      radial-gradient(160px 80px at 32% 60%, rgba(255, 140, 66, 0.32) 0%, rgba(255, 140, 66, 0.0) 74%),
+      radial-gradient(160px 80px at 50% 58%, rgba(183, 148, 246, 0.30) 0%, rgba(183, 148, 246, 0.0) 74%),
+      radial-gradient(160px 80px at 68% 60%, rgba(74, 158, 255, 0.28) 0%, rgba(74, 158, 255, 0.0) 74%),
+      radial-gradient(140px 70px at 86% 55%, rgba(80, 200, 120, 0.24) 0%, rgba(80, 200, 120, 0.0) 72%),
+      /* vignette so the shelf sits behind controls */
+      linear-gradient(to bottom, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.70) 100%);
+    opacity: 0.58;
+    filter: blur(22px) saturate(1.10);
     transform: translateZ(0);
   }
 

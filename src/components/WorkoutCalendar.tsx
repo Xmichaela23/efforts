@@ -982,12 +982,11 @@ export default function WorkoutCalendar({
                 border: isToday ? '0.5px solid rgba(255, 255, 255, 0.18)' : '0.5px solid rgba(255, 255, 255, 0.12)',
                 background: isToday
                   ? `
-                      radial-gradient(ellipse at 18% 50%, rgba(255, 215, 0, 0.22) 0%, rgba(255, 215, 0, 0.0) 66%),
-                      radial-gradient(ellipse at 44% 60%, rgba(255, 140, 66, 0.16) 0%, rgba(255, 140, 66, 0.0) 70%),
-                      radial-gradient(ellipse at 62% 55%, rgba(183, 148, 246, 0.14) 0%, rgba(183, 148, 246, 0.0) 70%),
-                      radial-gradient(ellipse at 78% 52%, rgba(74, 158, 255, 0.12) 0%, rgba(74, 158, 255, 0.0) 72%),
-                      radial-gradient(ellipse at left, rgba(255,255,255,0.12) 0%, rgba(0,0,0,0.10) 100%)
-                    ` // Today: brighter + faint spectrum
+                      /* dial back internal glow; keep a readable dark bed */
+                      radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.18) 100%),
+                      radial-gradient(ellipse at 24% 50%, rgba(255, 215, 0, 0.10) 0%, rgba(255, 215, 0, 0.0) 70%),
+                      radial-gradient(ellipse at 76% 50%, rgba(74, 158, 255, 0.08) 0%, rgba(74, 158, 255, 0.0) 72%)
+                    ` // Today: lower internal wash, keep focus on pills
                   : isSelected
                     ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.18) 100%)' // Selected: eye-catch, but less than Today
                   : 'radial-gradient(ellipse at left, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%)', // Week rows: mid glow
@@ -997,11 +996,11 @@ export default function WorkoutCalendar({
                 boxShadow: isToday
                   ? `
                       inset 0 0 0 1px rgba(255,255,255,0.10),
-                      0 0 26px rgba(255, 215, 0, 0.30),
-                      0 0 40px rgba(255, 140, 66, 0.22),
-                      0 0 34px rgba(183, 148, 246, 0.20),
-                      0 0 32px rgba(74, 158, 255, 0.18),
-                      0 0 48px rgba(239, 68, 68, 0.12)
+                      0 0 20px rgba(255, 215, 0, 0.18),
+                      0 0 28px rgba(255, 140, 66, 0.12),
+                      0 0 24px rgba(183, 148, 246, 0.11),
+                      0 0 22px rgba(74, 158, 255, 0.10),
+                      0 0 34px rgba(239, 68, 68, 0.07)
                     `.replace(/\s+/g,' ').trim()
                   : isSelected
                     ? 'inset 0 0 0 1px rgba(255,255,255,0.07), 0 0 16px rgba(255,255,255,0.10), 0 0 22px rgba(74,158,255,0.10)'
