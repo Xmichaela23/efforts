@@ -1029,7 +1029,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }, [weather]);
 
   return (
-    <div className="w-full flex-1 flex flex-col" style={{fontFamily: 'Inter, sans-serif', minHeight: 'var(--todays-h)', position:'relative', overflow: 'hidden', zIndex: 0}}>
+    <div className="w-full flex flex-col flex-shrink-0" style={{fontFamily: 'Inter, sans-serif', maxHeight: '40vh', position:'relative', overflow: 'hidden', zIndex: 0}}>
       {/* Today Panel - Live instrument cockpit (raised, glowing, primary focus) */}
       <div 
         ref={headerRef}

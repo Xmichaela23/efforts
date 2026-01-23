@@ -834,8 +834,8 @@ export default function WorkoutCalendar({
         </button>
       </div>
 
-      {/* Vertical Timeline - Days as horizontal rows (training log style) */}
-      <div className="flex flex-col gap-1 flex-1 overflow-y-auto pb-2">
+      {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
+      <div className="flex flex-col gap-1 flex-shrink-0 pb-2">
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
