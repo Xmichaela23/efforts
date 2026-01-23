@@ -891,7 +891,8 @@ export default function WorkoutCalendar({
         className="flex items-center justify-between py-1 mb-1 relative"
         style={{
           backgroundColor: '#000000',
-          padding: '0.5rem 0.75rem',
+          // narrower “week strip”
+          padding: '0.32rem 0.6rem',
           borderRadius: '6px',
           zIndex: 5,
           // Omni-inspired illuminated border
@@ -945,7 +946,8 @@ export default function WorkoutCalendar({
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, key)}
               className={[
-                "w-full flex items-center gap-2 px-2 py-1 rounded transition-all",
+                // slightly taller rows so pills can breathe
+                "w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all",
                 "hover:bg-white/[0.02]",
                 dragOverDate === key ? "ring-1 ring-white/20 bg-white/[0.03]" : "",
               ].join(" ")}
@@ -965,7 +967,7 @@ export default function WorkoutCalendar({
                     ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.18) 100%)' // Selected: eye-catch, but less than Today
                   : 'radial-gradient(ellipse at left, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%)', // Week rows: mid glow
                 opacity: 1.0,
-                minHeight: '36px', // Compact row height
+                minHeight: '42px', // Slightly taller row height
                 // More visible Omni glow for today
                 boxShadow: isToday
                   ? `
@@ -1060,12 +1062,12 @@ export default function WorkoutCalendar({
                         onDragEnd={handleDragEnd}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`text-xs px-1.5 py-0.5 flex-shrink-0 transition-all backdrop-blur-sm font-light tracking-wide ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                        className={`text-xs px-1.5 py-[0.34rem] flex-shrink-0 transition-all backdrop-blur-sm font-light tracking-wide ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                         style={{
                           ...phosphorPill.style,
                           borderRadius: '4px',
                           fontSize: '0.7rem', // Slightly smaller text
-                          lineHeight: '1.2', // Tighter line height
+                          lineHeight: '1.22', // Slightly taller
                           // 3D object feel (Omni: glossy, beveled, not flat "calendar event")
                           backgroundImage: isDone
                             ? `

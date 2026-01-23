@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Calendar, BarChart3, Home } from 'lucide-react';
+import { ArrowRight, Calendar, BarChart3, LayoutGrid } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
@@ -1703,6 +1703,45 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         <div className="mobile-tabbar px-4 flex items-center" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 18px)' }}>
           <div className="w-full">
             <div className="flex justify-center items-center gap-2">
+              {(() => {
+                const homeActive = activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear && !showContext;
+                const contextActive = activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear;
+                const plansActive = plansMenuOpen;
+                const tabBase =
+                  'relative flex-1 flex items-center justify-center gap-2 backdrop-blur-lg transition-all duration-300 shadow-lg hover:shadow-xl';
+                const tabChrome =
+                  'border-2 rounded-2xl bg-white/[0.07] text-white/75 hover:bg-white/[0.09] hover:text-white/90 border-white/30 hover:border-white/45';
+                const tabActive =
+                  'bg-white/[0.10] text-white border-white/55';
+                const tabStyle: React.CSSProperties = {
+                  padding: '10px 14px',
+                  minHeight: '44px',
+                  boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.10) inset, 0 6px 16px rgba(0, 0, 0, 0.35)',
+                };
+                const lampStyle = (active: boolean): React.CSSProperties => ({
+                  position: 'absolute',
+                  top: 6,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 8,
+                  height: 2,
+                  borderRadius: 999,
+                  opacity: active ? 1 : 0,
+                  background: 'rgba(255,255,255,0.85)',
+                  boxShadow:
+                    '0 0 10px rgba(255,215,0,0.22), 0 0 14px rgba(183,148,246,0.16), 0 0 14px rgba(74,158,255,0.14)',
+                  transition: 'opacity 200ms ease',
+                });
+                const iconStyle = (active: boolean): React.CSSProperties => ({
+                  opacity: active ? 0.95 : 0.75,
+                  filter: active
+                    ? 'drop-shadow(0 0 10px rgba(255,255,255,0.16)) drop-shadow(0 0 16px rgba(74,158,255,0.10))'
+                    : 'none',
+                });
+                const labelClass = 'text-sm font-light tracking-wide';
+
+                return (
+                  <>
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to home
@@ -1711,21 +1750,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     }
                     setActiveBottomNav('home');
                   }}
-                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear && !showContext
-                      ? 'border-white/50 text-white bg-white/[0.12]' 
-                      : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
-                  }`}
-                  style={{
-                    fontFamily: 'Inter, sans-serif',
-                    padding: '10px 14px',
-                    borderRadius: '1rem',
-                    fontSize: '14px',
-                    minHeight: '42px',
-                    boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
-                  }}
+                  className={`${tabBase} ${tabChrome} ${homeActive ? tabActive : ''}`}
+                  style={tabStyle}
                 >
-                  <Home className="h-4 w-4" />
+                  <span aria-hidden="true" style={lampStyle(homeActive)} />
+                  <LayoutGrid className="h-4 w-4" style={iconStyle(homeActive)} />
+                  <span className={labelClass}>Home</span>
                 </Button>
                 <Button
                   onClick={() => {
@@ -1736,21 +1766,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     setShowContext(false);
                     setActiveBottomNav('insights');
                   }}
-                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear
-                      ? 'border-white/50 text-white bg-white/[0.12]' 
-                      : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
-                  }`}
-                  style={{
-                    fontFamily: 'Inter, sans-serif',
-                    padding: '10px 14px',
-                    borderRadius: '1rem',
-                    fontSize: '14px',
-                    minHeight: '42px',
-                    boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
-                  }}
+                  className={`${tabBase} ${tabChrome} ${contextActive ? tabActive : ''}`}
+                  style={tabStyle}
                 >
-                  Context
+                  <span aria-hidden="true" style={lampStyle(contextActive)} />
+                  <BarChart3 className="h-4 w-4" style={iconStyle(contextActive)} />
+                  <span className={labelClass}>Context</span>
                 </Button>
                 <PlansMenu
                 currentPlans={currentPlans as any}
@@ -1767,25 +1788,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                           }
                           setPlansMenuOpen(true);
                         }}
-                        className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                          plansMenuOpen
-                            ? 'border-white/50 text-white bg-white/[0.12]' 
-                            : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
-                        }`}
-                style={{
-                  fontFamily: 'Inter, sans-serif',
-                          padding: '10px 14px',
-                          borderRadius: '1rem',
-                  fontSize: '14px',
-                  minHeight: '42px',
-                          boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
-                }}
+                        className={`${tabBase} ${tabChrome} ${plansActive ? tabActive : ''}`}
+                        style={tabStyle}
               >
-                        Plans
+                        <span aria-hidden="true" style={lampStyle(plansActive)} />
+                        <Calendar className="h-4 w-4" style={iconStyle(plansActive)} />
+                        <span className={labelClass}>Plans</span>
               </Button>
                   }
                 />
                 <LogFAB onSelectType={handleSelectEffortType} />
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

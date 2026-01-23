@@ -997,7 +997,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const blockLoading = unifiedLoading && !Array.isArray(dateWorkoutsMemo) ? true : false;
   if (blockLoading) {
     return (
-      <div className="w-full flex-shrink-0 flex items-center justify-center overflow-hidden" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)'}}>
+      <div className="w-full flex-shrink-0 flex items-center justify-center overflow-hidden" style={{ height: 'var(--todays-h)' }}>
         <p className="text-muted-foreground text-sm">Loading...</p>
       </div>
     );
@@ -1029,7 +1029,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }, [weather]);
 
   return (
-    <div className="w-full h-full flex flex-col" style={{fontFamily: 'Inter, sans-serif', position:'relative', overflow: 'hidden', zIndex: 0}}>
+    <div className="w-full h-full flex flex-col" style={{ position:'relative', overflow: 'hidden', zIndex: 0 }}>
       {/* Omni-inspired diamond-grid texture (matches reference) */}
       <div
         aria-hidden="true"
