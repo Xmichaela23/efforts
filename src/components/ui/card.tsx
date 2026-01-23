@@ -9,7 +9,9 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "bg-white/[0.03] backdrop-blur-md border border-white/10 text-card-foreground rounded-2xl shadow-lg",
+      // Text-bearing surfaces should be crisper than atmospheric layers:
+      // slightly less blur + slightly more opacity improves readability.
+      "bg-white/[0.04] backdrop-blur-sm border border-white/10 text-card-foreground rounded-2xl shadow-lg",
       className
     )}
     {...props}

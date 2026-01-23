@@ -155,7 +155,8 @@ const SidebarProvider = React.forwardRef<
 SidebarProvider.displayName = "SidebarProvider"
 
 const sidebarVariants = cva(
-  "h-full bg-background/80 backdrop-blur-sm border-r border-border/40 shadow-sm",
+  // Sidebar is a text-heavy surface: slightly less blur + slightly more opacity.
+  "h-full bg-background/85 backdrop-blur-[3px] border-r border-border/40 shadow-sm",
   {
     variants: {
       size: {

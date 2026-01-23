@@ -1386,11 +1386,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   <button
                     key={workout.id}
                     type="button"
-                    className={`w-full text-left transition-all backdrop-blur-lg ${phosphorPill.className}`}
+                    className={`w-full text-left transition-all ${!isCompleted ? 'backdrop-blur-md' : ''} ${phosphorPill.className}`}
                     style={{
                       ...phosphorPill.style,
                       borderRadius: '10px',
                       padding: '0.6rem 0.85rem',
+                      // Filled (completed) should read like backlit phosphor glass, not fog:
+                      // reduce blur radius ~30% on filled state only.
+                      ...(isCompleted
+                        ? {
+                            backdropFilter: 'blur(11.2px)',
+                            WebkitBackdropFilter: 'blur(11.2px)',
+                          }
+                        : null),
                       // Dimensional / “special” feel (gloss + bevel + subtle depth)
                       backgroundImage: `
                         radial-gradient(120% 120% at 26% 18%, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.00) 52%),
@@ -1432,7 +1440,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         style={{
                           color: getDisciplinePhosphorCore(workoutType),
                           // Legibility: slight dark edge + faint discipline bloom
-                          textShadow: `0 1px 1px rgba(0,0,0,0.55), 0 0 10px rgba(0,0,0,0.35), 0 0 14px rgba(${pillRgb},0.10)`,
+                          textShadow: isCompleted
+                            ? `0 1px 1px rgba(0,0,0,0.65), 0 0 8px rgba(0,0,0,0.45), 0 0 10px rgba(${pillRgb},0.07)`
+                            : `0 1px 1px rgba(0,0,0,0.55), 0 0 10px rgba(0,0,0,0.35), 0 0 14px rgba(${pillRgb},0.10)`,
                         }}
                       >
                         {title}

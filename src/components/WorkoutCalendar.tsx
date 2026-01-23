@@ -1116,14 +1116,24 @@ export default function WorkoutCalendar({
                         onDragEnd={handleDragEnd}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`text-xs px-1.5 py-[0.34rem] flex-shrink-0 transition-all backdrop-blur-sm font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                        className={`text-xs px-1.5 py-[0.34rem] flex-shrink-0 transition-all font-medium tracking-normal ${!isDone ? 'backdrop-blur-sm' : ''} ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                         style={{
                           ...phosphorPill.style,
                           borderRadius: '4px',
                           fontSize: '0.74rem', // Slightly larger for legibility
                           lineHeight: '1.22', // Slightly taller
                           // Legibility: tiny dark edge + faint phosphor bloom (kept subtle)
-                          textShadow: `0 1px 1px rgba(0,0,0,0.55), 0 0 8px rgba(0,0,0,0.35), 0 0 14px rgba(${pillRgb},0.10)`,
+                          textShadow: isDone
+                            ? `0 1px 1px rgba(0,0,0,0.65), 0 0 6px rgba(0,0,0,0.45), 0 0 10px rgba(${pillRgb},0.07)`
+                            : `0 1px 1px rgba(0,0,0,0.55), 0 0 8px rgba(0,0,0,0.35), 0 0 14px rgba(${pillRgb},0.10)`,
+                          // Reduce blur radius ~30% on FILLED (completed) chips only:
+                          // keep "phosphor glass" crisp instead of foggy.
+                          ...(isDone
+                            ? {
+                                backdropFilter: 'blur(2.8px)',
+                                WebkitBackdropFilter: 'blur(2.8px)',
+                              }
+                            : null),
                           // 3D object feel (Omni: glossy, beveled, not flat "calendar event")
                           backgroundImage: isDone
                             ? `
