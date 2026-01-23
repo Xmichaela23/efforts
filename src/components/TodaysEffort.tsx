@@ -1401,7 +1401,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         )}
         </div>
         </div>
-      </div>
 
       {/* Planned Workout Bottom Sheet */}
       <Drawer open={!!selectedPlannedWorkout} onOpenChange={(open) => !open && setSelectedPlannedWorkout(null)}>
