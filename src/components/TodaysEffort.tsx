@@ -1052,6 +1052,30 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           backgroundPosition: 'center, center, center, center, center',
         }}
       />
+      {/* Glow-field behind the Today panel (restores “Today halo”) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          left: '-16px',
+          right: '-16px',
+          top: '-24px',
+          height: '220px',
+          zIndex: 0,
+          pointerEvents: 'none',
+          mixBlendMode: 'screen',
+          backgroundImage: `
+            radial-gradient(200px 120px at 18% 40%, rgba(255, 215, 0, 0.28) 0%, rgba(255, 215, 0, 0.0) 72%),
+            radial-gradient(220px 140px at 40% 52%, rgba(255, 140, 66, 0.20) 0%, rgba(255, 140, 66, 0.0) 72%),
+            radial-gradient(220px 140px at 60% 52%, rgba(183, 148, 246, 0.18) 0%, rgba(183, 148, 246, 0.0) 72%),
+            radial-gradient(200px 120px at 82% 40%, rgba(74, 158, 255, 0.18) 0%, rgba(74, 158, 255, 0.0) 72%),
+            radial-gradient(260px 170px at 50% 72%, rgba(239, 68, 68, 0.14) 0%, rgba(239, 68, 68, 0.0) 76%)
+          `,
+          opacity: 0.60,
+          filter: 'blur(24px) saturate(1.12)',
+          transform: 'translateZ(0)',
+        }}
+      />
       {/* Scrollable container for Today panel */}
       <div 
         ref={scrollRef}
@@ -1074,36 +1098,37 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             zIndex: 20,
             // Opaque base + Omni texture so scroll content doesn't show through
             backgroundColor: '#000000',
-            // Diamond-grid texture (like the reference) + subtle spectral glow field
+            // Option 1 lighting: keep texture, but bias glow to a top-left “key light” (white)
             backgroundImage: `
-              radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.10) 0%, transparent 55%),
-              radial-gradient(ellipse at 85% 30%, rgba(74, 158, 255, 0.08) 0%, transparent 55%),
-              radial-gradient(ellipse at 15% 35%, rgba(183, 148, 246, 0.08) 0%, transparent 55%),
+              radial-gradient(ellipse at 18% 0%, rgba(255, 255, 255, 0.18) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 45%, rgba(255, 255, 255, 0.06) 0%, transparent 62%),
               linear-gradient(45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
               linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
               linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
               linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px)
             `,
-            backgroundSize: 'cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px',
-            backgroundPosition: 'center, center, center, center, center, center, center',
-            backgroundBlendMode: 'screen, screen, screen, soft-light, soft-light, soft-light, soft-light',
+            backgroundSize: 'cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px',
+            backgroundPosition: 'center, center, center, center, center, center',
+            backgroundBlendMode: 'screen, screen, soft-light, soft-light, soft-light, soft-light',
             overflow: 'hidden',
             // Omni-inspired illuminated border that blends
             border: '0.5px solid rgba(255, 255, 255, 0.08)',
             borderRadius: '12px', // Rounded corners for mounted instrument feel
             padding: '0.75rem 1rem', // More padding for panel breathing room
-            // Panel depth: raised above background with Omni-style glow field - more visible
+            // Panel depth: top-left key light + neutral depth (rainbow reserved for the horizon/road)
             boxShadow: `
-              0 0 0 1px rgba(255,255,255,0.04) inset,
-              0 2px 8px rgba(0,0,0,0.5),
-              0 0 20px rgba(255, 240, 200, 0.08),
-              0 0 40px rgba(255, 240, 200, 0.04),
-              0 0 0 1px rgba(255, 215, 0, 0.20),
-              0 0 20px rgba(255, 215, 0, 0.15),
-              0 0 32px rgba(255, 140, 66, 0.12),
-              0 0 32px rgba(183, 148, 246, 0.12),
-              0 0 24px rgba(74, 158, 255, 0.10)
-            `, // Inner stroke + depth + warm glow field + Omni rainbow glow - enhanced
+              0 0 0 1px rgba(255,255,255,0.05) inset,
+              inset 0 1px 0 rgba(255,255,255,0.20),
+              inset 0 -1px 0 rgba(0,0,0,0.45),
+              0 10px 22px rgba(0,0,0,0.55),
+              /* subtle spectrum halo so “Today” reads as active */
+              0 0 18px rgba(255,255,255,0.05),
+              0 0 26px rgba(255,215,0,0.10),
+              0 0 34px rgba(255,140,66,0.08),
+              0 0 30px rgba(183,148,246,0.06),
+              0 0 30px rgba(74,158,255,0.06),
+              0 0 40px rgba(239, 68, 68, 0.05)
+            `,
             // Keep aligned to the instrument panel surface (no “floating” offsets)
             marginLeft: 0,
             marginRight: 0,

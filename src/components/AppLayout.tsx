@@ -832,6 +832,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           date: workout.date,
           duration: workout.duration,
           distance: workout.distance,
+          steps_preset: (workout as any).steps_preset,
+          strength_exercises: (workout as any).strength_exercises,
+          mobility_exercises: (workout as any).mobility_exercises,
           description: workout.description || "",
           userComments: "",
           completedManually: false,
@@ -1432,7 +1435,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       navigate(location.pathname, { replace: true });
     } catch {
       // Fallback: full reload
-      try { location.reload(); } catch {}
+      try { window.location.reload(); } catch {}
     }
   };
 
@@ -1487,8 +1490,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onClose={handleBackToDashboard}
                 onSelectPlan={handlePlanSelect}
                 onBuildWorkout={handleBuildWorkout}
-                currentPlans={currentPlans}
-                completedPlans={completedPlans}
+                currentPlans={currentPlans as any}
+                completedPlans={completedPlans as any}
                 detailedPlans={detailedPlans}
                 onDeletePlan={handlePlanDeleted}
                 onSelectWorkout={(w) => {
@@ -1586,8 +1589,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     padding: 10,
                     position: 'relative',
                     background:
-                      'radial-gradient(ellipse at 20% 10%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.0) 55%),' +
-                      'radial-gradient(ellipse at 80% 20%, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.0) 60%),' +
+                      /* Option 1 lighting: top-left key light + neutral depth */
+                      'radial-gradient(ellipse at 18% 8%, rgba(255,255,255,0.09) 0%, rgba(0,0,0,0.0) 58%),' +
+                      'radial-gradient(ellipse at 78% 28%, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.0) 62%),' +
                       'radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.90) 100%)',
                     border: '0.5px solid rgba(255,255,255,0.10)',
                     boxShadow:
@@ -1669,10 +1673,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         onViewCompleted={handleViewCompleted}
                         onEditEffort={handleEditEffort}
                         onDateSelect={handleDateSelect}
+                        selectedDate={selectedDate}
                         onSelectRoutine={handleSelectRoutine}
                         onOpenPlanBuilder={handleOpenPlanBuilder}
-                        currentPlans={currentPlans}
-                        completedPlans={completedPlans}
+                        currentPlans={currentPlans as any}
+                        completedPlans={completedPlans as any}
                         workouts={workouts}
                         plannedWorkouts={[]}
                       />
@@ -1748,8 +1753,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   Context
                 </Button>
                 <PlansMenu
-                currentPlans={currentPlans}
-                completedPlans={completedPlans}
+                currentPlans={currentPlans as any}
+                completedPlans={completedPlans as any}
                   onSelectPlan={handleSelectRoutine}
                   isOpen={plansMenuOpen}
                   onOpenChange={setPlansMenuOpen}

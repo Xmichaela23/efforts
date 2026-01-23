@@ -28,6 +28,7 @@ interface WorkoutCalendarProps {
   onViewCompleted: () => void;
   onEditEffort: (workout: any) => void;
   onDateSelect: (date: string) => void;
+  selectedDate?: string;
   onSelectRoutine?: (type: string) => void;
   onOpenPlanBuilder?: () => void;
   currentPlans?: any[];
@@ -251,6 +252,7 @@ export default function WorkoutCalendar({
   onViewCompleted,
   onEditEffort,
   onDateSelect,
+  selectedDate,
   onSelectRoutine,
   onOpenPlanBuilder,
   currentPlans = [],
@@ -846,10 +848,13 @@ export default function WorkoutCalendar({
           pointerEvents: 'none',
           // Trapezoid “road” with vanishing point + lane/grid lines
           backgroundImage: `
-            radial-gradient(120px 70px at 50% 22%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.0) 70%),
-            radial-gradient(260px 180px at 50% 26%, rgba(255, 215, 0, 0.10) 0%, rgba(255, 215, 0, 0.0) 70%),
-            radial-gradient(260px 180px at 62% 32%, rgba(74, 158, 255, 0.08) 0%, rgba(74, 158, 255, 0.0) 72%),
-            radial-gradient(260px 180px at 38% 32%, rgba(183, 148, 246, 0.08) 0%, rgba(183, 148, 246, 0.0) 72%),
+            radial-gradient(120px 70px at 50% 22%, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.0) 70%),
+            /* discipline-tinted wash (kept near “horizon” so pills stay readable) */
+            radial-gradient(300px 190px at 50% 26%, rgba(255, 215, 0, 0.14) 0%, rgba(255, 215, 0, 0.0) 72%),
+            radial-gradient(320px 220px at 50% 36%, rgba(239, 68, 68, 0.10) 0%, rgba(239, 68, 68, 0.0) 74%),
+            radial-gradient(320px 220px at 38% 34%, rgba(183, 148, 246, 0.10) 0%, rgba(183, 148, 246, 0.0) 74%),
+            radial-gradient(320px 220px at 62% 34%, rgba(74, 158, 255, 0.10) 0%, rgba(74, 158, 255, 0.0) 74%),
+            radial-gradient(320px 220px at 84% 36%, rgba(80, 200, 120, 0.08) 0%, rgba(80, 200, 120, 0.0) 74%),
             /* center lane line */
             linear-gradient(90deg, rgba(255,255,255,0.0) 49.6%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.0) 50.4%),
             /* road edge lines */
@@ -857,20 +862,28 @@ export default function WorkoutCalendar({
             /* receding grid lines */
             repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 14px),
             repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 18px),
-            linear-gradient(180deg, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.35) 100%)
+            /* stronger bottom falloff so the road doesn’t wash out pills */
+            linear-gradient(180deg,
+              rgba(0,0,0,0.00) 0%,
+              rgba(0,0,0,0.18) 30%,
+              rgba(0,0,0,0.62) 64%,
+              rgba(0,0,0,0.90) 100%
+            )
           `,
-          backgroundBlendMode: 'screen, screen, screen, screen, screen, screen, soft-light, soft-light, normal',
+          backgroundBlendMode: 'screen, screen, screen, screen, screen, screen, screen, soft-light, soft-light, normal',
           transformOrigin: '50% 0%',
           transform: 'perspective(700px) rotateX(58deg) scaleY(1.12)',
           clipPath: 'polygon(50% 4%, 92% 96%, 8% 96%)',
-          opacity: 0.50,
+          opacity: 0.68,
           boxShadow: `
             0 10px 24px rgba(0,0,0,0.25),
             0 0 20px rgba(255,215,0,0.10),
-            0 0 26px rgba(74,158,255,0.08),
-            0 0 22px rgba(183,148,246,0.07)
+            0 0 24px rgba(239, 68, 68, 0.07),
+            0 0 22px rgba(183,148,246,0.07),
+            0 0 22px rgba(74,158,255,0.06),
+            0 0 18px rgba(80, 200, 120, 0.05)
           `,
-          filter: 'blur(0.2px)',
+          filter: 'blur(0.6px) saturate(1.06)',
         }}
       />
       {/* Week Navigation - Bright timeline header (compact) */}
@@ -884,10 +897,12 @@ export default function WorkoutCalendar({
           // Omni-inspired illuminated border
           border: '0.5px solid rgba(255, 255, 255, 0.08)',
           boxShadow: `
-            0 0 0 1px rgba(255,255,255,0.04) inset,
-            0 0 20px rgba(255, 215, 0, 0.15),
-            0 0 28px rgba(183, 148, 246, 0.12),
-            0 0 24px rgba(74, 158, 255, 0.10)
+            /* Option 1 lighting: top-left key light + neutral depth (let the road be the spectrum emitter) */
+            0 0 0 1px rgba(255,255,255,0.05) inset,
+            inset 0 1px 0 rgba(255,255,255,0.18),
+            inset -1px -1px 0 rgba(0,0,0,0.35),
+            0 8px 18px rgba(0,0,0,0.45),
+            0 0 22px rgba(255,255,255,0.06)
           `,
         }}
       >
@@ -918,6 +933,8 @@ export default function WorkoutCalendar({
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
           const isToday = toDateOnlyString(new Date()) === key;
+          const isSelected = !!selectedDate && selectedDate === key;
+          const isActiveDay = isToday || isSelected;
 
           return (
             <button
@@ -935,24 +952,61 @@ export default function WorkoutCalendar({
               style={{
                 borderRadius: '6px',
                 // Omni-inspired illuminated border that blends
-                border: '0.5px solid rgba(255, 255, 255, 0.12)',
-                background: isToday 
-                  ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0.12) 100%)' // Today: brighter
+                border: isToday ? '0.5px solid rgba(255, 255, 255, 0.18)' : '0.5px solid rgba(255, 255, 255, 0.12)',
+                background: isToday
+                  ? `
+                      radial-gradient(ellipse at 18% 50%, rgba(255, 215, 0, 0.22) 0%, rgba(255, 215, 0, 0.0) 66%),
+                      radial-gradient(ellipse at 44% 60%, rgba(255, 140, 66, 0.16) 0%, rgba(255, 140, 66, 0.0) 70%),
+                      radial-gradient(ellipse at 62% 55%, rgba(183, 148, 246, 0.14) 0%, rgba(183, 148, 246, 0.0) 70%),
+                      radial-gradient(ellipse at 78% 52%, rgba(74, 158, 255, 0.12) 0%, rgba(74, 158, 255, 0.0) 72%),
+                      radial-gradient(ellipse at left, rgba(255,255,255,0.12) 0%, rgba(0,0,0,0.10) 100%)
+                    ` // Today: brighter + faint spectrum
+                  : isSelected
+                    ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.18) 100%)' // Selected: eye-catch, but less than Today
                   : 'radial-gradient(ellipse at left, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%)', // Week rows: mid glow
                 opacity: 1.0,
                 minHeight: '36px', // Compact row height
                 // More visible Omni glow for today
-                boxShadow: isToday 
-                  ? '0 0 16px rgba(255, 215, 0, 0.20), 0 0 24px rgba(255, 140, 66, 0.15), 0 0 20px rgba(183, 148, 246, 0.12)'
-                  : 'none',
+                boxShadow: isToday
+                  ? `
+                      inset 0 0 0 1px rgba(255,255,255,0.10),
+                      0 0 26px rgba(255, 215, 0, 0.30),
+                      0 0 40px rgba(255, 140, 66, 0.22),
+                      0 0 34px rgba(183, 148, 246, 0.20),
+                      0 0 32px rgba(74, 158, 255, 0.18),
+                      0 0 48px rgba(239, 68, 68, 0.12)
+                    `.replace(/\s+/g,' ').trim()
+                  : isSelected
+                    ? 'inset 0 0 0 1px rgba(255,255,255,0.07), 0 0 16px rgba(255,255,255,0.10), 0 0 22px rgba(74,158,255,0.10)'
+                    : 'none',
               }}
             >
               {/* Left: Day label - bright and visible (compact) */}
               <div className="flex-shrink-0 w-10 text-left">
-                <div className="text-xs font-light leading-tight" style={{ color: isToday ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.75)' }}>
+                <div
+                  className="text-xs font-light leading-tight"
+                  style={{
+                    color: isActiveDay ? 'rgba(255, 255, 255, 0.96)' : 'rgba(255, 255, 255, 0.75)',
+                    textShadow: isToday
+                      ? '0 0 8px rgba(255,215,0,0.28), 0 0 14px rgba(255,140,66,0.20), 0 0 14px rgba(183,148,246,0.16)'
+                      : isSelected
+                        ? '0 0 8px rgba(255,255,255,0.14), 0 0 12px rgba(74,158,255,0.12)'
+                      : 'none',
+                  }}
+                >
                   {weekdayFmt.format(d)}
                 </div>
-                <div className="text-xs font-light tabular-nums leading-tight" style={{ color: isToday ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.7)' }}>
+                <div
+                  className="text-xs font-light tabular-nums leading-tight"
+                  style={{
+                    color: isActiveDay ? 'rgba(255, 255, 255, 0.92)' : 'rgba(255, 255, 255, 0.7)',
+                    textShadow: isToday
+                      ? '0 0 10px rgba(255,215,0,0.34), 0 0 16px rgba(74,158,255,0.18), 0 0 20px rgba(239,68,68,0.12)'
+                      : isSelected
+                        ? '0 0 10px rgba(255,255,255,0.18), 0 0 16px rgba(74,158,255,0.14)'
+                      : 'none',
+                  }}
+                >
                   {d.getDate()}
                 </div>
               </div>
