@@ -1642,7 +1642,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     }}
                   >
                     {/* Today's efforts - fixed height, scrolls internally */}
-                    <div style={{ height: '30vh', flexShrink: 0 }}>
+                    <div style={{ height: 'var(--todays-h)', flexShrink: 0 }}>
                       <TodaysEffort
                         selectedDate={selectedDate}
                         onAddEffort={handleAddEffort}
@@ -1700,7 +1700,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       {/* Bottom Navigation Tab Bar - Show on all screens (except some loggers and builder) */}
       {/* Extra 18px padding-bottom creates safe zone for iOS swipe-up gesture */}
       {!(showPilatesYogaLogger || showBuilder || workoutBeingEdited) && (
-        <div className="mobile-tabbar px-4 flex items-center" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 18px)' }}>
+        <div className="mobile-tabbar px-4 flex items-center">
           <div className="w-full">
             <div className="flex justify-center items-center gap-2">
               {(() => {

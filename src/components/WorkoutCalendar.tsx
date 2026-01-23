@@ -1306,12 +1306,18 @@ export default function WorkoutCalendar({
             });
           }
           
+          // Mobile fit: keep this block compact so Home doesn't require scrolling
+          const compactMetrics = metrics.filter((m) => {
+            const label = String(m?.label || '').toLowerCase();
+            return label.includes('run') || label.includes('strength') || label.includes('total');
+          });
+
           return (
-            <div className="mt-2 pt-2 border-t border-white/10" style={{ minHeight: '140px' }}>
-              <div className="space-y-1.5" style={{ fontSize: '0.7rem', paddingBottom: '0.5rem' }}>
+            <div className="mt-1.5 pt-1.5 border-t border-white/10">
+              <div className="space-y-1" style={{ fontSize: '0.7rem', paddingBottom: '0.25rem' }}>
                 {/* Total Workload header */}
                 <div 
-                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg flex-wrap"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg flex-wrap"
                   style={{
                     background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)',
                     border: '0.5px solid rgba(255, 255, 255, 0.08)',
@@ -1372,9 +1378,9 @@ export default function WorkoutCalendar({
                 </div>
                 
                 {/* All Metrics */}
-                {metrics.length > 0 && (
+                {compactMetrics.length > 0 && (
                   <div className="space-y-0.5 pt-1">
-                    {metrics.map((metric, index) => {
+                    {compactMetrics.map((metric, index) => {
                       const labelLower = String(metric.label || '').toLowerCase();
                       let disciplineType = '';
                       if (labelLower.includes('run')) disciplineType = 'run';
