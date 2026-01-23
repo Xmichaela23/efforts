@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
-import { getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
+import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
 import { Calendar, CheckCircle, Info } from 'lucide-react';
@@ -833,37 +833,44 @@ export default function WorkoutCalendar({
           backgroundPosition: 'center, center, center, center, center',
         }}
       />
-      {/* Omni-inspired pyramid backdrop (supporting, not dominant) */}
+      {/* Omni-inspired “road to horizon” backdrop (supporting, not dominant) */}
       <div
         aria-hidden="true"
         style={{
           position: 'absolute',
           left: '-16px',
           right: '-16px',
-          top: '24px',
-          height: '220px',
+          top: '18px',
+          height: '250px',
           zIndex: 0,
           pointerEvents: 'none',
-          background: `
-            linear-gradient(180deg, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.25) 100%),
-            conic-gradient(
-              from 210deg,
-              rgba(255,215,0,0.40),
-              rgba(255,140,66,0.40),
-              rgba(183,148,246,0.40),
-              rgba(74,158,255,0.40),
-              rgba(80,200,120,0.40),
-              rgba(255,215,0,0.40)
-            )
+          // Trapezoid “road” with vanishing point + lane/grid lines
+          backgroundImage: `
+            radial-gradient(120px 70px at 50% 22%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.0) 70%),
+            radial-gradient(260px 180px at 50% 26%, rgba(255, 215, 0, 0.10) 0%, rgba(255, 215, 0, 0.0) 70%),
+            radial-gradient(260px 180px at 62% 32%, rgba(74, 158, 255, 0.08) 0%, rgba(74, 158, 255, 0.0) 72%),
+            radial-gradient(260px 180px at 38% 32%, rgba(183, 148, 246, 0.08) 0%, rgba(183, 148, 246, 0.0) 72%),
+            /* center lane line */
+            linear-gradient(90deg, rgba(255,255,255,0.0) 49.6%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.0) 50.4%),
+            /* road edge lines */
+            linear-gradient(90deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.0) 12%, rgba(255,255,255,0.0) 88%, rgba(255,255,255,0.10) 100%),
+            /* receding grid lines */
+            repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 14px),
+            repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 18px),
+            linear-gradient(180deg, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.35) 100%)
           `,
-          clipPath: 'polygon(50% 6%, 96% 90%, 4% 90%)',
-          opacity: 0.42,
+          backgroundBlendMode: 'screen, screen, screen, screen, screen, screen, soft-light, soft-light, normal',
+          transformOrigin: '50% 0%',
+          transform: 'perspective(700px) rotateX(58deg) scaleY(1.12)',
+          clipPath: 'polygon(50% 4%, 92% 96%, 8% 96%)',
+          opacity: 0.50,
           boxShadow: `
             0 10px 24px rgba(0,0,0,0.25),
-            0 0 18px rgba(255,215,0,0.10),
-            0 0 22px rgba(74,158,255,0.08),
-            0 0 18px rgba(183,148,246,0.07)
+            0 0 20px rgba(255,215,0,0.10),
+            0 0 26px rgba(74,158,255,0.08),
+            0 0 22px rgba(183,148,246,0.07)
           `,
+          filter: 'blur(0.2px)',
         }}
       />
       {/* Week Navigation - Bright timeline header (compact) */}
@@ -983,6 +990,8 @@ export default function WorkoutCalendar({
                     }
                     
                     const phosphorPill = getDisciplinePhosphorPill(workoutType, glowState);
+                    const pillRgb = getDisciplineColorRgb(workoutType);
+                    const isDone = glowState === 'done';
                     
                     const isPlanned = workoutStatus === 'planned';
                     const workoutId = evt?._src?.id;
@@ -1003,6 +1012,20 @@ export default function WorkoutCalendar({
                           borderRadius: '4px',
                           fontSize: '0.7rem', // Slightly smaller text
                           lineHeight: '1.2', // Tighter line height
+                          // 3D object feel (Omni: glossy, beveled, not flat "calendar event")
+                          backgroundImage: isDone
+                            ? `
+                                radial-gradient(120% 120% at 30% 20%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.00) 46%),
+                                radial-gradient(120% 140% at 80% 110%, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.00) 55%),
+                                linear-gradient(180deg, rgba(${pillRgb},0.34) 0%, rgba(${pillRgb},0.18) 42%, rgba(0,0,0,0.28) 100%)
+                              `
+                            : `
+                                radial-gradient(120% 120% at 30% 20%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.00) 46%),
+                                radial-gradient(120% 140% at 80% 110%, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0.00) 55%),
+                                linear-gradient(180deg, rgba(${pillRgb},0.10) 0%, rgba(${pillRgb},0.04) 55%, rgba(0,0,0,0.20) 100%)
+                              `,
+                          backgroundBlendMode: 'screen, multiply, normal',
+                          backgroundClip: 'padding-box',
                           // Full glow brightness for timeline
                           boxShadow: phosphorPill.style.boxShadow 
                             ? (() => {
@@ -1011,9 +1034,18 @@ export default function WorkoutCalendar({
                                     const newAlpha = parseFloat(alpha) * 0.9; // Minimal reduction - bright
                                     return `rgba(${rgb}, ${newAlpha})`;
                                   });
-                                return `${reducedGlow}, 0 0 0 0.5px rgba(255, 255, 255, 0.12) inset`;
+                                return `${reducedGlow},
+                                  0 2px 6px rgba(0,0,0,0.45),
+                                  0 10px 18px rgba(0,0,0,0.18),
+                                  inset 0 1px 0 rgba(255,255,255,0.22),
+                                  inset 0 -1px 0 rgba(0,0,0,0.35),
+                                  inset 0 0 0 0.5px rgba(255, 255, 255, 0.12)`;
                               })()
-                            : '0 0 0 0.5px rgba(255, 255, 255, 0.12) inset',
+                            : `0 2px 6px rgba(0,0,0,0.45),
+                               0 10px 18px rgba(0,0,0,0.18),
+                               inset 0 1px 0 rgba(255,255,255,0.22),
+                               inset 0 -1px 0 rgba(0,0,0,0.35),
+                               inset 0 0 0 0.5px rgba(255, 255, 255, 0.12)`,
                           borderColor: phosphorPill.style.borderColor ? 
                             (typeof phosphorPill.style.borderColor === 'string' && phosphorPill.style.borderColor.includes('rgba') ?
                               (() => {
@@ -1027,6 +1059,7 @@ export default function WorkoutCalendar({
                               })() : phosphorPill.style.borderColor) : undefined,
                           borderWidth: '0.5px',
                           whiteSpace: 'nowrap',
+                          transform: 'translateZ(0)',
                         }}
                       >
                         {(() => {
