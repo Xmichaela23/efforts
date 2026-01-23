@@ -818,9 +818,9 @@ export default function WorkoutCalendar({
           position: 'sticky',
           top: 0,
           zIndex: 10,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          backgroundColor: 'rgba(0, 0, 0, 0.95)',
           paddingTop: '0.5rem',
           paddingBottom: '0.5rem',
           marginTop: '-0.5rem',
@@ -828,6 +828,7 @@ export default function WorkoutCalendar({
           marginRight: '-0.5rem',
           paddingLeft: '0.5rem',
           paddingRight: '0.5rem',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
         }}
       >
         <button
@@ -852,7 +853,7 @@ export default function WorkoutCalendar({
       </div>
 
       {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
-      <div className="flex flex-col gap-1 flex-shrink-0 pb-2">
+      <div className="flex flex-col gap-1 flex-shrink-0 pb-2" style={{ overflowY: 'auto' }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
