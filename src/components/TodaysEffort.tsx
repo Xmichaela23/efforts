@@ -1195,251 +1195,142 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </p>
           </div>
         ) : (
-          // Compact workout display - vertical list (reverted)
-          <div className="">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          // “Titles only” list: tap opens bottom sheet (planned) or detail (completed)
+          <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               {displayWorkouts.map((workout) => {
                 const workoutType = workout.type || workout.workout_type || '';
                 const isCompleted = workout.workout_status === 'completed';
-                // Today's workouts: completed = 'done' (filled), not completed = 'week' (empty border, no fill)
-                // This matches calendar behavior - empty border when not completed
+                const isPlanned = workout.workout_status === 'planned';
                 const glowState: 'idle' | 'week' | 'done' | 'active' = isCompleted ? 'done' : 'week';
                 const phosphorPill = getDisciplinePhosphorPill(workoutType, glowState);
-                
-                const workoutId = workout.id || String(workout.workout_status === 'planned' ? workout.workout_id : workout.id);
-                const isExpanded = expandedWorkouts.has(workoutId);
-                
-                const toggleExpand = () => {
-                  setExpandedWorkouts(prev => {
-                    const next = new Set(prev);
-                    if (isExpanded) {
-                      next.delete(workoutId);
-                    } else {
-                      next.add(workoutId);
+                const pillRgb = getDisciplineColorRgb(workoutType);
+
+                const title = (() => {
+                  const type = String(workout.type || '').toLowerCase();
+                  const desc = String(workout.description || '').toLowerCase();
+                  const steps = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
+                  if (type === 'strength') {
+                    const stTitle = String((workout as any)?.workout_structure?.title || '').trim();
+                    const name = stTitle || workout.name;
+                    if (name && name.trim() && name.toLowerCase() !== 'strength') {
+                      const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
+                      if (hasDateSuffix) return name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim() || 'Strength';
+                      return name;
                     }
-                    return next;
-                  });
-                };
-                
+                    if (/squat|deadlift|bench|ohp/.test(desc)) return 'Strength — Compounds';
+                    if (/chin|row|pull|lunge|accessor/i.test(desc)) return 'Strength — Accessory';
+                    if (/core/.test(desc)) return 'Strength — Core';
+                    return 'Strength';
+                  }
+                  if (type === 'run') {
+                    const joined = steps.join(' ').toLowerCase();
+                    if (/longrun_/.test(joined)) return 'Run — Long';
+                    if (/tempo_/.test(joined)) return 'Run — Tempo';
+                    if (/interval_/.test(joined)) return 'Run — Intervals';
+                    return 'Run';
+                  }
+                  if (type === 'ride') {
+                    const joined = steps.join(' ').toLowerCase();
+                    if (/bike_vo2_/.test(joined)) return 'Ride — VO2';
+                    if (/bike_thr_/.test(joined)) return 'Ride — Threshold';
+                    if (/bike_ss_/.test(joined)) return 'Ride — Sweet Spot';
+                    if (/bike_endurance_/.test(joined)) return 'Ride — Endurance';
+                    return 'Ride';
+                  }
+                  if (type === 'swim') {
+                    if (/drill|technique|swim_drills_|swim_technique_/.test(desc)) return 'Swim — Drills';
+                    return 'Swim';
+                  }
+                  if (type === 'pilates_yoga') {
+                    const nameLower = String(workout.name || '').toLowerCase();
+                    const descLower = String(workout.description || '').toLowerCase();
+                    const combined = (nameLower + ' ' + descLower).toLowerCase();
+                    if (/yoga/i.test(combined)) return 'Yoga';
+                    if (/pilates/i.test(combined)) return 'Pilates';
+                    return workout.name || 'Pilates/Yoga';
+                  }
+                  const name = workout.name;
+                  if (name) {
+                    const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
+                    if (hasDateSuffix) return name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
+                    return name;
+                  }
+                  return getDisplaySport(workout);
+                })();
+
                 return (
-                <div
-                  key={workout.id}
-                  className={`w-full text-left transition-all backdrop-blur-lg ${phosphorPill.className}`}
-                  style={{
-                    ...phosphorPill.style,
-                    borderRadius: '4px', // More rectangular - tighter radius for label strips
-                    padding: '0.5rem 0.75rem', // Reduced height - tighter vertical padding
-                    // Inset stroke for mounted/cut-into-panel feel
-                    boxShadow: phosphorPill.style.boxShadow 
-                      ? `${phosphorPill.style.boxShadow}, 0 0 0 0.5px rgba(255, 255, 255, 0.08) inset`
-                      : '0 0 0 0.5px rgba(255, 255, 255, 0.08) inset',
-                    // Reduce outer border dominance - lighter border for less "floating bubble" feel
-                    borderColor: phosphorPill.style.borderColor ? 
-                      (typeof phosphorPill.style.borderColor === 'string' && phosphorPill.style.borderColor.includes('rgba') ?
-                        (() => {
-                          const rgbaMatch = phosphorPill.style.borderColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
-                          if (rgbaMatch) {
-                            const [, r, g, b, alpha] = rgbaMatch;
-                            const newAlpha = Math.max(0.12, parseFloat(alpha) * 0.6);
-                            return `rgba(${r}, ${g}, ${b}, ${newAlpha})`;
-                          }
-                          return phosphorPill.style.borderColor;
-                        })() : phosphorPill.style.borderColor) : undefined,
-                    borderWidth: '0.5px', // Thinner border for less dominance
-                    marginBottom: '0.25rem', // Tight spacing between chips
-                  }}
-                >
-                  {/* Planned: show workout details with fixed height and expand */}
-                  {workout.workout_status === 'planned' ? (
-                    <WorkoutCardExpandable
-                      workout={workout}
-                      workoutType={workoutType}
-                      baselines={baselines}
-                      isExpanded={isExpanded}
-                      onToggleExpand={toggleExpand}
-                      getDisciplinePhosphorCore={getDisciplinePhosphorCore}
-                    />
-                  ) : (
-                    <div 
-                      className="space-y-1 cursor-pointer"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onEditEffort && onEditEffort(workout);
-                      }}
-                    >
-                      {/* Title and Duration Row */}
-                      <div className="flex items-center justify-between">
-                        <div className="font-light tracking-normal text-base" style={{ color: getDisciplinePhosphorCore(workoutType) }}>
-                          {(() => {
-                            const type = String(workout.type || '').toLowerCase();
-                            const desc = String(workout.description || '').toLowerCase();
-                            const steps = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-                            if (type === 'strength') {
-                              // Check workout_structure.title first (from plans), then workout.name
-                              const stTitle = String((workout as any)?.workout_structure?.title || '').trim();
-                              const name = stTitle || workout.name;
-                              if (name && name.trim() && name.toLowerCase() !== 'strength') {
-                                // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
-                                const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
-                                if (hasDateSuffix) {
-                                  const nameWithoutDate = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
-                                  return nameWithoutDate || 'Strength';
-                                }
-                                return name;
-                              }
-                              // Fallback to description-based logic if no name
-                              if (/squat|deadlift|bench|ohp/.test(desc)) return 'Strength — Compounds';
-                              if (/chin|row|pull|lunge|accessor/i.test(desc)) return 'Strength — Accessory';
-                              if (/core/.test(desc)) return 'Strength — Core';
-                              return 'Strength';
-                            }
-                            if (type === 'run') {
-                              const joined = steps.join(' ').toLowerCase();
-                              if (/longrun_/.test(joined)) return 'Run — Long';
-                              if (/tempo_/.test(joined)) return 'Run — Tempo';
-                              if (/interval_/.test(joined)) return 'Run — Intervals';
-                              return 'Run';
-                            }
-                            if (type === 'ride') {
-                              const joined = steps.join(' ').toLowerCase();
-                              if (/bike_vo2_/.test(joined)) return 'Ride — VO2';
-                              if (/bike_thr_/.test(joined)) return 'Ride — Threshold';
-                              if (/bike_ss_/.test(joined)) return 'Ride — Sweet Spot';
-                              if (/bike_endurance_/.test(joined)) return 'Ride — Endurance';
-                              return 'Ride';
-                            }
-                            if (type === 'swim') {
-                              if (/drill|technique|swim_drills_|swim_technique_/.test(desc)) return 'Swim — Drills';
-                              return 'Swim';
-                            }
-                            if (type === 'pilates_yoga') {
-                              // Just return "Pilates" or "Yoga" - specific type goes in description
-                              const nameLower = String(workout.name || '').toLowerCase();
-                              const descLower = String(workout.description || '').toLowerCase();
-                              const combined = (nameLower + ' ' + descLower).toLowerCase();
-                              
-                              // Determine if it's yoga or pilates
-                              if (/yoga/i.test(combined)) return 'Yoga';
-                              if (/pilates/i.test(combined)) return 'Pilates';
-                              
-                              return workout.name || 'Pilates/Yoga';
-                            }
-                            // Use workout.name if it's nice, otherwise fall back to getDisplaySport
-                            const name = workout.name;
-                            if (name) {
-                              // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
-                              const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
-                              if (hasDateSuffix) {
-                                const nameWithoutDate = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
-                                // If what's left is just the type, use getDisplaySport instead
-                                if (nameWithoutDate.toLowerCase() === type.toLowerCase()) {
-                                  return getDisplaySport(workout);
-                                }
-                                return nameWithoutDate;
-                              }
-                              
-                              // Check if it's a raw provider code or lowercase single word
-                              const isRawProviderCode = name.match(/^(ROAD_BIKING|RUNNING|LAP_SWIMMING|OPEN_WATER_SWIMMING|CYCLING|SWIMMING)$/i);
-                              const isGenericProvider = name.startsWith('Garmin ') || name.startsWith('Strava ');
-                              const isLowercaseSingleWord = name === name.toLowerCase() && 
-                                                            !name.includes(' ') && 
-                                                            ['swim', 'run', 'ride', 'walk', 'strength'].includes(name.toLowerCase());
-                              
-                              // Only use existing name if it's actually nice
-                              if (!isRawProviderCode && !isGenericProvider && !isLowercaseSingleWord) {
-                                return name;
-                              }
-                            }
-                            return getDisplaySport(workout);
-                          })()}
-                          {workout.workout_status === 'planned' && (
-                            <span className="text-xs ml-2 text-muted-foreground">(planned)</span>
-                          )}
-                          {workout.workout_status === 'completed' && (
-                            <span 
-                              className="ml-2"
-                              style={{
-                                // Checkmarks use primary white text color - status indicator, not category
-                                color: 'rgba(245, 245, 245, 0.9)', // Primary white text color (--text-active)
-                                // No glow - checkmarks read as status, not category
-                              }}
-                            >✓</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          {workout.workout_status === 'planned' && (() => {
-                            const sec = resolveMovingSeconds(workout);
-                            if (Number.isFinite(sec as any) && (sec as number) > 0) {
-                              const mins = Math.round((sec as number) / 60);
-                              return <span className="font-light tabular-nums" style={{
-                                color: 'rgba(255, 255, 255, 0.85)'
-                              }}>{mins}:00</span>;
-                            }
-                            return null;
-                          })()}
-                          {/* Source attribution - only for completed runs/rides/swims */}
-                          {workout.workout_status === 'completed' && (() => {
-                            const type = String(workout?.type || '').toLowerCase();
-                            const isRunRideSwim = type === 'run' || type === 'running' || type === 'ride' || type === 'cycling' || type === 'bike' || type === 'swim' || type === 'swimming';
-                            if (!isRunRideSwim) return null;
-                            
-                            const source = (workout as any)?.source;
-                            const isStravaImported = (workout as any)?.is_strava_imported;
-                            const stravaId = (workout as any)?.strava_activity_id;
-                            const garminId = (workout as any)?.garmin_activity_id;
-                            const deviceInfo = (() => {
-                              try {
-                                const di = (workout as any)?.device_info || (workout as any)?.deviceInfo;
-                                if (typeof di === 'string') return JSON.parse(di);
-                                return di;
-                              } catch { return null; }
-                            })();
-                            const rawDeviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
-                            const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
-
-                            if (source === 'strava' || stravaId || isStravaImported) {
-                              return (
-                                <div className="flex items-center gap-1 ml-2">
-                                  <img 
-                                    src="/icons/strava-powered-by.svg" 
-                                    alt="Powered by Strava" 
-                                    className="h-2"
-                                  />
-                                  {deviceName && (
-                                    <span className="text-gray-400 text-[10px] leading-tight">via {deviceName}</span>
-                                  )}
-                                </div>
-                              );
-                            }
-
-                            if (source === 'garmin' || garminId) {
-                              return (
-                                <div className="flex items-center gap-0.5 ml-2">
-                                  <span className="text-gray-400 text-[10px] leading-tight">via</span>
-                                  <svg width="5" height="6" viewBox="0 0 10 12" className="flex-shrink-0">
-                                    <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
-                                  </svg>
-                                  <span className="text-[#007CC3] font-light text-[10px] leading-tight">Garmin</span>
-                                  {deviceName && <span className="text-gray-400 text-[10px] leading-tight"> {deviceName}</span>}
-                                </div>
-                              );
-                            }
-
-                            return null;
-                          })()}
-                        </div>
+                  <button
+                    key={workout.id}
+                    type="button"
+                    className={`w-full text-left transition-all backdrop-blur-lg ${phosphorPill.className}`}
+                    style={{
+                      ...phosphorPill.style,
+                      borderRadius: '10px',
+                      padding: '0.6rem 0.85rem',
+                      // Dimensional / “special” feel (gloss + bevel + subtle depth)
+                      backgroundImage: `
+                        radial-gradient(120% 120% at 26% 18%, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.00) 52%),
+                        radial-gradient(120% 140% at 86% 110%, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.00) 58%),
+                        linear-gradient(180deg, rgba(${pillRgb},0.14) 0%, rgba(${pillRgb},0.06) 55%, rgba(0,0,0,0.22) 100%)
+                      `,
+                      backgroundBlendMode: 'screen, multiply, normal',
+                      backgroundClip: 'padding-box',
+                      // Inset stroke so it feels “mounted”
+                      boxShadow: phosphorPill.style.boxShadow
+                        ? `${phosphorPill.style.boxShadow},
+                           0 2px 8px rgba(0,0,0,0.45),
+                           0 14px 26px rgba(0,0,0,0.16),
+                           inset 0 1px 0 rgba(255,255,255,0.22),
+                           inset 0 -1px 0 rgba(0,0,0,0.40),
+                           inset 0 0 0 0.5px rgba(255,255,255,0.08)`
+                        : `0 2px 8px rgba(0,0,0,0.45),
+                           0 14px 26px rgba(0,0,0,0.16),
+                           inset 0 1px 0 rgba(255,255,255,0.22),
+                           inset 0 -1px 0 rgba(0,0,0,0.40),
+                           inset 0 0 0 0.5px rgba(255,255,255,0.08)`,
+                      borderWidth: '0.5px',
+                      transform: 'translateZ(0)',
+                      cursor: isPlanned ? 'pointer' : 'pointer',
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (isPlanned) {
+                        setSelectedPlannedWorkout(workout);
+                        return;
+                      }
+                      onEditEffort && onEditEffort(workout);
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-light tracking-normal text-base" style={{ color: getDisciplinePhosphorCore(workoutType) }}>
+                        {title}
+                        {isCompleted && (
+                          <span
+                            className="ml-2"
+                            style={{ color: 'rgba(245, 245, 245, 0.9)' }}
+                          >
+                            ✓
+                          </span>
+                        )}
                       </div>
-                      
-                      {/* Metrics Row */}
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground font-light">
-                        {formatRichWorkoutDisplay(workout).metrics.map((metric: any, index: number) => (
-                          <span key={index}>{typeof metric === 'string' ? metric : (metric && typeof metric.value === 'string' ? metric.value : '')}</span>
-                        ))}
-                      </div>
+
+                      {/* Optional: tiny planned duration readout (kept subtle) */}
+                      {isPlanned && (() => {
+                        const sec = resolveMovingSeconds(workout);
+                        if (Number.isFinite(sec as any) && (sec as number) > 0) {
+                          const mins = Math.round((sec as number) / 60);
+                          return (
+                            <span className="text-xs font-light tabular-nums" style={{ color: 'rgba(255,255,255,0.70)' }}>
+                              {mins}:00
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
-                  )}
-                </div>
+                  </button>
                 );
               })}
             </div>
