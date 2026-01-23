@@ -467,6 +467,22 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
   // Duration: single-source resolver (canonical computed totals)
   const durationMin: number | null = resolvePlannedDurationMinutes(workout);
+  const computedMilesFromSteps: number | null = (() => {
+    try {
+      if (!hasComputedV3) return null;
+      if (String(parentDisc).toLowerCase() !== 'run') return null;
+      const v3: any[] = Array.isArray(computedAny?.steps) ? computedAny.steps : [];
+      if (!v3.length) return null;
+      const totalM = v3.reduce((sum, st) => {
+        const m = Number((st as any)?.distanceMeters);
+        return (Number.isFinite(m) && m > 0) ? (sum + m) : sum;
+      }, 0);
+      if (!(Number.isFinite(totalM) && totalM > 0)) return null;
+      return totalM / 1609.34;
+    } catch {
+      return null;
+    }
+  })();
 
   // Pick a per-session summary for display in Planned view
   const sessionSummary: string | undefined = (() => {
@@ -480,6 +496,24 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     ];
     const txt = candidates.find((v) => typeof v === 'string' && String(v).trim().length>0);
     return txt ? String(txt).trim() : undefined;
+  })();
+  const displaySummary: string | undefined = (() => {
+    if (!sessionSummary) return undefined;
+    // If computed steps exist, never trust description's leading "X minutes (Y miles)" math.
+    if (!(hasComputedV3 && typeof durationMin === 'number' && durationMin > 0 && typeof computedMilesFromSteps === 'number' && computedMilesFromSteps > 0)) {
+      return sessionSummary;
+    }
+    const milesTxt = computedMilesFromSteps.toFixed(1);
+    const prefix = `${durationMin} min (${milesTxt} mi): `;
+    const txt = sessionSummary.trim();
+    // Replace common generated prefixes:
+    // - "166 minutes (15.0 miles): ..."
+    // - "15 miles: ..."
+    const m1 = txt.match(/^\s*\d+(?:\.\d+)?\s*(?:minutes?|mins?)\s*\([^)]+\)\s*:\s*/i);
+    if (m1) return prefix + txt.slice(m1[0].length);
+    const m2 = txt.match(/^\s*\d+(?:\.\d+)?\s*(?:miles?|mi)\s*:\s*/i);
+    if (m2) return prefix + txt.slice(m2[0].length);
+    return txt;
   })();
 
   const handleGarminExport = async () => {
@@ -613,9 +647,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           )}
         </div>
       )}
-      {sessionSummary && (
+      {displaySummary && (
         <div className="text-sm text-gray-200 font-light tracking-normal leading-snug">
-          {sessionSummary}
+          {displaySummary}
         </div>
       )}
       <div className="p-1">

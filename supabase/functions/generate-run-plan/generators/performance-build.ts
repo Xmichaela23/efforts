@@ -1447,8 +1447,10 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     const mpMiles2 = this.minutesToApproximateMiles(finalMPTime, mpPace);
     const easyMiles3 = this.minutesToApproximateMiles(finalEasyEnd, easyPace);
     const totalMiles = easyMiles1 + mpMiles1 + easyMiles2 + mpMiles2 + easyMiles3;
+    const mpTotalMin = finalMPTime * 2;
+    const totalTimeRounded = finalEasyStart + finalEasyBetween + finalEasyEnd + mpTotalMin;
 
-    const description = `${cappedTime} minutes (${totalMiles.toFixed(1)} miles): ` +
+    const description = `${totalTimeRounded} minutes (${totalMiles.toFixed(1)} miles): ` +
       `${finalEasyStart} min E + ${finalMPTime} min @ M + ${finalEasyBetween} min E + ${finalMPTime} min @ M + ${finalEasyEnd} min E. ` +
       `Quality long run with structured M-pace segments. Practice returning to M pace under fatigue.`;
 
@@ -1456,8 +1458,8 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       'Sunday',
       'Quality Long Run',
       description,
-      cappedTime,
-      [TOKEN_PATTERNS.long_run_with_mp(finalEasyStart + finalEasyBetween + finalEasyEnd, finalMPTime * 2)],
+      totalTimeRounded,
+      [TOKEN_PATTERNS.long_run_with_mp(totalTimeRounded, mpTotalMin)],
       ['long_run', 'quality', 'marathon_pace']
     );
   }
@@ -1813,6 +1815,7 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     
     let description: string;
     let tokens: string[];
+    let durationMinutes: number = totalTime;
     
     if (hasMPaceSegments) {
       // Calculate time breakdown for M-pace segments
@@ -1849,7 +1852,8 @@ export class PerformanceBuildGenerator extends BaseGenerator {
         `Practice race-day fueling and pacing.`;
       
       // Use time-based tokens per Jack Daniels method
-      tokens = [TOKEN_PATTERNS.long_run_with_mp(easyTimeRounded, mpTimeRounded)];
+      tokens = [TOKEN_PATTERNS.long_run_with_mp(totalTimeRounded, mpTimeRounded)];
+      durationMinutes = totalTimeRounded;
     } else {
       const totalMilesApprox = this.minutesToApproximateMiles(totalTime, easyPace);
       const timeRounded = Math.round(totalTime / 5) * 5;
@@ -1859,6 +1863,7 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       
       // Use time-based tokens per Jack Daniels method
       tokens = [TOKEN_PATTERNS.long_run(timeRounded)];
+      durationMinutes = timeRounded;
     }
     
     // Note if time was capped
@@ -1866,7 +1871,7 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       description += ` [Time capped at ${timeCap} minutes per Jack Daniels' method to prevent excessive fatigue.]`;
     }
     
-    return this.createSession('Sunday', 'Long Run', description, totalTime, tokens, ['long_run']);
+    return this.createSession('Sunday', 'Long Run', description, durationMinutes, tokens, ['long_run']);
   }
 
   /**
