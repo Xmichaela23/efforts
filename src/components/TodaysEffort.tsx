@@ -1029,14 +1029,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }, [weather]);
 
   return (
-    <div className="w-full flex-1" style={{fontFamily: 'Inter, sans-serif', minHeight: 'var(--todays-h)', position:'relative', overflow: 'visible', zIndex: 0}}>
+    <div className="w-full flex-1 flex flex-col" style={{fontFamily: 'Inter, sans-serif', minHeight: 'var(--todays-h)', position:'relative', overflow: 'hidden', zIndex: 0}}>
       {/* Today Panel - Live instrument cockpit (raised, glowing, primary focus) */}
       <div 
         ref={headerRef}
         className="mb-3 flex-shrink-0" 
         style={{ 
-          position: 'relative', 
-          zIndex: 20, // Higher z-index to feel raised above grid
+          position: 'sticky', // Sticky so it stays on top when scrolling
+          top: 0, // Stick to top of container
+          zIndex: 20, // Higher z-index to feel raised above grid and content
           // Raised panel with subtle elevation and glow field
           background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%)',
           border: '0.5px solid rgba(255, 255, 255, 0.08)', // Slightly brighter border for panel definition
@@ -1123,20 +1124,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       </div>
 
-      {/* Content area - scrolls vertically, starts from top so content can scroll behind header */}
+      {/* Content area - scrolls vertically, positioned after sticky header */}
       <div 
         ref={scrollRef}
-        className="scrollbar-hide" 
+        className="scrollbar-hide flex-1 min-h-0" 
         style={{ 
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          position: 'relative', // Changed from absolute to relative - content flows after header
           overflowY: 'auto',
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
-          paddingTop: `${headerHeight + 8}px`,
+          // No paddingTop needed since header is sticky and content flows naturally after it
         }}
       >
         <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
