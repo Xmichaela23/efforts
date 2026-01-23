@@ -1578,15 +1578,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           ) : (
             <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (
-              <div className="space-y-1 pt-2 flex-1 flex flex-col min-h-0 overflow-hidden">
-                <TodaysEffort
-                  selectedDate={selectedDate}
-                  onAddEffort={handleAddEffort}
-                  onViewCompleted={handleViewCompleted}
-                  onEditEffort={handleEditEffort}
-                />
+              <div className="space-y-1 pt-2 flex-1 flex flex-col min-h-0" style={{ overflow: 'hidden' }}>
+                {/* Today panel - constrained height, scrolls internally */}
+                <div className="flex-shrink-1" style={{ minHeight: 0, maxHeight: '40vh' }}>
+                  <TodaysEffort
+                    selectedDate={selectedDate}
+                    onAddEffort={handleAddEffort}
+                    onViewCompleted={handleViewCompleted}
+                    onEditEffort={handleEditEffort}
+                  />
+                </div>
                 {/* Calendar as vertical timeline - always visible, shows all 7 days and total workload */}
-                <div className="flex-shrink-0 flex flex-col">
+                <div className="flex-shrink-0 flex flex-col" style={{ minHeight: '50vh' }}>
                   <WorkoutCalendar
                     onAddEffort={() => handleAddEffort('run')}
                     onSelectType={handleSelectEffortType}

@@ -1029,113 +1029,119 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }, [weather]);
 
   return (
-    <div className="w-full flex flex-col flex-shrink-0" style={{fontFamily: 'Inter, sans-serif', maxHeight: '40vh', position:'relative', overflow: 'hidden', zIndex: 0}}>
-      {/* Today Panel - Live instrument cockpit (raised, glowing, primary focus) */}
-      <div 
-        ref={headerRef}
-        className="mb-3 flex-shrink-0" 
-        style={{ 
-          position: 'sticky', // Sticky so it stays on top when scrolling
-          top: 0, // Stick to top of container
-          zIndex: 20, // Higher z-index to feel raised above grid and content
-          // Raised panel with subtle elevation and glow field
-          background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%)',
-          border: '0.5px solid rgba(255, 255, 255, 0.08)', // Slightly brighter border for panel definition
-          borderRadius: '12px', // Rounded corners for mounted instrument feel
-          padding: '0.75rem 1rem', // More padding for panel breathing room
-          // Panel depth: raised above background with glow field
-          boxShadow: `
-            0 0 0 1px rgba(255,255,255,0.04) inset,
-            0 2px 8px rgba(0,0,0,0.5),
-            0 0 20px rgba(255, 240, 200, 0.08),
-            0 0 40px rgba(255, 240, 200, 0.04)
-          `, // Inner stroke + depth + warm glow field
-          marginLeft: '-0.5rem',
-          marginRight: '-0.5rem',
-        }}
-      >
-        <div className="space-y-1">
-          {/* Line 1: Date - Live channel (brightest, energized, more phosphor) */}
-          <div>
-            <span 
-              className="text-sm font-light tracking-wide" 
-              style={{ 
-                color: 'rgba(255, 255, 255, 1.0)', // Maximum brightness - primary instrument readout
-                textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)', // Stronger backlit LCD glow with warm phosphor
-              }}
-            >
-              {formatDisplayDate(activeDate)}
-            </span>
-          </div>
-
-          {/* Line 2: Weather + Location - Visible but secondary */}
-          {(weather || cityName) && (
-            <div className="flex items-center gap-1 flex-wrap">
-              {weather && isTodayDate && (
-                <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
-                  {Math.round(weather.temperature)}°F {weather.condition}
-                  {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
-                  {weather.sunrise && weather.sunset ? (()=>{ 
-                    try { 
-                      const fmt = (iso: string) => { 
-                        const d = new Date(iso); 
-                        return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, (m) => m.trim().toLowerCase()); 
-                      }; 
-                      return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; 
-                    } catch { 
-                      return ''; 
-                    }
-                  })() : ''}
-                </span>
-              )}
-              {/* City name from geolocation (show for any date if available) */}
-              {cityName && (
-                <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
-                  {weather && isTodayDate ? ' • ' : ''}{cityName}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Line 3: Week + Focus + Event - Yellow (run plan), dimmer than Today */}
-          {trainingPlanContext && (trainingPlanContext.currentWeek || trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
-            <div className="text-xs font-extralight tracking-normal" style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.65 }}>
-              {trainingPlanContext.currentWeek && (
-                <span>Week {trainingPlanContext.currentWeek}</span>
-              )}
-              {trainingPlanContext.currentWeek && trainingPlanContext.focus && (
-                <span> • </span>
-              )}
-              {trainingPlanContext.focus && (
-                <span>{trainingPlanContext.focus}</span>
-              )}
-              {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                <span> • </span>
-              )}
-              {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                <span className="font-light" style={{ 
-                  opacity: 0.8 // Slightly less bright than "Today" - yellow but dimmer
-                }}>
-                  {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Content area - scrolls vertically, positioned after sticky header */}
+    <div className="w-full flex flex-col h-full" style={{fontFamily: 'Inter, sans-serif', position:'relative', overflow: 'hidden', zIndex: 0}}>
+      {/* Scrollable container for Today panel */}
       <div 
         ref={scrollRef}
-        className="scrollbar-hide flex-1 min-h-0" 
+        className="scrollbar-hide flex flex-col"
         style={{ 
-          position: 'relative', // Changed from absolute to relative - content flows after header
+          height: '100%',
           overflowY: 'auto',
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
-          // No paddingTop needed since header is sticky and content flows naturally after it
         }}
       >
+        {/* Today Panel Header - Live instrument cockpit (sticky, raised, glowing) */}
+        <div 
+          ref={headerRef}
+          className="mb-3 flex-shrink-0" 
+          style={{ 
+            position: 'sticky', // Sticky so it stays on top when scrolling
+            top: 0, // Stick to top of scroll container
+            zIndex: 20, // Higher z-index to feel raised above content
+            // Raised panel with subtle elevation and glow field
+            background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%)',
+            border: '0.5px solid rgba(255, 255, 255, 0.08)', // Slightly brighter border for panel definition
+            borderRadius: '12px', // Rounded corners for mounted instrument feel
+            padding: '0.75rem 1rem', // More padding for panel breathing room
+            // Panel depth: raised above background with glow field
+            boxShadow: `
+              0 0 0 1px rgba(255,255,255,0.04) inset,
+              0 2px 8px rgba(0,0,0,0.5),
+              0 0 20px rgba(255, 240, 200, 0.08),
+              0 0 40px rgba(255, 240, 200, 0.04)
+            `, // Inner stroke + depth + warm glow field
+            marginLeft: '-0.5rem',
+            marginRight: '-0.5rem',
+          }}
+        >
+          <div className="space-y-1">
+            {/* Line 1: Date - Live channel (brightest, energized, more phosphor) */}
+            <div>
+              <span 
+                className="text-sm font-light tracking-wide" 
+                style={{ 
+                  color: 'rgba(255, 255, 255, 1.0)', // Maximum brightness - primary instrument readout
+                  textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)', // Stronger backlit LCD glow with warm phosphor
+                }}
+              >
+                {formatDisplayDate(activeDate)}
+              </span>
+            </div>
+
+            {/* Line 2: Weather + Location - Visible but secondary */}
+            {(weather || cityName) && (
+              <div className="flex items-center gap-1 flex-wrap">
+                {weather && isTodayDate && (
+                  <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
+                    {Math.round(weather.temperature)}°F {weather.condition}
+                    {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
+                    {weather.sunrise && weather.sunset ? (()=>{ 
+                      try { 
+                        const fmt = (iso: string) => { 
+                          const d = new Date(iso); 
+                          return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, (m) => m.trim().toLowerCase()); 
+                        }; 
+                        return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; 
+                      } catch { 
+                        return ''; 
+                      }
+                    })() : ''}
+                  </span>
+                )}
+                {/* City name from geolocation (show for any date if available) */}
+                {cityName && (
+                  <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
+                    {weather && isTodayDate ? ' • ' : ''}{cityName}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Line 3: Week + Focus + Event - Yellow (run plan), dimmer than Today */}
+            {trainingPlanContext && (trainingPlanContext.currentWeek || trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
+              <div className="text-xs font-extralight tracking-normal" style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.65 }}>
+                {trainingPlanContext.currentWeek && (
+                  <span>Week {trainingPlanContext.currentWeek}</span>
+                )}
+                {trainingPlanContext.currentWeek && trainingPlanContext.focus && (
+                  <span> • </span>
+                )}
+                {trainingPlanContext.focus && (
+                  <span>{trainingPlanContext.focus}</span>
+                )}
+                {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
+                  <span> • </span>
+                )}
+                {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
+                  <span className="font-light" style={{ 
+                    opacity: 0.8 // Slightly less bright than "Today" - yellow but dimmer
+                  }}>
+                    {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Content area - scrolls within Today panel container */}
+        <div 
+          className="flex-1 min-h-0"
+          style={{ 
+            position: 'relative',
+          }}
+        >
         <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
@@ -1401,44 +1407,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         )}
         </div>
-      </div>
-
-      {/* Week of header - de-emphasized label */}
-      <div 
-        className="flex items-center justify-between py-1 rounded-t-lg"
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: '0.5rem',
-          right: '0.5rem',
-          background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.01) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)',
-          border: '0.5px solid rgba(255, 255, 255, 0.04)',
-          borderBottom: 'none',
-          boxShadow: '0 0 0 1px rgba(255,255,255,0.02) inset, 0 1px 4px rgba(0,0,0,0.4)',
-          paddingLeft: '0.5rem',
-          paddingRight: '0.5rem',
-          zIndex: 20,
-        }}
-      >
-        <button
-          aria-label="Previous week"
-          className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
-          style={{ color: 'rgba(255, 255, 255, 0.3)' }}
-          onClick={() => handleWeekNav('prev')}
-        >
-          ‹
-        </button>
-        <span className="text-xs font-extralight tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.35)' }}>
-          Week of {formatWeekRange(weekStart, weekEnd)}
-        </span>
-        <button
-          aria-label="Next week"
-          className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
-          style={{ color: 'rgba(255, 255, 255, 0.3)' }}
-          onClick={() => handleWeekNav('next')}
-        >
-          ›
-        </button>
+        </div>
       </div>
 
       {/* Planned Workout Bottom Sheet */}
