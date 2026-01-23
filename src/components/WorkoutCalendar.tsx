@@ -1117,23 +1117,25 @@ export default function WorkoutCalendar({
                         onDragEnd={handleDragEnd}
                         onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                         onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`text-xs px-1.5 py-[0.34rem] flex-shrink-0 transition-all backdrop-blur-sm font-light tracking-wide ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                        className={`text-xs px-1.5 py-[0.34rem] flex-shrink-0 transition-all backdrop-blur-sm font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                         style={{
                           ...phosphorPill.style,
                           borderRadius: '4px',
-                          fontSize: '0.7rem', // Slightly smaller text
+                          fontSize: '0.74rem', // Slightly larger for legibility
                           lineHeight: '1.22', // Slightly taller
+                          // Legibility: tiny dark edge + faint phosphor bloom (kept subtle)
+                          textShadow: `0 1px 1px rgba(0,0,0,0.55), 0 0 8px rgba(0,0,0,0.35), 0 0 14px rgba(${pillRgb},0.10)`,
                           // 3D object feel (Omni: glossy, beveled, not flat "calendar event")
                           backgroundImage: isDone
                             ? `
                                 radial-gradient(120% 120% at 30% 20%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.00) 46%),
                                 radial-gradient(120% 140% at 80% 110%, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.00) 55%),
-                                linear-gradient(180deg, rgba(${pillRgb},0.34) 0%, rgba(${pillRgb},0.18) 42%, rgba(0,0,0,0.28) 100%)
+                                linear-gradient(180deg, rgba(${pillRgb},0.30) 0%, rgba(${pillRgb},0.14) 42%, rgba(0,0,0,0.34) 100%)
                               `
                             : `
                                 radial-gradient(120% 120% at 30% 20%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.00) 46%),
                                 radial-gradient(120% 140% at 80% 110%, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0.00) 55%),
-                                linear-gradient(180deg, rgba(${pillRgb},0.10) 0%, rgba(${pillRgb},0.04) 55%, rgba(0,0,0,0.20) 100%)
+                                linear-gradient(180deg, rgba(${pillRgb},0.10) 0%, rgba(0,0,0,0.10) 55%, rgba(0,0,0,0.32) 100%)
                               `,
                           backgroundBlendMode: 'screen, multiply, normal',
                           backgroundClip: 'padding-box',

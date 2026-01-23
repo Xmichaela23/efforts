@@ -1329,7 +1329,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     }}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="font-light tracking-normal text-base" style={{ color: getDisciplinePhosphorCore(workoutType) }}>
+                      <div
+                        className="font-medium tracking-normal text-base"
+                        style={{
+                          color: getDisciplinePhosphorCore(workoutType),
+                          // Legibility: slight dark edge + faint discipline bloom
+                          textShadow: `0 1px 1px rgba(0,0,0,0.55), 0 0 10px rgba(0,0,0,0.35), 0 0 14px rgba(${pillRgb},0.10)`,
+                        }}
+                      >
                         {title}
                         {isCompleted && (
                           <span
