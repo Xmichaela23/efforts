@@ -1580,7 +1580,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               {activeBottomNav === 'home' && (
               <div className="space-y-1 pt-2">
                 {/* Today's efforts - fixed height, scrolls internally */}
-                <div style={{ height: '40vh', flexShrink: 0 }}>
+                <div style={{ height: '30vh', flexShrink: 0 }}>
                   <TodaysEffort
                     selectedDate={selectedDate}
                     onAddEffort={handleAddEffort}
