@@ -771,7 +771,6 @@ export default function WorkoutCalendar({
   return (
     <div
       className="w-full max-w-md mx-auto flex flex-col touch-pan-y bg-transparent"
-      style={{ height: '100%' }}
       onTouchStart={(e) => {
         const t = e.changedTouches[0];
         setTouchStartX(t.clientX);
@@ -835,7 +834,7 @@ export default function WorkoutCalendar({
       </div>
 
       {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
-      <div className="flex flex-col gap-1 flex-shrink-0 pb-2" style={{ overflowY: 'auto' }}>
+      <div className="flex flex-col gap-1 flex-shrink-0 pb-2">
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];

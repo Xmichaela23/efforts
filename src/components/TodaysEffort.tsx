@@ -1029,26 +1029,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }, [weather]);
 
   return (
-    <div className="w-full flex flex-col h-full" style={{fontFamily: 'Inter, sans-serif', position:'relative', overflow: 'hidden', zIndex: 0}}>
-      {/* Scrollable container for Today panel */}
+    <div className="w-full flex flex-col" style={{fontFamily: 'Inter, sans-serif', position:'relative', zIndex: 0}}>
+      {/* Today Panel Header - Live instrument cockpit (raised, glowing) */}
       <div 
-        ref={scrollRef}
-        className="scrollbar-hide flex flex-col"
+        ref={headerRef}
+        className="mb-3 flex-shrink-0" 
         style={{ 
-          height: '100%',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
-        {/* Today Panel Header - Live instrument cockpit (sticky, raised, glowing) */}
-        <div 
-          ref={headerRef}
-          className="mb-3 flex-shrink-0" 
-          style={{ 
-            position: 'sticky', // Sticky so it stays on top when scrolling
-            top: 0, // Stick to top of scroll container
-            zIndex: 20, // Higher z-index to feel raised above content
             // Raised panel with subtle elevation and glow field
             background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%)',
             border: '0.5px solid rgba(255, 255, 255, 0.08)', // Slightly brighter border for panel definition
@@ -1135,13 +1121,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         </div>
 
-        {/* Content area - scrolls within Today panel container */}
-        <div 
-          className="flex-1 min-h-0"
-          style={{ 
-            position: 'relative',
-          }}
-        >
+        {/* Content area */}
         <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
@@ -1406,7 +1386,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </div>
           </div>
         )}
-        </div>
         </div>
       </div>
 
