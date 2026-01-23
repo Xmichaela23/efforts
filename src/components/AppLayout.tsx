@@ -20,6 +20,7 @@ import ContextTabs from './ContextTabs';
 import LogFAB from './LogFAB';
 import PlansMenu from './PlansMenu';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
+import ScreenErrorBoundary from './ScreenErrorBoundary';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
 import FitFileImporter from './FitFileImporter';
@@ -1455,16 +1456,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Render UnifiedWorkoutView OUTSIDE mobile-main-content to avoid z-index issues */}
       {selectedWorkout && !showPlanBuilder && !showStrengthPlans && !showAllPlans && !showStrengthLogger && !showTrainingBaselines && !showGear && !showImportPage && !showContext && !showPilatesYogaLogger && (
-        <UnifiedWorkoutView
-          workout={selectedWorkout}
-          onUpdateWorkout={handleUpdateWorkout}
-          onClose={handleBackToDashboard}
-          onDelete={handleDeleteWorkout}
-          onNavigateToContext={handleNavigateToContext}
-          onAddGear={() => setShowGear(true)}
-          origin="today"
-          initialTab={activeTab as any}
-        />
+        <ScreenErrorBoundary label="Workout details" onClose={handleBackToDashboard}>
+          <UnifiedWorkoutView
+            workout={selectedWorkout}
+            onUpdateWorkout={handleUpdateWorkout}
+            onClose={handleBackToDashboard}
+            onDelete={handleDeleteWorkout}
+            onNavigateToContext={handleNavigateToContext}
+            onAddGear={() => setShowGear(true)}
+            origin="today"
+            initialTab={activeTab as any}
+          />
+        </ScreenErrorBoundary>
       )}
       
       <main className="mobile-main-content">

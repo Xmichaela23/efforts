@@ -768,32 +768,84 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   
   // Use centralized RGB conversion helper
   const sportRgb = getDisciplineColorRgb(workoutTypeForGradient);
+  const sportPhosphorCore = getDisciplinePhosphorCore(workoutTypeForGradient);
   
-  // Sport color gradient style for all disciplines (consistent positioning)
-  // Applied to fixed parent container so it stays in place without needing background-attachment: fixed
-  const getSportGradientStyle = () => {
-    return {
-      background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
-      backgroundImage: `
-        radial-gradient(circle at 20% 50%, rgba(${sportRgb}, 0.15) 0%, transparent 60%),
-        radial-gradient(circle at 80% 80%, rgba(${sportRgb}, 0.12) 0%, transparent 60%),
-        radial-gradient(circle at 50% 20%, rgba(${sportRgb}, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
-        linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
-        linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%)
-      `
-    };
-  };
-
   return (
     <div 
-      className="fixed inset-0 flex flex-col z-40"
+      className="fixed inset-0 flex flex-col z-40 relative overflow-hidden"
       style={{ 
-        ...getSportGradientStyle()
+        backgroundColor: '#000000'
       }}
     >
+      {/* Omni environment field (match header/tabbar supernova, with discipline tint) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          opacity: 0.58,
+          mixBlendMode: 'soft-light',
+          backgroundColor: 'rgba(0, 0, 0, 0.16)',
+          backgroundImage: `
+            radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.10) 0%, transparent 60%),
+            radial-gradient(ellipse at 82% 38%, rgba(74, 158, 255, 0.08) 0%, transparent 60%),
+            radial-gradient(ellipse at 18% 42%, rgba(183, 148, 246, 0.08) 0%, transparent 60%),
+            radial-gradient(ellipse at 58% 60%, rgba(80, 200, 120, 0.06) 0%, transparent 62%),
+            radial-gradient(ellipse at 44% 62%, rgba(255, 140, 66, 0.06) 0%, transparent 62%),
+            radial-gradient(ellipse at 50% 18%, rgba(${sportRgb}, 0.10) 0%, transparent 62%),
+            radial-gradient(ellipse at 78% 70%, rgba(${sportRgb}, 0.06) 0%, transparent 62%),
+            linear-gradient(45deg, rgba(255,255,255,0.20) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
+            linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px)
+          `,
+          backgroundSize: 'cover, cover, cover, cover, cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px',
+          backgroundPosition: 'center, center, center, center, center, center, center, center, center, center, center',
+          backgroundBlendMode: 'screen, screen, screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light',
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 -top-12"
+        style={{
+          height: 220,
+          mixBlendMode: 'screen',
+          opacity: 0.55,
+          filter: 'blur(22px) saturate(1.12)',
+          transform: 'translateZ(0)',
+          backgroundImage: `
+            radial-gradient(160px 90px at 14% 55%, rgba(255, 215, 0, 0.38) 0%, rgba(255, 215, 0, 0.0) 72%),
+            radial-gradient(180px 100px at 32% 60%, rgba(255, 140, 66, 0.30) 0%, rgba(255, 140, 66, 0.0) 74%),
+            radial-gradient(180px 100px at 50% 58%, rgba(183, 148, 246, 0.28) 0%, rgba(183, 148, 246, 0.0) 74%),
+            radial-gradient(180px 100px at 68% 60%, rgba(74, 158, 255, 0.26) 0%, rgba(74, 158, 255, 0.0) 74%),
+            radial-gradient(160px 90px at 86% 55%, rgba(80, 200, 120, 0.22) 0%, rgba(80, 200, 120, 0.0) 72%),
+            radial-gradient(220px 120px at 52% 62%, rgba(${sportRgb}, 0.18) 0%, rgba(${sportRgb}, 0.0) 74%),
+            linear-gradient(to bottom, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.72) 100%)
+          `,
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage: `
+            radial-gradient(1200px 680px at 50% 24%, rgba(${sportRgb}, 0.08) 0%, rgba(0,0,0,0) 62%),
+            radial-gradient(900px 520px at 50% 110%, rgba(${sportRgb}, 0.06) 0%, rgba(0,0,0,0) 65%)
+          `,
+          mixBlendMode: 'screen',
+          opacity: 0.55,
+          filter: 'blur(10px) saturate(1.08)',
+          transform: 'translateZ(0)',
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.82) 100%)',
+        }}
+      />
       <div 
-        className="flex-1 overflow-y-auto overscroll-contain min-h-0"
+        className="flex-1 overflow-y-auto overscroll-contain min-h-0 relative"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
       {/* Spacer for app header */}
@@ -816,7 +868,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 onClick={()=>setAssocOpen(true)}
                 className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
                 style={{
-                  fontFamily: 'Inter, sans-serif',
+                  borderColor: `rgba(${sportRgb}, 0.32)`,
+                  boxShadow: `0 0 0 1px rgba(${sportRgb}, 0.10) inset, 0 0 18px rgba(${sportRgb}, 0.10)`,
                 }}
               >Attach</button>
             ) : (
@@ -841,7 +894,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 }}
                 className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
                 style={{
-                  fontFamily: 'Inter, sans-serif',
+                  borderColor: `rgba(${sportRgb}, 0.30)`,
+                  boxShadow: `0 0 0 1px rgba(${sportRgb}, 0.10) inset, 0 0 18px rgba(${sportRgb}, 0.08)`,
                 }}
               >Unattach</button>
             )
@@ -924,7 +978,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         
         {/* Row 3: Date */}
         <div>
-            <p className="text-sm text-gray-300 font-light tracking-normal leading-snug font-sans [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline">
+            <p className="text-sm text-gray-300 font-light tracking-normal leading-snug [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline">
               {(() => {
                 try {
                   // For completed workouts, use the date field for date and timestamp for time
@@ -990,9 +1044,16 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       {/* Completed + linked: Planned, Adherence, Details */}
       {/* Completed + not linked: Details only */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className={`grid w-full bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-0 py-0 ${
+        <TabsList
+          className={`grid w-full bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-0 py-0 ${
           !isCompleted ? 'grid-cols-1' : (isLinked ? 'grid-cols-3' : 'grid-cols-1')
-        }`}>
+        }`}
+          style={{
+            borderColor: `rgba(${sportRgb}, 0.16)`,
+            backgroundImage: `radial-gradient(820px 160px at 50% 0%, rgba(${sportRgb}, 0.10) 0%, rgba(0,0,0,0) 70%)`,
+            boxShadow: `0 1px 0 rgba(255,255,255,0.06) inset, 0 0 22px rgba(${sportRgb}, 0.06)`,
+          }}
+        >
           {/* Planned tab: show for planned workouts OR completed+linked */}
           {(!isCompleted || isLinked) && (
             <TabsTrigger value="planned" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">

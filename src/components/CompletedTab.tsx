@@ -23,6 +23,7 @@ import { formatDuration, formatPace, formatElevation, formatDistance, formatSwim
 import { useWorkoutData } from '@/hooks/useWorkoutData';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/use-toast';
+import { getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 // keeping local logic for now; Today's view uses shared resolver
 
 // Custom styles for range sliders
@@ -51,6 +52,7 @@ const sliderStyles = `
 
 interface CompletedTabProps {
   workoutData: any;
+  workoutType?: string;
   onAddGear?: () => void; // Callback to open gear management
 }
 
@@ -65,7 +67,7 @@ interface GearItem {
   total_distance?: number; // in meters
 }
 
-const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) => {
+const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, onAddGear }) => {
   const { useImperial } = useAppContext();
   const compact = useCompact();
   const queryClient = useQueryClient();
@@ -110,6 +112,54 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, onAddGear }) =
     workoutData: any;
   } | null>(null); // Track previous map props to prevent unnecessary re-renders
   const norm = useWorkoutData(hydrated||workoutData);
+
+  // NOTE: Hooks MUST run before any early returns.
+  // Details screen can render this component in a loading pass first.
+  const resolvedWorkoutType = useMemo(() => {
+    const raw = String(workoutType || workoutData?.type || (norm as any)?.sport || '').toLowerCase();
+    if (raw === 'bike' || raw === 'cycling') return 'ride';
+    if (raw === 'running') return 'run';
+    if (raw === 'swimming') return 'swim';
+    if (raw === 'walking') return 'walk';
+    if (raw === 'endurance') {
+      // Endurance sessions are typically ride/run/swim; fall back to run for stable theming.
+      return 'run';
+    }
+    return raw || 'run';
+  }, [workoutType, workoutData?.type, (norm as any)?.sport]);
+
+  const accentRgb = getDisciplineColorRgb(resolvedWorkoutType);
+  const accentCore = getDisciplinePhosphorCore(resolvedWorkoutType);
+  const plateGlow = getDisciplineGlowStyle(resolvedWorkoutType, 'week')?.boxShadow as string | undefined;
+
+  const readoutPlateStyle: React.CSSProperties = {
+    borderRadius: 16,
+    border: `1px solid rgba(${accentRgb}, 0.18)`,
+    backgroundColor: 'rgba(0,0,0,0.30)',
+    backgroundImage: `
+      radial-gradient(900px 220px at 50% 0%, rgba(${accentRgb}, 0.14) 0%, rgba(0,0,0,0) 68%),
+      radial-gradient(600px 220px at 10% 10%, rgba(255, 215, 0, 0.06) 0%, rgba(0,0,0,0) 65%),
+      radial-gradient(600px 220px at 90% 12%, rgba(74, 158, 255, 0.05) 0%, rgba(0,0,0,0) 65%),
+      linear-gradient(to bottom, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 18%, rgba(0,0,0,0.0) 100%)
+    `,
+    boxShadow: [
+      '0 0 0 1px rgba(255,255,255,0.06) inset',
+      '0 1px 0 rgba(255,255,255,0.06) inset',
+      plateGlow || '',
+      '0 10px 28px rgba(0,0,0,0.35)',
+    ].filter(Boolean).join(', '),
+  };
+
+  const metricValueBaseStyle: React.CSSProperties = {
+    color: 'rgba(255,255,255,0.92)',
+    textShadow: `0 0 14px rgba(${accentRgb}, 0.18), 0 0 2px rgba(${accentRgb}, 0.22)`,
+    fontVariantNumeric: 'tabular-nums lining-nums',
+  };
+
+  const metricLabelStyle: React.CSSProperties = {
+    color: `rgba(${accentRgb}, 0.58)`,
+    textShadow: `0 0 12px rgba(${accentRgb}, 0.10)`,
+  };
   
   // Load gear for runs and rides
   useEffect(() => {
@@ -1318,11 +1368,40 @@ const formatMovingTime = () => {
  return (
   <>
      {/* 🏠 ALL METRICS - 3-column grid with tighter spacing */}
+     <div className="mx-[-12px] px-3 py-2">
+       <div className="px-2.5 py-2.5" style={readoutPlateStyle}>
+         <div className="flex items-center justify-between px-0.5 pb-2">
+           <div className="text-[0.70rem] uppercase tracking-[0.22em] font-light" style={{ color: `rgba(${accentRgb}, 0.70)` }}>
+             Readouts
+           </div>
+           <div
+             aria-hidden
+             className="h-[1px] flex-1 mx-3"
+             style={{
+               backgroundImage: `linear-gradient(90deg, rgba(${accentRgb},0.0) 0%, rgba(${accentRgb},0.38) 45%, rgba(${accentRgb},0.0) 100%)`,
+               opacity: 0.9,
+             }}
+           />
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className="inline-block h-2 w-2 rounded-full"
+              style={{
+                backgroundColor: accentCore,
+                boxShadow: `0 0 8px rgba(${accentRgb}, 0.35), 0 0 2px rgba(${accentRgb}, 0.45)`,
+              }}
+            />
+            <span className="text-[0.70rem] font-light" style={{ color: `rgba(${accentRgb}, 0.55)`, fontFeatureSettings: '"tnum"' }}>
+              {resolvedWorkoutType.toUpperCase()}
+            </span>
+          </div>
+         </div>
+
      {workoutData.swim_data ? (
-       <div className="grid grid-cols-3 gap-0.5 -mt-10">
+       <div className="grid grid-cols-3 gap-0.5">
          {/* Distance */}
          <div className="px-0.5 pb-1">
-           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
              {(() => {
                const src = (hydrated || workoutData);
                const km = (computeDistanceKm(src) ?? Number((src as any)?.distance)) || 0;
@@ -1331,18 +1410,18 @@ const formatMovingTime = () => {
                return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
              })()}
            </div>
-           <div className="text-xs text-white/70 font-light">Distance</div>
+           <div className="text-xs font-light" style={metricLabelStyle}>Distance</div>
          </div>
 
          {/* Moving Time */}
          <div className="px-0.5 pb-1">
-          <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{formatMovingTime()}</div>
-          <div className="text-xs text-white/70 font-light">Moving Time</div>
+          <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>{formatMovingTime()}</div>
+          <div className="text-xs font-light" style={metricLabelStyle}>Moving Time</div>
          </div>
 
          {/* Avg Pace /100 */}
          <div className="px-0.5 pb-1">
-           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {(() => {
                 const pace = useImperial ? norm.avg_swim_pace_per_100yd : norm.avg_swim_pace_per_100m;
                 if (!pace) return 'N/A';
@@ -1351,44 +1430,44 @@ const formatMovingTime = () => {
                 return `${mins}:${String(secs).padStart(2, '0')}`;
               })()}
            </div>
-           <div className="text-xs text-white/70 font-light">Avg Pace {useImperial ? '/100yd' : '/100m'}</div>
+           <div className="text-xs font-light" style={metricLabelStyle}>Avg Pace {useImperial ? '/100yd' : '/100m'}</div>
          </div>
 
          {/* Duration (Elapsed) */}
          <div className="px-0.5 py-1">
-          <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+          <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
             {norm.elapsed_s ? formatDuration(norm.elapsed_s) : 'N/A'}
           </div>
-           <div className="text-xs text-white/70 font-light">Duration</div>
+           <div className="text-xs font-light" style={metricLabelStyle}>Duration</div>
          </div>
 
          {/* Avg HR */}
          <div className="px-0.5 py-1">
-           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
             {Number.isFinite(norm.avg_hr as any) ? String(norm.avg_hr) : 'N/A'}
            </div>
-           <div className="text-xs text-white/70 font-light">Avg HR</div>
+           <div className="text-xs font-light" style={metricLabelStyle}>Avg HR</div>
          </div>
 
          {/* Lengths */}
          <div className="px-0.5 py-1">
-           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
              {(() => { const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null); return n != null ? String(n) : 'N/A'; })()}
            </div>
-           <div className="text-xs text-white/70 font-light">Lengths</div>
+           <div className="text-xs font-light" style={metricLabelStyle}>Lengths</div>
          </div>
 
          {/* Avg stroke rate */}
          <div className="px-0.5 py-1">
-           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
              {(() => { const v = computeAvgStrokeRate(); return v != null ? String(v) : 'N/A'; })()}
            </div>
-           <div className="text-xs text-white/70 font-light">Avg stroke rate</div>
+           <div className="text-xs font-light" style={metricLabelStyle}>Avg stroke rate</div>
          </div>
 
          {/* Pool length */}
          <div className="px-0.5 py-1">
-           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
              {(() => {
                const Lm = Number(poolLengthMeters ?? (workoutData as any)?.pool_length);
                if (!Lm) return 'N/A';
@@ -1396,160 +1475,163 @@ const formatMovingTime = () => {
                return isYd ? `${Math.round(Lm / 0.9144)} yd` : `${Lm} m`;
              })()}
            </div>
-           <div className="text-xs text-white/70 font-light">Pool</div>
+           <div className="text-xs font-light" style={metricLabelStyle}>Pool</div>
          </div>
 
          {/* Max HR */}
          <div className="px-0.5 py-1">
-           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
             {Number.isFinite(norm.max_hr as any) ? String(norm.max_hr) : 'N/A'}
            </div>
-           <div className="text-xs text-white/70 font-light">Max HR</div>
+           <div className="text-xs font-light" style={metricLabelStyle}>Max HR</div>
          </div>
 
          {/* Calories */}
          <div className="px-0.5 py-1">
-           <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
             {Number.isFinite(norm.calories as any) ? String(norm.calories) : 'N/A'}
            </div>
-           <div className="text-xs text-white/70 font-light">Calories</div>
+           <div className="text-xs font-light" style={metricLabelStyle}>Calories</div>
          </div>
        </div>
      ) : (
-       <div className="grid grid-cols-3 gap-0.5 -mt-10">
+       <div className="grid grid-cols-3 gap-0.5">
        {/* General metrics - For runs/walks */}
        {(workoutData.type === 'run' || workoutData.type === 'walk' || norm.sport === 'run' || norm.sport === 'walk') && (
          <>
           {/* Row 1 */}
           <div className="px-0.5 pb-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.distance_km ? formatDistance(norm.distance_km, useImperial) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Distance</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Distance</div>
             </div>
           </div>
 
           <div className="px-0.5 pb-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.elapsed_s ? formatDuration(norm.elapsed_s) : (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Duration</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Duration</div>
             </div>
           </div>
 
           <div className="px-0.5 pb-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Moving Time</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Moving Time</div>
             </div>
           </div>
 
           {/* Row 2 */}
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.avg_pace_s_per_km ? formatPace(norm.avg_pace_s_per_km, useImperial) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Avg Pace</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Avg Pace</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.max_pace_s_per_km ? formatPace(norm.max_pace_s_per_km, useImperial) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Max Pace</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Max Pace</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.avg_hr ? `${norm.avg_hr} bpm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Avg HR</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Avg HR</div>
             </div>
           </div>
 
           {/* Row 3 */}
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.max_hr ? `${norm.max_hr} bpm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Max HR</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Max HR</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.elevation_gain_m ? `${(useImperial ? norm.elevation_gain_m * 3.28084 : norm.elevation_gain_m).toFixed(0)} ${useImperial ? 'ft' : 'm'}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Elevation</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Elevation</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.avg_running_cadence_spm ? `${norm.avg_running_cadence_spm} spm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Cadence</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Cadence</div>
             </div>
           </div>
 
           {/* Row 4 */}
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.max_cadence_rpm ? `${norm.max_cadence_rpm} spm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Max Cadence</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Max Cadence</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.calories ? String(norm.calories) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Calories</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Calories</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {(workoutData as any)?.workload_actual || (workoutData as any)?.workload_planned || 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Workload</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Workload</div>
             </div>
           </div>
 
           {/* Row 5: IF, RPE, Gear */}
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {(workoutData as any)?.intensity_factor ? (workoutData as any).intensity_factor.toFixed(2) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">IF</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>IF</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               <Select
                 value={((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : ""}
                 onValueChange={(value) => handleFeedbackChange('rpe', value ? parseInt(value) : null)}
                 disabled={savingFeedback}
               >
-                <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full justify-start p-0">
+                <SelectTrigger
+                  className="h-auto py-0 px-0 bg-transparent border-none text-base font-light hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full justify-start p-0"
+                  style={{ color: 'rgba(255,255,255,0.92)', textShadow: `0 0 12px rgba(${accentRgb}, 0.16)` }}
+                >
                   <SelectValue placeholder="N/A">
                     {((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : 'N/A'}
                   </SelectValue>
@@ -1568,12 +1650,12 @@ const formatMovingTime = () => {
               </Select>
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">RPE</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>RPE</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               <Select
                 value={(() => {
                   // Only use actual gear_id from workout, not default gear (for controlled component)
@@ -1584,7 +1666,10 @@ const formatMovingTime = () => {
                 onValueChange={(value) => handleFeedbackChange('gear_id', value || null)}
                 disabled={savingFeedback || gearLoading}
               >
-                <SelectTrigger className="h-auto py-0 px-0 bg-transparent border-none text-base font-light text-foreground hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full p-0 [&>svg]:hidden [&>span]:text-center [&>span]:block">
+                <SelectTrigger
+                  className="h-auto py-0 px-0 bg-transparent border-none text-base font-light hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full p-0 [&>svg]:hidden [&>span]:text-center [&>span]:block"
+                  style={{ color: 'rgba(255,255,255,0.92)', textShadow: `0 0 12px rgba(${accentRgb}, 0.16)` }}
+                >
                   <SelectValue placeholder="N/A">
                     {(() => {
                       const currentData = hydrated || workoutData;
@@ -1639,7 +1724,7 @@ const formatMovingTime = () => {
               </Select>
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Gear</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Gear</div>
             </div>
           </div>
          </>
@@ -1649,148 +1734,150 @@ const formatMovingTime = () => {
         <>
           {/* Row 1 */}
           <div className="px-0.5 pb-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.distance_km ? `${(useImperial ? norm.distance_km * 0.621371 : norm.distance_km).toFixed(1)} ${useImperial ? 'mi' : 'km'}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Distance</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Distance</div>
             </div>
           </div>
 
           <div className="px-0.5 pb-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.elapsed_s ? formatDuration(norm.elapsed_s) : (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Duration</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Duration</div>
             </div>
           </div>
 
           <div className="px-0.5 pb-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Moving Time</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Moving Time</div>
             </div>
           </div>
 
           {/* Row 2 */}
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.avg_speed_kmh ? `${(useImperial ? norm.avg_speed_kmh * 0.621371 : norm.avg_speed_kmh).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Avg Speed</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Avg Speed</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.max_speed_mps ? `${(useImperial ? norm.max_speed_mps * 2.23694 : norm.max_speed_mps * 3.6).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Max Speed</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Max Speed</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.avg_power ? `${norm.avg_power} W` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Avg Power</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Avg Power</div>
             </div>
           </div>
 
           {/* Row 3 */}
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.max_power ? `${norm.max_power} W` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Max Power</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Max Power</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.normalized_power ? `${norm.normalized_power} W` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="font-medium">Norm Power</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Norm Power</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.avg_hr ? `${norm.avg_hr} bpm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Avg HR</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Avg HR</div>
             </div>
           </div>
 
           {/* Row 4 */}
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.max_hr ? `${norm.max_hr} bpm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Max HR</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Max HR</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.elevation_gain_m ? `${(useImperial ? norm.elevation_gain_m * 3.28084 : norm.elevation_gain_m).toFixed(0)} ${useImperial ? 'ft' : 'm'}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Elevation</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Elevation</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.avg_cycling_cadence_rpm ? `${norm.avg_cycling_cadence_rpm} rpm` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Cadence</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Cadence</div>
             </div>
           </div>
 
           {/* Row 5 - Calories, Workload, IF */}
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.calories ? `${norm.calories}` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Calories</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Calories</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {(workoutData as any)?.workload_actual || (workoutData as any)?.workload_planned || 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">Workload</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Workload</div>
             </div>
           </div>
 
           <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.intensity_factor ? norm.intensity_factor.toFixed(2) : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs text-white/70 font-light">IF</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>IF</div>
             </div>
           </div>
 
         </>
       ) : null}
-     </div>
+       </div>
      )}
+       </div>
+     </div>
 
      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - hidden for pool swims */}
      <div className="w-full">
