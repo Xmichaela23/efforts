@@ -87,9 +87,9 @@
      * — always softly on, brighter when active or completed, never flat, never neon."
      */
 
-    /* Run (Amber) - Warm amber phosphor (oscilloscope/synth LED, not greenish yellow) */
-    --run-core: #B89A5A;
-    --run-glow-rgb: 184 154 90;
+    /* Run (Yellow) - Bright golden yellow (clean, not earthy) */
+    --run-core: #FFD700;
+    --run-glow-rgb: 255 215 0;
     /* Future/Planned - Very faint, "powered but idle" - barely visible */
     --run-glow-a1-idle: 0.015;
     --run-glow-a2-idle: 0.008;
@@ -107,9 +107,9 @@
     --run-glow-a2-active: 0.20;
     --run-glow-a3-active: 0.12;
 
-    /* Strength (Orange) - Phosphor orange LED */
-    --strength-core: #C98A4A;
-    --strength-glow-rgb: 201 138 74;
+    /* Strength (Orange) - Bright clean orange (not brown) */
+    --strength-core: #FF8C42;
+    --strength-glow-rgb: 255 140 66;
     --strength-glow-a1-idle: 0.015;
     --strength-glow-a2-idle: 0.008;
     --strength-glow-a3-idle: 0.004;
@@ -123,9 +123,9 @@
     --strength-glow-a2-active: 0.18;
     --strength-glow-a3-active: 0.11;
 
-    /* Mobility (Purple) - Phosphor purple LED */
-    --mobility-core: #9A7AB8;
-    --mobility-glow-rgb: 154 122 184;
+    /* Mobility (Purple) - Bright lavender purple (clean, vibrant) */
+    --mobility-core: #B794F6;
+    --mobility-glow-rgb: 183 148 246;
     --mobility-glow-a1-idle: 0.015;
     --mobility-glow-a2-idle: 0.008;
     --mobility-glow-a3-idle: 0.004;
@@ -139,9 +139,9 @@
     --mobility-glow-a2-active: 0.18;
     --mobility-glow-a3-active: 0.11;
 
-    /* Swim (Blue) - Phosphor blue LED */
-    --swim-core: #5A7FA8;
-    --swim-glow-rgb: 90 127 168;
+    /* Swim (Blue) - Bright cyan blue (clean, vibrant) */
+    --swim-core: #4A9EFF;
+    --swim-glow-rgb: 74 158 255;
     --swim-glow-a1-idle: 0.015;
     --swim-glow-a2-idle: 0.008;
     --swim-glow-a3-idle: 0.004;
@@ -155,9 +155,9 @@
     --swim-glow-a2-active: 0.18;
     --swim-glow-a3-active: 0.11;
 
-    /* Bike (Green) - Phosphor green LED */
-    --bike-core: #6BA85A;
-    --bike-glow-rgb: 107 168 90;
+    /* Bike (Green) - Bright emerald green (clean, vibrant) */
+    --bike-core: #50C878;
+    --bike-glow-rgb: 80 200 120;
     --bike-glow-a1-idle: 0.02;
     --bike-glow-a2-idle: 0.01;
     --bike-glow-a3-idle: 0.005;

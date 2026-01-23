@@ -25,19 +25,19 @@
  * — always softly on, brighter when active or completed, never flat, never neon."
  */
 export const SPORT_COLORS = {
-  run: '#B89A5A',      // warm amber phosphor (oscilloscope/synth LED amber, not greenish yellow)
-  running: '#B89A5A',  // alias
-  bike: '#6BA85A',     // phosphor green (muted, desaturated)
-  ride: '#6BA85A',     // alias
-  cycling: '#6BA85A',  // alias
-  swim: '#5A7FA8',     // phosphor blue (muted, desaturated)
-  swimming: '#5A7FA8', // alias
-  strength: '#C98A4A', // phosphor orange (muted, desaturated)
-  strength_training: '#C98A4A', // alias
-  weight: '#C98A4A',   // alias
-  weights: '#C98A4A',  // alias
-  mobility: '#9A7AB8', // phosphor purple (muted, desaturated)
-  pilates_yoga: '#9A7AB8', // alias
+  run: '#FFD700',      // bright golden yellow (clean, not earthy)
+  running: '#FFD700',  // alias
+  bike: '#50C878',     // bright emerald green (clean, vibrant)
+  ride: '#50C878',     // alias
+  cycling: '#50C878',  // alias
+  swim: '#4A9EFF',     // bright cyan blue (clean, vibrant)
+  swimming: '#4A9EFF', // alias
+  strength: '#FF8C42', // bright orange (clean, not brown)
+  strength_training: '#FF8C42', // alias
+  weight: '#FF8C42',   // alias
+  weights: '#FF8C42',  // alias
+  mobility: '#B794F6', // bright lavender purple (clean, vibrant)
+  pilates_yoga: '#B794F6', // alias
 } as const;
 
 /**
@@ -531,7 +531,7 @@ export function getDisciplineGlowStyle(
   // Fallback to direct values if not in browser or CSS vars not available
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     // SSR fallback: use default values
-    const defaultRgb = '184 154 90'; // run amber phosphor default
+    const defaultRgb = '255 215 0'; // run golden yellow default
     const defaultAlphas = { idle: [0.02, 0.01, 0.005], week: [0.15, 0.10, 0.06], done: [0.25, 0.18, 0.12], active: [0.40, 0.28, 0.18] };
     const alphas = defaultAlphas[state] || defaultAlphas.idle;
     return {
