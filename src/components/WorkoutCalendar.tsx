@@ -769,6 +769,18 @@ export default function WorkoutCalendar({
     weekEnd
   )} ${weekEnd.getDate()}`;
 
+  // For the “road”: bias to complementary colors so the glow supports pills instead of washing them out.
+  const contrastRgbForType = (t: string): string => {
+    const type = String(t || '').toLowerCase();
+    // Map discipline → complementary-ish wash (keep subtle and cool-biased)
+    if (type === 'run') return '74, 158, 255'; // blue against yellow
+    if (type === 'strength') return '183, 148, 246'; // purple against orange
+    if (type === 'mobility') return '255, 215, 0'; // yellow against purple
+    if (type === 'swim') return '255, 140, 66'; // warm against blue
+    if (type === 'bike') return '239, 68, 68'; // red against green
+    return '255, 255, 255';
+  };
+
   // VERTICAL TIMELINE PREVIEW - Replace grid with timeline list
   return (
     <div
@@ -937,6 +949,18 @@ export default function WorkoutCalendar({
           const isSelected = !!selectedDate && selectedDate === key;
           const isActiveDay = isToday || isSelected;
 
+          // Row-level road wash reacts to the workouts in this day.
+          const rowTypes = Array.from(
+            new Set(
+              (items || [])
+                .map((evt: any) => String(evt?._src?.type || evt?._src?.workout_type || '').toLowerCase())
+                .filter(Boolean)
+            )
+          ).slice(0, 3);
+          const washA = contrastRgbForType(rowTypes[0] || '');
+          const washB = contrastRgbForType(rowTypes[1] || rowTypes[0] || '');
+          const washC = contrastRgbForType(rowTypes[2] || rowTypes[1] || rowTypes[0] || '');
+
           return (
             <button
               type="button"
@@ -952,6 +976,7 @@ export default function WorkoutCalendar({
                 dragOverDate === key ? "ring-1 ring-white/20 bg-white/[0.03]" : "",
               ].join(" ")}
               style={{
+                position: 'relative',
                 borderRadius: '6px',
                 // Omni-inspired illuminated border that blends
                 border: isToday ? '0.5px solid rgba(255, 255, 255, 0.18)' : '0.5px solid rgba(255, 255, 255, 0.12)',
@@ -983,8 +1008,38 @@ export default function WorkoutCalendar({
                     : 'none',
               }}
             >
+              {/* Reactive “road tint” that adapts to the row’s workout types.
+                  Kept at the edges + behind a dark center so pills stay clean. */}
+              {items.length > 0 && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: 6,
+                    pointerEvents: 'none',
+                    zIndex: 0,
+                    // Edge-biased emission + center suppression
+                    backgroundImage: `
+                      radial-gradient(140px 48px at 12% 55%, rgba(${washA}, 0.14) 0%, rgba(${washA}, 0.0) 72%),
+                      radial-gradient(160px 56px at 88% 55%, rgba(${washB}, 0.14) 0%, rgba(${washB}, 0.0) 74%),
+                      radial-gradient(220px 70px at 50% 40%, rgba(${washC}, 0.08) 0%, rgba(${washC}, 0.0) 78%),
+                      linear-gradient(90deg,
+                        rgba(0,0,0,0.45) 0%,
+                        rgba(0,0,0,0.00) 26%,
+                        rgba(0,0,0,0.00) 74%,
+                        rgba(0,0,0,0.45) 100%
+                      )
+                    `,
+                    backgroundBlendMode: 'screen, screen, screen, normal',
+                    opacity: 0.60,
+                    filter: 'blur(10px) saturate(1.05)',
+                    transform: 'translateZ(0)',
+                  }}
+                />
+              )}
               {/* Left: Day label - bright and visible (compact) */}
-              <div className="flex-shrink-0 w-10 text-left">
+              <div className="flex-shrink-0 w-10 text-left" style={{ position: 'relative', zIndex: 1 }}>
                 <div
                   className="text-xs font-light leading-tight"
                   style={{
@@ -1014,7 +1069,7 @@ export default function WorkoutCalendar({
               </div>
 
               {/* Right: Workout chips - horizontal flow (compact) */}
-              <div className="flex-1 flex items-center gap-1 flex-wrap min-h-[20px]">
+              <div className="flex-1 flex items-center gap-1 flex-wrap min-h-[20px]" style={{ position: 'relative', zIndex: 1 }}>
                 {items.length > 0 && (
                   items.map((evt, i) => {
                     // Check actual workout_status from _src

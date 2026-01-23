@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Calendar, BarChart3, LayoutGrid } from 'lucide-react';
+import { ArrowRight, Calendar } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
@@ -1732,13 +1732,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     '0 0 10px rgba(255,215,0,0.22), 0 0 14px rgba(183,148,246,0.16), 0 0 14px rgba(74,158,255,0.14)',
                   transition: 'opacity 200ms ease',
                 });
-                const iconStyle = (active: boolean): React.CSSProperties => ({
-                  opacity: active ? 0.95 : 0.75,
-                  filter: active
-                    ? 'drop-shadow(0 0 10px rgba(255,255,255,0.16)) drop-shadow(0 0 16px rgba(74,158,255,0.10))'
-                    : 'none',
-                });
-                const labelClass = 'text-sm font-light tracking-wide';
+                const labelClass = 'tabbar-label';
+                const sigilClass = (base: string, active: boolean) =>
+                  `tab-sigil ${base} ${active ? 'is-active' : ''}`;
 
                 return (
                   <>
@@ -1754,7 +1750,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   style={tabStyle}
                 >
                   <span aria-hidden="true" style={lampStyle(homeActive)} />
-                  <LayoutGrid className="h-4 w-4" style={iconStyle(homeActive)} />
+                  <span aria-hidden="true" className={sigilClass('home', homeActive)} />
                   <span className={labelClass}>Home</span>
                 </Button>
                 <Button
@@ -1770,7 +1766,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   style={tabStyle}
                 >
                   <span aria-hidden="true" style={lampStyle(contextActive)} />
-                  <BarChart3 className="h-4 w-4" style={iconStyle(contextActive)} />
+                  <span aria-hidden="true" className={sigilClass('context', contextActive)} />
                   <span className={labelClass}>Context</span>
                 </Button>
                 <PlansMenu
@@ -1792,7 +1788,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         style={tabStyle}
               >
                         <span aria-hidden="true" style={lampStyle(plansActive)} />
-                        <Calendar className="h-4 w-4" style={iconStyle(plansActive)} />
+                        <span aria-hidden="true" className={sigilClass('plans', plansActive)} />
                         <span className={labelClass}>Plans</span>
               </Button>
                   }

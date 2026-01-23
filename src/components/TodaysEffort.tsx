@@ -1424,24 +1424,109 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             )}
           </div>
 
-          <DrawerFooter className="border-t border-white/10 pt-4">
+          <DrawerFooter
+            className="border-t border-white/10 pt-4"
+            style={{
+              // Subtle discipline-tinted “instrument shelf” behind the controls
+              ...(selectedPlannedWorkout
+                ? (() => {
+                    const raw = String(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
+                    const baseType =
+                      raw === 'walk' || raw === 'running' ? 'run' :
+                      raw === 'bike' || raw === 'cycling' ? 'ride' :
+                      raw;
+                    const rgb = getDisciplineColorRgb(baseType);
+                    return {
+                      backgroundImage: `
+                        radial-gradient(220px 120px at 20% 0%, rgba(${rgb}, 0.10) 0%, rgba(${rgb}, 0.0) 70%),
+                        radial-gradient(260px 140px at 80% 0%, rgba(${rgb}, 0.08) 0%, rgba(${rgb}, 0.0) 72%),
+                        linear-gradient(to bottom, rgba(0,0,0,0.00) 0%, rgba(0,0,0,0.55) 100%)
+                      `,
+                      backgroundBlendMode: 'screen, screen, normal',
+                    } as React.CSSProperties;
+                  })()
+                : {}),
+            }}
+          >
             <div className="flex flex-col gap-3 w-full">
+              {/* Logger shortcut (Strength/Mobility/Pilates-Yoga) */}
+              {selectedPlannedWorkout && (() => {
+                const raw = String(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
+                const isLoggerType = raw === 'strength' || raw === 'mobility' || raw === 'pilates_yoga';
+                if (!isLoggerType) return null;
+
+                const rgb = getDisciplineColorRgb(raw);
+                const core = getDisciplinePhosphorCore(raw);
+                const border = `rgba(${rgb}, 0.55)`;
+
+                return (
+                  <button
+                    className="w-full px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
+                    style={{
+                      backgroundColor: 'transparent',
+                      borderColor: border,
+                      borderWidth: '0.5px',
+                      borderStyle: 'solid',
+                      // Omni-ish chrome: bevel + faint grid + discipline glow
+                      backgroundImage: `
+                        radial-gradient(120% 120% at 26% 18%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.00) 52%),
+                        radial-gradient(120% 140% at 86% 110%, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.00) 58%),
+                        linear-gradient(45deg, rgba(255,255,255,0.10) 1px, transparent 1px),
+                        linear-gradient(-45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+                        linear-gradient(180deg, rgba(${rgb},0.12) 0%, rgba(${rgb},0.05) 55%, rgba(0,0,0,0.22) 100%)
+                      `,
+                      backgroundBlendMode: 'screen, multiply, soft-light, soft-light, normal',
+                      boxShadow: `
+                        0 0 0 1px rgba(255,255,255,0.05) inset,
+                        inset 0 1px 0 rgba(255,255,255,0.14),
+                        inset 0 -1px 0 rgba(0,0,0,0.45),
+                        0 10px 20px rgba(0,0,0,0.24),
+                        0 0 22px rgba(${rgb}, 0.10)
+                      `,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.10)`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      try {
+                        onEditEffort &&
+                          onEditEffort({
+                            ...selectedPlannedWorkout,
+                            __openLogger: true,
+                          });
+                      } finally {
+                        setSelectedPlannedWorkout(null);
+                      }
+                    }}
+                  >
+                    Go to workout
+                  </button>
+                );
+              })()}
+
               {/* Top row: Start on Phone and Send to Garmin - side by side with yellow outlines */}
               <div className="flex gap-2 w-full">
                 {selectedPlannedWorkout && isPhoneExecutable(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (() => {
                   const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
                   const isRun = ['run', 'running', 'walk'].includes(workoutType);
                   const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
-                  const sportColor = isRun ? SPORT_COLORS.run : (isRide ? SPORT_COLORS.ride : SPORT_COLORS.run); // default to run color
-                  const rgb = getDisciplineColorRgb(isRun ? 'run' : (isRide ? 'ride' : 'run'));
+                  const baseType = isRun ? 'run' : (isRide ? 'ride' : 'run');
+                  const sportColor = getDisciplinePhosphorCore(baseType);
+                  const rgb = getDisciplineColorRgb(baseType);
+                  const border = `rgba(${rgb}, 0.55)`;
                   
                   return (
                     <button
                       className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
                       style={{
                         backgroundColor: 'transparent',
-                        borderColor: sportColor,
-                        borderWidth: '1px',
+                        borderColor: border,
+                        borderWidth: '0.5px',
                         borderStyle: 'solid',
                       }}
                       onMouseEnter={(e) => {
@@ -1464,16 +1549,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
                   const isRun = ['run', 'running', 'walk'].includes(workoutType);
                   const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
-                  const sportColor = isRun ? SPORT_COLORS.run : (isRide ? SPORT_COLORS.ride : SPORT_COLORS.run); // default to run color
-                  const rgb = getDisciplineColorRgb(isRun ? 'run' : (isRide ? 'ride' : 'run'));
+                  const baseType = isRun ? 'run' : (isRide ? 'ride' : 'run');
+                  const sportColor = getDisciplinePhosphorCore(baseType);
+                  const rgb = getDisciplineColorRgb(baseType);
+                  const border = `rgba(${rgb}, 0.55)`;
                   
                   return (
                     <button
                       className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
                       style={{
                         backgroundColor: 'transparent',
-                        borderColor: sportColor,
-                        borderWidth: '1px',
+                        borderColor: border,
+                        borderWidth: '0.5px',
                         borderStyle: 'solid',
                       }}
                       onMouseEnter={(e) => {
@@ -1498,8 +1585,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
                   const isRun = ['run', 'running', 'walk'].includes(workoutType);
                   const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
-                  const sportColor = isRun ? SPORT_COLORS.run : (isRide ? SPORT_COLORS.ride : SPORT_COLORS.run);
-                  const rgb = getDisciplineColorRgb(isRun ? 'run' : (isRide ? 'ride' : 'run'));
+                  const baseType = isRun ? 'run' : (isRide ? 'ride' : workoutType);
+                  const sportColor = getDisciplinePhosphorCore(baseType);
+                  const rgb = getDisciplineColorRgb(baseType);
+                  const border = `rgba(${rgb}, 0.55)`;
                   
                   return (
                     <>
@@ -1507,8 +1596,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
                         style={{
                           backgroundColor: 'transparent',
-                          borderColor: sportColor,
-                          borderWidth: '1px',
+                          borderColor: border,
+                          borderWidth: '0.5px',
                           borderStyle: 'solid',
                         }}
                         onMouseEnter={(e) => {
@@ -1526,8 +1615,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
                         style={{
                           backgroundColor: 'transparent',
-                          borderColor: sportColor,
-                          borderWidth: '1px',
+                          borderColor: border,
+                          borderWidth: '0.5px',
                           borderStyle: 'solid',
                         }}
                         onMouseEnter={(e) => {
