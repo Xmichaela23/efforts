@@ -1030,6 +1030,28 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col" style={{fontFamily: 'Inter, sans-serif', position:'relative', overflow: 'hidden', zIndex: 0}}>
+      {/* Omni-inspired diamond-grid texture (matches reference) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: 'none',
+          opacity: 0.28,
+          mixBlendMode: 'soft-light',
+          backgroundColor: 'rgba(0,0,0,0.25)',
+          backgroundImage: `
+            linear-gradient(45deg, rgba(255,255,255,0.22) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
+            linear-gradient(45deg, rgba(255,255,255,0.10) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+            radial-gradient(ellipse at center, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)
+          `,
+          backgroundSize: '26px 26px, 26px 26px, 52px 52px, 52px 52px, cover',
+          backgroundPosition: 'center, center, center, center, center',
+        }}
+      />
       {/* Scrollable container for Today panel */}
       <div 
         ref={scrollRef}
@@ -1038,6 +1060,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           overflowY: 'auto',
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         {/* Today Panel Header - Live instrument cockpit (sticky, raised, glowing) */}
@@ -1048,18 +1072,38 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             position: 'sticky',
             top: 0,
             zIndex: 20,
-            // Solid opaque background - no transparency
+            // Opaque base + Omni texture so scroll content doesn't show through
             backgroundColor: '#000000',
-            border: '0.5px solid rgba(255, 255, 255, 0.08)', // Slightly brighter border for panel definition
+            // Diamond-grid texture (like the reference) + subtle spectral glow field
+            backgroundImage: `
+              radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.10) 0%, transparent 55%),
+              radial-gradient(ellipse at 85% 30%, rgba(74, 158, 255, 0.08) 0%, transparent 55%),
+              radial-gradient(ellipse at 15% 35%, rgba(183, 148, 246, 0.08) 0%, transparent 55%),
+              linear-gradient(45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
+              linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
+              linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+              linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px)
+            `,
+            backgroundSize: 'cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px',
+            backgroundPosition: 'center, center, center, center, center, center, center',
+            backgroundBlendMode: 'screen, screen, screen, soft-light, soft-light, soft-light, soft-light',
+            overflow: 'hidden',
+            // Omni-inspired illuminated border that blends
+            border: '0.5px solid rgba(255, 255, 255, 0.08)',
             borderRadius: '12px', // Rounded corners for mounted instrument feel
             padding: '0.75rem 1rem', // More padding for panel breathing room
-            // Panel depth: raised above background with glow field
+            // Panel depth: raised above background with Omni-style glow field - more visible
             boxShadow: `
               0 0 0 1px rgba(255,255,255,0.04) inset,
               0 2px 8px rgba(0,0,0,0.5),
               0 0 20px rgba(255, 240, 200, 0.08),
-              0 0 40px rgba(255, 240, 200, 0.04)
-            `, // Inner stroke + depth + warm glow field
+              0 0 40px rgba(255, 240, 200, 0.04),
+              0 0 0 1px rgba(255, 215, 0, 0.20),
+              0 0 20px rgba(255, 215, 0, 0.15),
+              0 0 32px rgba(255, 140, 66, 0.12),
+              0 0 32px rgba(183, 148, 246, 0.12),
+              0 0 24px rgba(74, 158, 255, 0.10)
+            `, // Inner stroke + depth + warm glow field + Omni rainbow glow - enhanced
             marginLeft: '-0.5rem',
             marginRight: '-0.5rem',
             marginTop: '-0.5rem',

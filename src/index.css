@@ -249,12 +249,60 @@
     right: 0;
     /* Height includes safe area for notch/dynamic island */
     height: calc(var(--header-h) + env(safe-area-inset-top));
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-    /* Solid dark background that matches the app theme */
-    background: hsl(0 0% 8%);
+    /* No separator line between wordmark and content */
+    border-bottom: none;
+    /* Solid dark base that matches the app theme */
+    background: #000000;
     z-index: 50;
     /* Push content below notch/status bar */
     padding-top: env(safe-area-inset-top);
+    overflow: hidden; /* contain texture + fade layers */
+  }
+
+  /* Blend header texture into content (Omni diamond-grid + spectral wash) */
+  .mobile-header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.55;
+    mix-blend-mode: soft-light;
+    background-color: rgba(0, 0, 0, 0.18);
+    background-image:
+      radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.10) 0%, transparent 60%),
+      radial-gradient(ellipse at 82% 38%, rgba(74, 158, 255, 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 18% 42%, rgba(183, 148, 246, 0.08) 0%, transparent 60%),
+      linear-gradient(45deg, rgba(255,255,255,0.20) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
+      linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px;
+    background-position: center, center, center, center, center, center, center;
+    background-blend-mode: screen, screen, screen, soft-light, soft-light, soft-light, soft-light;
+  }
+
+  /* Soft bottom fade so the header “melts” into the Today panel */
+  .mobile-header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    /* sit below the header edge so the glow can “spill” */
+    bottom: -44px;
+    height: 96px;
+    pointer-events: none;
+    /* Diffuse “glow field” (not a line): feeds the glow beneath */
+    mix-blend-mode: screen;
+    background-image:
+      radial-gradient(140px 70px at 14% 35%, rgba(255, 215, 0, 0.55) 0%, rgba(255, 215, 0, 0.0) 70%),
+      radial-gradient(160px 80px at 32% 45%, rgba(255, 140, 66, 0.45) 0%, rgba(255, 140, 66, 0.0) 72%),
+      radial-gradient(160px 80px at 50% 40%, rgba(183, 148, 246, 0.42) 0%, rgba(183, 148, 246, 0.0) 72%),
+      radial-gradient(160px 80px at 68% 45%, rgba(74, 158, 255, 0.40) 0%, rgba(74, 158, 255, 0.0) 72%),
+      radial-gradient(140px 70px at 86% 35%, rgba(80, 200, 120, 0.36) 0%, rgba(80, 200, 120, 0.0) 70%),
+      linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.65) 100%);
+    opacity: 0.62;
+    filter: blur(22px);
+    transform: translateZ(0);
   }
   
   /* 🚨 MOBILE MAIN CONTENT - Full viewport, scrolls behind fixed header/nav */

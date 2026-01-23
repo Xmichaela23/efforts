@@ -770,7 +770,8 @@ export default function WorkoutCalendar({
   // VERTICAL TIMELINE PREVIEW - Replace grid with timeline list
   return (
     <div
-      className="w-full max-w-md mx-auto flex flex-col touch-pan-y bg-transparent"
+      className="w-full max-w-md mx-auto flex flex-col touch-pan-y bg-transparent relative"
+      style={{ position: 'relative' }}
       onTouchStart={(e) => {
         const t = e.changedTouches[0];
         setTouchStartX(t.clientX);
@@ -810,13 +811,77 @@ export default function WorkoutCalendar({
         }
       }}
     >
+      {/* Omni-inspired diamond-grid texture (matches reference) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: 'none',
+          opacity: 0.28,
+          mixBlendMode: 'soft-light',
+          backgroundColor: 'rgba(0,0,0,0.25)',
+          backgroundImage: `
+            linear-gradient(45deg, rgba(255,255,255,0.22) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
+            linear-gradient(45deg, rgba(255,255,255,0.10) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+            radial-gradient(ellipse at center, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)
+          `,
+          backgroundSize: '26px 26px, 26px 26px, 52px 52px, 52px 52px, cover',
+          backgroundPosition: 'center, center, center, center, center',
+        }}
+      />
+      {/* Omni-inspired pyramid backdrop (supporting, not dominant) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          left: '-16px',
+          right: '-16px',
+          top: '24px',
+          height: '220px',
+          zIndex: 0,
+          pointerEvents: 'none',
+          background: `
+            linear-gradient(180deg, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.25) 100%),
+            conic-gradient(
+              from 210deg,
+              rgba(255,215,0,0.40),
+              rgba(255,140,66,0.40),
+              rgba(183,148,246,0.40),
+              rgba(74,158,255,0.40),
+              rgba(80,200,120,0.40),
+              rgba(255,215,0,0.40)
+            )
+          `,
+          clipPath: 'polygon(50% 6%, 96% 90%, 4% 90%)',
+          opacity: 0.42,
+          boxShadow: `
+            0 10px 24px rgba(0,0,0,0.25),
+            0 0 18px rgba(255,215,0,0.10),
+            0 0 22px rgba(74,158,255,0.08),
+            0 0 18px rgba(183,148,246,0.07)
+          `,
+        }}
+      />
       {/* Week Navigation - Bright timeline header (compact) */}
       <div 
-        className="flex items-center justify-between py-1 mb-1"
+        className="flex items-center justify-between py-1 mb-1 relative"
         style={{
           backgroundColor: '#000000',
           padding: '0.5rem 0.75rem',
           borderRadius: '6px',
+          zIndex: 5,
+          // Omni-inspired illuminated border
+          border: '0.5px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: `
+            0 0 0 1px rgba(255,255,255,0.04) inset,
+            0 0 20px rgba(255, 215, 0, 0.15),
+            0 0 28px rgba(183, 148, 246, 0.12),
+            0 0 24px rgba(74, 158, 255, 0.10)
+          `,
         }}
       >
         <button
@@ -841,7 +906,7 @@ export default function WorkoutCalendar({
       </div>
 
       {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
-      <div className="flex flex-col gap-1 flex-shrink-0 pb-2">
+      <div className="flex flex-col gap-1 flex-shrink-0 pb-2 relative" style={{ zIndex: 1 }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -862,12 +927,17 @@ export default function WorkoutCalendar({
               ].join(" ")}
               style={{
                 borderRadius: '6px',
+                // Omni-inspired illuminated border that blends
                 border: '0.5px solid rgba(255, 255, 255, 0.12)',
                 background: isToday 
                   ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0.12) 100%)' // Today: brighter
                   : 'radial-gradient(ellipse at left, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%)', // Week rows: mid glow
                 opacity: 1.0,
                 minHeight: '36px', // Compact row height
+                // More visible Omni glow for today
+                boxShadow: isToday 
+                  ? '0 0 16px rgba(255, 215, 0, 0.20), 0 0 24px rgba(255, 140, 66, 0.15), 0 0 20px rgba(183, 148, 246, 0.12)'
+                  : 'none',
               }}
             >
               {/* Left: Day label - bright and visible (compact) */}
