@@ -1062,6 +1062,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             `, // Inner stroke + depth + warm glow field
             marginLeft: '-0.5rem',
             marginRight: '-0.5rem',
+            marginTop: '-0.5rem',
           }}
         >
           <div className="space-y-1">

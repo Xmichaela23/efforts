@@ -1578,7 +1578,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           ) : (
             <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (
-              <div className="space-y-1 pt-2">
+              <div className="space-y-1">
                 {/* Today's efforts - fixed height, scrolls internally */}
                 <div style={{ height: '30vh', flexShrink: 0 }}>
                   <TodaysEffort
