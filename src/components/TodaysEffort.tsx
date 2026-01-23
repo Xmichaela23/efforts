@@ -1104,9 +1104,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               0 0 32px rgba(183, 148, 246, 0.12),
               0 0 24px rgba(74, 158, 255, 0.10)
             `, // Inner stroke + depth + warm glow field + Omni rainbow glow - enhanced
-            marginLeft: '-0.5rem',
-            marginRight: '-0.5rem',
-            marginTop: '-0.5rem',
+            // Keep aligned to the instrument panel surface (no “floating” offsets)
+            marginLeft: 0,
+            marginRight: 0,
+            marginTop: 0,
           }}
         >
           <div className="space-y-1">

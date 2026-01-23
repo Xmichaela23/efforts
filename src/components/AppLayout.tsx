@@ -1579,31 +1579,105 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (
               <div className="space-y-1">
-                {/* Today's efforts - fixed height, scrolls internally */}
-                <div style={{ height: '30vh', flexShrink: 0 }}>
-                  <TodaysEffort
-                    selectedDate={selectedDate}
-                    onAddEffort={handleAddEffort}
-                    onViewCompleted={handleViewCompleted}
-                    onEditEffort={handleEditEffort}
+                {/* A) One continuous instrument panel wrapper (outer rim + inner bevel) */}
+                <div
+                  style={{
+                    borderRadius: 14,
+                    padding: 10,
+                    position: 'relative',
+                    background:
+                      'radial-gradient(ellipse at 20% 10%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.0) 55%),' +
+                      'radial-gradient(ellipse at 80% 20%, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.0) 60%),' +
+                      'radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.90) 100%)',
+                    border: '0.5px solid rgba(255,255,255,0.10)',
+                    boxShadow:
+                      '0 10px 30px rgba(0,0,0,0.55),' +
+                      '0 0 0 1px rgba(255,255,255,0.04) inset,' +
+                      'inset 0 1px 0 rgba(255,255,255,0.10),' +
+                      'inset 0 -1px 0 rgba(0,0,0,0.60)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Shared surface texture for cohesion (one instrument panel) */}
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      pointerEvents: 'none',
+                      zIndex: 0,
+                      opacity: 0.40,
+                      mixBlendMode: 'soft-light',
+                      backgroundColor: 'rgba(0,0,0,0.20)',
+                      backgroundImage: `
+                        radial-gradient(ellipse at 12% 18%, rgba(255, 215, 0, 0.10) 0%, transparent 60%),
+                        radial-gradient(ellipse at 52% 8%, rgba(183, 148, 246, 0.08) 0%, transparent 60%),
+                        radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.08) 0%, transparent 60%),
+                        linear-gradient(45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
+                        linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
+                        linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+                        linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px)
+                      `,
+                      backgroundSize: 'cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px',
+                      backgroundPosition: 'center, center, center, center, center, center, center',
+                      backgroundBlendMode: 'screen, screen, screen, soft-light, soft-light, soft-light, soft-light',
+                    }}
                   />
-                </div>
-                {/* Schedule - locked in place, always visible */}
-                <div style={{ flexShrink: 0 }}>
-                  <WorkoutCalendar
-                    onAddEffort={() => handleAddEffort('run')}
-                    onSelectType={handleSelectEffortType}
-                    onSelectWorkout={handleEditEffort}
-                    onViewCompleted={handleViewCompleted}
-                    onEditEffort={handleEditEffort}
-                    onDateSelect={handleDateSelect}
-                    onSelectRoutine={handleSelectRoutine}
-                    onOpenPlanBuilder={handleOpenPlanBuilder}
-                    currentPlans={currentPlans}
-                    completedPlans={completedPlans}
-                    workouts={workouts}
-                    plannedWorkouts={[]}
-                  />
+
+                  {/* Inner surface (slightly inset) */}
+                  <div
+                    style={{
+                      borderRadius: 12,
+                      padding: 8,
+                      background: 'rgba(0,0,0,0.65)',
+                      boxShadow:
+                        'inset 0 0 0 1px rgba(255,255,255,0.05),' +
+                        'inset 0 10px 18px rgba(0,0,0,0.35)',
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    {/* Today's efforts - fixed height, scrolls internally */}
+                    <div style={{ height: '30vh', flexShrink: 0 }}>
+                      <TodaysEffort
+                        selectedDate={selectedDate}
+                        onAddEffort={handleAddEffort}
+                        onViewCompleted={handleViewCompleted}
+                        onEditEffort={handleEditEffort}
+                      />
+                    </div>
+
+                    {/* Subtle inset divider between Today and Week modules */}
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        height: 1,
+                        margin: '8px 2px',
+                        background:
+                          'linear-gradient(90deg, transparent, rgba(255,255,255,0.10), rgba(255,255,255,0.06), transparent)',
+                        boxShadow:
+                          '0 0 10px rgba(255,215,0,0.06), 0 0 12px rgba(74,158,255,0.05)',
+                      }}
+                    />
+
+                    {/* Schedule - locked in place, always visible */}
+                    <div style={{ flexShrink: 0 }}>
+                      <WorkoutCalendar
+                        onAddEffort={() => handleAddEffort('run')}
+                        onSelectType={handleSelectEffortType}
+                        onSelectWorkout={handleEditEffort}
+                        onViewCompleted={handleViewCompleted}
+                        onEditEffort={handleEditEffort}
+                        onDateSelect={handleDateSelect}
+                        onSelectRoutine={handleSelectRoutine}
+                        onOpenPlanBuilder={handleOpenPlanBuilder}
+                        currentPlans={currentPlans}
+                        completedPlans={completedPlans}
+                        workouts={workouts}
+                        plannedWorkouts={[]}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
               )}
