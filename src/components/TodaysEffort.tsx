@@ -1029,12 +1029,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }, [weather]);
 
   return (
-    <div className="w-full flex flex-col" style={{fontFamily: 'Inter, sans-serif', position:'relative', zIndex: 0}}>
-      {/* Today Panel Header - Live instrument cockpit (raised, glowing) */}
+    <div className="w-full h-full flex flex-col" style={{fontFamily: 'Inter, sans-serif', position:'relative', overflow: 'hidden', zIndex: 0}}>
+      {/* Scrollable container for Today panel */}
       <div 
-        ref={headerRef}
-        className="mb-3 flex-shrink-0" 
+        ref={scrollRef}
+        className="scrollbar-hide flex flex-col h-full"
         style={{ 
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        {/* Today Panel Header - Live instrument cockpit (sticky, raised, glowing) */}
+        <div 
+          ref={headerRef}
+          className="mb-3 flex-shrink-0" 
+          style={{ 
+            position: 'sticky',
+            top: 0,
+            zIndex: 20,
             // Raised panel with subtle elevation and glow field
             background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%)',
             border: '0.5px solid rgba(255, 255, 255, 0.08)', // Slightly brighter border for panel definition
@@ -1387,6 +1400,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         )}
         </div>
+        </div>
+      </div>
 
       {/* Planned Workout Bottom Sheet */}
       <Drawer open={!!selectedPlannedWorkout} onOpenChange={(open) => !open && setSelectedPlannedWorkout(null)}>

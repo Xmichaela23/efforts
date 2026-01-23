@@ -1579,26 +1579,32 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (
               <div className="space-y-1 pt-2">
-                <TodaysEffort
-                  selectedDate={selectedDate}
-                  onAddEffort={handleAddEffort}
-                  onViewCompleted={handleViewCompleted}
-                  onEditEffort={handleEditEffort}
-                />
-                <WorkoutCalendar
-                  onAddEffort={() => handleAddEffort('run')}
-                  onSelectType={handleSelectEffortType}
-                  onSelectWorkout={handleEditEffort}
-                  onViewCompleted={handleViewCompleted}
-                  onEditEffort={handleEditEffort}
-                  onDateSelect={handleDateSelect}
-                  onSelectRoutine={handleSelectRoutine}
-                  onOpenPlanBuilder={handleOpenPlanBuilder}
-                  currentPlans={currentPlans}
-                  completedPlans={completedPlans}
-                  workouts={workouts}
-                  plannedWorkouts={[]}
-                />
+                {/* Today's efforts - fixed height, scrolls internally */}
+                <div style={{ height: '40vh', flexShrink: 0 }}>
+                  <TodaysEffort
+                    selectedDate={selectedDate}
+                    onAddEffort={handleAddEffort}
+                    onViewCompleted={handleViewCompleted}
+                    onEditEffort={handleEditEffort}
+                  />
+                </div>
+                {/* Schedule - locked in place, always visible */}
+                <div style={{ flexShrink: 0 }}>
+                  <WorkoutCalendar
+                    onAddEffort={() => handleAddEffort('run')}
+                    onSelectType={handleSelectEffortType}
+                    onSelectWorkout={handleEditEffort}
+                    onViewCompleted={handleViewCompleted}
+                    onEditEffort={handleEditEffort}
+                    onDateSelect={handleDateSelect}
+                    onSelectRoutine={handleSelectRoutine}
+                    onOpenPlanBuilder={handleOpenPlanBuilder}
+                    currentPlans={currentPlans}
+                    completedPlans={completedPlans}
+                    workouts={workouts}
+                    plannedWorkouts={[]}
+                  />
+                </div>
               </div>
               )}
               {activeBottomNav === 'insights' && (
