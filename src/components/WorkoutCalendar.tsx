@@ -814,7 +814,7 @@ export default function WorkoutCalendar({
       <div 
         className="flex items-center justify-between py-1 mb-1"
         style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          backgroundColor: '#000000',
           padding: '0.5rem 0.75rem',
           borderRadius: '6px',
         }}
