@@ -79,13 +79,26 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           backgroundColor: '#000000',
           padding: '0.55rem 0.75rem',
           borderRadius: '10px',
-          border: '0.5px solid rgba(255, 255, 255, 0.08)',
+          border: '0.5px solid rgba(255, 255, 255, 0.12)',
+          backgroundImage: `
+            radial-gradient(ellipse at 18% 0%, rgba(255, 255, 255, 0.16) 0%, transparent 60%),
+            radial-gradient(ellipse at 70% 45%, rgba(255, 255, 255, 0.06) 0%, transparent 62%),
+            linear-gradient(45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
+            linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px)
+          `,
+          backgroundSize: 'cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px',
+          backgroundPosition: 'center, center, center, center, center, center',
+          backgroundBlendMode: 'screen, screen, soft-light, soft-light, soft-light, soft-light',
           boxShadow: `
             0 0 0 1px rgba(255,255,255,0.05) inset,
             inset 0 1px 0 rgba(255,255,255,0.18),
             inset -1px -1px 0 rgba(0,0,0,0.35),
             0 8px 18px rgba(0,0,0,0.45),
-            0 0 22px rgba(255,255,255,0.06)
+            0 0 22px rgba(255,255,255,0.06),
+            0 0 22px rgba(255,215,0,0.06),
+            0 0 26px rgba(74,158,255,0.05)
           `,
         }}
       >

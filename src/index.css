@@ -258,7 +258,8 @@
       0 10px 30px rgba(0,0,0,0.55),
       0 0 0 1px rgba(255,255,255,0.04) inset,
       inset 0 1px 0 rgba(255,255,255,0.10),
-      inset 0 -1px 0 rgba(0,0,0,0.60);
+      inset 0 -1px 0 rgba(0,0,0,0.60),
+      0 0 32px rgba(255,255,255,0.04);
   }
 
   .instrument-panel-texture {
@@ -266,20 +267,27 @@
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    opacity: 0.40;
+    opacity: 0.74;
     mix-blend-mode: soft-light;
     background-color: rgba(0,0,0,0.20);
     background-image:
-      radial-gradient(ellipse at 12% 18%, rgba(255, 215, 0, 0.10) 0%, transparent 60%),
-      radial-gradient(ellipse at 52% 8%, rgba(183, 148, 246, 0.08) 0%, transparent 60%),
-      radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.08) 0%, transparent 60%),
-      linear-gradient(45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
+      radial-gradient(ellipse at 12% 18%, rgba(255, 215, 0, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse at 48% 8%, rgba(183, 148, 246, 0.11) 0%, transparent 60%),
+      radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.08) 0%, transparent 62%),
+      radial-gradient(ellipse at 32% 36%, rgba(239, 68, 68, 0.06) 0%, transparent 64%),
+      /* micro grid (subtle, but should be visible) */
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.036) 0px, rgba(255,255,255,0.036) 1px, transparent 1px, transparent 9px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.030) 0px, rgba(255,255,255,0.030) 1px, transparent 1px, transparent 9px),
+      /* diamond grid */
+      linear-gradient(45deg, rgba(255,255,255,0.19) 1px, transparent 1px),
       linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
-      linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
-      linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px);
-    background-size: cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px;
-    background-position: center, center, center, center, center, center, center;
-    background-blend-mode: screen, screen, screen, soft-light, soft-light, soft-light, soft-light;
+      linear-gradient(45deg, rgba(255,255,255,0.10) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.08) 1px, transparent 1px);
+    background-size: cover, cover, cover, cover, cover, cover, cover, 22px 22px, 22px 22px, 44px 44px, 44px 44px;
+    background-position: center, center, center, center, center, center, center, center, center, center, center;
+    background-blend-mode: screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light, soft-light, soft-light;
+    filter: blur(0.16px) saturate(1.10) contrast(1.02);
   }
 
   .instrument-surface {
@@ -296,18 +304,81 @@
   .instrument-divider {
     height: 1px;
     margin: 8px 2px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.10), rgba(255,255,255,0.06), transparent);
-    box-shadow: 0 0 10px rgba(255,215,0,0.06), 0 0 12px rgba(74,158,255,0.05);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.14), rgba(255,255,255,0.09), transparent);
+    box-shadow: 0 0 14px rgba(255,215,0,0.08), 0 0 16px rgba(74,158,255,0.07);
   }
 
   .instrument-card {
+    position: relative;
+    overflow: hidden;
     border-radius: 12px;
     padding: 16px;
     background: radial-gradient(ellipse at center top, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%);
-    border: 0.5px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.03) inset, 0 2px 8px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.05) inset,
+      inset 0 1px 0 rgba(255,255,255,0.10),
+      inset 0 -1px 0 rgba(0,0,0,0.55),
+      0 10px 22px rgba(0,0,0,0.34),
+      0 0 22px rgba(255,255,255,0.06),
+      0 0 26px rgba(255,215,0,0.05),
+      0 0 26px rgba(74,158,255,0.04);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
+  }
+
+  /* Omni-ish printed texture + spectral wash for instrument cards */
+  .instrument-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.76;
+    /* Make texture read stronger than soft-light */
+    mix-blend-mode: overlay;
+    background-color: rgba(0,0,0,0.08);
+    background-image:
+      radial-gradient(ellipse at 14% 18%, rgba(255, 215, 0, 0.09) 0%, transparent 62%),
+      radial-gradient(ellipse at 50% 10%, rgba(183, 148, 246, 0.18) 0%, transparent 62%),
+      radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.20) 0%, transparent 62%),
+      radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.12) 0%, transparent 64%),
+      radial-gradient(ellipse at 32% 36%, rgba(239, 68, 68, 0.09) 0%, transparent 66%),
+      /* micro grid (lighter) */
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.034) 0px, rgba(255,255,255,0.034) 1px, transparent 1px, transparent 9px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.028) 0px, rgba(255,255,255,0.028) 1px, transparent 1px, transparent 9px),
+      /* diamond grid */
+      linear-gradient(45deg, rgba(255,255,255,0.22) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.16) 1px, transparent 1px),
+      linear-gradient(45deg, rgba(255,255,255,0.12) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.10) 1px, transparent 1px);
+    background-size: cover, cover, cover, cover, cover, cover, cover, 24px 24px, 24px 24px, 48px 48px, 48px 48px;
+    background-position: center, center, center, center, center, center, center, center, center, center, center;
+    background-blend-mode: screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light, soft-light, soft-light;
+    filter: blur(0.18px) saturate(1.12) contrast(1.02);
+  }
+
+  /* Explicit glow field (dashboard-like “supernova” spill) */
+  .instrument-card::after {
+    content: "";
+    position: absolute;
+    inset: -24px;
+    pointer-events: none;
+    opacity: 0.36;
+    mix-blend-mode: screen;
+    background-image:
+      radial-gradient(200px 120px at 18% 20%, rgba(255, 215, 0, 0.14) 0%, rgba(255, 215, 0, 0.0) 72%),
+      radial-gradient(220px 140px at 40% 32%, rgba(255, 140, 66, 0.12) 0%, rgba(255, 140, 66, 0.0) 72%),
+      radial-gradient(240px 150px at 56% 30%, rgba(183, 148, 246, 0.16) 0%, rgba(183, 148, 246, 0.0) 72%),
+      radial-gradient(220px 135px at 82% 20%, rgba(74, 158, 255, 0.18) 0%, rgba(74, 158, 255, 0.0) 72%),
+      radial-gradient(240px 150px at 76% 44%, rgba(80, 200, 120, 0.12) 0%, rgba(80, 200, 120, 0.0) 74%),
+      radial-gradient(260px 170px at 50% 58%, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.0) 76%);
+    filter: blur(24px) saturate(1.08);
+    transform: translateZ(0);
+  }
+
+  .instrument-card > * {
+    position: relative;
+    z-index: 1;
   }
   
   /* 🚨 MOBILE APP CONTAINER - Fixed layout with blur-through header/nav */
@@ -337,6 +408,14 @@
     /* Push content below notch/status bar */
     padding-top: env(safe-area-inset-top);
     overflow: hidden; /* contain texture + fade layers */
+    isolation: isolate; /* keep blend modes contained */
+    /* Subtle chassis depth (no hard separator) */
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.05) inset,
+      inset 0 1px 0 rgba(255,255,255,0.16),
+      inset 0 -1px 0 rgba(0,0,0,0.65),
+      0 8px 18px rgba(0,0,0,0.55),
+      0 0 26px rgba(255,255,255,0.06);
   }
 
   /* Blend header texture into content (Omni diamond-grid + spectral wash) */
@@ -345,20 +424,50 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    opacity: 0.55;
-    mix-blend-mode: soft-light;
-    background-color: rgba(0, 0, 0, 0.18);
+    opacity: 0.97;
+    mix-blend-mode: overlay;
+    background-color: rgba(0, 0, 0, 0.08);
     background-image:
-      radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.10) 0%, transparent 60%),
-      radial-gradient(ellipse at 82% 38%, rgba(74, 158, 255, 0.08) 0%, transparent 60%),
-      radial-gradient(ellipse at 18% 42%, rgba(183, 148, 246, 0.08) 0%, transparent 60%),
-      linear-gradient(45deg, rgba(255,255,255,0.20) 1px, transparent 1px),
-      linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
-      linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
-      linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px);
-    background-size: cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px;
-    background-position: center, center, center, center, center, center, center;
-    background-blend-mode: screen, screen, screen, soft-light, soft-light, soft-light, soft-light;
+      /* balanced spectral wash (match instrument cards) */
+      radial-gradient(ellipse at 14% 18%, rgba(255, 215, 0, 0.10) 0%, transparent 62%),
+      radial-gradient(ellipse at 50% 10%, rgba(183, 148, 246, 0.16) 0%, transparent 62%),
+      radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.18) 0%, transparent 62%),
+      radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.10) 0%, transparent 64%),
+      radial-gradient(ellipse at 32% 36%, rgba(239, 68, 68, 0.06) 0%, transparent 66%),
+      /* dot-matrix print */
+      radial-gradient(circle, rgba(255,255,255,0.080) 1px, transparent 1.70px),
+      /* finer dot pass (adds “ink” on smooth gradients) */
+      radial-gradient(circle, rgba(255,255,255,0.040) 0.7px, transparent 1.25px),
+      /* scanlines */
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.050) 0px, rgba(255,255,255,0.050) 1px, transparent 1px, transparent 6px),
+      /* diagonal hatch */
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.040) 0px, rgba(255,255,255,0.040) 1px, transparent 1px, transparent 12px),
+      /* micro grid */
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.070) 0px, rgba(255,255,255,0.070) 1px, transparent 1px, transparent 9px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.060) 0px, rgba(255,255,255,0.060) 1px, transparent 1px, transparent 9px),
+      /* diamond grid */
+      linear-gradient(45deg, rgba(255,255,255,0.38) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.30) 1px, transparent 1px),
+      linear-gradient(45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.12) 1px, transparent 1px);
+    background-size:
+      cover, cover, cover, cover, cover,
+      14px 14px,
+      9px 9px,
+      cover,
+      24px 24px,
+      cover, cover,
+      22px 22px, 22px 22px, 44px 44px, 44px 44px;
+    background-position: center, center, center, center, center, center, center, center, center, center, center, center, center;
+    background-blend-mode:
+      screen, screen, screen, screen, screen,
+      soft-light,
+      soft-light,
+      soft-light,
+      soft-light,
+      soft-light, soft-light,
+      soft-light, soft-light, soft-light, soft-light;
+    filter: blur(0.10px) saturate(1.20) contrast(1.12);
   }
 
   /* Soft bottom fade so the header “melts” into the Today panel */
@@ -368,21 +477,21 @@
     left: 0;
     right: 0;
     /* sit below the header edge so the glow can “spill” */
-    bottom: -52px;
-    height: 112px;
+    bottom: -92px;
+    height: 190px;
     pointer-events: none;
     /* Diffuse “glow field” (not a line): feeds the glow beneath */
     mix-blend-mode: screen;
     background-image:
-      radial-gradient(140px 70px at 14% 35%, rgba(255, 215, 0, 0.62) 0%, rgba(255, 215, 0, 0.0) 70%),
-      radial-gradient(160px 80px at 32% 45%, rgba(255, 140, 66, 0.52) 0%, rgba(255, 140, 66, 0.0) 72%),
-      radial-gradient(170px 90px at 50% 44%, rgba(239, 68, 68, 0.34) 0%, rgba(239, 68, 68, 0.0) 74%),
-      radial-gradient(160px 80px at 50% 40%, rgba(183, 148, 246, 0.46) 0%, rgba(183, 148, 246, 0.0) 72%),
-      radial-gradient(160px 80px at 68% 45%, rgba(74, 158, 255, 0.44) 0%, rgba(74, 158, 255, 0.0) 72%),
-      radial-gradient(140px 70px at 86% 35%, rgba(80, 200, 120, 0.40) 0%, rgba(80, 200, 120, 0.0) 70%),
+      radial-gradient(140px 70px at 14% 35%, rgba(255, 215, 0, 0.40) 0%, rgba(255, 215, 0, 0.0) 70%),
+      radial-gradient(160px 80px at 32% 45%, rgba(255, 140, 66, 0.34) 0%, rgba(255, 140, 66, 0.0) 72%),
+      radial-gradient(170px 90px at 50% 44%, rgba(239, 68, 68, 0.24) 0%, rgba(239, 68, 68, 0.0) 74%),
+      radial-gradient(160px 80px at 50% 40%, rgba(183, 148, 246, 0.36) 0%, rgba(183, 148, 246, 0.0) 72%),
+      radial-gradient(160px 80px at 68% 45%, rgba(74, 158, 255, 0.38) 0%, rgba(74, 158, 255, 0.0) 72%),
+      radial-gradient(140px 70px at 86% 35%, rgba(80, 200, 120, 0.30) 0%, rgba(80, 200, 120, 0.0) 70%),
       linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.65) 100%);
-    opacity: 0.72;
-    filter: blur(24px) saturate(1.12);
+    opacity: 0.90;
+    filter: blur(26px) saturate(1.16);
     transform: translateZ(0);
   }
   
@@ -402,8 +511,14 @@
     padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--tabbar-extra));
     /* Prevent white background on overscroll */
     overscroll-behavior: none;
-    /* Solid black background */
-    background: #000000;
+    /* Bridge the header → first panel with a shared glow field */
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.0) 58%),
+      radial-gradient(ellipse at 14% 0%, rgba(255, 215, 0, 0.07) 0%, rgba(255, 215, 0, 0.0) 62%),
+      radial-gradient(ellipse at 50% 0%, rgba(183, 148, 246, 0.08) 0%, rgba(183, 148, 246, 0.0) 62%),
+      radial-gradient(ellipse at 86% 0%, rgba(74, 158, 255, 0.09) 0%, rgba(74, 158, 255, 0.0) 62%),
+      radial-gradient(ellipse at 78% 18%, rgba(80, 200, 120, 0.05) 0%, rgba(80, 200, 120, 0.0) 66%),
+      #000000;
   }
   
   /* Bottom spacing removed - content fits without needing scroll buffer */

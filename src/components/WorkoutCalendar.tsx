@@ -1116,19 +1116,20 @@ export default function WorkoutCalendar({
                                 height: 12,
                                 borderRadius: 999,
                                 // “Power light” orb: shiny highlight + discipline-colored glow
-                                border: `1px solid rgba(${pillRgb}, 0.22)`,
+                                border: `1px solid rgba(${pillRgb}, 0.18)`,
                                 backgroundImage: `
-                                  radial-gradient(42% 42% at 30% 28%, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.30) 32%, rgba(255,255,255,0.00) 68%),
-                                  radial-gradient(circle at 50% 56%, rgba(${pillRgb}, 0.98) 0%, rgba(${pillRgb}, 0.72) 52%, rgba(0,0,0,0.92) 140%),
-                                  radial-gradient(120% 120% at 78% 88%, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.00) 58%)
+                                  /* matte highlight (less “wet”) */
+                                  radial-gradient(42% 42% at 30% 28%, rgba(255,255,255,0.58) 0%, rgba(255,255,255,0.16) 32%, rgba(255,255,255,0.00) 66%),
+                                  radial-gradient(circle at 50% 56%, rgba(${pillRgb}, 0.90) 0%, rgba(${pillRgb}, 0.60) 54%, rgba(0,0,0,0.92) 140%),
+                                  radial-gradient(120% 120% at 78% 88%, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.00) 58%)
                                 `,
                                 backgroundBlendMode: 'screen, normal, multiply',
                                 boxShadow: `
-                                  0 0 10px rgba(${pillRgb}, 0.26),
-                                  0 0 18px rgba(${pillRgb}, 0.12),
+                                  0 0 6px rgba(${pillRgb}, 0.14),
+                                  0 0 12px rgba(${pillRgb}, 0.07),
                                   0 2px 6px rgba(0,0,0,0.55),
-                                  inset 0 1px 1px rgba(255,255,255,0.55),
-                                  inset 0 -2px 4px rgba(0,0,0,0.55)
+                                  inset 0 1px 1px rgba(255,255,255,0.22),
+                                  inset 0 -2px 4px rgba(0,0,0,0.62)
                                 `.replace(/\s+/g,' ').trim(),
                                 // Prevent text selection cursor; orb is the indicator
                                 color: `rgba(${pillRgb}, 1)`,
