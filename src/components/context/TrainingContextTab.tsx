@@ -71,16 +71,38 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
   }
 
   return (
-    <div className="space-y-4 pb-6">
-      {/* Header with refresh button */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-white">Training Context</h2>
+    <div className="space-y-3 pb-6">
+      {/* Cockpit strip (matches dashboard week strip language) */}
+      <div
+        className="flex items-center justify-between relative"
+        style={{
+          backgroundColor: '#000000',
+          padding: '0.55rem 0.75rem',
+          borderRadius: '10px',
+          border: '0.5px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: `
+            0 0 0 1px rgba(255,255,255,0.05) inset,
+            inset 0 1px 0 rgba(255,255,255,0.18),
+            inset -1px -1px 0 rgba(0,0,0,0.35),
+            0 8px 18px rgba(0,0,0,0.45),
+            0 0 22px rgba(255,255,255,0.06)
+          `,
+        }}
+      >
+        <div className="flex flex-col">
+          <span className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.40)' }}>
+            Week
+          </span>
+          <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.92)' }}>
+            Training Context
+          </span>
+        </div>
         <button
           onClick={refresh}
           disabled={loading}
           className={`p-2 rounded-lg transition-colors ${
-            loading 
-              ? 'text-white/30 cursor-not-allowed' 
+            loading
+              ? 'text-white/30 cursor-not-allowed'
               : 'text-white/50 hover:text-white hover:bg-white/10'
           }`}
           title="Refresh context"
@@ -94,6 +116,8 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         <SmartInsights insights={data.insights} />
       )}
 
+      <div aria-hidden="true" className="instrument-divider" />
+
       {/* ACWR Gauge */}
       <ACWRGauge acwr={data.acwr} />
 
@@ -105,7 +129,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
 
       {/* Week Comparison */}
       {data.week_comparison && (
-        <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+        <div className="instrument-card">
           <div className="flex items-center justify-between">
             <span className="text-sm text-white/60">Week-over-Week</span>
             <div className="flex items-center gap-2">
@@ -130,6 +154,8 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
 
       {/* Sport Breakdown */}
       <SportBreakdown breakdown={data.sport_breakdown} />
+
+      <div aria-hidden="true" className="instrument-divider" />
 
       {/* Activity Timeline */}
       <ActivityTimeline 

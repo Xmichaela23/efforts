@@ -56,7 +56,7 @@ export const ACWRGauge: React.FC<ACWRGaugeProps> = ({ acwr, showProjected = true
   }
 
   return (
-    <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+    <div className="instrument-card">
       {/* ACWR Value and Status */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">

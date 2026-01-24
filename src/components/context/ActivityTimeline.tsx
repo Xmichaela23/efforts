@@ -40,7 +40,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   };
 
   return (
-    <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+    <div className="instrument-card">
       {/* Header */}
       <div className="text-sm font-medium text-white mb-3">Recent Activity</div>
       

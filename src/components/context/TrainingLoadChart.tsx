@@ -42,7 +42,7 @@ export const TrainingLoadChart: React.FC<TrainingLoadChartProps> = ({
   const chronologicalData = [...weekData].reverse();
 
   return (
-    <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+    <div className="instrument-card">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-medium text-white">7-Day Training Load</div>

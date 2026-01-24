@@ -138,12 +138,34 @@ const BlockSummaryTab: React.FC = () => {
   const hasStructuredData = data.performance_trends_structured && typeof data.performance_trends_structured === 'object';
 
   return (
-    <div className="space-y-4 pb-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-medium text-white">4-Week Block</h2>
-          <p className="text-xs text-white/50">Performance trends and training patterns</p>
+    <div className="space-y-3 pb-6">
+      {/* Cockpit strip (matches dashboard language) */}
+      <div
+        className="flex items-center justify-between relative"
+        style={{
+          backgroundColor: '#000000',
+          padding: '0.55rem 0.75rem',
+          borderRadius: '10px',
+          border: '0.5px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: `
+            0 0 0 1px rgba(255,255,255,0.05) inset,
+            inset 0 1px 0 rgba(255,255,255,0.18),
+            inset -1px -1px 0 rgba(0,0,0,0.35),
+            0 8px 18px rgba(0,0,0,0.45),
+            0 0 22px rgba(255,255,255,0.06)
+          `,
+        }}
+      >
+        <div className="flex flex-col">
+          <span className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.40)' }}>
+            Block
+          </span>
+          <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.92)' }}>
+            4-Week Block
+          </span>
+          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.50)' }}>
+            Performance trends and training patterns
+          </span>
         </div>
         <button
           onClick={handleRefresh}
@@ -158,6 +180,8 @@ const BlockSummaryTab: React.FC = () => {
           <RefreshCw className={`w-4 h-4 ${loading || isRefreshing ? 'animate-spin' : ''}`} />
         </button>
       </div>
+
+      <div aria-hidden="true" className="instrument-divider" />
 
       {hasStructuredData ? (
         <>
