@@ -1681,26 +1681,28 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     <div
                       style={{
                         flexShrink: 0,
-                        // Match Today’s “small bleed” so both modules feel like one instrument panel.
-                        marginLeft: -6,
-                        marginRight: -6,
+                        // Let the calendar read as its own module card (clear chassis edge)
+                        marginLeft: 0,
+                        marginRight: 0,
                       }}
                     >
-                      <WorkoutCalendar
-                        onAddEffort={() => handleAddEffort('run')}
-                        onSelectType={handleSelectEffortType}
-                        onSelectWorkout={handleEditEffort}
-                        onViewCompleted={handleViewCompleted}
-                        onEditEffort={handleEditEffort}
-                        onDateSelect={handleDateSelect}
-                        selectedDate={selectedDate}
-                        onSelectRoutine={handleSelectRoutine}
-                        onOpenPlanBuilder={handleOpenPlanBuilder}
-                        currentPlans={currentPlans as any}
-                        completedPlans={completedPlans as any}
-                        workouts={workouts}
-                        plannedWorkouts={[]}
-                      />
+                      <div className="instrument-card glass-card" style={{ padding: 10 }}>
+                        <WorkoutCalendar
+                          onAddEffort={() => handleAddEffort('run')}
+                          onSelectType={handleSelectEffortType}
+                          onSelectWorkout={handleEditEffort}
+                          onViewCompleted={handleViewCompleted}
+                          onEditEffort={handleEditEffort}
+                          onDateSelect={handleDateSelect}
+                          selectedDate={selectedDate}
+                          onSelectRoutine={handleSelectRoutine}
+                          onOpenPlanBuilder={handleOpenPlanBuilder}
+                          currentPlans={currentPlans as any}
+                          completedPlans={completedPlans as any}
+                          workouts={workouts}
+                          plannedWorkouts={[]}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1728,7 +1730,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 const contextActive = activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear;
                 const plansActive = plansMenuOpen;
                 const tabBase =
-                  'relative flex-1 flex items-center justify-center gap-2 backdrop-blur-lg transition-all duration-300 shadow-lg hover:shadow-xl';
+                  'relative flex-1 flex items-center justify-center gap-2 backdrop-blur-lg transition-all duration-300 shadow-lg hover:shadow-xl tabbar-button';
                 const tabChrome =
                   'border-2 rounded-2xl bg-white/[0.07] text-white/75 hover:bg-white/[0.09] hover:text-white/90 border-white/30 hover:border-white/45';
                 const tabActive =

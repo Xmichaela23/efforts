@@ -327,6 +327,37 @@
     -webkit-backdrop-filter: blur(16px);
   }
 
+  /* Glass variant (used for calendar chassis) */
+  .glass-card {
+    /* Lighter, more translucent “glass” bed */
+    background:
+      radial-gradient(ellipse at 18% 10%, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.00) 55%),
+      radial-gradient(ellipse at 70% 18%, rgba(74,158,255,0.06) 0%, rgba(74,158,255,0.0) 62%),
+      radial-gradient(ellipse at center, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.34) 100%);
+    border-color: rgba(255,255,255,0.20);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.06) inset,
+      inset 0 1px 0 rgba(255,255,255,0.16),
+      inset 0 -1px 0 rgba(0,0,0,0.40),
+      0 12px 26px rgba(0,0,0,0.30),
+      0 0 22px rgba(255,255,255,0.07);
+    backdrop-filter: blur(22px) saturate(1.22);
+    -webkit-backdrop-filter: blur(22px) saturate(1.22);
+  }
+
+  /* Softer “printed” texture on glass (less legacy-grid feel) */
+  .glass-card::before {
+    opacity: 0.58;
+    mix-blend-mode: soft-light;
+    filter: blur(0.20px) saturate(1.08) contrast(1.04);
+  }
+
+  /* Keep the spectral spill, but a bit calmer on glass */
+  .glass-card::after {
+    opacity: 0.26;
+    filter: blur(26px) saturate(1.06);
+  }
+
   /* Omni-ish printed texture + spectral wash for instrument cards */
   .instrument-card::before {
     content: "";
@@ -402,8 +433,11 @@
     height: calc(var(--header-h) + env(safe-area-inset-top));
     /* No separator line between wordmark and content */
     border-bottom: none;
-    /* Solid dark base that matches the app theme */
-    background: #000000;
+    /* Shared “console chassis” bed (ties Dashboard + Context) */
+    background:
+      radial-gradient(ellipse at 18% 8%, rgba(255,255,255,0.075) 0%, rgba(0,0,0,0.00) 58%),
+      radial-gradient(ellipse at 78% 28%, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.00) 62%),
+      radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.92) 100%);
     z-index: 50;
     /* Push content below notch/status bar */
     padding-top: env(safe-area-inset-top);
@@ -424,50 +458,38 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    opacity: 0.97;
-    mix-blend-mode: overlay;
+    opacity: 0.94;
+    mix-blend-mode: soft-light;
     background-color: rgba(0, 0, 0, 0.08);
     background-image:
       /* balanced spectral wash (match instrument cards) */
-      radial-gradient(ellipse at 14% 18%, rgba(255, 215, 0, 0.10) 0%, transparent 62%),
-      radial-gradient(ellipse at 50% 10%, rgba(183, 148, 246, 0.16) 0%, transparent 62%),
-      radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.18) 0%, transparent 62%),
-      radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.10) 0%, transparent 64%),
-      radial-gradient(ellipse at 32% 36%, rgba(239, 68, 68, 0.06) 0%, transparent 66%),
-      /* dot-matrix print */
-      radial-gradient(circle, rgba(255,255,255,0.080) 1px, transparent 1.70px),
-      /* finer dot pass (adds “ink” on smooth gradients) */
-      radial-gradient(circle, rgba(255,255,255,0.040) 0.7px, transparent 1.25px),
-      /* scanlines */
-      repeating-linear-gradient(0deg, rgba(255,255,255,0.050) 0px, rgba(255,255,255,0.050) 1px, transparent 1px, transparent 6px),
-      /* diagonal hatch */
-      repeating-linear-gradient(45deg, rgba(255,255,255,0.040) 0px, rgba(255,255,255,0.040) 1px, transparent 1px, transparent 12px),
+      radial-gradient(ellipse at 14% 18%, rgba(255, 215, 0, 0.06) 0%, transparent 62%),
+      radial-gradient(ellipse at 50% 10%, rgba(183, 148, 246, 0.10) 0%, transparent 62%),
+      radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.12) 0%, transparent 62%),
+      radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.07) 0%, transparent 64%),
+      radial-gradient(ellipse at 32% 36%, rgba(239, 68, 68, 0.04) 0%, transparent 66%),
+      /* very light dot-matrix (keeps “print” without shouting) */
+      radial-gradient(circle, rgba(255,255,255,0.050) 0.8px, transparent 1.55px),
       /* micro grid */
-      repeating-linear-gradient(0deg, rgba(255,255,255,0.070) 0px, rgba(255,255,255,0.070) 1px, transparent 1px, transparent 9px),
-      repeating-linear-gradient(90deg, rgba(255,255,255,0.060) 0px, rgba(255,255,255,0.060) 1px, transparent 1px, transparent 9px),
-      /* diamond grid */
-      linear-gradient(45deg, rgba(255,255,255,0.38) 1px, transparent 1px),
-      linear-gradient(-45deg, rgba(255,255,255,0.30) 1px, transparent 1px),
-      linear-gradient(45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
-      linear-gradient(-45deg, rgba(255,255,255,0.12) 1px, transparent 1px);
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.064) 0px, rgba(255,255,255,0.064) 1px, transparent 1px, transparent 9px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.054) 0px, rgba(255,255,255,0.054) 1px, transparent 1px, transparent 9px),
+      /* diamond grid (match console language) */
+      linear-gradient(45deg, rgba(255,255,255,0.36) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.28) 1px, transparent 1px),
+      linear-gradient(45deg, rgba(255,255,255,0.16) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px);
     background-size:
       cover, cover, cover, cover, cover,
-      14px 14px,
-      9px 9px,
-      cover,
-      24px 24px,
+      16px 16px,
       cover, cover,
       22px 22px, 22px 22px, 44px 44px, 44px 44px;
-    background-position: center, center, center, center, center, center, center, center, center, center, center, center, center;
+    background-position: center, center, center, center, center, center, center, center, center, center, center, center;
     background-blend-mode:
       screen, screen, screen, screen, screen,
       soft-light,
-      soft-light,
-      soft-light,
-      soft-light,
       soft-light, soft-light,
       soft-light, soft-light, soft-light, soft-light;
-    filter: blur(0.10px) saturate(1.20) contrast(1.12);
+    filter: blur(0.12px) saturate(1.16) contrast(1.12);
   }
 
   /* Soft bottom fade so the header “melts” into the Today panel */
@@ -656,6 +678,78 @@
 
   /* Ensure button content sits above the lighting layers */
   .mobile-tabbar > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Tab buttons: add Omni “printed” texture inside each pill */
+  .tabbar-button {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .tabbar-button::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.52;
+    mix-blend-mode: overlay;
+    background-color: rgba(0,0,0,0.10);
+    background-image:
+      radial-gradient(circle at 22% 36%, rgba(255,255,255,0.06) 0.9px, transparent 1.7px),
+      radial-gradient(circle at 76% 28%, rgba(255,255,255,0.05) 0.9px, transparent 1.7px),
+      /* micro grid */
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.038) 0px, rgba(255,255,255,0.038) 1px, transparent 1px, transparent 9px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.032) 0px, rgba(255,255,255,0.032) 1px, transparent 1px, transparent 9px),
+      /* diamond grid */
+      linear-gradient(45deg, rgba(255,255,255,0.20) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
+      linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size:
+      18px 18px,
+      22px 22px,
+      cover,
+      cover,
+      22px 22px,
+      22px 22px,
+      44px 44px,
+      44px 44px;
+    background-position:
+      0 0,
+      6px 8px,
+      center,
+      center,
+      center,
+      center,
+      center,
+      center;
+    background-blend-mode:
+      soft-light,
+      soft-light,
+      soft-light,
+      soft-light,
+      soft-light,
+      soft-light,
+      soft-light,
+      soft-light;
+    filter: blur(0.14px) saturate(1.10) contrast(1.05);
+  }
+  .tabbar-button::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.55;
+    mix-blend-mode: soft-light;
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 52%, rgba(0,0,0,0.18) 100%),
+      radial-gradient(120px 50px at 22% 0%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.0) 70%),
+      radial-gradient(140px 60px at 78% 120%, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.0) 72%);
+    background-blend-mode: screen, normal, normal;
+  }
+  .tabbar-button > * {
     position: relative;
     z-index: 1;
   }

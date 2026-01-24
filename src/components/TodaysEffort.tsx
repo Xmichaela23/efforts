@@ -1451,9 +1451,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         {isCompleted && (
                           <span
                             className="ml-2"
-                            style={{ color: 'rgba(245, 245, 245, 0.9)' }}
+                            style={{
+                              color: 'rgba(245, 245, 245, 0.82)',
+                              fontFamily:
+                                '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                              fontSize: '0.72rem',
+                              letterSpacing: '0.14em',
+                              textTransform: 'uppercase',
+                              opacity: 0.85,
+                            }}
                           >
-                            ✓
+                            Complete
                           </span>
                         )}
                       </div>

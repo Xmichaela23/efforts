@@ -825,52 +825,66 @@ export default function WorkoutCalendar({
         }
       }}
     >
-      {/* Omni-inspired diamond-grid texture (matches reference) */}
-      <div
+      {/* Subtle “printed” texture over the whole calendar (glass-safe) */}
+      <span
         aria-hidden="true"
         style={{
           position: 'absolute',
           inset: 0,
-          zIndex: 0,
           pointerEvents: 'none',
-          opacity: 0.28,
+          zIndex: 0,
+          opacity: 0.10,
           mixBlendMode: 'soft-light',
-          backgroundColor: 'rgba(0,0,0,0.25)',
           backgroundImage: `
-            linear-gradient(45deg, rgba(255,255,255,0.22) 1px, transparent 1px),
-            linear-gradient(-45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
+            radial-gradient(circle at 18% 28%, rgba(255,255,255,0.06) 0.9px, transparent 1.7px),
+            radial-gradient(circle at 72% 42%, rgba(255,255,255,0.05) 0.9px, transparent 1.7px),
+            repeating-linear-gradient(0deg, rgba(255,255,255,0.030) 0px, rgba(255,255,255,0.030) 1px, transparent 1px, transparent 9px),
+            repeating-linear-gradient(90deg, rgba(255,255,255,0.026) 0px, rgba(255,255,255,0.026) 1px, transparent 1px, transparent 9px),
             linear-gradient(45deg, rgba(255,255,255,0.10) 1px, transparent 1px),
-            linear-gradient(-45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
-            radial-gradient(ellipse at center, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)
+            linear-gradient(-45deg, rgba(255,255,255,0.08) 1px, transparent 1px)
           `,
-          backgroundSize: '26px 26px, 26px 26px, 52px 52px, 52px 52px, cover',
-          backgroundPosition: 'center, center, center, center, center',
+          backgroundSize: '18px 18px, 22px 22px, cover, cover, 44px 44px, 44px 44px',
+          backgroundPosition: '0 0, 8px 10px, center, center, center, center',
+          backgroundBlendMode: 'soft-light, soft-light, soft-light, soft-light, soft-light, soft-light',
+          filter: 'blur(0.18px) contrast(1.04)',
+          transform: 'translateZ(0)',
         }}
       />
+
       {/* Week Navigation - Bright timeline header (compact) */}
       <div 
         className="flex items-center justify-between py-1 mb-1 relative"
         style={{
-          backgroundColor: '#000000',
+          /* Glassy header strip (frosted, not opaque) */
+          backgroundColor: 'rgba(0,0,0,0.28)',
+          backdropFilter: 'blur(18px) saturate(1.18)',
+          WebkitBackdropFilter: 'blur(18px) saturate(1.18)',
+          backgroundImage: `
+            radial-gradient(ellipse at 18% 0%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.0) 58%),
+            radial-gradient(ellipse at 86% 40%, rgba(74,158,255,0.08) 0%, rgba(74,158,255,0.0) 70%),
+            radial-gradient(ellipse at 30% 55%, rgba(183,148,246,0.06) 0%, rgba(183,148,246,0.0) 72%),
+            linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 52%, rgba(0,0,0,0.06) 100%)
+          `,
+          backgroundBlendMode: 'screen, screen, screen, normal',
           // narrower “week strip”
-          padding: '0.32rem 0.6rem',
-          borderRadius: '6px',
+          padding: '0.28rem 0.44rem',
+          borderRadius: '5px',
           zIndex: 5,
           // Omni-inspired illuminated border
-          border: '0.5px solid rgba(255, 255, 255, 0.08)',
+          border: '0.5px solid rgba(255, 255, 255, 0.14)',
           boxShadow: `
             /* Option 1 lighting: top-left key light + neutral depth (let the road be the spectrum emitter) */
             0 0 0 1px rgba(255,255,255,0.05) inset,
-            inset 0 1px 0 rgba(255,255,255,0.18),
-            inset -1px -1px 0 rgba(0,0,0,0.35),
-            0 8px 18px rgba(0,0,0,0.45),
-            0 0 22px rgba(255,255,255,0.06)
+            inset 0 1px 0 rgba(255,255,255,0.22),
+            inset 0 -1px 0 rgba(0,0,0,0.35),
+            0 10px 22px rgba(0,0,0,0.32),
+            0 0 22px rgba(255,255,255,0.07)
           `,
         }}
       >
         <button
           aria-label="Previous week"
-          className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
+          className="px-1.5 py-1 min-w-7 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
           style={{ color: 'rgba(255, 255, 255, 0.7)' }}
           onClick={() => handlePrevWeek(addDays(weekStart, -7))}
         >
@@ -881,7 +895,7 @@ export default function WorkoutCalendar({
         </span>
         <button
           aria-label="Next week"
-          className="px-2 py-1 min-w-8 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
+          className="px-1.5 py-1 min-w-7 rounded hover:bg-white/5 active:bg-white/8 transition-colors"
           style={{ color: 'rgba(255, 255, 255, 0.7)' }}
           onClick={() => handleNextWeek(addDays(weekEnd, 1))}
         >
@@ -995,31 +1009,24 @@ export default function WorkoutCalendar({
                   borderRadius: 6,
                   pointerEvents: 'none',
                   zIndex: 0,
-                  opacity: 0.38,
+                  opacity: 0.14,
                   // Keep visible on iOS: avoid exotic blend modes
                   mixBlendMode: 'normal',
                   backgroundImage: `
                     /* LEFT rail + fade-in */
-                    linear-gradient(90deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.00) 46%),
+                    linear-gradient(90deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.00) 46%),
                     /* RIGHT rail + fade-in */
-                    linear-gradient(270deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.00) 46%),
+                    linear-gradient(270deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.00) 46%),
                     /* left ticks (kept near edge via local gradient weighting) */
-                    repeating-linear-gradient(155deg, rgba(255,255,255,0.030) 0px, rgba(255,255,255,0.030) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 18px),
+                    repeating-linear-gradient(155deg, rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 18px),
                     /* right ticks */
-                    repeating-linear-gradient(25deg, rgba(255,255,255,0.026) 0px, rgba(255,255,255,0.026) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 20px),
-                    /* dot matrix */
-                    radial-gradient(circle, rgba(255,255,255,0.070) 0.7px, rgba(255,255,255,0.0) 1.6px),
-                    /* emblem clusters (left / right) */
-                    radial-gradient(circle at 10% 28%, rgba(255,255,255,0.14) 0px, rgba(255,255,255,0.0) 2.2px),
-                    radial-gradient(circle at 14% 40%, rgba(255,255,255,0.10) 0px, rgba(255,255,255,0.0) 2.0px),
-                    radial-gradient(circle at 90% 28%, rgba(255,255,255,0.14) 0px, rgba(255,255,255,0.0) 2.2px),
-                    radial-gradient(circle at 86% 40%, rgba(255,255,255,0.10) 0px, rgba(255,255,255,0.0) 2.0px),
+                    repeating-linear-gradient(25deg, rgba(255,255,255,0.020) 0px, rgba(255,255,255,0.020) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 20px),
                     /* center suppression so it reads as "sides" */
                     linear-gradient(90deg, rgba(0,0,0,0.00) 0%, rgba(0,0,0,0.55) 32%, rgba(0,0,0,0.55) 68%, rgba(0,0,0,0.00) 100%)
                   `,
-                  backgroundSize: 'auto, auto, auto, auto, 22px 22px, auto, auto, auto, auto, auto',
-                  backgroundPosition: 'left top, right top, left top, right top, 0 0, left top, left top, right top, right top, center',
-                  backgroundBlendMode: 'screen, screen, normal, normal, normal, normal, normal, normal, normal, normal',
+                  backgroundSize: 'auto, auto, auto, auto, auto',
+                  backgroundPosition: 'left top, right top, left top, right top, center',
+                  backgroundBlendMode: 'screen, screen, normal, normal, normal',
                   filter: 'blur(0.2px)',
                 }}
               />
@@ -1114,23 +1121,12 @@ export default function WorkoutCalendar({
                                 marginLeft: 5,
                                 width: 12,
                                 height: 12,
-                                borderRadius: 999,
-                                // “Power light” orb: shiny highlight + discipline-colored glow
-                                border: `1px solid rgba(${pillRgb}, 0.18)`,
-                                backgroundImage: `
-                                  /* matte highlight (less “wet”) */
-                                  radial-gradient(42% 42% at 30% 28%, rgba(255,255,255,0.58) 0%, rgba(255,255,255,0.16) 32%, rgba(255,255,255,0.00) 66%),
-                                  radial-gradient(circle at 50% 56%, rgba(${pillRgb}, 0.90) 0%, rgba(${pillRgb}, 0.60) 54%, rgba(0,0,0,0.92) 140%),
-                                  radial-gradient(120% 120% at 78% 88%, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.00) 58%)
-                                `,
-                                backgroundBlendMode: 'screen, normal, multiply',
-                                boxShadow: `
-                                  0 0 6px rgba(${pillRgb}, 0.14),
-                                  0 0 12px rgba(${pillRgb}, 0.07),
-                                  0 2px 6px rgba(0,0,0,0.55),
-                                  inset 0 1px 1px rgba(255,255,255,0.22),
-                                  inset 0 -2px 4px rgba(0,0,0,0.62)
-                                `.replace(/\s+/g,' ').trim(),
+                                // Pyramid indicator: same discipline color, less “notification dot”
+                                // Wider base so it reads more like a pyramid (not a thin triangle)
+                                clipPath: 'polygon(50% 4%, 100% 96%, 0% 96%)',
+                                // Flat fill (no shading)
+                                backgroundColor: `rgba(${pillRgb}, 0.86)`,
+                                filter: `drop-shadow(0 1px 1px rgba(0,0,0,0.22))`,
                                 // Prevent text selection cursor; orb is the indicator
                                 color: `rgba(${pillRgb}, 1)`,
                                 lineHeight: 1,
