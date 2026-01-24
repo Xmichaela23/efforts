@@ -37,6 +37,13 @@ export default function WorkloadAdmin() {
   // Process workouts state
   const [processWorkoutsLoading, setProcessWorkoutsLoading] = useState(false);
 
+  // Adaptation backfill state
+  const [adaptationLoading, setAdaptationLoading] = useState(false);
+  const [adaptationDaysBack, setAdaptationDaysBack] = useState(183);
+  const [adaptationDryRun, setAdaptationDryRun] = useState(true);
+  const [adaptationLimit, setAdaptationLimit] = useState(25);
+  const [adaptationOffset, setAdaptationOffset] = useState(0);
+
   useEffect(() => {
     const getUser = async () => {
       setPlansLoading(true);
@@ -94,6 +101,32 @@ export default function WorkloadAdmin() {
       setResults({ error: error.message });
     } finally {
       setPowerCurveLoading(false);
+    }
+  };
+
+  const handleAdaptationBackfill = async (offset = 0) => {
+    if (!user?.id) return;
+    setAdaptationLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('backfill-adaptation-metrics', {
+        body: {
+          days_back: adaptationDaysBack,
+          dry_run: adaptationDryRun,
+          limit: adaptationLimit,
+          offset
+        }
+      });
+
+      if (error) throw error;
+
+      setResults(data);
+      if (data?.next_offset != null) setAdaptationOffset(data.next_offset);
+      else setAdaptationOffset(0);
+    } catch (e: any) {
+      console.error('Adaptation backfill failed:', e);
+      setResults({ error: e?.message || String(e) });
+    } finally {
+      setAdaptationLoading(false);
     }
   };
 
@@ -418,6 +451,78 @@ export default function WorkloadAdmin() {
               )}
               {powerCurveDryRun ? 'Preview Backfill' : 'Run Backfill (Batch of 10)'}
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Adaptation Metrics Backfill */}
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Adaptation Metrics Backfill
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Populate workouts.computed.adaptation (cheap lane) for the last N days. Run in small batches to avoid timeouts.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="adaptationDaysBack">Days Back</Label>
+                <Input
+                  id="adaptationDaysBack"
+                  type="number"
+                  value={adaptationDaysBack}
+                  onChange={(e) => setAdaptationDaysBack(parseInt(e.target.value) || 183)}
+                  min="7"
+                  max="365"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="adaptationLimit">Batch size</Label>
+                <Input
+                  id="adaptationLimit"
+                  type="number"
+                  value={adaptationLimit}
+                  onChange={(e) => setAdaptationLimit(parseInt(e.target.value) || 25)}
+                  min="1"
+                  max="50"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="adaptationDryRun"
+                checked={adaptationDryRun}
+                onCheckedChange={(checked) => setAdaptationDryRun(checked as boolean)}
+              />
+              <Label htmlFor="adaptationDryRun">Dry Run (preview only)</Label>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => handleAdaptationBackfill(0)}
+                disabled={adaptationLoading}
+                className="flex-1"
+              >
+                {adaptationLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Activity className="h-4 w-4 mr-2" />
+                )}
+                {adaptationDryRun ? 'Preview Backfill' : 'Run Backfill (Batch)'}
+              </Button>
+
+              <Button
+                onClick={() => handleAdaptationBackfill(adaptationOffset)}
+                disabled={adaptationLoading || !adaptationOffset}
+                variant="secondary"
+              >
+                Next
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
