@@ -5,7 +5,7 @@
  * in small batches to avoid timeouts.
  *
  * Usage: POST /backfill-adaptation-metrics
- * Body: { days_back?: number, dry_run?: boolean, limit?: number, offset?: number }
+ * Body: { days_back?: number, dry_run?: boolean, limit?: number, offset?: number, force_recompute?: boolean }
  *
  * Notes:
  * - Uses the authenticated user from the bearer token to scope the backfill.
@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
     const dryRun = body?.dry_run === true;
     const limit = Math.min(Math.max(Number(body?.limit ?? 25), 1), 50); // 1..50
     const offset = Math.max(Number(body?.offset ?? 0), 0);
+    const forceRecompute = body?.force_recompute === true;
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
@@ -63,25 +64,44 @@ Deno.serve(async (req) => {
     // Only run + strength are currently meaningful for adaptation metrics
     const allowedTypes = ['run', 'running', 'walk', 'hike', 'strength', 'strength_training'];
 
-    // Find workouts missing computed.adaptation (small page)
-    const { data: workouts, error: queryError, count } = await supabase
+    // Fetch a small page in date range (filtering done below)
+    const baseQuery = supabase
       .from('workouts')
       .select('id,name,date,type,computed', { count: 'exact' })
       .eq('user_id', user.id)
       .eq('workout_status', 'completed')
       .gte('date', startDateStr)
       .in('type', allowedTypes)
-      // PostgREST supports JSON path; this matches workouts where computed.adaptation is NULL / absent
-      .is('computed->adaptation', null)
       .order('date', { ascending: false })
       .range(offset, offset + limit - 1);
+    
+    // Default mode: only process missing computed.adaptation
+    const { data: workouts, error: queryError, count } = forceRecompute
+      ? await baseQuery
+      : await baseQuery.is('computed->adaptation', null);
 
     if (queryError) throw new Error(`Query failed: ${queryError.message}`);
 
-    const batch = Array.isArray(workouts) ? workouts : [];
+    const rawBatch = Array.isArray(workouts) ? workouts : [];
     const total = count ?? 0;
     const hasMore = (offset + limit) < total;
     const nextOffset = offset + limit;
+
+    // Decide which records need (re)compute
+    const batch = rawBatch.filter((w: any) => {
+      const computed = w?.computed && typeof w.computed === 'string' ? (() => { try { return JSON.parse(w.computed); } catch { return {}; } })() : (w?.computed || {});
+      const adaptation = computed?.adaptation;
+      const workoutType = adaptation?.workout_type ?? null;
+      if (!forceRecompute) {
+        // already filtered by SQL; keep all
+        return true;
+      }
+      // force mode: refresh only missing/null/non_comparable
+      if (!adaptation) return true;
+      if (workoutType == null) return true;
+      if (workoutType === 'non_comparable') return true;
+      return false;
+    });
 
     if (dryRun) {
       return new Response(
@@ -89,8 +109,10 @@ Deno.serve(async (req) => {
           dry_run: true,
           days_back: daysBack,
           start_date: startDateStr,
-          total_missing: total,
-          batch_size: batch.length,
+          force_recompute: forceRecompute,
+          total_in_range: total,
+          batch_size: rawBatch.length,
+          will_process: batch.length,
           offset,
           has_more: hasMore,
           next_offset: hasMore ? nextOffset : null,
@@ -128,13 +150,14 @@ Deno.serve(async (req) => {
         dry_run: false,
         days_back: daysBack,
         start_date: startDateStr,
+        force_recompute: forceRecompute,
         processed: results.length,
         success: successCount,
         errors: errorCount,
         offset,
         has_more: hasMore,
         next_offset: hasMore ? nextOffset : null,
-        message: hasMore ? `Batch complete. Run again with offset=${nextOffset} to continue.` : 'All missing workouts processed!',
+        message: hasMore ? `Batch complete. Run again with offset=${nextOffset} to continue.` : (forceRecompute ? 'All workouts scanned!' : 'All missing workouts processed!'),
         results,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

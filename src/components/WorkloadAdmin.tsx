@@ -43,6 +43,7 @@ export default function WorkloadAdmin() {
   const [adaptationDryRun, setAdaptationDryRun] = useState(true);
   const [adaptationLimit, setAdaptationLimit] = useState(25);
   const [adaptationOffset, setAdaptationOffset] = useState(0);
+  const [adaptationForceRecompute, setAdaptationForceRecompute] = useState(true);
 
   useEffect(() => {
     const getUser = async () => {
@@ -113,7 +114,8 @@ export default function WorkloadAdmin() {
           days_back: adaptationDaysBack,
           dry_run: adaptationDryRun,
           limit: adaptationLimit,
-          offset
+          offset,
+          force_recompute: adaptationForceRecompute
         }
       });
 
@@ -499,6 +501,15 @@ export default function WorkloadAdmin() {
                 onCheckedChange={(checked) => setAdaptationDryRun(checked as boolean)}
               />
               <Label htmlFor="adaptationDryRun">Dry Run (preview only)</Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="adaptationForceRecompute"
+                checked={adaptationForceRecompute}
+                onCheckedChange={(checked) => setAdaptationForceRecompute(checked as boolean)}
+              />
+              <Label htmlFor="adaptationForceRecompute">Recompute existing (fix null/non-comparable)</Label>
             </div>
 
             <div className="flex gap-2">
