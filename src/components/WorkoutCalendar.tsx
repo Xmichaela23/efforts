@@ -1163,17 +1163,58 @@ export default function WorkoutCalendar({
                           </>
                         );
                       }
+
+                      // Not done: add an outline-only pyramid (no illumination)
                       const parts = label.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
-                      if (parts.length > 0) {
-                        const nonNumericParts = label.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
-                        return nonNumericParts.map((part, idx) => {
-                          const isNumeric = parts.includes(part);
-                          return isNumeric ? (
-                            <span key={idx} className="tabular-nums">{part}</span>
-                          ) : part;
-                        });
+                      const content = (() => {
+                        if (parts.length > 0) {
+                          const nonNumericParts = label.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
+                          return nonNumericParts.map((part, idx) => {
+                            const isNumeric = parts.includes(part);
+                            return isNumeric ? (
+                              <span key={idx} className="tabular-nums">{part}</span>
+                            ) : part;
+                          });
+                        }
+                        return label;
+                      })();
+
+                      if (!isCompleted) {
+                        return (
+                          <>
+                            {content}
+                            <span
+                              aria-hidden="true"
+                              className="inline-flex items-center justify-center"
+                              style={{
+                                marginLeft: 8,
+                                width: 18,
+                                height: 12,
+                                verticalAlign: 'middle',
+                              }}
+                            >
+                              <svg
+                                width="18"
+                                height="12"
+                                viewBox="0 0 18 12"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                                style={{ display: 'block' }}
+                              >
+                                <polygon
+                                  points="9,1 17,11 1,11"
+                                  stroke="rgba(245,245,245,0.62)"
+                                  strokeWidth="1.25"
+                                  strokeLinejoin="round"
+                                  fill="transparent"
+                                />
+                              </svg>
+                            </span>
+                          </>
+                        );
                       }
-                      return label;
+
+                      return content;
                     };
                     
                     return (
