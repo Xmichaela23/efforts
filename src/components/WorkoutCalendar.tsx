@@ -1123,6 +1123,7 @@ export default function WorkoutCalendar({
                                 height: 12,
                                 position: 'relative',
                                 verticalAlign: 'middle',
+                                transform: 'translateY(1px)',
                               }}
                             >
                               {/* 3-line “emission” mark (inside the pill so it can't get clipped) */}
@@ -1131,7 +1132,7 @@ export default function WorkoutCalendar({
                                 style={{
                                   position: 'absolute',
                                   left: '50%',
-                                  top: -7,
+                                  top: -6,
                                   transform: 'translateX(-50%)',
                                   width: 18,
                                   height: 6,
