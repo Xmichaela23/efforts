@@ -1635,7 +1635,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   <div
                     style={{
                       borderRadius: 12,
-                      padding: 8,
+                      // Slightly wider "rail" for a more immersive console feel
+                      padding: 6,
                       background: 'rgba(0,0,0,0.65)',
                       boxShadow:
                         'inset 0 0 0 1px rgba(255,255,255,0.05),' +
@@ -1645,7 +1646,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     }}
                   >
                     {/* Today's efforts - fixed height, scrolls internally */}
-                    <div style={{ height: 'var(--todays-h)', flexShrink: 0 }}>
+                    <div
+                      style={{
+                        height: 'var(--todays-h)',
+                        flexShrink: 0,
+                        // Widen Today at the module level so header + cards stay perfectly aligned.
+                        // Keeps the "console" feel without making Today feel pulled to one side.
+                        marginLeft: -6,
+                        marginRight: -6,
+                      }}
+                    >
                       <TodaysEffort
                         selectedDate={selectedDate}
                         onAddEffort={handleAddEffort}
@@ -1668,7 +1678,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     />
 
                     {/* Schedule - locked in place, always visible */}
-                    <div style={{ flexShrink: 0 }}>
+                    <div
+                      style={{
+                        flexShrink: 0,
+                        // Match Today’s “small bleed” so both modules feel like one instrument panel.
+                        marginLeft: -6,
+                        marginRight: -6,
+                      }}
+                    >
                       <WorkoutCalendar
                         onAddEffort={() => handleAddEffort('run')}
                         onSelectType={handleSelectEffortType}

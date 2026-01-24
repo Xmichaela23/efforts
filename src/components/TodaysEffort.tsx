@@ -1299,8 +1299,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         </div>
 
-        {/* Content area */}
-        <div className="px-3" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
+        {/* Content area
+            Option C: slightly wider rail + Today blocks get a small bleed.
+            Calendar/week strip spacing is untouched (handled in `WorkoutCalendar`). */}
+        <div className="px-2 overflow-x-hidden" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
           <div className="flex items-center justify-center h-full px-4">
