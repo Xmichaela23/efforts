@@ -194,8 +194,8 @@ function isComparableZ2Run(
 
   // Optional pace gate using manual easy pace baseline (reduces false negatives when HR is noisy)
   const avgPace = Number(workout?.avg_pace); // sec/km
-  const lf = typeof learnedFitness === 'string' ? parseJson<any>(learnedFitness) : learnedFitness;
-  const learnedEasyPaceMetric: LearnedMetric | null = lf?.run_easy_pace_sec_per_km ?? null;
+  const lf2 = lf;
+  const learnedEasyPaceMetric: LearnedMetric | null = lf2?.run_easy_pace_sec_per_km ?? null;
   const learnedEasyPaceConf = confidenceToNumber(learnedEasyPaceMetric?.confidence);
   const baselineEasySecPerKm =
     learnedEasyPaceMetric?.value && learnedEasyPaceConf >= 0.35
