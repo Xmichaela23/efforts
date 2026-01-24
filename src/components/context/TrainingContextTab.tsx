@@ -140,6 +140,59 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         totalWorkload={data.sport_breakdown.total_workload} 
       />
 
+      {/* Plan progress (only when on an active plan and data is available) */}
+      {data.plan_progress && data.acwr?.plan_context?.hasActivePlan && (
+        <div className="instrument-card">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white/60">On-plan progress</span>
+            <span className="text-xs text-white/40">
+              {data.plan_progress.week_start} → {data.plan_progress.week_end}
+            </span>
+          </div>
+
+          <div className="mt-2 flex items-baseline justify-between gap-2">
+            <div className="text-sm text-white/80">
+              {data.plan_progress.status === 'on_track' && (
+                <span className="text-green-400 font-medium">On track</span>
+              )}
+              {data.plan_progress.status === 'behind' && (
+                <span className="text-amber-400 font-medium">Behind</span>
+              )}
+              {data.plan_progress.status === 'ahead' && (
+                <span className="text-blue-400 font-medium">Ahead</span>
+              )}
+              {data.plan_progress.status === 'unknown' && (
+                <span className="text-white/60 font-medium">Unknown</span>
+              )}
+              <span className="text-white/40 ml-2">
+                {data.acwr.plan_context?.planName ? `${data.acwr.plan_context.planName}` : 'Active plan'}
+                {data.acwr.plan_context?.weekIndex ? ` • Week ${data.acwr.plan_context.weekIndex}` : ''}
+              </span>
+            </div>
+
+            {typeof data.plan_progress.percent_of_planned_to_date === 'number' && (
+              <div className="text-sm text-white/80">
+                <span className="font-medium">{data.plan_progress.percent_of_planned_to_date}%</span>
+                <span className="text-white/40"> of planned (to-date)</span>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-1 text-xs text-white/50 flex items-center justify-between">
+            <span>
+              Sessions: {data.plan_progress.matched_planned_sessions_to_date}/{data.plan_progress.planned_sessions_to_date} matched (to-date)
+            </span>
+            <span>
+              Match confidence: {Math.round((data.plan_progress.match_confidence || 0) * 100)}%
+            </span>
+          </div>
+
+          <div className="mt-1 text-xs text-white/50">
+            Workload (to-date): {Math.round(data.plan_progress.completed_to_date_total)} / {Math.round(data.plan_progress.planned_to_date_total)} planned
+          </div>
+        </div>
+      )}
+
       {/* Week Comparison */}
       {data.week_comparison && (
         <div className="instrument-card">

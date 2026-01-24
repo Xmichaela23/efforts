@@ -24,6 +24,10 @@ interface ACWRGaugeProps {
 export const ACWRGauge: React.FC<ACWRGaugeProps> = ({ acwr, showProjected = true }) => {
   const [showInfo, setShowInfo] = useState(false);
   const config = ACWR_STATUS_CONFIG[acwr.status];
+  const hasActivePlan = !!acwr.plan_context?.hasActivePlan;
+  const weekIntent = acwr.plan_context?.weekIntent;
+  const isPlanLow = hasActivePlan && (weekIntent === 'build' || weekIntent === 'baseline' || weekIntent === 'peak') && acwr.status === 'undertrained';
+  const statusLabelOverride = isPlanLow ? 'Below Base' : config.label;
   
   // Calculate gauge position (0.5 = leftmost, 2.0 = rightmost)
   // Map 0.5-2.0 range to 0-100%
@@ -65,7 +69,7 @@ export const ACWRGauge: React.FC<ACWRGaugeProps> = ({ acwr, showProjected = true
               {acwr.ratio.toFixed(2)}
             </div>
             <div className={`text-sm ${config.textClass}`}>
-              {config.label}
+              {statusLabelOverride}
               {caveat && <span className="text-white/40 ml-1">{caveat}</span>}
             </div>
           </div>
@@ -94,15 +98,24 @@ export const ACWRGauge: React.FC<ACWRGaugeProps> = ({ acwr, showProjected = true
           <div className="text-white/60">
             Compares your recent training to your fitness base to prevent injury from ramping up too fast.
           </div>
+          {hasActivePlan && (
+            <div className="bg-white/[0.03] rounded p-2.5 border-l-2 border-white/20">
+              <div className="font-medium text-white/80 mb-1">Plan-aware note:</div>
+              <div className="text-white/50">
+                When you’re following a plan, a low ACWR can be intentional (especially early in the plan or after recovery). Use this as a “vs baseline” signal, not a mandate to add volume.
+              </div>
+            </div>
+          )}
           
           {/* The Calculation */}
           <div className="bg-white/[0.03] rounded p-2.5">
             <div className="font-medium text-white/70 mb-1.5">Your calculation:</div>
             <div className="font-mono text-white/80 text-center py-1">
-              ({acwr.acute_total} ÷ 7) ÷ ({acwr.chronic_total} ÷ 28) = <span className={config.textClass}>{acwr.ratio.toFixed(2)}</span>
+              ({acwr.acute_daily_avg.toFixed(1)}/day) ÷ ({acwr.chronic_daily_avg.toFixed(1)}/day) ={' '}
+              <span className={config.textClass}>{acwr.ratio.toFixed(2)}</span>
             </div>
             <div className="text-white/50 text-center mt-1">
-              {Math.round(acwr.acute_total / 7)}/day vs {Math.round(acwr.chronic_total / 28)}/day
+              {Math.round(acwr.acute_daily_avg)}/day vs {Math.round(acwr.chronic_daily_avg)}/day
             </div>
           </div>
 

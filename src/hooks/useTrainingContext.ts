@@ -87,6 +87,26 @@ export interface WeekComparison {
   change_direction: 'increase' | 'decrease' | 'stable';
 }
 
+export interface PlanProgress {
+  week_start: string;
+  week_end: string;
+  focus_date: string;
+
+  planned_week_total: number;
+  planned_to_date_total: number;
+  planned_sessions_week: number;
+  planned_sessions_to_date: number;
+
+  completed_to_date_total: number;
+  completed_sessions_to_date: number;
+
+  matched_planned_sessions_to_date: number;
+  match_confidence: number; // 0..1
+
+  status: 'on_track' | 'behind' | 'ahead' | 'unknown';
+  percent_of_planned_to_date: number | null;
+}
+
 export interface Insight {
   type: 'acwr_high' | 'consecutive_hard' | 'sport_imbalance' | 'weekly_jump';
   severity: 'critical' | 'warning' | 'info';
@@ -100,6 +120,7 @@ export interface TrainingContextData {
   timeline: TimelineDay[];
   week_comparison: WeekComparison;
   insights: Insight[];
+  plan_progress?: PlanProgress;
 }
 
 interface UseTrainingContextResult {

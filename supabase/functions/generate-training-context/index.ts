@@ -78,6 +78,30 @@ interface PlanContext {
   planName: string | null;
 }
 
+interface PlanProgress {
+  week_start: string; // ISO date (YYYY-MM-DD)
+  week_end: string;   // ISO date (YYYY-MM-DD)
+  focus_date: string; // ISO date (YYYY-MM-DD)
+
+  // Planned totals (from planned_workouts)
+  planned_week_total: number;
+  planned_to_date_total: number;
+  planned_sessions_week: number;
+  planned_sessions_to_date: number;
+
+  // Completed totals (from workouts)
+  completed_to_date_total: number;
+  completed_sessions_to_date: number;
+
+  // Linking confidence (planned -> completed)
+  matched_planned_sessions_to_date: number; // matched via planned_id or same-day discipline match
+  match_confidence: number; // 0..1
+
+  // Coarse status derived from planned vs completed (only when meaningful)
+  status: 'on_track' | 'behind' | 'ahead' | 'unknown';
+  percent_of_planned_to_date: number | null; // 0..100, null if unknown
+}
+
 interface ACWRData {
   ratio: number;
   status: 'undertrained' | 'optimal' | 'elevated' | 'high_risk' | 'recovery' | 'optimal_recovery';
@@ -147,6 +171,7 @@ interface TrainingContextResponse {
   timeline: TimelineDay[];
   week_comparison: WeekComparison;
   insights: Insight[];
+  plan_progress?: PlanProgress;
 }
 
 interface WorkoutRecord {
@@ -154,6 +179,7 @@ interface WorkoutRecord {
   type: string;
   name: string;
   date: string;
+  planned_id?: string | null;
   workload_actual: number;
   workload_planned: number;
   intensity_factor: number | null;
@@ -170,6 +196,7 @@ interface PlannedWorkoutRecord {
   workload_planned: number;
   duration: number;
   workout_status: string;
+  training_plan_id?: string | null;
 }
 
 // =============================================================================
@@ -243,7 +270,7 @@ Deno.serve(async (req) => {
     // Fetch completed workouts for chronic window (28 days or 4 plan weeks)
     const { data: completedWorkouts, error: completedError } = await supabase
       .from('workouts')
-      .select('id, type, name, date, workload_actual, workload_planned, intensity_factor, duration, moving_time, workout_status')
+      .select('id, type, name, date, planned_id, workload_actual, workload_planned, intensity_factor, duration, moving_time, workout_status')
       .eq('user_id', user_id)
       .eq('workout_status', 'completed')
       .gte('date', dateRanges.chronicStartISO)
@@ -255,13 +282,30 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to fetch workouts: ${completedError.message}`);
     }
 
-    // Fetch planned workout for focus date (if not yet completed)
-    const { data: plannedWorkouts, error: plannedError } = await supabase
+    // Fetch planned workouts for current week (plan-aware) so context can be accurate on-plan
+    const plannedRangeStartISO =
+      planContext?.hasActivePlan && dateRanges.currentWeekStartISO
+        ? dateRanges.currentWeekStartISO
+        : dateRanges.acuteStartISO;
+    const plannedRangeEndISO =
+      planContext?.hasActivePlan && dateRanges.currentWeekEndISO
+        ? dateRanges.currentWeekEndISO
+        : dateRanges.acuteEndISO;
+
+    let plannedWeekQuery = supabase
       .from('planned_workouts')
-      .select('id, type, name, date, workload_planned, duration, workout_status')
+      .select('id, type, name, date, workload_planned, duration, workout_status, training_plan_id')
       .eq('user_id', user_id)
-      .eq('date', focusDateISO)
-      .eq('workout_status', 'planned');
+      .eq('workout_status', 'planned')
+      .gte('date', plannedRangeStartISO)
+      .lte('date', plannedRangeEndISO);
+
+    // If we have an active plan ID, filter planned workouts to that plan
+    if (planContext?.hasActivePlan && planContext.planId) {
+      plannedWeekQuery = plannedWeekQuery.eq('training_plan_id', planContext.planId);
+    }
+
+    const { data: plannedWeekWorkouts, error: plannedError } = await plannedWeekQuery.order('date', { ascending: true });
 
     if (plannedError) {
       console.error('❌ Error fetching planned workouts:', plannedError);
@@ -269,15 +313,17 @@ Deno.serve(async (req) => {
     }
 
     const workouts: WorkoutRecord[] = completedWorkouts || [];
-    const planned: PlannedWorkoutRecord[] = plannedWorkouts || [];
+    const plannedWeek: PlannedWorkoutRecord[] = plannedWeekWorkouts || [];
+    // Planned workouts on the focus date (used for projected ACWR + timeline)
+    const plannedForFocusDate: PlannedWorkoutRecord[] = plannedWeek.filter(p => p.date === focusDateISO);
 
-    console.log(`📊 Found ${workouts.length} completed workouts, ${planned.length} planned workouts`);
+    console.log(`📊 Found ${workouts.length} completed workouts, ${plannedWeek.length} planned workouts (week range)`);
 
     // ==========================================================================
     // CALCULATE ACWR (using smart date ranges)
     // ==========================================================================
 
-    const acwr = calculateACWR(workouts, focusDate, dateRanges, planned, planContext);
+    const acwr = calculateACWR(workouts, focusDate, dateRanges, plannedForFocusDate, planContext);
 
     // ==========================================================================
     // CALCULATE SPORT BREAKDOWN (using current plan week or last 7 days)
@@ -289,7 +335,7 @@ Deno.serve(async (req) => {
     // BUILD TIMELINE (last 14 days)
     // ==========================================================================
 
-    const timeline = buildTimeline(workouts, planned, dateRanges.fourteenDaysAgo, focusDate, dateRanges.acuteStart);
+    const timeline = buildTimeline(workouts, plannedForFocusDate, dateRanges.fourteenDaysAgo, focusDate, dateRanges.acuteStart);
 
     // ==========================================================================
     // CALCULATE WEEK COMPARISON (using plan weeks when available)
@@ -301,7 +347,8 @@ Deno.serve(async (req) => {
     // GENERATE SMART INSIGHTS
     // ==========================================================================
 
-    const insights = generateInsights(acwr, sportBreakdown, weekComparison, timeline, planContext);
+    const planProgress = calculatePlanProgress(plannedWeek, workouts, dateRanges, focusDateISO, planContext);
+    const insights = generateInsights(acwr, sportBreakdown, weekComparison, timeline, planContext, planProgress);
 
     // ==========================================================================
     // BUILD RESPONSE
@@ -312,7 +359,8 @@ Deno.serve(async (req) => {
       sport_breakdown: sportBreakdown,
       timeline,
       week_comparison: weekComparison,
-      insights
+      insights,
+      plan_progress: planProgress || undefined
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);
@@ -770,7 +818,8 @@ function calculateACWR(
     
     if (plannedWorkload > 0) {
       const projectedAcuteTotal = acuteTotal + plannedWorkload;
-      const projectedAcuteDailyAvg = projectedAcuteTotal / 7;
+      // Use the same acuteDays basis as the current ACWR calculation (plan-aware mid-week)
+      const projectedAcuteDailyAvg = projectedAcuteTotal / acuteDays;
       const projectedRatio = chronicDailyAvg > 0 
         ? Math.round((projectedAcuteDailyAvg / chronicDailyAvg) * 100) / 100 
         : 0;
@@ -1098,6 +1147,120 @@ function calculateWeekComparison(
 }
 
 // =============================================================================
+// PLAN PROGRESS (PLAN-AWARE TARGETS)
+// =============================================================================
+
+function calculatePlanProgress(
+  plannedWeek: PlannedWorkoutRecord[],
+  completed: WorkoutRecord[],
+  dateRanges: SmartDateRanges,
+  focusDateISO: string,
+  planContext: PlanContext | null
+): PlanProgress | null {
+  if (!planContext?.hasActivePlan) return null;
+
+  const weekStartISO = dateRanges.currentWeekStartISO || dateRanges.acuteStartISO;
+  const weekEndISO = dateRanges.currentWeekEndISO || dateRanges.acuteEndISO;
+
+  // Planned workouts for the week (already filtered by date range in query)
+  const plannedWeekAll = plannedWeek || [];
+  const plannedToDate = plannedWeekAll.filter(p => p.date <= focusDateISO);
+
+  const plannedWeekTotal = plannedWeekAll.reduce((sum, p) => sum + (Number(p.workload_planned) || 0), 0);
+  const plannedToDateTotal = plannedToDate.reduce((sum, p) => sum + (Number(p.workload_planned) || 0), 0);
+
+  // Completed workouts to date for the week (use acute window start and focus date)
+  const weekCompletedToDate = completed.filter(w => w.date >= weekStartISO && w.date <= focusDateISO);
+  const completedToDateTotal = weekCompletedToDate.reduce((sum, w) => sum + (Number(w.workload_actual) || 0), 0);
+
+  // Link planned -> completed conservatively:
+  // - Primary: planned_id match (high confidence)
+  // - Secondary: same-day discipline match (medium confidence)
+  const normalizeSportTypeLocal = (type: string): string => {
+    const t = (type || '').toLowerCase();
+    if (t === 'run' || t === 'running') return 'run';
+    if (t === 'ride' || t === 'bike' || t === 'cycling') return 'bike';
+    if (t === 'swim' || t === 'swimming') return 'swim';
+    if (t === 'strength' || t === 'strength_training' || t === 'weight' || t === 'weights') return 'strength';
+    if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'pilates_yoga' || t === 'stretch') return 'mobility';
+    return 'other';
+  };
+
+  const completedByPlannedId = new Map<string, WorkoutRecord>();
+  for (const w of weekCompletedToDate) {
+    if (w.planned_id) {
+      completedByPlannedId.set(String(w.planned_id), w);
+    }
+  }
+
+  // Build a lookup by date+discipline for secondary matching
+  const completedByDateDiscipline = new Map<string, WorkoutRecord[]>();
+  for (const w of weekCompletedToDate) {
+    const key = `${w.date}::${normalizeSportTypeLocal(w.type)}`;
+    const arr = completedByDateDiscipline.get(key) || [];
+    arr.push(w);
+    completedByDateDiscipline.set(key, arr);
+  }
+
+  let matchedPlanned = 0;
+  for (const p of plannedToDate) {
+    const pid = String(p.id);
+    if (completedByPlannedId.has(pid)) {
+      matchedPlanned += 1;
+      continue;
+    }
+    const key = `${p.date}::${normalizeSportTypeLocal(p.type)}`;
+    if ((completedByDateDiscipline.get(key) || []).length > 0) {
+      matchedPlanned += 1;
+    }
+  }
+
+  const plannedSessionsToDate = plannedToDate.length;
+  const plannedSessionsWeek = plannedWeekAll.length;
+  const completedSessionsToDate = weekCompletedToDate.length;
+
+  const matchConfidence = plannedSessionsToDate > 0 ? matchedPlanned / plannedSessionsToDate : 0;
+
+  // Determine on-track/behind/ahead using workload ratio, but only when meaningful:
+  // - Need planned_to_date_total > 0
+  // - Need at least moderate matching confidence
+  let status: PlanProgress['status'] = 'unknown';
+  let pct: number | null = null;
+
+  if (plannedToDateTotal > 0 && plannedSessionsToDate > 0) {
+    const ratio = completedToDateTotal / plannedToDateTotal;
+    pct = Math.round(ratio * 100);
+
+    // Require some confidence before asserting behind/ahead.
+    // If we can't reliably link plan->completed, we refuse to prescribe changes.
+    const confidentEnough = matchConfidence >= 0.5;
+    if (confidentEnough) {
+      if (ratio < 0.85) status = 'behind';
+      else if (ratio > 1.15) status = 'ahead';
+      else status = 'on_track';
+    } else {
+      status = 'unknown';
+    }
+  }
+
+  return {
+    week_start: weekStartISO,
+    week_end: weekEndISO,
+    focus_date: focusDateISO,
+    planned_week_total: Math.round(plannedWeekTotal),
+    planned_to_date_total: Math.round(plannedToDateTotal),
+    planned_sessions_week: plannedSessionsWeek,
+    planned_sessions_to_date: plannedSessionsToDate,
+    completed_to_date_total: Math.round(completedToDateTotal),
+    completed_sessions_to_date: completedSessionsToDate,
+    matched_planned_sessions_to_date: matchedPlanned,
+    match_confidence: Math.round(matchConfidence * 100) / 100,
+    status,
+    percent_of_planned_to_date: pct
+  };
+}
+
+// =============================================================================
 // SMART INSIGHTS
 // =============================================================================
 
@@ -1106,7 +1269,8 @@ function generateInsights(
   sportBreakdown: SportBreakdown,
   weekComparison: WeekComparison,
   timeline: TimelineDay[],
-  planContext: PlanContext | null
+  planContext: PlanContext | null,
+  planProgress: PlanProgress | null
 ): Insight[] {
   const insights: Insight[] = [];
 
@@ -1231,12 +1395,41 @@ function generateInsights(
 
   // 3b. Low load warning for build weeks (not recovery/taper)
   if (!isRecoveryWeek && !isTaperWeek && acwr.ratio < 0.80 && hasActivePlan && weekIntent === 'build') {
-    insights.push({
-      type: 'weekly_jump', // Reuse type
-      severity: 'info',
-      message: `Build week: Load is below target (ACWR ${acwr.ratio.toFixed(2)}). Consider adding volume if feeling fresh.`,
-      data: { ratio: acwr.ratio }
-    });
+    // IMPORTANT: ACWR is NOT a plan target. Do not recommend adding volume unless we can
+    // confidently detect that the user is behind plan workload to-date.
+    if (planProgress && planProgress.planned_sessions_to_date > 0 && planProgress.planned_to_date_total > 0) {
+      if (planProgress.status === 'behind') {
+        insights.push({
+          type: 'weekly_jump', // Reuse type for now
+          severity: 'info',
+          message: `On plan: you're behind this week's workload so far (${planProgress.percent_of_planned_to_date}% of planned to-date). Consider rescheduling a missed easy session—avoid adding intensity.`,
+          data: { ratio: acwr.ratio, plan_progress: planProgress }
+        });
+      } else if (planProgress.status === 'on_track') {
+        insights.push({
+          type: 'weekly_jump',
+          severity: 'info',
+          message: `On plan: you're on track so far. ACWR ${acwr.ratio.toFixed(2)} is low vs your 28-day base, which can be normal early in a plan or after a recovery week.`,
+          data: { ratio: acwr.ratio, plan_progress: planProgress }
+        });
+      } else {
+        // Unknown/ahead: stay conservative and never tell the user to add volume.
+        insights.push({
+          type: 'weekly_jump',
+          severity: 'info',
+          message: `ACWR ${acwr.ratio.toFixed(2)} is low vs your 28-day base. If you're following your plan, stay the course—this isn't a cue to add extra volume.`,
+          data: { ratio: acwr.ratio, plan_progress: planProgress }
+        });
+      }
+    } else {
+      // No planned workload available — do not prescribe.
+      insights.push({
+        type: 'weekly_jump',
+        severity: 'info',
+        message: `ACWR ${acwr.ratio.toFixed(2)} is low vs your 28-day base. If you're following your plan, stay the course—this isn't a cue to add extra volume.`,
+        data: { ratio: acwr.ratio }
+      });
+    }
   }
   
   // 3c. Recovery week with too much load (compared to previous week)
