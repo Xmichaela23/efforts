@@ -1,7 +1,19 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { BlockAdaptation } from '@/types/fitness';
 
 export interface OverallContextData {
+  // Structured data (v2)
+  performance_trends_structured?: any;
+  plan_adherence_structured?: any;
+  workout_quality?: any;
+  this_week?: any;
+  focus_areas?: any;
+  data_quality?: any;
+  goal?: any;
+  fitness_adaptation_structured?: BlockAdaptation | null;
+  generated_at?: string;
+
   performance_trends: string;
   plan_adherence: string;
   weekly_summary: string;

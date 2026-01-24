@@ -1419,6 +1419,39 @@ Deno.serve(async (req)=>{
         } catch (workloadErr) {
           console.error('[ingest-activity] calculate-workload failed:', workloadErr);
         }
+
+        // Compute cheap adaptation metrics (fast lane). Never fail ingestion on error.
+        try {
+          const adaptUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-adaptation-metrics`;
+          const adaptResp = await fetch(adaptUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${key}`,
+              'apikey': key
+            },
+            body: JSON.stringify({ workout_id: wid })
+          });
+          if (!adaptResp.ok) {
+            const errText = await adaptResp.text();
+            console.error('[ingest-activity] compute-adaptation-metrics returned non-OK status:', adaptResp.status, errText);
+          } else {
+            console.log('[ingest-activity] compute-adaptation-metrics succeeded for workout:', wid);
+          }
+        } catch (adaptErr) {
+          console.error('[ingest-activity] compute-adaptation-metrics failed:', adaptErr);
+        }
+
+        // Invalidate server-side block cache (24h TTL, safe to delete all for user)
+        try {
+          await supabase
+            .from('block_adaptation_cache')
+            .delete()
+            .eq('user_id', userId);
+        } catch (cacheErr) {
+          console.error('[ingest-activity] Failed to invalidate block cache:', cacheErr);
+        }
+
         // Generate details chat/context for completed workouts (fire-and-forget background processing)
         // Note: analyze-running-workout will now have planned_id available (deterministic ordering)
         if (workoutStatus === 'completed' && workoutType) {

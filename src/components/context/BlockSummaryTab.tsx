@@ -200,6 +200,9 @@ const BlockSummaryTab: React.FC = () => {
         <>
           {/* Performance Trends - Structured */}
           <PerformanceTrendsSection trends={data.performance_trends_structured} quality={data.data_quality} />
+
+          {/* Fitness Adaptation - Structured (cached server-side) */}
+          <FitnessAdaptationSection adaptation={data.fitness_adaptation_structured} />
           
           {/* Plan Adherence - Structured */}
           <PlanAdherenceSection adherence={data.plan_adherence_structured} />
@@ -368,6 +371,183 @@ const DataQualityNotes: React.FC<{ quality: any }> = ({ quality }) => {
           </div>
         );
       })}
+    </div>
+  );
+};
+
+// =============================================================================
+// FITNESS ADAPTATION SECTION (BLOCK)
+// =============================================================================
+
+const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }> = ({ adaptation }) => {
+  const formatPaceSecPerKmToMinPerMi = (secPerKm: number): string => {
+    if (!Number.isFinite(secPerKm) || secPerKm <= 0) return '—';
+    const secPerMi = secPerKm * 1.60934;
+    const mm = Math.floor(secPerMi / 60);
+    const ss = Math.round(secPerMi % 60);
+    return `${mm}:${String(ss).padStart(2, '0')}/mi`;
+  };
+
+  const formatSecondsPerMi = (secPerMi: number): string => {
+    if (!Number.isFinite(secPerMi) || secPerMi <= 0) return '—';
+    const mm = Math.floor(secPerMi / 60);
+    const ss = Math.round(secPerMi % 60);
+    return `${mm}:${String(ss).padStart(2, '0')}/mi`;
+  };
+
+  const aero = adaptation?.aerobic_efficiency;
+  const strength = adaptation?.strength_progression;
+  const recos = Array.isArray(adaptation?.baseline_recommendations) ? adaptation.baseline_recommendations : [];
+
+  const hasAero = Array.isArray(aero?.weekly_trend) && aero.weekly_trend.some((w: any) => Number(w?.sample_count || 0) > 0);
+  const hasStrength = strength?.by_exercise && typeof strength.by_exercise === 'object' && Object.keys(strength.by_exercise).length > 0;
+  const hasRecos = recos.length > 0;
+
+  return (
+    <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Activity className="w-4 h-4 text-cyan-300" />
+        <h3 className="text-sm font-medium text-white">Fitness Adaptation</h3>
+        <span className="text-xs text-white/40">(4-week)</span>
+      </div>
+
+      {!adaptation ? (
+        <div className="text-sm text-white/60">
+          Not enough adaptation data yet. New workouts will populate this automatically.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Aerobic efficiency */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs uppercase tracking-wide text-white/50">Aerobic efficiency (easy/Z2)</div>
+              <div className="text-xs text-white/50">
+                {aero?.sample_count ? `${aero.sample_count} samples` : '—'}
+                {aero?.confidence ? ` • ${String(aero.confidence).toUpperCase()}` : ''}
+              </div>
+            </div>
+
+            {hasAero ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-4 gap-2 text-[11px] text-white/50">
+                  <div>Week</div>
+                  <div>Pace</div>
+                  <div>HR</div>
+                  <div>Samples</div>
+                </div>
+                {aero.weekly_trend.map((w: any) => (
+                  <div key={w.week} className="grid grid-cols-4 gap-2 text-[12px] text-white/85">
+                    <div className="text-white/60">W{w.week}</div>
+                    <div>{w.sample_count ? formatPaceSecPerKmToMinPerMi(Number(w.avg_pace)) : '—'}</div>
+                    <div>{w.sample_count ? `${Math.round(Number(w.avg_hr))} bpm` : '—'}</div>
+                    <div className="text-white/60">{Number(w.sample_count || 0) || '—'}</div>
+                  </div>
+                ))}
+
+                <div className="text-xs text-white/55 mt-2">
+                  {aero?.improvement_pct == null ? (
+                    <>Need Week 1 + Week 4 samples to compute change.</>
+                  ) : (
+                    <>
+                      Change: <span className="text-white/80">{aero.improvement_pct > 0 ? '+' : ''}{aero.improvement_pct}%</span>{' '}
+                      <span className="text-white/40">(lower pace/hr is better)</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-white/60">
+                No comparable easy/Z2 runs detected in this block yet.
+              </div>
+            )}
+          </div>
+
+          {/* Strength progression */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs uppercase tracking-wide text-white/50">Strength progression (est. 1RM)</div>
+              <div className="text-xs text-white/50">
+                {strength?.overall_gain_pct != null ? `Overall ${strength.overall_gain_pct > 0 ? '+' : ''}${strength.overall_gain_pct}%` : '—'}
+              </div>
+            </div>
+
+            {hasStrength ? (
+              <div className="space-y-2">
+                {Object.entries(strength.by_exercise).map(([lift, series]: any) => {
+                  const w1 = Array.isArray(series) ? series.find((s: any) => s.week === 1) : null;
+                  const w4 = Array.isArray(series) ? series.find((s: any) => s.week === 4) : null;
+                  const a = w1?.sample_count ? Number(w1.estimated_1rm) : null;
+                  const b = w4?.sample_count ? Number(w4.estimated_1rm) : null;
+                  const pct = a && b ? ((b - a) / a) * 100 : null;
+                  return (
+                    <div key={lift} className="flex items-center justify-between text-sm">
+                      <div className="text-white/85">{lift}</div>
+                      <div className="text-white/60">
+                        {a && b ? (
+                          <>
+                            {Math.round(a)} → {Math.round(b)} ({pct != null ? `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%` : '—'})
+                          </>
+                        ) : (
+                          <>Need Week 1 + Week 4 samples</>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-sm text-white/60">
+                No major lift data detected in this block yet.
+              </div>
+            )}
+          </div>
+
+          {/* Baseline recommendations */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Info className="w-4 h-4 text-white/40" />
+              <div className="text-xs uppercase tracking-wide text-white/50">Baseline recommendations</div>
+            </div>
+
+            {hasRecos ? (
+              <div className="space-y-2">
+                {recos.map((r: any, idx: number) => {
+                  const type = String(r?.type || '');
+                  const current = Number(r?.current_value);
+                  const recommended = Number(r?.recommended_value);
+                  const conf = Number(r?.confidence);
+                  const label =
+                    type === 'run_easy_pace' ? 'Easy pace' :
+                    type === 'ride_ftp' ? 'FTP' :
+                    type || 'Baseline';
+
+                  const valueText =
+                    type === 'run_easy_pace'
+                      ? `${formatSecondsPerMi(current)} → ${formatSecondsPerMi(recommended)}`
+                      : type === 'ride_ftp'
+                        ? `${Math.round(current)}w → ${Math.round(recommended)}w`
+                        : `${current} → ${recommended}`;
+
+                  return (
+                    <div key={`${type}-${idx}`} className="p-3 rounded-lg bg-white/[0.04] border border-white/10">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-white/85">{label}</div>
+                        <div className="text-xs text-white/50">{Number.isFinite(conf) ? `${Math.round(conf * 100)}%` : '—'}</div>
+                      </div>
+                      <div className="text-sm text-white/70 mt-1">{valueText}</div>
+                      {r?.evidence ? <div className="text-xs text-white/45 mt-1">{String(r.evidence)}</div> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-sm text-white/60">
+                No high-confidence baseline updates to suggest right now.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

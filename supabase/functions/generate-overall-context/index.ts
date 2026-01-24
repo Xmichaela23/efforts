@@ -24,6 +24,7 @@ import {
   assessDataQuality,
   calculateWorkoutQuality
 } from '../_shared/block-analysis/index.ts';
+import { getBlockAdaptation } from '../_shared/block-adaptation/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -193,6 +194,20 @@ Deno.serve(async (req) => {
       weeks_back
     );
 
+    // Optional: block adaptation aggregation (cached server-side)
+    let fitnessAdaptationStructured: any = null;
+    try {
+      fitnessAdaptationStructured = await getBlockAdaptation(
+        user_id,
+        startDateISO,
+        endDateISO,
+        supabase
+      );
+    } catch (e) {
+      console.error('[generate-overall-context] getBlockAdaptation failed:', e);
+      fitnessAdaptationStructured = null;
+    }
+
     // ==========================================================================
     // BUILD STRUCTURED RESPONSE (No GPT - structured data speaks for itself)
     // ==========================================================================
@@ -210,6 +225,7 @@ Deno.serve(async (req) => {
       this_week: thisWeek,
       focus_areas: focusAreas,
       data_quality: dataQuality,
+      fitness_adaptation_structured: fitnessAdaptationStructured,
       goal: goal, // Include goal so frontend knows context
       generated_at: new Date().toISOString(),
       
