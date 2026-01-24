@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Calculator, History, BarChart3, Zap, Link2, RefreshCw } from 'lucide-react';
+import { Loader2, Calculator, History, BarChart3, Zap, Link2, RefreshCw, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { 
   calculateWorkloadForWorkout, 
