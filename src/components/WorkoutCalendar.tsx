@@ -1457,12 +1457,18 @@ export default function WorkoutCalendar({
           // Mobile fit: keep this block compact so Home doesn't require scrolling
           const compactMetrics = metrics.filter((m) => {
             const label = String(m?.label || '').toLowerCase();
-            return label.includes('run') || label.includes('strength') || label.includes('total');
+            return (
+              label.includes('run') ||
+              label.includes('swim') ||
+              label.includes('bike') ||
+              label.includes('strength') ||
+              label.includes('total')
+            );
           });
 
           return (
-            <div className="mt-1 pt-1 border-t border-white/10">
-              <div className="space-y-1" style={{ fontSize: '0.68rem', paddingBottom: '0.20rem' }}>
+            <div className="mt-1.5 pt-1.5 border-t border-white/10">
+              <div className="space-y-1.5" style={{ fontSize: '0.72rem', paddingBottom: '0.30rem' }}>
                 {/* Total Workload header */}
                 <div 
                   className="flex items-center gap-1.5 px-2 py-1 rounded-lg flex-wrap"
@@ -1541,14 +1547,14 @@ export default function WorkoutCalendar({
                       
                       return (
                         <div key={index} className="flex items-center justify-between gap-1">
-                          <span className="text-xs font-light leading-tight" style={{ color: labelColor, fontSize: '0.7rem' }}>
+                          <span className="text-xs font-light leading-tight" style={{ color: labelColor, fontSize: '0.72rem' }}>
                             {metric.label}
                           </span>
                           <span 
                             className="text-xs font-light tabular-nums leading-tight"
                             style={{
                               color: 'rgba(255, 255, 255, 0.85)',
-                              fontSize: '0.7rem'
+                              fontSize: '0.72rem'
                             }}
                           >
                             {metric.value}
