@@ -1185,7 +1185,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         {/* Today Panel Header - Live instrument cockpit (sticky, raised, glowing) */}
         <div 
           ref={headerRef}
-          className="mb-3 flex-shrink-0" 
+          className="mb-2 flex-shrink-0" 
           style={{ 
             position: 'sticky',
             top: 0,
@@ -1208,7 +1208,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             // Omni-inspired illuminated border that blends
             border: '0.5px solid rgba(255, 255, 255, 0.08)',
             borderRadius: '12px', // Rounded corners for mounted instrument feel
-            padding: '0.75rem 1rem', // More padding for panel breathing room
+            padding: '0.6rem 0.9rem',
             // Panel depth: top-left key light + neutral depth (rainbow reserved for the horizon/road)
             boxShadow: `
               0 0 0 1px rgba(255,255,255,0.05) inset,

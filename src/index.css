@@ -46,7 +46,8 @@
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
     --tabbar-extra: 18px; /* iOS swipe-up gesture safe zone */
-    --todays-h: 14rem; /* balanced height */
+    /* Keep Today compact enough that calendar fits on iOS */
+    --todays-h: clamp(8.5rem, 16vh, 11.5rem);
     --cal-cell-h: 100px; /* compact height for ghosted timeline - emphasis on Today */
     /* Analytics tokens (mobile, minimal) */
     --series-pace: #3b82f6;
@@ -880,11 +881,11 @@
 /* Make PWA and browser blocks match the universal values to avoid divergence */
 @media (display-mode: standalone) {
   .mobile-tabbar { padding-top: 8px; padding-bottom: calc(env(safe-area-inset-bottom) + var(--tabbar-extra)); height: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--tabbar-extra)); }
-  :root { --todays-h: 14rem; --cal-cell-h: 100px; }
+  :root { --cal-cell-h: 100px; }
 }
 
 @media not all and (display-mode: standalone) {
-  :root { --todays-h: 14rem; --cal-cell-h: 100px; }
+  :root { --cal-cell-h: 100px; }
 }
 
 /* iOS WebView backdrop-filter support */
