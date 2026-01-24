@@ -284,6 +284,8 @@ Deno.serve(async (req) => {
       });
     }
 
+    console.log(`[compute-adaptation-metrics] start workout_id=${workout_id}`);
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -294,6 +296,7 @@ Deno.serve(async (req) => {
       lock_key: `compute-adaptation:${workout_id}`,
     });
     if (!gotLock) {
+      console.log(`[compute-adaptation-metrics] skip already_running workout_id=${workout_id}`);
       return new Response(JSON.stringify({ success: true, workout_id, wrote: false, skipped: true, reason: 'already_running' }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -312,6 +315,7 @@ Deno.serve(async (req) => {
     const sport = String((w as any)?.type || '').toLowerCase();
     const status = String((w as any)?.workout_status || '').toLowerCase();
     if (status && status !== 'completed') {
+      console.log(`[compute-adaptation-metrics] skip not_completed workout_id=${workout_id} status=${status}`);
       return new Response(JSON.stringify({ success: true, workout_id, wrote: false, skipped: true, reason: 'not_completed' }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -432,6 +436,9 @@ Deno.serve(async (req) => {
     }
 
     const ms = Date.now() - startedAt;
+    console.log(
+      `[compute-adaptation-metrics] wrote workout_id=${workout_id} type=${String(adaptation?.workout_type || 'unknown')} reason=${String(adaptation?.excluded_reason || 'ok')} ms=${ms}`
+    );
     return new Response(JSON.stringify({ success: true, workout_id, wrote: true, adaptation, ms }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
