@@ -853,7 +853,7 @@ export default function WorkoutCalendar({
 
       {/* Week Navigation - Bright timeline header (compact) */}
       <div 
-        className="flex items-center justify-between py-1 mb-1 relative"
+        className="flex items-center justify-between py-0.5 mb-0.5 relative"
         style={{
           /* Glassy header strip (frosted, not opaque) */
           backgroundColor: 'rgba(0,0,0,0.28)',
@@ -867,7 +867,7 @@ export default function WorkoutCalendar({
           `,
           backgroundBlendMode: 'screen, screen, screen, normal',
           // narrower “week strip”
-          padding: '0.28rem 0.44rem',
+          padding: '0.24rem 0.40rem',
           borderRadius: '5px',
           zIndex: 5,
           // Omni-inspired illuminated border
@@ -904,7 +904,7 @@ export default function WorkoutCalendar({
       </div>
 
       {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
-      <div className="flex flex-col gap-1 flex-shrink-0 pb-2 relative" style={{ zIndex: 1 }}>
+      <div className="flex flex-col gap-1 flex-shrink-0 pb-1 relative" style={{ zIndex: 1 }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -933,8 +933,8 @@ export default function WorkoutCalendar({
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, key)}
               className={[
-                // slightly taller rows so pills can breathe
-                "w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all",
+                // compact rows so Today can breathe
+                "w-full flex items-center gap-2 px-2 py-1 rounded transition-all",
                 "hover:bg-white/[0.02]",
                 dragOverDate === key ? "ring-1 ring-white/20 bg-white/[0.03]" : "",
               ].join(" ")}
@@ -954,7 +954,7 @@ export default function WorkoutCalendar({
                     ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.18) 100%)' // Selected: eye-catch, but less than Today
                   : 'radial-gradient(ellipse at left, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%)', // Week rows: mid glow
                 opacity: 1.0,
-                minHeight: '42px', // Slightly taller row height
+                minHeight: '36px',
                 // More visible Omni glow for today
                 boxShadow: isToday
                   ? `
@@ -1031,7 +1031,7 @@ export default function WorkoutCalendar({
                 }}
               />
               {/* Left: Day label - bright and visible (compact) */}
-              <div className="flex-shrink-0 w-10 text-left" style={{ position: 'relative', zIndex: 1 }}>
+              <div className="flex-shrink-0 w-9 text-left" style={{ position: 'relative', zIndex: 1 }}>
                 <div
                   className="text-xs font-light leading-tight"
                   style={{
@@ -1461,8 +1461,8 @@ export default function WorkoutCalendar({
           });
 
           return (
-            <div className="mt-1.5 pt-1.5 border-t border-white/10">
-              <div className="space-y-1" style={{ fontSize: '0.7rem', paddingBottom: '0.25rem' }}>
+            <div className="mt-1 pt-1 border-t border-white/10">
+              <div className="space-y-1" style={{ fontSize: '0.68rem', paddingBottom: '0.20rem' }}>
                 {/* Total Workload header */}
                 <div 
                   className="flex items-center gap-1.5 px-2 py-1 rounded-lg flex-wrap"

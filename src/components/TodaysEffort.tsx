@@ -1185,7 +1185,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         {/* Today Panel Header - Live instrument cockpit (sticky, raised, glowing) */}
         <div 
           ref={headerRef}
-          className="mb-2 flex-shrink-0" 
+          className="mb-1.5 flex-shrink-0" 
           style={{ 
             position: 'sticky',
             top: 0,
@@ -1208,7 +1208,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             // Omni-inspired illuminated border that blends
             border: '0.5px solid rgba(255, 255, 255, 0.08)',
             borderRadius: '12px', // Rounded corners for mounted instrument feel
-            padding: '0.6rem 0.9rem',
+            padding: '0.52rem 0.82rem',
             // Panel depth: top-left key light + neutral depth (rainbow reserved for the horizon/road)
             boxShadow: `
               0 0 0 1px rgba(255,255,255,0.05) inset,
@@ -1229,14 +1229,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             marginTop: 0,
           }}
         >
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {/* Line 1: Date - Live channel (brightest, energized, more phosphor) */}
             <div>
               <span 
-                className="text-sm font-light tracking-wide" 
+                className="text-[0.82rem] font-light tracking-wide" 
                 style={{ 
                   color: 'rgba(255, 255, 255, 1.0)', // Maximum brightness - primary instrument readout
                   textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)', // Stronger backlit LCD glow with warm phosphor
+                  lineHeight: 1.05,
                 }}
               >
                 {formatDisplayDate(activeDate)}
@@ -1247,7 +1248,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {(weather || cityName) && (
               <div className="flex items-center gap-1 flex-wrap">
                 {weather && isTodayDate && (
-                  <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
+                  <span className="text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.62)', lineHeight: 1.1 }}>
                     {Math.round(weather.temperature)}°F {weather.condition}
                     {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
                     {weather.sunrise && weather.sunset ? (()=>{ 
@@ -1265,7 +1266,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 )}
                 {/* City name from geolocation (show for any date if available) */}
                 {cityName && (
-                  <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
+                  <span className="text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.62)', lineHeight: 1.1 }}>
                     {weather && isTodayDate ? ' • ' : ''}{cityName}
                   </span>
                 )}
@@ -1274,7 +1275,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
             {/* Line 3: Week + Focus + Event - Yellow (run plan), dimmer than Today */}
             {trainingPlanContext && (trainingPlanContext.currentWeek || trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
-              <div className="text-xs font-extralight tracking-normal" style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.65 }}>
+              <div
+                className="text-[0.68rem] font-extralight tracking-normal"
+                style={{
+                  color: getDisciplinePhosphorCore('run'),
+                  opacity: 0.62,
+                  lineHeight: 1.1,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
                 {trainingPlanContext.currentWeek && (
                   <span>Week {trainingPlanContext.currentWeek}</span>
                 )}
@@ -1318,7 +1329,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         ) : (
           // “Titles only” list: tap opens bottom sheet (planned) or detail (completed)
           <div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.30rem' }}>
               {displayWorkouts.map((workout) => {
                 const workoutType = workout.type || workout.workout_type || '';
                 const isCompleted = workout.workout_status === 'completed';
@@ -1392,7 +1403,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     style={{
                       ...phosphorPill.style,
                       borderRadius: '10px',
-                      padding: '0.6rem 0.85rem',
+                      padding: '0.52rem 0.78rem',
                       // Filled (completed) should read like backlit phosphor glass, not fog:
                       // reduce blur radius ~30% on filled state only.
                       ...(isCompleted

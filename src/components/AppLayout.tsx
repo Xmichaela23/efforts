@@ -1669,7 +1669,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       aria-hidden="true"
                       style={{
                         height: 1,
-                        margin: '8px 2px',
+                        margin: '6px 2px',
                         background:
                           'linear-gradient(90deg, transparent, rgba(255,255,255,0.10), rgba(255,255,255,0.06), transparent)',
                         boxShadow:
@@ -1686,7 +1686,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         marginRight: 0,
                       }}
                     >
-                      <div className="instrument-card glass-card" style={{ padding: 10 }}>
+                      <div className="instrument-card glass-card" style={{ padding: 8 }}>
                         <WorkoutCalendar
                           onAddEffort={() => handleAddEffort('run')}
                           onSelectType={handleSelectEffortType}
