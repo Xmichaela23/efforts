@@ -110,14 +110,32 @@ function getWorkoutTextHints(workout: any): string {
   return `${name} ${tags} ${desc} ${detected}`.toLowerCase();
 }
 
-function isComparableZ2Run(workout: any, learnedFitness: any, userAge: number | null): { ok: boolean; z2: { lower: number; upper: number } | null; confidence: number } {
+function parseEasyPaceMmSsPerMiToSecPerKm(val: any): number | null {
+  if (val == null) return null;
+  const s = String(val).trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const mm = Number(m[1]);
+  const ss = Number(m[2]);
+  if (!Number.isFinite(mm) || !Number.isFinite(ss) || ss < 0 || ss >= 60) return null;
+  const secPerMi = mm * 60 + ss;
+  return secPerMi / 1.60934;
+}
+
+function isComparableZ2Run(
+  workout: any,
+  learnedFitness: any,
+  userAge: number | null,
+  perfNumbers: any
+): { ok: boolean; z2: { lower: number; upper: number; source: string } | null; confidence: number } {
   const hints = getWorkoutTextHints(workout);
   if (hints.includes('interval')) return { ok: false, z2: null, confidence: 0 };
   if (hints.includes('tempo')) return { ok: false, z2: null, confidence: 0 };
   if (hints.includes('race')) return { ok: false, z2: null, confidence: 0 };
 
   const minutes = minutesFromWorkout(workout?.duration, workout?.moving_time);
-  if (minutes == null || minutes < 35 || minutes > 75) return { ok: false, z2: null, confidence: 0 };
+  // Slightly looser by default, then we rely on pace/HR gates.
+  if (minutes == null || minutes < 30 || minutes > 90) return { ok: false, z2: null, confidence: 0 };
 
   const avgHr = Number(workout?.avg_heart_rate);
   if (!Number.isFinite(avgHr) || avgHr < 80 || avgHr > 220) return { ok: false, z2: null, confidence: 0 };
@@ -127,30 +145,66 @@ function isComparableZ2Run(workout: any, learnedFitness: any, userAge: number | 
   const if1 = Number(computed?.intensity_factor ?? computed?.overall?.intensity_factor ?? computed?.metrics?.intensity_factor);
   if (Number.isFinite(if1) && if1 > 0.8) return { ok: false, z2: null, confidence: 0 };
 
-  // Z2 range determination
+  // Z2 range determination (prefer learned baselines, fallback to derived)
   const lf = typeof learnedFitness === 'string' ? parseJson<any>(learnedFitness) : learnedFitness;
   const easyHrMetric: LearnedMetric | null = lf?.run_easy_hr ?? null;
   const easyHrConf = confidenceToNumber(easyHrMetric?.confidence);
+  const thresholdHrMetric: LearnedMetric | null = lf?.run_threshold_hr ?? null;
+  const thresholdHrConf = confidenceToNumber(thresholdHrMetric?.confidence);
 
   let z2Lower: number;
   let z2Upper: number;
   let conf: number;
+  let source = 'age';
 
-  if (easyHrMetric?.value && easyHrConf >= 0.5) {
+  if (easyHrMetric?.value) {
+    // If learned confidence is low, widen the band instead of discarding (hot days / hills).
     const center = Number(easyHrMetric.value);
-    z2Lower = center * 0.95;
-    z2Upper = center * 1.05;
-    conf = easyHrConf;
+    const band = easyHrConf >= 0.5 ? 0.06 : 0.10;
+    z2Lower = center * (1 - band);
+    z2Upper = center * (1 + band);
+    conf = Math.max(0.35, easyHrConf);
+    source = 'learned_easy_hr';
+  } else if (thresholdHrMetric?.value) {
+    // Derive easy/Z2 center from threshold HR (~82–85% of threshold for many runners).
+    const thr = Number(thresholdHrMetric.value);
+    const center = thr * 0.83;
+    z2Lower = center * 0.92;
+    z2Upper = center * 1.10;
+    conf = Math.max(0.35, thresholdHrConf);
+    source = 'derived_from_threshold_hr';
   } else {
     const age = userAge != null ? clamp(userAge, 10, 95) : 35;
     const maxHr = 220 - age;
     z2Lower = maxHr * 0.65;
     z2Upper = maxHr * 0.75;
     conf = 0.35;
+    source = 'age';
   }
 
-  if (avgHr < z2Lower || avgHr > z2Upper) return { ok: false, z2: { lower: z2Lower, upper: z2Upper }, confidence: conf };
-  return { ok: true, z2: { lower: z2Lower, upper: z2Upper }, confidence: conf };
+  // Optional pace gate using manual easy pace baseline (reduces false negatives when HR is noisy)
+  const avgPace = Number(workout?.avg_pace); // sec/km
+  const baselineEasySecPerKm = parseEasyPaceMmSsPerMiToSecPerKm(perfNumbers?.easyPace);
+  const paceLooksEasy =
+    Number.isFinite(avgPace) &&
+    avgPace > 120 &&
+    avgPace < 900 &&
+    baselineEasySecPerKm != null &&
+    // within +25% slower to -10% faster than baseline easy pace
+    avgPace >= baselineEasySecPerKm * 0.90 &&
+    avgPace <= baselineEasySecPerKm * 1.25;
+
+  const hrLooksEasy = avgHr >= z2Lower && avgHr <= z2Upper;
+
+  // Accept if HR fits OR pace fits and HR isn't clearly hard (cap at ~92% threshold if known)
+  let hrHardCap: number | null = null;
+  if (thresholdHrMetric?.value) hrHardCap = Number(thresholdHrMetric.value) * 0.92;
+
+  const notClearlyHard = hrHardCap == null ? avgHr <= z2Upper * 1.08 : avgHr <= hrHardCap;
+
+  const ok = hrLooksEasy || (paceLooksEasy && notClearlyHard);
+  if (!ok) return { ok: false, z2: { lower: z2Lower, upper: z2Upper, source }, confidence: conf };
+  return { ok: true, z2: { lower: z2Lower, upper: z2Upper, source }, confidence: conf };
 }
 
 Deno.serve(async (req) => {
@@ -204,12 +258,13 @@ Deno.serve(async (req) => {
 
     const { data: baseline } = await supabase
       .from('user_baselines')
-      .select('age,learned_fitness')
+      .select('age,learned_fitness,performance_numbers')
       .eq('user_id', (w as any)?.user_id)
       .maybeSingle();
 
     const userAge = baseline?.age != null ? Number(baseline.age) : null;
     const learnedFitness = baseline?.learned_fitness ? parseJson<any>(baseline.learned_fitness) : null;
+    const perfNumbers = baseline?.performance_numbers ? parseJson<any>(baseline.performance_numbers) : null;
 
     const adaptation: any = {
       data_quality: 'poor',
@@ -223,7 +278,7 @@ Deno.serve(async (req) => {
     if (sport === 'run' || sport === 'running' || sport === 'walk' || sport === 'hike') {
       const avgPace = Number((w as any)?.avg_pace); // stored as sec/km in ingest
       const avgHr = Number((w as any)?.avg_heart_rate);
-      const gate = isComparableZ2Run(w, learnedFitness, userAge);
+      const gate = isComparableZ2Run(w, learnedFitness, userAge, perfNumbers);
 
       if (gate.ok && Number.isFinite(avgPace) && avgPace > 120 && avgPace < 900 && Number.isFinite(avgHr) && avgHr > 80 && avgHr < 220) {
         const aerobicEfficiency = avgPace / avgHr;
@@ -246,6 +301,8 @@ Deno.serve(async (req) => {
     // STRENGTH: Progression snapshot for major lifts
     // -------------------------------------------------------------------------
     if (sport === 'strength' || sport === 'strength_training') {
+      // Always label strength snapshots so downstream aggregations don't see workout_type:null
+      adaptation.workout_type = 'strength';
       const raw = parseJson<any>(w?.strength_exercises);
       const exercises = Array.isArray(raw) ? raw : [];
 
