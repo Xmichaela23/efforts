@@ -847,123 +847,6 @@ export default function WorkoutCalendar({
           backgroundPosition: 'center, center, center, center, center',
         }}
       />
-      {/* Omni-inspired “road to horizon” backdrop (supporting, not dominant) */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          left: '-16px',
-          right: '-16px',
-          // Start below the opaque week header so the apex is visible
-          top: '54px',
-          height: '196px',
-          zIndex: 0,
-          pointerEvents: 'none',
-          // Subtle glowing “pyramid road” (supporting, not dominant)
-          backgroundImage: `
-            /* tip highlight so the apex reads clearly */
-            radial-gradient(140px 78px at 50% 10%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.0) 70%),
-            /* discipline-tinted wash (kept near “horizon” so pills stay readable) */
-            radial-gradient(320px 200px at 50% 18%, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.0) 72%),
-            radial-gradient(340px 240px at 50% 30%, rgba(239, 68, 68, 0.10) 0%, rgba(239, 68, 68, 0.0) 74%),
-            radial-gradient(340px 240px at 38% 30%, rgba(183, 148, 246, 0.10) 0%, rgba(183, 148, 246, 0.0) 74%),
-            radial-gradient(340px 240px at 62% 30%, rgba(74, 158, 255, 0.10) 0%, rgba(74, 158, 255, 0.0) 74%),
-            radial-gradient(340px 240px at 84% 30%, rgba(80, 200, 120, 0.08) 0%, rgba(80, 200, 120, 0.0) 74%),
-            /* graphic scanlines (horizontal-first to avoid “guitar strings”) */
-            repeating-linear-gradient(0deg, rgba(255,255,255,0.048) 0px, rgba(255,255,255,0.048) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 22px),
-            /* Omni-ish linework (subtle) */
-            repeating-linear-gradient(160deg, rgba(255,255,255,0.020) 0px, rgba(255,255,255,0.020) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 30px),
-            repeating-linear-gradient(20deg, rgba(255,255,255,0.014) 0px, rgba(255,255,255,0.014) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 34px),
-            /* pyramid “rims” (two faint diagonals meeting at the tip) */
-            linear-gradient(30deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.0) 38%),
-            linear-gradient(150deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.0) 38%),
-            /* stronger bottom falloff so the road doesn’t wash out pills */
-            linear-gradient(180deg,
-              rgba(0,0,0,0.00) 0%,
-              rgba(0,0,0,0.18) 30%,
-              rgba(0,0,0,0.62) 64%,
-              rgba(0,0,0,0.90) 100%
-            )
-          `,
-          backgroundBlendMode: 'screen, screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, screen, screen, normal',
-          transformOrigin: '50% 0%',
-          // Reduce the “guitar neck” read: less extreme perspective + softer shape
-          transform: 'perspective(700px) rotateX(48deg) scaleY(1.06)',
-          // Pyramid silhouette instead of “neck”
-          clipPath: 'polygon(50% 0%, 96% 92%, 4% 92%)',
-          opacity: 0.62,
-          boxShadow: `
-            0 10px 24px rgba(0,0,0,0.25),
-            0 0 20px rgba(255,215,0,0.10),
-            0 0 24px rgba(239, 68, 68, 0.07),
-            0 0 22px rgba(183,148,246,0.07),
-            0 0 22px rgba(74,158,255,0.06),
-            0 0 18px rgba(80, 200, 120, 0.05)
-          `,
-          filter: 'blur(0.9px) saturate(1.1)',
-        }}
-      />
-      {/* Pyramid texture overlay (Omni dot-matrix + micro grid) */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          left: '-16px',
-          right: '-16px',
-          top: '54px',
-          height: '196px',
-          zIndex: 0,
-          pointerEvents: 'none',
-          // Keep subtle; this is texture, not a new “feature”
-          opacity: 0.22,
-          mixBlendMode: 'overlay',
-          backgroundImage: `
-            /* dot matrix (two scales) */
-            radial-gradient(circle, rgba(255,255,255,0.10) 0.8px, rgba(255,255,255,0.0) 1.6px),
-            radial-gradient(circle, rgba(255,255,255,0.06) 0.6px, rgba(255,255,255,0.0) 1.4px),
-            /* faint vertical gridlines (Omni perspective will come from the transform) */
-            repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 34px),
-            /* light scanlines (extra fine) */
-            repeating-linear-gradient(0deg, rgba(255,255,255,0.028) 0px, rgba(255,255,255,0.028) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 18px),
-            /* micro grain hatch (breaks “flat gradient” read) */
-            repeating-linear-gradient(135deg, rgba(255,255,255,0.016) 0px, rgba(255,255,255,0.016) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 8px)
-          `,
-          backgroundSize: '20px 20px, 34px 34px, auto, auto, auto',
-          backgroundPosition: '0 0, 11px 7px, center, center, center',
-          backgroundBlendMode: 'normal, normal, soft-light, soft-light, soft-light',
-          transformOrigin: '50% 0%',
-          transform: 'perspective(700px) rotateX(48deg) scaleY(1.06)',
-          clipPath: 'polygon(50% 0%, 96% 92%, 4% 92%)',
-          filter: 'blur(0.15px)',
-        }}
-      />
-      {/* Pyramid linework overlay (higher contrast, still subtle) */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          left: '-16px',
-          right: '-16px',
-          top: '54px',
-          height: '196px',
-          zIndex: 0,
-          pointerEvents: 'none',
-          opacity: 0.34,
-          mixBlendMode: 'soft-light',
-          backgroundImage: `
-            /* tighter scanlines so texture reads */
-            repeating-linear-gradient(0deg, rgba(255,255,255,0.085) 0px, rgba(255,255,255,0.085) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 14px),
-            /* thin diagonals (Omni graphic linework) */
-            repeating-linear-gradient(155deg, rgba(255,255,255,0.040) 0px, rgba(255,255,255,0.040) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 26px),
-            repeating-linear-gradient(25deg, rgba(255,255,255,0.030) 0px, rgba(255,255,255,0.030) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 30px)
-          `,
-          backgroundBlendMode: 'normal, normal, normal',
-          transformOrigin: '50% 0%',
-          transform: 'perspective(700px) rotateX(48deg) scaleY(1.06)',
-          clipPath: 'polygon(50% 0%, 96% 92%, 4% 92%)',
-          filter: 'blur(0.35px)',
-        }}
-      />
       {/* Week Navigation - Bright timeline header (compact) */}
       <div 
         className="flex items-center justify-between py-1 mb-1 relative"
@@ -1103,6 +986,43 @@ export default function WorkoutCalendar({
                   }}
                 />
               )}
+              {/* Side-gutter texture lives INSIDE the row (so it isn't covered by the row's own background) */}
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: 6,
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                  opacity: 0.38,
+                  // Keep visible on iOS: avoid exotic blend modes
+                  mixBlendMode: 'normal',
+                  backgroundImage: `
+                    /* LEFT rail + fade-in */
+                    linear-gradient(90deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.00) 46%),
+                    /* RIGHT rail + fade-in */
+                    linear-gradient(270deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.00) 46%),
+                    /* left ticks (kept near edge via local gradient weighting) */
+                    repeating-linear-gradient(155deg, rgba(255,255,255,0.030) 0px, rgba(255,255,255,0.030) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 18px),
+                    /* right ticks */
+                    repeating-linear-gradient(25deg, rgba(255,255,255,0.026) 0px, rgba(255,255,255,0.026) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 20px),
+                    /* dot matrix */
+                    radial-gradient(circle, rgba(255,255,255,0.070) 0.7px, rgba(255,255,255,0.0) 1.6px),
+                    /* emblem clusters (left / right) */
+                    radial-gradient(circle at 10% 28%, rgba(255,255,255,0.14) 0px, rgba(255,255,255,0.0) 2.2px),
+                    radial-gradient(circle at 14% 40%, rgba(255,255,255,0.10) 0px, rgba(255,255,255,0.0) 2.0px),
+                    radial-gradient(circle at 90% 28%, rgba(255,255,255,0.14) 0px, rgba(255,255,255,0.0) 2.2px),
+                    radial-gradient(circle at 86% 40%, rgba(255,255,255,0.10) 0px, rgba(255,255,255,0.0) 2.0px),
+                    /* center suppression so it reads as "sides" */
+                    linear-gradient(90deg, rgba(0,0,0,0.00) 0%, rgba(0,0,0,0.55) 32%, rgba(0,0,0,0.55) 68%, rgba(0,0,0,0.00) 100%)
+                  `,
+                  backgroundSize: 'auto, auto, auto, auto, 22px 22px, auto, auto, auto, auto, auto',
+                  backgroundPosition: 'left top, right top, left top, right top, 0 0, left top, left top, right top, right top, center',
+                  backgroundBlendMode: 'screen, screen, normal, normal, normal, normal, normal, normal, normal, normal',
+                  filter: 'blur(0.2px)',
+                }}
+              />
               {/* Left: Day label - bright and visible (compact) */}
               <div className="flex-shrink-0 w-10 text-left" style={{ position: 'relative', zIndex: 1 }}>
                 <div
