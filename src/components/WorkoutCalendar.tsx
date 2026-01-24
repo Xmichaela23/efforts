@@ -1118,21 +1118,47 @@ export default function WorkoutCalendar({
                               aria-label="Completed"
                               className="inline-flex items-center justify-center tabular-nums"
                               style={{
-                                marginLeft: 5,
-                                width: 12,
+                                marginLeft: 8,
+                                width: 18,
                                 height: 12,
-                                // Pyramid indicator: same discipline color, less “notification dot”
-                                // Wider base so it reads more like a pyramid (not a thin triangle)
-                                clipPath: 'polygon(50% 4%, 100% 96%, 0% 96%)',
-                                // Flat fill (no shading)
-                                backgroundColor: `rgba(${pillRgb}, 0.86)`,
-                                filter: `drop-shadow(0 1px 1px rgba(0,0,0,0.22))`,
-                                // Prevent text selection cursor; orb is the indicator
-                                color: `rgba(${pillRgb}, 1)`,
-                                lineHeight: 1,
+                                position: 'relative',
+                                verticalAlign: 'middle',
                               }}
                             >
-                              {/* orb only */}
+                              {/* 3-line “emission” mark (inside the pill so it can't get clipped) */}
+                              <span
+                                aria-hidden="true"
+                                style={{
+                                  position: 'absolute',
+                                  left: '50%',
+                                  top: -7,
+                                  transform: 'translateX(-50%)',
+                                  width: 18,
+                                  height: 6,
+                                  pointerEvents: 'none',
+                                  backgroundImage: `
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.78) 42%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.64) 42%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.52) 42%, rgba(${pillRgb},0.0) 100%)
+                                  `,
+                                  backgroundRepeat: 'no-repeat',
+                                  backgroundSize: '18px 1px, 16px 1px, 14px 1px',
+                                  backgroundPosition: 'center 0px, center 2px, center 4px',
+                                  filter: `drop-shadow(0 0 6px rgba(${pillRgb},0.22))`,
+                                  opacity: 0.95,
+                                }}
+                              />
+                              {/* Pyramid indicator (flat, no shading) */}
+                              <span
+                                aria-hidden="true"
+                                style={{
+                                  width: 14,
+                                  height: 12,
+                                  clipPath: 'polygon(50% 2%, 102% 98%, -2% 98%)',
+                                  backgroundColor: `rgba(${pillRgb}, 0.88)`,
+                                  filter: `drop-shadow(0 1px 1px rgba(0,0,0,0.22))`,
+                                }}
+                              />
                             </span>
                           </>
                         );
@@ -1161,13 +1187,13 @@ export default function WorkoutCalendar({
                           onDragEnd={handleDragEnd}
                           onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                           onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                          className={`text-xs px-1.5 py-[0.34rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                          className={`text-xs px-2 py-[0.38rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                           style={{
                             ...phosphorPill.style,
                             // Stamp > pill: squarer corners + slightly “pressed” feel
                             borderRadius: '6px',
-                            fontSize: '0.74rem',
-                            lineHeight: '1.22',
+                            fontSize: '0.78rem',
+                            lineHeight: '1.24',
                             // A: grey ink fill with a colored rim (no “power-up” glow)
                             // White denotes completed
                             color: 'rgba(245,245,245,0.92)',
@@ -1208,12 +1234,12 @@ export default function WorkoutCalendar({
                           onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                           onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
                           // Non-completed returns to a pill, but keep it calm: low fill, low glow.
-                          className={`text-xs px-1.5 py-[0.34rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                          className={`text-xs px-2 py-[0.38rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                           style={{
                             ...phosphorPill.style,
                             borderRadius: '6px',
-                            fontSize: '0.74rem',
-                            lineHeight: '1.22',
+                            fontSize: '0.78rem',
+                            lineHeight: '1.24',
                             // Calm, readable capsule (no “note” shine)
                             backgroundImage: `
                               linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 100%),
