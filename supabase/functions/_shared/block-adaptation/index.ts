@@ -24,6 +24,7 @@ export type BlockAdaptation = {
     improvement_pct: number | null;
     confidence: ConfidenceLabel;
     sample_count: number;
+    excluded_reasons?: Record<string, number>;
   };
   strength_progression: {
     by_exercise: Record<
@@ -134,6 +135,10 @@ export async function getBlockAdaptation(
       const weeklyTrend = (parseJson<any>(cached.aerobic_efficiency_trend) || []) as any[];
       const strengthTrend = (parseJson<any>(cached.strength_progression_trend) || {}) as any;
       const baselineRecos = (parseJson<any>(cached.baseline_recommendations) || []) as any[];
+      const cachedExclusions =
+        strengthTrend?.aerobic_exclusions && typeof strengthTrend.aerobic_exclusions === 'object'
+          ? strengthTrend.aerobic_exclusions
+          : undefined;
 
       return {
         aerobic_efficiency: {
@@ -143,6 +148,7 @@ export async function getBlockAdaptation(
             (Array.isArray(weeklyTrend) ? weeklyTrend : []).map((w: any) => Number(w?.sample_count || 0))
           ),
           sample_count: (Array.isArray(weeklyTrend) ? weeklyTrend : []).reduce((s: number, w: any) => s + Number(w?.sample_count || 0), 0),
+          excluded_reasons: cachedExclusions,
         },
         strength_progression: {
           by_exercise: strengthTrend?.by_exercise && typeof strengthTrend.by_exercise === 'object' ? strengthTrend.by_exercise : {},
@@ -173,6 +179,7 @@ export async function getBlockAdaptation(
 
   // Aerobic efficiency trend
   const aeroBuckets: Array<{ pace: number; hr: number; eff: number }>[] = [[], [], [], []];
+  const aeroExcluded: Record<string, number> = {};
 
   // Strength progression buckets: exercise -> week -> entries
   const strengthBuckets: Record<string, Array<{ weight: number; rir: number | null; est1rm: number }>[] > = {};
@@ -189,6 +196,9 @@ export async function getBlockAdaptation(
       if (Number.isFinite(pace) && Number.isFinite(hr) && Number.isFinite(eff)) {
         aeroBuckets[week - 1].push({ pace, hr, eff });
       }
+    } else if (adaptation.workout_type === 'non_comparable') {
+      const reason = String(adaptation.excluded_reason || 'non_comparable');
+      aeroExcluded[reason] = (aeroExcluded[reason] || 0) + 1;
     }
 
     const se = Array.isArray(adaptation.strength_exercises) ? adaptation.strength_exercises : [];
@@ -313,6 +323,7 @@ export async function getBlockAdaptation(
       improvement_pct: improvementPct,
       confidence: aeroConfidence,
       sample_count: weeklyTrend.reduce((s, w) => s + w.sample_count, 0),
+      excluded_reasons: aeroExcluded,
     },
     strength_progression: {
       by_exercise: byExercise,
@@ -331,7 +342,7 @@ export async function getBlockAdaptation(
         block_end_date: blockEndDateISO,
         aerobic_efficiency_trend: result.aerobic_efficiency.weekly_trend,
         aerobic_efficiency_improvement_pct: result.aerobic_efficiency.improvement_pct,
-        strength_progression_trend: { by_exercise: result.strength_progression.by_exercise },
+        strength_progression_trend: { by_exercise: result.strength_progression.by_exercise, aerobic_exclusions: result.aerobic_efficiency.excluded_reasons || {} },
         strength_overall_gain_pct: result.strength_progression.overall_gain_pct,
         baseline_recommendations: result.baseline_recommendations,
         computed_at: nowIso,

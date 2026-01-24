@@ -398,6 +398,7 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
   const aero = adaptation?.aerobic_efficiency;
   const strength = adaptation?.strength_progression;
   const recos = Array.isArray(adaptation?.baseline_recommendations) ? adaptation.baseline_recommendations : [];
+  const exclusions = aero?.excluded_reasons && typeof aero.excluded_reasons === 'object' ? aero.excluded_reasons : null;
 
   const hasAero = Array.isArray(aero?.weekly_trend) && aero.weekly_trend.some((w: any) => Number(w?.sample_count || 0) > 0);
   const hasStrength = strength?.by_exercise && typeof strength.by_exercise === 'object' && Object.keys(strength.by_exercise).length > 0;
@@ -460,6 +461,23 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
                 No comparable easy/Z2 runs detected in this block yet.
               </div>
             )}
+
+            {exclusions ? (
+              <div className="mt-3">
+                <div className="text-[11px] uppercase tracking-wide text-white/45 mb-2">Why runs were excluded</div>
+                <div className="space-y-1">
+                  {Object.entries(exclusions)
+                    .sort((a: any, b: any) => Number(b[1]) - Number(a[1]))
+                    .slice(0, 5)
+                    .map(([reason, count]) => (
+                      <div key={reason} className="flex items-center justify-between text-xs text-white/60">
+                        <span className="truncate pr-3">{String(reason).replaceAll('_', ' ')}</span>
+                        <span className="text-white/45">{count}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* Strength progression */}

@@ -127,23 +127,33 @@ function isComparableZ2Run(
   learnedFitness: any,
   userAge: number | null,
   perfNumbers: any
-): { ok: boolean; z2: { lower: number; upper: number; source: string } | null; confidence: number } {
+): {
+  ok: boolean;
+  reason: string;
+  z2: { lower: number; upper: number; source: string } | null;
+  confidence: number;
+  debug: Record<string, any>;
+} {
   const hints = getWorkoutTextHints(workout);
-  if (hints.includes('interval')) return { ok: false, z2: null, confidence: 0 };
-  if (hints.includes('tempo')) return { ok: false, z2: null, confidence: 0 };
-  if (hints.includes('race')) return { ok: false, z2: null, confidence: 0 };
+  if (hints.includes('interval')) return { ok: false, reason: 'tagged_interval', z2: null, confidence: 0, debug: { hints } };
+  if (hints.includes('tempo')) return { ok: false, reason: 'tagged_tempo', z2: null, confidence: 0, debug: { hints } };
+  if (hints.includes('race')) return { ok: false, reason: 'tagged_race', z2: null, confidence: 0, debug: { hints } };
 
   const minutes = minutesFromWorkout(workout?.duration, workout?.moving_time);
   // Slightly looser by default, then we rely on pace/HR gates.
-  if (minutes == null || minutes < 30 || minutes > 90) return { ok: false, z2: null, confidence: 0 };
+  if (minutes == null) return { ok: false, reason: 'missing_duration', z2: null, confidence: 0, debug: { hints } };
+  if (minutes < 30) return { ok: false, reason: 'too_short', z2: null, confidence: 0, debug: { hints, minutes } };
+  if (minutes > 90) return { ok: false, reason: 'too_long', z2: null, confidence: 0, debug: { hints, minutes } };
 
   const avgHr = Number(workout?.avg_heart_rate);
-  if (!Number.isFinite(avgHr) || avgHr < 80 || avgHr > 220) return { ok: false, z2: null, confidence: 0 };
+  if (!Number.isFinite(avgHr)) return { ok: false, reason: 'missing_hr', z2: null, confidence: 0, debug: { hints, minutes } };
+  if (avgHr < 80 || avgHr > 220) return { ok: false, reason: 'hr_out_of_range', z2: null, confidence: 0, debug: { hints, minutes, avgHr } };
 
   // Intensity factor gate (if present in computed or calculated metrics)
   const computed = parseJson<any>(workout?.computed) || {};
   const if1 = Number(computed?.intensity_factor ?? computed?.overall?.intensity_factor ?? computed?.metrics?.intensity_factor);
-  if (Number.isFinite(if1) && if1 > 0.8) return { ok: false, z2: null, confidence: 0 };
+  // Note: IF can be noisy for runs; we keep the gate but emit a debug reason.
+  if (Number.isFinite(if1) && if1 > 0.85) return { ok: false, reason: 'high_intensity_factor', z2: null, confidence: 0, debug: { hints, minutes, avgHr, if1 } };
 
   // Z2 range determination (prefer learned baselines, fallback to derived)
   const lf = typeof learnedFitness === 'string' ? parseJson<any>(learnedFitness) : learnedFitness;
@@ -185,6 +195,12 @@ function isComparableZ2Run(
   // Optional pace gate using manual easy pace baseline (reduces false negatives when HR is noisy)
   const avgPace = Number(workout?.avg_pace); // sec/km
   const baselineEasySecPerKm = parseEasyPaceMmSsPerMiToSecPerKm(perfNumbers?.easyPace);
+  if (!Number.isFinite(avgPace) || !(avgPace > 0)) {
+    // If HR matches our easy range, we can still accept and store pace as missing (but aerobic efficiency can't be computed).
+    // For comparability gating, treat missing pace as non-comparable to keep the metric clean.
+    return { ok: false, reason: 'missing_pace', z2: { lower: z2Lower, upper: z2Upper, source }, confidence: conf, debug: { hints, minutes, avgHr, if1, z2Lower, z2Upper, source } };
+  }
+
   const paceLooksEasy =
     Number.isFinite(avgPace) &&
     avgPace > 120 &&
@@ -203,8 +219,54 @@ function isComparableZ2Run(
   const notClearlyHard = hrHardCap == null ? avgHr <= z2Upper * 1.08 : avgHr <= hrHardCap;
 
   const ok = hrLooksEasy || (paceLooksEasy && notClearlyHard);
-  if (!ok) return { ok: false, z2: { lower: z2Lower, upper: z2Upper, source }, confidence: conf };
-  return { ok: true, z2: { lower: z2Lower, upper: z2Upper, source }, confidence: conf };
+  if (!ok) {
+    const reason =
+      !notClearlyHard ? 'too_hard' :
+      !hrLooksEasy && paceLooksEasy ? 'hr_outside_easy_band' :
+      'pace_or_hr_not_easy';
+    return {
+      ok: false,
+      reason,
+      z2: { lower: z2Lower, upper: z2Upper, source },
+      confidence: conf,
+      debug: {
+        hints,
+        minutes,
+        avgHr,
+        avgPace,
+        if1: Number.isFinite(if1) ? if1 : null,
+        z2Lower,
+        z2Upper,
+        source,
+        baselineEasySecPerKm,
+        paceLooksEasy,
+        hrLooksEasy,
+        hrHardCap,
+        notClearlyHard,
+      },
+    };
+  }
+  return {
+    ok: true,
+    reason: 'ok',
+    z2: { lower: z2Lower, upper: z2Upper, source },
+    confidence: conf,
+    debug: {
+      hints,
+      minutes,
+      avgHr,
+      avgPace,
+      if1: Number.isFinite(if1) ? if1 : null,
+      z2Lower,
+      z2Upper,
+      source,
+      baselineEasySecPerKm,
+      paceLooksEasy,
+      hrLooksEasy,
+      hrHardCap,
+      notClearlyHard,
+    },
+  };
 }
 
 Deno.serve(async (req) => {
@@ -288,10 +350,14 @@ Deno.serve(async (req) => {
         adaptation.avg_pace_at_z2 = Math.round(avgPace);
         adaptation.avg_hr_in_z2 = Math.round(avgHr);
         adaptation.z2_hr_range = gate.z2;
+        adaptation.debug = gate.debug;
         adaptation.confidence = clamp(gate.confidence, 0, 1);
         adaptation.data_quality = adaptation.confidence >= 0.75 ? 'excellent' : adaptation.confidence >= 0.5 ? 'good' : 'fair';
       } else {
         adaptation.workout_type = 'non_comparable';
+        adaptation.excluded_reason = gate?.reason || 'non_comparable';
+        adaptation.z2_hr_range = gate?.z2 || null;
+        adaptation.debug = gate?.debug || null;
         adaptation.data_quality = 'fair';
         adaptation.confidence = 0;
       }
@@ -343,6 +409,7 @@ Deno.serve(async (req) => {
         adaptation.confidence = clamp(0.5 + 0.5 * rirCoverage, 0, 1);
         adaptation.data_quality = rirCoverage >= 0.8 ? 'excellent' : rirCoverage >= 0.5 ? 'good' : 'fair';
       } else {
+        adaptation.excluded_reason = 'no_major_lifts_detected';
         adaptation.data_quality = 'fair';
         adaptation.confidence = 0.2;
       }

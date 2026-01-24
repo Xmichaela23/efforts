@@ -32,6 +32,7 @@ export type BlockAdaptation = {
     improvement_pct: number | null;
     confidence: 'high' | 'medium' | 'low';
     sample_count: number;
+    excluded_reasons?: Record<string, number>;
   };
   strength_progression: {
     by_exercise: Record<
