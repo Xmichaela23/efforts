@@ -855,7 +855,7 @@ export default function WorkoutCalendar({
           left: '-16px',
           right: '-16px',
           top: '18px',
-          height: '250px',
+          height: '210px',
           zIndex: 0,
           pointerEvents: 'none',
           // Trapezoid “road” with vanishing point + lane/grid lines
@@ -867,13 +867,11 @@ export default function WorkoutCalendar({
             radial-gradient(320px 220px at 38% 34%, rgba(183, 148, 246, 0.10) 0%, rgba(183, 148, 246, 0.0) 74%),
             radial-gradient(320px 220px at 62% 34%, rgba(74, 158, 255, 0.10) 0%, rgba(74, 158, 255, 0.0) 74%),
             radial-gradient(320px 220px at 84% 36%, rgba(80, 200, 120, 0.08) 0%, rgba(80, 200, 120, 0.0) 74%),
-            /* center lane line */
-            linear-gradient(90deg, rgba(255,255,255,0.0) 49.6%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.0) 50.4%),
-            /* road edge lines */
-            linear-gradient(90deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.0) 12%, rgba(255,255,255,0.0) 88%, rgba(255,255,255,0.10) 100%),
-            /* receding grid lines */
-            repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 14px),
-            repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 18px),
+            /* de-string the “neck”: remove strong lane lines, keep only subtle texture */
+            repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 26px),
+            repeating-linear-gradient(90deg, rgba(255,255,255,0.028) 0px, rgba(255,255,255,0.028) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 34px),
+            /* subtle diagonal micro-texture (avoids “strings/lanes” read) */
+            repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 22px),
             /* stronger bottom falloff so the road doesn’t wash out pills */
             linear-gradient(180deg,
               rgba(0,0,0,0.00) 0%,
@@ -882,11 +880,12 @@ export default function WorkoutCalendar({
               rgba(0,0,0,0.90) 100%
             )
           `,
-          backgroundBlendMode: 'screen, screen, screen, screen, screen, screen, screen, soft-light, soft-light, normal',
+          backgroundBlendMode: 'screen, screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, normal',
           transformOrigin: '50% 0%',
-          transform: 'perspective(700px) rotateX(58deg) scaleY(1.12)',
-          clipPath: 'polygon(50% 4%, 92% 96%, 8% 96%)',
-          opacity: 0.68,
+          // Reduce the “guitar neck” read: less extreme perspective + softer shape
+          transform: 'perspective(700px) rotateX(48deg) scaleY(1.06)',
+          clipPath: 'ellipse(62% 50% at 50% 58%)',
+          opacity: 0.46,
           boxShadow: `
             0 10px 24px rgba(0,0,0,0.25),
             0 0 20px rgba(255,215,0,0.10),
@@ -895,7 +894,7 @@ export default function WorkoutCalendar({
             0 0 22px rgba(74,158,255,0.06),
             0 0 18px rgba(80, 200, 120, 0.05)
           `,
-          filter: 'blur(0.6px) saturate(1.06)',
+          filter: 'blur(1.55px) saturate(1.02)',
         }}
       />
       {/* Week Navigation - Bright timeline header (compact) */}
@@ -1105,125 +1104,154 @@ export default function WorkoutCalendar({
                     
                     const isPlanned = workoutStatus === 'planned';
                     const workoutId = evt?._src?.id;
+
+                    const renderLabel = () => {
+                      const label = String(evt.label || '');
+                      const hasCheckmark = /✓+$/.test(label);
+                      if (hasCheckmark && isCompleted) {
+                        const labelText = label.replace(/✓+$/, '').trim();
+                        const parts = labelText.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
+                        const nonNumericParts = labelText.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
+                        return (
+                          <>
+                            {nonNumericParts.map((part, idx) => {
+                              const isNumeric = parts.includes(part);
+                              return isNumeric ? (
+                                <span key={idx} className="tabular-nums">{part}</span>
+                              ) : part;
+                            })}
+                            <span
+                              aria-label="Completed"
+                              className="inline-flex items-center justify-center tabular-nums"
+                              style={{
+                                marginLeft: 6,
+                                width: 15,
+                                height: 15,
+                                borderRadius: 4,
+                                // A: grey ink fill with a colored rim
+                                border: `1px solid rgba(${pillRgb}, 0.38)`,
+                                boxShadow: `
+                                  0 0 0 1px rgba(255,255,255,0.10) inset,
+                                  0 0 0 2px rgba(0,0,0,0.22) inset
+                                `.replace(/\s+/g,' ').trim(),
+                                background: `
+                                  linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 100%),
+                                  radial-gradient(70% 70% at 30% 30%, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.00) 60%),
+                                  radial-gradient(90% 110% at 70% 120%, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.00) 60%)
+                                `,
+                                backgroundBlendMode: 'screen, normal, multiply',
+                                // White denotes completed
+                                color: 'rgba(245,245,245,0.92)',
+                                fontSize: '0.70rem',
+                                lineHeight: 1,
+                              }}
+                            >
+                              ✓
+                            </span>
+                          </>
+                        );
+                      }
+                      const parts = label.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
+                      if (parts.length > 0) {
+                        const nonNumericParts = label.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
+                        return nonNumericParts.map((part, idx) => {
+                          const isNumeric = parts.includes(part);
+                          return isNumeric ? (
+                            <span key={idx} className="tabular-nums">{part}</span>
+                          ) : part;
+                        });
+                      }
+                      return label;
+                    };
                     
                     return (
-                      <span
-                        key={`${key}-${i}`}
-                        role="button"
-                        tabIndex={0}
-                        draggable={isPlanned && !!workoutId}
-                        onDragStart={(e) => isPlanned && workoutId && handleDragStart(e, evt._src)}
-                        onDragEnd={handleDragEnd}
-                        onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
-                        onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                        className={`text-xs px-1.5 py-[0.34rem] flex-shrink-0 transition-all font-medium tracking-normal ${!isDone ? 'backdrop-blur-sm' : ''} ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
-                        style={{
-                          ...phosphorPill.style,
-                          borderRadius: '4px',
-                          fontSize: '0.74rem', // Slightly larger for legibility
-                          lineHeight: '1.22', // Slightly taller
-                          // Legibility: tiny dark edge + faint phosphor bloom (kept subtle)
-                          textShadow: isDone
-                            ? `0 1px 1px rgba(0,0,0,0.65), 0 0 6px rgba(0,0,0,0.45), 0 0 10px rgba(${pillRgb},0.07)`
-                            : `0 1px 1px rgba(0,0,0,0.55), 0 0 8px rgba(0,0,0,0.35), 0 0 14px rgba(${pillRgb},0.10)`,
-                          // Reduce blur radius ~30% on FILLED (completed) chips only:
-                          // keep "phosphor glass" crisp instead of foggy.
-                          ...(isDone
-                            ? {
-                                backdropFilter: 'blur(2.8px)',
-                                WebkitBackdropFilter: 'blur(2.8px)',
-                              }
-                            : null),
-                          // 3D object feel (Omni: glossy, beveled, not flat "calendar event")
-                          backgroundImage: isDone
-                            ? `
-                                radial-gradient(120% 120% at 30% 20%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.00) 46%),
-                                radial-gradient(120% 140% at 80% 110%, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.00) 55%),
-                                linear-gradient(180deg, rgba(${pillRgb},0.30) 0%, rgba(${pillRgb},0.14) 42%, rgba(0,0,0,0.34) 100%)
-                              `
-                            : `
-                                radial-gradient(120% 120% at 30% 20%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.00) 46%),
-                                radial-gradient(120% 140% at 80% 110%, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0.00) 55%),
-                                linear-gradient(180deg, rgba(${pillRgb},0.10) 0%, rgba(0,0,0,0.10) 55%, rgba(0,0,0,0.32) 100%)
-                              `,
-                          backgroundBlendMode: 'screen, multiply, normal',
-                          backgroundClip: 'padding-box',
-                          // Full glow brightness for timeline
-                          boxShadow: phosphorPill.style.boxShadow 
-                            ? (() => {
-                                const reducedGlow = phosphorPill.style.boxShadow
-                                  .replace(/rgba\(([^)]+),\s*([\d.]+)\)/g, (match, rgb, alpha) => {
-                                    const newAlpha = parseFloat(alpha) * 0.9; // Minimal reduction - bright
-                                    return `rgba(${rgb}, ${newAlpha})`;
-                                  });
-                                return `${reducedGlow},
-                                  0 2px 6px rgba(0,0,0,0.45),
-                                  0 10px 18px rgba(0,0,0,0.18),
-                                  inset 0 1px 0 rgba(255,255,255,0.22),
-                                  inset 0 -1px 0 rgba(0,0,0,0.35),
-                                  inset 0 0 0 0.5px rgba(255, 255, 255, 0.12)`;
-                              })()
-                            : `0 2px 6px rgba(0,0,0,0.45),
-                               0 10px 18px rgba(0,0,0,0.18),
-                               inset 0 1px 0 rgba(255,255,255,0.22),
-                               inset 0 -1px 0 rgba(0,0,0,0.35),
-                               inset 0 0 0 0.5px rgba(255, 255, 255, 0.12)`,
-                          borderColor: phosphorPill.style.borderColor ? 
-                            (typeof phosphorPill.style.borderColor === 'string' && phosphorPill.style.borderColor.includes('rgba') ?
-                              (() => {
-                                const rgbaMatch = phosphorPill.style.borderColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
-                                if (rgbaMatch) {
-                                  const [, r, g, b, alpha] = rgbaMatch;
-                                  const newAlpha = Math.max(0.35, parseFloat(alpha) * 0.95); // Much brighter borders
-                                  return `rgba(${r}, ${g}, ${b}, ${newAlpha})`;
-                                }
-                                return phosphorPill.style.borderColor;
-                              })() : phosphorPill.style.borderColor) : undefined,
-                          borderWidth: '0.5px',
-                          whiteSpace: 'nowrap',
-                          transform: 'translateZ(0)',
-                        }}
-                      >
-                        {(() => {
-                          const label = String(evt.label || '');
-                          const hasCheckmark = /✓+$/.test(label);
-                          if (hasCheckmark && isCompleted) {
-                            const labelText = label.replace(/✓+$/, '').trim();
-                            // Extract numbers for tabular numerals
-                            const parts = labelText.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
-                            const nonNumericParts = labelText.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
-                            return (
-                              <>
-                                {nonNumericParts.map((part, i) => {
-                                  const isNumeric = parts.includes(part);
-                                  return isNumeric ? (
-                                    <span key={i} className="tabular-nums">{part}</span>
-                                  ) : part;
-                                })}
-                                <span 
-                                  style={{
-                                    // Checkmarks use primary white text color - status indicator, not category
-                                    color: 'rgba(245, 245, 245, 0.9)', // Primary white text color (--text-active)
-                                    // No glow, no discipline tint - checkmarks read as status, not category
-                                  }}
-                                > ✓</span>
-                              </>
-                            );
-                          }
-                          // Apply tabular numerals to numbers in regular labels too
-                          const parts = label.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
-                          if (parts.length > 0) {
-                            const nonNumericParts = label.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
-                              return nonNumericParts.map((part, i) => {
-                                const isNumeric = parts.includes(part);
-                                  return isNumeric ? (
-                                    <span key={i} className="tabular-nums">{part}</span>
-                                  ) : part;
-                              });
-                          }
-                          return label;
-                        })()}
-                      </span>
+                      isDone ? (
+                        <span
+                          key={`${key}-${i}`}
+                          role="button"
+                          tabIndex={0}
+                          draggable={isPlanned && !!workoutId}
+                          onDragStart={(e) => isPlanned && workoutId && handleDragStart(e, evt._src)}
+                          onDragEnd={handleDragEnd}
+                          onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
+                          onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
+                          className={`text-xs px-1.5 py-[0.34rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                          style={{
+                            ...phosphorPill.style,
+                            // Stamp > pill: squarer corners + slightly “pressed” feel
+                            borderRadius: '6px',
+                            fontSize: '0.74rem',
+                            lineHeight: '1.22',
+                            // A: grey ink fill with a colored rim (no “power-up” glow)
+                            // White denotes completed
+                            color: 'rgba(245,245,245,0.92)',
+                            textShadow: `0 1px 1px rgba(0,0,0,0.75)`,
+                            backdropFilter: 'blur(2px)',
+                            WebkitBackdropFilter: 'blur(2px)',
+                            // Darker “ink” bed so completed reads quieter
+                            backgroundColor: 'rgba(8, 8, 8, 0.72)',
+                            backgroundImage: `
+                              linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%),
+                              radial-gradient(80% 90% at 35% 25%, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.00) 60%),
+                              radial-gradient(90% 120% at 70% 120%, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.00) 60%),
+                              /* subtle grain (non-lane) */
+                              repeating-linear-gradient(135deg, rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 22px)
+                            `,
+                            backgroundBlendMode: 'screen, normal, multiply, soft-light',
+                            backgroundClip: 'padding-box',
+                            border: `1px solid rgba(${pillRgb}, 0.38)`,
+                            boxShadow: `
+                              0 0 0 1px rgba(255,255,255,0.10) inset,
+                              0 0 0 2px rgba(0,0,0,0.24) inset,
+                              0 2px 8px rgba(0,0,0,0.42)
+                            `.replace(/\s+/g,' ').trim(),
+                            whiteSpace: 'nowrap',
+                            transform: 'translateZ(0)',
+                          }}
+                        >
+                          {renderLabel()}
+                        </span>
+                      ) : (
+                        <span
+                          key={`${key}-${i}`}
+                          role="button"
+                          tabIndex={0}
+                          draggable={isPlanned && !!workoutId}
+                          onDragStart={(e) => isPlanned && workoutId && handleDragStart(e, evt._src)}
+                          onDragEnd={handleDragEnd}
+                          onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
+                          onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
+                          // Non-completed returns to a pill, but keep it calm: low fill, low glow.
+                          className={`text-xs px-1.5 py-[0.34rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                          style={{
+                            ...phosphorPill.style,
+                            borderRadius: '6px',
+                            fontSize: '0.74rem',
+                            lineHeight: '1.22',
+                            // Calm, readable capsule (no “note” shine)
+                            backgroundImage: `
+                              linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 100%),
+                              radial-gradient(90% 110% at 30% 20%, rgba(${pillRgb},0.10) 0%, rgba(${pillRgb},0.00) 58%),
+                              radial-gradient(100% 120% at 70% 120%, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.00) 60%)
+                            `,
+                            backgroundBlendMode: 'screen, normal, multiply',
+                            backdropFilter: 'blur(2px)',
+                            WebkitBackdropFilter: 'blur(2px)',
+                            // Planned/upcoming uses discipline color in the text; rim stays subtle
+                            border: `1px solid rgba(${pillRgb}, 0.18)`,
+                            boxShadow: `
+                              0 0 0 1px rgba(255,255,255,0.06) inset,
+                              0 2px 8px rgba(0,0,0,0.35)
+                            `.replace(/\s+/g,' ').trim(),
+                            color: getDisciplinePhosphorCore(workoutType),
+                            textShadow: `0 1px 1px rgba(0,0,0,0.60)`,
+                            whiteSpace: 'nowrap',
+                            transform: 'translateZ(0)',
+                          }}
+                        >
+                          {renderLabel()}
+                        </span>
+                      )
                     );
                   })
                 )}
