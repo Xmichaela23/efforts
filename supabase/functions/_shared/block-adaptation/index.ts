@@ -26,6 +26,17 @@ export type BlockAdaptation = {
     sample_count: number;
     excluded_reasons?: Record<string, number>;
   };
+  long_run_endurance?: {
+    weekly_trend: Array<{
+      week: number;
+      avg_pace: number;
+      avg_hr: number;
+      avg_duration_min: number;
+      sample_count: number;
+    }>;
+    sample_count: number;
+    excluded_reasons?: Record<string, number>;
+  };
   strength_progression: {
     by_exercise: Record<
       string,
@@ -139,6 +150,14 @@ export async function getBlockAdaptation(
         strengthTrend?.aerobic_exclusions && typeof strengthTrend.aerobic_exclusions === 'object'
           ? strengthTrend.aerobic_exclusions
           : undefined;
+      const cachedLongRunTrend =
+        strengthTrend?.long_run_trend && Array.isArray(strengthTrend.long_run_trend)
+          ? strengthTrend.long_run_trend
+          : undefined;
+      const cachedLongRunExclusions =
+        strengthTrend?.long_run_exclusions && typeof strengthTrend.long_run_exclusions === 'object'
+          ? strengthTrend.long_run_exclusions
+          : undefined;
 
       return {
         aerobic_efficiency: {
@@ -150,6 +169,13 @@ export async function getBlockAdaptation(
           sample_count: (Array.isArray(weeklyTrend) ? weeklyTrend : []).reduce((s: number, w: any) => s + Number(w?.sample_count || 0), 0),
           excluded_reasons: cachedExclusions,
         },
+        long_run_endurance: cachedLongRunTrend
+          ? {
+              weekly_trend: cachedLongRunTrend,
+              sample_count: cachedLongRunTrend.reduce((s: number, w: any) => s + Number(w?.sample_count || 0), 0),
+              excluded_reasons: cachedLongRunExclusions,
+            }
+          : undefined,
         strength_progression: {
           by_exercise: strengthTrend?.by_exercise && typeof strengthTrend.by_exercise === 'object' ? strengthTrend.by_exercise : {},
           overall_gain_pct: cached.strength_overall_gain_pct != null ? Number(cached.strength_overall_gain_pct) : null,
@@ -180,6 +206,9 @@ export async function getBlockAdaptation(
   // Aerobic efficiency trend
   const aeroBuckets: Array<{ pace: number; hr: number; eff: number }>[] = [[], [], [], []];
   const aeroExcluded: Record<string, number> = {};
+  // Long run lane
+  const longBuckets: Array<{ pace: number | null; hr: number | null; dur: number | null }>[] = [[], [], [], []];
+  const longExcluded: Record<string, number> = {};
 
   // Strength progression buckets: exercise -> week -> entries
   const strengthBuckets: Record<string, Array<{ weight: number; rir: number | null; est1rm: number }>[] > = {};
@@ -199,6 +228,15 @@ export async function getBlockAdaptation(
     } else if (adaptation.workout_type === 'non_comparable') {
       const reason = String(adaptation.excluded_reason || 'non_comparable');
       aeroExcluded[reason] = (aeroExcluded[reason] || 0) + 1;
+    } else if (adaptation.workout_type === 'long_run') {
+      const pace = adaptation.avg_pace != null ? Number(adaptation.avg_pace) : null;
+      const hr = adaptation.avg_hr != null ? Number(adaptation.avg_hr) : null;
+      const dur = adaptation.duration_min != null ? Number(adaptation.duration_min) : null;
+      longBuckets[week - 1].push({ pace: Number.isFinite(pace as any) ? (pace as number) : null, hr: Number.isFinite(hr as any) ? (hr as number) : null, dur: Number.isFinite(dur as any) ? (dur as number) : null });
+      if (adaptation.excluded_reason) {
+        const reason = String(adaptation.excluded_reason);
+        longExcluded[reason] = (longExcluded[reason] || 0) + 1;
+      }
     }
 
     const se = Array.isArray(adaptation.strength_exercises) ? adaptation.strength_exercises : [];
@@ -235,6 +273,18 @@ export async function getBlockAdaptation(
 
   const aeroCounts = weeklyTrend.map((w) => w.sample_count);
   const aeroConfidence = confidenceLabelFromWeeklyCounts(aeroCounts);
+
+  const longRunTrend = [1, 2, 3, 4].map((week) => {
+    const items = longBuckets[week - 1];
+    const sample_count = items.length;
+    const paceItems = items.map((i) => i.pace).filter((v) => v != null) as number[];
+    const hrItems = items.map((i) => i.hr).filter((v) => v != null) as number[];
+    const durItems = items.map((i) => i.dur).filter((v) => v != null) as number[];
+    const avg_pace = paceItems.length ? Math.round(paceItems.reduce((s, v) => s + v, 0) / paceItems.length) : 0;
+    const avg_hr = hrItems.length ? Math.round(hrItems.reduce((s, v) => s + v, 0) / hrItems.length) : 0;
+    const avg_duration_min = durItems.length ? Math.round(durItems.reduce((s, v) => s + v, 0) / durItems.length) : 0;
+    return { week, avg_pace, avg_hr, avg_duration_min, sample_count };
+  });
 
   // Strength progression trend
   const byExercise: BlockAdaptation['strength_progression']['by_exercise'] = {};
@@ -325,6 +375,11 @@ export async function getBlockAdaptation(
       sample_count: weeklyTrend.reduce((s, w) => s + w.sample_count, 0),
       excluded_reasons: aeroExcluded,
     },
+    long_run_endurance: {
+      weekly_trend: longRunTrend,
+      sample_count: longRunTrend.reduce((s, w) => s + w.sample_count, 0),
+      excluded_reasons: longExcluded,
+    },
     strength_progression: {
       by_exercise: byExercise,
       overall_gain_pct: overallGainPct,
@@ -342,7 +397,12 @@ export async function getBlockAdaptation(
         block_end_date: blockEndDateISO,
         aerobic_efficiency_trend: result.aerobic_efficiency.weekly_trend,
         aerobic_efficiency_improvement_pct: result.aerobic_efficiency.improvement_pct,
-        strength_progression_trend: { by_exercise: result.strength_progression.by_exercise, aerobic_exclusions: result.aerobic_efficiency.excluded_reasons || {} },
+        strength_progression_trend: {
+          by_exercise: result.strength_progression.by_exercise,
+          aerobic_exclusions: result.aerobic_efficiency.excluded_reasons || {},
+          long_run_trend: result.long_run_endurance?.weekly_trend || [],
+          long_run_exclusions: result.long_run_endurance?.excluded_reasons || {},
+        },
         strength_overall_gain_pct: result.strength_progression.overall_gain_pct,
         baseline_recommendations: result.baseline_recommendations,
         computed_at: nowIso,

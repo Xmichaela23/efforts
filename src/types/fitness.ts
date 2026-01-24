@@ -34,6 +34,17 @@ export type BlockAdaptation = {
     sample_count: number;
     excluded_reasons?: Record<string, number>;
   };
+  long_run_endurance?: {
+    weekly_trend: Array<{
+      week: number;
+      avg_pace: number;
+      avg_hr: number;
+      avg_duration_min: number;
+      sample_count: number;
+    }>;
+    sample_count: number;
+    excluded_reasons?: Record<string, number>;
+  };
   strength_progression: {
     by_exercise: Record<
       string,

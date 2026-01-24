@@ -480,6 +480,40 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
             ) : null}
           </div>
 
+          {/* Long run endurance */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs uppercase tracking-wide text-white/50">Long run endurance</div>
+              <div className="text-xs text-white/50">
+                {adaptation?.long_run_endurance?.sample_count ? `${adaptation.long_run_endurance.sample_count} samples` : '—'}
+              </div>
+            </div>
+
+            {Array.isArray(adaptation?.long_run_endurance?.weekly_trend) &&
+            adaptation.long_run_endurance.weekly_trend.some((w: any) => Number(w?.sample_count || 0) > 0) ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-4 gap-2 text-[11px] text-white/50">
+                  <div>Week</div>
+                  <div>Pace</div>
+                  <div>HR</div>
+                  <div>Dur</div>
+                </div>
+                {adaptation.long_run_endurance.weekly_trend.map((w: any) => (
+                  <div key={w.week} className="grid grid-cols-4 gap-2 text-[12px] text-white/85">
+                    <div className="text-white/60">W{w.week}</div>
+                    <div>{w.sample_count ? formatPaceSecPerKmToMinPerMi(Number(w.avg_pace)) : '—'}</div>
+                    <div>{w.sample_count ? `${Math.round(Number(w.avg_hr))} bpm` : '—'}</div>
+                    <div className="text-white/60">{w.sample_count ? `${Math.round(Number(w.avg_duration_min))}m` : '—'}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-white/60">
+                No long runs detected in this block yet.
+              </div>
+            )}
+          </div>
+
           {/* Strength progression */}
           <div>
             <div className="flex items-center justify-between mb-2">

@@ -143,7 +143,7 @@ function isComparableZ2Run(
   // Slightly looser by default, then we rely on pace/HR gates.
   if (minutes == null) return { ok: false, reason: 'missing_duration', z2: null, confidence: 0, debug: { hints } };
   if (minutes < 30) return { ok: false, reason: 'too_short', z2: null, confidence: 0, debug: { hints, minutes } };
-  if (minutes > 90) return { ok: false, reason: 'too_long', z2: null, confidence: 0, debug: { hints, minutes } };
+  // >90 minutes is handled as a "long run" lane elsewhere
 
   const avgHr = Number(workout?.avg_heart_rate);
   if (!Number.isFinite(avgHr)) return { ok: false, reason: 'missing_hr', z2: null, confidence: 0, debug: { hints, minutes } };
@@ -194,7 +194,13 @@ function isComparableZ2Run(
 
   // Optional pace gate using manual easy pace baseline (reduces false negatives when HR is noisy)
   const avgPace = Number(workout?.avg_pace); // sec/km
-  const baselineEasySecPerKm = parseEasyPaceMmSsPerMiToSecPerKm(perfNumbers?.easyPace);
+  const lf = typeof learnedFitness === 'string' ? parseJson<any>(learnedFitness) : learnedFitness;
+  const learnedEasyPaceMetric: LearnedMetric | null = lf?.run_easy_pace_sec_per_km ?? null;
+  const learnedEasyPaceConf = confidenceToNumber(learnedEasyPaceMetric?.confidence);
+  const baselineEasySecPerKm =
+    learnedEasyPaceMetric?.value && learnedEasyPaceConf >= 0.35
+      ? Number(learnedEasyPaceMetric.value)
+      : parseEasyPaceMmSsPerMiToSecPerKm(perfNumbers?.easyPace);
   if (!Number.isFinite(avgPace) || !(avgPace > 0)) {
     // If HR matches our easy range, we can still accept and store pace as missing (but aerobic efficiency can't be computed).
     // For comparability gating, treat missing pace as non-comparable to keep the metric clean.
@@ -243,6 +249,8 @@ function isComparableZ2Run(
         hrLooksEasy,
         hrHardCap,
         notClearlyHard,
+        learned_easy_pace_sec_per_km: learnedEasyPaceMetric?.value ?? null,
+        learned_easy_pace_conf: learnedEasyPaceMetric?.confidence ?? null,
       },
     };
   }
@@ -265,6 +273,8 @@ function isComparableZ2Run(
       hrLooksEasy,
       hrHardCap,
       notClearlyHard,
+      learned_easy_pace_sec_per_km: learnedEasyPaceMetric?.value ?? null,
+      learned_easy_pace_conf: learnedEasyPaceMetric?.confidence ?? null,
     },
   };
 }
@@ -344,26 +354,45 @@ Deno.serve(async (req) => {
     if (sport === 'run' || sport === 'running' || sport === 'walk' || sport === 'hike') {
       const avgPace = Number((w as any)?.avg_pace); // stored as sec/km in ingest
       const avgHr = Number((w as any)?.avg_heart_rate);
-      const gate = isComparableZ2Run(w, learnedFitness, userAge, perfNumbers);
+      const minutes = minutesFromWorkout((w as any)?.duration, (w as any)?.moving_time);
 
-      if (gate.ok && Number.isFinite(avgPace) && avgPace > 120 && avgPace < 900 && Number.isFinite(avgHr) && avgHr > 80 && avgHr < 220) {
-        const aerobicEfficiency = avgPace / avgHr;
-
-        adaptation.workout_type = 'easy_z2';
-        adaptation.aerobic_efficiency = Number(aerobicEfficiency.toFixed(6));
-        adaptation.avg_pace_at_z2 = Math.round(avgPace);
-        adaptation.avg_hr_in_z2 = Math.round(avgHr);
-        adaptation.z2_hr_range = gate.z2;
-        adaptation.debug = gate.debug;
-        adaptation.confidence = clamp(gate.confidence, 0, 1);
-        adaptation.data_quality = adaptation.confidence >= 0.75 ? 'excellent' : adaptation.confidence >= 0.5 ? 'good' : 'fair';
+      // Long run lane (do not throw away as "too_long")
+      if (minutes != null && minutes > 90) {
+        adaptation.workout_type = 'long_run';
+        adaptation.duration_min = minutes;
+        adaptation.avg_hr = Number.isFinite(avgHr) ? Math.round(avgHr) : null;
+        adaptation.avg_pace = Number.isFinite(avgPace) ? Math.round(avgPace) : null;
+        if (Number.isFinite(avgPace) && avgPace > 0 && Number.isFinite(avgHr) && avgHr > 0) {
+          adaptation.long_run_efficiency = Number((avgPace / avgHr).toFixed(6));
+          adaptation.data_quality = 'good';
+          adaptation.confidence = 0.6;
+        } else {
+          adaptation.excluded_reason = !Number.isFinite(avgPace) ? 'missing_pace' : !Number.isFinite(avgHr) ? 'missing_hr' : 'insufficient_data';
+          adaptation.data_quality = 'fair';
+          adaptation.confidence = 0.2;
+        }
       } else {
-        adaptation.workout_type = 'non_comparable';
-        adaptation.excluded_reason = gate?.reason || 'non_comparable';
-        adaptation.z2_hr_range = gate?.z2 || null;
-        adaptation.debug = gate?.debug || null;
-        adaptation.data_quality = 'fair';
-        adaptation.confidence = 0;
+        const gate = isComparableZ2Run(w, learnedFitness, userAge, perfNumbers);
+
+        if (gate.ok && Number.isFinite(avgPace) && avgPace > 120 && avgPace < 900 && Number.isFinite(avgHr) && avgHr > 80 && avgHr < 220) {
+          const aerobicEfficiency = avgPace / avgHr;
+
+          adaptation.workout_type = 'easy_z2';
+          adaptation.aerobic_efficiency = Number(aerobicEfficiency.toFixed(6));
+          adaptation.avg_pace_at_z2 = Math.round(avgPace);
+          adaptation.avg_hr_in_z2 = Math.round(avgHr);
+          adaptation.z2_hr_range = gate.z2;
+          adaptation.debug = gate.debug;
+          adaptation.confidence = clamp(gate.confidence, 0, 1);
+          adaptation.data_quality = adaptation.confidence >= 0.75 ? 'excellent' : adaptation.confidence >= 0.5 ? 'good' : 'fair';
+        } else {
+          adaptation.workout_type = 'non_comparable';
+          adaptation.excluded_reason = gate?.reason || 'non_comparable';
+          adaptation.z2_hr_range = gate?.z2 || null;
+          adaptation.debug = gate?.debug || null;
+          adaptation.data_quality = 'fair';
+          adaptation.confidence = 0;
+        }
       }
     }
 
