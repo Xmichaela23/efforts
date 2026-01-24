@@ -11,6 +11,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 import CoreTimer from '@/components/CoreTimer';
+import { NumericKeypadSheet } from '@/components/ui/numeric-keypad-sheet';
 
 interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
@@ -373,6 +374,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
   const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
   const [editingTimerValue, setEditingTimerValue] = useState<string>("");
+  // Numeric keypad (bottom sheet) for fast, error-resistant input
+  type KeypadField = 'reps' | 'weight' | 'rir';
+  const keypadCtxRef = useRef<{ exerciseId: string; setIndex: number; field: KeypadField; alsoComplete?: boolean } | null>(null);
+  const [keypadOpen, setKeypadOpen] = useState(false);
+  const [keypadTitle, setKeypadTitle] = useState<string>('');
+  const [keypadValue, setKeypadValue] = useState<string>('');
+  const [keypadAllowDecimal, setKeypadAllowDecimal] = useState<boolean>(false);
+  const [keypadConfirmLabel, setKeypadConfirmLabel] = useState<string>('Save');
+  const [keypadSecondaryLabel, setKeypadSecondaryLabel] = useState<string | undefined>(undefined);
+  const [keypadHint, setKeypadHint] = useState<string | undefined>(undefined);
+  const keypadSecondaryHandlerRef = useRef<(() => void) | undefined>(undefined);
   // Menus
   const [showPlannedMenu, setShowPlannedMenu] = useState(false);
   const [showAddonsMenu, setShowAddonsMenu] = useState(false);
@@ -395,6 +407,86 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [currentRIRExercise, setCurrentRIRExercise] = useState<string>('');
   const [currentRIRSet, setCurrentRIRSet] = useState<number>(-1);
   const [selectedRIR, setSelectedRIR] = useState<number | null>(null);
+
+  const startAutoRestForNextSet = (exerciseId: string, completedSetIndex: number) => {
+    try {
+      const ex = exercises.find((e) => e.id === exerciseId);
+      if (!ex) return;
+      const completedSet = ex.sets[completedSetIndex];
+      const nextSet = ex.sets[completedSetIndex + 1];
+      if (!completedSet || !nextSet) return;
+      // Don't auto-rest for duration-based sets (usually managed by their own timer)
+      if (completedSet.duration_seconds !== undefined) return;
+
+      const reps = typeof completedSet.reps === 'number' ? completedSet.reps : 0;
+      const restSeconds = calculateRestTime(ex.name, reps);
+      const key = `${exerciseId}-${completedSetIndex + 1}`;
+
+      setTimers((prev) => {
+        const cur = prev[key];
+        if (cur?.running) return prev;
+        return {
+          ...prev,
+          [key]: { seconds: cur?.seconds ?? restSeconds, running: true },
+        };
+      });
+    } catch {}
+  };
+
+  const openKeypadForSet = (opts: {
+    exerciseId: string;
+    setIndex: number;
+    field: KeypadField;
+    title: string;
+    initialValue: string;
+    allowDecimal?: boolean;
+    confirmLabel?: string;
+    secondaryLabel?: string;
+    onSecondary?: () => void;
+    alsoComplete?: boolean;
+    hint?: string;
+  }) => {
+    keypadCtxRef.current = {
+      exerciseId: opts.exerciseId,
+      setIndex: opts.setIndex,
+      field: opts.field,
+      alsoComplete: opts.alsoComplete,
+    };
+    setKeypadTitle(opts.title);
+    setKeypadValue(opts.initialValue);
+    setKeypadAllowDecimal(Boolean(opts.allowDecimal));
+    setKeypadConfirmLabel(opts.confirmLabel || 'Save');
+    setKeypadSecondaryLabel(opts.secondaryLabel);
+    setKeypadHint(opts.hint);
+    keypadSecondaryHandlerRef.current = opts.onSecondary;
+    setKeypadOpen(true);
+  };
+
+  const commitKeypad = (rawOverride?: string) => {
+    const ctx = keypadCtxRef.current;
+    if (!ctx) {
+      setKeypadOpen(false);
+      return;
+    }
+
+    const raw = String(rawOverride ?? keypadValue ?? '').trim();
+    const n = ctx.field === 'weight' ? parseFloat(raw) : parseInt(raw, 10);
+    const isValidNumber = raw.length > 0 && Number.isFinite(n);
+
+    if (ctx.field === 'reps') {
+      updateSet(ctx.exerciseId, ctx.setIndex, { reps: isValidNumber ? Math.max(0, Math.round(n)) : 0 });
+    } else if (ctx.field === 'weight') {
+      updateSet(ctx.exerciseId, ctx.setIndex, { weight: isValidNumber ? Math.max(0, n) : 0 });
+    } else if (ctx.field === 'rir') {
+      const rirVal = isValidNumber ? Math.max(0, Math.min(10, Math.round(n))) : undefined;
+      updateSet(ctx.exerciseId, ctx.setIndex, { rir: rirVal, ...(ctx.alsoComplete ? { completed: true } : null) });
+      if (ctx.alsoComplete) {
+        startAutoRestForNextSet(ctx.exerciseId, ctx.setIndex);
+      }
+    }
+
+    setKeypadOpen(false);
+  };
   
   // Session RPE prompt state
   const [showSessionRPE, setShowSessionRPE] = useState(false);
@@ -2227,20 +2319,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // If mobility mode, just mark as complete without RIR prompt
     if (isMobilityMode) {
       updateSet(exerciseId, setIndex, { completed: true });
+      startAutoRestForNextSet(exerciseId, setIndex);
       return;
     }
     
     // If RIR was already entered inline, just mark complete (don't prompt again)
     if (set.rir !== undefined && set.rir !== null) {
       updateSet(exerciseId, setIndex, { completed: true });
+      startAutoRestForNextSet(exerciseId, setIndex);
       return;
     }
     
-    // If set is not completed and no RIR entered, show RIR prompt
-    setCurrentRIRExercise(exerciseId);
-    setCurrentRIRSet(setIndex);
-    setSelectedRIR(null);
-    setShowRIRPrompt(true);
+    // If set is not completed and no RIR entered, prompt via numeric keypad (no separate screen)
+    openKeypadForSet({
+      exerciseId,
+      setIndex,
+      field: 'rir',
+      title: 'RIR (reps in reserve)',
+      initialValue: '',
+      allowDecimal: false,
+      confirmLabel: 'Done',
+      secondaryLabel: 'Skip RIR',
+      onSecondary: () => {
+        updateSet(exerciseId, setIndex, { completed: true });
+        startAutoRestForNextSet(exerciseId, setIndex);
+      },
+      alsoComplete: true,
+    });
   };
 
   const handleRIRSubmit = (rir: number | null) => {
@@ -3093,16 +3198,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // Hide reps input if no reps are prescribed (for "until" patterns)
                         set.reps === undefined ? null : (
                           <div className="flex flex-col items-center gap-0.5">
-                            <Input
-                              type="number"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              value={set.reps === 0 ? '' : set.reps.toString()}
-                              onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openKeypadForSet({
+                                  exerciseId: exercise.id,
+                                  setIndex,
+                                  field: 'reps',
+                                  title: 'Reps',
+                                  initialValue: set.reps === 0 ? '' : String(set.reps ?? ''),
+                                  allowDecimal: false,
+                                })
+                              }
+                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                              placeholder=""
-                            />
+                            >
+                              {set.reps === 0 ? '' : (set.reps ?? '—')}
+                            </button>
                             <span className="text-[9px] text-white/50 font-medium">Reps</span>
                           </div>
                         )
@@ -3145,16 +3257,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (exerciseType === 'dumbbell') {
                           return (
                             <div className="flex flex-col items-center gap-0.5">
-                              <Input
-                                type="number"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                value={set.weight === 0 ? '' : set.weight.toString()}
-                                onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                                className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16"
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openKeypadForSet({
+                                    exerciseId: exercise.id,
+                                    setIndex,
+                                    field: 'weight',
+                                    title: 'Weight',
+                                    initialValue: set.weight === 0 ? '' : String(set.weight ?? ''),
+                                    allowDecimal: true,
+                                  })
+                                }
+                                className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16 tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                                placeholder=""
-                              />
+                              >
+                                {set.weight === 0 ? '' : (set.weight ?? '—')}
+                              </button>
                               <span className="text-[9px] text-white/50 font-medium">lb/hand</span>
                             </div>
                           );
@@ -3164,16 +3283,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (exerciseType === 'goblet') {
                           return (
                             <div className="flex flex-col items-center gap-0.5">
-                              <Input
-                                type="number"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                value={set.weight === 0 ? '' : set.weight.toString()}
-                                onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                                className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16"
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openKeypadForSet({
+                                    exerciseId: exercise.id,
+                                    setIndex,
+                                    field: 'weight',
+                                    title: 'Weight',
+                                    initialValue: set.weight === 0 ? '' : String(set.weight ?? ''),
+                                    allowDecimal: true,
+                                  })
+                                }
+                                className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16 tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                                placeholder=""
-                              />
+                              >
+                                {set.weight === 0 ? '' : (set.weight ?? '—')}
+                              </button>
                               <span className="text-[9px] text-white/50 font-medium">Weight</span>
                             </div>
                           );
@@ -3182,16 +3308,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // Barbell exercises: Standard weight input
                         return (
                           <div className="flex flex-col items-center gap-0.5">
-                            <Input
-                              type="number"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              value={set.weight === 0 ? '' : set.weight.toString()}
-                              onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openKeypadForSet({
+                                  exerciseId: exercise.id,
+                                  setIndex,
+                                  field: 'weight',
+                                  title: 'Weight',
+                                  initialValue: set.weight === 0 ? '' : String(set.weight ?? ''),
+                                  allowDecimal: true,
+                                })
+                              }
+                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                              placeholder=""
-                            />
+                            >
+                              {set.weight === 0 ? '' : (set.weight ?? '—')}
+                            </button>
                             <span className="text-[9px] text-white/50 font-medium">Weight</span>
                           </div>
                         );
@@ -3206,18 +3339,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const targetRir = exercise.target_rir;
                         return (
                           <div className="flex flex-col items-center gap-0.5">
-                            <Input
-                              type="number"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              value={set.rir || ''}
-                              onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-amber-400/60 w-16 focus-visible:ring-0 focus-visible:border-white/35 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                              min="0"
-                              max="5"
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openKeypadForSet({
+                                  exerciseId: exercise.id,
+                                  setIndex,
+                                  field: 'rir',
+                                  title: 'RIR (reps in reserve)',
+                                  initialValue: set.rir == null ? '' : String(set.rir),
+                                  allowDecimal: false,
+                                  hint: targetRir ? `Target: ${targetRir}` : undefined,
+                                })
+                              }
+                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-amber-400/60 w-16 focus-visible:ring-0 focus-visible:border-white/35 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                              placeholder={targetRir ? `→${targetRir}` : ''}
-                            />
+                            >
+                              {set.rir == null ? (targetRir ? `→${targetRir}` : '') : set.rir}
+                            </button>
                             <span className={`text-[9px] font-medium ${targetRir ? 'text-amber-400/70' : 'text-white/50'}`}>
                               {targetRir ? `Target: ${targetRir}` : 'RIR'}
                             </span>
@@ -3662,6 +3801,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Numeric keypad sheet (reps / weight / RIR) */}
+      <NumericKeypadSheet
+        open={keypadOpen}
+        title={keypadTitle}
+        value={keypadValue}
+        onChange={setKeypadValue}
+        allowDecimal={keypadAllowDecimal}
+        hint={keypadHint}
+        confirmLabel={keypadConfirmLabel}
+        secondaryLabel={keypadSecondaryLabel}
+        onSecondary={() => {
+          try {
+            keypadSecondaryHandlerRef.current?.();
+          } catch {}
+          setKeypadOpen(false);
+        }}
+        onConfirm={(raw) => commitKeypad(raw)}
+        onOpenChange={(open) => {
+          setKeypadOpen(open);
+          if (!open) {
+            keypadSecondaryHandlerRef.current = undefined;
+            keypadCtxRef.current = null;
+            setKeypadHint(undefined);
+          }
+        }}
+      />
 
       {/* Session RPE Prompt */}
       {showSessionRPE && (
