@@ -1002,13 +1002,28 @@ Deno.serve(async (req) => {
   }
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { 'Access-Control-Allow-Origin': '*' } });
 
-  try {
-    const { workout_id } = await req.json();
-    if (!workout_id) {
-      return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
-    }
+  // Create client outside try/catch so error handling can still update status.
+  const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
-    const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+  let workout_id: string | null = null;
+  try {
+    const body = await req.json();
+    workout_id = body?.workout_id ?? null;
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: 'Invalid JSON body', details: String(e?.message || e) }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
+  }
+
+  if (!workout_id) {
+    return new Response(JSON.stringify({ error: 'workout_id required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
+  }
+
+  try {
 
     // FIX: Check advisory lock to prevent duplicate execution
     const { data: gotLock } = await supabase.rpc('try_advisory_lock', {
@@ -1829,10 +1844,12 @@ Deno.serve(async (req) => {
   } catch (e: any) {
     // FIX: Update analysis_status to failed on error
     try {
-      await supabase.from('workouts').update({
-        analysis_status: 'failed',
-        analysis_error: String(e)
-      }).eq('id', workout_id);
+      if (workout_id) {
+        await supabase.from('workouts').update({
+          analysis_status: 'failed',
+          analysis_error: String(e)
+        }).eq('id', workout_id);
+      }
     } catch (statusErr) {
       console.error('[compute-workout-analysis] Failed to update status:', statusErr);
     }

@@ -46,8 +46,8 @@
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
     --tabbar-extra: 18px; /* iOS swipe-up gesture safe zone */
-    /* Keep Today compact enough that calendar fits on iOS */
-    --todays-h: clamp(8.5rem, 16vh, 11.5rem);
+    /* Keep Today compact enough that calendar + workload fits (swim/bike lines) */
+    --todays-h: clamp(7.5rem, 14vh, 10.5rem);
     --cal-cell-h: 100px; /* compact height for ghosted timeline - emphasis on Today */
     /* Analytics tokens (mobile, minimal) */
     --series-pace: #3b82f6;
@@ -828,14 +828,15 @@
   /* Responsive height tuning so everything fits without manual tweaks */
   @media (max-height: 740px) {
     :root {
-      --todays-h: 10rem;
+      /* Smaller screens need MORE calendar room for workload lines */
+      --todays-h: 9rem;
       --cal-cell-h: 70px; /* compact */
     }
   }
 
   @media (max-height: 670px) {
     :root {
-      --todays-h: 8rem;
+      --todays-h: 7.5rem;
       --cal-cell-h: 65px; /* compact */
     }
   }

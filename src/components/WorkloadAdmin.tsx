@@ -235,19 +235,58 @@ export default function WorkloadAdmin() {
     
     setProcessWorkoutsLoading(true);
     try {
-      // Last 10 workout IDs that need processing
-      const workoutIds = [
-        '3698ec60-84fa-4d32-8bb4-81f67a1e56bf', // ride, 2026-01-05
-        'b85e797b-135c-488a-8e15-71edc0236ad9', // run, 2026-01-04
-        '0c2b43df-7806-44d9-b5a3-af652342b348', // ride, 2026-01-03
-        '32179ccd-9008-4d4a-81d5-df5912688996', // ride, 2026-01-02
-        '361d3165-d52a-4271-b4b1-f091ca0cef61', // run, 2026-01-01
-        '830508fc-e780-453b-9de2-de515cda3c7d', // run, 2025-12-31
-        'f75edc59-4492-40cb-88ec-3f42ec30ec7c', // run, 2025-12-29
-        '2f51666b-315e-42b0-b0b6-916f45178a72', // run, 2025-12-22
-        '697a5c25-9363-4c55-b463-c94c658a9b0a', // ride, 2025-12-14
-        'c6132234-c169-49d2-add2-803adc8b3875', // ride, 2025-12-13
-      ];
+      const processableTypes = ['run', 'running', 'ride', 'cycling', 'bike', 'swim'];
+
+      // Grab a recent window and filter client-side for "needs series"
+      const { data: recentWorkouts, error: recentErr } = await supabase
+        .from('workouts')
+        .select('id, date, type, workout_status, computed, sensor_data, gps_track')
+        .eq('user_id', user.id)
+        .eq('workout_status', 'completed')
+        .in('type', processableTypes)
+        .order('date', { ascending: false })
+        .limit(150);
+
+      if (recentErr) throw recentErr;
+
+      const safeParseJson = (v: any) => {
+        if (v == null) return null;
+        if (typeof v === 'string') {
+          try {
+            return JSON.parse(v);
+          } catch {
+            return null;
+          }
+        }
+        return v;
+      };
+
+      const needsSeries = (w: any): boolean => {
+        const sensor = safeParseJson(w.sensor_data);
+        const gps = safeParseJson(w.gps_track);
+        // must have some source data to build series
+        if (!sensor && !gps) return false;
+
+        const computed = safeParseJson(w.computed) || {};
+        const series = computed?.analysis?.series;
+        if (!series) return true;
+
+        const dist = series?.distance_m;
+        if (!Array.isArray(dist)) return true;
+        return dist.length < 2;
+      };
+
+      const candidates = (recentWorkouts || []).filter(needsSeries).slice(0, 10);
+      const workoutIds = candidates.map((w: any) => w.id);
+      if (workoutIds.length === 0) {
+        setResults({
+          processed: 0,
+          success: 0,
+          errors: 0,
+          message: 'No recent workouts found that are missing computed.analysis.series.'
+        });
+        return;
+      }
 
       const results: Array<{ id: string; status: string; error?: string }> = [];
 
@@ -258,7 +297,17 @@ export default function WorkloadAdmin() {
           });
 
           if (error) {
-            results.push({ id: workoutId, status: 'error', error: error.message });
+            let errorMessage = error.message || 'Unknown error';
+            try {
+              const ctx = (error as any)?.context;
+              if (ctx?.body?.text) {
+                const bodyText = await ctx.body.text();
+                if (bodyText) errorMessage = bodyText;
+              }
+            } catch {
+              // ignore parsing errors
+            }
+            results.push({ id: workoutId, status: 'error', error: errorMessage });
           } else {
             results.push({ id: workoutId, status: 'success' });
           }
@@ -274,6 +323,7 @@ export default function WorkloadAdmin() {
       const errorCount = results.filter(r => r.status === 'error').length;
 
       setResults({
+        selected: candidates.map((w: any) => ({ id: w.id, date: w.date, type: w.type })),
         processed: results.length,
         success: successCount,
         errors: errorCount,

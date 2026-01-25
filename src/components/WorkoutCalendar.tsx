@@ -1533,7 +1533,13 @@ export default function WorkoutCalendar({
                 
                 {/* All Metrics */}
                 {compactMetrics.length > 0 && (
-                  <div className="space-y-0.5 pt-1">
+                  <div
+                    className={[
+                      // When we have more lines (e.g., Run + Swim + Bike + Strength + Total),
+                      // use 2 columns so it fits comfortably in the module.
+                      compactMetrics.length >= 4 ? 'grid grid-cols-2 gap-x-3 gap-y-0.5 pt-1' : 'space-y-0.5 pt-1',
+                    ].join(' ')}
+                  >
                     {compactMetrics.map((metric, index) => {
                       const labelLower = String(metric.label || '').toLowerCase();
                       let disciplineType = '';
@@ -1546,7 +1552,7 @@ export default function WorkoutCalendar({
                       const labelColor = disciplineType ? getDisciplinePhosphorCore(disciplineType) : 'rgba(255, 255, 255, 0.9)';
                       
                       return (
-                        <div key={index} className="flex items-center justify-between gap-1">
+                        <div key={index} className="flex items-center justify-between gap-1 min-w-0">
                           <span className="text-xs font-light leading-tight" style={{ color: labelColor, fontSize: '0.72rem' }}>
                             {metric.label}
                           </span>
