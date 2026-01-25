@@ -841,9 +841,10 @@
     }
   }
 
-  @media (min-height: 900px) {
+  /* Very tall viewports only (avoid PWA vs iOS WebView divergence on iPhone) */
+  @media (min-height: 1000px) {
     :root {
-      --todays-h: 16rem;
+      --todays-h: 12rem;
       --cal-cell-h: 110px; /* compact */
     }
   }
