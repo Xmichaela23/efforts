@@ -1584,13 +1584,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           ) : (
             <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (
-              <div className="space-y-1">
+              <div className="h-full flex flex-col">
                 {/* A) One continuous instrument panel wrapper (outer rim + inner bevel) */}
                 <div
                   style={{
                     borderRadius: 14,
                     padding: 10,
                     position: 'relative',
+                    // Fill the available Home viewport so the calendar can extend downward
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
                     background:
                       /* Option 1 lighting: top-left key light + neutral depth */
                       'radial-gradient(ellipse at 18% 8%, rgba(255,255,255,0.09) 0%, rgba(0,0,0,0.0) 58%),' +
@@ -1643,6 +1647,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         'inset 0 10px 18px rgba(0,0,0,0.35)',
                       position: 'relative',
                       zIndex: 1,
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      minHeight: 0,
                     }}
                   >
                     {/* Today's efforts - fixed height, scrolls internally */}
@@ -1677,16 +1685,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       }}
                     />
 
-                    {/* Schedule - locked in place, always visible */}
+                    {/* Schedule - extend down to use available space */}
                     <div
                       style={{
-                        flexShrink: 0,
+                        flex: 1,
+                        minHeight: 0,
                         // Let the calendar read as its own module card (clear chassis edge)
                         marginLeft: 0,
                         marginRight: 0,
                       }}
                     >
-                      <div className="instrument-card glass-card" style={{ padding: 8 }}>
+                      <div className="instrument-card glass-card" style={{ padding: 8, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                         <WorkoutCalendar
                           onAddEffort={() => handleAddEffort('run')}
                           onSelectType={handleSelectEffortType}
