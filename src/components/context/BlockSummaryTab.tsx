@@ -380,6 +380,8 @@ const DataQualityNotes: React.FC<{ quality: any }> = ({ quality }) => {
 // =============================================================================
 
 const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }> = ({ adaptation }) => {
+  const [showDetails, setShowDetails] = useState(false);
+
   const formatPaceSecPerKmToMinPerMi = (secPerKm: number): string => {
     if (!Number.isFinite(secPerKm) || secPerKm <= 0) return '—';
     const secPerMi = secPerKm * 1.60934;
@@ -399,10 +401,25 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
   const strength = adaptation?.strength_progression;
   const recos = Array.isArray(adaptation?.baseline_recommendations) ? adaptation.baseline_recommendations : [];
   const exclusions = aero?.excluded_reasons && typeof aero.excluded_reasons === 'object' ? aero.excluded_reasons : null;
+  const overview = adaptation?.overview;
 
   const hasAero = Array.isArray(aero?.weekly_trend) && aero.weekly_trend.some((w: any) => Number(w?.sample_count || 0) > 0);
   const hasStrength = strength?.by_exercise && typeof strength.by_exercise === 'object' && Object.keys(strength.by_exercise).length > 0;
   const hasRecos = recos.length > 0;
+
+  const focusLabel = (() => {
+    const f = String(overview?.focus || '');
+    if (f === 'base') return 'Base';
+    if (f === 'marathon_prep') return 'Marathon prep';
+    if (f === 'hybrid') return 'Hybrid';
+    if (f === 'recovery') return 'Recovery';
+    return 'Block';
+  })();
+
+  const qualityLabel = overview?.signal_quality ? String(overview.signal_quality).toUpperCase() : null;
+  const score = Number(overview?.adaptation_score);
+  const hasScore = Number.isFinite(score);
+  const drivers = Array.isArray(overview?.drivers) ? overview.drivers : [];
 
   return (
     <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
@@ -418,6 +435,41 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Synthesized "whole picture" */}
+          <div className="p-3 rounded-lg bg-white/[0.04] border border-white/10">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col">
+                <div className="text-xs uppercase tracking-wide text-white/50">Adaptation score</div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <div className="text-2xl font-semibold text-white/90">
+                    {hasScore ? score : '—'}
+                  </div>
+                  <div className="text-xs text-white/50">
+                    {focusLabel}
+                    {qualityLabel ? ` • ${qualityLabel}` : ''}
+                  </div>
+                </div>
+                <div className="mt-1 text-xs text-white/55">
+                  {drivers.length ? (
+                    <>Driven by: <span className="text-white/75">{drivers.join(' • ')}</span></>
+                  ) : (
+                    <>Add more workouts to increase signal quality.</>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowDetails((v) => !v)}
+                className="text-xs text-white/60 hover:text-white/85 px-2 py-1 rounded-md hover:bg-white/10 transition-colors"
+                type="button"
+              >
+                {showDetails ? 'Hide details' : 'Show details'}
+              </button>
+            </div>
+          </div>
+
+          {!showDetails ? null : (
+            <div className="space-y-4">
           {/* Aerobic efficiency */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -486,6 +538,7 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
               <div className="text-xs uppercase tracking-wide text-white/50">Long run endurance</div>
               <div className="text-xs text-white/50">
                 {adaptation?.long_run_endurance?.sample_count ? `${adaptation.long_run_endurance.sample_count} samples` : '—'}
+                {adaptation?.long_run_endurance?.confidence ? ` • ${String(adaptation.long_run_endurance.confidence).toUpperCase()}` : ''}
               </div>
             </div>
 
@@ -598,6 +651,8 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
               </div>
             )}
           </div>
+            </div>
+          )}
         </div>
       )}
     </div>

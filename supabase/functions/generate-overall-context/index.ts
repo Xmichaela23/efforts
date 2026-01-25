@@ -24,7 +24,7 @@ import {
   assessDataQuality,
   calculateWorkoutQuality
 } from '../_shared/block-analysis/index.ts';
-import { getBlockAdaptation } from '../_shared/block-adaptation/index.ts';
+import { getBlockAdaptation, type BlockFocus } from '../_shared/block-adaptation/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -154,6 +154,7 @@ Deno.serve(async (req) => {
 
     // Extract goal context
     const goal = extractGoalContext(activePlan);
+    const blockFocus = deriveBlockFocus(goal);
 
     // ==========================================================================
     // CALCULATE EVERYTHING IN TYPESCRIPT (No AI)
@@ -201,7 +202,8 @@ Deno.serve(async (req) => {
         user_id,
         startDateISO,
         endDateISO,
-        supabase
+        supabase,
+        { focus: blockFocus }
       );
     } catch (e) {
       console.error('[generate-overall-context] getBlockAdaptation failed:', e);
@@ -331,6 +333,20 @@ function extractGoalContext(plan: any): Goal | undefined {
     current_phase: currentPhase,
     weeks_remaining: weeksRemaining
   };
+}
+
+function deriveBlockFocus(goal?: Goal): BlockFocus {
+  if (!goal) return 'unknown';
+  const type = String(goal.type || '').toLowerCase();
+  const phase = String(goal.current_phase || '').toLowerCase();
+
+  if (phase === 'taper') return 'recovery';
+  if (type === 'marathon' || type === 'running') {
+    return phase === 'base' ? 'base' : 'marathon_prep';
+  }
+  if (type === 'triathlon') return 'hybrid';
+  if (type === 'cycling') return 'hybrid';
+  return 'hybrid';
 }
 
 // =============================================================================

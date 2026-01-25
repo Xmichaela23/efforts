@@ -11,8 +11,15 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 type ConfidenceLabel = 'high' | 'medium' | 'low';
+export type BlockFocus = 'base' | 'marathon_prep' | 'hybrid' | 'recovery' | 'unknown';
 
 export type BlockAdaptation = {
+  overview: {
+    focus: BlockFocus;
+    adaptation_score: number; // 0..100 (higher is better)
+    signal_quality: ConfidenceLabel;
+    drivers: string[];
+  };
   aerobic_efficiency: {
     weekly_trend: Array<{
       week: number;
@@ -32,8 +39,11 @@ export type BlockAdaptation = {
       avg_pace: number;
       avg_hr: number;
       avg_duration_min: number;
+      avg_efficiency: number;
       sample_count: number;
     }>;
+    improvement_pct: number | null;
+    confidence: ConfidenceLabel;
     sample_count: number;
     excluded_reasons?: Record<string, number>;
   };
@@ -71,6 +81,136 @@ function parseJson<T = any>(val: any): T | null {
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
+}
+
+function pctToSignal(pctChange: number | null | undefined, capPct = 6): number {
+  if (pctChange == null || !Number.isFinite(pctChange)) return 0;
+  return clamp(pctChange / capPct, -1, 1);
+}
+
+function deriveFocusFromCounts(counts: { aero: number; strength: number; long: number }): BlockFocus {
+  // If strength has meaningful samples, call it hybrid unless marathon signals dominate.
+  const hasStrength = counts.strength >= 6; // ~1-2 lifts/week for 4 weeks
+  const hasLong = counts.long >= 2;
+  if (hasStrength && hasLong) return 'hybrid';
+  if (hasStrength) return 'hybrid';
+  return 'unknown';
+}
+
+function focusWeights(focus: BlockFocus): { aerobic: number; strength: number; longRun: number } {
+  switch (focus) {
+    case 'base':
+      return { aerobic: 0.85, strength: 0.15, longRun: 0.0 };
+    case 'marathon_prep':
+      // Marathon prep: durability matters most; strength should not penalize (only reward).
+      return { aerobic: 0.4, strength: 0.1, longRun: 0.5 };
+    case 'hybrid':
+      // Hybrid/concurrent: prioritize aerobic efficiency while keeping strength as a gatekeeper.
+      return { aerobic: 0.65, strength: 0.3, longRun: 0.05 };
+    case 'recovery':
+      return { aerobic: 0.6, strength: 0.4, longRun: 0.0 };
+    default:
+      return { aerobic: 0.65, strength: 0.25, longRun: 0.1 };
+  }
+}
+
+function computeStrengthSampleCount(byExercise: BlockAdaptation['strength_progression']['by_exercise']): number {
+  try {
+    let total = 0;
+    for (const series of Object.values(byExercise || {})) {
+      if (!Array.isArray(series)) continue;
+      total += series.reduce((s: number, w: any) => s + Number(w?.sample_count || 0), 0);
+    }
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
+function computeSignalQualityFromSamples(totalSamples: number): ConfidenceLabel {
+  if (totalSamples >= 16) return 'high';
+  if (totalSamples >= 8) return 'medium';
+  return 'low';
+}
+
+function computeOverview(
+  adaptation: Omit<BlockAdaptation, 'overview'>,
+  focusOverride?: BlockFocus
+): BlockAdaptation['overview'] {
+  const aeroPct = adaptation.aerobic_efficiency?.improvement_pct ?? null;
+  const strengthPct = adaptation.strength_progression?.overall_gain_pct ?? null;
+  const longPct = adaptation.long_run_endurance?.improvement_pct ?? null;
+
+  const aeroSamples = Number(adaptation.aerobic_efficiency?.sample_count || 0);
+  const strengthSamples = computeStrengthSampleCount(adaptation.strength_progression?.by_exercise || {});
+  const longSamples = Number(adaptation.long_run_endurance?.sample_count || 0);
+
+  const totalSamples = aeroSamples + strengthSamples + longSamples;
+  const signal_quality = computeSignalQualityFromSamples(totalSamples);
+
+  const focus =
+    focusOverride ||
+    deriveFocusFromCounts({ aero: aeroSamples, strength: strengthSamples, long: longSamples });
+
+  const w = focusWeights(focus);
+
+  // Aerobic + strength are real % signals.
+  const aeroSignal = pctToSignal(aeroPct);
+  let strengthSignal = pctToSignal(strengthPct);
+
+  // Long-run: if we can compute a change, use it; otherwise use coverage as a weak proxy.
+  const longSignal =
+    longPct != null
+      ? pctToSignal(longPct)
+      : clamp(longSamples / 4, 0, 1) * 2 - 1; // [-1,+1], centered at ~1/wk
+
+  // ---------------------------------------------------------------------------
+  // Guardrails by focus
+  // ---------------------------------------------------------------------------
+
+  // Marathon prep: allow strength drops (no penalty). Only reward positive strength trends.
+  if (focus === 'marathon_prep') {
+    strengthSignal = Math.max(0, strengthSignal);
+  }
+
+  // Base: keep it simple (mostly aerobic).
+
+  // Hybrid: "don’t rob Peter to pay Paul"
+  // - If strength drops more than ~2%, heavily dampen the overall score (coefficient).
+  // - If strength is stable/positive AND aerobic improves, apply a small "holy grail" bonus.
+  const strengthDropPct = strengthPct != null && Number.isFinite(strengthPct) ? strengthPct : null;
+  const isStrengthBadInHybrid = focus === 'hybrid' && strengthDropPct != null && strengthDropPct < -2;
+  const isHolyGrailHybrid = focus === 'hybrid' && (strengthDropPct == null || strengthDropPct >= -2) && aeroPct != null && aeroPct > 0;
+
+  // First compute a raw lane blend.
+  let raw = w.aerobic * aeroSignal + w.strength * strengthSignal + w.longRun * longSignal;
+
+  // Hybrid coefficient: strength loss dampens, but doesn't invert the signal.
+  // Example behaviors:
+  // - -3% => ~0.75 coefficient
+  // - -6% => ~0.50 coefficient
+  // - -10% => ~0.20 coefficient (floor)
+  let coeff = 1;
+  if (isStrengthBadInHybrid && strengthDropPct != null) {
+    coeff = clamp(1 + strengthDropPct / 12, 0.2, 1); // strengthDropPct is negative
+  }
+
+  // Hybrid bonus: reward concurrent improvement (small multiplier, capped).
+  if (isHolyGrailHybrid) {
+    raw = clamp(raw * 1.12, -1, 1);
+  }
+
+  const adaptation_score = Math.round(50 + 50 * clamp(raw * coeff, -1, 1));
+
+  const drivers: string[] = [];
+  if (aeroPct != null) drivers.push(`Aerobic ${aeroPct > 0 ? '+' : ''}${aeroPct.toFixed(2)}%`);
+  if (strengthPct != null) drivers.push(`Strength ${strengthPct > 0 ? '+' : ''}${strengthPct.toFixed(2)}%`);
+  if (longPct != null) drivers.push(`Long run ${longPct > 0 ? '+' : ''}${longPct.toFixed(2)}%`);
+  else if (longSamples > 0) drivers.push(`Long runs ${longSamples} sample${longSamples === 1 ? '' : 's'}`);
+
+  if (!drivers.length) drivers.push('Need more data');
+
+  return { focus, adaptation_score, signal_quality, drivers };
 }
 
 function daysBetween(aISO: string, bISO: string): number {
@@ -126,7 +266,8 @@ export async function getBlockAdaptation(
   userId: string,
   blockStartDateISO: string,
   blockEndDateISO: string,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  opts?: { focus?: BlockFocus }
 ): Promise<BlockAdaptation> {
   const nowIso = new Date().toISOString();
 
@@ -159,28 +300,62 @@ export async function getBlockAdaptation(
           ? strengthTrend.long_run_exclusions
           : undefined;
 
-      return {
-        aerobic_efficiency: {
-          weekly_trend: Array.isArray(weeklyTrend) ? weeklyTrend : [],
-          improvement_pct: cached.aerobic_efficiency_improvement_pct != null ? Number(cached.aerobic_efficiency_improvement_pct) : null,
-          confidence: confidenceLabelFromWeeklyCounts(
-            (Array.isArray(weeklyTrend) ? weeklyTrend : []).map((w: any) => Number(w?.sample_count || 0))
-          ),
-          sample_count: (Array.isArray(weeklyTrend) ? weeklyTrend : []).reduce((s: number, w: any) => s + Number(w?.sample_count || 0), 0),
-          excluded_reasons: cachedExclusions,
-        },
-        long_run_endurance: cachedLongRunTrend
-          ? {
-              weekly_trend: cachedLongRunTrend,
-              sample_count: cachedLongRunTrend.reduce((s: number, w: any) => s + Number(w?.sample_count || 0), 0),
+      const aerobic_efficiency = {
+        weekly_trend: Array.isArray(weeklyTrend) ? weeklyTrend : [],
+        improvement_pct: cached.aerobic_efficiency_improvement_pct != null ? Number(cached.aerobic_efficiency_improvement_pct) : null,
+        confidence: confidenceLabelFromWeeklyCounts(
+          (Array.isArray(weeklyTrend) ? weeklyTrend : []).map((w: any) => Number(w?.sample_count || 0))
+        ),
+        sample_count: (Array.isArray(weeklyTrend) ? weeklyTrend : []).reduce((s: number, w: any) => s + Number(w?.sample_count || 0), 0),
+        excluded_reasons: cachedExclusions,
+      };
+
+      const long_run_endurance = cachedLongRunTrend
+        ? (() => {
+            const trend = cachedLongRunTrend.map((w: any) => ({
+              ...w,
+              avg_efficiency:
+                Number(w?.sample_count || 0) > 0 && Number(w?.avg_pace) > 0 && Number(w?.avg_hr) > 0
+                  ? Number((Number(w.avg_pace) / Number(w.avg_hr)).toFixed(6))
+                  : 0,
+            }));
+
+            const w1 = trend?.[0]?.sample_count ? Number(trend[0].avg_efficiency) : null;
+            const w4 = trend?.[3]?.sample_count ? Number(trend[3].avg_efficiency) : null;
+            const improvement_pct =
+              w1 != null && w4 != null && w1 !== 0 ? Number((((w1 - w4) / w1) * 100).toFixed(2)) : null;
+
+            const counts = Array.isArray(trend) ? trend.map((x: any) => Number(x?.sample_count || 0)) : [];
+            return {
+              weekly_trend: trend,
+              improvement_pct,
+              confidence: confidenceLabelFromWeeklyCounts(counts),
+              sample_count: trend.reduce((s: number, w: any) => s + Number(w?.sample_count || 0), 0),
               excluded_reasons: cachedLongRunExclusions,
-            }
-          : undefined,
-        strength_progression: {
-          by_exercise: strengthTrend?.by_exercise && typeof strengthTrend.by_exercise === 'object' ? strengthTrend.by_exercise : {},
-          overall_gain_pct: cached.strength_overall_gain_pct != null ? Number(cached.strength_overall_gain_pct) : null,
+            };
+          })()
+        : undefined;
+
+      const strength_progression = {
+        by_exercise: strengthTrend?.by_exercise && typeof strengthTrend.by_exercise === 'object' ? strengthTrend.by_exercise : {},
+        overall_gain_pct: cached.strength_overall_gain_pct != null ? Number(cached.strength_overall_gain_pct) : null,
+      };
+
+      const baseline_recommendations = Array.isArray(baselineRecos) ? baselineRecos : [];
+
+      const overview = computeOverview(
+        { aerobic_efficiency, long_run_endurance, strength_progression, baseline_recommendations },
+        opts?.focus
+      );
+
+      return {
+        overview,
+        aerobic_efficiency: {
+          ...aerobic_efficiency,
         },
-        baseline_recommendations: Array.isArray(baselineRecos) ? baselineRecos : [],
+        long_run_endurance,
+        strength_progression,
+        baseline_recommendations,
       };
     }
   } catch (e) {
@@ -283,8 +458,18 @@ export async function getBlockAdaptation(
     const avg_pace = paceItems.length ? Math.round(paceItems.reduce((s, v) => s + v, 0) / paceItems.length) : 0;
     const avg_hr = hrItems.length ? Math.round(hrItems.reduce((s, v) => s + v, 0) / hrItems.length) : 0;
     const avg_duration_min = durItems.length ? Math.round(durItems.reduce((s, v) => s + v, 0) / durItems.length) : 0;
-    return { week, avg_pace, avg_hr, avg_duration_min, sample_count };
+    const avg_efficiency = sample_count && avg_pace > 0 && avg_hr > 0 ? Number((avg_pace / avg_hr).toFixed(6)) : 0;
+    return { week, avg_pace, avg_hr, avg_duration_min, avg_efficiency, sample_count };
   });
+
+  const longW1Eff = longRunTrend[0].sample_count ? longRunTrend[0].avg_efficiency : null;
+  const longW4Eff = longRunTrend[3].sample_count ? longRunTrend[3].avg_efficiency : null;
+  const longImprovementPct =
+    longW1Eff != null && longW4Eff != null && longW1Eff !== 0
+      ? Number((((longW1Eff - longW4Eff) / longW1Eff) * 100).toFixed(2))
+      : null;
+  const longCounts = longRunTrend.map((w) => w.sample_count);
+  const longConfidence = confidenceLabelFromWeeklyCounts(longCounts);
 
   // Strength progression trend
   const byExercise: BlockAdaptation['strength_progression']['by_exercise'] = {};
@@ -368,6 +553,30 @@ export async function getBlockAdaptation(
   const baselineRecosTop = baselineRecos.slice(0, 2);
 
   const result: BlockAdaptation = {
+    overview: computeOverview(
+      {
+        aerobic_efficiency: {
+          weekly_trend: weeklyTrend,
+          improvement_pct: improvementPct,
+          confidence: aeroConfidence,
+          sample_count: weeklyTrend.reduce((s, w) => s + w.sample_count, 0),
+          excluded_reasons: aeroExcluded,
+        },
+        long_run_endurance: {
+          weekly_trend: longRunTrend,
+          improvement_pct: longImprovementPct,
+          confidence: longConfidence,
+          sample_count: longRunTrend.reduce((s, w) => s + w.sample_count, 0),
+          excluded_reasons: longExcluded,
+        },
+        strength_progression: {
+          by_exercise: byExercise,
+          overall_gain_pct: overallGainPct,
+        },
+        baseline_recommendations: baselineRecosTop,
+      },
+      opts?.focus
+    ),
     aerobic_efficiency: {
       weekly_trend: weeklyTrend,
       improvement_pct: improvementPct,
@@ -377,6 +586,8 @@ export async function getBlockAdaptation(
     },
     long_run_endurance: {
       weekly_trend: longRunTrend,
+      improvement_pct: longImprovementPct,
+      confidence: longConfidence,
       sample_count: longRunTrend.reduce((s, w) => s + w.sample_count, 0),
       excluded_reasons: longExcluded,
     },

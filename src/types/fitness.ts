@@ -21,6 +21,12 @@ export type AdaptationMetrics = {
 };
 
 export type BlockAdaptation = {
+  overview: {
+    focus: 'base' | 'marathon_prep' | 'hybrid' | 'recovery' | 'unknown';
+    adaptation_score: number; // 0..100 (higher is better)
+    signal_quality: 'high' | 'medium' | 'low';
+    drivers: string[];
+  };
   aerobic_efficiency: {
     weekly_trend: Array<{
       week: number;
@@ -40,8 +46,11 @@ export type BlockAdaptation = {
       avg_pace: number;
       avg_hr: number;
       avg_duration_min: number;
+      avg_efficiency: number;
       sample_count: number;
     }>;
+    improvement_pct: number | null;
+    confidence: 'high' | 'medium' | 'low';
     sample_count: number;
     excluded_reasons?: Record<string, number>;
   };
