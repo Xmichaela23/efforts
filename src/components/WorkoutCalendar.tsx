@@ -1153,11 +1153,14 @@ export default function WorkoutCalendar({
                               <span
                                 aria-hidden="true"
                                 style={{
-                                  width: 14,
+                                  // Wider “illuminati” triangle (less teepee)
+                                  width: 18,
                                   height: 12,
-                                  clipPath: 'polygon(50% 2%, 102% 98%, -2% 98%)',
+                                  // Slightly wider base + a sharper apex
+                                  clipPath: 'polygon(50% 1%, 108% 99%, -8% 99%)',
                                   backgroundColor: `rgba(${pillRgb}, 0.88)`,
                                   filter: `drop-shadow(0 1px 1px rgba(0,0,0,0.22))`,
+                                  boxShadow: `0 0 0 1px rgba(0,0,0,0.22) inset`,
                                 }}
                               />
                             </span>
