@@ -47,7 +47,7 @@
     --tabbar-h: 56px; /* matches h-14 */
     --tabbar-extra: 18px; /* iOS swipe-up gesture safe zone */
     /* Make Today readable while letting calendar fill remaining space */
-    --todays-h: clamp(9rem, 18vh, 12.5rem);
+    --todays-h: clamp(10rem, 20vh, 14rem);
     --cal-cell-h: 100px; /* compact height for ghosted timeline - emphasis on Today */
     /* Analytics tokens (mobile, minimal) */
     --series-pace: #3b82f6;
