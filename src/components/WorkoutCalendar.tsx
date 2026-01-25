@@ -904,7 +904,8 @@ export default function WorkoutCalendar({
       </div>
 
       {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
-      <div className="flex flex-col gap-1 flex-shrink-0 pb-1 relative" style={{ zIndex: 1 }}>
+      {/* Let rows expand to use leftover vertical space in the calendar card. */}
+      <div className="flex flex-col gap-1 flex-1 min-h-0 pb-1 relative" style={{ zIndex: 1 }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -940,6 +941,9 @@ export default function WorkoutCalendar({
               ].join(" ")}
               style={{
                 position: 'relative',
+                // Expand rows to fill space between header and footer.
+                flex: 1,
+                minHeight: '36px',
                 borderRadius: '6px',
                 // Omni-inspired illuminated border that blends
                 border: isToday ? '0.5px solid rgba(255, 255, 255, 0.18)' : '0.5px solid rgba(255, 255, 255, 0.12)',
@@ -954,7 +958,6 @@ export default function WorkoutCalendar({
                     ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.18) 100%)' // Selected: eye-catch, but less than Today
                   : 'radial-gradient(ellipse at left, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%)', // Week rows: mid glow
                 opacity: 1.0,
-                minHeight: '36px',
                 // More visible Omni glow for today
                 boxShadow: isToday
                   ? `
@@ -1334,7 +1337,7 @@ export default function WorkoutCalendar({
           );
         })}
         
-        {/* Total Workload - Separate panel at bottom of timeline */}
+        {/* Total Workload - Separate panel pinned to bottom of timeline */}
         {(() => {
           // Collect all metrics
           const metrics: Array<{ label: string; value: string }> = [];
@@ -1470,7 +1473,7 @@ export default function WorkoutCalendar({
           });
 
           return (
-            <div className="mt-1.5 pt-1.5 border-t border-white/10">
+            <div className="mt-auto pt-1.5 border-t border-white/10">
               <div className="space-y-1.5" style={{ fontSize: '0.72rem', paddingBottom: '0.30rem' }}>
                 {/* Total Workload header */}
                 <div 
