@@ -941,9 +941,6 @@ export default function WorkoutCalendar({
               ].join(" ")}
               style={{
                 position: 'relative',
-                // Expand rows to fill space between header and footer.
-                flex: 1,
-                minHeight: '36px',
                 borderRadius: '6px',
                 // Omni-inspired illuminated border that blends
                 border: isToday ? '0.5px solid rgba(255, 255, 255, 0.18)' : '0.5px solid rgba(255, 255, 255, 0.12)',
@@ -1473,7 +1470,9 @@ export default function WorkoutCalendar({
           });
 
           return (
-            <div className="mt-auto pt-1.5 border-t border-white/10">
+            // Let the footer absorb extra height so swim/bike lines can fit,
+            // while keeping day row sizing unchanged.
+            <div className="mt-auto flex-1 pt-1.5 border-t border-white/10">
               <div className="space-y-1.5" style={{ fontSize: '0.72rem', paddingBottom: '0.30rem' }}>
                 {/* Total Workload header */}
                 <div 
