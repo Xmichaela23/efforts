@@ -904,7 +904,7 @@ export default function WorkoutCalendar({
       </div>
 
       {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
-      <div className="flex flex-col gap-1 flex-shrink-0 pb-1 relative" style={{ zIndex: 1 }}>
+      <div className="flex flex-col gap-0.5 flex-shrink-0 pb-1 relative" style={{ zIndex: 1 }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -934,7 +934,7 @@ export default function WorkoutCalendar({
               onDrop={(e) => handleDrop(e, key)}
               className={[
                 // compact rows so Today can breathe
-                "w-full flex items-center gap-2 px-2 py-1 rounded transition-all",
+                "w-full flex items-center gap-2 px-2 py-0.5 rounded transition-all",
                 "hover:bg-white/[0.02]",
                 dragOverDate === key ? "ring-1 ring-white/20 bg-white/[0.03]" : "",
               ].join(" ")}
@@ -954,7 +954,7 @@ export default function WorkoutCalendar({
                     ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.18) 100%)' // Selected: eye-catch, but less than Today
                   : 'radial-gradient(ellipse at left, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%)', // Week rows: mid glow
                 opacity: 1.0,
-                minHeight: '36px',
+                minHeight: '34px',
                 // More visible Omni glow for today
                 boxShadow: isToday
                   ? `
@@ -1536,13 +1536,7 @@ export default function WorkoutCalendar({
                 
                 {/* All Metrics */}
                 {compactMetrics.length > 0 && (
-                  <div
-                    className={[
-                      // When we have more lines (e.g., Run + Swim + Bike + Strength + Total),
-                      // use 2 columns so it fits comfortably in the module.
-                      compactMetrics.length >= 4 ? 'grid grid-cols-2 gap-x-3 gap-y-0.5 pt-1' : 'space-y-0.5 pt-1',
-                    ].join(' ')}
-                  >
+                  <div className="space-y-0.5 pt-1">
                     {compactMetrics.map((metric, index) => {
                       const labelLower = String(metric.label || '').toLowerCase();
                       let disciplineType = '';
