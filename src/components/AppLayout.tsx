@@ -112,23 +112,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           setActiveTab('planned');
         }
       } else if (selectedWorkout.workout_status === 'completed') {
-        // Check if this was a planned workout that got completed
-        // Be more specific about what constitutes "planned data" to avoid false positives for Garmin imports
-        const hasPlannedData = (selectedWorkout.intervals && selectedWorkout.intervals.length > 0) || 
-                               selectedWorkout.target_power || 
-                               selectedWorkout.target_pace ||
-                               // Only consider workout_type as planned data if it's NOT a Garmin import
-                               (selectedWorkout.workout_type && 
-                                selectedWorkout.workout_type !== selectedWorkout.type &&
-                                !selectedWorkout.description?.includes('Imported from Garmin'));
-        
-        if (hasPlannedData) {
-          // B) Completed planned workout -> Summary tab (shows planned vs actual)
-          setActiveTab('summary');
-        } else {
-          // C) Completed workout without plan -> Completed tab (just show data)
-          setActiveTab('completed');
-        }
+        // Always go to completed/details tab - handleEditEffort already set this,
+        // and UnifiedWorkoutView will show the summary tab trigger if there's linked planned data
+        setActiveTab('completed');
       } else {
         // A) Planned workout -> Planned tab
         setActiveTab('planned');
