@@ -772,7 +772,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   
   return (
     <div 
-      className="fixed inset-0 flex flex-col z-40 relative overflow-hidden"
+      className="fixed inset-0 flex flex-col z-40 overflow-hidden"
       style={{ 
         backgroundColor: '#000000'
       }}
@@ -1043,7 +1043,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       {/* Planned workout (not completed): Planned tab only */}
       {/* Completed + linked: Planned, Adherence, Details */}
       {/* Completed + not linked: Details only */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList
           className={`grid w-full bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-0 py-0 ${
           !isCompleted ? 'grid-cols-1' : (isLinked ? 'grid-cols-3' : 'grid-cols-1')
@@ -1077,9 +1077,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           )}
         </TabsList>
 
-        <div className="pt-3" style={{ paddingBottom: 'calc(var(--tabbar-h, 80px) + env(safe-area-inset-bottom, 0px) + 16px)' }}>
+        <div className="pt-3">
           {/* Planned Tab */}
-          <TabsContent value="planned" className="p-2">
+          <TabsContent value="planned" className="flex-1 p-2">
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'p-4' : ''}>
                 <StructuredPlannedView 
@@ -1215,7 +1215,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Adherence Tab - only rendered when linked, so no need for unlinked state */}
-          <TabsContent value="summary" className="p-2">
+          <TabsContent value="summary" className="flex-1 p-2">
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'p-4' : ''}>
                 {/* Inline Strength Logger editor */}
@@ -1258,7 +1258,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent value="completed" className="px-1 py-2">
+          <TabsContent value="completed" className="flex-1 px-1 py-2">
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'px-2 py-4' : ''}>
                 {isCompleted ? (
