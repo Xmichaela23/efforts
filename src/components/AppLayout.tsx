@@ -1573,8 +1573,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               <div 
                 className="flex flex-col"
                 style={{
-                  // Explicit height calculation bypasses scroll container flex issues
-                  height: 'calc(100svh - var(--header-h) - env(safe-area-inset-top) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--tabbar-extra) - 16px)',
+                  // Explicit height = viewport minus header/tabbar padding already on mobile-main-content
+                  height: 'calc(100svh - var(--header-h) - env(safe-area-inset-top) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--tabbar-extra))',
                   minHeight: 0,
                 }}
               >
