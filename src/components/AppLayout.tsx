@@ -1677,6 +1677,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       style={{
                         flex: 1,
                         minHeight: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
                         // Let the calendar read as its own module card (clear chassis edge)
                         marginLeft: 0,
                         marginRight: 0,
