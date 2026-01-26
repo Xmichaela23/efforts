@@ -2011,18 +2011,19 @@ const formatMovingTime = () => {
           shouldShowPlaceholder
         });
         
+        // If still hydrating and no valid track yet, show spinner (prevents "No route data" flash)
+        if (isHydrating && !hasValidTrack) {
+          return (
+            <div className="mt-6 mb-6 mx-[-16px] flex items-center justify-center" style={{ minHeight: 300 }}>
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-white/30"></div>
+            </div>
+          );
+        }
+        
         // Render map component for all workouts - it will show placeholder for indoor/treadmill
-        // Only skip if we have no data AND it's not a virtual activity AND we're done loading
+        // Only skip if we have no data AND it's not a virtual activity
         if (!shouldShowPlaceholder && !hasValidSeries && !hasValidTrack) {
-          if (isHydrating) {
-            // Still loading - show spinner instead of skipping
-            return (
-              <div className="mt-6 mb-6 mx-[-16px] flex items-center justify-center" style={{ minHeight: 300 }}>
-                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-white/30"></div>
-              </div>
-            );
-          }
-          // Don't render map if no data - prevents blink
+          // Don't render map if no data
           console.log('⏭️ [CompletedTab] Skipping map render - no valid data');
           return null;
         }
