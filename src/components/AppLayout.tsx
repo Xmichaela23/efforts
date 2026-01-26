@@ -1570,7 +1570,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           ) : (
             <div className="w-full flex-1 flex flex-col min-h-0">
               {activeBottomNav === 'home' && (
-              <div className="flex-1 flex flex-col min-h-0">
+              <div 
+                className="flex flex-col"
+                style={{
+                  // Explicit height calculation bypasses scroll container flex issues
+                  height: 'calc(100svh - var(--header-h) - env(safe-area-inset-top) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--tabbar-extra) - 16px)',
+                  minHeight: 0,
+                }}
+              >
                 {/* A) One continuous instrument panel wrapper (outer rim + inner bevel) */}
                 <div
                   style={{
