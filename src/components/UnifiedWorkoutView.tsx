@@ -774,7 +774,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     <div 
       className="fixed inset-0 flex flex-col z-40"
       style={{ 
-        backgroundColor: '#000000'
+        backgroundColor: '#000000',
+        transform: 'translateX(0)',
+        left: 0,
+        right: 0,
+        willChange: 'auto'
       }}
     >
       {/* Omni environment field (match header/tabbar supernova, with discipline tint) */}
