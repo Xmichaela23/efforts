@@ -772,7 +772,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   
   return (
     <div 
-      className="fixed inset-0 flex flex-col z-40 overflow-hidden"
+      className="fixed inset-0 flex flex-col z-40"
       style={{ 
         backgroundColor: '#000000'
       }}
@@ -846,7 +846,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       />
       <div 
         className="flex-1 overflow-y-auto overscroll-contain min-h-0 relative"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          height: '100%'
+        }}
       >
       {/* Spacer for app header */}
       <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
