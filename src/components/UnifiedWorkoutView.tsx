@@ -1274,6 +1274,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                             workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
                             workoutData={completedData}
                             onAddGear={onAddGear}
+                            isHydrating={detailLoading}
                           />
                         </div>
                       ) : (workout.type === 'strength' || workout.type === 'mobility' || workout.type === 'pilates_yoga') ? (

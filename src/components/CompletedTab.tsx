@@ -54,6 +54,7 @@ interface CompletedTabProps {
   workoutData: any;
   workoutType?: string;
   onAddGear?: () => void; // Callback to open gear management
+  isHydrating?: boolean; // True while GPS/sensor data is still loading
 }
 
 
@@ -67,7 +68,7 @@ interface GearItem {
   total_distance?: number; // in meters
 }
 
-const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, onAddGear }) => {
+const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, onAddGear, isHydrating }) => {
   const { useImperial } = useAppContext();
   const compact = useCompact();
   const queryClient = useQueryClient();
@@ -1994,7 +1995,8 @@ const formatMovingTime = () => {
                                  (workout as any)?.start_position_lat !== 0;
         
         // Consider it virtual if: explicit indicators OR (likely treadmill AND no start position)
-        const shouldShowPlaceholder = isVirtual || hasTreadmillIndicator || (isLikelyTreadmill && !hasStartPosition);
+        // BUT: don't show placeholder if we're still loading GPS data (prevents flash)
+        const shouldShowPlaceholder = !isHydrating && (isVirtual || hasTreadmillIndicator || (isLikelyTreadmill && !hasStartPosition));
         
         console.log('🗺️ [CompletedTab] Map render check:', {
           workoutId: (hydrated||workoutData)?.id,
@@ -2010,8 +2012,16 @@ const formatMovingTime = () => {
         });
         
         // Render map component for all workouts - it will show placeholder for indoor/treadmill
-        // Only skip if we have no data AND it's not a virtual activity
+        // Only skip if we have no data AND it's not a virtual activity AND we're done loading
         if (!shouldShowPlaceholder && !hasValidSeries && !hasValidTrack) {
+          if (isHydrating) {
+            // Still loading - show spinner instead of skipping
+            return (
+              <div className="mt-6 mb-6 mx-[-16px] flex items-center justify-center" style={{ minHeight: 300 }}>
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-white/30"></div>
+              </div>
+            );
+          }
           // Don't render map if no data - prevents blink
           console.log('⏭️ [CompletedTab] Skipping map render - no valid data');
           return null;
