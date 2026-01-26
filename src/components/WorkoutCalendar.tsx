@@ -1485,8 +1485,8 @@ export default function WorkoutCalendar({
           return (
             // Let the footer absorb extra height so swim/bike lines can fit,
             // while keeping day row sizing unchanged.
-            <div className="mt-auto flex-1 pt-1.5 border-t border-white/10">
-              <div className="space-y-1.5" style={{ fontSize: '0.72rem', paddingBottom: '0.30rem' }}>
+            <div className="mt-auto flex-1 pt-2 pb-2 border-t border-white/10 flex flex-col">
+              <div className="space-y-2 flex-1" style={{ fontSize: '0.75rem' }}>
                 {/* Total Workload header */}
                 <div 
                   className="flex items-center gap-1.5 px-2 py-1 rounded-lg flex-wrap"
