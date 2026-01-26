@@ -1458,7 +1458,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       
       <main className="mobile-main-content">
         <PullToRefresh onRefresh={handleGlobalRefresh}>
-        <div className="w-full h-full px-2">
+        <div className="w-full flex-1 flex flex-col min-h-0 px-2">
           {showPlanBuilder ? (
             <div className="pt-1">
               <PlanBuilder
@@ -1568,9 +1568,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             /* UnifiedWorkoutView now rendered outside mobile-main-content */
             null
           ) : (
-            <div className="w-full h-full flex flex-col">
+            <div className="w-full flex-1 flex flex-col min-h-0">
               {activeBottomNav === 'home' && (
-              <div className="h-full flex flex-col">
+              <div className="flex-1 flex flex-col min-h-0">
                 {/* A) One continuous instrument panel wrapper (outer rim + inner bevel) */}
                 <div
                   style={{
@@ -1578,7 +1578,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     padding: 10,
                     position: 'relative',
                     // Fill the available Home viewport so the calendar can extend downward
-                    height: '100%',
+                    flex: 1,
+                    minHeight: 0,
                     display: 'flex',
                     flexDirection: 'column',
                     background:
@@ -1633,7 +1634,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         'inset 0 10px 18px rgba(0,0,0,0.35)',
                       position: 'relative',
                       zIndex: 1,
-                      height: '100%',
+                      flex: 1,
                       display: 'flex',
                       flexDirection: 'column',
                       minHeight: 0,
@@ -1681,7 +1682,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         marginRight: 0,
                       }}
                     >
-                      <div className="instrument-card glass-card" style={{ padding: 8, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                      <div className="instrument-card glass-card" style={{ padding: 8, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                         <WorkoutCalendar
                           onAddEffort={() => handleAddEffort('run')}
                           onSelectType={handleSelectEffortType}

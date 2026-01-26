@@ -526,6 +526,9 @@
     right: 0;
     /* Extend to bottom so content can scroll behind glassmorphic tabbar */
     bottom: 0;
+    /* Flex container so children can fill height with flex-1 */
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     /* Padding so content starts below header */

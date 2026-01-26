@@ -784,7 +784,7 @@ export default function WorkoutCalendar({
   // VERTICAL TIMELINE PREVIEW - Replace grid with timeline list
   return (
     <div
-      className="w-full h-full flex flex-col touch-pan-y bg-transparent relative"
+      className="w-full flex-1 flex flex-col touch-pan-y bg-transparent relative min-h-0"
       style={{ position: 'relative' }}
       onTouchStart={(e) => {
         const t = e.changedTouches[0];
