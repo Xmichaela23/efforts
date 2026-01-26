@@ -81,7 +81,15 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thre
   }, [offset, thresholdPx, onRefresh, refreshing]);
 
   return (
-    <div style={{ transform: offset ? `translateY(${offset}px)` : undefined, transition: pullingRef.current ? 'none' : 'transform 120ms ease-out', flex: 1, display: 'flex', flexDirection: 'column' as const, minHeight: 0 }}>
+    <div style={{ 
+      transform: offset ? `translateY(${offset}px)` : undefined, 
+      transition: pullingRef.current ? 'none' : 'transform 120ms ease-out', 
+      // Explicit height bypasses scroll container flex issue - this is the FIRST child of mobile-main-content
+      height: 'calc(100svh - var(--header-h) - env(safe-area-inset-top) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--tabbar-extra))',
+      display: 'flex', 
+      flexDirection: 'column' as const, 
+      minHeight: 0 
+    }}>
       {refreshing && (
         <div className="fixed top-10 left-1/2 -translate-x-1/2 text-[11px] text-gray-500">Refreshing…</div>
       )}
