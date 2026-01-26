@@ -1149,7 +1149,7 @@ export default function WorkoutCalendar({
                                   opacity: 0.95,
                                 }}
                               />
-                              {/* Pyramid indicator (flat, no shading) */}
+                              {/* Pyramid indicator built from horizontal lines (matches emission aesthetic) */}
                               <span
                                 aria-hidden="true"
                                 style={{
@@ -1157,10 +1157,23 @@ export default function WorkoutCalendar({
                                   width: 18,
                                   height: 12,
                                   // Slightly wider base + a sharper apex
-                                  clipPath: 'polygon(50% 1%, 108% 99%, -8% 99%)',
-                                  backgroundColor: `rgba(${pillRgb}, 0.88)`,
-                                  filter: `drop-shadow(0 1px 1px rgba(0,0,0,0.22))`,
-                                  boxShadow: `0 0 0 1px rgba(0,0,0,0.22) inset`,
+                                  position: 'relative',
+                                  backgroundImage: `
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.92) 40%, rgba(${pillRgb},0.92) 60%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.88) 35%, rgba(${pillRgb},0.88) 65%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.84) 30%, rgba(${pillRgb},0.84) 70%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.80) 25%, rgba(${pillRgb},0.80) 75%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.76) 20%, rgba(${pillRgb},0.76) 80%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.72) 15%, rgba(${pillRgb},0.72) 85%, rgba(${pillRgb},0.0) 100%)
+                                  `,
+                                  backgroundRepeat: 'no-repeat',
+                                  backgroundSize: '4px 1.5px, 7px 1.5px, 10px 1.5px, 13px 1.5px, 16px 1.5px, 18px 1.5px',
+                                  backgroundPosition: 'center 0px, center 2px, center 4px, center 6px, center 8px, center 10px',
+                                  filter: `
+                                    drop-shadow(0 0 2px rgba(${pillRgb},0.6))
+                                    drop-shadow(0 0 4px rgba(${pillRgb},0.4))
+                                    drop-shadow(0 0 8px rgba(${pillRgb},0.25))
+                                  `,
                                 }}
                               />
                             </span>
