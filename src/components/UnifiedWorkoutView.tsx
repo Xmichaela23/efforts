@@ -775,10 +775,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       className="fixed inset-0 flex flex-col z-40"
       style={{ 
         backgroundColor: '#000000',
-        transform: 'translateX(0)',
+        transform: 'none',
         left: 0,
         right: 0,
-        willChange: 'auto'
+        overflowX: 'hidden',
+        touchAction: 'pan-y pinch-zoom'
       }}
     >
       {/* Omni environment field (match header/tabbar supernova, with discipline tint) */}
@@ -849,11 +850,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         }}
       />
       <div 
-        className="flex-1 overflow-y-auto overscroll-contain min-h-0 relative"
+        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain min-h-0 relative"
         style={{ 
           WebkitOverflowScrolling: 'touch',
           touchAction: 'pan-y',
-          height: '100%'
+          height: '100%',
+          overscrollBehaviorX: 'none'
         }}
       >
       {/* Spacer for app header */}
