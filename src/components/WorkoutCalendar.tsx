@@ -905,7 +905,7 @@ export default function WorkoutCalendar({
 
       {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
       {/* Let rows expand to use leftover vertical space in the calendar card. */}
-      <div className="flex flex-col gap-1 flex-1 min-h-0 pb-1 relative" style={{ zIndex: 1 }}>
+      <div className="flex flex-col gap-2 flex-1 min-h-0 pb-1 relative" style={{ zIndex: 1 }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -935,7 +935,7 @@ export default function WorkoutCalendar({
               onDrop={(e) => handleDrop(e, key)}
               className={[
                 // compact rows so Today can breathe
-                "w-full flex items-center gap-2 px-2 py-1 rounded transition-all",
+                "w-full flex items-center gap-2 px-2 py-2.5 rounded transition-all",
                 "hover:bg-white/[0.02]",
                 dragOverDate === key ? "ring-1 ring-white/20 bg-white/[0.03]" : "",
               ].join(" ")}
@@ -1061,7 +1061,7 @@ export default function WorkoutCalendar({
               </div>
 
               {/* Right: Workout chips - horizontal flow (compact) */}
-              <div className="flex-1 flex items-center gap-1 flex-wrap min-h-[20px]" style={{ position: 'relative', zIndex: 1 }}>
+              <div className="flex-1 flex items-center gap-1.5 flex-wrap min-h-[28px]" style={{ position: 'relative', zIndex: 1 }}>
                 {items.length > 0 && (
                   items.map((evt, i) => {
                     // Check actual workout_status from _src
