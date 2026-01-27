@@ -1679,12 +1679,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         minHeight: 0,
                         display: 'flex',
                         flexDirection: 'column',
+                        overflow: 'hidden',
                         // Let the calendar read as its own module card (clear chassis edge)
                         marginLeft: 0,
                         marginRight: 0,
                       }}
                     >
-                      <div className="instrument-card glass-card" style={{ padding: 8, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                      <div className="instrument-card glass-card" style={{ padding: 8, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
                         <WorkoutCalendar
                           onAddEffort={() => handleAddEffort('run')}
                           onSelectType={handleSelectEffortType}
