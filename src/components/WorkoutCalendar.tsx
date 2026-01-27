@@ -905,7 +905,7 @@ export default function WorkoutCalendar({
 
       {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
       {/* Let rows expand to use leftover vertical space in the calendar card. */}
-      <div className="flex flex-col gap-1 flex-1 min-h-0 pb-1 relative" style={{ zIndex: 1 }}>
+      <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, auto) 1fr', gap: 4, flex: 1, minHeight: 0, paddingBottom: 4, position: 'relative', zIndex: 1 }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -1485,7 +1485,7 @@ export default function WorkoutCalendar({
           return (
             // Let the footer absorb extra height so swim/bike lines can fit,
             // while keeping day row sizing unchanged.
-            <div className="flex-1 pt-3 pb-4 border-t border-white/10 flex flex-col justify-end" style={{ backgroundColor: 'rgba(255,0,0,0.3)', minHeight: 120 }}>
+            <div className="pt-3 pb-4 border-t border-white/10 flex flex-col justify-end" style={{ backgroundColor: 'rgba(255,0,0,0.3)' }}>
               {/* Spacer to push content down */}
               <div className="flex-1" />
               
