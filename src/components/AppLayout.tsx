@@ -1579,8 +1579,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     borderRadius: 14,
                     padding: 10,
                     position: 'relative',
-                    // Fill the available Home viewport so the calendar can extend downward
-                    height: '100%',
+                    // Explicit height using viewport units minus header/tabbar
+                    height: 'calc(100dvh - var(--header-h) - env(safe-area-inset-top) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--tabbar-extra) - 16px)',
                     display: 'flex',
                     flexDirection: 'column',
                     background:
