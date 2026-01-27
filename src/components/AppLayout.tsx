@@ -1570,7 +1570,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           ) : (
             <div className="w-full flex-1 flex flex-col min-h-0">
               {activeBottomNav === 'home' && (
-              <div className="flex-1 flex flex-col min-h-0">
+              <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
                 {/* A) One continuous instrument panel wrapper (outer rim + inner bevel) */}
                 <div
                   style={{

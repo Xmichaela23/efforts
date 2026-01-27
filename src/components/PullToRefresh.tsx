@@ -84,8 +84,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thre
     <div style={{ 
       transform: offset ? `translateY(${offset}px)` : undefined, 
       transition: pullingRef.current ? 'none' : 'transform 120ms ease-out', 
-      // Explicit height bypasses scroll container flex issue - this is the FIRST child of mobile-main-content
-      height: 'calc(100svh - var(--header-h) - env(safe-area-inset-top) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--tabbar-extra))',
+      flex: 1,
       display: 'flex', 
       flexDirection: 'column' as const, 
       minHeight: 0 
