@@ -88,6 +88,8 @@ export function mapUnifiedItemToCompleted(item: any): any {
     strava_activity_id: item.strava_activity_id || null,
     garmin_activity_id: item.garmin_activity_id || null,
     device_info: item.device_info || null,
+    // Link to planned workout (for attached workouts)
+    planned_id: item.planned?.id || item.planned_id || null,
   };
   
   return mapped;
