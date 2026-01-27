@@ -84,10 +84,9 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thre
     <div style={{ 
       transform: offset ? `translateY(${offset}px)` : undefined, 
       transition: pullingRef.current ? 'none' : 'transform 120ms ease-out', 
-      flex: 1,
+      height: '100%',
       display: 'flex', 
-      flexDirection: 'column' as const, 
-      minHeight: 0 
+      flexDirection: 'column' as const,
     }}>
       {refreshing && (
         <div className="fixed top-10 left-1/2 -translate-x-1/2 text-[11px] text-gray-500">Refreshing…</div>

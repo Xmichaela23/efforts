@@ -1460,7 +1460,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       
       <main className="mobile-main-content">
         <PullToRefresh onRefresh={handleGlobalRefresh}>
-        <div className="w-full flex-1 flex flex-col min-h-0 px-2">
+        <div className="w-full h-full flex flex-col px-2">
           {showPlanBuilder ? (
             <div className="pt-1">
               <PlanBuilder
@@ -1570,9 +1570,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             /* UnifiedWorkoutView now rendered outside mobile-main-content */
             null
           ) : (
-            <div className="w-full flex-1 flex flex-col min-h-0">
+            <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 {/* A) One continuous instrument panel wrapper (outer rim + inner bevel) */}
                 <div
                   style={{
@@ -1580,8 +1580,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     padding: 10,
                     position: 'relative',
                     // Fill the available Home viewport so the calendar can extend downward
-                    flex: 1,
-                    minHeight: 0,
+                    height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
                     background:
@@ -1639,7 +1638,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       flex: 1,
                       display: 'flex',
                       flexDirection: 'column',
-                      minHeight: 0,
                     }}
                   >
                     {/* Today's efforts - fixed height, scrolls internally */}
