@@ -851,9 +851,11 @@ export default function WorkoutCalendar({
         }}
       />
 
-      {/* Week Navigation - Bright timeline header (compact) */}
-      <div 
-        className="flex items-center justify-between py-0.5 mb-0.5 relative"
+      {/* Calendar (week nav + grid) scrolls so workload section always gets space */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden" style={{ position: 'relative', zIndex: 1 }}>
+        {/* Week Navigation - Bright timeline header (compact) */}
+        <div 
+          className="flex items-center justify-between py-0.5 mb-0.5 relative flex-shrink-0"
         style={{
           /* Glassy header strip (frosted, not opaque) */
           backgroundColor: 'rgba(0,0,0,0.28)',
@@ -903,9 +905,8 @@ export default function WorkoutCalendar({
         </button>
       </div>
 
-      {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
-      {/* Grid sizes to content; workload section is a flex sibling that fills remaining space */}
-      <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, auto)', gap: 4, flexShrink: 0, paddingBottom: 4, position: 'relative', zIndex: 1 }}>
+        {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
+        <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, auto)', gap: 4, flexShrink: 0, paddingBottom: 4, position: 'relative', zIndex: 1 }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -1346,6 +1347,7 @@ export default function WorkoutCalendar({
             </button>
           );
         })}
+        </div>
       </div>
         
       {/* Total Workload - Flex sibling that fills remaining space */}
