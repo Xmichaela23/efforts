@@ -1460,7 +1460,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       
       <main className="mobile-main-content">
         <PullToRefresh onRefresh={handleGlobalRefresh}>
-        <div className="w-full h-full flex flex-col px-2">
+        <div className="w-full flex-1 min-h-0 flex flex-col px-2">
           {showPlanBuilder ? (
             <div className="pt-1">
               <PlanBuilder
@@ -1570,9 +1570,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             /* UnifiedWorkoutView now rendered outside mobile-main-content */
             null
           ) : (
-            <div className="w-full h-full flex flex-col">
+            <div className="w-full flex-1 min-h-0 flex flex-col">
               {activeBottomNav === 'home' && (
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 {/* SIMPLIFIED: One container with all styling, TodaysEffort + WorkoutCalendar as direct children */}
                 <div
                   style={{
