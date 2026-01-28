@@ -1573,136 +1573,63 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             <div className="w-full h-full flex flex-col">
               {activeBottomNav === 'home' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                {/* A) One continuous instrument panel wrapper (outer rim + inner bevel) */}
+                {/* SIMPLIFIED: One container with all styling, TodaysEffort + WorkoutCalendar as direct children */}
                 <div
                   style={{
                     borderRadius: 14,
-                    padding: 10,
+                    padding: 12,
                     position: 'relative',
-                    // Explicit height using viewport units minus header/tabbar
-                    height: 'calc(100dvh - var(--header-h) - env(safe-area-inset-top) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--tabbar-extra) - 16px)',
+                    flex: 1,
+                    minHeight: 0,
                     display: 'flex',
                     flexDirection: 'column',
                     background:
-                      /* Option 1 lighting: top-left key light + neutral depth */
-                      'radial-gradient(ellipse at 18% 8%, rgba(255,255,255,0.09) 0%, rgba(0,0,0,0.0) 58%),' +
-                      'radial-gradient(ellipse at 78% 28%, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.0) 62%),' +
-                      'radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.90) 100%)',
+                      'radial-gradient(ellipse at 18% 8%, rgba(255,255,255,0.06) 0%, transparent 50%),' +
+                      'radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.85) 100%)',
                     border: '0.5px solid rgba(255,255,255,0.10)',
                     boxShadow:
                       '0 10px 30px rgba(0,0,0,0.55),' +
-                      '0 0 0 1px rgba(255,255,255,0.04) inset,' +
-                      'inset 0 1px 0 rgba(255,255,255,0.10),' +
+                      'inset 0 1px 0 rgba(255,255,255,0.08),' +
                       'inset 0 -1px 0 rgba(0,0,0,0.60)',
-                    overflow: 'hidden',
                   }}
                 >
-                  {/* Shared surface texture for cohesion (one instrument panel) */}
+                  {/* Today's efforts - fixed height */}
+                  <div style={{ height: 'var(--todays-h)', flexShrink: 0 }}>
+                    <TodaysEffort
+                      selectedDate={selectedDate}
+                      onAddEffort={handleAddEffort}
+                      onViewCompleted={handleViewCompleted}
+                      onEditEffort={handleEditEffort}
+                    />
+                  </div>
+
+                  {/* Divider */}
                   <div
                     aria-hidden="true"
                     style={{
-                      position: 'absolute',
-                      inset: 0,
-                      pointerEvents: 'none',
-                      zIndex: 0,
-                      opacity: 0.40,
-                      mixBlendMode: 'soft-light',
-                      backgroundColor: 'rgba(0,0,0,0.20)',
-                      backgroundImage: `
-                        radial-gradient(ellipse at 12% 18%, rgba(255, 215, 0, 0.10) 0%, transparent 60%),
-                        radial-gradient(ellipse at 52% 8%, rgba(183, 148, 246, 0.08) 0%, transparent 60%),
-                        radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.08) 0%, transparent 60%),
-                        linear-gradient(45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
-                        linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
-                        linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
-                        linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px)
-                      `,
-                      backgroundSize: 'cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px',
-                      backgroundPosition: 'center, center, center, center, center, center, center',
-                      backgroundBlendMode: 'screen, screen, screen, soft-light, soft-light, soft-light, soft-light',
+                      height: 1,
+                      margin: '8px 0',
+                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent)',
                     }}
                   />
 
-                  {/* Inner surface (slightly inset) */}
-                  <div
-                    style={{
-                      borderRadius: 12,
-                      // Slightly wider "rail" for a more immersive console feel
-                      padding: 6,
-                      background: 'rgba(0,0,0,0.65)',
-                      boxShadow:
-                        'inset 0 0 0 1px rgba(255,255,255,0.05),' +
-                        'inset 0 10px 18px rgba(0,0,0,0.35)',
-                      position: 'relative',
-                      zIndex: 1,
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                  >
-                    {/* Today's efforts - fixed height, scrolls internally */}
-                    <div
-                      style={{
-                        height: 'var(--todays-h)',
-                        flexShrink: 0,
-                        // Widen Today at the module level so header + cards stay perfectly aligned.
-                        // Keeps the "console" feel without making Today feel pulled to one side.
-                        marginLeft: -6,
-                        marginRight: -6,
-                      }}
-                    >
-                      <TodaysEffort
-                        selectedDate={selectedDate}
-                        onAddEffort={handleAddEffort}
-                        onViewCompleted={handleViewCompleted}
-                        onEditEffort={handleEditEffort}
-                      />
-                    </div>
-
-                    {/* Subtle inset divider between Today and Week modules */}
-                    <div
-                      aria-hidden="true"
-                      style={{
-                        height: 1,
-                        margin: '6px 2px',
-                        background:
-                          'linear-gradient(90deg, transparent, rgba(255,255,255,0.10), rgba(255,255,255,0.06), transparent)',
-                        boxShadow:
-                          '0 0 10px rgba(255,215,0,0.06), 0 0 12px rgba(74,158,255,0.05)',
-                      }}
+                  {/* WorkoutCalendar - fills remaining space */}
+                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                    <WorkoutCalendar
+                      onAddEffort={() => handleAddEffort('run')}
+                      onSelectType={handleSelectEffortType}
+                      onSelectWorkout={handleEditEffort}
+                      onViewCompleted={handleViewCompleted}
+                      onEditEffort={handleEditEffort}
+                      onDateSelect={handleDateSelect}
+                      selectedDate={selectedDate}
+                      onSelectRoutine={handleSelectRoutine}
+                      onOpenPlanBuilder={handleOpenPlanBuilder}
+                      currentPlans={currentPlans as any}
+                      completedPlans={completedPlans as any}
+                      workouts={workouts}
+                      plannedWorkouts={[]}
                     />
-
-                    {/* Schedule - extend down to use available space */}
-                    <div
-                      style={{
-                        flex: 1,
-                        minHeight: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        overflow: 'hidden',
-                        // Let the calendar read as its own module card (clear chassis edge)
-                        marginLeft: 0,
-                        marginRight: 0,
-                      }}
-                    >
-                      <div className="instrument-card glass-card" style={{ padding: 8, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-                        <WorkoutCalendar
-                          onAddEffort={() => handleAddEffort('run')}
-                          onSelectType={handleSelectEffortType}
-                          onSelectWorkout={handleEditEffort}
-                          onViewCompleted={handleViewCompleted}
-                          onEditEffort={handleEditEffort}
-                          onDateSelect={handleDateSelect}
-                          selectedDate={selectedDate}
-                          onSelectRoutine={handleSelectRoutine}
-                          onOpenPlanBuilder={handleOpenPlanBuilder}
-                          currentPlans={currentPlans as any}
-                          completedPlans={completedPlans as any}
-                          workouts={workouts}
-                          plannedWorkouts={[]}
-                        />
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>

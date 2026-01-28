@@ -1485,7 +1485,7 @@ export default function WorkoutCalendar({
           return (
             // Let the footer absorb extra height so swim/bike lines can fit,
             // while keeping day row sizing unchanged.
-            <div className="pt-3 pb-4 border-t border-white/10 flex flex-col justify-end" style={{ backgroundColor: 'rgba(255,0,0,0.3)' }}>
+            <div className="pt-3 pb-4 border-t border-white/10 flex flex-col justify-end" style={{ height: '100%' }}>
               {/* Spacer to push content down */}
               <div className="flex-1" />
               
