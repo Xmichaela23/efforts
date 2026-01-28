@@ -904,8 +904,8 @@ export default function WorkoutCalendar({
       </div>
 
       {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
-      {/* Let rows expand to use leftover vertical space in the calendar card. */}
-      <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, auto) 1fr', gap: 4, flex: 1, minHeight: 0, paddingBottom: 4, position: 'relative', zIndex: 1 }}>
+      {/* Grid sizes to content; workload section is a flex sibling that fills remaining space */}
+      <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, auto)', gap: 4, flexShrink: 0, paddingBottom: 4, position: 'relative', zIndex: 1 }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -1346,8 +1346,10 @@ export default function WorkoutCalendar({
             </button>
           );
         })}
+      </div>
         
-        {/* Total Workload - Separate panel pinned to bottom of timeline */}
+      {/* Total Workload - Flex sibling that fills remaining space */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {(() => {
           // Collect all metrics
           const metrics: Array<{ label: string; value: string }> = [];
