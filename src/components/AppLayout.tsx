@@ -1397,18 +1397,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   }
 
   // Training baselines is now included in main layout flow below
-
-
-  if (loading) {
-    return (
-      <div className="mobile-app-container">
-        <div className="flex items-center justify-center h-full">
-          <div className="text-lg">Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
+  // Show dashboard immediately; workouts load in background (avoids stuck "Loading..." on slow iOS)
   const currentWorkout = dateWorkouts[currentWorkoutIndex];
 
   const handleGlobalRefresh = async () => {
