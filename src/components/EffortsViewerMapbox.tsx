@@ -880,6 +880,7 @@ function EffortsViewerMapbox({
   
   // Segment click state
   const [selectedSegment, setSelectedSegment] = useState<SegmentEffort | null>(null);
+  const [showPRCard, setShowPRCard] = useState(false);
   
   // Memoize segments to prevent re-renders from clearing them
   const memoizedSegments = useMemo(() => {
@@ -1721,22 +1722,30 @@ function EffortsViewerMapbox({
             loading={weatherLoading}
             fallbackTemperature={workoutData?.avg_temperature ? Number(workoutData.avg_temperature) : undefined}
           />
-          {/* PR count badge */}
+          {/* PR count badge - tap to open PR card */}
           {(() => {
-            const prCount = memoizedSegments?.filter(s => s.pr_rank === 1).length || 0;
+            const prSegments = memoizedSegments?.filter(s => s.pr_rank === 1) ?? [];
+            const prCount = prSegments.length;
             if (prCount === 0) return null;
             return (
-              <span style={{ 
-                background: '#fef3c7', 
-                color: '#92400e', 
-                fontSize: 12, 
-                fontWeight: 600, 
-                padding: '2px 8px', 
-                borderRadius: 12,
-                whiteSpace: 'nowrap'
-              }}>
+              <button
+                type="button"
+                onClick={() => setShowPRCard(true)}
+                style={{ 
+                  background: '#fef3c7', 
+                  color: '#92400e', 
+                  fontSize: 12, 
+                  fontWeight: 600, 
+                  padding: '2px 8px', 
+                  borderRadius: 12,
+                  whiteSpace: 'nowrap',
+                  border: '1px solid rgba(251,191,36,0.5)',
+                  cursor: 'pointer',
+                }}
+                className="hover:opacity-90 active:opacity-80 transition-opacity"
+              >
                 {prCount} PR{prCount > 1 ? 's' : ''}
-              </span>
+              </button>
             );
           })()}
           {memoizedSegments && memoizedSegments.length > 0 && (
@@ -1772,6 +1781,83 @@ function EffortsViewerMapbox({
           {theme === 'outdoor' ? 'Hybrid' : theme === 'hybrid' ? 'Topo' : 'Outdoor'}
         </button>
       </div>
+
+      {/* PR card - opens when tapping "1 PR" badge */}
+      {showPRCard && (() => {
+        const prSegments = memoizedSegments?.filter(s => s.pr_rank === 1) ?? [];
+        if (prSegments.length === 0) return null;
+        return (
+          <div
+            style={{
+              margin: '0 6px 10px 6px',
+              padding: '12px 14px',
+              background: 'linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)',
+              border: '1px solid rgba(251,191,36,0.5)',
+              borderRadius: 12,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#78350f', letterSpacing: '0.3px' }}>
+                Personal Records
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowPRCard(false)}
+                className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-200/60 hover:bg-amber-200/80 text-amber-900 transition-colors"
+                aria-label="Close PR card"
+              >
+                ×
+              </button>
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {prSegments.map((seg) => (
+                <li key={seg.name}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSegment(seg);
+                      setShowPRCard(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 0',
+                      borderBottom: '1px solid rgba(251,191,36,0.25)',
+                      background: 'transparent',
+                      borderLeft: 'none',
+                      borderRight: 'none',
+                      borderTop: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      fontFamily: 'inherit',
+                    }}
+                    className="hover:bg-amber-100/50 active:bg-amber-100/70 rounded-lg transition-colors last:border-b-0"
+                  >
+                    <span style={{ fontWeight: 600, color: '#1f2937', fontSize: 14 }}>{seg.name}</span>
+                    <span style={{ fontSize: 13, color: '#6b7280' }}>
+                      {seg.elapsed_time != null && (
+                        <span style={{ marginRight: 12 }}>
+                          {Math.floor(seg.elapsed_time / 60)}:{String(seg.elapsed_time % 60).padStart(2, '0')}
+                        </span>
+                      )}
+                      {seg.distance != null && (
+                        <span>
+                          {useMiles
+                            ? `${(seg.distance / 1609.34).toFixed(2)} mi`
+                            : `${(seg.distance / 1000).toFixed(2)} km`}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })()}
 
       {/* Map (MapLibre) or Indoor/Virtual Activity Placeholder */}
       {isVirtualActivity(workoutData) ? (

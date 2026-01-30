@@ -379,7 +379,7 @@ export default function MapEffort({
         });
       }
       
-      // PR halo - dark outline under PR segment so it stands out on satellite/busy maps
+      // PR halo - subtle dark outline so PR segment stands out without being heavy
       if (!map.getLayer(SEGMENT_PR_HALO)) {
         map.addLayer({
           id: SEGMENT_PR_HALO,
@@ -388,14 +388,14 @@ export default function MapEffort({
           filter: ['==', ['get', 'isPR'], true],
           paint: {
             'line-color': '#1f2937',
-            'line-width': 14,
-            'line-opacity': 0.9
+            'line-width': 10,
+            'line-opacity': 0.85
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
         });
       }
       
-      // PR segment line - bright gold on top of halo so PRs don't get lost
+      // PR segment line - gold on top of halo (moderate width)
       if (!map.getLayer(SEGMENT_PR_LINE)) {
         map.addLayer({
           id: SEGMENT_PR_LINE,
@@ -404,7 +404,7 @@ export default function MapEffort({
           filter: ['==', ['get', 'isPR'], true],
           paint: {
             'line-color': '#fbbf24',  // Amber/gold for PRs
-            'line-width': 9,
+            'line-width': 7,
             'line-opacity': 1
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
@@ -628,7 +628,7 @@ export default function MapEffort({
         // Brighten the appropriate layer
         if (isPR) {
           map.setPaintProperty(SEGMENT_PR_LINE, 'line-opacity', 1);
-          map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 11);
+          map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 9);
         } else {
           map.setPaintProperty(SEGMENT_LINE, 'line-opacity', 1);
           map.setPaintProperty(SEGMENT_LINE, 'line-width', 7);
@@ -665,7 +665,7 @@ export default function MapEffort({
       map.setPaintProperty(SEGMENT_LINE, 'line-opacity', 0.9);
       map.setPaintProperty(SEGMENT_LINE, 'line-width', 5);
       map.setPaintProperty(SEGMENT_PR_LINE, 'line-opacity', 1);
-      map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 9);
+      map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 7);
     };
     
     // Add handlers to hit zone layer
