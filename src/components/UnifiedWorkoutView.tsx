@@ -781,6 +781,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         touchAction: 'pan-y pinch-zoom'
       }}
     >
+      {/* Instrument panel texture for app continuity with dashboard */}
+      <div aria-hidden className="instrument-panel-texture" style={{ zIndex: 0 }} />
       {/* Omni environment field (match header/tabbar supernova, with discipline tint) */}
       <div
         aria-hidden
