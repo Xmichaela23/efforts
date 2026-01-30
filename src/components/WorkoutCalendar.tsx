@@ -1118,7 +1118,7 @@ export default function WorkoutCalendar({
                               className="inline-flex items-center justify-center tabular-nums"
                               style={{
                                 marginLeft: 8,
-                                width: 18,
+                                width: 22,
                                 height: 12,
                                 position: 'relative',
                                 verticalAlign: 'middle',
@@ -1133,7 +1133,7 @@ export default function WorkoutCalendar({
                                   left: '50%',
                                   top: -6,
                                   transform: 'translateX(-50%)',
-                                  width: 18,
+                                  width: 22,
                                   height: 6,
                                   pointerEvents: 'none',
                                   backgroundImage: `
@@ -1152,27 +1152,21 @@ export default function WorkoutCalendar({
                               <span
                                 aria-hidden="true"
                                 style={{
-                                  // Wider “illuminati” triangle (less teepee)
-                                  width: 18,
+                                  width: 22,
                                   height: 12,
-                                  // Slightly wider base + a sharper apex
                                   position: 'relative',
                                   backgroundImage: `
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.92) 40%, rgba(${pillRgb},0.92) 60%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.88) 35%, rgba(${pillRgb},0.88) 65%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.84) 30%, rgba(${pillRgb},0.84) 70%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.80) 25%, rgba(${pillRgb},0.80) 75%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.76) 20%, rgba(${pillRgb},0.76) 80%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.72) 15%, rgba(${pillRgb},0.72) 85%, rgba(${pillRgb},0.0) 100%)
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.72) 40%, rgba(${pillRgb},0.72) 60%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.76) 35%, rgba(${pillRgb},0.76) 65%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.80) 30%, rgba(${pillRgb},0.80) 70%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.82) 25%, rgba(${pillRgb},0.82) 75%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.78) 20%, rgba(${pillRgb},0.78) 80%, rgba(${pillRgb},0.0) 100%),
+                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.72) 28%, rgba(${pillRgb},0.72) 72%, rgba(${pillRgb},0.0) 100%)
                                   `,
                                   backgroundRepeat: 'no-repeat',
-                                  backgroundSize: '4px 1.5px, 7px 1.5px, 10px 1.5px, 13px 1.5px, 16px 1.5px, 18px 1.5px',
+                                  backgroundSize: '4px 1.25px, 7px 1.25px, 10px 1.25px, 13px 1.25px, 16px 1.25px, 22px 0.5px',
                                   backgroundPosition: 'center 0px, center 2px, center 4px, center 6px, center 8px, center 10px',
-                                  filter: `
-                                    drop-shadow(0 0 2px rgba(${pillRgb},0.6))
-                                    drop-shadow(0 0 4px rgba(${pillRgb},0.4))
-                                    drop-shadow(0 0 8px rgba(${pillRgb},0.25))
-                                  `,
+                                  filter: 'none',
                                 }}
                               />
                             </span>
