@@ -1176,13 +1176,16 @@ function calculatePlanProgress(
   // Link planned -> completed conservatively:
   // - Primary: planned_id match (high confidence)
   // - Secondary: same-day discipline match (medium confidence)
+  // Use "contains" normalization so planned names like "Long Run", "Easy Run", "Run — Tempo"
+  // and completed types like "run", "running", "Run" all map to the same discipline.
   const normalizeSportTypeLocal = (type: string): string => {
     const t = (type || '').toLowerCase();
-    if (t === 'run' || t === 'running') return 'run';
-    if (t === 'ride' || t === 'bike' || t === 'cycling') return 'bike';
-    if (t === 'swim' || t === 'swimming') return 'swim';
-    if (t === 'strength' || t === 'strength_training' || t === 'weight' || t === 'weights') return 'strength';
-    if (t === 'mobility' || t === 'pilates' || t === 'yoga' || t === 'pilates_yoga' || t === 'stretch') return 'mobility';
+    if (t.includes('swim')) return 'swim';
+    if (t.includes('ride') || t.includes('bike') || t.includes('cycl')) return 'bike';
+    if (t.includes('run') || t.includes('jog')) return 'run';
+    if (t.includes('walk') || t.includes('hike')) return 'run'; // treat walk as run for matching
+    if (t.includes('strength') || t.includes('weight')) return 'strength';
+    if (t.includes('mobility') || t.includes('pilates') || t.includes('yoga') || t.includes('stretch') || t === 'pt') return 'mobility';
     return 'other';
   };
 
@@ -1417,16 +1420,16 @@ function generateInsights(
         insights.push({
           type: 'weekly_jump',
           severity: 'info',
-          message: `ACWR ${acwr.ratio.toFixed(2)} is low vs your 28-day base. If you're following your plan, stay the course—this isn't a cue to add extra volume.`,
+          message: `You're on plan—stay the course. This low ACWR isn't a cue to add extra volume.`,
           data: { ratio: acwr.ratio, plan_progress: planProgress }
         });
       }
     } else {
-      // No planned workload available — do not prescribe.
+      // No planned workload available — we still know they have a plan (we're in hasActivePlan).
       insights.push({
         type: 'weekly_jump',
         severity: 'info',
-        message: `ACWR ${acwr.ratio.toFixed(2)} is low vs your 28-day base. If you're following your plan, stay the course—this isn't a cue to add extra volume.`,
+        message: `You're on plan—stay the course. This low ACWR isn't a cue to add extra volume.`,
         data: { ratio: acwr.ratio }
       });
     }

@@ -190,6 +190,12 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           <div className="mt-1 text-xs text-white/50">
             Workload (to-date): {Math.round(data.plan_progress.completed_to_date_total)} / {Math.round(data.plan_progress.planned_to_date_total)} planned
           </div>
+
+          {(data.plan_progress.match_confidence ?? 0) < 0.5 && (
+            <div className="mt-2 text-xs text-white/40 italic">
+              Low match: start workouts from your plan so we can link them. The % above is total workload vs planned workload for the week so far.
+            </div>
+          )}
         </div>
       )}
 

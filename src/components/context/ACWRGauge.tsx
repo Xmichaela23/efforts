@@ -26,8 +26,14 @@ export const ACWRGauge: React.FC<ACWRGaugeProps> = ({ acwr, showProjected = true
   const config = ACWR_STATUS_CONFIG[acwr.status];
   const hasActivePlan = !!acwr.plan_context?.hasActivePlan;
   const weekIntent = acwr.plan_context?.weekIntent;
-  const isPlanLow = hasActivePlan && (weekIntent === 'build' || weekIntent === 'baseline' || weekIntent === 'peak') && acwr.status === 'undertrained';
+  const isBuildBaselinePeak = weekIntent === 'build' || weekIntent === 'baseline' || weekIntent === 'peak';
+  const isPlanLow = hasActivePlan && isBuildBaselinePeak && acwr.status === 'undertrained';
   const statusLabelOverride = isPlanLow ? 'Below Base' : config.label;
+  // Same override for projected: when on plan (build/baseline/peak), show "Below Base" instead of "Undertrained"
+  const projectedConfig = acwr.projected ? ACWR_STATUS_CONFIG[acwr.projected.status] : null;
+  const projectedLabelOverride = projectedConfig && hasActivePlan && isBuildBaselinePeak && acwr.projected?.status === 'undertrained'
+    ? 'Below Base'
+    : projectedConfig?.label;
   
   // Calculate gauge position (0.5 = leftmost, 2.0 = rightmost)
   // Map 0.5-2.0 range to 0-100%
@@ -189,11 +195,11 @@ export const ACWRGauge: React.FC<ACWRGaugeProps> = ({ acwr, showProjected = true
       </div>
 
       {/* Projected ACWR */}
-      {showProjected && acwr.projected && (
+      {showProjected && acwr.projected && projectedConfig && (
         <div className="mt-3 pt-3 border-t border-white/10 text-sm text-white/70">
           <span className="text-white/50">If you complete today's workout: </span>
-          <span className={ACWR_STATUS_CONFIG[acwr.projected.status].textClass}>
-            {acwr.projected.ratio.toFixed(2)} ({ACWR_STATUS_CONFIG[acwr.projected.status].label})
+          <span className={projectedConfig.textClass}>
+            {acwr.projected.ratio.toFixed(2)} ({projectedLabelOverride ?? projectedConfig.label})
           </span>
         </div>
       )}
