@@ -507,15 +507,31 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     ? serverPlannedLight.map((s:any)=> ({ id: s.planned_step_id || undefined, planned_index: s.planned_index, distanceMeters: s.meters, duration: s.seconds }))
     : [];
   // Derive compact pace-only rows from the same source the Planned tab renders
-  // Client-side FTP calculations removed - now handled by server
-  // Server processes power ranges and provides them in planned.steps
-  // Prefer structured steps when present; otherwise use light steps
-  // Display steps come from full planned steps when available, else light
-  // Server now handles all power/pace calculations, so no client-side description parsing needed
+  // For unplanned runs: use interval_breakdown from workout_analysis (one row = analysis)
+  const intervalBreakdownForUnplanned = (completed as any)?.workout_analysis?.detailed_analysis?.interval_breakdown;
+  const unplannedIntervals = intervalBreakdownForUnplanned?.available && Array.isArray(intervalBreakdownForUnplanned?.intervals)
+    ? intervalBreakdownForUnplanned.intervals
+    : [];
+  const stepsFromUnplanned = unplannedIntervals.length > 0 && !planned
+    ? unplannedIntervals.map((iv: any, idx: number) => ({
+        id: iv.interval_id || 'unplanned_interval',
+        kind: iv.interval_type || 'work',
+        type: iv.interval_type || 'work',
+        planned_index: idx,
+        seconds: iv.planned_duration_s || iv.actual_duration_s,
+        duration_s: iv.actual_duration_s,
+        distanceMeters: iv.actual_distance_m,
+        pace_range: (iv.planned_pace_range_lower != null && iv.planned_pace_range_upper != null)
+          ? { lower: iv.planned_pace_range_lower, upper: iv.planned_pace_range_upper }
+          : undefined,
+      }))
+    : [];
   const steps: any[] = (
     plannedStepsFull.length > 0
       ? plannedStepsFull
-      : plannedStepsLight
+      : plannedStepsLight.length > 0
+        ? plannedStepsLight
+        : stepsFromUnplanned
   );
   if (!steps.length) {
     steps.push({ kind: 'steady', id: 'overall', planned_index: 0, seconds: (planned as any)?.computed?.total_duration_seconds || undefined });
@@ -2168,6 +2184,19 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 const ix = Number((st as any)?.planned_index);
                 if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null;
               }
+              // Unplanned: row comes from interval_breakdown (not computed.intervals)
+              if (!row && !planned && unplannedIntervals[idx]) {
+                const iv = unplannedIntervals[idx];
+                row = {
+                  ...iv,
+                  executed: {
+                    distance_m: iv.actual_distance_m,
+                    duration_s: iv.actual_duration_s,
+                    avg_pace_s_per_mi: iv.actual_pace_min_per_mi,
+                  },
+                  planned_label: iv.planned_label || (iv.interval_type === 'work' ? `Work · ${iv.actual_duration_s ? `${Math.round(iv.actual_duration_s / 60)} min` : ''}` : String(iv.interval_type || '')),
+                };
+              }
             }
             // Use enhanced analysis adherence percentage if available (works for both running and cycling)
             const getEnhancedAdherence = () => {
@@ -2392,7 +2421,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           if (hasNothing) {
             return (
               <div className="mt-4 px-3 pb-4">
-                <p className="text-sm text-gray-500 italic">No summary for this workout. Re-attach to a planned workout and open the Summary tab to generate insights.</p>
+                <p className="text-sm text-gray-500 italic">
+                  {planned
+                    ? 'No summary for this workout. Re-attach to a planned workout and open the Performance tab to generate execution insights.'
+                    : 'No analysis for this workout yet. Analysis runs automatically for new runs; refresh or re-open to see results.'}
+                </p>
               </div>
             );
           }

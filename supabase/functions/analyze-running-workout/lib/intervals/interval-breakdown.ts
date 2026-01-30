@@ -86,6 +86,14 @@ export function generateIntervalBreakdown(
         }
       }
     }
+    // Fallback: derive pace from interval's actual duration + distance when no other source (e.g. no sample indices or sensor pace)
+    if (actualPace <= 0 && actualDuration > 0 && intervalDistanceM > 0) {
+      const miles = intervalDistanceM / 1609.34;
+      if (miles > 0) {
+        actualPace = actualDuration / miles; // seconds per mile
+        console.log(`🔍 [PACE FALLBACK] Interval ${index + 1}: pace from duration=${actualDuration}s, distance=${intervalDistanceM}m → ${actualPace.toFixed(0)}s/mi`);
+      }
+    }
     
     // Calculate duration adherence: how close actual is to planned (not just ratio)
     // If planned is 250s and actual is 245s, adherence = 100 - |245-250|/250 * 100 = 98%

@@ -1468,7 +1468,7 @@ function generateAdherenceSummary(
   const isTaperContext = planContext?.isTaperWeek || planContext?.weekIntent === 'taper';
   const isBuildContext = planContext?.weekIntent === 'build' || planContext?.weekIntent === 'peak';
   const weekNumber = planContext?.weekIndex;
-  const phaseName = planContext?.phaseName;
+  const currentPhaseName = planContext?.phaseName ?? null;
   
   console.log(`🔍 [EXPLANATION CONTEXT] isEasyOrRecoveryRun=${isEasyOrRecoveryRun}, planContext=${planContext ? JSON.stringify({ weekIntent: planContext.weekIntent, isRecoveryWeek: planContext.isRecoveryWeek, weekIndex: planContext.weekIndex }) : 'none'}`);
 
@@ -1678,44 +1678,43 @@ function generateAdherenceSummary(
     verdict = "Physiologically efficient, but tactically over-paced for a recovery day.";
   }
 
-  // Plan impact: use phaseName and weekFocusLabel to explain trade-offs (consequence, not restatement)
+  // Plan impact: use currentPhaseName and weekFocusLabel to explain trade-offs (consequence, not restatement)
   let focus = 'Adherence';
   let outlook = '';
-  const phaseName = planContext?.phaseName || '';
   const weekFocus = planContext?.weekFocusLabel || '';
 
   if (planContext?.hasActivePlan) {
     if (isRecoveryContext) {
       focus = 'Recovery Integrity';
       if (fastDominant) {
-        outlook = phaseName
-          ? `This extra effort in the ${phaseName} phase may dampen the supercompensation intended for this rest block.${weekFocus ? ` Consider a more conservative approach to ${weekFocus.toLowerCase()}.` : ''}`
+        outlook = currentPhaseName
+          ? `This extra effort in the ${currentPhaseName} phase may dampen the supercompensation intended for this rest block.${weekFocus ? ` Consider a more conservative approach to ${weekFocus.toLowerCase()}.` : ''}`
           : "By exceeding the pace today, you turned a recovery session into a moderate-intensity run. This may dampen the supercompensation effect intended for this rest block.";
       } else if (slowDominant) {
-        outlook = phaseName
-          ? `Slower-than-target pacing in ${phaseName} supports adaptation and sets you up well for the next build.`
+        outlook = currentPhaseName
+          ? `Slower-than-target pacing in ${currentPhaseName} supports adaptation and sets you up well for the next build.`
           : "Slower-than-target pacing on this recovery day supports adaptation and sets you up well for the next build phase.";
       }
     } else if (isBuildContext) {
       focus = 'Build Execution';
       if (fastDominant) {
-        outlook = phaseName
-          ? `Strong execution in ${phaseName}; this extra load may necessitate a more conservative approach to your next key session.${weekFocus ? ` Focus: ${weekFocus}.` : ''}`
+        outlook = currentPhaseName
+          ? `Strong execution in ${currentPhaseName}; this extra load may necessitate a more conservative approach to your next key session.${weekFocus ? ` Focus: ${weekFocus}.` : ''}`
           : "Strong execution; keep an eye on cumulative fatigue as the block progresses.";
       } else if (slowDominant) {
-        outlook = phaseName
-          ? `Missed target stimulus in ${phaseName} may reduce the intended training load for this block.${weekFocus ? ` Adjust ${weekFocus.toLowerCase()} as needed.` : ''}`
+        outlook = currentPhaseName
+          ? `Missed target stimulus in ${currentPhaseName} may reduce the intended training load for this block.${weekFocus ? ` Adjust ${weekFocus.toLowerCase()} as needed.` : ''}`
           : "Missed target stimulus today may reduce the intended training load for this phase.";
       }
     } else if (isTaperContext) {
       focus = 'Taper Discipline';
-      outlook = phaseName
-        ? `Sticking to prescribed effort in ${phaseName} protects race-day readiness.`
+      outlook = currentPhaseName
+        ? `Sticking to prescribed effort in ${currentPhaseName} protects race-day readiness.`
         : "Sticking to prescribed effort in taper protects race-day readiness.";
     }
   }
-  if (!outlook && phaseName) {
-    outlook = `This effort fits within your current phase (${phaseName}).`;
+  if (!outlook && currentPhaseName) {
+    outlook = `This effort fits within your current phase (${currentPhaseName}).`;
   }
 
   // Overall context (no plan): still give a useful outlook — pacing consequence + HR when available

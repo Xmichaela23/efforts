@@ -221,8 +221,14 @@ Deno.serve(async (req) => {
         }
         console.log('[auto-attach-planned] Workout linked successfully');
         
-        // FIX: No function triggers - ingest-activity handles orchestration
-        // This ensures deterministic ordering (planned_id exists before analysis runs)
+        // Trigger run analysis when user attaches (pace + summary); fire-and-forget
+        if (finalSport === 'run') {
+          const baseUrl = Deno.env.get('SUPABASE_URL');
+          const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+          fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) })
+            .then(() => fetch(`${baseUrl}/functions/v1/analyze-running-workout`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) }))
+            .catch(e => console.error('[auto-attach-planned] Run analysis trigger error:', e));
+        }
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       } catch (explicitError: any) {
         console.error('[auto-attach-planned] Explicit attach error:', explicitError);
@@ -475,8 +481,14 @@ Deno.serve(async (req) => {
 
     console.log('[auto-attach-planned] heuristic: Workout linked successfully');
     
-    // FIX: No function triggers - ingest-activity handles orchestration
-    // This ensures deterministic ordering (planned_id exists before analysis runs)
+    // Trigger run analysis when attach matches a run (pace + summary); fire-and-forget
+    if (finalSport === 'run') {
+      const baseUrl = Deno.env.get('SUPABASE_URL');
+      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+      fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) })
+        .then(() => fetch(`${baseUrl}/functions/v1/analyze-running-workout`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) }))
+        .catch(e => console.error('[auto-attach-planned] Run analysis trigger error:', e));
+    }
     return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
     console.error('[auto-attach-planned] Error:', e);

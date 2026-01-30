@@ -1086,9 +1086,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         }
       } catch {}
       setSelectedWorkout(row);
-      // If workout is attached to a planned workout, show Adherence tab; otherwise Details
-      const isLinked = Boolean((row as any)?.planned_id);
-      setActiveTab(isLinked ? 'summary' : 'completed');
+      // Completed: open on Performance tab (execution scores when linked, analysis when unplanned)
+      setActiveTab('summary');
     } else if (status === 'planned') {
       // Planned workout: open in UnifiedWorkoutView on Planned sub-tab
       setShowAllPlans(false);

@@ -68,7 +68,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
   const [currentPlannedId, setCurrentPlannedId] = useState<string | null>((workout as any)?.planned_id || null);
   const hasLink = Boolean(currentPlannedId);
-  const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? (hasLink ? 'summary' : 'completed') : 'planned'));
+  const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'summary' : 'planned'));
   const [editingInline, setEditingInline] = useState(false);
   const [assocOpen, setAssocOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
@@ -386,10 +386,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {
-    const linked = Boolean((workout as any)?.planned_id) || Boolean(linkedPlanned?.id);
-    const desired = initialTab || (isCompleted ? (linked ? 'summary' : 'completed') : 'planned');
+    const desired = initialTab || (isCompleted ? 'summary' : 'planned');
     setActiveTab(desired);
-  }, [initialTab, isCompleted, (workout as any)?.planned_id, linkedPlanned?.id, workout?.id]);
+  }, [initialTab, isCompleted, workout?.id]);
 
   // Strict server coordination on Summary open: ensure attach+compute without client fallbacks
   useEffect(() => {
@@ -1051,12 +1050,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
       {/* Tabs - conditionally show based on link status */}
       {/* Planned workout (not completed): Planned tab only */}
-      {/* Completed + linked: Planned, Adherence, Details */}
-      {/* Completed + not linked: Details only */}
+      {/* Completed + linked: Planned, Performance, Details */}
+      {/* Completed + not linked: Performance, Details */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList
           className={`grid w-full bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-0 py-0 ${
-          !isCompleted ? 'grid-cols-1' : (isLinked ? 'grid-cols-3' : 'grid-cols-1')
+          !isCompleted ? 'grid-cols-1' : (isLinked ? 'grid-cols-3' : 'grid-cols-2')
         }`}
           style={{
             borderColor: `rgba(${sportRgb}, 0.16)`,
@@ -1071,11 +1070,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               Planned
             </TabsTrigger>
           )}
-          {/* Adherence tab: only show for completed+linked */}
-          {isCompleted && isLinked && (
+          {/* Performance tab: show for all completed (planned = execution scores, unplanned = analysis) */}
+          {isCompleted && (
             <TabsTrigger value="summary" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
               <ListCollapse className="h-4 w-4" />
-              Adherence
+              Performance
             </TabsTrigger>
           )}
           {/* Details tab: only show for completed workouts */}
@@ -1224,7 +1223,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             </div>
           </TabsContent>
 
-          {/* Adherence Tab - only rendered when linked, so no need for unlinked state */}
+          {/* Performance Tab - execution (linked) or analysis (unplanned) */}
           <TabsContent value="summary" className="flex-1 p-2">
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'p-4' : ''}>
