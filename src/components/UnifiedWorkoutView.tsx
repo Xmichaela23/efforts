@@ -833,11 +833,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         style={{
           backgroundImage: `
             radial-gradient(1200px 680px at 50% 24%, rgba(${sportRgb}, 0.08) 0%, rgba(0,0,0,0) 62%),
-            radial-gradient(900px 520px at 50% 110%, rgba(${sportRgb}, 0.06) 0%, rgba(0,0,0,0) 65%)
+            radial-gradient(1000px 600px at 50% 110%, rgba(${sportRgb}, 0.18) 0%, rgba(0,0,0,0) 58%),
+            radial-gradient(900px 520px at 50% 92%, rgba(${sportRgb}, 0.16) 0%, rgba(0,0,0,0) 55%)
           `,
           mixBlendMode: 'screen',
-          opacity: 0.55,
-          filter: 'blur(10px) saturate(1.08)',
+          opacity: 0.62,
+          filter: 'blur(10px) saturate(1.12)',
           transform: 'translateZ(0)',
         }}
       />
@@ -845,7 +846,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
-          backgroundImage: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.82) 100%)',
+          backgroundImage: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.58) 100%)',
         }}
       />
       <div 
@@ -1544,7 +1545,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           }}
         />
       )}
-      {/* Instrument panel texture ON TOP so it's always visible (pointer-events: none so taps pass through) */}
+      {/* Instrument panel texture full-screen so it covers entire details (incl. splits) */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -1552,19 +1553,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           zIndex: 20,
           opacity: 1,
           mixBlendMode: 'soft-light',
-          backgroundColor: 'rgba(0,0,0,0.12)',
+          backgroundColor: 'rgba(0,0,0,0.22)',
           backgroundImage: `
-            repeating-linear-gradient(0deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 1px, transparent 1px, transparent 9px),
-            repeating-linear-gradient(90deg, rgba(255,255,255,0.10) 0px, rgba(255,255,255,0.10) 1px, transparent 1px, transparent 9px),
-            linear-gradient(45deg, rgba(255,255,255,0.50) 1px, transparent 1px),
-            linear-gradient(-45deg, rgba(255,255,255,0.38) 1px, transparent 1px),
-            linear-gradient(45deg, rgba(255,255,255,0.28) 1px, transparent 1px),
-            linear-gradient(-45deg, rgba(255,255,255,0.22) 1px, transparent 1px)
+            repeating-linear-gradient(0deg, rgba(255,255,255,0.22) 0px, rgba(255,255,255,0.22) 1px, transparent 1px, transparent 9px),
+            repeating-linear-gradient(90deg, rgba(255,255,255,0.18) 0px, rgba(255,255,255,0.18) 1px, transparent 1px, transparent 9px),
+            linear-gradient(45deg, rgba(255,255,255,0.65) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.52) 1px, transparent 1px),
+            linear-gradient(45deg, rgba(255,255,255,0.40) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.34) 1px, transparent 1px)
           `,
-          backgroundSize: '22px 22px, 22px 22px, 22px 22px, 22px 22px, 44px 44px, 44px 44px',
+          backgroundSize: '20px 20px, 20px 20px, 20px 20px, 20px 20px, 40px 40px, 40px 40px',
           backgroundPosition: 'center, center, center, center, center, center',
           backgroundBlendMode: 'soft-light, soft-light, soft-light, soft-light, soft-light, soft-light',
-          filter: 'blur(0.15px) contrast(1.06)',
+          filter: 'blur(0.2px) contrast(1.12)',
         }}
       />
     </div>
