@@ -781,8 +781,34 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         touchAction: 'pan-y pinch-zoom'
       }}
     >
-      {/* Instrument panel texture for app continuity with dashboard */}
-      <div aria-hidden className="instrument-panel-texture" style={{ zIndex: 0 }} />
+      {/* Instrument panel texture (heavy) for app continuity with dashboard */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          zIndex: 0,
+          opacity: 1,
+          mixBlendMode: 'soft-light',
+          backgroundColor: 'rgba(0,0,0,0.28)',
+          backgroundImage: `
+            radial-gradient(ellipse at 12% 18%, rgba(255, 215, 0, 0.12) 0%, transparent 60%),
+            radial-gradient(ellipse at 48% 8%, rgba(183, 148, 246, 0.18) 0%, transparent 60%),
+            radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.20) 0%, transparent 60%),
+            radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.14) 0%, transparent 62%),
+            radial-gradient(ellipse at 32% 36%, rgba(239, 68, 68, 0.10) 0%, transparent 64%),
+            repeating-linear-gradient(0deg, rgba(255,255,255,0.09) 0px, rgba(255,255,255,0.09) 1px, transparent 1px, transparent 9px),
+            repeating-linear-gradient(90deg, rgba(255,255,255,0.075) 0px, rgba(255,255,255,0.075) 1px, transparent 1px, transparent 9px),
+            linear-gradient(45deg, rgba(255,255,255,0.42) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.32) 1px, transparent 1px),
+            linear-gradient(45deg, rgba(255,255,255,0.22) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.18) 1px, transparent 1px)
+          `,
+          backgroundSize: 'cover, cover, cover, cover, cover, cover, cover, 22px 22px, 22px 22px, 44px 44px, 44px 44px',
+          backgroundPosition: 'center, center, center, center, center, center, center, center, center, center, center',
+          backgroundBlendMode: 'screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light, soft-light, soft-light',
+          filter: 'blur(0.2px) saturate(1.12) contrast(1.04)',
+        }}
+      />
       {/* Omni environment field (match header/tabbar supernova, with discipline tint) */}
       <div
         aria-hidden
