@@ -1,5 +1,11 @@
 # Context API Protocol — Congruent Backend for Multisport Training
 
+**Single source of truth:** This document is the **authoritative specification** for Context API behavior: verdict logic, goal profiles, implementation reality (ACWR from actual workload, pace adherence from `planned_id`, single readiness algorithm), and API contract. Code and other docs (e.g. **CONTEXT_METRICS_INVENTORY.md**) should align with this protocol. For "what metrics exist and how they feed context," see the inventory; for "how the coach interprets them," this doc is the source of truth.
+
+**Smart server, dumb client:** All Context API logic runs on the server. The server computes ACWR, 3-run readiness, structural load, goal-predictor verdicts, and messaging; the client **only** fetches and displays the returned `weekly_verdict`, `goal_prediction`, `structural_load`, `acwr`, etc. The client does **no** readiness math, no verdict interpretation, and no goal-profile logic—display only.
+
+---
+
 ## Purpose
 
 Leading training platforms (TrainingPeaks, Garmin, Whoop) prioritize three narrative pillars for multisport athletes: **Integrated Load**, **Functional Readiness**, and **Long-term Adaptation**. The Context API protocol goes beyond "completed vs. planned" so the **Efforts** app can act as a unified "Head Coach" that understands how different disciplines—like a heavy Tuesday leg day and a Wednesday tempo run—interact biologically.
@@ -54,6 +60,22 @@ Both context endpoints return verdicts that answer one of two questions. The **v
 | **Verdict** | *"Ready for today's specific work"* | *"On track for the ultimate target"* |
 | **Endpoint** | `generate-training-context` | `generate-overall-context` |
 
+### Temporal Synchronicity (7-Day Boundary)
+
+The **weekly_verdict** must be derived solely from data within the **acute** window (current 7 days, or current plan week when a plan is active). This ensures the Head Coach interprets metabolic and mechanical stress within the same timeframe as **ACWR** and **Structural Load**.
+
+- **Rule:** All inputs to the weekly verdict (3-run average HR drift/pace, structural load, avg_rir_acute) use the acute window. No data from 10+ days ago may drive the readiness score.
+- **Rationale:** Prevents a "halo effect" where high performance from 10+ days ago masks a current systemic over-reach. Readiness answers *"Am I ready *this week*?"* — so only this week’s workload and run quality apply.
+- **Integrated logic:** When **ACWR > 1.3** (elevated systemic risk) and the **3-run HR drift trend** is increasing (worsening), the server should prioritize a "Systemic Fatigue" / over-reaching interpretation over a simple "Low Readiness" score — i.e. the coach sees that volume and aerobic strain are rising together.
+
+### Implementation Reality (Technical)
+
+The protocol’s math relies on **actual workload** and **ID-matching**, not learned baselines. Engineering distinctions:
+
+- **ACWR source:** The **ACWR ratio** is derived strictly from **Actual Workload** — acute and chronic **totals of `workload_actual`** from completed workouts. It does **not** use "Learned Fitness" or user baselines for this calculation.
+- **Pace adherence logic:** "Plan pace targets" are used **only when a completed run is explicitly linked to a `planned_id`** (and that planned workout has pace/steps). Otherwise, the analyzer uses structure-based adherence (e.g. Z2 gating, workout type).
+- **Unified algorithm:** There are **not** two separate code paths for "plan mode" vs "no-plan mode." There is a **single readiness logic**; **messaging** (and ACWR insight wording) adjusts based on `goal_profile` and plan context (e.g. "on plan" vs "below base").
+
 ---
 
 ## 3. Cross-Discipline Interference
@@ -97,6 +119,41 @@ The protocol detects when the body's systems are out of sync and returns coachin
 | **`weekly_verdict`** | Readiness %, Message, Drivers, Label | Immediate go/no-go guidance for today's session (Functional Readiness). |
 | **`goal_prediction`** | Forecast, Goal Probability %, Interference, Durability Risk | Long-term confidence and "fade risk" alerts (Long-term Adaptation). |
 | **`structural_load`** | Strength Workload (Acute), **Avg RIR (Acute)** | Flags "heavy legs" / deep fatigue even when cardio feels fresh (Integrated Load). Low avg RIR = high-repair state. |
+
+### Integrated Verdict — How the Three Signals Work Together (7-Day Window)
+
+All three signals use the same acute 7-day window so the verdict reflects one coherent "state of the athlete" for the week.
+
+| Signal | Window | Role in "The Verdict" |
+| --- | --- | --- |
+| **3-Run Average** | 7 Days | **Aerobic Form:** Average HR drift and pace adherence across the last 3 runs in the acute window. Detects if the engine is handling pace/heat; trend (improving/worsening) can boost or contextualize readiness. |
+| **Structural Load** | 7 Days | **Mechanical Strain:** Strength workload sum + **avg_rir_acute**. Protects the chassis: high load or low RIR → "heart ready, legs need easy day" even when cardio is fresh. |
+| **ACWR** | 7 Days | **Systemic Risk:** Acute vs chronic workload ratio (from **actual workload** only). Checks if volume is building too fast for the athlete’s base; when high (e.g. >1.3) and 3-run drift is worsening, supports a "systemic over-reaching" message. |
+
+### Refined Stability Logic (Technical View)
+
+The **Training Stability (7d)** card interprets the same metrics differently depending on whether the user has an active plan. Same algorithm; different **interpretation** and messaging.
+
+| Pillar | With Active Plan | Without Plan (General) |
+| --- | --- | --- |
+| **Aerobic Form** | Uses **planned vs. actual** adherence when the run is linked to `planned_id`; otherwise 3-run average and trend. | Uses **3-run average** and trend (improving / stable / worsening). |
+| **Structural Load** | Detects if strength **workload / RIR** interferes with goal-specific tasks (e.g. "heart ready, legs need easy day" before a quality session). | Acts as a **biological guardrail** to prevent mechanical injury (same threshold: acute &gt;40 or avg_rir_acute &lt; 1.5). |
+| **Systemic Risk** | Evaluates **7-day volume** relative to plan’s ramp (ACWR insight wording; plan week vs rolling window). | Evaluates **7-day volume** (ACWR) relative to chronic base; flags spikes &gt;1.3. |
+
+### Integrated Verdict Behavior
+
+The system remains protective of the athlete regardless of plan status:
+
+- **No plan ("Trend as Truth"):** The coach relies on the **3-run average** and **ACWR** to indicate whether current habits are stable or risky. Messaging is goal_profile `general`.
+- **With plan ("Execution"):** The coach acts as a filter: **Structural Load** and **RIR** (deep fatigue) are checked so they don’t cause a "mechanical failure" before the next planned quality session. Messaging is goal-specific (e.g. marathon, strength).
+
+### Summary of Unified API Data Flow
+
+| Object | Implementation Detail | User Value |
+| --- | --- | --- |
+| **`weekly_verdict`** | 3-run average (HR drift, pace adherence) + acute **avg_rir_acute** &lt; 1.5 threshold; single readiness logic; message varies by `goal_profile`. | Go/no-go based on current systemic strain. |
+| **`structural_load`** | Derived from **`workload_actual`** (acute strength sum) and **avg_rir_acute** from `strength_exercises` in acute window. | Identifies "heavy legs" to protect the chassis. |
+| **`acwr`** | **Acute total / Chronic total** of completed workouts’ `workload_actual`. No Learned Fitness in formula. | Flags volume spikes that exceed historical base. |
 
 ### RIR vs. RPE in Context API
 

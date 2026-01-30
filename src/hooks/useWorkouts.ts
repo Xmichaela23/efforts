@@ -1894,13 +1894,12 @@ export const useWorkouts = () => {
       // Compute summary (fire-and-forget) to refresh metrics post-update
       const isRun = (t: string) => { const l = String(t || '').toLowerCase(); return l === 'run' || l === 'running'; };
       const isCompletedRun = isRun(data.type) && data.workout_status === 'completed';
-      const plannedIdChanged = updates.planned_id !== undefined;
       try {
         (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: id } } as any)
           .then(() => {
             try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-            // Re-run adherence/pace analysis when user attaches a planned workout (pace + summary)
-            if (isCompletedRun && plannedIdChanged) {
+            // Run adherence/pace/HR-drift analysis for any completed run so Readiness can show a verdict
+            if (isCompletedRun) {
               (supabase.functions.invoke as any)?.('analyze-running-workout', { body: { workout_id: id } } as any)
                 .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
                 .catch(() => {});

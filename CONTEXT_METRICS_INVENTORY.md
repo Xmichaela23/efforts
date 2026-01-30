@@ -1,6 +1,6 @@
 # Context API — Metrics Inventory
 
-This document lists **what metrics we have** in the system and **which we use** to power Context API predictions (Weekly Readiness, Block Trajectory, Structural Load, Interference, Durability).
+**Single source of truth for behavior:** For verdict logic, implementation reality (ACWR source, pace adherence, single readiness algorithm), and API contract, **CONTEXT_API_PROTOCOL.md** is the authoritative spec. This inventory lists **what metrics we have** in the system and **which we use** to power Context API predictions (Weekly Readiness, Block Trajectory, Structural Load, Interference, Durability). It aligns with the protocol; when in doubt, protocol wins. **Smart server, dumb client:** all verdict and readiness logic runs server-side; the client only displays the API response.
 
 ---
 
@@ -30,7 +30,7 @@ This document lists **what metrics we have** in the system and **which we use** 
 | **Execution adherence** | `workout_analysis.performance.execution_adherence` | (pace + duration) / 2. |
 | **Interval breakdown** | `workout_analysis.granular_analysis` (intervals) | Per-interval pace_adherence_percent, HR; used for interval narratives. |
 
-*Note: `workout_analysis` is populated by `analyze-running-workout` (and cycling/swim analyzers). HR drift and pace adherence are computed there; context reads them from the **most recent run** in the acute window.*
+*Note: `workout_analysis` is populated by `analyze-running-workout` (and cycling/swim analyzers). HR drift and pace adherence are computed there; context reads them from the **last 3 runs** in the acute window (see Data Availability below).*
 
 ### C. Planned workouts
 
@@ -128,11 +128,22 @@ So **user-logged RPE after endurance** exists and is prompted/displayed, but is 
 
 | Input | Source | How it’s used |
 |-------|--------|----------------|
-| **HR drift (bpm)** | Most recent **run** in acute window: `workout_analysis.granular_analysis.heart_rate_analysis.hr_drift_bpm` | 0 = best; +N bpm reduces readiness score. Thresholds: high/medium/low. |
-| **Pace adherence (%)** | Same run: `workout_analysis.performance.pace_adherence` | ~75% = neutral; &gt;75% boosts, &lt;75% reduces score. |
+| **HR drift (bpm)** | **Average** over last 3 runs in acute window: `workout_analysis.granular_analysis.heart_rate_analysis.hr_drift_bpm` | 0 = best; +N bpm reduces readiness score. Thresholds: high/medium/low. |
+| **Pace adherence (%)** | **Average** over same 3 runs: `workout_analysis.performance.pace_adherence`. Plan pace targets used **only when run is linked to `planned_id`**; otherwise structure-based (e.g. Z2 gating). | ~75% = neutral; &gt;75% boosts, &lt;75% reduces score. |
 | **Structural load (acute)** | Sum of **strength** `workload_actual` in acute window (`sport_breakdown.strength.workload`) | If &gt;40 and cardio “fresh” → append “heart ready, legs need easy day” and driver. |
+| **Trend (optional)** | HR drift from oldest to newest of the 3 runs | Improving → small readiness boost; worsening → contextualizes low readiness (e.g. systemic over-reaching when ACWR high). |
 
 *If there’s no run with `workout_analysis` in the acute window, we have no HR drift or pace adherence → no weekly_verdict (client shows “complete a run with HR…”).*
+
+
+#### Data Availability (Low-Volume Weeks)
+
+Weekly readiness uses only data **within the acute 7-day window** so the verdict stays aligned with ACWR and structural load.
+
+- **1–2 runs in acute window:** The system calculates **Recent Form** by averaging the available sessions (HR drift and pace adherence). A **Trend** (improving / stable / worsening) is only computed when there are **at least 2 runs** with HR drift in the window.
+- **0 runs in acute window:** The `weekly_verdict` is not computed so "Weekly" readiness reflects only current-week data. The UI shows an **Action Required** state: *"Complete a run with HR to see how ready you are for this week's intensity."*
+
+This keeps the coach from using old runs to mask a bad week and ensures that when the AI sees a "bad run," it considers the 7-day volume and strength history before issuing a verdict.
 
 ### Block Trajectory (Probability) — `generate-overall-context` → `goal_prediction`
 
@@ -174,7 +185,7 @@ So **user-logged RPE after endurance** exists and is prompted/displayed, but is 
 | **Duration adherence** | `workout_analysis.performance.duration_adherence` | Could fold into weekly readiness (e.g. with pace) or separate “session completeness” signal. |
 | **Execution adherence** | `workout_analysis.performance.execution_adherence` | Alternative or complement to pace_adherence for “Form” score. |
 | **Intensity factor (IF)** | `workouts.intensity_factor` or computed | Already used for ACWR, quality days, timeline; could feed “readiness” (e.g. recent high-IF load). |
-| **ACWR** | Computed in generate-training-context | Used for insights and gauge; not passed into goal-predictor. Could gate or weight verdict (e.g. very high ACWR → cap readiness). |
+| **ACWR** | Computed in generate-training-context from **actual workload** (acute/chronic sums of `workload_actual`). Does **not** use Learned Fitness. | Used for insights and gauge; not passed into goal-predictor. Could gate or weight verdict (e.g. very high ACWR → cap readiness). |
 | **RIR / estimated 1RM** | Strength exercises, computed.adaptation | Block: strength_progression. Weekly: **avg_rir_acute** (from acute strength workouts) is passed to goal-predictor and drives "deep fatigue" message when < 1.5. |
 | **user_baselines (FTP, threshold HR, 1RMs)** | user_baselines | Used for workload and adaptation gating; not used in goal-predictor. Could support “target vs current” messaging. |
 | **Plan progress (matched %, behind/ahead)** | generate-training-context | Used for insights and UI; not passed into goal-predictor. Could adjust verdict (e.g. “on track” vs “behind plan”). |
@@ -187,7 +198,7 @@ So **user-logged RPE after endurance** exists and is prompted/displayed, but is 
 
 | Prediction | Metrics used | Source |
 |------------|-------------|--------|
-| **Weekly Readiness (score + message)** | HR drift, Pace adherence | Most recent run `workout_analysis` in acute window |
+| **Weekly Readiness (score + message)** | HR drift (avg), Pace adherence (avg), Trend | Last 3 runs with `workout_analysis` in acute window |
 | **Structural vs. cardio message** | Structural load acute &gt; 40 **or** avg RIR acute &lt; 1.5, cardio fresh | `sport_breakdown.strength.workload`, **avg_rir_acute** (from acute strength workouts), weekly readiness |
 | **Block Goal Probability** | Aero %, Long-run %, Strength % | `fitness_adaptation_structured` (block-adaptation) |
 | **Race-day forecast** | Aero %, Long-run %, Target time | Block adaptation + plan config |
@@ -202,8 +213,8 @@ So **user-logged RPE after endurance** exists and is prompted/displayed, but is 
 
 1. **Weekly context**  
    - Load workouts (acute/chronic), planned week, plan context.  
-   - ACWR, sport_breakdown, timeline, plan_progress, insights from workloads and dates.  
-   - Latest run in acute window → `workout_analysis` → `hr_drift_bpm`, `pace_adherence` → goal-predictor **weekly** input.  
+   - ACWR (acute/chronic sums of `workload_actual` only; no Learned Fitness), sport_breakdown, timeline, plan_progress, insights from workloads and dates.  
+   - Last 3 runs in acute window → `workout_analysis` → average `hr_drift_bpm`, `pace_adherence` + trend → goal-predictor **weekly** input.  
    - Acute strength workouts → **avg_rir_acute** (average RIR across sets in acute window).  
    - goal-predictor **weekly** input: `structural_load_acute` = `sport_breakdown.strength.workload`, **avg_rir_acute**.  
    - Goal-predictor → `weekly_verdict`; response includes `structural_load` (`acute`, **avg_rir_acute**).

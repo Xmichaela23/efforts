@@ -15,7 +15,7 @@
  */
 
 import React from 'react';
-import { Loader2, RefreshCw, AlertCircle, Target } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle, Target, Activity, Dumbbell, TrendingUp } from 'lucide-react';
 import { useTrainingContext } from '@/hooks/useTrainingContext';
 import { ACWRGauge } from './ACWRGauge';
 import { TrainingLoadChart } from './TrainingLoadChart';
@@ -134,6 +134,65 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
       {/* ACWR Gauge */}
       <ACWRGauge acwr={data.acwr} />
 
+      {/* Training Stability: three pillars (7-day window) — how HR drift trend responds to ACWR and structural load */}
+      <div className="instrument-card">
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp className="w-4 h-4 text-white/50" />
+          <span className="text-sm font-medium text-white">Training Stability (7d)</span>
+        </div>
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2 text-white/70">
+              <Activity className="w-3.5 h-3.5 text-teal-400/80" />
+              <span>Aerobic form</span>
+              {data.weekly_readiness?.recent_form_trend && (
+                <span className={`text-xs capitalize ${data.weekly_readiness.recent_form_trend === 'improving' ? 'text-emerald-400' : data.weekly_readiness.recent_form_trend === 'worsening' ? 'text-amber-400' : 'text-white/50'}`}>
+                  ({data.weekly_readiness.recent_form_trend})
+                </span>
+              )}
+            </div>
+            <span className="text-white/90">
+              {data.weekly_verdict ? (
+                <span className={data.weekly_verdict.label === 'high' ? 'text-green-400' : data.weekly_verdict.label === 'medium' ? 'text-amber-400' : 'text-white/70'}>
+                  {data.weekly_verdict.label}
+                </span>
+              ) : data.weekly_readiness?.hr_drift_bpm != null || data.weekly_readiness?.pace_adherence_pct != null ? (
+                `${data.weekly_readiness?.hr_drift_bpm ?? '—'} bpm drift, ${data.weekly_readiness?.pace_adherence_pct ?? '—'}% pace`
+              ) : (
+                <span className="text-white/50">No run data</span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2 text-white/70">
+              <Dumbbell className="w-3.5 h-3.5 text-orange-400/80" />
+              <span>Structural load</span>
+            </div>
+            <span className="text-white/90">
+              {data.structural_load != null ? (
+                <>
+                  <span>{data.structural_load.acute}</span>
+                  {data.structural_load.avg_rir_acute != null && (
+                    <span className="text-white/50 ml-1">(avg RIR {data.structural_load.avg_rir_acute})</span>
+                  )}
+                </>
+              ) : (
+                <span className="text-white/50">—</span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2 text-white/70">
+              <TrendingUp className="w-3.5 h-3.5 text-blue-400/80" />
+              Systemic risk (ACWR)
+            </span>
+            <span className={`font-medium ${data.acwr.status === 'elevated' || data.acwr.status === 'high_risk' ? 'text-amber-400' : data.acwr.status === 'optimal' || data.acwr.status === 'optimal_recovery' ? 'text-green-400' : 'text-white/80'}`}>
+              {data.acwr.ratio.toFixed(2)} — {data.acwr.status.replace('_', ' ')}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Readiness: server-computed weekly verdict ("Am I ready for today's specific work?") */}
       {data.weekly_verdict ? (
         <div className="instrument-card">
@@ -157,6 +216,13 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           <p className="text-sm text-white/80">{data.weekly_verdict.message}</p>
           {data.weekly_verdict.drivers.length > 0 && (
             <p className="text-xs text-white/50 mt-2">{data.weekly_verdict.drivers.join(' • ')}</p>
+          )}
+          {data.readiness_source_date && (
+            <p className="text-xs text-white/40 mt-2">
+              {data.readiness_source_start_date
+                ? `Based on your last runs (${new Date(data.readiness_source_start_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(data.readiness_source_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`
+                : `Based on your run on ${new Date(data.readiness_source_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+            </p>
           )}
         </div>
       ) : (

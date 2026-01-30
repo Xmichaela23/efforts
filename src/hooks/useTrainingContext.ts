@@ -114,10 +114,13 @@ export interface Insight {
   data?: any;
 }
 
-/** Weekly readiness for Goal Predictor (from most recent run in acute window) */
+/** Weekly readiness for Goal Predictor (3-run average in acute window) */
 export interface WeeklyReadiness {
   hr_drift_bpm: number | null;
   pace_adherence_pct: number | null;
+  source_date?: string | null;
+  recent_runs_count?: number | null;
+  recent_form_trend?: 'improving' | 'stable' | 'worsening' | null;
 }
 
 /** Server-computed weekly verdict (readiness % + message + drivers) */
@@ -135,6 +138,9 @@ export interface StructuralLoad {
   avg_rir_acute?: number | null;
 }
 
+/** When verdict is from an older run (fallback), so UI can show "Based on your run on …" */
+export type ReadinessSourceDate = string | null | undefined;
+
 export interface TrainingContextData {
   acwr: ACWRData;
   sport_breakdown: SportBreakdown;
@@ -146,6 +152,10 @@ export interface TrainingContextData {
   weekly_verdict?: WeeklyVerdict;
   /** Integrated Load: strength workload acute — for "heart ready, legs tired" narrative */
   structural_load?: StructuralLoad;
+  /** End date of run(s) used for readiness (most recent in trend window) */
+  readiness_source_date?: string | null;
+  /** Start date of trend window when multi-run (oldest run); with readiness_source_date = "Jan 15 – Jan 28" */
+  readiness_source_start_date?: string | null;
 }
 
 interface UseTrainingContextResult {

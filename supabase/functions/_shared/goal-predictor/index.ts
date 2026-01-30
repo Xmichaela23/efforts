@@ -23,6 +23,10 @@ export interface WeeklyReadinessInput {
   structural_load_acute?: number | null;
   /** Average RIR across strength sessions in acute window. Low RIR = deep fatigue / high-repair state. */
   avg_rir_acute?: number | null;
+  /** When readiness is from a multi-run trend (e.g. last 3 runs). Enables "Across your last N runs" messaging. */
+  recent_runs_count?: number | null;
+  /** Trend in HR drift across recent runs: improving = positive adaptation; used to boost readiness. */
+  recent_form_trend?: 'improving' | 'stable' | 'worsening' | null;
 }
 
 export interface BlockTrajectoryInput {
@@ -106,9 +110,11 @@ export interface GoalPredictionResult {
 const CONFIDENCE_HIGH_MIN = 70;
 const CONFIDENCE_MEDIUM_MIN = 40;
 
+const TREND_BOOST_IMPROVING = 5;
+
 export function computeCurrentConfidence(input: WeeklyReadinessInput | null): CurrentConfidenceResult | null {
   if (!input) return null;
-  const { hr_drift_bpm, pace_adherence_pct } = input;
+  const { hr_drift_bpm, pace_adherence_pct, recent_runs_count, recent_form_trend } = input;
   const hasDrift = hr_drift_bpm !== null && hr_drift_bpm !== undefined;
   const hasPace = pace_adherence_pct !== null && pace_adherence_pct !== undefined;
   if (!hasDrift && !hasPace) return null;
@@ -131,17 +137,32 @@ export function computeCurrentConfidence(input: WeeklyReadinessInput | null): Cu
     drivers.push(`${pct}% pace adherence`);
   }
 
+  if (recent_form_trend === 'improving') {
+    score += TREND_BOOST_IMPROVING;
+    drivers.push('improving trend across recent runs');
+  }
+
   const clamped = Math.max(0, Math.min(100, score));
   const label: CurrentConfidenceResult['label'] =
     clamped >= CONFIDENCE_HIGH_MIN ? 'high' : clamped >= CONFIDENCE_MEDIUM_MIN ? 'medium' : 'low';
 
+  const n = recent_runs_count != null && recent_runs_count >= 2 ? recent_runs_count : 0;
   let message: string;
-  if (label === 'high')
-    message = "Based on your recent run data, your 'Form' is high. You are ready for this week's intensity.";
-  else if (label === 'medium')
-    message = "Form is moderate. You're in a good place to complete planned sessions; watch effort on key days.";
-  else
-    message = "Form may be slightly off. Prioritize recovery and stick to the lower end of pace targets if needed.";
+  if (n >= 2) {
+    if (label === 'high')
+      message = `Your recent form is high. Across your last ${n} runs, your aerobic efficiency has stabilized and you are absorbing the load well. You are ready for today's intensity.`;
+    else if (label === 'medium')
+      message = `Across your last ${n} runs, form is moderate. You're in a good place to complete planned sessions; watch effort on key days.`;
+    else
+      message = `Across your last ${n} runs, form may be slightly off. Prioritize recovery and stick to the lower end of pace targets if needed.`;
+  } else {
+    if (label === 'high')
+      message = "Based on your recent run data, your 'Form' is high. You are ready for this week's intensity.";
+    else if (label === 'medium')
+      message = "Form is moderate. You're in a good place to complete planned sessions; watch effort on key days.";
+    else
+      message = "Form may be slightly off. Prioritize recovery and stick to the lower end of pace targets if needed.";
+  }
 
   return { score: clamped, label, message, drivers };
 }

@@ -166,10 +166,12 @@ interface Insight {
   data?: any;
 }
 
-/** Weekly readiness for Goal Predictor (HR drift + pace adherence from most recent run) */
+/** Weekly readiness for Goal Predictor (HR drift + pace adherence from most recent run with analysis) */
 interface WeeklyReadiness {
   hr_drift_bpm: number | null;
   pace_adherence_pct: number | null;
+  /** Date of the run we used (YYYY-MM-DD); may be outside acute window when we fall back to older runs */
+  source_date?: string | null;
 }
 
 /** Weekly verdict from Goal Predictor (server-computed; no client-side math) */
@@ -199,6 +201,10 @@ interface TrainingContextResponse {
   weekly_verdict?: WeeklyVerdict;
   /** Integrated Load: strength workload acute — for "heart ready, legs tired" narrative */
   structural_load?: StructuralLoad;
+  /** When verdict is from trend: end date of window (most recent run). UI can show "Based on your last N runs". */
+  readiness_source_date?: string | null;
+  /** When verdict is from multi-run trend: start date of window (oldest run). With readiness_source_date = "Jan 15 – Jan 28". */
+  readiness_source_start_date?: string | null;
 }
 
 interface WorkoutRecord {
@@ -392,28 +398,72 @@ Deno.serve(async (req) => {
     const avg_rir_acute = computeAvgRirAcute(acuteStrengthWorkouts || []);
 
     // ==========================================================================
-    // WEEKLY READINESS (for Goal Predictor — most recent run in acute window)
+    // WEEKLY READINESS (3-run window within acute 7 days = "Recent Form")
+    // Fetches last 3 runs within the acute window that have workout_analysis;
+    // averages HR drift and pace adherence to filter daily noise; trend boosts when improving.
+    // Aligns with ACWR and structural load (same 7-day acute window).
     // ==========================================================================
+    const RECENT_FORM_WINDOW = 3;
     let weekly_readiness: WeeklyReadiness | undefined;
-    const { data: latestRun } = await supabase
+    let readiness_source_date: string | null = null;
+    let readiness_source_start_date: string | null = null;
+
+    const { data: recentRuns } = await supabase
       .from('workouts')
-      .select('workout_analysis')
+      .select('date, workout_analysis')
       .eq('user_id', user_id)
       .eq('workout_status', 'completed')
       .gte('date', dateRanges.acuteStartISO)
       .lte('date', dateRanges.acuteEndISO)
       .in('type', ['run', 'running'])
+      .not('workout_analysis', 'is', null)
       .order('date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (latestRun?.workout_analysis && typeof latestRun.workout_analysis === 'object') {
-      const wa = latestRun.workout_analysis as any;
-      const hrDrift = wa.granular_analysis?.heart_rate_analysis?.hr_drift_bpm;
-      const paceAdherence = wa.performance?.pace_adherence;
-      weekly_readiness = {
-        hr_drift_bpm: hrDrift != null && Number.isFinite(hrDrift) ? Number(hrDrift) : null,
-        pace_adherence_pct: paceAdherence != null && Number.isFinite(paceAdherence) ? Math.round(Number(paceAdherence)) : null
-      };
+      .limit(RECENT_FORM_WINDOW);
+
+    if (recentRuns && recentRuns.length > 0) {
+      const points: { date: string; hr_drift_bpm: number | null; pace_adherence_pct: number | null }[] = [];
+      for (const run of recentRuns) {
+        if (!run?.workout_analysis || typeof run.workout_analysis !== 'object') continue;
+        const wa = run.workout_analysis as any;
+        const hrDrift = wa.granular_analysis?.heart_rate_analysis?.hr_drift_bpm;
+        const paceAdherence = wa.performance?.pace_adherence;
+        const hasDrift = hrDrift != null && Number.isFinite(hrDrift);
+        const hasPace = paceAdherence != null && Number.isFinite(paceAdherence);
+        if (hasDrift || hasPace)
+          points.push({
+            date: run.date ?? '',
+            hr_drift_bpm: hasDrift ? Number(hrDrift) : null,
+            pace_adherence_pct: hasPace ? Math.round(Number(paceAdherence)) : null
+          });
+      }
+      if (points.length > 0) {
+        const sumDrift = points.reduce((s, p) => s + (p.hr_drift_bpm ?? 0), 0);
+        const countDrift = points.filter(p => p.hr_drift_bpm != null).length;
+        const sumPace = points.reduce((s, p) => s + (p.pace_adherence_pct ?? 0), 0);
+        const countPace = points.filter(p => p.pace_adherence_pct != null).length;
+        const avgDrift = countDrift > 0 ? sumDrift / countDrift : null;
+        const avgPace = countPace > 0 ? Math.round(sumPace / countPace) : null;
+        let recent_form_trend: 'improving' | 'stable' | 'worsening' | null = null;
+        if (points.length >= 2 && countDrift >= 2) {
+          const oldestFirst = [...points].reverse();
+          const firstDrift = oldestFirst[0].hr_drift_bpm ?? 0;
+          const lastDrift = oldestFirst[oldestFirst.length - 1].hr_drift_bpm ?? 0;
+          if (lastDrift < firstDrift) recent_form_trend = 'improving';
+          else if (lastDrift > firstDrift) recent_form_trend = 'worsening';
+          else recent_form_trend = 'stable';
+        }
+        const firstDate = points[points.length - 1]?.date ?? points[0]?.date;
+        const lastDate = points[0]?.date ?? firstDate;
+        weekly_readiness = {
+          hr_drift_bpm: avgDrift != null ? Math.round(avgDrift * 10) / 10 : null,
+          pace_adherence_pct: avgPace,
+          source_date: lastDate || undefined
+        };
+        readiness_source_date = lastDate || null;
+        readiness_source_start_date = firstDate !== lastDate ? firstDate : null;
+        (weekly_readiness as any).recent_runs_count = points.length;
+        (weekly_readiness as any).recent_form_trend = recent_form_trend;
+      }
     }
 
     // ==========================================================================
@@ -447,7 +497,9 @@ Deno.serve(async (req) => {
       plan_progress: planProgress || undefined,
       weekly_readiness,
       weekly_verdict,
-      structural_load: { acute: sportBreakdown.strength.workload, avg_rir_acute: avg_rir_acute ?? undefined }
+      structural_load: { acute: sportBreakdown.strength.workload, avg_rir_acute: avg_rir_acute ?? undefined },
+      readiness_source_date: readiness_source_date ?? undefined,
+      readiness_source_start_date: readiness_source_start_date ?? undefined
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);
