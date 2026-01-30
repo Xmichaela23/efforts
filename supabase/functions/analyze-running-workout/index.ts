@@ -4207,6 +4207,25 @@ function generateAdherenceSummary(
     outlook = `This effort fits within your current phase (${phaseName}).`;
   }
 
+  // Overall context (no plan): still give a useful outlook — pacing consequence + HR when available
+  if (!outlook && !planContext?.hasActivePlan) {
+    focus = 'Overall';
+    const hrLine = hrDrift != null && Number.isFinite(hrDrift)
+      ? hrDriftAbs != null && hrDriftAbs <= 3
+        ? ' Heart rate stayed stable — good aerobic efficiency at this pace.'
+        : hrDriftAbs != null && hrDriftAbs <= 10
+          ? ` Moderate HR drift (+${hrDrift} bpm) — pace may have felt harder toward the end.`
+          : ` Significant HR drift (+${hrDrift} bpm) — consider recovery and whether fatigue is building.`
+      : '';
+    if (fastDominant) {
+      outlook = `Intervals were faster than prescribed; sustained faster pacing can contribute to fatigue and injury risk.${hrLine}`;
+    } else if (slowDominant) {
+      outlook = `Intervals were slower than prescribed — you may have missed the intended stimulus.${hrLine}`;
+    } else {
+      outlook = `Pacing was on target or mixed relative to prescribed.${hrLine}`.trim();
+    }
+  }
+
   // Technical insights: internal vs external load + diagnostic labels (interpret, don't mirror)
   const technical_insights: { label: string; value: string }[] = [];
 

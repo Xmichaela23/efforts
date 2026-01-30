@@ -2376,16 +2376,26 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           })}
           </tbody>
         </table>
-        {/* Run adherence summary below intervals: structured (technical + coach outlook) or AI narrative fallback */}
+        {/* Run adherence summary below intervals: structured (technical + coach outlook), AI narrative, old score_explanation, or fallback */}
         {/run|walk/i.test(sportType) && (() => {
-          const adherenceSummary = (completed as any)?.workout_analysis?.adherence_summary;
-          const narrativeInsights = (completed as any)?.workout_analysis?.narrative_insights;
+          const workoutAnalysis = (completed as any)?.workout_analysis;
+          const adherenceSummary = workoutAnalysis?.adherence_summary;
+          const narrativeInsights = workoutAnalysis?.narrative_insights;
+          const scoreExplanation = workoutAnalysis?.score_explanation;
           const hasStructured = adherenceSummary && (
             (Array.isArray(adherenceSummary.technical_insights) && adherenceSummary.technical_insights.length > 0) ||
             (adherenceSummary.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.')
           );
           const hasNarrative = Array.isArray(narrativeInsights) && narrativeInsights.length > 0;
-          if (!hasStructured && !hasNarrative) return null;
+          const hasLegacyVerdict = typeof scoreExplanation === 'string' && scoreExplanation.trim().length > 0;
+          const hasNothing = !hasStructured && !hasNarrative && !hasLegacyVerdict;
+          if (hasNothing) {
+            return (
+              <div className="mt-4 px-3 pb-4">
+                <p className="text-sm text-gray-500 italic">No summary for this workout. Re-attach to a planned workout and open the Summary tab to generate insights.</p>
+              </div>
+            );
+          }
           return (
             <div className="mt-4 px-3 pb-4 space-y-3">
               {hasStructured && adherenceSummary && (
@@ -2414,6 +2424,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                     <p key={i} className="text-sm text-gray-300 leading-relaxed">{insight}</p>
                   ))}
                 </div>
+              )}
+              {!hasStructured && !hasNarrative && hasLegacyVerdict && (
+                <p className="text-sm text-gray-300 leading-relaxed">{scoreExplanation}</p>
               )}
             </div>
           );

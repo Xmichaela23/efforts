@@ -673,116 +673,19 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       };
     }
     
-    // FALLBACK: Generate insights from structured data (only if AI narrative missing)
-    console.warn('⚠️ No AI narrative insights found, generating from structured data');
-    console.warn('⚠️ Analysis keys:', analysis ? Object.keys(analysis) : 'no analysis');
-    console.warn('⚠️ narrative_insights:', analysis?.narrative_insights);
-    console.warn('⚠️ narrative_insights type:', typeof analysis?.narrative_insights);
-    console.warn('⚠️ narrative_insights is array:', Array.isArray(analysis?.narrative_insights));
-    console.warn('⚠️ narrative_insights length:', analysis?.narrative_insights?.length);
-    const insights: string[] = [];
-    
-    const performance = analysis.performance;
-    const detailed = analysis.detailed_analysis;
-    
-    // Overall execution insight
-    const executionPct = Math.round(performance.execution_adherence);
-    if (executionPct >= 90) {
-      insights.push(`Excellent execution - ${executionPct}% overall adherence`);
-    } else if (executionPct >= 80) {
-      insights.push(`Good execution - ${executionPct}% overall adherence`);
-    } else if (executionPct >= 70) {
-      insights.push(`Fair execution - ${executionPct}% overall adherence`);
-    } else {
-      insights.push(`Needs improvement - ${executionPct}% overall adherence`);
+    // No AI narrative: do not generate generic client-side insights (avoids same mirror text on every old workout)
+    if (selectedWorkoutId && workoutWithAnalysis.id === selectedWorkoutId) {
+      return {
+        insights: [],
+        key_metrics: {},
+        red_flags: analysis.red_flags || analysis.primary_issues || [],
+        workout: workoutWithAnalysis,
+        performance: analysis.performance,
+        is_yesterday: workoutWithAnalysis.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA'),
+        noInsights: true
+      };
     }
-    
-    // Pace adherence insight
-    const pacePct = Math.round(performance.pace_adherence);
-    if (pacePct >= 95) {
-      insights.push(`Excellent pace control - ${pacePct}% adherence`);
-    } else if (pacePct >= 85) {
-      insights.push(`Good pace control - ${pacePct}% adherence`);
-    } else if (pacePct >= 75) {
-      insights.push(`Fair pace control - ${pacePct}% adherence`);
-    } else {
-      insights.push(`Pace control needs work - ${pacePct}% adherence`);
-    }
-    
-    // Duration adherence insight
-    const durationPct = Math.round(performance.duration_adherence);
-    if (durationPct >= 95) {
-      insights.push(`Perfect timing - ${durationPct}% duration adherence`);
-    } else if (durationPct >= 90) {
-      insights.push(`Good timing - ${durationPct}% duration adherence`);
-    } else if (durationPct >= 85) {
-      insights.push(`Timing slightly off - ${durationPct}% duration adherence`);
-    } else {
-      insights.push(`Timing needs attention - ${durationPct}% duration adherence`);
-    }
-    
-    // Interval breakdown insights
-    if (detailed.interval_breakdown?.available && detailed.interval_breakdown.summary) {
-      const summary = detailed.interval_breakdown.summary;
-      if (summary.total_intervals > 0) {
-        const avgScore = Math.round(summary.average_performance_score);
-        insights.push(`${summary.total_intervals} intervals completed - ${avgScore}% average performance`);
-      }
-    }
-    
-    // Speed fluctuation insights
-    if (detailed.speed_fluctuations?.available) {
-      const sf = detailed.speed_fluctuations;
-      insights.push(`Pace range: ${sf.fastest_pace_min_per_mi}-${sf.slowest_pace_min_per_mi} min/mi (${sf.pace_variability_percent}% variability)`);
-      if (sf.patterns?.summary) {
-        insights.push(`Pacing pattern: ${sf.patterns.summary}`);
-      }
-    }
-    
-    // Heart rate recovery insights
-    if (detailed.heart_rate_recovery?.available) {
-      const hr = detailed.heart_rate_recovery;
-      insights.push(`Heart rate recovery: ${hr.average_hr_drop_bpm} bpm drop (${hr.recovery_quality} quality)`);
-    }
-    
-    // Pacing consistency insights
-    if (detailed.pacing_consistency?.available) {
-      const pc = detailed.pacing_consistency;
-      insights.push(`Pacing consistency: ${pc.consistency_score}% (${pc.coefficient_of_variation_percent}% variation)`);
-    }
-    
-    // Strict mode: insights must exist
-    if (insights.length === 0) {
-      console.log('❌ No insights in analysis for selected workout');
-      if (selectedWorkoutId && workoutWithAnalysis.id === selectedWorkoutId) {
-        return {
-          insights: [],
-          key_metrics: {},
-          red_flags: [],
-          workout: workoutWithAnalysis,
-          is_yesterday: workoutWithAnalysis.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA'),
-          noInsights: true
-        };
-      }
-      return null;
-    }
-    
-    // Extract metrics from new analysis structure
-    const powerVariability = analysis.key_metrics?.power_distribution?.power_variability;
-    const powerFade = analysis.key_metrics?.fatigue_pattern?.power_fade_percent;
-    const hrDrift = analysis.key_metrics?.hr_dynamics?.hr_drift_percent;
-
-    return {
-      insights: insights,
-      key_metrics: {
-        power_variability: powerVariability,
-        power_fade: powerFade,
-        hr_drift: hrDrift
-      },
-      red_flags: analysis.red_flags || analysis.primary_issues || [],
-      workout: workoutWithAnalysis,
-      is_yesterday: workoutWithAnalysis.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA')
-    };
+    return null;
   }, [recentWorkouts, selectedWorkoutId, analyzingWorkout]);
 
   // Memoize analysis metrics to prevent flickering during re-renders
