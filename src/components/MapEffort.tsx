@@ -199,9 +199,9 @@ export default function MapEffort({
             source: ROUTE_SRC, 
             paint: { 
               'line-color': '#1e40af',  // Navy blue
-              'line-width': 8, 
+              'line-width': 6, 
               'line-opacity': 0.35,
-              'line-blur': 4
+              'line-blur': 3
             },
             layout: { 'line-cap': 'round', 'line-join': 'round' }
           });
@@ -218,7 +218,7 @@ export default function MapEffort({
           source: ROUTE_SRC, 
           paint: { 
             'line-color': '#3b82f6',  // Royal blue
-            'line-width': 5,
+            'line-width': 4,
             'line-opacity': 0.8
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
@@ -234,7 +234,7 @@ export default function MapEffort({
             source: ROUTE_SRC, 
             paint: { 
               'line-color': '#60a5fa',  // Bright blue (main color)
-              'line-width': 3.5,
+              'line-width': 3,
               'line-opacity': 1
             }, 
             layout: { 'line-cap': 'round', 'line-join': 'round' }
@@ -376,7 +376,7 @@ export default function MapEffort({
               '#f97316',  // Orange (even index)
               SPORT_COLORS.run   // Run color (odd index) - much more visible contrast
             ],
-            'line-width': 5,
+            'line-width': 4,
             'line-opacity': 0.9
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
@@ -392,7 +392,7 @@ export default function MapEffort({
           filter: ['==', ['get', 'isPR'], true],
           paint: {
             'line-color': '#1f2937',
-            'line-width': 10,
+            'line-width': 8,
             'line-opacity': 0.85
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
@@ -408,7 +408,7 @@ export default function MapEffort({
           filter: ['==', ['get', 'isPR'], true],
           paint: {
             'line-color': '#fbbf24',  // Amber/gold for PRs
-            'line-width': 7,
+            'line-width': 6,
             'line-opacity': 1
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
@@ -424,7 +424,7 @@ export default function MapEffort({
           filter: ['literal', false],
           paint: {
             'line-color': '#dc2626',
-            'line-width': 9,
+            'line-width': 7,
             'line-opacity': 1
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
@@ -659,10 +659,10 @@ export default function MapEffort({
         // Brighten the appropriate layer
         if (isPR) {
           map.setPaintProperty(SEGMENT_PR_LINE, 'line-opacity', 1);
-          map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 9);
+          map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 7);
         } else {
           map.setPaintProperty(SEGMENT_LINE, 'line-opacity', 1);
-          map.setPaintProperty(SEGMENT_LINE, 'line-width', 7);
+          map.setPaintProperty(SEGMENT_LINE, 'line-width', 6);
         }
       }
     };
@@ -694,9 +694,9 @@ export default function MapEffort({
       
       // Restore original styling
       map.setPaintProperty(SEGMENT_LINE, 'line-opacity', 0.9);
-      map.setPaintProperty(SEGMENT_LINE, 'line-width', 5);
+      map.setPaintProperty(SEGMENT_LINE, 'line-width', 4);
       map.setPaintProperty(SEGMENT_PR_LINE, 'line-opacity', 1);
-      map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 7);
+      map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 6);
     };
     
     // Add handlers to hit zone layer
