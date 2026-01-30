@@ -45,6 +45,8 @@ export type MapEffortProps = {
   onSegmentClick?: (segment: SegmentEffort) => void;
   // Raw (unsimplified) track for segment index lookups
   rawTrackLngLat?: [number, number][];
+  // When set, this segment is drawn in red on the map (e.g. after tapping it in the PR card)
+  highlightedSegmentName?: string | null;
 };
 
 // Layer IDs
@@ -64,6 +66,7 @@ const SEGMENT_HIT_ZONE = 'segment-hit-zone';  // Invisible wide layer for tap de
 const SEGMENT_LINE = 'segment-line';
 const SEGMENT_PR_HALO = 'segment-pr-halo';   // Dark outline under PR so it pops on map
 const SEGMENT_PR_LINE = 'segment-pr-line';
+const SEGMENT_HIGHLIGHT = 'segment-highlight'; // Red highlight when segment selected from PR card
 
 function styleUrl(theme: 'outdoor' | 'hybrid' | 'topo') {
   const key = import.meta.env.VITE_MAPTILER_KEY as string | undefined;
@@ -103,6 +106,7 @@ export default function MapEffort({
   segments,
   onSegmentClick,
   rawTrackLngLat,
+  highlightedSegmentName,
 }: MapEffortProps) {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const divRef = useRef<HTMLDivElement>(null);
@@ -411,6 +415,22 @@ export default function MapEffort({
         });
       }
       
+      // Highlight layer - selected segment from PR card drawn in red (filter updated in useEffect)
+      if (!map.getLayer(SEGMENT_HIGHLIGHT)) {
+        map.addLayer({
+          id: SEGMENT_HIGHLIGHT,
+          type: 'line',
+          source: SEGMENTS_SRC,
+          filter: ['literal', false],
+          paint: {
+            'line-color': '#dc2626',
+            'line-width': 9,
+            'line-opacity': 1
+          },
+          layout: { 'line-cap': 'round', 'line-join': 'round' }
+        });
+      }
+      
       layersAttachedRef.current = true;
     };
     // Expose a safe reattach for later effects
@@ -576,6 +596,17 @@ export default function MapEffort({
       segmentFeaturesRef.current = features; // Store for reapplication after theme changes
     }
   }, [rawTrackLngLat, ready, segments]);
+
+  // Update highlight layer filter when selected segment from PR card changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    if (!map.getLayer(SEGMENT_HIGHLIGHT)) return;
+    const filter = highlightedSegmentName
+      ? ['==', ['get', 'name'], highlightedSegmentName]
+      : (['literal', false] as [string, boolean]);
+    map.setFilter(SEGMENT_HIGHLIGHT, filter);
+  }, [ready, highlightedSegmentName]);
 
   // Track if we're currently over a segment (to prevent zoom)
   const overSegmentRef = useRef(false);

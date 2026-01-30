@@ -1730,7 +1730,7 @@ function EffortsViewerMapbox({
             return (
               <button
                 type="button"
-                onClick={() => setShowPRCard(true)}
+                onClick={() => setShowPRCard((prev) => !prev)}
                 style={{ 
                   background: '#fef3c7', 
                   color: '#92400e', 
@@ -2020,6 +2020,8 @@ function EffortsViewerMapbox({
           }}
           // Pass raw (unsimplified) track for segment index lookups (memoized)
           rawTrackLngLat={memoizedRawTrack}
+          // Highlight segment in red when selected from PR card or map
+          highlightedSegmentName={selectedSegment?.name ?? null}
         />
       )}
       
