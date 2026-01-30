@@ -25,6 +25,7 @@ import {
   calculateWorkoutQuality
 } from '../_shared/block-analysis/index.ts';
 import { getBlockAdaptation, type BlockFocus } from '../_shared/block-adaptation/index.ts';
+import { runGoalPredictor } from '../_shared/goal-predictor/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -211,6 +212,30 @@ Deno.serve(async (req) => {
     }
 
     // ==========================================================================
+    // GOAL PREDICTOR (server-side; no client-side math)
+    // ==========================================================================
+    const block =
+      fitnessAdaptationStructured != null
+        ? {
+            aerobic_efficiency_improvement_pct: fitnessAdaptationStructured.aerobic_efficiency?.improvement_pct ?? null,
+            long_run_improvement_pct: fitnessAdaptationStructured.long_run_endurance?.improvement_pct ?? null,
+            strength_overall_gain_pct: fitnessAdaptationStructured.strength_progression?.overall_gain_pct ?? null
+          }
+        : null;
+    const planConfig = activePlan?.config ?? {};
+    const targetSeconds =
+      planConfig.target_time != null && Number.isFinite(Number(planConfig.target_time))
+        ? Number(planConfig.target_time)
+        : planConfig.marathon_target_seconds != null && Number.isFinite(Number(planConfig.marathon_target_seconds))
+          ? Number(planConfig.marathon_target_seconds)
+          : null;
+    const plan =
+      activePlan?.name != null
+        ? { target_finish_time_seconds: targetSeconds, race_name: activePlan.name }
+        : null;
+    const goal_prediction = runGoalPredictor({ block, plan });
+
+    // ==========================================================================
     // BUILD STRUCTURED RESPONSE (No GPT - structured data speaks for itself)
     // ==========================================================================
 
@@ -229,6 +254,7 @@ Deno.serve(async (req) => {
       data_quality: dataQuality,
       fitness_adaptation_structured: fitnessAdaptationStructured,
       goal: goal, // Include goal so frontend knows context
+      goal_prediction, // Server-computed verdicts (block_verdict, race_day_forecast, durability_risk, interference)
       generated_at: new Date().toISOString(),
       
       // Legacy text fields (for old frontend - same keys it expects)

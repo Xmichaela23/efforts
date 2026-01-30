@@ -50,6 +50,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { runGoalPredictor } from '../_shared/goal-predictor/index.ts';
 
 // =============================================================================
 // CORS HEADERS (matching existing edge functions)
@@ -165,6 +166,28 @@ interface Insight {
   data?: any;
 }
 
+/** Weekly readiness for Goal Predictor (HR drift + pace adherence from most recent run) */
+interface WeeklyReadiness {
+  hr_drift_bpm: number | null;
+  pace_adherence_pct: number | null;
+}
+
+/** Weekly verdict from Goal Predictor (server-computed; no client-side math) */
+interface WeeklyVerdict {
+  readiness_pct: number;
+  message: string;
+  drivers: string[];
+  label: 'high' | 'medium' | 'low';
+}
+
+/** Strength workload and RIR in acute window (last 7 days). Protocol: flags "heavy legs" / deep fatigue even when cardio is fresh. */
+interface StructuralLoad {
+  /** Total strength workload in acute window */
+  acute: number;
+  /** Average RIR across strength sessions in acute window (null if no RIR data). Low RIR = high-repair state. */
+  avg_rir_acute?: number | null;
+}
+
 interface TrainingContextResponse {
   acwr: ACWRData;
   sport_breakdown: SportBreakdown;
@@ -172,6 +195,10 @@ interface TrainingContextResponse {
   week_comparison: WeekComparison;
   insights: Insight[];
   plan_progress?: PlanProgress;
+  weekly_readiness?: WeeklyReadiness;
+  weekly_verdict?: WeeklyVerdict;
+  /** Integrated Load: strength workload acute — for "heart ready, legs tired" narrative */
+  structural_load?: StructuralLoad;
 }
 
 interface WorkoutRecord {
@@ -351,6 +378,63 @@ Deno.serve(async (req) => {
     const insights = generateInsights(acwr, sportBreakdown, weekComparison, timeline, planContext, planProgress);
 
     // ==========================================================================
+    // AVG RIR ACUTE (strength sessions in acute window — "HR drift" for lifting)
+    // ==========================================================================
+    const { data: acuteStrengthWorkouts } = await supabase
+      .from('workouts')
+      .select('id, strength_exercises, computed')
+      .eq('user_id', user_id)
+      .eq('workout_status', 'completed')
+      .in('type', ['strength', 'strength_training'])
+      .gte('date', dateRanges.acuteStartISO)
+      .lte('date', dateRanges.acuteEndISO)
+      .order('date', { ascending: false });
+    const avg_rir_acute = computeAvgRirAcute(acuteStrengthWorkouts || []);
+
+    // ==========================================================================
+    // WEEKLY READINESS (for Goal Predictor — most recent run in acute window)
+    // ==========================================================================
+    let weekly_readiness: WeeklyReadiness | undefined;
+    const { data: latestRun } = await supabase
+      .from('workouts')
+      .select('workout_analysis')
+      .eq('user_id', user_id)
+      .eq('workout_status', 'completed')
+      .gte('date', dateRanges.acuteStartISO)
+      .lte('date', dateRanges.acuteEndISO)
+      .in('type', ['run', 'running'])
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latestRun?.workout_analysis && typeof latestRun.workout_analysis === 'object') {
+      const wa = latestRun.workout_analysis as any;
+      const hrDrift = wa.granular_analysis?.heart_rate_analysis?.hr_drift_bpm;
+      const paceAdherence = wa.performance?.pace_adherence;
+      weekly_readiness = {
+        hr_drift_bpm: hrDrift != null && Number.isFinite(hrDrift) ? Number(hrDrift) : null,
+        pace_adherence_pct: paceAdherence != null && Number.isFinite(paceAdherence) ? Math.round(Number(paceAdherence)) : null
+      };
+    }
+
+    // ==========================================================================
+    // WEEKLY VERDICT (Goal Predictor — server-side; no client-side math)
+    // Pass structural_load_acute for structural-vs-cardio adaptive guidance.
+    // ==========================================================================
+    const weeklyInput =
+      weekly_readiness != null
+        ? {
+            ...weekly_readiness,
+            structural_load_acute: sportBreakdown.strength.workload > 0 ? sportBreakdown.strength.workload : null,
+            avg_rir_acute: avg_rir_acute ?? undefined
+          }
+        : undefined;
+    const goalPrediction = runGoalPredictor({
+      weekly: weeklyInput,
+      plan: planContext?.planName ? { target_finish_time_seconds: null, race_name: planContext.planName } : null
+    });
+    const weekly_verdict = goalPrediction.weekly_verdict ?? undefined;
+
+    // ==========================================================================
     // BUILD RESPONSE
     // ==========================================================================
 
@@ -360,7 +444,10 @@ Deno.serve(async (req) => {
       timeline,
       week_comparison: weekComparison,
       insights,
-      plan_progress: planProgress || undefined
+      plan_progress: planProgress || undefined,
+      weekly_readiness,
+      weekly_verdict,
+      structural_load: { acute: sportBreakdown.strength.workload, avg_rir_acute: avg_rir_acute ?? undefined }
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);
@@ -536,6 +623,43 @@ function calculateSmartDateRanges(
     fourteenDaysAgo,
     fourteenDaysAgoISO: toISO(fourteenDaysAgo)
   };
+}
+
+// =============================================================================
+// AVG RIR ACUTE (from strength sessions in acute window)
+// =============================================================================
+
+/**
+ * Compute average RIR across strength workouts in acute window.
+ * RIR = "Reps in Reserve" — the "HR drift" for lifting; low RIR = high strain / deep fatigue.
+ * Uses strength_exercises sets (rir/RIR/reps_in_reserve) or computed.adaptation.strength_exercises[].avg_rir.
+ */
+function computeAvgRirAcute(workouts: Array<{ strength_exercises?: any; computed?: any }>): number | null {
+  const rirValues: number[] = [];
+  for (const w of workouts) {
+    const computed = w.computed && typeof w.computed === 'object' ? w.computed : {};
+    const adaptation = computed.adaptation && typeof computed.adaptation === 'object' ? computed.adaptation : {};
+    const adapStrength = Array.isArray(adaptation.strength_exercises) ? adaptation.strength_exercises : [];
+    if (adapStrength.length) {
+      for (const ex of adapStrength) {
+        const r = ex?.avg_rir;
+        if (typeof r === 'number' && r >= 0 && r <= 10) rirValues.push(r);
+      }
+      continue;
+    }
+    const raw = w.strength_exercises;
+    const exercises = Array.isArray(raw) ? raw : [];
+    for (const ex of exercises) {
+      const sets = Array.isArray(ex?.sets) ? ex.sets : Array.isArray(ex?.working_sets) ? ex.working_sets : Array.isArray(ex?.performance?.sets) ? ex.performance.sets : [];
+      for (const s of sets) {
+        const r = s?.rir ?? s?.RIR ?? s?.reps_in_reserve ?? s?.repsInReserve;
+        if (typeof r === 'number' && r >= 0 && r <= 10) rirValues.push(r);
+      }
+    }
+  }
+  if (rirValues.length === 0) return null;
+  const sum = rirValues.reduce((a, b) => a + b, 0);
+  return Math.round((sum / rirValues.length) * 10) / 10;
 }
 
 // =============================================================================
@@ -1149,6 +1273,11 @@ function calculateWeekComparison(
 // =============================================================================
 // PLAN PROGRESS (PLAN-AWARE TARGETS)
 // =============================================================================
+// Unit alignment: planned_workload (planned_workouts) and workload_actual (workouts)
+// both come from the same calculate-workload function (duration×intensity²×100,
+// TRIMP, or volume-based for strength). So 248 completed vs 52 planned to-date
+// is apples-to-apples; "52" is the sum of planned workload for sessions due by
+// focus_date (e.g. 2 easy sessions early in the week).
 
 function calculatePlanProgress(
   plannedWeek: PlannedWorkoutRecord[],
@@ -1416,20 +1545,28 @@ function generateInsights(
           data: { ratio: acwr.ratio, plan_progress: planProgress }
         });
       } else {
-        // Unknown/ahead: stay conservative and never tell the user to add volume.
+        // Unknown/ahead or very low ACWR: nuance. Very low (< 0.6) = below base; gradual increase can be appropriate.
+        const veryLow = acwr.ratio < 0.60;
+        const message = veryLow
+          ? `You're on plan—stay the course. ACWR ${acwr.ratio.toFixed(2)} is below your base; if this persists, a gradual volume increase may be appropriate. Stay within plan guidance.`
+          : `You're on plan—stay the course. This low ACWR isn't a cue to add extra volume.`;
         insights.push({
           type: 'weekly_jump',
           severity: 'info',
-          message: `You're on plan—stay the course. This low ACWR isn't a cue to add extra volume.`,
+          message,
           data: { ratio: acwr.ratio, plan_progress: planProgress }
         });
       }
     } else {
       // No planned workload available — we still know they have a plan (we're in hasActivePlan).
+      const veryLow = acwr.ratio < 0.60;
+      const message = veryLow
+        ? `You're on plan—stay the course. ACWR ${acwr.ratio.toFixed(2)} is below your base; if this persists, a gradual volume increase may be appropriate. Stay within plan guidance.`
+        : `You're on plan—stay the course. This low ACWR isn't a cue to add extra volume.`;
       insights.push({
         type: 'weekly_jump',
         severity: 'info',
-        message: `You're on plan—stay the course. This low ACWR isn't a cue to add extra volume.`,
+        message,
         data: { ratio: acwr.ratio }
       });
     }

@@ -15,7 +15,7 @@
  */
 
 import React from 'react';
-import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle, Target } from 'lucide-react';
 import { useTrainingContext } from '@/hooks/useTrainingContext';
 import { ACWRGauge } from './ACWRGauge';
 import { TrainingLoadChart } from './TrainingLoadChart';
@@ -134,6 +134,43 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
       {/* ACWR Gauge */}
       <ACWRGauge acwr={data.acwr} />
 
+      {/* Readiness: server-computed weekly verdict ("Am I ready for today's specific work?") */}
+      {data.weekly_verdict ? (
+        <div className="instrument-card">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-white/50" />
+              <span className="text-sm font-medium text-white">Readiness</span>
+            </div>
+            <span
+              className={`text-lg font-semibold ${
+                data.weekly_verdict.label === 'high'
+                  ? 'text-green-400'
+                  : data.weekly_verdict.label === 'medium'
+                    ? 'text-amber-400'
+                    : 'text-white/70'
+              }`}
+            >
+              {data.weekly_verdict.readiness_pct}%
+            </span>
+          </div>
+          <p className="text-sm text-white/80">{data.weekly_verdict.message}</p>
+          {data.weekly_verdict.drivers.length > 0 && (
+            <p className="text-xs text-white/50 mt-2">{data.weekly_verdict.drivers.join(' • ')}</p>
+          )}
+        </div>
+      ) : (
+        <div className="instrument-card">
+          <div className="flex items-center gap-2 mb-2">
+            <Target className="w-4 h-4 text-white/50" />
+            <span className="text-sm font-medium text-white">Readiness</span>
+          </div>
+          <p className="text-xs text-white/50">
+            Complete a run with HR to see how ready you are for today&apos;s work (based on HR drift and pace adherence).
+          </p>
+        </div>
+      )}
+
       {/* Training Load Chart */}
       <TrainingLoadChart 
         timeline={data.timeline} 
@@ -173,7 +210,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
             {typeof data.plan_progress.percent_of_planned_to_date === 'number' && (
               <div className="text-sm text-white/80">
                 <span className="font-medium">{data.plan_progress.percent_of_planned_to_date}%</span>
-                <span className="text-white/40"> of planned (to-date)</span>
+                <span className="text-white/40"> of planned workload so far (to-date)</span>
               </div>
             )}
           </div>
@@ -188,12 +225,15 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           </div>
 
           <div className="mt-1 text-xs text-white/50">
-            Workload (to-date): {Math.round(data.plan_progress.completed_to_date_total)} / {Math.round(data.plan_progress.planned_to_date_total)} planned
+            Workload so far: {Math.round(data.plan_progress.completed_to_date_total)} completed / {Math.round(data.plan_progress.planned_to_date_total)} planned to-date
+            {data.plan_progress.planned_week_total > 0 && data.plan_progress.planned_week_total !== data.plan_progress.planned_to_date_total && (
+              <span className="text-white/40"> • {Math.round(data.plan_progress.planned_week_total)} planned (full week)</span>
+            )}
           </div>
 
           {(data.plan_progress.match_confidence ?? 0) < 0.5 && (
             <div className="mt-2 text-xs text-white/40 italic">
-              Low match: start workouts from your plan so we can link them. The % above is total workload vs planned workload for the week so far.
+              Sessions not matched—your activities may be on different days than the planned sessions, or start workouts from your plan to link them. The % above compares completed workload so far to planned workload for the same period (same units).
             </div>
           )}
         </div>

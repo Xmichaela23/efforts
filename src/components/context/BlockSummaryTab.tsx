@@ -29,6 +29,8 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useOverallContext } from '@/hooks/useOverallContext';
+import type { GoalPredictionResult } from '@/lib/analysis/goal-predictor';
+import type { BlockAdaptation } from '@/types/fitness';
 
 // =============================================================================
 // CONSTANTS
@@ -203,6 +205,9 @@ const BlockSummaryTab: React.FC = () => {
 
           {/* Fitness Adaptation - Structured (cached server-side) */}
           <FitnessAdaptationSection adaptation={data.fitness_adaptation_structured} />
+
+          {/* Goal Predictor: server-computed (block_verdict, race_day_forecast, durability_risk, interference) */}
+          <GoalPredictorBlockSection goalPrediction={data.goal_prediction} />
           
           {/* Plan Adherence - Structured */}
           <PlanAdherenceSection adherence={data.plan_adherence_structured} />
@@ -224,6 +229,74 @@ const BlockSummaryTab: React.FC = () => {
           <LegacyWeeklySummary data={data} />
         </>
       )}
+    </div>
+  );
+};
+
+// =============================================================================
+// GOAL PREDICTOR (Block: server-computed verdicts only; no client-side math)
+// =============================================================================
+
+const GoalPredictorBlockSection: React.FC<{ goalPrediction?: GoalPredictionResult | null }> = ({
+  goalPrediction,
+}) => {
+  if (!goalPrediction) return null;
+  const blockVerdict = goalPrediction.block_verdict;
+  const forecast = goalPrediction.race_day_forecast;
+  const risk = goalPrediction.durability_risk;
+  const interference = goalPrediction.interference;
+
+  const hasContent = blockVerdict || forecast?.projected_time_display || risk?.has_risk || (interference?.all.length ?? 0) > 0;
+  if (!hasContent) return null;
+
+  return (
+    <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Target className="w-4 h-4 text-white/50" />
+        <h3 className="text-sm font-medium text-white">Goal Predictor</h3>
+        {goalPrediction.goal_profile !== 'general' && (
+          <span className="text-xs text-white/45 capitalize">({goalPrediction.goal_profile})</span>
+        )}
+      </div>
+      <div className="space-y-3">
+        {/* Block verdict: "Am I on track for my ultimate target?" (Goal Probability %) */}
+        {blockVerdict && (
+          <div>
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-lg font-semibold text-white/90">{blockVerdict.goal_probability_pct}%</span>
+              <span className="text-xs text-white/50">Goal Probability</span>
+            </div>
+            <p className="text-sm text-white/70">{blockVerdict.message}</p>
+            {blockVerdict.drivers.length > 0 && (
+              <p className="text-xs text-white/50 mt-1">{blockVerdict.drivers.join(' • ')}</p>
+            )}
+          </div>
+        )}
+        {/* Marathon-specific: projected finish time */}
+        {forecast?.projected_time_display && goalPrediction.goal_profile === 'marathon' && (
+          <div className="text-sm text-white/80">
+            <span className="font-medium">Projected: {forecast.projected_time_display}</span>
+            {forecast.improvement_display && forecast.improvement_seconds != null && forecast.improvement_seconds < 0 && (
+              <span className="text-emerald-400 ml-2">{forecast.improvement_display} this month</span>
+            )}
+          </div>
+        )}
+        {risk?.has_risk && risk.message && (
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+            <div className="text-sm font-medium text-amber-400">{risk.label}</div>
+            <p className="text-sm text-white/80 mt-1">{risk.message}</p>
+          </div>
+        )}
+        {/* Cross-goal interference */}
+        {interference?.all.length ? (
+          <div className="p-3 rounded-lg bg-white/[0.06] border border-white/15">
+            <div className="text-xs font-medium text-white/70 mb-1">Cross-Goal Note</div>
+            {interference.all.map((msg, i) => (
+              <p key={i} className="text-sm text-white/70">{msg}</p>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };

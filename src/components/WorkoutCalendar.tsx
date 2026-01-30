@@ -1125,7 +1125,7 @@ export default function WorkoutCalendar({
                                 transform: 'translateY(1px)',
                               }}
                             >
-                              {/* 3-line “emission” mark (inside the pill so it can't get clipped) */}
+                              {/* 3-line “emission” mark (wider to match completed pyramid) */}
                               <span
                                 aria-hidden="true"
                                 style={{
@@ -1142,13 +1142,13 @@ export default function WorkoutCalendar({
                                     linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.52) 42%, rgba(${pillRgb},0.0) 100%)
                                   `,
                                   backgroundRepeat: 'no-repeat',
-                                  backgroundSize: '18px 1px, 16px 1px, 14px 1px',
+                                  backgroundSize: '22px 1px, 20px 1px, 18px 1px',
                                   backgroundPosition: 'center 0px, center 2px, center 4px',
                                   filter: `drop-shadow(0 0 6px rgba(${pillRgb},0.22))`,
                                   opacity: 0.95,
                                 }}
                               />
-                              {/* Pyramid indicator built from horizontal lines (matches emission aesthetic) */}
+                              {/* Pyramid indicator: wider (22px base) to match incomplete visual size */}
                               <span
                                 aria-hidden="true"
                                 style={{
@@ -1164,7 +1164,7 @@ export default function WorkoutCalendar({
                                     linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.72) 28%, rgba(${pillRgb},0.72) 72%, rgba(${pillRgb},0.0) 100%)
                                   `,
                                   backgroundRepeat: 'no-repeat',
-                                  backgroundSize: '4px 1.25px, 7px 1.25px, 10px 1.25px, 13px 1.25px, 16px 1.25px, 22px 0.5px',
+                                  backgroundSize: '5px 1.25px, 8px 1.25px, 11px 1.25px, 14px 1.25px, 17px 1.25px, 22px 0.5px',
                                   backgroundPosition: 'center 0px, center 2px, center 4px, center 6px, center 8px, center 10px',
                                   filter: 'none',
                                 }}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { BlockAdaptation } from '@/types/fitness';
+import type { GoalPredictionResult } from '@/lib/analysis/goal-predictor';
 
 export interface OverallContextData {
   // Structured data (v2)
@@ -12,6 +13,8 @@ export interface OverallContextData {
   data_quality?: any;
   goal?: any;
   fitness_adaptation_structured?: BlockAdaptation | null;
+  /** Server-computed goal predictor (block_verdict, race_day_forecast, durability_risk, interference) */
+  goal_prediction?: GoalPredictionResult | null;
   generated_at?: string;
 
   performance_trends: string;

@@ -6,6 +6,8 @@ The Context Screen answers: **"How does today's workout fit into my training?"**
 
 This is different from workout analysis (which answers "How well did I execute this workout?"). Context provides the bigger picture: training load, fatigue accumulation, sport balance, and actionable insights.
 
+**See also:** [CONTEXT_API_PROTOCOL.md](./CONTEXT_API_PROTOCOL.md) — congruent backend protocol for multisport training (State of the Athlete, Goal Profiles, Weekly vs Block verdicts, cross-discipline interference).
+
 ---
 
 ## Architecture

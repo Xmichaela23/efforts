@@ -114,6 +114,27 @@ export interface Insight {
   data?: any;
 }
 
+/** Weekly readiness for Goal Predictor (from most recent run in acute window) */
+export interface WeeklyReadiness {
+  hr_drift_bpm: number | null;
+  pace_adherence_pct: number | null;
+}
+
+/** Server-computed weekly verdict (readiness % + message + drivers) */
+export interface WeeklyVerdict {
+  readiness_pct: number;
+  message: string;
+  drivers: string[];
+  label: 'high' | 'medium' | 'low';
+}
+
+/** Strength workload and RIR in acute window (Integrated Load). Flags "heavy legs" / deep fatigue when cardio is fresh. */
+export interface StructuralLoad {
+  acute: number;
+  /** Average RIR across strength sessions in acute window (null if no RIR data). Low RIR = high-repair state. */
+  avg_rir_acute?: number | null;
+}
+
 export interface TrainingContextData {
   acwr: ACWRData;
   sport_breakdown: SportBreakdown;
@@ -121,6 +142,10 @@ export interface TrainingContextData {
   week_comparison: WeekComparison;
   insights: Insight[];
   plan_progress?: PlanProgress;
+  weekly_readiness?: WeeklyReadiness;
+  weekly_verdict?: WeeklyVerdict;
+  /** Integrated Load: strength workload acute — for "heart ready, legs tired" narrative */
+  structural_load?: StructuralLoad;
 }
 
 interface UseTrainingContextResult {
