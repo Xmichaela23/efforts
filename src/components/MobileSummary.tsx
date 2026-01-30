@@ -2376,29 +2376,43 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           })}
           </tbody>
         </table>
-        {/* Run adherence summary below intervals — structured only (no mirror blurb) */}
+        {/* Run adherence summary below intervals: structured (technical + coach outlook) or AI narrative fallback */}
         {/run|walk/i.test(sportType) && (() => {
           const adherenceSummary = (completed as any)?.workout_analysis?.adherence_summary;
-          if (!adherenceSummary) return null;
-          const hasTechnical = Array.isArray(adherenceSummary.technical_insights) && adherenceSummary.technical_insights.length > 0;
-          const hasOutlook = adherenceSummary.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.';
-          if (!hasTechnical && !hasOutlook) return null;
+          const narrativeInsights = (completed as any)?.workout_analysis?.narrative_insights;
+          const hasStructured = adherenceSummary && (
+            (Array.isArray(adherenceSummary.technical_insights) && adherenceSummary.technical_insights.length > 0) ||
+            (adherenceSummary.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.')
+          );
+          const hasNarrative = Array.isArray(narrativeInsights) && narrativeInsights.length > 0;
+          if (!hasStructured && !hasNarrative) return null;
           return (
             <div className="mt-4 px-3 pb-4 space-y-3">
-              {hasTechnical && (
-                <div className="space-y-2">
-                  {adherenceSummary.technical_insights.map((t: { label: string; value: string }, i: number) => (
-                    <div key={i}>
-                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{t.label}</span>
-                      <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{t.value}</p>
+              {hasStructured && adherenceSummary && (
+                <>
+                  {Array.isArray(adherenceSummary.technical_insights) && adherenceSummary.technical_insights.length > 0 && (
+                    <div className="space-y-2">
+                      {adherenceSummary.technical_insights.map((t: { label: string; value: string }, i: number) => (
+                        <div key={i}>
+                          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{t.label}</span>
+                          <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{t.value}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+                  {adherenceSummary.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.' && (
+                    <div>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{adherenceSummary.plan_impact.focus || "Coach's Outlook"}</span>
+                      <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{adherenceSummary.plan_impact.outlook}</p>
+                    </div>
+                  )}
+                </>
               )}
-              {hasOutlook && (
-                <div>
-                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{adherenceSummary.plan_impact.focus || "Coach's Outlook"}</span>
-                  <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{adherenceSummary.plan_impact.outlook}</p>
+              {!hasStructured && hasNarrative && (
+                <div className="space-y-2">
+                  {narrativeInsights.map((insight: string, i: number) => (
+                    <p key={i} className="text-sm text-gray-300 leading-relaxed">{insight}</p>
+                  ))}
                 </div>
               )}
             </div>

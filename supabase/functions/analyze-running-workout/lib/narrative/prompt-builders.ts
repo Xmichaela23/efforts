@@ -355,22 +355,30 @@ export function buildPrompt(
   const isPlannedWorkout = !!plannedWorkout;
   const paceUnit = workoutContext.pace_unit;
   
-  let prompt = `You are analyzing a running workout. Generate 3-4 concise, data-driven observations based on the metrics below.
+  let prompt = `You are analyzing a running workout. Generate 3-4 concise, INTERPRETATIVE observations. The user already sees adherence percentages and the interval table in the UI — do not restate them.
 
-CRITICAL RULES:
-- Write like "a chart in words" - factual observations only
-- NO motivational language ("great job", "keep it up")
-- NO subjective judgments ("slow", "bad", "should have")
-- NO generic advice ("run more", "push harder")
-- Focus on WHAT HAPPENED, not what should happen
-- Use specific numbers and time references
-- Describe patterns visible in the data
-- Each observation should provide UNIQUE information - avoid repeating the same insight
-- Combine related metrics into single observations (e.g., HR average + drift + peak in one paragraph)
-${planContext ? `
-- CRITICAL: Reference plan context when available - explain WHY workout was programmed, whether performance matches plan expectations, and what's coming next week
-- Contextualize adherence relative to phase goals (e.g., Foundation Build vs Peak Strength)
-` : ''}
+DO NOT (redundant "mirror" — user sees this on screen):
+- Do NOT repeat execution %, pace %, or duration % (e.g. "81% execution", "75% pace adherence", "87% duration")
+- Do NOT list actual paces (e.g. "8:12, 8:16, 8:20 min/mi") or target range (e.g. "8:41-9:03 min/mi") — the table shows that
+- Do NOT write "Heart rate averaged X bpm, maximum Y bpm" or "Duration: X of Y minutes (Z% adherence)" as standalone lines
+- Do NOT summarize with "Completed N of N planned work intervals" or "performance exceeded/did not meet target pace expectations" — that is redundant
+
+DO (interpret, don't mirror):
+- Explain RELATIONSHIPS: e.g. internal vs external load (if pace was high but HR drift was low, note "surprising aerobic efficiency")
+- Physiological meaning: what HR drift or recovery efficiency suggests (e.g. "minimal cardiac drift suggests this pace sits within aerobic threshold")
+- Plan CONSEQUENCE: e.g. "Exceeding pace on this recovery day may dampen supercompensation for the block" or "Strong execution; watch cumulative fatigue as the phase builds"
+- Reference phase/week focus only to explain impact (e.g. "In Foundation week, turning this into a moderate session may shift the intended stimulus")
+- Each observation must add information the user cannot get by glancing at the chips or table
+
+FORBIDDEN PHRASES — never use these patterns (user already sees them):
+- "Duration: X of Y minutes completed (Z% adherence)"
+- "Overall execution: X% (Y% pace adherence, Z% duration adherence)"
+- "The workout was programmed as part of" or "programmed as part of the ... Plan"
+- "The performance met/exceeded/did not meet plan expectations" or "performance met the plan expectations"
+- "The average heart rate during the workout was X bpm, with a maximum (heart rate) of Y bpm"
+- "indicating a moderate intensity level consistent with aerobic training" (only if it just restates HR numbers)
+- "100% adherence to the prescribed work intervals" or "X% adherence to prescribed"
+If you write any of the above, the response will be rejected. Interpret relationships and consequences instead.
 
 Workout Profile:
 - Type: ${workoutContext.type}
@@ -413,7 +421,7 @@ ${workoutContext.weather?.windSpeed ? `- Wind Speed: ${workoutContext.weather.wi
   }
 
   prompt += `
-Return ONLY a JSON array of strings, no other text:
+Return ONLY a JSON array of 3-4 interpretative observation strings. No mirror phrases: no "Duration: X of Y minutes", no "Overall execution: X%", no "The workout was programmed as part of", no "average heart rate was X bpm, maximum Y bpm", no "performance met/exceeded plan expectations". Interpret relationships, physiology, and plan consequences only.
 ["observation 1", "observation 2", ...]`;
 
   return prompt;
@@ -454,7 +462,7 @@ ${planContext ? buildPlanContextSection(planContext) : ''}
 CRITICAL ANALYSIS RULES:
 ${hasIntervals ? buildIntervalWorkoutRules(plannedWorkout, detailedAnalysis, paceUnit, workoutContext) : buildContinuousRunRules(plannedPaceInfo, detailedAnalysis)}
 
-Generate 3-4 observations comparing actual vs. planned performance:
+Generate 3-4 INTERPRETATIVE observations (do not list interval paces or adherence percentages — interpret relationships, physiology, and plan consequences):
 ${hasIntervals ? buildIntervalObservations(detailedAnalysis, plannedWorkout, adherenceContext) : buildContinuousRunObservations(plannedPaceInfo, detailedAnalysis, adherenceContext, paceUnit)}
 ${buildHRObservation(adherenceContext)}
 ${buildDurationObservation(plannedWorkout, adherenceContext)}
@@ -619,11 +627,9 @@ WORK INTERVAL DETAILS:
 ${workIntervalDetails || 'No work interval data available'}
 
 CRITICAL INSTRUCTION: 
-- Focus EXCLUSIVELY on work interval performance shown above
-- Compare each work interval's actual pace to its target pace range
-- DO NOT compare overall average pace (${workoutContext.avg_pace} ${paceUnit}) to work interval targets - this is mathematically incorrect
-- DO NOT mention overall average pace in relation to work intervals
-- Report interval completion and pace adherence as shown above
+- Interpret work interval outcome (e.g. what pace pattern or internal load suggests) — do NOT write "Completed N of N work intervals" or list pace adherence % or actual paces
+- DO NOT compare overall average pace (${workoutContext.avg_pace} ${paceUnit}) to work interval targets
+- Focus on relationship (internal vs external load), physiological meaning, and plan consequence
 
 `;
   } else if (plannedWorkoutDesc) {
@@ -637,11 +643,9 @@ ${plannedWorkoutDesc}
 CRITICAL: This is an INTERVAL workout with work intervals and recovery periods.
 
 ANALYSIS RULES:
-- Focus EXCLUSIVELY on work interval performance (pace adherence, consistency across intervals)
-- DO NOT compare overall average pace (${workoutContext.avg_pace} ${paceUnit}) to work interval pace targets - overall pace includes warmup/recovery/cooldown and will ALWAYS be slower than work interval targets
-- DO NOT mention overall average pace in relation to work interval targets - this is mathematically incorrect
-- Report interval completion (X of Y intervals completed)
-- Report pace adherence range across work intervals
+- Interpret work interval outcome (e.g. what pace pattern or internal load suggests) — do NOT write "Completed N of N intervals" or list pace adherence % or actual paces (8:12, 8:16, etc.)
+- DO NOT compare overall average pace (${workoutContext.avg_pace} ${paceUnit}) to work interval targets
+- Focus on relationships, physiological meaning, and plan consequence — not restating the table
 - Note any fading pattern (pace getting slower) or consistency across intervals
 - For each work interval, compare its actual pace to its specific target pace range
 - Do NOT analyze mile-by-mile breakdown for interval workouts
@@ -750,10 +754,10 @@ function buildIntervalObservations(detailedAnalysis: any, plannedWorkout: any, a
   }
   
   if (workIntervals.length === 0) {
-    return `"Completed ${completedIntervals.length} of ${totalPlannedIntervals} prescribed work intervals."`;
+    return `- One observation: interpret work interval outcome. Do NOT write "Completed N of N work intervals."`;
   }
-  
-  return `"Completed ${completedIntervals.length} of ${totalPlannedIntervals} prescribed work intervals. Work interval pace adherence ranged from ${minPaceAdherence}% to ${maxPaceAdherence}% (average ${avgPaceAdherence}%). ${patternNote}"`;
+  const patternHint = isFading ? 'Pace faded; interpret what that suggests for stimulus or fatigue.' : isConsistent ? 'Pace was consistent; interpret what that suggests.' : 'Pace varied; interpret what that suggests.';
+  return `- One observation: interpret work interval outcome (${patternHint}) Do NOT write "Completed N of N work intervals" or "pace adherence was X%" or list actual paces.`;
 }
 
 /**
@@ -777,77 +781,44 @@ Pace control varied significantly mile-to-mile, with only ${milesInRange} of ${t
 }
 
 /**
- * Build HR observation template
+ * Build HR observation guidance (interpret, don't mirror — user sees avg/max in UI)
  */
 function buildHRObservation(adherenceContext: any): string {
-  // This is a template - actual values filled in by AI
-  // HR drift is null for interval workouts (not applicable)
   if (adherenceContext.hr_drift_bpm === null || adherenceContext.hr_drift_bpm === undefined) {
-    return `"Heart rate averaged X bpm, peaking at Z bpm."`;
+    return `- One observation: interpret what HR pattern suggests (e.g. recovery efficiency, aerobic stress). Do NOT write "Heart rate averaged X bpm, peaking at Z bpm."`;
   }
-  return `"Heart rate averaged X bpm with ${adherenceContext.hr_drift_bpm > 0 ? '+' : ''}${adherenceContext.hr_drift_bpm} bpm drift, peaking at Z bpm."`;
+  const drift = adherenceContext.hr_drift_bpm;
+  return `- One observation: interpret HR drift (${drift > 0 ? '+' : ''}${drift} bpm) — what it suggests about internal load or aerobic efficiency. Do NOT restate "Heart rate averaged X bpm, max Y bpm."`;
 }
 
 /**
- * Build duration observation template
+ * Build duration observation guidance (interpret impact, don't restate X of Y minutes)
  */
 function buildDurationObservation(plannedWorkout: any, adherenceContext: any): string {
   if (!plannedWorkout) return '';
-  
-  let plannedDurationS = 0;
-  if (plannedWorkout?.computed?.total_duration_seconds) {
-    plannedDurationS = plannedWorkout.computed.total_duration_seconds;
-  } else if (plannedWorkout?.computed?.steps?.length > 0) {
-    plannedDurationS = plannedWorkout.computed.steps.reduce((sum: number, step: any) => {
-      return sum + (step.duration_s || step.duration || 0);
-    }, 0);
-  }
-  const plannedDurationMin = plannedDurationS > 0 ? Math.round(plannedDurationS / 60) : 0;
-  
-  if (plannedDurationMin > 0) {
-    return `"Duration: X of ${plannedDurationMin} minutes completed (${adherenceContext.duration_adherence_pct}% adherence)."`;
-  }
-  return '';
+  const pct = adherenceContext.duration_adherence_pct;
+  return `- If duration was meaningfully short or long vs planned, note the IMPACT (e.g. stimulus achieved, recovery compromised). Do NOT write "Duration: X of Y minutes (Z% adherence)."`;
 }
 
 /**
- * Build execution observation template
+ * Build execution observation guidance (interpret consequence, don't restate percentages)
  */
 function buildExecutionObservation(plannedWorkout: any, workout: any, adherenceContext: any): string {
   if (!plannedWorkout) return '';
-  
-  // This is complex - simplified for now, can be expanded
-  return `"Overall execution: ${adherenceContext.execution_adherence_pct}% (${adherenceContext.pace_adherence_pct}% pace adherence, ${adherenceContext.duration_adherence_pct}% duration adherence)."`;
+  return `- Interpret what the execution outcome means for this workout type and plan (e.g. "recovery day turned into moderate session — may dampen supercompensation" or "strong execution; watch cumulative fatigue"). Do NOT write "Overall execution: X% (Y% pace, Z% duration)."`;
 }
 
 /**
- * Build required observations section
+ * Build required observations section (interpretative only — no mirror lines)
  */
 function buildRequiredObservations(plannedWorkout: any, adherenceContext: any, planContext: any): string {
   if (!plannedWorkout) return '';
-  
-  let plannedDurationS = 0;
-  if (plannedWorkout?.computed?.total_duration_seconds) {
-    plannedDurationS = plannedWorkout.computed.total_duration_seconds;
-  } else if (plannedWorkout?.computed?.steps?.length > 0) {
-    plannedDurationS = plannedWorkout.computed.steps.reduce((sum: number, step: any) => {
-      return sum + (step.duration_s || step.duration || 0);
-    }, 0);
-  }
-  const plannedDurationMin = plannedDurationS > 0 ? Math.round(plannedDurationS / 60) : 0;
-  
   let required = '';
-  if (plannedDurationMin > 0) {
-    required += `- You MUST include this exact line: "Duration: X of ${plannedDurationMin} minutes completed (${adherenceContext.duration_adherence_pct}% adherence)."
-- You MUST include this exact line: "Overall execution: ${adherenceContext.execution_adherence_pct}% (${adherenceContext.pace_adherence_pct}% pace adherence, ${adherenceContext.duration_adherence_pct}% duration adherence)."`;
-  }
-  
   if (planContext) {
     required += `
-- You MUST include plan context: Reference the plan phase (${planContext.phase}), week focus (${planContext.weekly_summary?.focus || 'N/A'}), and explain WHY this workout was programmed and whether performance matches plan expectations.`;
+- One observation MUST explain plan consequence: reference phase (${planContext.phase}), week focus (${planContext.weekly_summary?.focus || 'N/A'}), and the CONSEQUENCE of today's effort (e.g. "Exceeding pace on this recovery day may dampen supercompensation" or "This effort fits the Foundation focus"). Do NOT write "This workout was programmed as part of... aiming to... and performance exceeded/did not meet expectations."`;
   }
-  
-  return required ? `\n\nREQUIRED OBSERVATIONS (MUST INCLUDE):\n${required}` : '';
+  return required ? `\n\nREQUIRED (interpret, do not mirror):\n${required}` : '';
 }
 
 /**
@@ -866,7 +837,7 @@ export async function callOpenAI(openaiKey: string, prompt: string): Promise<str
         messages: [
           {
             role: 'system',
-            content: 'You are a data analyst converting workout metrics into factual observations. Never use motivational language or subjective judgments.'
+            content: 'You are a coach interpreting workout data. Write interpretative observations only. FORBIDDEN: "Duration: X of Y minutes", "Overall execution: X%", "The workout was programmed as part of", "average heart rate was X bpm, maximum Y bpm", "performance met/exceeded plan expectations". Explain relationships (internal vs external load), physiological meaning (HR drift, recovery), and plan consequences. Never use motivational language or subjective judgments.'
           },
           {
             role: 'user',
