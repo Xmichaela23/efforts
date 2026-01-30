@@ -1490,17 +1490,17 @@ export default function WorkoutCalendar({
               {/* Spacer to push content down */}
               <div className="flex-1" />
               
-              <div className="space-y-3" style={{ fontSize: '0.78rem' }}>
+              <div className="space-y-3" style={{ fontSize: '0.875rem' }}>
                 {/* Total Workload header */}
                 <div 
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg flex-wrap"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg flex-wrap"
                   style={{
                     background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)',
                     border: '0.5px solid rgba(255, 255, 255, 0.08)',
                     boxShadow: '0 0 0 1px rgba(255,255,255,0.03) inset, 0 2px 8px rgba(0,0,0,0.3)',
                   }}
                 >
-                  <span className="text-xs font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Total Workload</span>
+                  <span className="font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.9rem' }}>Total Workload</span>
                   <Popover open={workloadTooltipOpen} onOpenChange={setWorkloadTooltipOpen}>
                     <PopoverTrigger asChild>
                       <button 
@@ -1543,19 +1543,19 @@ export default function WorkoutCalendar({
                       </div>
                     </PopoverContent>
                   </Popover>
-                  <div className="flex items-center gap-0.5">
-                    <Calendar className="w-2.5 h-2.5" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
-                    <span className="text-xs tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.planned}</span>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                    <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>{weeklyStats.planned}</span>
                   </div>
-                  <div className="flex items-center gap-0.5">
-                    <CheckCircle className="w-2.5 h-2.5" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
-                    <span className="text-xs tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>{weeklyStats.completed}</span>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                    <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>{weeklyStats.completed}</span>
                   </div>
                 </div>
                 
-                {/* All Metrics */}
+                {/* All Metrics - label and value next to each other */}
                 {compactMetrics.length > 0 && (
-                  <div className="space-y-0.5 pt-1">
+                  <div className="space-y-1 pt-1">
                     {compactMetrics.map((metric, index) => {
                       const labelLower = String(metric.label || '').toLowerCase();
                       let disciplineType = '';
@@ -1568,15 +1568,15 @@ export default function WorkoutCalendar({
                       const labelColor = disciplineType ? getDisciplinePhosphorCore(disciplineType) : 'rgba(255, 255, 255, 0.9)';
                       
                       return (
-                        <div key={index} className="flex items-center justify-between gap-1 min-w-0">
-                          <span className="text-xs font-light leading-tight" style={{ color: labelColor, fontSize: '0.72rem' }}>
+                        <div key={index} className="flex items-center gap-2 min-w-0">
+                          <span className="font-light leading-tight" style={{ color: labelColor, fontSize: '0.875rem' }}>
                             {metric.label}
                           </span>
                           <span 
-                            className="text-xs font-light tabular-nums leading-tight"
+                            className="font-light tabular-nums leading-tight"
                             style={{
                               color: 'rgba(255, 255, 255, 0.85)',
-                              fontSize: '0.72rem'
+                              fontSize: '0.875rem'
                             }}
                           >
                             {metric.value}
