@@ -1201,14 +1201,38 @@ export default function WorkoutCalendar({
                             {content}
                             <span
                               aria-hidden="true"
-                              className="inline-flex items-center justify-center"
+                              className="inline-flex items-center justify-center tabular-nums"
                               style={{
                                 marginLeft: 8,
                                 width: 18,
                                 height: 12,
+                                position: 'relative',
                                 verticalAlign: 'middle',
+                                transform: 'translateY(1px)',
                               }}
                             >
+                              {/* Emission lines above incomplete pyramid (match complete) */}
+                              <span
+                                aria-hidden="true"
+                                style={{
+                                  position: 'absolute',
+                                  left: '50%',
+                                  top: -6,
+                                  transform: 'translateX(-50%)',
+                                  width: 18,
+                                  height: 6,
+                                  pointerEvents: 'none',
+                                  backgroundImage: `
+                                    linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.62) 42%, rgba(255,255,255,0) 100%),
+                                    linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 42%, rgba(255,255,255,0) 100%),
+                                    linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 42%, rgba(255,255,255,0) 100%)
+                                  `,
+                                  backgroundRepeat: 'no-repeat',
+                                  backgroundSize: '18px 1px, 16px 1px, 14px 1px',
+                                  backgroundPosition: 'center 0px, center 2px, center 4px',
+                                  opacity: 0.9,
+                                }}
+                              />
                               <svg
                                 width="18"
                                 height="12"
