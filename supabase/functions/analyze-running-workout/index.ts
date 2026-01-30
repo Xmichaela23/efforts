@@ -1675,9 +1675,10 @@ Deno.serve(async (req) => {
       } : 'No plan context');
     }
 
-    // Generate deterministic score explanation (explains WHY scores are what they are)
-    const scoreExplanation = generateScoreExplanation(performance, detailedAnalysis, plannedWorkout, planContext);
-    console.log('📝 [SCORE EXPLANATION] Generated:', scoreExplanation);
+    // Structured adherence summary (verdict + technical insights + plan impact)
+    const adherenceSummary = generateAdherenceSummary(performance, detailedAnalysis, plannedWorkout, planContext, enhancedAnalysis);
+    const scoreExplanation = adherenceSummary?.verdict ?? null;
+    console.log('📝 [ADHERENCE SUMMARY] verdict:', scoreExplanation, 'technical_insights:', adherenceSummary?.technical_insights?.length, 'plan_impact:', !!adherenceSummary?.plan_impact);
     
     // Use RPC to merge computed (preserves analysis.series from compute-workout-analysis)
     // RPC is required - no fallbacks to prevent data loss
@@ -1699,7 +1700,8 @@ Deno.serve(async (req) => {
         performance: performance,
         detailed_analysis: detailedAnalysis,
         narrative_insights: narrativeInsights,  // AI-generated human-readable insights
-        score_explanation: scoreExplanation,  // Deterministic explanation of adherence scores
+        score_explanation: scoreExplanation,  // Backward-compat: single verdict line
+        adherence_summary: adherenceSummary ?? null,  // Structured: verdict + technical_insights + plan_impact
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null  // Include terrain breakdown
       },
       analysis_status: 'complete',
@@ -3904,21 +3906,29 @@ async function fetchPlanContextForWorkout(
   }
 }
 
-function generateScoreExplanation(
+/** Structured adherence summary: verdict + technical insights + plan impact (interpret, don't mirror). */
+export interface WorkoutAdherenceSummary {
+  verdict: string;
+  technical_insights: { label: string; value: string }[];
+  plan_impact: { focus: string; outlook: string };
+}
+
+function generateAdherenceSummary(
   performance: { execution_adherence: number; pace_adherence: number; duration_adherence: number },
   detailedAnalysis: any,
-  plannedWorkout?: any,
-  planContext?: {
+  plannedWorkout: any,
+  planContext: {
     hasActivePlan: boolean;
     weekIndex: number | null;
-    weekIntent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
+    weekIntent: string;
     isRecoveryWeek: boolean;
     isTaperWeek: boolean;
     phaseName: string | null;
     weekFocusLabel: string | null;
     planName: string | null;
-  } | null
-): string | null {
+  } | null,
+  granularAnalysis?: any
+): WorkoutAdherenceSummary | null {
   const intervalBreakdown = detailedAnalysis?.interval_breakdown;
   
   // Only generate for interval workouts with breakdown data
@@ -4116,7 +4126,7 @@ function generateScoreExplanation(
       } else {
         // Work intervals that missed target significantly
         if (planContext?.hasActivePlan && isBuildContext) {
-          const weekInfo = weekNumber ? ` (Week ${weekIndex})` : '';
+          const weekInfo = weekNumber ? ` (Week ${weekNumber})` : '';
           parts.push(`Build week${weekInfo}: ${slowIntervals.length} of ${deviations.length} intervals missed target by ${fmtDelta(avgSlowDelta)}/mi — workout stimulus not achieved, may impact phase goals`);
         } else {
           parts.push(`${slowIntervals.length} of ${deviations.length} intervals missed target by ${fmtDelta(avgSlowDelta)}/mi — workout stimulus not achieved`);
@@ -4143,6 +4153,140 @@ function generateScoreExplanation(
     }
   }
 
-  return parts.length > 0 ? parts.join('. ') + '.' : null;
+  if (parts.length === 0) return null;
+
+  const fastDominant = fastIntervals.length > 0 && slowIntervals.length === 0;
+  const slowDominant = slowIntervals.length > 0 && fastIntervals.length === 0;
+  const ws = detailedAnalysis?.workout_summary;
+  const hrDrift = ws?.hr_drift ?? granularAnalysis?.heart_rate_analysis?.hr_drift_bpm ?? null;
+  const hrDriftAbs = hrDrift != null && Number.isFinite(hrDrift) ? Math.abs(hrDrift) : null;
+
+  // Verdict: single non-repetitive sentence; upgrade when internal vs external load tells a story
+  let verdict = parts[0].trim() + (parts[0].endsWith('.') ? '' : '.');
+  if (fastDominant && isRecoveryContext && hrDriftAbs != null && hrDriftAbs <= 5) {
+    verdict = "Physiologically efficient, but tactically over-paced for a recovery day.";
+  }
+
+  // Plan impact: use phaseName and weekFocusLabel to explain trade-offs (consequence, not restatement)
+  let focus = 'Adherence';
+  let outlook = '';
+  const phaseName = planContext?.phaseName || '';
+  const weekFocus = planContext?.weekFocusLabel || '';
+
+  if (planContext?.hasActivePlan) {
+    if (isRecoveryContext) {
+      focus = 'Recovery Integrity';
+      if (fastDominant) {
+        outlook = phaseName
+          ? `This extra effort in the ${phaseName} phase may dampen the supercompensation intended for this rest block.${weekFocus ? ` Consider a more conservative approach to ${weekFocus.toLowerCase()}.` : ''}`
+          : "By exceeding the pace today, you turned a recovery session into a moderate-intensity run. This may dampen the supercompensation effect intended for this rest block.";
+      } else if (slowDominant) {
+        outlook = phaseName
+          ? `Slower-than-target pacing in ${phaseName} supports adaptation and sets you up well for the next build.`
+          : "Slower-than-target pacing on this recovery day supports adaptation and sets you up well for the next build phase.";
+      }
+    } else if (isBuildContext) {
+      focus = 'Build Execution';
+      if (fastDominant) {
+        outlook = phaseName
+          ? `Strong execution in ${phaseName}; this extra load may necessitate a more conservative approach to your next key session.${weekFocus ? ` Focus: ${weekFocus}.` : ''}`
+          : "Strong execution; keep an eye on cumulative fatigue as the block progresses.";
+      } else if (slowDominant) {
+        outlook = phaseName
+          ? `Missed target stimulus in ${phaseName} may reduce the intended training load for this block.${weekFocus ? ` Adjust ${weekFocus.toLowerCase()} as needed.` : ''}`
+          : "Missed target stimulus today may reduce the intended training load for this phase.";
+      }
+    } else if (isTaperContext) {
+      focus = 'Taper Discipline';
+      outlook = phaseName
+        ? `Sticking to prescribed effort in ${phaseName} protects race-day readiness.`
+        : "Sticking to prescribed effort in taper protects race-day readiness.";
+    }
+  }
+  if (!outlook && phaseName) {
+    outlook = `This effort fits within your current phase (${phaseName}).`;
+  }
+
+  // Technical insights: internal vs external load + diagnostic labels (interpret, don't mirror)
+  const technical_insights: { label: string; value: string }[] = [];
+
+  // Internal vs external: if external load (pace) was high but internal (HR drift) low → surprising efficiency
+  if (fastDominant && hrDriftAbs != null && hrDriftAbs <= 5) {
+    technical_insights.push({
+      label: 'Internal vs External Load',
+      value: "External load was high for the day's intent, but internal load stayed low — surprising aerobic efficiency at this pace."
+    });
+  }
+
+  // HR drift → Aerobic Efficiency / Aerobic Stress (coaching logic)
+  if (hrDrift != null && Number.isFinite(hrDrift) && hrDriftAbs !== null) {
+    if (hrDriftAbs <= 3) {
+      technical_insights.push({ label: 'Aerobic Efficiency', value: `Heart rate remained stable (${hrDrift > 0 ? '+' : ''}${hrDrift} bpm drift), suggesting this pace is within your aerobic threshold.` });
+    } else if (hrDriftAbs <= 10) {
+      technical_insights.push({ label: 'Cardiac Drift', value: `Moderate HR drift (+${hrDrift} bpm) in the second half — pace may have felt harder as the session went on.` });
+    } else {
+      technical_insights.push({ label: 'Aerobic Stress', value: `Significant HR drift (+${hrDrift} bpm) suggests accumulated fatigue or intensity creep. Consider hydration, heat, and recovery; this may take longer to absorb.` });
+    }
+  }
+
+  // Pacing stability: < 5% → Pacing Mastery; otherwise diagnostic
+  const speedFlux = detailedAnalysis?.speed_fluctuations;
+  if (speedFlux?.available && speedFlux?.pace_variability_percent != null) {
+    const pct = speedFlux.pace_variability_percent;
+    if (pct < 5) {
+      technical_insights.push({ label: 'Pacing Mastery', value: `Pace variance under 5% — high control across work intervals, even under changing terrain or effort.` });
+    } else if (pct <= 8) {
+      technical_insights.push({ label: 'Pacing Stability', value: `Moderate pace variance (${pct}%) — some fluctuation between intervals.` });
+    } else {
+      technical_insights.push({ label: 'Pacing Stability', value: `Higher pace variance (${pct}%) — consider smoothing effort across intervals next time.` });
+    }
+  }
+  const paceVar = granularAnalysis?.pacing_analysis?.pacing_variability;
+  if (paceVar?.coefficient_of_variation != null && technical_insights.every(t => t.label !== 'Pacing Mastery' && t.label !== 'Pacing Stability')) {
+    const cv = paceVar.coefficient_of_variation;
+    if (cv < 5) {
+      technical_insights.push({ label: 'Pacing Mastery', value: `Pace variability (CV ${cv}%) was low — steady output and high control.` });
+    } else {
+      technical_insights.push({ label: 'Pacing Stability', value: `Pace variability (CV ${cv}%) ${cv <= 10 ? 'was moderate.' : 'was high — uneven effort.'}` });
+    }
+  }
+
+  // HR recovery: > 30 bpm → High Readiness; otherwise diagnostic
+  const hrRecovery = detailedAnalysis?.heart_rate_recovery;
+  if (hrRecovery?.available && hrRecovery?.average_hr_drop_bpm != null) {
+    const drop = hrRecovery.average_hr_drop_bpm;
+    if (drop >= 30) {
+      technical_insights.push({ label: 'High Readiness', value: `HR dropped ${drop} bpm in recovery intervals — strong cardiovascular rebound and readiness for the next interval.` });
+    } else {
+      const quality = hrRecovery.recovery_quality || (drop > 20 ? 'Excellent' : drop > 15 ? 'Good' : drop > 10 ? 'Fair' : 'Poor');
+      technical_insights.push({ label: 'Recovery Efficiency', value: `HR dropped ${drop} bpm in recovery (${quality}) — reflects aerobic fitness and readiness.` });
+    }
+  }
+
+  return {
+    verdict,
+    technical_insights,
+    plan_impact: { focus, outlook: outlook || 'No plan context.' }
+  };
+}
+
+/** Backward-compat: returns single verdict string. */
+function generateScoreExplanation(
+  performance: { execution_adherence: number; pace_adherence: number; duration_adherence: number },
+  detailedAnalysis: any,
+  plannedWorkout?: any,
+  planContext?: {
+    hasActivePlan: boolean;
+    weekIndex: number | null;
+    weekIntent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
+    isRecoveryWeek: boolean;
+    isTaperWeek: boolean;
+    phaseName: string | null;
+    weekFocusLabel: string | null;
+    planName: string | null;
+  } | null
+): string | null {
+  const summary = generateAdherenceSummary(performance, detailedAnalysis, plannedWorkout ?? null, planContext ?? null, undefined);
+  return summary?.verdict ?? null;
 }
 

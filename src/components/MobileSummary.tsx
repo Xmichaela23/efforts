@@ -1612,58 +1612,26 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             return `${sign}${val} mi`;
           };
 
-          // Read server-generated score explanation (smart server, dumb client)
-          // Prefer backend-generated plan-aware explanation over client-side generic message
-          const scoreReasoning = (completed as any)?.workout_analysis?.score_explanation || null;
-          
-          // Fallback to client-side message only if backend didn't generate one
-          const message = scoreReasoning ? null : getContextualMessage(workoutIntent, finalDurationPct, finalDistPct, finalPacePct, 'run', planned, executedSecPerMi);
+          // Adherence chips only; summary (technical_insights + plan_impact) is rendered below the intervals table
+          const adherenceSummary = (completed as any)?.workout_analysis?.adherence_summary;
 
           return (
             <div className="w-full pt-1 pb-2">
-              {/* Descriptive blurb first - prefer backend plan-aware explanation */}
-              {scoreReasoning ? (
-                <div className="mb-3 text-sm text-gray-300 text-center">
-                  {scoreReasoning}
-                </div>
-              ) : message ? (
-                <div className="mb-3 text-sm text-gray-300 text-center">
-                  {message.icon} {message.text}
-                </div>
-              ) : null}
-              
-              {/* Adherence scores */}
+              {/* Adherence scores — no blurb above */}
               <div className="flex items-center justify-center gap-6 text-center mb-3">
                 <div className="flex items-end gap-3">
-                  {/* Overall Execution Score */}
                   {chip('Execution', finalExecutionScore, 
                        performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence', 'pace')}
-                  
-                  {/* Duration Adherence */}
                   {chip('Duration', finalDurationPct, 
                        'Time adherence', 'duration')}
-                  
-                  {/* Pace Adherence */}
                   {chip('Pace', finalPacePct, 
                        'Interval adherence', 'pace')}
                 </div>
               </div>
               
-              {/* AI narrative insights (plan-aware, interval-aware) */}
-              {Array.isArray((completed as any)?.workout_analysis?.narrative_insights) &&
-               (completed as any).workout_analysis.narrative_insights.length > 0 && (
-                <div className="mb-4 px-3 space-y-2">
-                  {(completed as any).workout_analysis.narrative_insights.map((insight: string, i: number) => (
-                    <p key={i} className="text-sm text-gray-300 leading-relaxed">
-                      {insight}
-                    </p>
-                  ))}
-                </div>
-              )}
-              
-              {/* View in Context link */}
+              {/* View in Context link — above table */}
               {onNavigateToContext && completed?.id && (
-                <div className="text-center">
+                <div className="text-center mb-2">
                   <button
                     onClick={() => onNavigateToContext(completed.id)}
                     className="text-sm text-gray-200 hover:text-white transition-colors underline underline-offset-2"
@@ -2088,6 +2056,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           })()}
         </div>
       ) : (
+        <>
         <table className="w-full text-[13px] table-fixed">
           <colgroup>
             <col className="w-[36%]" />
@@ -2407,6 +2376,46 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           })}
           </tbody>
         </table>
+        {/* Run adherence summary below intervals (technical insights + coach's outlook) */}
+        {/run|walk/i.test(sportType) && (() => {
+          const adherenceSummary = (completed as any)?.workout_analysis?.adherence_summary;
+          const narrativeInsights = (completed as any)?.workout_analysis?.narrative_insights;
+          const hasStructured = adherenceSummary && (Array.isArray(adherenceSummary.technical_insights) && adherenceSummary.technical_insights.length > 0 || adherenceSummary.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.');
+          const hasNarrative = Array.isArray(narrativeInsights) && narrativeInsights.length > 0;
+          if (!hasStructured && !hasNarrative) return null;
+          return (
+            <div className="mt-4 px-3 pb-4 space-y-3">
+              {adherenceSummary && (
+                <>
+                  {Array.isArray(adherenceSummary.technical_insights) && adherenceSummary.technical_insights.length > 0 && (
+                    <div className="space-y-2">
+                      {adherenceSummary.technical_insights.map((t: { label: string; value: string }, i: number) => (
+                        <div key={i}>
+                          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{t.label}</span>
+                          <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{t.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {adherenceSummary.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.' && (
+                    <div>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{adherenceSummary.plan_impact.focus || "Coach's Outlook"}</span>
+                      <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{adherenceSummary.plan_impact.outlook}</p>
+                    </div>
+                  )}
+                </>
+              )}
+              {!adherenceSummary && hasNarrative && (
+                <div className="space-y-2">
+                  {narrativeInsights.map((insight: string, i: number) => (
+                    <p key={i} className="text-sm text-gray-300 leading-relaxed">{insight}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+        </>
       )}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
         <div className="py-2">
