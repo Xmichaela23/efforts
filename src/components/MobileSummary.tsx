@@ -1649,10 +1649,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 </div>
               </div>
               
-              {/* Score reasoning explanation for interval workouts */}
-              {scoreReasoning && (
-                <div className="mb-4 text-sm text-gray-300 text-center px-3 leading-relaxed">
-                  {scoreReasoning}
+              {/* AI narrative insights (plan-aware, interval-aware) */}
+              {Array.isArray((completed as any)?.workout_analysis?.narrative_insights) &&
+               (completed as any).workout_analysis.narrative_insights.length > 0 && (
+                <div className="mb-4 px-3 space-y-2">
+                  {(completed as any).workout_analysis.narrative_insights.map((insight: string, i: number) => (
+                    <p key={i} className="text-sm text-gray-300 leading-relaxed">
+                      {insight}
+                    </p>
+                  ))}
                 </div>
               )}
               
