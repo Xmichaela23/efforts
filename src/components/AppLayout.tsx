@@ -1781,9 +1781,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             }
             setFeedbackWorkout(null);
           }}
-          onSave={() => {
+          onSave={(data) => {
             // Don't mark as dismissed on save - user completed the action
             setFeedbackWorkout(null);
+            // Update selectedWorkout with saved RPE/gear so details screen shows it immediately
+            if (feedbackWorkout && selectedWorkout?.id === feedbackWorkout.id && data) {
+              setSelectedWorkout((prev: any) => (prev ? { ...prev, ...data } : prev));
+            }
+            // Trigger refetch so UnifiedWorkoutView and useWorkoutDetail get fresh DB row
+            try {
+              window.dispatchEvent(new CustomEvent('workout:invalidate'));
+              window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+            } catch {}
             // Only check for next workout if no workout is selected (don't interfere with workout-specific checks)
             if (!selectedWorkout) {
               setTimeout(() => checkForFeedbackNeeded(), 1000);
