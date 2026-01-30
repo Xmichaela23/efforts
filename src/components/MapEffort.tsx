@@ -62,6 +62,7 @@ const CURSOR_PT = 'cursor-pt';
 const SEGMENTS_SRC = 'segments-source';
 const SEGMENT_HIT_ZONE = 'segment-hit-zone';  // Invisible wide layer for tap detection
 const SEGMENT_LINE = 'segment-line';
+const SEGMENT_PR_HALO = 'segment-pr-halo';   // Dark outline under PR so it pops on map
 const SEGMENT_PR_LINE = 'segment-pr-line';
 
 function styleUrl(theme: 'outdoor' | 'hybrid' | 'topo') {
@@ -378,7 +379,23 @@ export default function MapEffort({
         });
       }
       
-      // PR segment line - Gold/amber for PRs (always same color, stands out)
+      // PR halo - dark outline under PR segment so it stands out on satellite/busy maps
+      if (!map.getLayer(SEGMENT_PR_HALO)) {
+        map.addLayer({
+          id: SEGMENT_PR_HALO,
+          type: 'line',
+          source: SEGMENTS_SRC,
+          filter: ['==', ['get', 'isPR'], true],
+          paint: {
+            'line-color': '#1f2937',
+            'line-width': 14,
+            'line-opacity': 0.9
+          },
+          layout: { 'line-cap': 'round', 'line-join': 'round' }
+        });
+      }
+      
+      // PR segment line - bright gold on top of halo so PRs don't get lost
       if (!map.getLayer(SEGMENT_PR_LINE)) {
         map.addLayer({
           id: SEGMENT_PR_LINE,
@@ -387,7 +404,7 @@ export default function MapEffort({
           filter: ['==', ['get', 'isPR'], true],
           paint: {
             'line-color': '#fbbf24',  // Amber/gold for PRs
-            'line-width': 6,
+            'line-width': 9,
             'line-opacity': 1
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' }
@@ -611,7 +628,7 @@ export default function MapEffort({
         // Brighten the appropriate layer
         if (isPR) {
           map.setPaintProperty(SEGMENT_PR_LINE, 'line-opacity', 1);
-          map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 8);
+          map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 11);
         } else {
           map.setPaintProperty(SEGMENT_LINE, 'line-opacity', 1);
           map.setPaintProperty(SEGMENT_LINE, 'line-width', 7);
@@ -648,7 +665,7 @@ export default function MapEffort({
       map.setPaintProperty(SEGMENT_LINE, 'line-opacity', 0.9);
       map.setPaintProperty(SEGMENT_LINE, 'line-width', 5);
       map.setPaintProperty(SEGMENT_PR_LINE, 'line-opacity', 1);
-      map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 6);
+      map.setPaintProperty(SEGMENT_PR_LINE, 'line-width', 9);
     };
     
     // Add handlers to hit zone layer
