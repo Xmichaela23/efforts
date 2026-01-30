@@ -1615,7 +1615,17 @@ export const useWorkouts = () => {
       // Compute analysis (fire-and-forget) so computed.overall is available to unified/Today
       try {
         (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: data.id } } as any)
-          .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
+          .then(() => {
+            try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+            // Run adherence/pace analysis for completed running workouts (pace column + summary)
+            const typeLower = String(data.type || '').toLowerCase();
+            const isRun = typeLower === 'run' || typeLower === 'running';
+            if (isRun && (data.workout_status === 'completed' || newWorkout.workout_status === 'completed')) {
+              (supabase.functions.invoke as any)?.('analyze-running-workout', { body: { workout_id: data.id } } as any)
+                .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
+                .catch(() => {});
+            }
+          })
           .catch(() => {});
       } catch {}
       
@@ -1882,9 +1892,20 @@ export const useWorkouts = () => {
       setWorkouts((prev) => prev.map((w) => (w.id === id ? updated : w)));
 
       // Compute summary (fire-and-forget) to refresh metrics post-update
+      const isRun = (t: string) => { const l = String(t || '').toLowerCase(); return l === 'run' || l === 'running'; };
+      const isCompletedRun = isRun(data.type) && data.workout_status === 'completed';
+      const plannedIdChanged = updates.planned_id !== undefined;
       try {
         (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: id } } as any)
-          .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
+          .then(() => {
+            try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+            // Re-run adherence/pace analysis when user attaches a planned workout (pace + summary)
+            if (isCompletedRun && plannedIdChanged) {
+              (supabase.functions.invoke as any)?.('analyze-running-workout', { body: { workout_id: id } } as any)
+                .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
+                .catch(() => {});
+            }
+          })
           .catch(() => {});
       } catch {}
       return updated;
