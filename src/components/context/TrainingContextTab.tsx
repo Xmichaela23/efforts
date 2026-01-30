@@ -70,6 +70,14 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
     );
   }
 
+  // Plan-aware ACWR label: on build/baseline/peak weeks, show "Below Base" instead of "undertrained"
+  const hasActivePlan = !!data.acwr.plan_context?.hasActivePlan;
+  const weekIntent = data.acwr.plan_context?.weekIntent;
+  const isBuildBaselinePeak = weekIntent === 'build' || weekIntent === 'baseline' || weekIntent === 'peak';
+  const acwrStatusLabel = hasActivePlan && isBuildBaselinePeak && data.acwr.status === 'undertrained'
+    ? 'Below Base'
+    : data.acwr.status.replace('_', ' ');
+
   return (
     <div className="space-y-3 pb-6">
       {/* Cockpit strip (matches dashboard week strip language) */}
@@ -187,9 +195,14 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               Systemic risk (ACWR)
             </span>
             <span className={`font-medium ${data.acwr.status === 'elevated' || data.acwr.status === 'high_risk' ? 'text-amber-400' : data.acwr.status === 'optimal' || data.acwr.status === 'optimal_recovery' ? 'text-green-400' : 'text-white/80'}`}>
-              {data.acwr.ratio.toFixed(2)} — {data.acwr.status.replace('_', ' ')}
+              {data.acwr.ratio.toFixed(2)} — {acwrStatusLabel}
             </span>
           </div>
+          {acwrStatusLabel === 'Below Base' && (
+            <p className="text-xs text-white/50 mt-1.5 pt-1.5 border-t border-white/10">
+              On your plan, low ACWR here means you’re below your planned baseline—not undertrained. Use it as a “vs baseline” signal, not a cue to add volume.
+            </p>
+          )}
         </div>
       </div>
 
