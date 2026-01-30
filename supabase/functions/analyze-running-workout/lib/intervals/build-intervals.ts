@@ -4,7 +4,7 @@
  * Enriches planned intervals with execution data from workout.computed.intervals.
  */
 
-import { parseRunningTokens } from '../../_shared/token-parser.ts';
+import { parseRunningTokens } from '../../../_shared/token-parser.ts';
 
 export type Baselines = {
   fiveK_pace?: number;
