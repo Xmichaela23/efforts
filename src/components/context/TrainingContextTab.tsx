@@ -239,6 +239,15 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               {audit.detail && <p className="text-xs text-white/60 mt-0.5">One adjustment: {audit.detail}</p>}
             </div>
           ))}
+          {/* Dev-only: truth debug block */}
+          {import.meta.env.DEV && data.week_review.debug_week_truth && (
+            <details className="mt-2 pt-2 border-t border-white/10 text-xs font-mono text-white/50" open={false}>
+              <summary className="cursor-pointer text-white/40">debug_week_truth</summary>
+              <pre className="mt-1 overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                {JSON.stringify(data.week_review.debug_week_truth, null, 2)}
+              </pre>
+            </details>
+          )}
         </div>
       ) : data.context_summary && data.context_summary.length > 0 ? (
         <div className="instrument-card flex flex-col gap-2">

@@ -318,6 +318,15 @@ interface TrainingContextResponse {
       reason_codes: string[];
     };
     match_coverage_note?: string | null;
+    /** Dev-only: raw planned/completed dates and matched pairs for truth debugging */
+    debug_week_truth?: {
+      focus_date: string;
+      week_start: string;
+      week_end: string;
+      planned_dates: string[];
+      completed_dates: string[];
+      matched_pairs: Array<{ planned_date: string; completed_date: string; planned_id: string; workout_id: string }>;
+    };
   };
 }
 
@@ -864,49 +873,73 @@ Deno.serve(async (req) => {
       const sessionsRemaining = plannedRemaining.length;
       const qualityToDate = plannedToDate.filter(p => isQualityType(p.type, p.name)).length;
 
-      // Run-only counts for week: completed_total = all runs in week; matched = those with planned_id
+      const weekStartDate = new Date(weekStartISO + 'T12:00:00');
+      const dayIndex = (dateIso: string): number =>
+        Math.floor((new Date(toLocalDay(dateIso) + 'T12:00:00').getTime() - weekStartDate.getTime()) / (24 * 60 * 60 * 1000));
+
+      // Run-only: completed runs in week (to focus date)
       const weekRuns = (workouts || []).filter((w: WorkoutRecord) => {
         const t = (w.type || '').toLowerCase();
         if (t !== 'run' && t !== 'running') return false;
         return w.date >= weekStartISO! && w.date <= focusDateISO;
       });
       const sessionsCompletedTotal = weekRuns.length;
-      const sessionsMatchedToPlan = weekRuns.filter((w: WorkoutRecord) => w.planned_id).length;
-      const matchCoveragePct = sessionsCompletedTotal > 0 ? sessionsMatchedToPlan / sessionsCompletedTotal : 0;
-      const enoughData = sessionsToDate >= 3 || sessionsCompletedTotal >= 3;
-      const sessionsMissed =
-        sessionsCompletedTotal === 0
-          ? null
-          : matchCoveragePct >= 0.8 && enoughData
-            ? Math.max(0, sessionsToDate - sessionsMatchedToPlan)
-            : null;
+      const planned_dates = plannedToDate.map(p => toLocalDay(p.date));
+      const completed_dates = weekRuns.map((w: WorkoutRecord) => toLocalDay(w.date));
 
-      const matchCoverageNote =
-        sessionsMissed === null && matchCoveragePct < 0.8 && sessionsCompletedTotal > 0
-          ? `Plan matching is limited (${Math.round(matchCoveragePct * 100)}% coverage).`
-          : null;
-
-      // Moved: completed on different day than planned (consistent local day)
-      const movedExamples: Array<{ title: string; planned_date: string; done_date: string }> = [];
-      let sessionsMoved = 0;
-      for (const r of weekRuns) {
-        if (!r.planned_id) continue;
-        const planned = plannedWeek.find(p => String(p.id) === String(r.planned_id));
-        if (!planned) continue;
-        const plannedDay = toLocalDay(planned.date);
-        const doneDay = toLocalDay(r.date);
-        if (plannedDay === doneDay) continue;
-        sessionsMoved += 1;
-        if (movedExamples.length < 2) {
-          movedExamples.push({
-            title: r.name || planned.name || 'Run',
+      // Day-aligned matching: a workout satisfies a planned session only if planned_id matches AND |planned_day_index - completed_day_index| <= 1
+      const matched_pairs: Array<{ planned_date: string; completed_date: string; planned_id: string; workout_id: string }> = [];
+      const usedWorkoutIds = new Set<string>();
+      for (const p of plannedToDate) {
+        const plannedDay = toLocalDay(p.date);
+        const plannedIdx = dayIndex(p.date);
+        const candidate = weekRuns.find((w: WorkoutRecord) => {
+          if (!w.planned_id || String(w.planned_id) !== String(p.id)) return false;
+          if (usedWorkoutIds.has(w.id)) return false;
+          const completedIdx = dayIndex(w.date);
+          if (Math.abs(plannedIdx - completedIdx) > 1) return false;
+          return true;
+        });
+        if (candidate) {
+          usedWorkoutIds.add(candidate.id);
+          matched_pairs.push({
             planned_date: plannedDay,
-            done_date: doneDay
+            completed_date: toLocalDay(candidate.date),
+            planned_id: String(p.id),
+            workout_id: candidate.id
           });
         }
       }
 
-      const weekStartDate = new Date(weekStartISO + 'T12:00:00');
+      const sessionsMatchedToPlan = matched_pairs.length;
+      const matchCoveragePct = sessionsCompletedTotal > 0 ? matched_pairs.length / sessionsCompletedTotal : 0;
+      const sessionsMissedRaw = Math.max(0, sessionsToDate - sessionsMatchedToPlan);
+      const sessionsMissed = matchCoveragePct >= 1
+        ? sessionsMissedRaw
+        : null;
+
+      const matchCoverageNote =
+        matchCoveragePct < 1 && sessionsCompletedTotal > 0
+          ? 'Some sessions couldn\'t be matched to your plan. We\'re still learning your patterns.'
+          : null;
+
+      // Moved: matched pair where planned_date !== completed_date (done on different day, within ±1)
+      const movedExamples: Array<{ title: string; planned_date: string; done_date: string }> = [];
+      let sessionsMoved = 0;
+      for (const pair of matched_pairs) {
+        if (pair.planned_date === pair.completed_date) continue;
+        sessionsMoved += 1;
+        if (movedExamples.length < 2) {
+          const r = weekRuns.find((w: WorkoutRecord) => w.id === pair.workout_id);
+          const p = plannedToDate.find(pp => String(pp.id) === pair.planned_id);
+          movedExamples.push({
+            title: r?.name || p?.name || 'Run',
+            planned_date: pair.planned_date,
+            done_date: pair.completed_date
+          });
+        }
+      }
+
       const focusDateOnly = new Date(focusDateISO + 'T12:00:00');
       const weekDayIndex = Math.min(7, Math.max(1, Math.floor((focusDateOnly.getTime() - weekStartDate.getTime()) / (24 * 60 * 60 * 1000)) + 1));
 
@@ -1062,17 +1095,17 @@ Deno.serve(async (req) => {
         weekVerdictHeadline = 'Week is behind plan.';
         weekVerdictDetail = `${sessionsMissed} session(s) missed to date.`;
         reasonCodes.push('MISSED_SESSIONS');
+      } else if (latestIsHot) {
+        weekVerdictHeadline = 'Execution is trending hot.';
+        weekVerdictDetail = 'Your last quality session was faster than target. Tighten pacing on the next key day.';
+        reasonCodes.push('KEY_SESSION_HOT');
       } else if (sessionsMoved > 0) {
-        weekVerdictHeadline = 'Week is on track.';
+        weekVerdictHeadline = 'Week is on track (adjusted).';
         weekVerdictDetail = `Schedule adjusted: ${sessionsMoved} moved.`;
         reasonCodes.push('MOVED_SESSIONS');
       } else {
         weekVerdictHeadline = 'Week is on track.';
         if (mostlyHitClose) reasonCodes.push('ON_TRACK');
-      }
-      if (latestIsHot) {
-        weekVerdictDetail = 'Key execution is trending hot — tighten targets.';
-        reasonCodes.push('KEY_SESSION_HOT');
       }
       const week_verdict = {
         headline: weekVerdictHeadline,
@@ -1115,7 +1148,15 @@ Deno.serve(async (req) => {
           : { planned_id: null, date: null, date_local: null, title: null, primary_target: null, sport: null },
         moved_examples: movedExamples.length > 0 ? movedExamples : undefined,
         week_verdict,
-        match_coverage_note: matchCoverageNote ?? undefined
+        match_coverage_note: matchCoverageNote ?? undefined,
+        debug_week_truth: {
+          focus_date: focusDateISO,
+          week_start: weekStartISO!,
+          week_end: weekEndISO!,
+          planned_dates,
+          completed_dates,
+          matched_pairs
+        }
       };
     }
 

@@ -250,6 +250,15 @@ export interface TrainingContextData {
     moved_examples?: Array<{ title: string; planned_date: string; done_date: string }>;
     week_verdict?: { headline: string; detail?: string | null; reason_codes: string[] };
     match_coverage_note?: string | null;
+    /** Dev-only: planned_dates, completed_dates, matched_pairs for truth debugging */
+    debug_week_truth?: {
+      focus_date: string;
+      week_start: string;
+      week_end: string;
+      planned_dates: string[];
+      completed_dates: string[];
+      matched_pairs: Array<{ planned_date: string; completed_date: string; planned_id: string; workout_id: string }>;
+    };
   };
 }
 
