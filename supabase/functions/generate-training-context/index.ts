@@ -220,6 +220,10 @@ interface TrainingContextResponse {
   display_aerobic_tier?: 'Low' | 'Moderate' | 'Elevated';
   display_structural_tier?: 'Low' | 'Moderate' | 'Elevated';
   display_limiter_line?: string;
+  /** Short label for Current Training State: "Aerobic (moderate fatigue)" | "Structural (elevated fatigue)" | "None" */
+  display_limiter_label?: string;
+  /** One-line next action (mirrors summary close); use in Training Guidance card. */
+  next_action?: string;
   display_load_change_risk_label?: 'Below baseline' | 'Below baseline (planned)' | 'In range' | 'Ramping fast' | 'Overreaching';
   /** When on plan and ratio < 0.8: optional helper e.g. "Often normal in down-weeks." */
   display_load_change_risk_helper?: string | null;
@@ -240,6 +244,8 @@ interface TrainingContextResponse {
     projected_label: 'below' | 'in range' | 'ramping';
     message: string;
   };
+  /** Single synthesized story — one integrated Context Summary (replaces scattered banner + plan lines). */
+  context_summary?: string[];
 }
 
 interface WorkoutRecord {
@@ -561,6 +567,13 @@ Deno.serve(async (req) => {
         : tierOrder[display_structural_tier] > tierOrder[display_aerobic_tier]
           ? 'Today is limited by structural fatigue.'
           : 'No clear limiter.';
+    const tierWord = (t: FatigueTier) => (t === 'Low' ? 'low' : t === 'Moderate' ? 'moderate' : 'elevated');
+    const display_limiter_label =
+      tierOrder[display_aerobic_tier] > tierOrder[display_structural_tier]
+        ? `Aerobic (${tierWord(display_aerobic_tier)} fatigue)`
+        : tierOrder[display_structural_tier] > tierOrder[display_aerobic_tier]
+          ? `Structural (${tierWord(display_structural_tier)} fatigue)`
+          : 'None';
     let display_load_change_risk_label: 'Below baseline' | 'In range' | 'Ramping fast' | 'Overreaching' =
       acwr.status === 'undertrained' || acwr.status === 'recovery' || acwr.status === 'optimal_recovery'
         ? 'Below baseline'
@@ -628,12 +641,17 @@ Deno.serve(async (req) => {
       const projected_ratio = chronic_daily > 0 ? projected_acute_daily / chronic_daily : 0;
       const projected_label: 'below' | 'in range' | 'ramping' =
         projected_ratio < 0.8 ? 'below' : projected_ratio <= 1.3 ? 'in range' : 'ramping';
-      const landCopy =
+      const isRecovery = planContext?.isRecoveryWeek ?? false;
+      const isTaper = planContext?.isTaperWeek ?? false;
+      const weekIntentMsg = planContext?.weekIntent ?? 'build';
+      const intentSuffixMsg =
+        isRecovery ? ' (recovery week)' : isTaper ? ' (taper)' : projected_label === 'below' && (weekIntentMsg === 'build' || weekIntentMsg === 'peak' || weekIntentMsg === 'baseline') ? ' (lighter build week)' : '';
+      const neutralLine =
         projected_label === 'below'
-          ? 'below baseline'
+          ? `Planned week is lighter than your recent baseline${intentSuffixMsg}.`
           : projected_label === 'in range'
-            ? 'in range'
-            : 'ramping';
+            ? 'Planned week is in line with your recent baseline.'
+            : 'Planned week is heavier than your recent baseline.';
       projected_week_load = {
         completed_acute,
         planned_remaining: planned_remaining_sum,
@@ -641,9 +659,70 @@ Deno.serve(async (req) => {
         chronic_weekly: Math.round(chronic_weekly),
         projected_ratio: Math.round(projected_ratio * 100) / 100,
         projected_label,
-        message: `Projected week load: ${Math.round(projected_acute)} vs baseline ${Math.round(chronic_weekly)} — expected to land ${landCopy} if you follow the plan.`
+        message: `Projected week load: ${Math.round(projected_acute)} vs baseline ${Math.round(chronic_weekly)} — ${neutralLine}`
       };
     }
+
+    // ==========================================================================
+    // CONTEXT SUMMARY (one integrated story — resolves signals, no repetition)
+    // Built from: plan phase + day type, adherence tier, limiter, projected load.
+    // ==========================================================================
+    const weekIntentForSummary = planContext?.weekIntent ?? 'build';
+    const pacePct = weekly_readiness?.pace_adherence_pct ?? null;
+    const adherenceTier: 'high' | 'moderate' | 'low' | null =
+      pacePct == null ? null : pacePct >= 85 ? 'high' : pacePct >= 70 ? 'moderate' : 'low';
+    const phaseLabel = !hasActivePlan ? 'OFF PLAN' : isRecoveryWeek ? 'RECOVERY WEEK' : isTaperWeek ? 'TAPER WEEK' : weekIntentForSummary === 'peak' ? 'PEAK WEEK' : weekIntentForSummary === 'baseline' ? 'BASELINE WEEK' : 'BUILD WEEK';
+    const dayTypeLabel = todayIsRestDay ? 'REST' : 'TRAINING';
+    const aerobicWord = display_aerobic_tier === 'Low' ? 'low' : display_aerobic_tier === 'Moderate' ? 'moderate' : 'elevated';
+    const structuralWord = display_structural_tier === 'Low' ? 'fresh' : display_structural_tier === 'Moderate' ? 'moderate' : 'elevated';
+
+    const context_summary: string[] = [];
+    context_summary.push(`${phaseLabel} — ${dayTypeLabel}`);
+    if (hasActivePlan) {
+      if (adherenceTier !== null && pacePct != null) {
+        if (adherenceTier === 'high') context_summary.push(`You're on plan and adhering well (${pacePct}%).`);
+        else if (adherenceTier === 'moderate') context_summary.push(`Moderate adherence to pace (${pacePct}%) — some variability in signals.`);
+        else context_summary.push(`Low adherence to pace (${pacePct}%) — treat readiness signals with caution.`);
+      } else {
+        context_summary.push("You're on plan.");
+      }
+    }
+    if (todayIsRestDay && hasActivePlan) {
+      context_summary.push('This is a planned rest day.');
+    } else if (hasActivePlan) {
+      context_summary.push(`This is a training day in a ${phaseLabel.toLowerCase().replace(' week', '')} week.`);
+    } else {
+      context_summary.push(todayIsRestDay ? 'Today is a rest day.' : 'Today is a training day.');
+    }
+    context_summary.push(`Your aerobic system is carrying ${aerobicWord} fatigue from recent sessions, while your structural system is ${structuralWord}.`);
+    if (hasActivePlan && projected_week_load) {
+      const label = projected_week_load.projected_label;
+      const intentSuffix =
+        isRecoveryWeek ? ' (recovery week)' : isTaperWeek ? ' (taper)' : label === 'below' && (weekIntentForSummary === 'build' || weekIntentForSummary === 'peak' || weekIntentForSummary === 'baseline') ? ' (lighter build week)' : '';
+      if (label === 'below') {
+        context_summary.push(`Planned week is lighter than your recent baseline${intentSuffix}.`);
+      } else if (label === 'in range') {
+        context_summary.push('Planned week is in line with your recent baseline.');
+      } else {
+        context_summary.push('Planned week is heavier than your recent baseline.');
+      }
+    }
+    if (acwr.ratio > 1.3 && acwr.data_days >= 7) {
+      context_summary.push(acwr.ratio > 1.5 ? 'Load change risk is overreaching — avoid adding volume.' : 'Load change risk is ramping fast — avoid adding volume.');
+    }
+    const next_action =
+      acwr.ratio > 1.3 && acwr.data_days >= 7
+        ? 'Do not add volume this week.'
+        : todayIsRestDay
+          ? (hasActivePlan ? 'Rest today. Resume tomorrow.' : 'Recover today. Resume when ready.')
+          : weekly_verdict
+            ? weekly_verdict.label === 'high'
+              ? 'No changes needed today.'
+              : weekly_verdict.label === 'medium'
+                ? 'Proceed with planned session; keep intensity controlled.'
+                : 'Reduce intensity today; stay within plan.'
+            : hasActivePlan ? 'Follow the plan — no changes needed today.' : 'No changes needed today.';
+    context_summary.push(next_action);
 
     // ==========================================================================
     // BUILD RESPONSE
@@ -664,10 +743,13 @@ Deno.serve(async (req) => {
       display_aerobic_tier,
       display_structural_tier,
       display_limiter_line,
+      display_limiter_label,
+      next_action,
       display_load_change_risk_label,
       display_load_change_risk_helper: display_load_change_risk_helper ?? undefined,
       context_banner,
-      projected_week_load
+      projected_week_load,
+      context_summary
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);

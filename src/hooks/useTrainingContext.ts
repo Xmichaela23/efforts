@@ -166,6 +166,9 @@ export interface TrainingContextData {
   display_aerobic_tier?: 'Low' | 'Moderate' | 'Elevated';
   display_structural_tier?: 'Low' | 'Moderate' | 'Elevated';
   display_limiter_line?: string;
+  display_limiter_label?: string;
+  /** One-line next action (mirrors summary close); use in Training Guidance card. */
+  next_action?: string;
   display_load_change_risk_label?: 'Below baseline' | 'Below baseline (planned)' | 'In range' | 'Ramping fast' | 'Overreaching';
   display_load_change_risk_helper?: string | null;
   /** Top banner: plan + limiter + guidance (never leads with ACWR). */
@@ -185,6 +188,8 @@ export interface TrainingContextData {
     projected_label: 'below' | 'in range' | 'ramping';
     message: string;
   };
+  /** Single synthesized story — one integrated Context Summary (replaces scattered banner + plan lines). */
+  context_summary?: string[];
 }
 
 interface UseTrainingContextResult {

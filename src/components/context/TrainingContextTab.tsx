@@ -181,37 +181,44 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </button>
       </div>
 
-      {/* Plan science: length + what's coming (when available) */}
-      {data.acwr?.plan_context?.hasActivePlan && (data.acwr.plan_context.weekIndex != null || data.acwr.plan_context.weeks_remaining != null) && (
-        <div className="text-xs text-white/50 px-1 flex flex-wrap gap-x-2">
-          {data.acwr.plan_context.weekIndex != null && data.acwr.plan_context.duration_weeks != null && (
-            <span>Week {data.acwr.plan_context.weekIndex} of {data.acwr.plan_context.duration_weeks}</span>
-          )}
-          {data.acwr.plan_context.weekIndex != null && !data.acwr.plan_context.duration_weeks && (
-            <span>Week {data.acwr.plan_context.weekIndex}</span>
-          )}
-          {data.acwr.plan_context.weeks_remaining != null && (
-            <span>{data.acwr.plan_context.race_date ? `${data.acwr.plan_context.weeks_remaining} weeks to race` : `${data.acwr.plan_context.weeks_remaining} weeks to go`}</span>
-          )}
-          {data.acwr.plan_context.next_week_intent != null && data.acwr.plan_context.next_week_intent !== 'unknown' && (
-            <span>Next week: {data.acwr.plan_context.next_week_focus_label || data.acwr.plan_context.next_week_intent}</span>
-          )}
+      {/* Context Summary: one integrated story (replaces scattered banner + plan lines) */}
+      {data.context_summary && data.context_summary.length > 0 ? (
+        <div className="instrument-card flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{data.context_summary[0]}</p>
+          {data.context_summary.slice(1).map((line, i) => (
+            <p key={i} className="text-sm text-white/90 leading-relaxed">{line}</p>
+          ))}
         </div>
+      ) : (
+        <>
+          {/* Fallback: plan science + banner when no context_summary (e.g. old cache) */}
+          {data.acwr?.plan_context?.hasActivePlan && (data.acwr.plan_context.weekIndex != null || data.acwr.plan_context.weeks_remaining != null) && (
+            <div className="text-xs text-white/50 px-1 flex flex-wrap gap-x-2">
+              {data.acwr.plan_context.weekIndex != null && data.acwr.plan_context.duration_weeks != null && (
+                <span>Week {data.acwr.plan_context.weekIndex} of {data.acwr.plan_context.duration_weeks}</span>
+              )}
+              {data.acwr.plan_context.weeks_remaining != null && (
+                <span>{data.acwr.plan_context.race_date ? `${data.acwr.plan_context.weeks_remaining} weeks to race` : `${data.acwr.plan_context.weeks_remaining} weeks to go`}</span>
+              )}
+              {data.acwr.plan_context.next_week_intent != null && data.acwr.plan_context.next_week_intent !== 'unknown' && (
+                <span>Next week: {data.acwr.plan_context.next_week_focus_label || data.acwr.plan_context.next_week_intent}</span>
+              )}
+            </div>
+          )}
+          {data.context_banner && (
+            <div className="instrument-card flex flex-col gap-1.5">
+              <p className="text-sm font-medium text-white/95">{data.context_banner.line1}</p>
+              <p className="text-sm text-white/80">{data.context_banner.line2}</p>
+              <p className="text-sm text-white/80">{data.context_banner.line3}</p>
+              {data.context_banner.acwr_clause && (
+                <p className="text-sm text-amber-400/90 pt-0.5">{data.context_banner.acwr_clause}</p>
+              )}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Top banner: plan + limiter + guidance (never leads with ACWR) */}
-      {data.context_banner && (
-        <div className="instrument-card flex flex-col gap-1.5">
-          <p className="text-sm font-medium text-white/95">{data.context_banner.line1}</p>
-          <p className="text-sm text-white/80">{data.context_banner.line2}</p>
-          <p className="text-sm text-white/80">{data.context_banner.line3}</p>
-          {data.context_banner.acwr_clause && (
-            <p className="text-sm text-amber-400/90 pt-0.5">{data.context_banner.acwr_clause}</p>
-          )}
-        </div>
-      )}
-
-      {/* Other insights (ACWR-led insight removed; banner replaces it) */}
+      {/* Other insights (ACWR-led insight removed; summary or banner replaces it) */}
       {data.insights && data.insights.length > 0 && (
         <SmartInsights insights={data.insights} />
       )}
@@ -249,20 +256,28 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               </span>
             </div>
           </div>
-          {/* Limiter line (deterministic: higher tier = limiter) */}
-          <p className="text-sm text-white/80 pt-1 border-t border-white/10">{limiterLine}</p>
+          {/* Limiter as label (no repeated prose) */}
+          <p className="text-sm text-white/80 pt-1 border-t border-white/10">
+            Limiter: {data.display_limiter_label ?? (limiterLine === 'No clear limiter.' ? 'None' : limiterLine.replace('Today is limited by ', '').replace('.', ''))}
+          </p>
         </div>
       </div>
 
-      {/* Section 2: Why (compact — drivers only, no data dump) */}
-      <div className="instrument-card py-2.5 px-3">
-        <p className="text-xs text-white/50">
-          <span className="text-white/70">Aerobic Load (based on):</span> HR drift trend, pace adherence, last 3 runs.
-        </p>
-        <p className="text-xs text-white/50 mt-1">
-          <span className="text-white/70">Structural Load (based on):</span> lifting volume (7d), avg RIR (7d).
-        </p>
-      </div>
+      {/* Why (collapsed by default — supports summary, not duplicate) */}
+      <details className="instrument-card py-2 px-3" open={false}>
+        <summary className="text-xs text-white/50 cursor-pointer list-none flex items-center gap-1">
+          <span className="text-white/60">Why</span>
+          <span className="text-white/40">— Aerobic: HR drift, pace adherence, last 3 runs. Structural: volume (7d), avg RIR (7d).</span>
+        </summary>
+        <div className="mt-2 pt-2 border-t border-white/10">
+          <p className="text-xs text-white/50">
+            <span className="text-white/70">Aerobic Load (based on):</span> HR drift trend, pace adherence, last 3 runs.
+          </p>
+          <p className="text-xs text-white/50 mt-1">
+            <span className="text-white/70">Structural Load (based on):</span> lifting volume (7d), avg RIR (7d).
+          </p>
+        </div>
+      </details>
 
       {/* Section 3: Load Change Risk — minimal row; on-plan + low = "Below baseline (planned)" + optional helper */}
       {data.acwr.data_days < 7 ? (
@@ -286,17 +301,17 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </div>
       )}
 
-      {/* Projected week load (plan-aware: completed + planned remaining) */}
-      {data.projected_week_load && (
+      {/* Projected week load — only when no context_summary (summary already includes it) */}
+      {data.projected_week_load && !data.context_summary?.length && (
         <div className="text-xs text-white/50 py-2 px-3">
           {data.projected_week_load.message}
         </div>
       )}
 
-      {/* Section 4: Training Guidance (Verdict) */}
+      {/* Training Guidance (1–2 lines when summary present; full when not) */}
       {data.weekly_verdict ? (
         <div className="instrument-card">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-white/50" />
               <span className="text-sm font-medium text-white">Training Guidance</span>
@@ -313,10 +328,18 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               {data.weekly_verdict.readiness_pct}%
             </span>
           </div>
-          <p className="text-sm font-medium text-white/90 mb-1.5">&ldquo;{verdictPermission}&rdquo;</p>
-          <p className="text-sm text-white/80">{data.weekly_verdict.message}</p>
-          {data.weekly_verdict.drivers.length > 0 && (
-            <p className="text-xs text-white/50 mt-2">{data.weekly_verdict.drivers.join(' • ')}</p>
+          {data.context_summary?.length && data.next_action ? (
+            <p className="text-sm text-white/85 mt-1">{data.next_action}</p>
+          ) : data.context_summary?.length ? (
+            <p className="text-sm text-white/85 mt-1">&ldquo;{verdictPermission}&rdquo;</p>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-white/90 mb-1.5 mt-1">&ldquo;{verdictPermission}&rdquo;</p>
+              <p className="text-sm text-white/80">{data.weekly_verdict.message}</p>
+              {data.weekly_verdict.drivers.length > 0 && (
+                <p className="text-xs text-white/50 mt-2">{data.weekly_verdict.drivers.join(' • ')}</p>
+              )}
+            </>
           )}
           {data.readiness_source_date && (
             <p className="text-xs text-white/40 mt-2">
