@@ -181,7 +181,19 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </button>
       </div>
 
-      {/* Smart Insights (show at top if any) */}
+      {/* Top banner: plan + limiter + guidance (never leads with ACWR) */}
+      {data.context_banner && (
+        <div className="instrument-card flex flex-col gap-1.5">
+          <p className="text-sm font-medium text-white/95">{data.context_banner.line1}</p>
+          <p className="text-sm text-white/80">{data.context_banner.line2}</p>
+          <p className="text-sm text-white/80">{data.context_banner.line3}</p>
+          {data.context_banner.acwr_clause && (
+            <p className="text-sm text-amber-400/90 pt-0.5">{data.context_banner.acwr_clause}</p>
+          )}
+        </div>
+      )}
+
+      {/* Other insights (ACWR-led insight removed; banner replaces it) */}
       {data.insights && data.insights.length > 0 && (
         <SmartInsights insights={data.insights} />
       )}
@@ -234,20 +246,32 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </p>
       </div>
 
-      {/* Section 3: Load Change Risk — minimal row (no gauge, no "Undertrained") */}
+      {/* Section 3: Load Change Risk — minimal row; on-plan + low = "Below baseline (planned)" + optional helper */}
       {data.acwr.data_days < 7 ? (
         <div className="text-xs text-white/50 py-2 px-3">
           Train for {7 - data.acwr.data_days} more day{7 - data.acwr.data_days !== 1 ? 's' : ''} to unlock load change risk.
         </div>
       ) : (
-        <div className={`flex items-center justify-between text-sm py-2 px-3 rounded-lg border border-white/10 ${data.acwr.ratio > 1.3 ? 'bg-amber-500/10 border-amber-400/30' : 'bg-white/[0.03]'}`}>
-          <span className="text-white/60">Load Change Risk</span>
-          <span className="flex items-center gap-2">
-            <span className="font-mono text-white/80">{data.acwr.ratio.toFixed(2)}</span>
-            <span className={`font-medium ${data.acwr.ratio > 1.5 ? 'text-red-400' : data.acwr.ratio > 1.3 ? 'text-amber-400' : 'text-white/80'}`}>
-              {loadChangeRiskLabel}
+        <div className="space-y-1">
+          <div className={`flex items-center justify-between text-sm py-2 px-3 rounded-lg border border-white/10 ${data.acwr.ratio > 1.3 ? 'bg-amber-500/10 border-amber-400/30' : 'bg-white/[0.03]'}`}>
+            <span className="text-white/60">Load Change Risk</span>
+            <span className="flex items-center gap-2">
+              <span className="font-mono text-white/80">{data.acwr.ratio.toFixed(2)}</span>
+              <span className={`font-medium ${data.acwr.ratio > 1.5 ? 'text-red-400' : data.acwr.ratio > 1.3 ? 'text-amber-400' : 'text-white/80'}`}>
+                {loadChangeRiskLabel}
+              </span>
             </span>
-          </span>
+          </div>
+          {data.display_load_change_risk_helper && (
+            <p className="text-xs text-white/50 px-3">{data.display_load_change_risk_helper}</p>
+          )}
+        </div>
+      )}
+
+      {/* Projected week load (plan-aware: completed + planned remaining) */}
+      {data.projected_week_load && (
+        <div className="text-xs text-white/50 py-2 px-3">
+          {data.projected_week_load.message}
         </div>
       )}
 

@@ -209,7 +209,26 @@ interface TrainingContextResponse {
   display_aerobic_tier?: 'Low' | 'Moderate' | 'Elevated';
   display_structural_tier?: 'Low' | 'Moderate' | 'Elevated';
   display_limiter_line?: string;
-  display_load_change_risk_label?: 'Below baseline' | 'In range' | 'Ramping fast' | 'Overreaching';
+  display_load_change_risk_label?: 'Below baseline' | 'Below baseline (planned)' | 'In range' | 'Ramping fast' | 'Overreaching';
+  /** When on plan and ratio < 0.8: optional helper e.g. "Often normal in down-weeks." */
+  display_load_change_risk_helper?: string | null;
+  /** Top banner: plan + limiter + guidance (never leads with ACWR). */
+  context_banner?: {
+    line1: string;
+    line2: string;
+    line3: string;
+    acwr_clause?: string | null;
+  };
+  /** Plan-aware projected week load (completed + planned remaining) for reconciliation. */
+  projected_week_load?: {
+    completed_acute: number;
+    planned_remaining: number;
+    projected_acute: number;
+    chronic_weekly: number;
+    projected_ratio: number;
+    projected_label: 'below' | 'in range' | 'ramping';
+    message: string;
+  };
 }
 
 interface WorkoutRecord {
@@ -516,7 +535,7 @@ Deno.serve(async (req) => {
         : tierOrder[display_structural_tier] > tierOrder[display_aerobic_tier]
           ? 'Today is limited by structural fatigue.'
           : 'No clear limiter.';
-    const display_load_change_risk_label: 'Below baseline' | 'In range' | 'Ramping fast' | 'Overreaching' =
+    let display_load_change_risk_label: 'Below baseline' | 'In range' | 'Ramping fast' | 'Overreaching' =
       acwr.status === 'undertrained' || acwr.status === 'recovery' || acwr.status === 'optimal_recovery'
         ? 'Below baseline'
         : acwr.status === 'optimal'
@@ -524,6 +543,77 @@ Deno.serve(async (req) => {
           : acwr.status === 'elevated'
             ? 'Ramping fast'
             : 'Overreaching';
+    // On plan + low ACWR: label as planned, optional helper for down-weeks (never scold).
+    let display_load_change_risk_helper: string | null = null;
+    if (planContext?.hasActivePlan && acwr.ratio < 0.8) {
+      display_load_change_risk_label = 'Below baseline (planned)';
+      if (planContext.isRecoveryWeek || planContext.isTaperWeek) {
+        display_load_change_risk_helper = 'Often normal in down-weeks.';
+      }
+    }
+
+    // ==========================================================================
+    // CONTEXT BANNER (never lead with ACWR — plan + limiter + guidance first)
+    // ==========================================================================
+    const hasActivePlan = planContext?.hasActivePlan ?? false;
+    const isRecoveryWeek = planContext?.isRecoveryWeek ?? false;
+    const isTaperWeek = planContext?.isTaperWeek ?? false;
+    let context_banner: TrainingContextResponse['context_banner'] | undefined;
+    if (display_limiter_line) {
+      const line1 =
+        hasActivePlan && (isRecoveryWeek || isTaperWeek)
+          ? 'This is a down-week by design.'
+          : hasActivePlan
+            ? 'On plan — stay the course.'
+            : 'Off plan — adjust this week.';
+      const line2 = display_limiter_line;
+      const line3 = weekly_verdict
+        ? weekly_verdict.label === 'high'
+          ? 'Proceed with planned sessions.'
+          : weekly_verdict.label === 'medium'
+            ? 'Proceed with caution.'
+            : 'Prioritize recovery.'
+        : 'Follow your planned sessions.';
+      const acwr_clause =
+        acwr.ratio > 1.3
+          ? acwr.ratio > 1.5
+            ? 'Load Change Risk is overreaching — avoid adding volume.'
+            : 'Load Change Risk is ramping fast — avoid adding volume.'
+          : null;
+      context_banner = { line1, line2, line3, acwr_clause: acwr_clause ?? undefined };
+    }
+
+    // ==========================================================================
+    // PROJECTED WEEK LOAD (completed acute + planned remaining — plan-aware forecast)
+    // ==========================================================================
+    let projected_week_load: TrainingContextResponse['projected_week_load'] | undefined;
+    const plannedRemaining = plannedWeek.filter(p => p.date > focusDateISO);
+    const planned_remaining_sum = plannedRemaining.reduce((s, p) => s + (Number(p.workload_planned) || 0), 0);
+    const completed_acute = acwr.acute_total;
+    const projected_acute = completed_acute + planned_remaining_sum;
+    const chronic_weekly = acwr.chronic_total / 4;
+    if (chronic_weekly > 0 && (hasActivePlan || plannedRemaining.length > 0)) {
+      const projected_acute_daily = projected_acute / 7;
+      const chronic_daily = acwr.chronic_total / 28;
+      const projected_ratio = chronic_daily > 0 ? projected_acute_daily / chronic_daily : 0;
+      const projected_label: 'below' | 'in range' | 'ramping' =
+        projected_ratio < 0.8 ? 'below' : projected_ratio <= 1.3 ? 'in range' : 'ramping';
+      const landCopy =
+        projected_label === 'below'
+          ? 'below baseline'
+          : projected_label === 'in range'
+            ? 'in range'
+            : 'ramping';
+      projected_week_load = {
+        completed_acute,
+        planned_remaining: planned_remaining_sum,
+        projected_acute,
+        chronic_weekly: Math.round(chronic_weekly),
+        projected_ratio: Math.round(projected_ratio * 100) / 100,
+        projected_label,
+        message: `Projected week load: ${Math.round(projected_acute)} vs baseline ${Math.round(chronic_weekly)} — expected to land ${landCopy} if you follow the plan.`
+      };
+    }
 
     // ==========================================================================
     // BUILD RESPONSE
@@ -544,7 +634,10 @@ Deno.serve(async (req) => {
       display_aerobic_tier,
       display_structural_tier,
       display_limiter_line,
-      display_load_change_risk_label
+      display_load_change_risk_label,
+      display_load_change_risk_helper: display_load_change_risk_helper ?? undefined,
+      context_banner,
+      projected_week_load
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);
@@ -1622,53 +1715,19 @@ function generateInsights(
     });
   }
 
-  // 3b. Low load warning for build weeks (not recovery/taper)
+  // 3b. Low load: only "behind plan" insight; never lead with ACWR. Banner (context_banner) replaces
+  //     "on plan, stay the course, ACWR below base" messaging — see handler where context_banner is built.
   if (!isRecoveryWeek && !isTaperWeek && acwr.ratio < 0.80 && hasActivePlan && weekIntent === 'build') {
-    // IMPORTANT: ACWR is NOT a plan target. Do not recommend adding volume unless we can
-    // confidently detect that the user is behind plan workload to-date.
-    if (planProgress && planProgress.planned_sessions_to_date > 0 && planProgress.planned_to_date_total > 0) {
-      if (planProgress.status === 'behind') {
-        insights.push({
-          type: 'weekly_jump', // Reuse type for now
-          severity: 'info',
-          message: `On plan: you're behind this week's workload so far (${planProgress.percent_of_planned_to_date}% of planned to-date). Consider rescheduling a missed easy session—avoid adding intensity.`,
-          data: { ratio: acwr.ratio, plan_progress: planProgress }
-        });
-      } else if (planProgress.status === 'on_track') {
-        insights.push({
-          type: 'weekly_jump',
-          severity: 'info',
-          message: `On plan: you're on track so far. ACWR ${acwr.ratio.toFixed(2)} is low vs your 28-day base, which can be normal early in a plan or after a recovery week.`,
-          data: { ratio: acwr.ratio, plan_progress: planProgress }
-        });
-      } else {
-        // Unknown/ahead or very low ACWR: nuance. Very low (< 0.6) = below base; gradual increase can be appropriate.
-        const veryLow = acwr.ratio < 0.60;
-        const message = veryLow
-          ? `You're on plan—stay the course. ACWR ${acwr.ratio.toFixed(2)} is below your base; if this persists, a gradual volume increase may be appropriate. Stay within plan guidance.`
-          : `You're on plan—stay the course. This low ACWR isn't a cue to add extra volume.`;
-        insights.push({
-          type: 'weekly_jump',
-          severity: 'info',
-          message,
-          data: { ratio: acwr.ratio, plan_progress: planProgress }
-        });
-      }
-    } else {
-      // No planned workload available — we still know they have a plan (we're in hasActivePlan).
-      const veryLow = acwr.ratio < 0.60;
-      const message = veryLow
-        ? `You're on plan—stay the course. ACWR ${acwr.ratio.toFixed(2)} is below your base; if this persists, a gradual volume increase may be appropriate. Stay within plan guidance.`
-        : `You're on plan—stay the course. This low ACWR isn't a cue to add extra volume.`;
+    if (planProgress && planProgress.planned_sessions_to_date > 0 && planProgress.planned_to_date_total > 0 && planProgress.status === 'behind') {
       insights.push({
         type: 'weekly_jump',
         severity: 'info',
-        message,
-        data: { ratio: acwr.ratio }
+        message: `On plan: you're behind this week's workload so far (${planProgress.percent_of_planned_to_date}% of planned to-date). Consider rescheduling a missed easy session—avoid adding intensity.`,
+        data: { ratio: acwr.ratio, plan_progress: planProgress }
       });
     }
   }
-  
+
   // 3c. Recovery week with too much load (compared to previous week)
   if (isRecoveryWeek && weekComparison.change_direction === 'increase' && weekComparison.change_percent > 10) {
     insights.push({

@@ -12,7 +12,9 @@
     "bake": "node scripts/bake-one.mjs",
     "bake:all": "node scripts/bake-all.mjs",
     "plan:validate": "node scripts/validate-plan.mjs",
-    "plan:minify": "node scripts/plan-minify.mjs"
+    "plan:minify": "node scripts/plan-minify.mjs",
+    "cap:sync": "cap sync ios",
+    "ios": "npm run build && cap sync ios"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^7.3.0",

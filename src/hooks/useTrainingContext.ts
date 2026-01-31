@@ -160,7 +160,25 @@ export interface TrainingContextData {
   display_aerobic_tier?: 'Low' | 'Moderate' | 'Elevated';
   display_structural_tier?: 'Low' | 'Moderate' | 'Elevated';
   display_limiter_line?: string;
-  display_load_change_risk_label?: 'Below baseline' | 'In range' | 'Ramping fast' | 'Overreaching';
+  display_load_change_risk_label?: 'Below baseline' | 'Below baseline (planned)' | 'In range' | 'Ramping fast' | 'Overreaching';
+  display_load_change_risk_helper?: string | null;
+  /** Top banner: plan + limiter + guidance (never leads with ACWR). */
+  context_banner?: {
+    line1: string;
+    line2: string;
+    line3: string;
+    acwr_clause?: string | null;
+  };
+  /** Plan-aware projected week load (completed + planned remaining). */
+  projected_week_load?: {
+    completed_acute: number;
+    planned_remaining: number;
+    projected_acute: number;
+    chronic_weekly: number;
+    projected_ratio: number;
+    projected_label: 'below' | 'in range' | 'ramping';
+    message: string;
+  };
 }
 
 interface UseTrainingContextResult {
