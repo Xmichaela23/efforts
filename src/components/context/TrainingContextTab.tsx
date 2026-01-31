@@ -126,7 +126,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
   // One-line explanations for fatigue tiers (reusable; teaches without wall of text)
   const fatigueTierCopy: Record<FatigueTier, string> = {
     Low: 'You should handle normal training well.',
-    Moderate: 'You can train, but intensity may feel harder than normal.',
+    Moderate: 'This will feel harder than normal if you push intensity.',
     Elevated: 'Prioritize recovery; quality work will underperform.',
   };
 
@@ -184,8 +184,63 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </button>
       </div>
 
-      {/* Plan Check-in (when on plan) or Today's context: plan-driven narrative */}
-      {data.context_summary && data.context_summary.length > 0 ? (
+      {/* Week Review (when on plan with week_review): verdict first, then day/counts, coverage note, moved, audits */}
+      {data.week_review ? (
+        <div className="instrument-card flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
+            Week {data.week_review.week_index} check-in
+          </p>
+          {data.week_review.week_verdict && (
+            <>
+              <p className="text-sm font-medium text-white/95">{data.week_review.week_verdict.headline}</p>
+              {data.week_review.week_verdict.detail && (
+                <p className="text-xs text-white/60">{data.week_review.week_verdict.detail}</p>
+              )}
+            </>
+          )}
+          <p className="text-sm text-white/90">
+            Day {data.week_review.week_day_index} of 7 • {data.week_review.phase.charAt(0).toUpperCase() + data.week_review.phase.slice(1).replace('_', ' ')}
+          </p>
+          <p className="text-sm text-white/85">
+            {data.week_review.completed.sessions_missed != null
+              ? `Completed: ${data.week_review.completed.sessions_matched_to_plan}/${data.week_review.planned.sessions_to_date} planned • Missed: ${data.week_review.completed.sessions_missed} • Remaining: ${data.week_review.planned.sessions_remaining}`
+              : `Completed: ${data.week_review.completed.sessions_matched_to_plan}/${data.week_review.planned.sessions_to_date} planned sessions • Remaining: ${data.week_review.planned.sessions_remaining}`}
+          </p>
+          {data.week_review.match_coverage_note && (
+            <p className="text-xs text-white/40">{data.week_review.match_coverage_note}</p>
+          )}
+          {data.week_review.completed.sessions_moved > 0 && data.week_review.moved_examples?.length ? (
+            <p className="text-sm text-white/85">
+              Moved: {data.week_review.completed.sessions_moved} session{data.week_review.completed.sessions_moved !== 1 ? 's' : ''}
+              {data.week_review.moved_examples[0]
+                ? ` (done ${new Date(data.week_review.moved_examples[0].done_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })} instead of ${new Date(data.week_review.moved_examples[0].planned_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })})`
+                : ''}
+            </p>
+          ) : null}
+          {data.week_review.key_session_audits.length > 0 && (
+            <p className="text-sm text-white/85">
+              Key sessions: {data.week_review.key_session_audits.filter(a => a.status === 'hit' || a.status === 'close').length}/{data.week_review.key_session_audits.length} on target
+            </p>
+          )}
+          {data.week_review.key_session_audits.slice(0, 2).map((audit, i) => (
+            <div key={i} className="pt-1 border-t border-white/10">
+              <p className="text-sm text-white/90">{audit.headline}</p>
+              {audit.delta && (
+                <p className="text-xs text-white/60 mt-0.5">
+                  Target {audit.delta.planned} → Actual {audit.delta.actual}
+                  {audit.delta.direction === 'fast' && audit.delta.seconds_per_mile < 0 && (
+                    <span> ({Math.abs(audit.delta.seconds_per_mile)}s fast{audit.delta.pct !== 0 ? `, ${Math.abs(audit.delta.pct)}% fast` : ''})</span>
+                  )}
+                  {audit.delta.direction === 'slow' && audit.delta.seconds_per_mile > 0 && (
+                    <span> ({audit.delta.seconds_per_mile}s slow{audit.delta.pct !== 0 ? `, ${audit.delta.pct}% slow` : ''})</span>
+                  )}
+                </p>
+              )}
+              {audit.detail && <p className="text-xs text-white/60 mt-0.5">One adjustment: {audit.detail}</p>}
+            </div>
+          ))}
+        </div>
+      ) : data.context_summary && data.context_summary.length > 0 ? (
         <div className="instrument-card flex flex-col gap-2">
           <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
             {data.plan_checkin?.plan_is_active ? 'Plan Check-in' : "Today's context"}
@@ -229,108 +284,27 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </>
       )}
 
-      {/* Other insights (ACWR-led insight removed; summary or banner replaces it) */}
-      {data.insights && data.insights.length > 0 && (
-        <SmartInsights insights={data.insights} />
-      )}
-
-      <div aria-hidden="true" className="instrument-divider" />
-
-      {/* Today's signals: aerobic + structural + limiter (state, not prescription) */}
-      <div className="instrument-card">
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="w-4 h-4 text-white/50" />
-          <span className="text-sm font-medium text-white">Today&apos;s signals</span>
-        </div>
-        <div className="space-y-3">
-          {/* Aerobic Load — helper only for Moderate/Elevated (option B) */}
-          <div>
-            <div className="flex items-center justify-between text-sm mb-0.5">
-              <div className="flex items-center gap-2 text-white/70">
-                <Activity className="w-3.5 h-3.5 text-teal-400/80" />
-                <span>Aerobic Load</span>
-              </div>
-              <span className={`font-medium ${aerobicTier === 'Low' ? 'text-green-400' : aerobicTier === 'Elevated' ? 'text-amber-400' : 'text-white/80'}`}>
-                {aerobicTier === 'Low' ? 'Low' : aerobicTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
-              </span>
-            </div>
-            {aerobicTier !== 'Low' && (
-              <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[aerobicTier]}</p>
-            )}
-          </div>
-          {/* Structural Load — helper only for Moderate/Elevated */}
-          <div>
-            <div className="flex items-center justify-between text-sm mb-0.5">
-              <div className="flex items-center gap-2 text-white/70">
-                <Dumbbell className="w-3.5 h-3.5 text-orange-400/80" />
-                <span>Structural Load</span>
-              </div>
-              <span className={`font-medium ${structuralTier === 'Low' ? 'text-green-400' : structuralTier === 'Elevated' ? 'text-amber-400' : 'text-white/80'}`}>
-                {structuralTier === 'Low' ? 'Low' : structuralTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
-              </span>
-            </div>
-            {structuralTier !== 'Low' && (
-              <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[structuralTier]}</p>
-            )}
-          </div>
-          {/* Limiter as label (no repeated prose) */}
-          <p className="text-sm text-white/80 pt-1 border-t border-white/10">
-            Limiter: {data.display_limiter_label ?? (limiterLine === 'No clear limiter.' ? 'None' : limiterLine.replace('Today is limited by ', '').replace('.', ''))}
-          </p>
-        </div>
-      </div>
-
-      {/* Why (collapsed; instrumentation language) */}
-      <details className="instrument-card py-2 px-3" open={false}>
-        <summary className="text-xs text-white/50 cursor-pointer list-none flex items-center gap-1">
-          <span className="text-white/60">Why</span>
-          <span className="text-white/40">Aerobic (recent run efficiency, HR drift, pace adherence). Structural (strength volume, avg RIR).</span>
-        </summary>
-        <div className="mt-2 pt-2 border-t border-white/10">
-          <p className="text-xs text-white/50">
-            <span className="text-white/70">Aerobic:</span> recent run efficiency, HR drift, pace adherence.
-          </p>
-          <p className="text-xs text-white/50 mt-1">
-            <span className="text-white/70">Structural:</span> strength volume (7d), avg RIR (7d).
-          </p>
-        </div>
-      </details>
-
-      {/* Section 3: Load Change Risk — minimal row; on-plan + low = "Below baseline (planned)" + optional helper */}
-      {data.acwr.data_days < 7 ? (
-        <div className="text-xs text-white/50 py-2 px-3">
-          Train for {7 - data.acwr.data_days} more day{7 - data.acwr.data_days !== 1 ? 's' : ''} to unlock load change risk.
-        </div>
-      ) : (
-        <div className="space-y-1">
-          <div className={`flex items-center justify-between text-sm py-2 px-3 rounded-lg border border-white/10 ${data.acwr.ratio > 1.3 ? 'bg-amber-500/10 border-amber-400/30' : 'bg-white/[0.03]'}`}>
-            <span className="text-white/60">Load Change Risk</span>
-            <span className="flex items-center gap-2">
-              <span className="font-mono text-white/80">{data.acwr.ratio.toFixed(2)}</span>
-              <span className={`font-medium ${data.acwr.ratio > 1.5 ? 'text-red-400' : data.acwr.ratio > 1.3 ? 'text-amber-400' : 'text-white/80'}`}>
-                {loadChangeRiskLabel}
-              </span>
+      {/* Next key session (when week_review has next quality session); date from plan calendar (date_local) */}
+      {data.week_review?.next_key_session?.title && (
+        <div className="text-sm text-white/85 py-2 px-3 rounded-lg border border-white/10 bg-white/[0.03]">
+          <span className="text-white/60">Next key session: </span>
+          <span className="text-white/90">{data.week_review.next_key_session.title}</span>
+          {(data.week_review.next_key_session.date_local || data.week_review.next_key_session.date) && (
+            <span className="text-white/50 ml-1">
+              — {new Date((data.week_review.next_key_session.date_local || data.week_review.next_key_session.date)! + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </span>
-          </div>
-          {data.display_load_change_risk_helper && (
-            <p className="text-xs text-white/50 px-3">{data.display_load_change_risk_helper}</p>
+          )}
+          {data.week_review.next_key_session.primary_target && (
+            <p className="text-xs text-white/60 mt-0.5">Target: {data.week_review.next_key_session.primary_target}</p>
           )}
         </div>
       )}
 
-      {/* Projected week load — only when no context_summary (summary already includes it) */}
-      {data.projected_week_load && !data.context_summary?.length && (
-        <div className="text-xs text-white/50 py-2 px-3">
-          {data.projected_week_load.message}
-        </div>
-      )}
-
-      {/* Guidance: Recovery Day (no score) on rest; Training Readiness (index) on training with stimulus; Low-stress or Updating otherwise */}
+      {/* Today: single action (rest day / execution readiness / low-stress) — premium scan path #3 */}
       {(() => {
-        // Do not infer day_type from strings; missing = show "Updating" (ship-safe).
         const isRestDay = data.day_type === 'rest';
         const dayTypeUnknown = data.day_type == null;
-        const hasStimulus = data.has_planned_stimulus !== false; // show score when true or undefined (legacy payload)
+        const hasStimulus = data.has_planned_stimulus !== false;
 
         if (dayTypeUnknown) {
           return (
@@ -358,7 +332,6 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
             </div>
           );
         }
-        // Training day but low/no stimulus: no score.
         if (data.day_type === 'training' && data.has_planned_stimulus === false) {
           return (
             <div className="instrument-card">
@@ -423,6 +396,108 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           </div>
         );
       })()}
+
+      {/* Load Change Risk — premium scan path #4 */}
+      {data.acwr.data_days < 7 ? (
+        <div className="text-xs text-white/50 py-2 px-3">
+          Train for {7 - data.acwr.data_days} more day{7 - data.acwr.data_days !== 1 ? 's' : ''} to unlock load change risk.
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <div className={`flex items-center justify-between text-sm py-2 px-3 rounded-lg border border-white/10 ${data.acwr.ratio > 1.3 ? 'bg-amber-500/10 border-amber-400/30' : 'bg-white/[0.03]'}`}>
+            <span className="text-white/60">Load Change Risk</span>
+            <span className="flex items-center gap-2">
+              <span className="font-mono text-white/80">{data.acwr.ratio.toFixed(2)}</span>
+              <span className={`font-medium ${data.acwr.ratio > 1.5 ? 'text-red-400' : data.acwr.ratio > 1.3 ? 'text-amber-400' : 'text-white/80'}`}>
+                {loadChangeRiskLabel}
+              </span>
+            </span>
+          </div>
+          {data.display_load_change_risk_helper && (
+            <p className="text-xs text-white/50 px-3">{data.display_load_change_risk_helper}</p>
+          )}
+        </div>
+      )}
+
+      <div aria-hidden="true" className="instrument-divider" />
+
+      {/* Details accordion: Today's signals + Why — premium scan path #5 */}
+      <details className="instrument-card" open={false}>
+        <summary className="text-sm font-medium text-white/80 cursor-pointer list-none flex items-center gap-2 py-2">
+          <TrendingUp className="w-4 h-4 text-white/50" />
+          <span>Today&apos;s signals</span>
+        </summary>
+        <div className="pt-2 mt-1 border-t border-white/10">
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp className="w-4 h-4 text-white/50" />
+          <span className="text-sm font-medium text-white">Today&apos;s signals</span>
+        </div>
+        <div className="space-y-3">
+          {/* Aerobic Load — helper only for Moderate/Elevated (option B) */}
+          <div>
+            <div className="flex items-center justify-between text-sm mb-0.5">
+              <div className="flex items-center gap-2 text-white/70">
+                <Activity className="w-3.5 h-3.5 text-teal-400/80" />
+                <span>Aerobic Load</span>
+              </div>
+              <span className={`font-medium ${aerobicTier === 'Low' ? 'text-green-400' : aerobicTier === 'Elevated' ? 'text-amber-400' : 'text-white/80'}`}>
+                {aerobicTier === 'Low' ? 'Low' : aerobicTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
+              </span>
+            </div>
+            {aerobicTier !== 'Low' && (
+              <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[aerobicTier]}</p>
+            )}
+          </div>
+          {/* Structural Load — helper only for Moderate/Elevated */}
+          <div>
+            <div className="flex items-center justify-between text-sm mb-0.5">
+              <div className="flex items-center gap-2 text-white/70">
+                <Dumbbell className="w-3.5 h-3.5 text-orange-400/80" />
+                <span>Structural Load</span>
+              </div>
+              <span className={`font-medium ${structuralTier === 'Low' ? 'text-green-400' : structuralTier === 'Elevated' ? 'text-amber-400' : 'text-white/80'}`}>
+                {structuralTier === 'Low' ? 'Low' : structuralTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
+              </span>
+            </div>
+            {structuralTier !== 'Low' && (
+              <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[structuralTier]}</p>
+            )}
+          </div>
+          {/* Limiter as label (no repeated prose) */}
+          <p className="text-sm text-white/80 pt-1 border-t border-white/10">
+            Limiter: {data.display_limiter_label ?? (limiterLine === 'No clear limiter.' ? 'None' : limiterLine.replace('Today is limited by ', '').replace('.', ''))}
+          </p>
+        </div>
+        </div>
+      </details>
+
+      {/* Why (collapsed; instrumentation language) */}
+      <details className="instrument-card py-2 px-3" open={false}>
+        <summary className="text-xs text-white/50 cursor-pointer list-none flex items-center gap-1">
+          <span className="text-white/60">Why</span>
+          <span className="text-white/40">Aerobic (recent run efficiency, HR drift, pace adherence). Structural (strength volume, avg RIR).</span>
+        </summary>
+        <div className="mt-2 pt-2 border-t border-white/10">
+          <p className="text-xs text-white/50">
+            <span className="text-white/70">Aerobic:</span> recent run efficiency, HR drift, pace adherence.
+          </p>
+          <p className="text-xs text-white/50 mt-1">
+            <span className="text-white/70">Structural:</span> strength volume (7d), avg RIR (7d).
+          </p>
+        </div>
+      </details>
+
+      {/* Projected week load — only when no context_summary (summary already includes it) */}
+      {data.projected_week_load && !data.context_summary?.length && (
+        <div className="text-xs text-white/50 py-2 px-3">
+          {data.projected_week_load.message}
+        </div>
+      )}
+
+      {/* Other insights (optional) */}
+      {data.insights && data.insights.length > 0 && (
+        <SmartInsights insights={data.insights} />
+      )}
 
       {/* Training Load Chart */}
       <TrainingLoadChart 

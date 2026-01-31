@@ -262,6 +262,63 @@ interface TrainingContextResponse {
     week_adherence_tier: 'high' | 'moderate' | 'low';
     plan_is_active: boolean;
   };
+  /** Week-to-date plan review: what changed, what you did vs plan, what it implies. Deterministic; no fake adherence. */
+  week_review?: {
+    week_index: number;
+    week_total: number;
+    week_day_index: number;
+    phase: 'build' | 'recovery' | 'peak' | 'taper' | 'off_plan';
+    planned: {
+      sessions_total: number;
+      sessions_to_date: number;
+      sessions_remaining: number;
+      quality_sessions_to_date: number;
+    };
+    completed: {
+      sessions_completed_total: number;
+      sessions_matched_to_plan: number;
+      sessions_missed: number | null;
+      match_coverage_pct: number;
+      sessions_moved: number;
+    };
+    execution: {
+      pace_adherence_pct: number | null;
+      overall_adherence_pct: number | null;
+    };
+    key_session_audits: Array<{
+      planned_id: string;
+      date: string;
+      title: string;
+      type: string;
+      status: 'hit' | 'close' | 'miss' | 'too_hard' | 'too_easy' | 'partial' | 'unknown';
+      reason_codes: string[];
+      headline: string;
+      detail?: string;
+      delta?: {
+        metric: string;
+        planned: string;
+        actual: string;
+        pct: number;
+        seconds_per_mile: number;
+        direction: 'fast' | 'slow' | 'on_target';
+      } | null;
+    }>;
+    next_key_session: {
+      planned_id: string | null;
+      date: string | null;
+      date_local: string | null;
+      title: string | null;
+      primary_target: string | null;
+      sport?: string | null;
+    };
+    moved_examples?: Array<{ title: string; planned_date: string; done_date: string }>;
+    week_verdict?: {
+      headline: string;
+      detail?: string | null;
+      reason_codes: string[];
+    };
+    match_coverage_note?: string | null;
+  };
 }
 
 interface WorkoutRecord {
@@ -407,7 +464,22 @@ Deno.serve(async (req) => {
     // Planned workouts on the focus date (used for projected ACWR + timeline)
     const plannedForFocusDate: PlannedWorkoutRecord[] = plannedWeek.filter(p => p.date === focusDateISO);
 
-    console.log(`📊 Found ${workouts.length} completed workouts, ${plannedWeek.length} planned workouts (week range)`);
+    // Runs this week (to focus date) with workout_analysis + planned_id for week_review key_session_audits
+    const weekStartISO = dateRanges.currentWeekStartISO || dateRanges.acuteStartISO;
+    const weekEndISO = dateRanges.currentWeekEndISO || dateRanges.acuteEndISO;
+    const { data: runsThisWeekWithAnalysis } = await supabase
+      .from('workouts')
+      .select('id, date, planned_id, name, type, workout_analysis')
+      .eq('user_id', user_id)
+      .eq('workout_status', 'completed')
+      .gte('date', weekStartISO)
+      .lte('date', focusDateISO)
+      .not('planned_id', 'is', null)
+      .not('workout_analysis', 'is', null)
+      .in('type', ['run', 'running'])
+      .order('date', { ascending: false });
+
+    console.log(`📊 Found ${workouts.length} completed workouts, ${plannedWeek.length} planned workouts (week range), ${runsThisWeekWithAnalysis?.length ?? 0} runs this week with analysis`);
 
     // ==========================================================================
     // CALCULATE ACWR (using smart date ranges)
@@ -631,7 +703,7 @@ Deno.serve(async (req) => {
           ? weekly_verdict.label === 'high'
             ? 'Proceed with planned sessions.'
             : weekly_verdict.label === 'medium'
-              ? 'Proceed with caution.'
+              ? 'Hold target pace; keep the session controlled.'
               : 'Prioritize recovery.'
           : 'Follow your planned sessions.';
       const acwr_clause =
@@ -714,6 +786,340 @@ Deno.serve(async (req) => {
     }
 
     // ==========================================================================
+    // WEEK REVIEW (plan vs completed; key session audits; no fake adherence)
+    // ==========================================================================
+    /** Normalize to local training day (YYYY-MM-DD). No tz in edge fn: use date string as-is (plan/DB already store local date). */
+    const toLocalDay = (dateIso: string): string => {
+      if (!dateIso || typeof dateIso !== 'string') return '';
+      const d = dateIso.split('T')[0];
+      return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : dateIso;
+    };
+
+    /** Deterministic one-line target from planned workout JSON (computed.steps). */
+    const summarizePlannedWorkoutTarget = (computed: any, fallbackName: string): string => {
+      const steps = computed?.steps;
+      if (!Array.isArray(steps) || steps.length === 0) return fallbackName || 'See plan';
+      const formatPace = (s: number): string => {
+        const m = Math.floor(s / 60);
+        const sec = Math.round(s % 60);
+        return `${m}:${String(sec).padStart(2, '0')}`;
+      };
+      const workSteps = steps.filter((s: any) => (s.kind === 'work' || s.role === 'work') && (s.pace_range || s.target_pace));
+      const hasIntervals = workSteps.length > 1 || (workSteps.length === 1 && steps.some((s: any) => (s.kind === 'recovery' || s.role === 'recovery')));
+      if (hasIntervals && workSteps.length > 0) {
+        const w = workSteps[0];
+        const workDur = w.duration_s ? `${Math.round(w.duration_s / 60)} min` : w.distance_m ? `${(w.distance_m / 1609.34).toFixed(1)} mi` : '';
+        const target = w.pace_range ? `${formatPace(w.pace_range.lower)}–${formatPace(w.pace_range.upper)}/mi` : w.target_pace ? `${formatPace(w.target_pace)}/mi` : 'target';
+        const restStep = steps.find((s: any) => s.kind === 'recovery' || s.role === 'recovery');
+        const rest = restStep?.duration_s ? `${Math.round(restStep.duration_s)}s` : '';
+        return `${workSteps.length}×${workDur || 'work'} @ ${target}${rest ? ` (rest ${rest})` : ''}`;
+      }
+      if (workSteps.length === 1) {
+        const w = workSteps[0];
+        const dur = w.duration_s ? `${Math.round(w.duration_s / 60)} min` : w.distance_m ? `${(w.distance_m / 1609.34).toFixed(1)} mi` : '';
+        const target = w.pace_range ? `${formatPace(w.pace_range.lower)}–${formatPace(w.pace_range.upper)}/mi` : w.target_pace ? `${formatPace(w.target_pace)}/mi` : 'easy';
+        if (/tempo|threshold/i.test(fallbackName)) return `Tempo ${dur} @ ${target}`;
+        if (/long|easy/i.test(fallbackName)) return `Long run ${dur} @ easy`;
+        return `${dur} @ ${target}`;
+      }
+      return fallbackName || 'See plan';
+    };
+
+    const isQualityType = (type: string, name: string): boolean => {
+      const t = (type || '').toLowerCase();
+      const n = (name || '').toLowerCase();
+      return /interval|vo2|tempo|threshold|fartlek/.test(t) || /interval|tempo|threshold|long run|longrun/.test(n);
+    };
+    const deriveAuditStatus = (wa: any): { status: 'hit' | 'close' | 'miss' | 'too_hard' | 'too_easy' | 'partial' | 'unknown'; reason_codes: string[] } => {
+      const pace = wa?.performance?.pace_adherence;
+      const assessment = (wa?.performance_assessment || wa?.summary?.performance_assessment || '') as string;
+      const issues = (wa?.primary_issues || []) as string[];
+      const reason_codes: string[] = [];
+      if (pace != null && Number.isFinite(pace)) {
+        if (assessment && /too fast|faster than|over pace|bonus pace/i.test(assessment)) {
+          reason_codes.push('PACE_TOO_FAST');
+          return { status: 'too_hard', reason_codes };
+        }
+        if (assessment && /too slow|slower than|under pace/i.test(assessment)) {
+          reason_codes.push('PACE_TOO_SLOW');
+          return { status: 'too_easy', reason_codes };
+        }
+        if (pace >= 90) return { status: 'hit', reason_codes };
+        if (pace >= 75) return { status: 'close', reason_codes };
+        if (pace >= 60) {
+          reason_codes.push('PACE_OFF_TARGET');
+          return { status: 'partial', reason_codes };
+        }
+        reason_codes.push('PACE_OFF_TARGET');
+        return { status: 'miss', reason_codes };
+      }
+      return { status: 'unknown', reason_codes };
+    };
+
+    let week_review: TrainingContextResponse['week_review'] | undefined;
+    if (hasActivePlan && planContext?.planName && planContext.weekIndex != null && weekStartISO && weekEndISO) {
+      const plannedToDate = plannedWeek.filter(p => p.date <= focusDateISO);
+      const plannedRemaining = plannedWeek.filter(p => p.date > focusDateISO);
+      const sessionsToDate = plannedToDate.length;
+      const sessionsRemaining = plannedRemaining.length;
+      const qualityToDate = plannedToDate.filter(p => isQualityType(p.type, p.name)).length;
+
+      // Run-only counts for week: completed_total = all runs in week; matched = those with planned_id
+      const weekRuns = (workouts || []).filter((w: WorkoutRecord) => {
+        const t = (w.type || '').toLowerCase();
+        if (t !== 'run' && t !== 'running') return false;
+        return w.date >= weekStartISO! && w.date <= focusDateISO;
+      });
+      const sessionsCompletedTotal = weekRuns.length;
+      const sessionsMatchedToPlan = weekRuns.filter((w: WorkoutRecord) => w.planned_id).length;
+      const matchCoveragePct = sessionsCompletedTotal > 0 ? sessionsMatchedToPlan / sessionsCompletedTotal : 0;
+      const enoughData = sessionsToDate >= 3 || sessionsCompletedTotal >= 3;
+      const sessionsMissed =
+        sessionsCompletedTotal === 0
+          ? null
+          : matchCoveragePct >= 0.8 && enoughData
+            ? Math.max(0, sessionsToDate - sessionsMatchedToPlan)
+            : null;
+
+      const matchCoverageNote =
+        sessionsMissed === null && matchCoveragePct < 0.8 && sessionsCompletedTotal > 0
+          ? `Plan matching is limited (${Math.round(matchCoveragePct * 100)}% coverage).`
+          : null;
+
+      // Moved: completed on different day than planned (consistent local day)
+      const movedExamples: Array<{ title: string; planned_date: string; done_date: string }> = [];
+      let sessionsMoved = 0;
+      for (const r of weekRuns) {
+        if (!r.planned_id) continue;
+        const planned = plannedWeek.find(p => String(p.id) === String(r.planned_id));
+        if (!planned) continue;
+        const plannedDay = toLocalDay(planned.date);
+        const doneDay = toLocalDay(r.date);
+        if (plannedDay === doneDay) continue;
+        sessionsMoved += 1;
+        if (movedExamples.length < 2) {
+          movedExamples.push({
+            title: r.name || planned.name || 'Run',
+            planned_date: plannedDay,
+            done_date: doneDay
+          });
+        }
+      }
+
+      const weekStartDate = new Date(weekStartISO + 'T12:00:00');
+      const focusDateOnly = new Date(focusDateISO + 'T12:00:00');
+      const weekDayIndex = Math.min(7, Math.max(1, Math.floor((focusDateOnly.getTime() - weekStartDate.getTime()) / (24 * 60 * 60 * 1000)) + 1));
+
+      const runsWithAnalysis = (runsThisWeekWithAnalysis || []) as Array<{ id: string; date: string; planned_id: string; name: string; type: string; workout_analysis: any }>;
+      const qualityRunsWithAnalysis = runsWithAnalysis.filter(r => {
+        const planned = plannedWeek.find(p => String(p.id) === String(r.planned_id));
+        return planned && isQualityType(planned.type, planned.name);
+      });
+
+      /** Build delta from workout_analysis (single source of truth). Runner-trustworthy: seconds/mi primary, pct in parens. */
+      const buildAuditDelta = (wa: any): {
+        metric: string;
+        planned: string;
+        actual: string;
+        pct: number;
+        seconds_per_mile: number;
+        direction: 'fast' | 'slow' | 'on_target';
+      } | null => {
+        const intervals = wa?.detailed_analysis?.interval_breakdown?.intervals;
+        if (!Array.isArray(intervals)) return null;
+        const work = intervals.filter((i: any) => (i.interval_type || '').toLowerCase() === 'work');
+        if (work.length === 0) return null;
+        const withPace = work.filter((i: any) =>
+          (i.planned_pace_range_lower != null && i.planned_pace_range_upper != null) || (i.planned_pace_range?.lower != null && i.planned_pace_range?.upper != null)
+        );
+        if (withPace.length === 0) return null;
+        const formatPaceS = (s: number): string => {
+          const m = Math.floor(s / 60);
+          const sec = Math.round(s % 60);
+          return `${m}:${String(sec).padStart(2, '0')}/mi`;
+        };
+        const lower = withPace[0].planned_pace_range_lower ?? withPace[0].planned_pace_range?.lower ?? 0;
+        const upper = withPace[0].planned_pace_range_upper ?? withPace[0].planned_pace_range?.upper ?? 0;
+        if (upper <= 0) return null;
+        let actualSum = 0;
+        let actualCount = 0;
+        for (const i of withPace) {
+          const ap = i.actual_pace_min_per_mi;
+          if (ap != null && Number.isFinite(ap)) {
+            actualSum += ap * 60; // min/mi -> s/mi
+            actualCount += 1;
+          }
+        }
+        if (actualCount === 0) return null;
+        const actualS = actualSum / actualCount;
+        const mid = (lower + upper) / 2;
+        const pct = Math.round((actualS - mid) / mid * 100); // negative = faster
+        const plannedStr = `${formatPaceS(lower)}–${formatPaceS(upper)}`;
+        const actualStr = formatPaceS(actualS) + ' avg';
+        const secFastVsUpper = actualS - upper; // negative = faster than upper
+        const secSlowVsLower = actualS - lower; // positive = slower than lower
+        let seconds_per_mile: number;
+        let direction: 'fast' | 'slow' | 'on_target';
+        if (actualS < upper && actualS > lower) {
+          seconds_per_mile = 0;
+          direction = 'on_target';
+        } else if (actualS <= upper && actualS < lower) {
+          seconds_per_mile = Math.round(actualS - lower); // negative
+          direction = 'fast';
+        } else if (actualS >= lower && actualS > upper) {
+          seconds_per_mile = Math.round(actualS - upper); // positive
+          direction = 'slow';
+        } else if (secFastVsUpper < 0) {
+          seconds_per_mile = Math.round(secFastVsUpper);
+          direction = 'fast';
+        } else {
+          seconds_per_mile = Math.round(secSlowVsLower);
+          direction = 'slow';
+        }
+        return { metric: 'pace', planned: plannedStr, actual: actualStr, pct, seconds_per_mile, direction };
+      };
+
+      type AuditItem = NonNullable<NonNullable<TrainingContextResponse['week_review']>['key_session_audits'][number]>;
+      const key_session_audits: AuditItem[] = [];
+      let paceSum = 0;
+      let paceCount = 0;
+      for (let i = 0; i < Math.min(2, qualityRunsWithAnalysis.length); i++) {
+        const r = qualityRunsWithAnalysis[i];
+        const wa = r.workout_analysis as any;
+        const { status, reason_codes } = deriveAuditStatus(wa);
+        const delta = buildAuditDelta(wa);
+        const pace = wa?.performance?.pace_adherence;
+        if (pace != null && Number.isFinite(pace)) {
+          paceSum += Number(pace);
+          paceCount += 1;
+        }
+        const planned = plannedWeek.find(p => String(p.id) === String(r.planned_id));
+        const sessionType = (planned?.type || r.type || 'run').toLowerCase();
+        let headline = '';
+        let detail = '';
+        if (status === 'too_hard') {
+          if (delta != null) {
+            headline = delta.direction === 'fast'
+              ? `Intervals were ${Math.abs(delta.pct)}% faster than target.`
+              : 'Intervals were faster than target.';
+            detail = 'Next time: keep reps inside target band; don\'t "bonus pace".';
+          } else {
+            headline = 'Execution review unavailable.';
+            detail = 'Missing plan targets or interval splits for this workout.';
+          }
+        } else if (status === 'too_easy') {
+          if (delta != null) {
+            headline = `Session ${delta.pct}% slower than target.`;
+            detail = 'Next quality day: aim for target pace band.';
+          } else {
+            headline = 'Session slower than plan target.';
+            detail = 'Next quality day: aim for target pace band.';
+          }
+        } else if (status === 'hit' || status === 'close') {
+          headline = sessionType.includes('interval') ? 'Intervals on target.' : 'Session on target.';
+        } else if (status === 'partial' || status === 'miss') {
+          headline = pace != null ? `Pace adherence ${Math.round(pace)}% vs plan.` : 'Execution off plan target.';
+          detail = 'Next quality day: hold target pace band.';
+        } else {
+          headline = 'Execution review unavailable.';
+          detail = 'Missing plan targets or interval splits for this workout.';
+        }
+        key_session_audits.push({
+          planned_id: String(r.planned_id),
+          date: r.date,
+          title: r.name || planned?.name || 'Run',
+          type: sessionType,
+          status,
+          reason_codes,
+          headline,
+          detail: detail || undefined,
+          delta: delta ?? undefined
+        });
+      }
+      const overallPacePct = paceCount > 0 ? Math.round(paceSum / paceCount) : null;
+
+      const nextQualityPlanned = plannedRemaining.find(p => isQualityType(p.type, p.name)) ?? null;
+      let primaryTarget: string | null = null;
+      const dateLocal = nextQualityPlanned ? toLocalDay(nextQualityPlanned.date) : null;
+      if (nextQualityPlanned) {
+        const { data: nextPlannedRow } = await supabase
+          .from('planned_workouts')
+          .select('computed, name')
+          .eq('id', nextQualityPlanned.id)
+          .single();
+        const computed = (nextPlannedRow as any)?.computed;
+        primaryTarget = summarizePlannedWorkoutTarget(computed, nextQualityPlanned.name || nextPlannedRow?.name || 'Run');
+      }
+
+      const latestAudit = key_session_audits[0];
+      const latestIsHot = latestAudit?.status === 'too_hard';
+      const mostlyHitClose = key_session_audits.length > 0 &&
+        key_session_audits.filter(a => a.status === 'hit' || a.status === 'close').length >= Math.ceil(key_session_audits.length / 2);
+      const reasonCodes: string[] = [];
+      let weekVerdictHeadline: string;
+      let weekVerdictDetail: string | null = null;
+      if (sessionsMissed != null && sessionsMissed > 0) {
+        weekVerdictHeadline = 'Week is behind plan.';
+        weekVerdictDetail = `${sessionsMissed} session(s) missed to date.`;
+        reasonCodes.push('MISSED_SESSIONS');
+      } else if (sessionsMoved > 0) {
+        weekVerdictHeadline = 'Week is on track.';
+        weekVerdictDetail = `Schedule adjusted: ${sessionsMoved} moved.`;
+        reasonCodes.push('MOVED_SESSIONS');
+      } else {
+        weekVerdictHeadline = 'Week is on track.';
+        if (mostlyHitClose) reasonCodes.push('ON_TRACK');
+      }
+      if (latestIsHot) {
+        weekVerdictDetail = 'Key execution is trending hot — tighten targets.';
+        reasonCodes.push('KEY_SESSION_HOT');
+      }
+      const week_verdict = {
+        headline: weekVerdictHeadline,
+        detail: weekVerdictDetail ?? undefined,
+        reason_codes: reasonCodes
+      };
+
+      week_review = {
+        week_index: planContext.weekIndex,
+        week_total: planContext.duration_weeks ?? 12,
+        week_day_index: weekDayIndex,
+        phase: (phaseLabel === 'OFF PLAN' ? 'off_plan' : phaseLabel === 'RECOVERY' ? 'recovery' : phaseLabel === 'TAPER' ? 'taper' : phaseLabel === 'PEAK' ? 'peak' : 'build') as 'build' | 'recovery' | 'peak' | 'taper' | 'off_plan',
+        planned: {
+          sessions_total: plannedWeek.length,
+          sessions_to_date: sessionsToDate,
+          sessions_remaining: sessionsRemaining,
+          quality_sessions_to_date: qualityToDate
+        },
+        completed: {
+          sessions_completed_total: sessionsCompletedTotal,
+          sessions_matched_to_plan: sessionsMatchedToPlan,
+          sessions_missed: sessionsMissed,
+          match_coverage_pct: Math.round(matchCoveragePct * 100) / 100,
+          sessions_moved: sessionsMoved
+        },
+        execution: {
+          pace_adherence_pct: overallPacePct,
+          overall_adherence_pct: overallPacePct
+        },
+        key_session_audits,
+        next_key_session: nextQualityPlanned
+          ? {
+              planned_id: nextQualityPlanned.id,
+              date: nextQualityPlanned.date,
+              date_local: dateLocal,
+              title: nextQualityPlanned.name,
+              primary_target: primaryTarget,
+              sport: (nextQualityPlanned.type || 'run').toLowerCase()
+            }
+          : { planned_id: null, date: null, date_local: null, title: null, primary_target: null, sport: null },
+        moved_examples: movedExamples.length > 0 ? movedExamples : undefined,
+        week_verdict,
+        match_coverage_note: matchCoverageNote ?? undefined
+      };
+    }
+
+    // ==========================================================================
     // CONTEXT SUMMARY (plan-driven when plan_checkin exists; max 5–6 lines)
     // On plan: (1) Week n/N — phase, (2) On plan (X% complete), (3) Today, (4) Next, (5) optional Note, (6) action.
     // ==========================================================================
@@ -725,7 +1131,7 @@ Deno.serve(async (req) => {
       context_summary.push(`Week ${plan_checkin.plan_week_index}/${plan_checkin.plan_week_total} — ${plan_checkin.plan_phase_label}`);
       context_summary.push(`On plan (${plan_checkin.week_completion_pct}% complete this week).`);
       if (todayIsRestDay) {
-        context_summary.push('Today: Rest day (planned).');
+        // Omit rest line here so only the Today card shows "Rest day. Resume tomorrow." (no duplicate)
       } else if (plan_checkin.today_planned_workout) {
         context_summary.push(`Today: ${plan_checkin.today_planned_workout.title} (${(plan_checkin.today_planned_workout.type || 'planned').toLowerCase()}).`);
       } else {
@@ -792,7 +1198,8 @@ Deno.serve(async (req) => {
       context_summary,
       day_type: todayIsRestDay ? 'rest' : 'training',
       has_planned_stimulus: todayIsRestDay ? undefined : plannedForFocusDate.some(p => ['run', 'ride', 'strength', 'swim'].includes((p.type || '').toLowerCase())),
-      plan_checkin
+      plan_checkin,
+      week_review
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);

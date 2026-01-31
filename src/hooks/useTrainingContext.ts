@@ -206,6 +206,51 @@ export interface TrainingContextData {
     week_adherence_tier: 'high' | 'moderate' | 'low';
     plan_is_active: boolean;
   };
+  /** Week-to-date plan review: what changed, what you did vs plan, key session audits. No fake adherence. */
+  week_review?: {
+    week_index: number;
+    week_total: number;
+    week_day_index: number;
+    phase: 'build' | 'recovery' | 'peak' | 'taper' | 'off_plan';
+    planned: { sessions_total: number; sessions_to_date: number; sessions_remaining: number; quality_sessions_to_date: number };
+    completed: {
+      sessions_completed_total: number;
+      sessions_matched_to_plan: number;
+      sessions_missed: number | null;
+      match_coverage_pct: number;
+      sessions_moved: number;
+    };
+    execution: { pace_adherence_pct: number | null; overall_adherence_pct: number | null };
+    key_session_audits: Array<{
+      planned_id: string;
+      date: string;
+      title: string;
+      type: string;
+      status: string;
+      reason_codes: string[];
+      headline: string;
+      detail?: string;
+      delta?: {
+        metric: string;
+        planned: string;
+        actual: string;
+        pct: number;
+        seconds_per_mile: number;
+        direction: 'fast' | 'slow' | 'on_target';
+      } | null;
+    }>;
+    next_key_session: {
+      planned_id: string | null;
+      date: string | null;
+      date_local: string | null;
+      title: string | null;
+      primary_target: string | null;
+      sport?: string | null;
+    };
+    moved_examples?: Array<{ title: string; planned_date: string; done_date: string }>;
+    week_verdict?: { headline: string; detail?: string | null; reason_codes: string[] };
+    match_coverage_note?: string | null;
+  };
 }
 
 interface UseTrainingContextResult {
