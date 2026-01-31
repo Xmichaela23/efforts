@@ -1168,7 +1168,10 @@ Deno.serve(async (req) => {
                 ? 'Proceed with planned session; keep intensity controlled.'
                 : 'Reduce intensity today; stay within plan.'
             : hasActivePlan ? 'Follow the plan — no changes needed today.' : 'No changes needed today.';
-    context_summary.push(next_action);
+    // On rest days, only the Today card shows the rest instruction — don't duplicate in context_summary
+    if (!todayIsRestDay) {
+      context_summary.push(next_action);
+    }
 
     // ==========================================================================
     // BUILD RESPONSE

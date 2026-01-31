@@ -245,7 +245,8 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
             {data.plan_checkin?.plan_is_active ? 'Plan Check-in' : "Today's context"}
           </p>
-          {data.plan_checkin?.plan_is_active && (
+          {/* Show week line once: from context_summary[0] if it's the week line, else from plan_checkin */}
+          {data.plan_checkin?.plan_is_active && !data.context_summary[0]?.startsWith('Week ') && (
             <p className="text-xs uppercase tracking-wider text-white/40">
               Week {data.plan_checkin.plan_week_index} of {data.plan_checkin.plan_week_total} — {data.plan_checkin.plan_phase_label}
             </p>
